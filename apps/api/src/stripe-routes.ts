@@ -56,40 +56,26 @@ import {
   tenantByCustomer,
   unmarkSeen,
 } from "@4dl/billing";
-/** The Connect rail's own half — see `@4dl/commerce/connect.ts`. */
-import { cancelInstallmentSub as cancelInstallmentSubBase, hasPriorPurchase, purchaseBlocked as purchaseBlockedBase, scaleSpecs, syncConnectAccount, type CancelOnConnectedAccount } from "@4dl/commerce";
+import { cancelInstallmentSub as cancelInstallmentSubBase, hasPriorPurchase, scaleSpecs, type CancelOnConnectedAccount } from "@4dl/commerce";
 
 /**
- * Kova's stored value for "restricted to one subject".
+ * Ending a recurring charge is now the STUDIO'S to do, not ours.
  *
- * `@4dl/commerce` takes it as a parameter because it is DATA — these strings are
- * in the `packages.visibility` column of a live database, and renaming one is a
- * migration rather than an edit. The package's own default matches nothing, so
- * an app that forgets to pass it gets grant-only (fails closed) instead of
- * accidentally opening a package to everyone.
+ * The Connect rail could cancel a client's subscription because the platform
+ * held API access to the connected account. On the tenant rail it does not —
+ * that is the entire point — so there is nothing to call. What is left is the
+ * local half: forget the recurring key, so this row stops expecting renewals and
+ * a later stray charge is not mistaken for one we owe access against.
+ *
+ * Returning `true` is therefore accurate rather than optimistic: it reports that
+ * OUR side is settled. The customer's standing order lives in the studio's own
+ * provider, where only the studio (or the customer) can stop it — and where they
+ * would go to refund it, too.
  */
-const RESTRICTED_VISIBILITY = "client_specific";
-const purchaseBlocked = (pkg: { visibility: string; restricted_subject_id: string | null }, clientId: string) =>
-  purchaseBlockedBase(pkg, clientId, RESTRICTED_VISIBILITY);
+const cancelOnConnectedAccount: CancelOnConnectedAccount = async () => true;
 
-/**
- * The connected-account canceller `@4dl/commerce` takes rather than imports.
- *
- * It sits BESIDE `@4dl/billing`, never on it — an app can sell access to its own
- * customers without billing its tenants for the privilege — so the Stripe client
- * is passed in from here, where both rails already meet.
- */
 const cancelInstallmentSub = (db: D1Database, tenantId: string, stripeSubId: string, rowId: string) =>
-  cancelInstallmentSubBase(db, tenantId, stripeSubId, rowId, (acct, sub) => cancelOnConnectedFor(db)(acct, sub));
-
-/** Bound to the DB the caller already has — no ambient env. */
-const cancelOnConnectedFor = (db: D1Database): CancelOnConnectedAccount => async (accountId, stripeSubId) => {
-  const cfg = await stripeConfig(db);
-  if (!stripeEnabled(cfg)) return true;
-  return stripeCall(cfg.secretKey, `subscriptions/${stripeSubId}`, undefined, { connectedAccount: accountId, method: "DELETE" })
-    .then(() => true)
-    .catch(() => false);
-};
+  cancelInstallmentSubBase(db, tenantId, stripeSubId, rowId, cancelOnConnectedAccount);
 import { resolveAndApplyPromo, bumpPromoRedemption, consumePromoRedemption, releasePromoRedemption } from "./promo-apply.js";
 import { updateSubscriptionRunway } from "./subscription-runway.js";
 import { MAX_PACKAGE_PRICE_CENTS } from "./commerce-routes.js";
@@ -356,389 +342,6 @@ export const stripeRoutes = new Hono<AppEnv>()
     return c.json(outcome.body, outcome.status as 200);
   })
 
-  // ── Connect rail (tenant ↔ client, no application fee) ─────────────────────
-  .post("/connect/onboard", async (c) => {
-    const who = requireTenant(c)!;
-    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
-    { const g = await gateFeature(c, "commerce"); if (g) return g; }
-    const cfg = await stripeConfig(c.env.DB);
-    if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
-    const body = z.object({ returnUrl: z.string().url() }).safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid body" }, 400);
-
-    const existing = await c.env.DB.prepare("SELECT stripe_account_id FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null }>();
-    let accountId = existing?.stripe_account_id ?? null;
-    if (!accountId) {
-      const account = await stripeCall<{ id: string }>(cfg.secretKey, "accounts", {
-        type: "standard",
-        "metadata[kova_tenant]": who.tenantId,
-      });
-      accountId = account.id;
-      // Stamp WHEN. A connected account that is created and then abandoned
-      // mid-onboarding costs the platform a Radar per-account fee every month
-      // for as long as it exists, and it is invisible: `charges_enabled = 0`
-      // looks identical to a studio that simply has not got round to it yet.
-      // Without this column there is no way to tell a week-old account from a
-      // year-old one, and so no way to reap the dead ones.
-      await c.env.DB.prepare(
-        "INSERT INTO tenant_settings (tenant_id, stripe_account_id, connect_created_at, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = ?, connect_created_at = COALESCE(tenant_settings.connect_created_at, ?), updated_at = ?",
-      )
-        .bind(who.tenantId, accountId, nowIso(), nowIso(), accountId, nowIso(), nowIso())
-        .run();
-    }
-    const link = await stripeCall<{ url: string }>(cfg.secretKey, "account_links", {
-      account: accountId,
-      refresh_url: body.data.returnUrl,
-      return_url: body.data.returnUrl,
-      type: "account_onboarding",
-    });
-    return c.json({ url: link.url });
-  })
-
-  // Client buys a tenant package on the tenant's connected account.
-  .post("/connect/checkout", async (c) => {
-    const who = requireTenant(c)!;
-    const cfg = await stripeConfig(c.env.DB);
-    if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
-    const body = z.object({ clientId: z.string(), packageId: z.string(), returnUrl: z.string().url() }).safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid body" }, 400);
-    const access = await requireClientAccess(c, body.data.clientId);
-    if ("response" in access) return access.response;
-    const settings = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null }>();
-    if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
-    // The account must actually be able to accept charges (onboarding done).
-    if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT * FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_subject_id: string | null; once_per_customer: number | null }>();
-    if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
-    // The Packages editor offers a `once_per_customer` toggle, so it must actually
-    // bind on the PAID paths too — until now only the free staff grant checked it,
-    // and a client could re-buy a "first month intro" package unlimited times.
-    if (pkg.once_per_customer && (await hasPriorPurchase(c.env.DB, access.client.id, pkg.id))) {
-      return c.json({ error: "package is once per customer" }, 409);
-    }
-    // Three pricing modes. A monthly price = an open-ended subscription. An
-    // installment plan (installment_months N on a one-time package) = a
-    // LIMITED-term subscription: monthly = one_time/N, billed N times then
-    // self-cancels; each cycle unlocks 1/N of the term. Otherwise it's a
-    // one-time day-pack. The budget model stays the source of truth.
-    const monthly = pkg.monthly_price_cents ?? 0;
-    const recurring = monthly > 0;
-    const installN = !recurring && (pkg.installment_months ?? 0) > 1 && (pkg.one_time_price_cents ?? 0) > 0 ? (pkg.installment_months as number) : 0;
-    const isSub = recurring || installN > 0;
-    const amount = recurring ? monthly : installN ? Math.ceil((pkg.one_time_price_cents ?? 0) / installN) : (pkg.one_time_price_cents ?? 0);
-    if (amount <= 0) return c.json({ error: "use /subscriptions/grant for $0 packages" }, 400);
-    // Re-check the ceiling HERE, at the charge, not only in the editor's schema.
-    // The editor bounds what can be written from today on; this bounds what can
-    // be CHARGED, which is the part that costs money. The two differ for any row
-    // written before the cap existed, and for any row that reached `packages` by
-    // some other path (an import, a fixture, a future bulk edit). Full exposure
-    // is the total, so an installment plan is measured on the whole one-time
-    // price rather than on one instalment.
-    if (Math.max(amount, pkg.one_time_price_cents ?? 0) > MAX_PACKAGE_PRICE_CENTS) {
-      return c.json({ error: "package price exceeds the platform maximum", maxCents: MAX_PACKAGE_PRICE_CENTS }, 400);
-    }
-
-    // Optional platform cut — a basis-points application fee set by the platform
-    // admin (default 0 = zero markup, tenant keeps 100%). Direct charge on the
-    // connected account, so the fee routes to the platform on this payment.
-    const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
-    const meta: Record<string, string | number> = {
-      "metadata[kova_tenant]": who.tenantId,
-      "metadata[kova_client]": access.client.id,
-      "metadata[kova_package]": pkg.id,
-      ...(installN ? { "metadata[kova_installments]": installN } : {}),
-    };
-    const priceData = {
-      "line_items[0][price_data][currency]": pkg.currency || "usd",
-      "line_items[0][price_data][product_data][name]": installN ? `${pkg.name} (${installN}-month plan)` : pkg.name,
-      "line_items[0][price_data][unit_amount]": amount,
-      "line_items[0][quantity]": 1,
-    };
-    const params: Record<string, string | number | undefined> = isSub
-      ? {
-          mode: "subscription",
-          ...priceData,
-          "line_items[0][price_data][recurring][interval]": "month",
-          ...(feeBps > 0 ? { "subscription_data[application_fee_percent]": feeBps / 100 } : {}),
-          // Carry the mapping on the subscription too, so renewals resolve it.
-          "subscription_data[metadata][kova_tenant]": who.tenantId,
-          "subscription_data[metadata][kova_client]": access.client.id,
-          "subscription_data[metadata][kova_package]": pkg.id,
-          ...(installN ? { "subscription_data[metadata][kova_installments]": installN } : {}),
-          success_url: `${body.data.returnUrl}?purchase=success`,
-          cancel_url: `${body.data.returnUrl}?purchase=cancel`,
-          ...meta,
-        }
-      : {
-          mode: "payment",
-          ...priceData,
-          ...(feeBps > 0 ? { "payment_intent_data[application_fee_amount]": Math.round((amount * feeBps) / 10000) } : {}),
-          success_url: `${body.data.returnUrl}?purchase=success`,
-          cancel_url: `${body.data.returnUrl}?purchase=cancel`,
-          ...meta,
-        };
-    const session = await stripeCall<{ url: string }>(cfg.secretKey, "checkout/sessions", params, { connectedAccount: settings.stripe_account_id });
-    return c.json({ url: session.url });
-  })
-
-  // Inline (Payment Element) one-time purchase on the tenant's connected account.
-  // Direct charge → the tenant stays merchant of record; the app confirms this
-  // client secret with Stripe.js scoped to `stripeAccount`. Recurring packages
-  // keep the hosted checkout above (Checkout auto-provisions the connected-account
-  // customer + price a bare Subscription call would need).
-  .post("/connect/pay-intent", async (c) => {
-    const who = requireTenant(c)!;
-    const cfg = await stripeConfig(c.env.DB);
-    if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
-    const body = z.object({ clientId: z.string(), packageId: z.string(), promoCode: z.string().optional() }).safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid body" }, 400);
-    const access = await requireClientAccess(c, body.data.clientId);
-    if ("response" in access) return access.response;
-    const settings = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null }>();
-    if (!settings?.stripe_account_id) return c.json({ error: "tenant has no connected Stripe account" }, 409);
-    if (!settings.charges_enabled) return c.json({ error: "connected account can't accept payments yet — finish Stripe onboarding" }, 409);
-    const pkg = await c.env.DB.prepare("SELECT id, name, one_time_price_cents, monthly_price_cents, installment_months, currency, visibility, restricted_subject_id, once_per_customer FROM packages WHERE id = ? AND tenant_id = ? AND active = 1").bind(body.data.packageId, who.tenantId).first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string; visibility: string; restricted_subject_id: string | null; once_per_customer: number | null }>();
-    if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
-    // Same once-per-customer rule as the hosted path (and re-checked in
-    // grantClientPackage, the last gate before days are written).
-    if (pkg.once_per_customer && (await hasPriorPurchase(c.env.DB, access.client.id, pkg.id))) {
-      return c.json({ error: "package is once per customer" }, 409);
-    }
-    // Subscriptions and installment plans go through hosted checkout (Stripe
-    // provisions the connected-account customer + recurring price); inline is
-    // one-time only.
-    if ((pkg.monthly_price_cents ?? 0) > 0 || (pkg.installment_months ?? 0) > 1) return c.json({ error: "use /connect/checkout for subscriptions" }, 400);
-    let amount = pkg.one_time_price_cents ?? 0;
-    if (amount <= 0) return c.json({ error: "use /subscriptions/grant for $0 packages" }, 400);
-    // The ceiling, before any promo — a discount must not be the thing that
-    // brings an over-cap package under it. See the note on the hosted path.
-    if (amount > MAX_PACKAGE_PRICE_CENTS) {
-      return c.json({ error: "package price exceeds the platform maximum", maxCents: MAX_PACKAGE_PRICE_CENTS }, 400);
-    }
-    let promoId: string | null = null;
-    let discountCents = 0;
-    if (body.data.promoCode) {
-      const p = await resolveAndApplyPromo(c.env.DB, { scope: "tenant", tenantId: who.tenantId, code: body.data.promoCode, amountCents: amount, nowIso: nowIso(), targetId: pkg.id, clientId: access.client.id });
-      if (!p.ok) return c.json({ error: `promo_${p.reason}` }, 400);
-      amount = p.finalCents;
-      promoId = p.id;
-      discountCents = p.discountCents;
-    }
-    // Fully discounted → grant directly (no charge). No payment gate, so consume
-    // the redemption slot atomically and grant only if we won it.
-    if (amount <= 0) {
-      if (!promoId || !(await consumePromoRedemption(c.env.DB, promoId))) return c.json({ error: "promo_exhausted" }, 400);
-      // Release the consumed slot if the grant fails, so a burned one-use code
-      // can be retried instead of stranding the client (mirrors /redeem).
-      try {
-        await grantClientPackage(c.env.DB, who.tenantId, access.client.id, pkg.id, null, null);
-      } catch (err) {
-        await releasePromoRedemption(c.env.DB, promoId);
-        throw err;
-      }
-      return c.json({ granted: true, discountCents });
-    }
-    if (promoId && amount < 50) return c.json({ error: "promo_min_amount" }, 400);
-    const feeBps = Number((await getConfig(c.env.DB))["stripe.platform_fee_bps"] ?? "0");
-    // Clamp the fee strictly below the charge. NOT because Stripe enforces it — it
-    // does not: verified in test mode, `application_fee_amount` equal to AND greater
-    // than the charge amount were both accepted and both succeeded. This clamp is
-    // the only thing standing between a mis-set `platform_fee_bps` (say someone
-    // types 10000 meaning "100 bps") and Kova taking the tenant's entire payment.
-    // Do not remove it believing Stripe will catch it.
-    const fee = feeBps > 0 ? Math.min(Math.round((amount * feeBps) / 10000), Math.max(0, amount - 1)) : 0;
-    try {
-      const pi = await stripeCall<{ client_secret: string; id: string }>(
-        cfg.secretKey,
-        "payment_intents",
-        {
-          amount,
-          currency: pkg.currency || "usd",
-          "automatic_payment_methods[enabled]": "true",
-          ...(fee > 0 ? { application_fee_amount: fee } : {}),
-          "metadata[kova_tenant]": who.tenantId,
-          "metadata[kova_client]": access.client.id,
-          "metadata[kova_package]": pkg.id,
-          ...(promoId ? { "metadata[kova_promo]": promoId } : {}),
-        },
-        { connectedAccount: settings.stripe_account_id },
-      );
-      // Return the amount we ACTUALLY created the PaymentIntent for (mirroring
-      // /billing/pack-intent). The app labels its Pay button from this: labelling
-      // it from the package's list price showed "Pay $250.00" on a sheet that
-      // charges $200 once a promo applied.
-      return c.json({ clientSecret: pi.client_secret, publishableKey: cfg.publishableKey, stripeAccount: settings.stripe_account_id, amountCents: amount, discountCents });
-    } catch {
-      return c.json({ error: "checkout_failed" }, 402);
-    }
-  })
-
-  // Cancel a client's auto-renewing package (stops future billing; the current
-  // period's budget still runs out naturally). Client, their coach, or owner.
-  .post("/connect/cancel-subscription", async (c) => {
-    const who = requireTenant(c)!;
-    const body = z.object({ clientId: z.string(), subscriptionId: z.string().optional() }).safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid body" }, 400);
-    const access = await requireClientAccess(c, body.data.clientId);
-    if ("response" in access) return access.response;
-    // Cancel a SPECIFIC row when named (a client can hold several auto-renewing
-    // packages, so "cancel the newest" would silently cancel the wrong one),
-    // else the most recent auto-renewing one.
-    const sub = body.data.subscriptionId
-      ? await c.env.DB.prepare("SELECT id, stripe_sub_id FROM subject_subscriptions WHERE id = ? AND subject_id = ? AND status = 'active' AND stripe_sub_id IS NOT NULL").bind(body.data.subscriptionId, access.client.id).first<{ id: string; stripe_sub_id: string | null }>()
-      : await c.env.DB.prepare("SELECT id, stripe_sub_id FROM subject_subscriptions WHERE subject_id = ? AND status = 'active' AND stripe_sub_id IS NOT NULL ORDER BY started_at DESC LIMIT 1").bind(access.client.id).first<{ id: string; stripe_sub_id: string | null }>();
-    if (!sub?.stripe_sub_id) return c.json({ error: "no auto-renewing subscription" }, 404);
-    const settings = await c.env.DB.prepare("SELECT stripe_account_id FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null }>();
-    const cfg = await stripeConfig(c.env.DB);
-    // Cancel at Stripe FIRST and only clear the renewal marker once it actually
-    // succeeded. Clearing it on a FAILED cancel (outage, revoked account,
-    // network) would strand a still-live subscription: the client keeps being
-    // charged, renewClientSubscription can no longer resolve the row by sub id
-    // (money taken, no top-up), and the cancel can never be retried (no row
-    // carries the sub id). Mirrors cancelInstallmentSub's cancel-before-unlink.
-    if (settings?.stripe_account_id && stripeEnabled(cfg)) {
-      const canceled = await stripeCall(cfg.secretKey, `subscriptions/${sub.stripe_sub_id}`, undefined, { connectedAccount: settings.stripe_account_id, method: "DELETE" })
-        .then(() => true)
-        .catch(() => false);
-      if (!canceled) return c.json({ error: "could not cancel subscription — please try again" }, 502);
-    }
-    // Clear the renewal marker; access continues until the current budget lapses.
-    await c.env.DB.prepare("UPDATE subject_subscriptions SET stripe_sub_id = NULL, payment_status = 'canceled', updated_at = ? WHERE id = ?").bind(nowIso(), sub.id).run();
-    return c.json({ ok: true });
-  })
-
-  // Live Connect account status (owner) — fetch from Stripe when configured,
-  // sync the stored flags, and report whether the tenant can sell yet.
-  .get("/connect/status", async (c) => {
-    const who = requireTenant(c)!;
-    const row = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled, payouts_enabled, details_submitted, connect_disabled_reason FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null; payouts_enabled: number | null; details_submitted: number | null; connect_disabled_reason: string | null }>();
-    if (!row?.stripe_account_id) return c.json({ connected: false, chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false, disabledReason: null });
-    const cfg = await stripeConfig(c.env.DB);
-    if (stripeEnabled(cfg)) {
-      try {
-        // `requirements` comes back on the account object, so the poll learns the
-        // restriction reason on the same round-trip the flags arrive on — the
-        // webhook is not the only path that has to stay informed.
-        const a = await stripeCall<{ charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean; requirements?: { disabled_reason?: string | null } | null }>(cfg.secretKey, `accounts/${row.stripe_account_id}`);
-        await syncConnectAccount(c.env.DB, { id: row.stripe_account_id, ...a });
-        return c.json({ connected: true, chargesEnabled: !!a.charges_enabled, payoutsEnabled: !!a.payouts_enabled, detailsSubmitted: !!a.details_submitted, disabledReason: a.requirements?.disabled_reason ?? null });
-      } catch { /* fall back to stored flags below */ }
-    }
-    return c.json({ connected: true, chargesEnabled: !!row.charges_enabled, payoutsEnabled: !!row.payouts_enabled, detailsSubmitted: !!row.details_submitted, disabledReason: row.connect_disabled_reason ?? null });
-  })
-
-  // Connect webhook — grants the client package on successful payment.
-  .post("/connect/webhook", async (c) => {
-    const cfg = await stripeConfig(c.env.DB);
-    const payload = await c.req.text();
-    const sig = c.req.header("stripe-signature") ?? "";
-    const secret = cfg.connectWebhookSecret || cfg.webhookSecret;
-    if (!secret || !(await verifyWebhook(payload, sig, secret))) return c.json({ error: "bad signature" }, 400);
-    // Connect events carry the connected account id at the top level.
-    const event = JSON.parse(payload) as { id?: string; account?: string; type: string; data: { object: Record<string, unknown> } };
-    if (!(await firstSeen(c.env.DB, event.id))) return c.json({ received: true, duplicate: true });
-    // The connected account this event fired for → its owning tenant. The Connect
-    // webhook endpoint receives events for ALL connected accounts, and a
-    // connected `standard` account is fully controlled by its tenant (own keys +
-    // dashboard). So EVERY grant branch must confirm the metadata-named tenant
-    // IS this account's tenant — otherwise a user who onboarded their own account
-    // could pay a $0.50 intent carrying a VICTIM tenant's ids and have us grant
-    // that tenant's package for free. Mismatch (or an unmapped account) ⇒ drop.
-    const accountTenantId = event.account
-      ? (await c.env.DB.prepare("SELECT tenant_id FROM tenant_settings WHERE stripe_account_id = ?").bind(event.account).first<{ tenant_id: string }>())?.tenant_id ?? null
-      : null;
-    try {
-    if (event.type === "checkout.session.completed") {
-      const s = event.data.object as { id?: string; mode?: string; subscription?: string; metadata?: Record<string, string> };
-      const m = s.metadata ?? {};
-      if (m.kova_client && m.kova_package && m.kova_tenant && m.kova_tenant === accountTenantId) {
-        // First period for one-time, recurring, and installments; for the last
-        // two we pin the Stripe subscription id so later invoices renew this row.
-        // `kova_installments` (N) marks a limited-term plan → per-cycle unlock.
-        const installN = m.kova_installments ? Number(m.kova_installments) : null;
-        await grantClientPackage(c.env.DB, accountTenantId, m.kova_client, m.kova_package, s.id ?? null, s.mode === "subscription" ? s.subscription ?? null : null, installN);
-      }
-    } else if (event.type === "payment_intent.succeeded") {
-      // Inline one-time purchase (Payment Element on the connected account).
-      // Metadata rides on the PI; the hosted path keeps it on the session, so
-      // this and checkout.session.completed never both grant the same purchase.
-      const pi = event.data.object as { id?: string; metadata?: Record<string, string> };
-      const m = pi.metadata ?? {};
-      if (m.kova_client && m.kova_package && m.kova_tenant && m.kova_tenant === accountTenantId) {
-        await grantClientPackage(c.env.DB, accountTenantId, m.kova_client, m.kova_package, pi.id ?? null, null);
-        if (m.kova_promo) await bumpPromoRedemption(c.env.DB, m.kova_promo);
-      }
-    } else if (event.type === "invoice.paid") {
-      // Renewal cycles top up the budget; the first invoice (subscription_create)
-      // is skipped — checkout.session.completed already granted period one. Scope
-      // the renewal to the account's tenant so a foreign account can't top up a
-      // row it doesn't own.
-      const inv = event.data.object;
-      // Resolve the sub id across API-version shapes (Basil moved it off the
-      // invoice root) — see invoiceSubscriptionId. A cycle invoice we can't map to
-      // a subscription means a charged client with no top-up, so make it LOUD:
-      // there is no other signal (we answer Stripe 200 either way).
-      const invSubId = invoiceSubscriptionId(inv);
-      if (inv.billing_reason === "subscription_cycle" && !invSubId) {
-        console.error("connect invoice.paid: subscription_cycle with no resolvable subscription id", event.id);
-      }
-      if (invSubId && inv.billing_reason === "subscription_cycle" && accountTenantId) {
-        await renewClientSubscription(c.env.DB, invSubId, accountTenantId);
-      }
-    } else if (event.type === "invoice.payment_failed") {
-      // Auto-renew charge failed — mark past_due + nudge the client to fix their
-      // card. Access still runs until the current budget lapses (grace by design).
-      const failedSubId = invoiceSubscriptionId(event.data.object);
-      if (failedSubId) {
-        const row = await c.env.DB.prepare("SELECT id, tenant_id, subject_id FROM subject_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(failedSubId).first<{ id: string; tenant_id: string; subject_id: string }>();
-        if (row) {
-          await c.env.DB.prepare("UPDATE subject_subscriptions SET payment_status = 'past_due', updated_at = ? WHERE id = ?").bind(nowIso(), row.id).run();
-          const cl = await c.env.DB.prepare("SELECT user_id FROM clients WHERE id = ?").bind(row.subject_id).first<{ user_id: string | null }>();
-          if (cl?.user_id) await notify(c.env, { tenantId: row.tenant_id, userId: cl.user_id, type: "sub_payment_failed", message: "Update your card to keep your plan from pausing.", dedupeKey: `pf_${row.id}` });
-        }
-      }
-    } else if (event.type === "customer.subscription.deleted") {
-      // Auto-renew ended (client canceled or Stripe gave up). No more top-ups;
-      // the current budget simply runs out. Clear the renewal marker.
-      const subObj = event.data.object as { id?: string };
-      if (subObj.id) await c.env.DB.prepare("UPDATE subject_subscriptions SET stripe_sub_id = NULL, payment_status = 'canceled', updated_at = ? WHERE stripe_sub_id = ?").bind(nowIso(), subObj.id).run();
-    } else if (event.type === "account.updated") {
-      // Onboarding / capability changes for a connected account — and the one
-      // channel through which Stripe tells us it has RESTRICTED a seller. The
-      // reason rides on `requirements.disabled_reason`; dropping it left
-      // "hasn't onboarded" and "rejected for fraud" indistinguishable.
-      const a = event.data.object as {
-        id?: string;
-        charges_enabled?: boolean;
-        payouts_enabled?: boolean;
-        details_submitted?: boolean;
-        requirements?: { disabled_reason?: string | null } | null;
-      };
-      if (a.id) await syncConnectAccount(c.env.DB, a);
-    } else if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
-      // Money-safe: don't guess which budget days to claw back (partial refunds,
-      // elapsed time) — surface it to the tenant to adjust the client's access.
-      const tenantId = accountTenantId ?? undefined;
-      if (tenantId) {
-        const disputed = event.type === "charge.dispute.created";
-        await notifyOwners(c.env, tenantId, {
-          // Title (per type) + link (/clients) come from the type's record.
-          type: disputed ? "payment_disputed" : "payment_refunded",
-          message: disputed
-            ? "A client opened a dispute on a package payment. Review it in Stripe and adjust their access if needed."
-            : "A client package payment was refunded. Review whether their access should be adjusted.",
-          dedupeKey: `${event.type}_${(event.data.object as { id?: string }).id ?? event.id}`,
-        });
-      }
-    }
-    } catch (err) {
-      // Same contract as the platform webhook: a failed handler must release the
-      // event-id claim so Stripe's retry re-processes instead of being dropped.
-      await unmarkSeen(c.env.DB, event.id);
-      throw err;
-    }
-    return c.json({ received: true });
-  });
 
 
 
@@ -752,14 +355,12 @@ const CREDENTIAL_SHAPE: Record<StripeCredential, { prefix: RegExp; label: string
   secretKey: { prefix: /^sk_/, label: "Secret key", expect: "sk_…" },
   publishableKey: { prefix: /^pk_/, label: "Publishable key", expect: "pk_…" },
   webhookSecret: { prefix: /^whsec_/, label: "Platform webhook secret", expect: "whsec_…" },
-  connectWebhookSecret: { prefix: /^whsec_/, label: "Connect webhook secret", expect: "whsec_…" },
 };
 
 const CredentialBody = z.object({
   secretKey: z.string().max(400).optional(),
   publishableKey: z.string().max(400).optional(),
   webhookSecret: z.string().max(400).optional(),
-  connectWebhookSecret: z.string().max(400).optional(),
 });
 
 /** Admin Stripe config + catalog sync (platform-admin lane). */
@@ -803,7 +404,7 @@ export const stripeAdminRoutes = new Hono<AppEnv>()
     // feature exists to prevent.
     const pending = new Map<string, string>();
     const perLane: { lane: StripeLane; fields: z.infer<typeof CredentialBody> }[] = [
-      { lane: flatLane, fields: { secretKey: d.secretKey, publishableKey: d.publishableKey, webhookSecret: d.webhookSecret, connectWebhookSecret: d.connectWebhookSecret } },
+      { lane: flatLane, fields: { secretKey: d.secretKey, publishableKey: d.publishableKey, webhookSecret: d.webhookSecret} },
       ...(d.lanes?.test ? [{ lane: "test" as StripeLane, fields: d.lanes.test }] : []),
       ...(d.lanes?.live ? [{ lane: "live" as StripeLane, fields: d.lanes.live }] : []),
     ];

@@ -26,10 +26,10 @@ import { getConfig, setConfig } from "@4dl/core";
 
 export type StripeMode = "disabled" | "test" | "live";
 export type StripeLane = "test" | "live";
-export type StripeCredential = "secretKey" | "publishableKey" | "webhookSecret" | "connectWebhookSecret";
+export type StripeCredential = "secretKey" | "publishableKey" | "webhookSecret";
 
 /** Ordered so status output and validation iterate the same four credentials. */
-export const STRIPE_CREDENTIALS: readonly StripeCredential[] = ["secretKey", "publishableKey", "webhookSecret", "connectWebhookSecret"];
+export const STRIPE_CREDENTIALS: readonly StripeCredential[] = ["secretKey", "publishableKey", "webhookSecret"];
 
 /** app_config name per credential: lane-scoped is `stripe.<lane>.<suffix>`,
  *  legacy (pre-lane, still honoured as a fallback) is `stripe.<suffix>`. */
@@ -37,7 +37,6 @@ const CREDENTIAL_SUFFIX: Record<StripeCredential, string> = {
   secretKey: "secret_key",
   publishableKey: "publishable_key",
   webhookSecret: "webhook_secret",
-  connectWebhookSecret: "connect_webhook_secret",
 };
 
 export const stripeLaneConfigKey = (lane: StripeLane, cred: StripeCredential): string => `stripe.${lane}.${CREDENTIAL_SUFFIX[cred]}`;
@@ -62,7 +61,6 @@ export interface StripeConfig {
   secretKey: string;
   publishableKey: string;
   webhookSecret: string;
-  connectWebhookSecret: string;
   sources: Record<StripeCredential, CredentialSource>;
 }
 
@@ -128,7 +126,6 @@ export interface StripeLaneStatus {
   secretKey: boolean;
   publishableKey: boolean;
   webhookSecret: boolean;
-  connectWebhookSecret: boolean;
   /** All four present in this exact scope. */
   complete: boolean;
   secretKeyLast4: string | null;
@@ -149,10 +146,8 @@ export interface StripeStatus {
   /** Every credential the active lane needs is resolvable. */
   activeLaneComplete: boolean;
   /** No Connect signing secret at all → Connect webhooks are rejected. */
-  connectWebhookMissing: boolean;
   /** Falling back to the PLATFORM signing secret for Connect events — which is a
    *  different endpoint with a different secret, so verification will fail. */
-  connectWebhookFallback: boolean;
   /** Which of the four are present, per lane-scoped scope and legacy scope. */
   lanes: Record<StripeLane, StripeLaneStatus>;
   legacy: StripeLaneStatus;
@@ -164,7 +159,6 @@ const laneStatus = (values: Record<StripeCredential, string>): StripeLaneStatus 
   secretKey: !!values.secretKey,
   publishableKey: !!values.publishableKey,
   webhookSecret: !!values.webhookSecret,
-  connectWebhookSecret: !!values.connectWebhookSecret,
   complete: STRIPE_CREDENTIALS.every((cred) => !!values[cred]),
   secretKeyLast4: last4(values.secretKey),
   publishableKeyLast4: last4(values.publishableKey),
@@ -189,7 +183,6 @@ export function stripeStatus(raw: Record<string, string | undefined>): StripeSta
     secretKey: cfg.secretKey,
     publishableKey: cfg.publishableKey,
     webhookSecret: cfg.webhookSecret,
-    connectWebhookSecret: cfg.connectWebhookSecret,
   });
   const fee = Number(raw["stripe.platform_fee_bps"] ?? "0");
   return {
@@ -199,8 +192,6 @@ export function stripeStatus(raw: Record<string, string | undefined>): StripeSta
     keyLane: active.secretKeyLane,
     laneMismatch: stripeLaneMismatch(cfg),
     activeLaneComplete: active.complete,
-    connectWebhookMissing: !cfg.connectWebhookSecret,
-    connectWebhookFallback: !cfg.connectWebhookSecret && !!cfg.webhookSecret,
     lanes: {
       test: laneStatus(scopeValues(raw, (cred) => stripeLaneConfigKey("test", cred))),
       live: laneStatus(scopeValues(raw, (cred) => stripeLaneConfigKey("live", cred))),

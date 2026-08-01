@@ -153,10 +153,23 @@ export function permissionFor(method: string, path: string): Record<string, stri
   // Media: any authenticated member; tenant isolation enforced in the handler.
   if (path.startsWith("/api/media")) return null;
 
-  // Connect: onboarding + checkout. Onboarding is owner (billing:manage);
-  // client-package checkout is a purchase (any member, row-scoped in handler).
-  if (path === "/api/connect/onboard") return { billing: ["manage"] };
-  if (path === "/api/connect/checkout") return null;
+  /**
+   * The tenant's own payment rail.
+   *
+   * `payments/settings` is how the studio gets paid, so it sits with the other
+   * money settings: read for the owner surface, write behind `billing:manage`
+   * (the handler additionally requires the owner role, because a signing secret
+   * is not a thing a trainer should be able to swap).
+   *
+   * `purchases` splits by direction. Opening one is a CLIENT action — the buyer
+   * starts it — so it is `null`, with `requireClientAccess` scoping the row in
+   * the handler exactly as the old Connect checkout was. Reading the pending
+   * list and confirming a payment are staff acts on the studio's takings, so
+   * they ride `package`, the resource that already governs what is sold.
+   */
+  if (path.startsWith("/api/payments/")) return isGet ? { billing: ["read"] } : { billing: ["manage"] };
+  if (path === "/api/purchases" && !isGet) return null;
+  if (path.startsWith("/api/purchases")) return { package: [isGet ? "read" : "update"] };
 
   // Billing: reads for owner surface, mutations need billing:manage.
   if (path.startsWith("/api/billing")) return isGet ? { billing: ["read"] } : { billing: ["manage"] };
@@ -221,8 +234,6 @@ function isStripeWebhook(path: string): boolean {
 
 function isProviderWebhook(path: string): boolean {
   if (path === "/api/stripe/webhook") return true;
-  // TODO(connect-removal): goes with the Connect rail itself.
-  if (path === "/api/connect/webhook") return true;
   // The tenant id is a path segment, so this is a prefix match rather than an
   // equality check — and it is anchored so `/api/pay/webhookXYZ` cannot slip in.
   return /^\/api\/pay\/webhook\/[^/]+$/.test(path);

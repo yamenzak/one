@@ -10,6 +10,8 @@ import { fmtPrice } from "../../money.js";
 import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
 import { Staff } from "./Staff.js";
 import { Packages } from "./Packages.js";
+import { PaymentSetup } from "./PaymentSetup.js";
+import { PendingPayments } from "./PendingPayments.js";
 
 /** `billingState` is the server's one honest answer to "is this studio paying for
  *  anything" — derived in `GET /billing`, never re-inferred here. `status` alone
@@ -29,7 +31,6 @@ interface Billing {
   ledger: { delta: number; reason: string; at: number }[];
   stripeEnabled?: boolean;
   publishableKey?: string | null;
-  connect?: { connected: boolean; chargesEnabled: boolean; detailsSubmitted: boolean };
   clientBilling?: { lapsed: number; expiringSoon: number; active: number };
 }
 
@@ -53,7 +54,7 @@ const STATE_LABEL: Record<BillingState, string> = {
   none: "No subscription",
 };
 interface AiUsage { usage: { feature: string; calls: number; credits: number }[] }
-type Tab = "overview" | "packages" | "staff";
+type Tab = "overview" | "packages" | "getting-paid" | "staff";
 
 const featLabel = (f: string) => f.replace(/-/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 
@@ -80,23 +81,32 @@ export function Business() {
   const canSell = !!ctx?.entitlements?.features?.commerce; // packages = the commerce feature
   const [tab, setTab] = useState<Tab>("overview");
   // If a plan change dropped commerce, don't strand the user on a hidden tab.
-  const activeTab = tab === "packages" && !canSell ? "overview" : tab;
+  const activeTab = (tab === "packages" || tab === "getting-paid") && !canSell ? "overview" : tab;
   const options: { value: Tab; label: string }[] = [
     { value: "overview", label: "Overview" },
     ...(canSell ? [{ value: "packages" as Tab, label: "Packages" }] : []),
+    ...(canSell ? [{ value: "getting-paid" as Tab, label: "Getting paid" }] : []),
     { value: "staff", label: "Staff" },
   ];
   return (
     <div>
       <div className="column p-4 pb-0"><SegmentedControl options={options} value={activeTab} onChange={(v) => setTab(v as Tab)} /></div>
-      {activeTab === "overview" && <Overview />}
+      {activeTab === "overview" && <Overview onOpenPayments={() => setTab("getting-paid")} />}
       {activeTab === "packages" && <Packages />}
+      {activeTab === "getting-paid" && (
+        <div className="column space-y-6 p-4">
+          {/* The list first: a coach opening this tab usually has a client
+              waiting on access, not a provider to configure. */}
+          <PendingPayments canConfirm />
+          <PaymentSetup isOwner={ctx?.active?.role === "owner"} />
+        </div>
+      )}
       {activeTab === "staff" && <Staff />}
     </div>
   );
 }
 
-function Overview() {
+function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
   const { ctx } = useSession();
   const isOwner = ctx?.active?.role === "owner";
   const canSell = !!ctx?.entitlements?.features?.commerce;
@@ -327,25 +337,25 @@ function Overview() {
             </Stagger>
           )}
 
-          {/* Stripe Connect — sell packages to clients. */}
-          {canSell && billing.connect && (
+          {/* Getting paid. No longer a "connect your Stripe to us" card: the
+              studio is paid on its OWN account by its OWN provider, so this is a
+              route into their setup rather than a handshake with ours. */}
+          {canSell && (
             <Stagger>
-              <Card className="flex items-center gap-3.5">
-                <div className="grid size-11 shrink-0 place-items-center rounded-2xl [&_svg]:size-[1.35rem]" style={{ backgroundColor: `color-mix(in oklch, ${toneVar.nutrition} 15%, transparent)`, color: toneVar.nutrition }}><Store /></div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-semibold tracking-tight">Sell with Stripe</div>
-                  <p className="text-sm text-muted-foreground">
-                    {billing.connect.chargesEnabled ? "Connected — you can charge clients for packages." : billing.connect.connected ? "Finish onboarding to start accepting payments." : "Connect Stripe to sell packages to your clients."}
-                  </p>
+              <button
+                type="button"
+                onClick={onOpenPayments}
+                className="w-full rounded-2xl border border-border/60 p-3.5 text-left transition-colors hover:bg-muted/40"
+              >
+                <div className="flex items-center gap-3.5">
+                  <div className="grid size-11 shrink-0 place-items-center rounded-2xl [&_svg]:size-[1.35rem]" style={{ backgroundColor: `color-mix(in oklch, ${toneVar.nutrition} 15%, transparent)`, color: toneVar.nutrition }}><Store /></div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold tracking-tight">Getting paid</div>
+                    <p className="text-sm text-muted-foreground">Your clients pay you directly — we never hold your money or take a cut.</p>
+                  </div>
+                  <ArrowRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
                 </div>
-                {billing.connect.chargesEnabled ? (
-                  <Badge tone="success"><CheckCheck className="size-3.5" /> Live</Badge>
-                ) : isOwner && billing.stripeEnabled ? (
-                  <Button size="sm" variant="tonal" disabled={busy === "connect"} onClick={() => void redirectTo("/api/connect/onboard", "connect")}>{busy === "connect" ? "Opening…" : billing.connect.connected ? "Finish setup" : "Connect"}</Button>
-                ) : (
-                  <Badge tone="warning">Setup</Badge>
-                )}
-              </Card>
+              </button>
             </Stagger>
           )}
 

@@ -65,62 +65,49 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
     catch (e) { setRedeemMsg(e instanceof Error && e.message.includes("not found") ? "That code isn't valid." : "Couldn't redeem that code."); }
     finally { setBusy(false); }
   };
-  // Recurring subscriptions use hosted Checkout (Stripe provisions the
-  // connected-account customer + price for us).
+  /**
+   * ONE buy path for every package and every provider.
+   *
+   * The studio is paid on its own merchant account, so the app's whole job is to
+   * open a purchase and hand the client wherever that studio takes payment.
+   * There is no inline card form any more: Kova never sees the card, which is
+   * exactly why the studio's provider — and their country, and their currency —
+   * is entirely their choice.
+   *
+   * `checkoutUrl` comes back null when the studio settles off-platform (cash,
+   * transfer, their own card machine). That is not a failure and must not read
+   * like one: the purchase is real and waiting on their coach's confirmation.
+   */
   const buy = async (packageId: string) => {
     if (buying) return;
     setBuying(true); setMsg(null);
-    try { const r = await api.post<{ url: string }>("/api/connect/checkout", { clientId, packageId, returnUrl: location.href }); location.href = r.url; }
-    catch { setMsg("Checkout isn't available yet — ask your coach to finish Stripe setup."); setBuying(false); }
-  };
-  // One-time packages check out inline (Payment Element) on the tenant's account.
-  const [checkout, setCheckout] = useState<{ intent: CheckoutIntent; name: string; price: string } | null>(null);
-  const [buyPromo, setBuyPromo] = useState("");
-  const promoMsg = (m: string): string => ({ not_found: "That promo code isn't valid.", inactive: "That code is no longer active.", expired: "That code has expired.", exhausted: "That code has been fully used.", wrong_package: "That code doesn't apply to this package.", wrong_subject: "That code isn't available on your account." }[m.replace("promo_", "")] ?? "That promo code can't be applied.");
-  const buyInline = async (p: Pkg) => {
-    if (buying) return;
-    setBuying(true); setMsg(null);
     try {
-      const r = await api.post<{ clientSecret?: string; publishableKey?: string; stripeAccount?: string; granted?: boolean; amountCents?: number }>("/api/connect/pay-intent", { clientId, packageId: p.id, promoCode: buyPromo || undefined });
-      if (r.granted) { setMsg("Access unlocked!"); await load(); await refresh(); return; } // promo covered it fully
-      // Label the button from the amount the SERVER created the PaymentIntent for
-      // — with a promo applied the list price is not what Stripe will charge.
-      if (r.clientSecret && r.publishableKey) setCheckout({ intent: { clientSecret: r.clientSecret, publishableKey: r.publishableKey, stripeAccount: r.stripeAccount }, name: p.name, price: fmtPrice(r.amountCents ?? p.one_time_price_cents ?? 0) });
-      else setMsg("Checkout isn't available yet — ask your coach to finish Stripe setup.");
-    } catch (e) { setMsg(e instanceof Error && e.message.startsWith("promo_") ? promoMsg(e.message) : "Checkout isn't available yet — ask your coach to finish Stripe setup."); }
-    finally { setBuying(false); }
-  };
-  const onPaid = async () => {
-    setCheckout(null);
-    setMsg("Payment received — your access updates in a moment.");
-    await load();
-    await refresh();
-  };
-  const cancelRenew = async () => {
-    setBusy(true); setMsg(null);
-    // The route returns non-2xx (502) when the Stripe cancel actually fails —
-    // never assume success; surface a retryable error and keep auto-renew shown.
-    try { await api.post("/api/connect/cancel-subscription", { clientId }); setMsg("Auto-renew canceled — your access continues until it runs out."); await load(); }
-    catch { setMsg("Couldn't cancel — please try again."); }
-    finally { setBusy(false); }
+      const r = await api.post<{ checkoutUrl: string | null }>("/api/purchases", { clientId, packageId });
+      if (r.checkoutUrl) { location.href = r.checkoutUrl; return; }
+      setMsg("Your coach will confirm this payment with you — your access starts as soon as they do.");
+      await load();
+    } catch (e) {
+      // The server's message is worth showing: it distinguishes "this renews
+      // monthly but your coach's payment method can't do that" from a generic
+      // outage, and only the first tells the client anything useful.
+      setMsg(e instanceof Error && e.message ? e.message : "Couldn't start that purchase — please try again.");
+    } finally { setBuying(false); }
   };
 
   const cta = (p: Pkg): ReactNode => {
     if (p.monthly_price_cents) return <Button size="lg" className="mt-4 w-full" disabled={buying} onClick={() => void buy(p.id)}>Subscribe</Button>;
-    if (p.installment_months && p.installment_months > 1 && p.one_time_price_cents) return <Button size="lg" className="mt-4 w-full" disabled={buying} onClick={() => void buy(p.id)}>Pay in {p.installment_months} months</Button>;
-    if (p.one_time_price_cents) return <Button size="lg" className="mt-4 w-full" disabled={buying} onClick={() => void buyInline(p)}>Buy now</Button>;
+    if (p.one_time_price_cents) return <Button size="lg" className="mt-4 w-full" disabled={buying} onClick={() => void buy(p.id)}>Buy now</Button>;
     return <p className="mt-3 text-center text-xs text-muted-foreground">Ask your coach to add this to your account.</p>;
   };
 
   const memberships = (packages ?? []).filter(isRecurring);
   const oneTime = (packages ?? []).filter((p) => !isRecurring(p));
-  const hasInlinePaid = oneTime.some((p) => p.one_time_price_cents);
 
   // One-tap "extend" = re-buy the same package the current access came from.
   // Only offered when it's a paid, non-renewing package still on sale.
   const activePkg = sub?.packageId ? (packages ?? []).find((p) => p.id === sub.packageId) : undefined;
   const canExtend = !!sub && !sub.autoRenew && !!activePkg && !!(activePkg.one_time_price_cents || activePkg.monthly_price_cents);
-  const extend = () => { if (activePkg) void (isRecurring(activePkg) ? buy(activePkg.id) : buyInline(activePkg)); };
+  const extend = () => { if (activePkg) void buy(activePkg.id); };
 
   return (
     <Page className="relative isolate column space-y-5 p-4 pb-28">
@@ -230,9 +217,12 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
       {oneTime.length > 0 && (
         <section className="space-y-3">
           <Eyebrow>{memberships.length > 0 ? "Packages" : "Packages & access"}</Eyebrow>
-          {hasInlinePaid && (
-            <Field label="Discount code — applied at checkout (optional)" icon={Ticket} value={buyPromo} onChange={(e) => setBuyPromo(e.target.value.toUpperCase())} placeholder="SUMMER20" />
-          )}
+          {/* No discount-code field any more. A checkout discount has to be
+              applied by whoever owns the checkout page, and that is now the
+              studio's own provider — Kova cannot discount a payment link it does
+              not own. Studios put promotions in their provider instead; ACCESS
+              codes (below) are unaffected, because those grant days rather than
+              reduce a price. */}
           {oneTime.map((p, i) => <Stagger key={p.id}><PackageCard p={p} tone={CARD_TONES[(memberships.length + i) % CARD_TONES.length]!} cta={cta(p)} hasActive={!!sub} /></Stagger>)}
         </section>
       )}
@@ -255,24 +245,20 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
         )}
       </Reveal>
 
+      {/* Kova cannot stop the charge — that standing order lives with the
+          studio's own payment provider, which is the whole point of the studio
+          being paid directly. Offering a "Cancel auto-renew" button we cannot
+          honour would be worse than saying so: the client would believe it
+          worked and be charged again next month. So this points them at the two
+          people who CAN stop it. */}
       <ConfirmDialog
         open={confirmCancel}
         onOpenChange={setConfirmCancel}
-        title="Cancel auto-renew?"
-        description="Your access stays active until the current period runs out, then it won't renew. You can resubscribe anytime."
-        confirmLabel="Cancel auto-renew"
-        cancelLabel="Keep it"
-        destructive
-        onConfirm={() => void cancelRenew()}
-      />
-
-      <PaymentSheet
-        open={!!checkout}
-        onClose={() => setCheckout(null)}
-        title={checkout ? `Buy ${checkout.name}` : "Checkout"}
-        intent={checkout?.intent ?? null}
-        submitLabel={checkout ? `Pay ${checkout.price}` : "Pay"}
-        onSuccess={onPaid}
+        title="Stopping your subscription"
+        description="Your coach takes this payment on their own account, so they'll stop it for you — just message them. If you paid by card you can also cancel from the receipt email your payment went through. Your access stays active until the time you've paid for runs out."
+        confirmLabel="Got it"
+        cancelLabel="Close"
+        onConfirm={() => setConfirmCancel(false)}
       />
 
       {redeemOpen && (

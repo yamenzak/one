@@ -33,6 +33,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   assertSafeConfig,
+  hasPriorPurchase,
+  purchaseBlocked as purchaseBlockedBase,
   isValidReference,
   ProviderRegistry,
   manualProvider,
@@ -52,6 +54,19 @@ import { notifyOwners } from "./notify.js";
 import { recordAudit } from "./audit.js";
 import { grantClientPackage, renewClientSubscription } from "./stripe-routes.js";
 import { MAX_PACKAGE_PRICE_CENTS } from "./commerce-routes.js";
+
+/**
+ * Kova's stored value for "restricted to one subject".
+ *
+ * `@4dl/commerce` takes it as a parameter because it is DATA — the string lives
+ * in the `packages.visibility` column of a live database, so renaming it is a
+ * migration rather than an edit. The package's own default matches nothing, so
+ * an app that forgets to pass it gets grant-only (fails closed) rather than
+ * accidentally opening every package to self-purchase.
+ */
+const RESTRICTED_VISIBILITY = "client_specific";
+const purchaseBlocked = (pkg: { visibility: string; restricted_subject_id: string | null }, clientId: string) =>
+  purchaseBlockedBase(pkg, clientId, RESTRICTED_VISIBILITY);
 
 /**
  * Kova's providers. `manual` is deliberately first — it is the only one that
@@ -157,13 +172,42 @@ export const paymentsRoutes = new Hono<AppEnv>()
     if ("response" in access) return access.response;
 
     const pkg = await c.env.DB.prepare(
-      "SELECT id, name, one_time_price_cents, monthly_price_cents, currency, pay_link, visibility, restricted_subject_id FROM packages WHERE id = ? AND tenant_id = ? AND active = 1",
+      "SELECT id, name, one_time_price_cents, monthly_price_cents, installment_months, currency, pay_link, visibility, restricted_subject_id, once_per_customer FROM packages WHERE id = ? AND tenant_id = ? AND active = 1",
     )
       .bind(body.data.packageId, who.tenantId)
-      .first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; currency: string | null; pay_link: string | null; visibility: string; restricted_subject_id: string | null }>();
-    if (!pkg) return c.json({ error: "package not found" }, 404);
-    if (pkg.visibility === "client_specific" && pkg.restricted_subject_id && pkg.restricted_subject_id !== access.client.id) {
-      return c.json({ error: "package is private to another client" }, 403);
+      .first<{ id: string; name: string; one_time_price_cents: number | null; monthly_price_cents: number | null; installment_months: number | null; currency: string | null; pay_link: string | null; visibility: string; restricted_subject_id: string | null; once_per_customer: number | null }>();
+    /**
+     * The two selling rules that must hold BEFORE the customer is sent to pay,
+     * not only when the money comes back.
+     *
+     * `purchaseBlocked` covers visibility: a `private` package is grant-only and
+     * a `client_specific` one belongs to its own person. 404 rather than 403,
+     * matching every other package lookup — a package you may not buy should not
+     * be distinguishable from one that does not exist.
+     *
+     * `once_per_customer` is a real selling rule (an intro offer). `grantClientPackage`
+     * re-checks it at the last gate, so nothing double-grants either way — but a
+     * check only there means the customer PAYS first and is refused after, on a
+     * provider we cannot refund from. Both checks, both sides.
+     */
+    if (!pkg || purchaseBlocked(pkg, access.client.id)) return c.json({ error: "package not found" }, 404);
+    if (pkg.once_per_customer && (await hasPriorPurchase(c.env.DB, access.client.id, pkg.id))) {
+      return c.json({ error: "package is once per customer" }, 409);
+    }
+    /**
+     * Instalment plans are not offered on this rail, and saying so is better
+     * than half-supporting them.
+     *
+     * "Charge N times, then stop" needs someone to COUNT and then cancel. On the
+     * Connect rail the platform held API access to the connected account and
+     * could do it. Here it does not — a hosted payment link bills until the
+     * studio or the customer stops it, and nothing we can call will end it. A
+     * silent best-effort would charge a customer indefinitely for a package they
+     * finished paying for, which is the one failure in this design that takes
+     * real money from someone who did nothing wrong.
+     */
+    if ((pkg.installment_months ?? 0) > 1) {
+      return c.json({ error: "instalment plans aren't supported with your own payment provider — price this package as one payment or a monthly plan" }, 409);
     }
 
     const recurring = (pkg.monthly_price_cents ?? 0) > 0;
@@ -273,9 +317,23 @@ export const paymentsWebhook = new Hono<AppEnv>().post("/pay/webhook/:tenantId",
   const tenantId = c.req.param("tenantId");
   const { id, cfg } = await providerFor(c.env.DB, tenantId);
   const provider = PROVIDERS.get(id);
-  // An unknown or unconfigured provider REFUSES. See the header: silence here
-  // would be an open door on a half-configured studio.
+  /**
+   * A provider that cannot VERIFY must not ACCEPT.
+   *
+   * Refusing only an unknown provider is not enough: the default is `manual`,
+   * whose `verify` returns `[]` because there is nothing to check. That would
+   * make this endpoint answer 200 to anything at all for every studio that has
+   * not set a provider up — which is most of them — and 200 is what a caller
+   * probing for an open door is looking for.
+   *
+   * `refundEvents` is not the test; the test is whether a signing secret is
+   * stored at all. No secret means no way to tell a real notice from a forged
+   * one, and the only safe answer to an unverifiable request is refusal.
+   */
   if (!provider) return c.json({ error: "no payment provider configured" }, 400);
+  if (provider.id === "manual" || Object.keys(cfg).length === 0) {
+    return c.json({ error: "this studio does not accept payment notifications" }, 400);
+  }
 
   const body = await c.req.text();
   let events: PaymentEvent[];

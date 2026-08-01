@@ -58,13 +58,15 @@ export const billingRoutes = new Hono<AppEnv>()
     // getPlan (not the active-only list) so a retired id still renders a name.
     const pendingPlan = sub.pending_plan_id ? await getPlan(c.env.DB, sub.pending_plan_id) : null;
 
-    // Connect account + the tenant's own client-delinquency roll-up, so the
-    // owner's Business surface can nudge onboarding and flag lapsing clients.
+    // The tenant's own client-delinquency roll-up, so the owner's Business
+    // surface can flag lapsing clients.
+    //
+    // There is no `connect` block any more: a studio is paid on its OWN provider
+    // and the platform holds no account for it to report on. Its setup lives on
+    // `/api/payments/settings`, which is that provider's business and not this
+    // endpoint's — this one describes the studio's standing with US.
     const cfg = await stripeConfig(c.env.DB);
-    const [connectRow, csubs] = await Promise.all([
-      c.env.DB.prepare("SELECT stripe_account_id, charges_enabled, details_submitted FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null; details_submitted: number | null }>(),
-      c.env.DB.prepare("SELECT budgets_json FROM subject_subscriptions WHERE tenant_id = ? AND status IN ('active','paused')").bind(who.tenantId).all<{ budgets_json: string | null }>(),
-    ]);
+    const csubs = await c.env.DB.prepare("SELECT budgets_json FROM subject_subscriptions WHERE tenant_id = ? AND status IN ('active','paused')").bind(who.tenantId).all<{ budgets_json: string | null }>();
     const now = nowIso();
     let lapsed = 0, expiringSoon = 0;
     for (const r of csubs.results ?? []) {
@@ -131,11 +133,6 @@ export const billingRoutes = new Hono<AppEnv>()
       stripeEnabled: stripeEnabled(cfg),
       // Publishable key drives the inline Payment Element (safe to expose).
       publishableKey: cfg.publishableKey || null,
-      connect: {
-        connected: Boolean(connectRow?.stripe_account_id),
-        chargesEnabled: Boolean(connectRow?.charges_enabled),
-        detailsSubmitted: Boolean(connectRow?.details_submitted),
-      },
       clientBilling: { lapsed, expiringSoon, active: (csubs.results ?? []).length },
     });
   })

@@ -293,113 +293,6 @@ describe("credits + AI metering", () => {
   });
 });
 
-describe("connect rail — webhook idempotency + grant", () => {
-  async function stripeSig(payload: string, secret: string): Promise<string> {
-    const t = Math.floor(Date.now() / 1000);
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${payload}`));
-    const hex = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
-    return `t=${t},v1=${hex}`;
-  }
-
-  it("grants a client package once; a redelivered event is a no-op", async () => {
-    const db = env.DB as D1Database;
-    const secret = "whsec_connect_test";
-    for (const [k, v] of [["stripe.mode", "test"], ["stripe.secret_key", "sk_test_x"], ["stripe.connect_webhook_secret", secret]] as const) {
-      await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
-    }
-    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "WebhookBuyer" }) })).json()) as { client: { id: string } };
-    const pkgId = "pkg_wh_test";
-    await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 1, ?)")
-      .bind(pkgId, ctx.active.tenantId, "Webhook Pack", 5000, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
-    await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_wh_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_wh_1'").bind(ctx.active.tenantId, new Date().toISOString()).run();
-
-    const payload = JSON.stringify({ id: "evt_conn_dedup_1", account: "acct_wh_1", type: "checkout.session.completed", data: { object: { id: "cs_test_1", metadata: { kova_tenant: ctx.active.tenantId, kova_client: client.id, kova_package: pkgId } } } });
-    const post = async () => SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
-
-    const r1 = await post();
-    expect(r1.status).toBe(200);
-    const n1 = (await db.prepare("SELECT COUNT(*) AS n FROM subject_subscriptions WHERE subject_id = ? AND status = 'active'").bind(client.id).first<{ n: number }>())!.n;
-    expect(n1).toBe(1); // granted
-
-    const r2 = await post();
-    expect((await r2.json() as { duplicate?: boolean }).duplicate).toBe(true); // dedup fired
-    const n2 = (await db.prepare("SELECT COUNT(*) AS n FROM subject_subscriptions WHERE subject_id = ? AND status = 'active'").bind(client.id).first<{ n: number }>())!.n;
-    expect(n2).toBe(1); // no double grant
-
-    // A bad signature is rejected outright.
-    const bad = await SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": "t=1,v1=deadbeef" }, body: payload });
-    expect(bad.status).toBe(400);
-  });
-
-  it("a refund on a connected account notifies the tenant owner", async () => {
-    const db = env.DB as D1Database;
-    const secret = "whsec_connect_test";
-    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
-    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    // Pin a connected account to this tenant so event.account maps back.
-    await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_ref_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_ref_1'").bind(ctx.active.tenantId, new Date().toISOString()).run();
-    const payload = JSON.stringify({ id: "evt_refund_1", account: "acct_ref_1", type: "charge.refunded", data: { object: { id: "ch_test_1" } } });
-    const r = await SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
-    expect(r.status).toBe(200);
-    const notif = (await db.prepare("SELECT COUNT(*) AS n FROM notifications WHERE tenant_id = ? AND type = 'payment_refunded'").bind(ctx.active.tenantId).first<{ n: number }>())!;
-    expect(notif.n).toBeGreaterThanOrEqual(1);
-  });
-
-  it("recurring: subscription checkout grants period one + a renewal cycle tops up", async () => {
-    const db = env.DB as D1Database;
-    const secret = "whsec_connect_test";
-    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
-    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    // Connect grants now require event.account to map back to the tenant — pin one.
-    await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_recur_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_recur_1'").bind(ctx.active.tenantId, new Date().toISOString()).run();
-    const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "RecurBuyer" }) })).json()) as { client: { id: string } };
-    const pkgId = "pkg_recur_1";
-    await db.prepare("INSERT INTO packages (id, tenant_id, name, monthly_price_cents, budgets_json, currency, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 1, ?)")
-      .bind(pkgId, ctx.active.tenantId, "Monthly Coaching", 4900, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
-
-    const post = async (payload: string) => SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
-
-    // Period one via subscription-mode checkout.
-    const created = JSON.stringify({ id: "evt_sub_create", account: "acct_recur_1", type: "checkout.session.completed", data: { object: { id: "cs_sub_1", mode: "subscription", subscription: "sub_recur_1", metadata: { kova_tenant: ctx.active.tenantId, kova_client: client.id, kova_package: pkgId } } } });
-    expect((await post(created)).status).toBe(200);
-    const days1 = (await (await SELF.fetch(`${ORIGIN}/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; autoRenew?: boolean; budgets: unknown[] }[] };
-    const sub1 = days1.subscriptions.find((s) => (s.budgets?.length ?? 0) > 0)!;
-    expect(sub1.autoRenew).toBe(true);
-    expect(sub1.daysRemaining).toBeGreaterThan(20);
-    const budgetsAfterCreate = sub1.budgets.length;
-
-    // A renewal cycle tops the budget up (queued behind the current period).
-    const renew = JSON.stringify({ id: "evt_sub_cycle", account: "acct_recur_1", type: "invoice.paid", data: { object: { subscription: "sub_recur_1", billing_reason: "subscription_cycle" } } });
-    expect((await post(renew)).status).toBe(200);
-    const days2 = (await (await SELF.fetch(`${ORIGIN}/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; budgets: unknown[] }[] };
-    const sub2 = days2.subscriptions.find((s) => (s.budgets?.length ?? 0) > 0)!;
-    expect(sub2.budgets.length).toBeGreaterThan(budgetsAfterCreate); // another period queued
-    expect(sub2.daysRemaining).toBeGreaterThan(sub1.daysRemaining);
-  });
-
-  it("inline one-time: payment_intent.succeeded grants the client package", async () => {
-    const db = env.DB as D1Database;
-    const secret = "whsec_connect_test";
-    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
-    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_inline_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_inline_1'").bind(ctx.active.tenantId, new Date().toISOString()).run();
-    const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "InlineBuyer" }) })).json()) as { client: { id: string } };
-    const pkgId = "pkg_inline_ot";
-    await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 1, ?)")
-      .bind(pkgId, ctx.active.tenantId, "Inline Pack", 3000, JSON.stringify([{ feature: "all", days: 20 }]), new Date().toISOString()).run();
-    const payload = JSON.stringify({ id: "evt_pi_ot_1", account: "acct_inline_1", type: "payment_intent.succeeded", data: { object: { id: "pi_ot_1", metadata: { kova_tenant: ctx.active.tenantId, kova_client: client.id, kova_package: pkgId } } } });
-    const r = await SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await stripeSig(payload, secret) }, body: payload });
-    expect(r.status).toBe(200);
-    const subs = (await (await SELF.fetch(`${ORIGIN}/api/subscriptions?clientId=${client.id}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { daysRemaining: number; budgets: unknown[] }[] };
-    const granted = subs.subscriptions.find((s) => (s.budgets?.length ?? 0) > 0)!;
-    expect(granted.daysRemaining).toBeGreaterThan(15);
-  });
-});
 
 describe("auth — sign-out revokes the session", () => {
   it("POST /api/auth/sign-out clears the cookie; the same cookie is then 401", async () => {
@@ -3157,94 +3050,7 @@ describe("platform rail — inline Stripe webhooks", () => {
   });
 });
 
-describe("promo codes — website-native discounts (tenant rail)", () => {
-  it("a 100%-off code grants free, enforces max_redemptions, and honors client/package scope", async () => {
-    const db = env.DB as D1Database;
-    const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    for (const [k, v] of [["stripe.mode", "test"], ["stripe.secret_key", "sk_test_x"]] as const) {
-      await db.prepare("INSERT INTO app_config (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(k, v).run();
-    }
-    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, charges_enabled, updated_at) VALUES (?, 'acct_promo', 1, ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_promo', charges_enabled = 1").bind(ctx.active.tenantId, new Date().toISOString()).run();
-    const mk = async (name: string) => ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client.id;
-    const buyer = await mk("PromoBuyer");
-    const other = await mk("PromoOther");
-    const pkgId = "pkg_promo_ot";
-    await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, budgets_json, currency, visibility, active, created_at) VALUES (?, ?, ?, ?, ?, 'usd', 'marketplace', 1, ?)")
-      .bind(pkgId, ctx.active.tenantId, "Promo Pack", 5000, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
 
-    // A 100%-off code exclusive to `buyer` + this package, single use.
-    expect((await SELF.fetch(`${ORIGIN}/api/promo-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "FREE100", discountType: "percent", percentOff: 100, restrictedClientId: buyer, restrictedPackageId: pkgId, maxRedemptions: 1 }) })).status).toBe(201);
-
-    // Fully discounted → granted directly, no Stripe charge.
-    const r1 = await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "FREE100" }) });
-    expect(r1.status).toBe(200);
-    expect((await r1.json() as { granted?: boolean }).granted).toBe(true);
-    const subs = (await (await SELF.fetch(`${ORIGIN}/api/subscriptions?clientId=${buyer}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: { budgets: unknown[] }[] };
-    expect(subs.subscriptions.some((s) => (s.budgets?.length ?? 0) > 0)).toBe(true);
-
-    // The single use is now spent.
-    const r2 = await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "FREE100" }) });
-    expect(r2.status).toBe(400);
-    expect((await r2.json() as { error: string }).error).toBe("promo_exhausted");
-
-    // A code locked to `buyer` is rejected for another client.
-    await SELF.fetch(`${ORIGIN}/api/promo-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "ONLYME", discountType: "percent", percentOff: 100, restrictedClientId: buyer }) });
-    const r3 = await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: other, packageId: pkgId, promoCode: "ONLYME" }) });
-    expect(r3.status).toBe(400);
-    expect((await r3.json() as { error: string }).error).toBe("promo_wrong_subject");
-
-    // A discount that lands the charge below Stripe's minimum → clean 400, not a 500.
-    await SELF.fetch(`${ORIGIN}/api/promo-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "ALMOSTALL", discountType: "amount", amountOffCents: 4980 }) }); // 5000 → 20¢
-    const r4 = await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: buyer, packageId: pkgId, promoCode: "ALMOSTALL" }) });
-    expect(r4.status).toBe(400);
-    expect((await r4.json() as { error: string }).error).toBe("promo_min_amount");
-  });
-});
-
-describe("installments — limited-term subscription (per-cycle unlock)", () => {
-  async function sig(payload: string, secret: string): Promise<string> {
-    const t = Math.floor(Date.now() / 1000);
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${payload}`));
-    return `t=${t},v1=${[...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
-  }
-  it("each cycle unlocks 1/N of the term; the final payment completes and stops billing", async () => {
-    const db = env.DB as D1Database;
-    const secret = "whsec_connect_test";
-    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
-    // Isolated synthetic tenant (no connected account) so completion doesn't call Stripe.
-    const tenantId = "tenant_install_1";
-    const pkgId = "pkg_install_1";
-    await db.prepare("INSERT INTO packages (id, tenant_id, name, one_time_price_cents, installment_months, budgets_json, currency, visibility, active, created_at) VALUES (?, ?, ?, 9000, 3, ?, 'usd', 'marketplace', 1, ?)")
-      .bind(pkgId, tenantId, "3-Month Plan", JSON.stringify([{ feature: "all", days: 90 }]), new Date().toISOString()).run();
-    // Connect grants require event.account → tenant. Pin the mapping; the renewal/
-    // completion path is pure DB (no Stripe call) so this stays offline.
-    await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_install_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_install_1'").bind(tenantId, new Date().toISOString()).run();
-    const post = async (payload: string) => SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await sig(payload, secret) }, body: payload });
-    const subId = "sub_install_1";
-
-    // Period one via installment-mode checkout (N=3).
-    await post(JSON.stringify({ id: "evt_inst_create", account: "acct_install_1", type: "checkout.session.completed", data: { object: { id: "cs_inst_1", mode: "subscription", subscription: subId, metadata: { kova_tenant: tenantId, kova_client: "cl_install_1", kova_package: pkgId, kova_installments: "3" } } } }));
-    let row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ installments_total: number; installments_paid: number; payment_status: string; stripe_sub_id: string | null; budgets_json: string }>())!;
-    expect([row.installments_total, row.installments_paid]).toEqual([3, 1]);
-    const cycleBudgets = JSON.parse(row.budgets_json).length; // 'all' → workout+meal = 2 per cycle
-
-    // Cycle two (still billing, so keyed by the Stripe sub id).
-    await post(JSON.stringify({ id: "evt_inst_c2", account: "acct_install_1", type: "invoice.paid", data: { object: { subscription: subId, billing_reason: "subscription_cycle" } } }));
-    row = (await db.prepare("SELECT installments_total, installments_paid, payment_status, stripe_sub_id, budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first())!;
-    expect(row.installments_paid).toBe(2);
-    expect(JSON.parse(row.budgets_json).length).toBe(cycleBudgets * 2); // another period queued
-
-    // Final cycle → completed, billing stopped (stripe_sub_id cleared).
-    await post(JSON.stringify({ id: "evt_inst_c3", account: "acct_install_1", type: "invoice.paid", data: { object: { subscription: subId, billing_reason: "subscription_cycle" } } }));
-    row = (await db.prepare("SELECT installments_paid, payment_status, stripe_sub_id, budgets_json FROM subject_subscriptions WHERE package_id = ? LIMIT 1").bind(pkgId).first())!;
-    expect(row.installments_paid).toBe(3);
-    expect(row.payment_status).toBe("completed");
-    expect(row.stripe_sub_id).toBeNull();
-    expect(JSON.parse(row.budgets_json).length).toBe(cycleBudgets * 3); // full term unlocked across 3 cycles
-  });
-});
 
 describe("notifications — surface-scoped mark-all-read", () => {
   it("coach mode clears staff/owner notifications but leaves client ones unread", async () => {
@@ -3337,17 +3143,17 @@ describe("package lifecycle + redemption scoping", () => {
 
     // A `private` package is grant-only — not client-purchasable.
     await mkPkg("pkg_priv", "private", null);
-    expect((await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, packageId: "pkg_priv" }) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/purchases`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, packageId: "pkg_priv" }) })).status).toBe(404);
     // A `client_specific` package is purchasable only by its own client.
     await mkPkg("pkg_cs", "client_specific", a);
-    expect((await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: b, packageId: "pkg_cs" }) })).status).toBe(404);
+    expect((await SELF.fetch(`${ORIGIN}/api/purchases`, { method: "POST", headers: H, body: JSON.stringify({ clientId: b, packageId: "pkg_cs" }) })).status).toBe(404);
     // …and BOTH halves are asserted. Only checking that B is refused passes just
     // as happily when the rule fails CLOSED and nobody can buy it at all — which
     // is exactly what a wrong `restrictedVisibility` produces now that the value
-    // is a parameter. A is not expected to complete a charge here (no Stripe
-    // account is connected in this suite); what matters is that the visibility
-    // check let them THROUGH, so anything but the 404 is the pass.
-    expect((await SELF.fetch(`${ORIGIN}/api/connect/pay-intent`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, packageId: "pkg_cs" }) })).status).not.toBe(404);
+    // is a parameter. A opens a real purchase here — on the tenant rail that
+    // needs no provider configured, because `manual` is the default — so the
+    // visibility check letting them THROUGH is what anything-but-404 proves.
+    expect((await SELF.fetch(`${ORIGIN}/api/purchases`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, packageId: "pkg_cs" }) })).status).not.toBe(404);
 
     // Redemption code locked to client A: B is rejected, A succeeds.
     await SELF.fetch(`${ORIGIN}/api/redemption-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "LOCKEDA", daysToAdd: 10, restrictedClientId: a }) });
@@ -4214,61 +4020,6 @@ describe("client flags union across concurrent access rows", () => {
   });
 });
 
-describe("connect rail — Basil-shaped invoices still renew", () => {
-  const secret = "whsec_connect_basil";
-  const post = async (payload: string) =>
-    SELF.fetch(`${ORIGIN}/api/connect/webhook`, { method: "POST", headers: { "content-type": "application/json", "stripe-signature": await whSig(payload, secret) }, body: payload });
-
-  it("invoice.paid with the subscription under parent.subscription_details tops the budget up", async () => {
-    const db = env.DB as D1Database;
-    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
-    const tenantId = "tenant_basil_1";
-    const pkgId = "pkg_basil_1";
-    const subId = "sub_basil_1";
-    await db.prepare("INSERT INTO packages (id, tenant_id, name, monthly_price_cents, budgets_json, currency, visibility, active, created_at) VALUES (?, ?, 'Basil Monthly', 4900, ?, 'usd', 'marketplace', 1, ?)")
-      .bind(pkgId, tenantId, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
-    await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_basil_1', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_basil_1'").bind(tenantId, new Date().toISOString()).run();
-
-    // Period one (subscription-mode checkout).
-    await post(JSON.stringify({ id: "evt_basil_create", account: "acct_basil_1", type: "checkout.session.completed", data: { object: { id: "cs_basil_1", mode: "subscription", subscription: subId, metadata: { kova_tenant: tenantId, kova_client: "cl_basil_1", kova_package: pkgId } } } }));
-    const budgetsAfterCreate = JSON.parse((await db.prepare("SELECT budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
-    expect(budgetsAfterCreate).toBeGreaterThan(0);
-
-    // A Basil-shaped renewal: NO `subscription` at the invoice root.
-    const basil = JSON.stringify({
-      id: "evt_basil_cycle",
-      account: "acct_basil_1",
-      type: "invoice.paid",
-      data: { object: { id: "in_basil_1", billing_reason: "subscription_cycle", parent: { type: "subscription_details", subscription_details: { subscription: subId } }, lines: { data: [{ id: "il_1" }] } } },
-    });
-    expect((await post(basil)).status).toBe(200);
-    const after = JSON.parse((await db.prepare("SELECT budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
-    expect(after).toBeGreaterThan(budgetsAfterCreate); // another period queued
-  });
-
-  it("a renewal whose subscription rides only on the line item still resolves", async () => {
-    const db = env.DB as D1Database;
-    await db.prepare("INSERT INTO app_config (key, value) VALUES ('stripe.connect_webhook_secret', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(secret).run();
-    const tenantId = "tenant_basil_2";
-    const pkgId = "pkg_basil_2";
-    const subId = "sub_basil_2";
-    await db.prepare("INSERT INTO packages (id, tenant_id, name, monthly_price_cents, budgets_json, currency, visibility, active, created_at) VALUES (?, ?, 'Basil Lines', 4900, ?, 'usd', 'marketplace', 1, ?)")
-      .bind(pkgId, tenantId, JSON.stringify([{ feature: "all", days: 30 }]), new Date().toISOString()).run();
-    await db.prepare("INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, 'acct_basil_2', ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = 'acct_basil_2'").bind(tenantId, new Date().toISOString()).run();
-    await post(JSON.stringify({ id: "evt_basil2_create", account: "acct_basil_2", type: "checkout.session.completed", data: { object: { id: "cs_basil_2", mode: "subscription", subscription: subId, metadata: { kova_tenant: tenantId, kova_client: "cl_basil_2", kova_package: pkgId } } } }));
-    const before = JSON.parse((await db.prepare("SELECT budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
-
-    const lineOnly = JSON.stringify({
-      id: "evt_basil2_cycle",
-      account: "acct_basil_2",
-      type: "invoice.paid",
-      data: { object: { id: "in_basil_2", billing_reason: "subscription_cycle", lines: { data: [{ id: "il_2", parent: { subscription_item_details: { subscription: subId } } }] } } },
-    });
-    expect((await post(lineOnly)).status).toBe(200);
-    const after = JSON.parse((await db.prepare("SELECT budgets_json FROM subject_subscriptions WHERE stripe_sub_id = ?").bind(subId).first<{ budgets_json: string }>())!.budgets_json).length;
-    expect(after).toBeGreaterThan(before);
-  });
-});
 
 describe("once_per_customer is enforced on paid checkout", () => {
   it("a repeat inline purchase of a once-per-customer package is refused (409)", async () => {
@@ -4287,12 +4038,13 @@ describe("once_per_customer is enforced on paid checkout", () => {
     // First purchase: the staff grant lane (also once-gated) writes the row.
     expect((await SELF.fetch(`${ORIGIN}/api/subscriptions/grant`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, packageId: pkgId }) })).status).toBeLessThan(300);
 
-    // Buying it again must be refused BEFORE any Stripe call — on both paid paths.
-    for (const path of ["/api/connect/pay-intent", "/api/connect/checkout"]) {
-      const r = await SELF.fetch(`${ORIGIN}${path}`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, packageId: pkgId, returnUrl: "http://localhost:5173/shop" }) });
-      expect(r.status, path).toBe(409);
-      expect((await r.json() as { error: string }).error).toBe("package is once per customer");
-    }
+    // Buying it again must be refused BEFORE the customer is sent anywhere to
+    // pay. `grantClientPackage` re-checks at the last gate so nothing
+    // double-grants either way — but a check only THERE means they pay first and
+    // are refused after, on a provider we cannot refund from.
+    const r = await SELF.fetch(`${ORIGIN}/api/purchases`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id, packageId: pkgId }) });
+    expect(r.status).toBe(409);
+    expect((await r.json() as { error: string }).error).toBe("package is once per customer");
   });
 });
 
@@ -4805,7 +4557,7 @@ describe("a hostname with no studio serves nothing", () => {
     // invisible: Stripe retries, disables the endpoint, and customers pay while
     // their studio is never activated. Verified against production, where the root
     // door was 404ing exactly this.
-    for (const p of ["/api/stripe/webhook", "/api/connect/webhook"]) {
+    for (const p of ["/api/stripe/webhook", "/api/pay/webhook/t_any"]) {
       const res = await SELF.fetch(`http://localhost:8787${p}`, {
         method: "POST",
         headers: { "content-type": "application/json" },

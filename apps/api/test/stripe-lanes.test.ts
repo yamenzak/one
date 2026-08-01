@@ -81,7 +81,6 @@ let evtSeq = 0;
 /** A side-effect-free platform event (unhandled type ⇒ the switch is a no-op),
  *  so a 200 means "this secret verified the signature" and nothing else. */
 const platformEvent = () => JSON.stringify({ id: `evt_lane_${++evtSeq}_${Date.now()}`, type: "customer.updated", data: { object: {} } });
-const connectEvent = () => JSON.stringify({ id: `evt_lane_c_${++evtSeq}_${Date.now()}`, account: "acct_lane_none", type: "account.updated", data: { object: {} } });
 
 const postWebhook = async (path: string, payload: string, secret: string) =>
 // The SETUP door. A hostname resolving no studio now serves only `/api/host`
@@ -92,7 +91,6 @@ const postWebhook = async (path: string, payload: string, secret: string) =>
 /** Verified by the platform rail with `secret`? (400 = bad signature.) */
 const platformAccepts = async (secret: string) => (await postWebhook("/api/stripe/webhook", platformEvent(), secret)).status === 200;
 /** Verified by the Connect rail with `secret`? */
-const connectAccepts = async (secret: string) => (await postWebhook("/api/connect/webhook", connectEvent(), secret)).status === 200;
 
 async function setCfg(entries: Record<string, string>): Promise<void> {
   const db = env.DB as D1Database;
@@ -101,10 +99,10 @@ async function setCfg(entries: Record<string, string>): Promise<void> {
   }
 }
 
-interface LaneStatus { secretKey: boolean; publishableKey: boolean; webhookSecret: boolean; connectWebhookSecret: boolean; complete: boolean; secretKeyLast4: string | null; secretKeyLane: string | null }
+interface LaneStatus { secretKey: boolean; publishableKey: boolean; webhookSecret: boolean; complete: boolean; secretKeyLast4: string | null; secretKeyLane: string | null }
 interface StatusBody {
   mode: string; enabled: boolean; activeLane: string; keyLane: string | null; laneMismatch: boolean;
-  activeLaneComplete: boolean; connectWebhookMissing: boolean; connectWebhookFallback: boolean;
+  activeLaneComplete: boolean;
   lanes: { test: LaneStatus; live: LaneStatus }; legacy: LaneStatus;
   active: LaneStatus & { lane: string; sources: Record<string, string> }; platformFeeBps: number;
 }
@@ -129,20 +127,17 @@ describe("stripe credential lanes — resolution", () => {
       "stripe.secret_key": "sk_test_legacy_1234",
       "stripe.publishable_key": "pk_test_legacy",
       "stripe.webhook_secret": "whsec_legacy_platform",
-      "stripe.connect_webhook_secret": "whsec_legacy_connect",
     });
     expect(await platformAccepts("whsec_legacy_platform")).toBe(true);
-    expect(await connectAccepts("whsec_legacy_connect")).toBe(true);
 
     const s = await getStatus();
     expect(s.mode).toBe("test");
     expect(s.enabled).toBe(true); // the legacy secret key still enables Stripe
     expect(s.activeLane).toBe("test");
-    expect(s.active.sources).toMatchObject({ secretKey: "legacy", webhookSecret: "legacy", connectWebhookSecret: "legacy" });
+    expect(s.active.sources).toMatchObject({ secretKey: "legacy", webhookSecret: "legacy" });
     expect(s.legacy.complete).toBe(true);
     expect(s.lanes.test.secretKey).toBe(false); // nothing lane-scoped stored yet
     expect(s.activeLaneComplete).toBe(true);
-    expect(s.connectWebhookMissing).toBe(false);
   });
 
   it("a lane-scoped value takes precedence over the legacy one", async () => {
@@ -150,14 +145,10 @@ describe("stripe credential lanes — resolution", () => {
       "stripe.mode": "test",
       "stripe.secret_key": "sk_test_legacy_1234",
       "stripe.webhook_secret": "whsec_legacy_platform",
-      "stripe.connect_webhook_secret": "whsec_legacy_connect",
       "stripe.test.webhook_secret": "whsec_test_platform",
-      "stripe.test.connect_webhook_secret": "whsec_test_connect",
     });
     expect(await platformAccepts("whsec_test_platform")).toBe(true);
     expect(await platformAccepts("whsec_legacy_platform")).toBe(false); // superseded
-    expect(await connectAccepts("whsec_test_connect")).toBe(true);
-    expect(await connectAccepts("whsec_legacy_connect")).toBe(false);
 
     const s = await getStatus();
     expect(s.active.sources.webhookSecret).toBe("lane");
@@ -172,15 +163,9 @@ describe("stripe credential lanes — resolution", () => {
       "stripe.secret_key": "sk_test_x",
       "stripe.test.webhook_secret": "whsec_test_platform_only",
       "stripe.live.webhook_secret": "whsec_live_platform_only",
-      "stripe.live.connect_webhook_secret": "whsec_live_connect",
     });
-    expect(await connectAccepts("whsec_test_platform_only")).toBe(true); // in-lane fallback
-    expect(await connectAccepts("whsec_live_platform_only")).toBe(false); // never the other lane
-    expect(await connectAccepts("whsec_live_connect")).toBe(false);
 
     const s = await getStatus();
-    expect(s.connectWebhookMissing).toBe(true); // the highest-consequence gap is reported
-    expect(s.connectWebhookFallback).toBe(true);
   });
 
   it("flipping stripe.mode swaps which credentials are used, with no re-paste", async () => {
@@ -189,11 +174,9 @@ describe("stripe credential lanes — resolution", () => {
       "stripe.test.secret_key": "sk_test_flip_1111",
       "stripe.test.publishable_key": "pk_test_flip",
       "stripe.test.webhook_secret": "whsec_test_flip",
-      "stripe.test.connect_webhook_secret": "whsec_test_flip_connect",
       "stripe.live.secret_key": "sk_live_flip_2222",
       "stripe.live.publishable_key": "pk_live_flip",
       "stripe.live.webhook_secret": "whsec_live_flip",
-      "stripe.live.connect_webhook_secret": "whsec_live_flip_connect",
     });
     expect(await platformAccepts("whsec_test_flip")).toBe(true);
     expect(await platformAccepts("whsec_live_flip")).toBe(false);
@@ -212,8 +195,6 @@ describe("stripe credential lanes — resolution", () => {
     expect(s.active.secretKeyLast4).toBe("2222"); // the live key, not the test one
     expect(await platformAccepts("whsec_live_flip")).toBe(true);
     expect(await platformAccepts("whsec_test_flip")).toBe(false);
-    expect(await connectAccepts("whsec_live_flip_connect")).toBe(true);
-    expect(await connectAccepts("whsec_test_flip_connect")).toBe(false);
   });
 });
 
@@ -272,7 +253,6 @@ describe("stripe credential lanes — /admin/stripe/status is secret-free", () =
       "stripe.live.secret_key": "sk_live_lane_secret_value_abcd",
       "stripe.live.publishable_key": "pk_live_lane_value",
       "stripe.live.webhook_secret": "whsec_live_platform_value",
-      "stripe.live.connect_webhook_secret": "whsec_live_connect_value",
       "stripe.test.secret_key": "sk_test_lane_secret_value_wxyz",
       "stripe.platform_fee_bps": "250",
     });
@@ -284,7 +264,6 @@ describe("stripe credential lanes — /admin/stripe/status is secret-free", () =
       "sk_live_legacy_secret_value",
       "sk_test_lane_secret_value_wxyz",
       "whsec_live_platform_value",
-      "whsec_live_connect_value",
       "pk_live_lane_value",
     ]) {
       expect(text).not.toContain(secret);
@@ -300,7 +279,7 @@ describe("stripe credential lanes — /admin/stripe/status is secret-free", () =
     expect(s.laneMismatch).toBe(false);
     expect(s.activeLaneComplete).toBe(true);
     expect(s.active.secretKeyLast4).toBe("abcd"); // a 4-char hint is the most it gives
-    expect(s.lanes.live).toMatchObject({ secretKey: true, publishableKey: true, webhookSecret: true, connectWebhookSecret: true, complete: true });
+    expect(s.lanes.live).toMatchObject({ secretKey: true, publishableKey: true, webhookSecret: true, complete: true });
     expect(s.lanes.test).toMatchObject({ secretKey: true, publishableKey: false, complete: false });
     expect(s.legacy.secretKey).toBe(true);
     expect(s.platformFeeBps).toBe(250);

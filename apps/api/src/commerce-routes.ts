@@ -69,6 +69,16 @@ const PackageBody = z.object({
   visibility: Visibility.default("private"),
   restrictedClientId: z.string().nullish(),
   oncePerCustomer: z.boolean().default(false),
+  /**
+   * The tenant's own checkout page for THIS package.
+   *
+   * A URL and nothing else — never a credential. It is per-package because a
+   * hosted payment link is fixed-price, so one link cannot serve a catalogue.
+   * `url()` is a real guard, not politeness: a malformed value here sends a
+   * paying customer nowhere, and the studio would only find out from the
+   * customer.
+   */
+  payLink: z.string().url().max(2000).nullish(),
 });
 
 interface SubRow {
@@ -177,14 +187,14 @@ export const commerceRoutes = new Hono<AppEnv>()
     const d = parsed.data;
     const id = newId("pkg");
     await c.env.DB.prepare(
-      `INSERT INTO packages (id, tenant_id, name, description, one_time_price_cents, monthly_price_cents, installment_months, budgets_json, addons_json, flags_json, visibility, restricted_subject_id, once_per_customer, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO packages (id, tenant_id, name, description, one_time_price_cents, monthly_price_cents, installment_months, budgets_json, addons_json, flags_json, visibility, restricted_subject_id, once_per_customer, pay_link, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
       .bind(
         id, who.tenantId, d.name, d.description ?? null, d.oneTimePriceCents ?? null,
         d.monthlyPriceCents ?? null, d.installmentMonths ?? null, j(d.budgets),
         d.addOns ? j(d.addOns) : null, d.flags ? j(d.flags) : null, d.visibility,
-        d.restrictedClientId ?? null, d.oncePerCustomer ? 1 : 0, nowIso(),
+        d.restrictedClientId ?? null, d.oncePerCustomer ? 1 : 0, d.payLink ?? null, nowIso(),
       )
       .run();
     return c.json({ ok: true, id }, 201);
@@ -206,6 +216,7 @@ export const commerceRoutes = new Hono<AppEnv>()
     if (d.description !== undefined) put("description", d.description);
     if (d.oneTimePriceCents !== undefined) put("one_time_price_cents", d.oneTimePriceCents);
     if (d.monthlyPriceCents !== undefined) put("monthly_price_cents", d.monthlyPriceCents);
+    if (d.payLink !== undefined) put("pay_link", d.payLink);
     if (d.installmentMonths !== undefined) put("installment_months", d.installmentMonths);
     if (d.budgets !== undefined) put("budgets_json", j(d.budgets));
     if (d.addOns !== undefined) put("addons_json", d.addOns ? j(d.addOns) : null);

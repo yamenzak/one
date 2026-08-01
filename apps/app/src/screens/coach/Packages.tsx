@@ -19,6 +19,7 @@ interface Pkg {
   one_time_price_cents: number | null;
   monthly_price_cents?: number | null;
   installment_months?: number | null;
+  pay_link?: string | null;
   budgets: { feature: string; days: number }[];
   addOns?: { addOnTypeId: string; quantity: number }[] | null;
   flags?: PkgFlags | null;
@@ -285,6 +286,7 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
   );
   const [price, setPrice] = useState(centsToInput(pkg?.monthly_price_cents ?? pkg?.one_time_price_cents ?? null));
   const [installmentMonths, setInstallmentMonths] = useState(String(pkg?.installment_months && pkg.installment_months > 1 ? pkg.installment_months : 3));
+  const [payLink, setPayLink] = useState(pkg?.pay_link ?? "");
   const [budgets, setBudgets] = useState<{ feature: BudgetFeature; days: number }[]>(() => {
     const initial = (pkg?.budgets ?? [])
       .filter((b): b is { feature: BudgetFeature; days: number } => BUDGET_FEATURES.includes(b.feature as BudgetFeature));
@@ -347,6 +349,7 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
         oncePerCustomer,
         visibility,
         restrictedClientId: visibility === "client_specific" && restrictedClientId ? restrictedClientId : null,
+        payLink: payLink.trim() || null,
       };
       if (pkg) await api.patch(`/api/packages/${pkg.id}`, body);
       else await api.post("/api/packages", body);
@@ -377,6 +380,18 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
           hint={priceError ? undefined : parsed.cents != null ? `Clients see ${fmtPrice(parsed.cents)}${priceMode === "monthly" ? " per month" : ""}.` : undefined}
         />
         {priceMode === "installment" && <Field label="Installment months" value={installmentMonths} inputMode="numeric" onChange={(e) => setInstallmentMonths(e.target.value.replace(/\D/g, ""))} error={monthsError ?? undefined} />}
+
+        {/* The checkout page for THIS package, on the coach's own provider.
+            Per-package because a hosted payment link is fixed-price — one link
+            cannot serve a catalogue. Blank is fine and common: the studio
+            settles off-platform and confirms by hand. */}
+        <Field
+          label="Payment link (optional)"
+          value={payLink}
+          onChange={(e) => setPayLink(e.target.value)}
+          placeholder="https://buy.stripe.com/…"
+          hint={payLink.trim() ? "Clients are sent here to pay." : "Leave blank to take payment your own way and confirm it yourself."}
+        />
 
         <div className="space-y-2">
           <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Feature budgets</span><button type="button" onClick={() => setBudgets((b) => [...b, { feature: "workout", days: 30 }])} className="text-xs font-medium text-primary">+ Budget</button></div>

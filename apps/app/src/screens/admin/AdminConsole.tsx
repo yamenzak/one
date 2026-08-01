@@ -2213,19 +2213,20 @@ function NuclearResetCard() {
  * fields. Three of them were unreachable, each with a silent consequence:
  *  • no publishable key → every inline payment breaks on both rails, because the
  *    Payment Element cannot initialise without it (pack-intent, plan-intent and
- *    connect/pay-intent all return it to the browser);
- *  • no Connect webhook secret → client→tenant events fail signature verification,
- *    so a client pays their coach and no access is ever granted;
+ *    pack-intent and plan-intent both return it to the browser);
  *  • mode pinned to "test" → live keys could never be activated from the product.
+ *
+ * The Connect webhook secret is gone with the Connect rail: a studio is paid on
+ * its OWN provider now, and that provider's signing secret lives with the studio
+ * (Business → Getting paid), never here. These credentials are Kova's own.
  */
 type StripeLane = "test" | "live";
 type StripeMode = StripeLane | "disabled";
-type LaneCreds = { secretKey: string; publishableKey: string; webhookSecret: string; connectWebhookSecret: string };
+type LaneCreds = { secretKey: string; publishableKey: string; webhookSecret: string };
 interface LaneStatus {
   secretKey: boolean;
   publishableKey: boolean;
   webhookSecret: boolean;
-  connectWebhookSecret: boolean;
   complete: boolean;
   secretKeyLast4: string | null;
   publishableKeyLast4: string | null;
@@ -2239,20 +2240,17 @@ interface StripeStatusView {
   keyLane: StripeLane | null;
   laneMismatch: boolean;
   activeLaneComplete: boolean;
-  connectWebhookMissing: boolean;
-  connectWebhookFallback: boolean;
   lanes: Record<StripeLane, LaneStatus>;
   legacy: LaneStatus;
   active: LaneStatus & { lane: StripeLane; sources: Record<keyof LaneCreds, "lane" | "legacy" | "none"> };
   platformFeeBps: number;
 }
 
-const EMPTY_CREDS: LaneCreds = { secretKey: "", publishableKey: "", webhookSecret: "", connectWebhookSecret: "" };
+const EMPTY_CREDS: LaneCreds = { secretKey: "", publishableKey: "", webhookSecret: "" };
 const CRED_LABEL: Record<keyof LaneCreds, string> = {
   secretKey: "secret key",
   publishableKey: "publishable key",
   webhookSecret: "platform webhook secret",
-  connectWebhookSecret: "Connect webhook secret",
 };
 const CRED_KEYS = Object.keys(CRED_LABEL) as (keyof LaneCreds)[];
 const nonEmpty = (c: LaneCreds): Partial<LaneCreds> => Object.fromEntries(Object.entries(c).filter(([, v]) => v.trim() !== ""));
@@ -2427,17 +2425,10 @@ function StripeConfig() {
                     Store matching keys in the {status.mode} lane, or switch to {status.keyLane} mode.
                   </Callout>
                 )}
-                {status.mode !== "disabled" && status.connectWebhookMissing && (
-                  <Callout tone="danger" icon={AlertTriangle} live="alert">
-                    No Connect webhook secret in the {status.mode} lane
-                    {status.connectWebhookFallback ? " — Connect events fall back to the platform secret, which is a different endpoint and will fail signature verification" : ""}.
-                    A client pays their coach and no access is granted, with no error anywhere.
-                  </Callout>
-                )}
                 <div className="flex flex-wrap gap-1.5" aria-label="Credentials stored per lane">
                   {(["test", "live"] as const).map((lane) => (
                     <Badge key={lane} tone={laneOf(lane)?.complete ? "success" : laneOf(lane)?.secretKey ? "warning" : "neutral"}>
-                      {lane}: {laneOf(lane)?.complete ? "all 4 stored" : `${CRED_KEYS.filter((k) => laneOf(lane)?.[k]).length}/4 stored`}
+                      {lane}: {laneOf(lane)?.complete ? "all 3 stored" : `${CRED_KEYS.filter((k) => laneOf(lane)?.[k]).length}/3 stored`}
                     </Badge>
                   ))}
                   {status.legacy.secretKey && <Badge tone="neutral">pre-lane keys present (used as a fallback)</Badge>}
@@ -2521,14 +2512,6 @@ function StripeConfig() {
                           value={creds[lane].webhookSecret}
                           onChange={(e) => setCred(lane, "webhookSecret", e.target.value)}
                           hint={storedHint(!!laneOf(lane)?.webhookSecret, null, false)}
-                          placeholder="whsec_…"
-                        />
-                        <Field
-                          label={`Connect webhook secret (${lane})`}
-                          icon={KeyRound}
-                          value={creds[lane].connectWebhookSecret}
-                          onChange={(e) => setCred(lane, "connectWebhookSecret", e.target.value)}
-                          hint={storedHint(!!laneOf(lane)?.connectWebhookSecret, null, false)}
                           placeholder="whsec_…"
                         />
                       </div>
