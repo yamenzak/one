@@ -1,0 +1,21 @@
+{
+  "name": "@tessa/domain",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tessa's pure domain logic — GS1/UDI barcode parsing and expiry composition. No I/O, no platform dependencies: every function here is a total function over its arguments, which is what lets the safety-critical rules be tested exhaustively.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
