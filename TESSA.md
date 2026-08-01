@@ -389,12 +389,16 @@ editing it.
   role** — everyone who touches Tessa works at the centre, so every member
   consumes a staff seat.
 - `/api/catalog` — the first real routes, and the shape later ones copy.
-- 18 app tests (12 conformance, 6 integration through the real worker).
+- **The ledger chokepoint** (`apps/tessa/src/ledger.ts`). `applyEvent` is the
+  ONLY way a lot, unit or pack changes: it writes the ledger row and applies the
+  state change in a single `db.batch()`, guards the state update with a
+  compare-and-set, and refuses rather than clamps. Tessa's equivalent of Kova's
+  `requireClientAccess` — the value is entirely in it never being bypassed.
+- 31 app tests (12 conformance, 6 integration, 13 ledger) + 62 in
+  `@tessa/domain`.
 
 **Not built:** everything else. Locations, lots, units, packs, cycles, cases and
 the ledger exist as tables with no routes over them. There is no SPA.
 
-Next: the ledger write path, because it is the invariant everything else depends
-on — no route may change a state column without writing the ledger row that
-justifies it, and that is far easier to establish now than to retrofit across a
-dozen routes.
+Next: routes over the ledger — receive, move, consume — and then the
+sterilisation cycle, which is where the recall query finally becomes real.

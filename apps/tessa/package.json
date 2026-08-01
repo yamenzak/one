@@ -23,6 +23,7 @@
     "@4dl/purge": "workspace:*",
     "@4dl/storage": "workspace:*",
     "@4dl/tenancy": "workspace:*",
+    "@tessa/domain": "workspace:*",
     "better-auth": "^1.6.23",
     "hono": "^4.9.10"
   },
