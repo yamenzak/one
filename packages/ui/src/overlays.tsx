@@ -452,18 +452,40 @@ export function IconTabs<T extends string>({
 }
 
 // ── Select ───────────────────────────────────────────────────────────────────
-export function Select<T extends string>({ value, onChange, options, placeholder, className, "aria-label": ariaLabel }: { value: T; onChange: (v: T) => void; options: { value: T; label: string }[]; placeholder?: string; className?: string; "aria-label"?: string }) {
+/**
+ * The one dropdown. Not `<select>` — and the difference is not cosmetic.
+ *
+ * A native `<select>` can hold a `value` that none of its `<option>`s carry, and
+ * when it does it renders BLANK or silently shows the first option instead. That
+ * is not a styling nit: it is the exact failure mode of a picker whose stored
+ * choice has since been withdrawn (a model an operator disabled, a coach who
+ * left, a package that was retired). The control shows something plausible, the
+ * database still holds the withdrawn value, and nobody is told. This component
+ * cannot do that — the trigger renders the placeholder when nothing matches, so
+ * a caller with a stale value has to decide what to say about it.
+ *
+ * It also honours the tokens on iOS, where a native `<select>` ignores nearly
+ * every style, and it can carry a two-line item where an `<option>` cannot.
+ *
+ * `options` may include a `value: ""` entry — Radix 2.3.3 permits it, and it is
+ * how "no choice / auto" is spelled. `disabled` on an option keeps a value
+ * VISIBLE but unpickable, which is what a withdrawn-but-stored choice needs.
+ */
+export function Select<T extends string>({ value, onChange, options, placeholder, className, disabled, "aria-label": ariaLabel }: { value: T; onChange: (v: T) => void; options: { value: T; label: string; disabled?: boolean }[]; placeholder?: string; className?: string; disabled?: boolean; "aria-label"?: string }) {
   return (
-    <SelectPrimitive.Root value={value} onValueChange={(v) => onChange(v as T)}>
+    <SelectPrimitive.Root value={value} onValueChange={(v) => onChange(v as T)} disabled={disabled}>
       <SelectPrimitive.Trigger
         aria-label={ariaLabel}
         className={cn(
-          "inline-flex h-11 w-full items-center justify-between gap-2 rounded-xl border border-input bg-secondary/50 px-3.5 text-sm outline-none transition-colors focus-visible:border-primary/70 data-[placeholder]:text-muted-foreground",
+          "inline-flex h-11 w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-input bg-secondary/50 px-3.5 text-sm outline-none transition-colors focus-visible:border-primary/70 data-[placeholder]:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60",
           FOCUS,
           className,
         )}
       >
-        <SelectPrimitive.Value placeholder={placeholder} />
+        {/* The label truncates rather than widening the trigger. A model name
+            with its price appended is long, and these sit in right-aligned slots
+            that must not push the label beside them off the row. */}
+        <span className="min-w-0 truncate text-left"><SelectPrimitive.Value placeholder={placeholder} /></span>
         <SelectPrimitive.Icon>
           <ChevronDown className="size-4 text-muted-foreground" />
         </SelectPrimitive.Icon>
@@ -475,7 +497,8 @@ export function Select<T extends string>({ value, onChange, options, placeholder
               <SelectPrimitive.Item
                 key={o.value}
                 value={o.value}
-                className="flex cursor-pointer items-center justify-between rounded-xl px-3 py-2.5 text-sm outline-none transition-colors data-[highlighted]:bg-secondary"
+                disabled={o.disabled}
+                className="flex cursor-pointer items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm outline-none transition-colors data-[highlighted]:bg-secondary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
               >
                 <SelectPrimitive.ItemText>{o.label}</SelectPrimitive.ItemText>
                 <SelectPrimitive.ItemIndicator>

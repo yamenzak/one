@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { AiSettingsPayload, AiFeatureMeta, AiModelMeta, TenantAiConfig, AiFeatureConfig, AiTone } from "@kova/protocol";
-import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, Field, IconBadge, cn, PencilLine, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, Wallet, CircleCheck, CircleAlert, type Tone, type LucideIcon, Wand2, Sliders, ListChecks, ActionResult, useConfirmedState} from "@4dl/ui";
+import { Card, Badge, Skeleton, Reveal, SkeletonLine, Switch, Button, Textarea, Chip, Field, IconBadge, cn, PencilLine, ChevronDown, Building2, Users, HeartPulse, Camera, ImageIcon, Play, Wallet, CircleCheck, CircleAlert, type Tone, type LucideIcon, Wand2, Sliders, ListChecks, Select, ActionResult, useConfirmedState} from "@4dl/ui";
 import { SectionSplit } from "./SectionSplit.js";
 import { api, errorText } from "../api.js";
 import { AiAvatar, useAiIdentity } from "../AiAvatar.js";
@@ -57,6 +57,36 @@ const modelOption = (m: AiModelMeta, task: string): string => {
   const c = costOf(m, task);
   return c === null ? m.label : `${m.label} — ~${c} cr`;
 };
+
+/**
+ * The options for one model picker, INCLUDING a stored choice that no longer
+ * exists.
+ *
+ * `/api/settings/ai` only ever returns models the platform has switched on
+ * (`listModels` filters `enabled = 1`), so the moment an operator withdraws a
+ * model, every studio that had chosen it holds an id that is no longer in the
+ * list. The engine already does the right thing — `modelById` filters on
+ * `enabled = 1`, so the pick is ignored and the automatic default answers — but
+ * the SCREEN said nothing, and a native `<select>` cannot: given a `value` no
+ * `<option>` carries it silently shows the first one, so the picker read
+ * "Default (auto)" while the database still held the dead id. The owner had no
+ * way to know their choice had lapsed, and if the model were ever switched back
+ * on it would silently return.
+ *
+ * So the withdrawn id is carried as a disabled entry that says so. It cannot be
+ * re-picked, it is visibly not a normal choice, and choosing anything else
+ * clears it for good.
+ */
+function modelOptions(pickable: AiModelMeta[], task: string, selected: string, autoLabel: string) {
+  const options: { value: string; label: string; disabled?: boolean }[] = [
+    { value: "", label: autoLabel },
+    ...pickable.map((m) => ({ value: m.id, label: modelOption(m, task) })),
+  ];
+  if (selected && !pickable.some((m) => m.id === selected)) {
+    options.push({ value: selected, label: `${selected} — no longer available`, disabled: true });
+  }
+  return options;
+}
 
 /** "the cheapest here costs 2" → "4× the cheapest option". Comparison inside
  *  one picker is what makes an absolute credit figure actionable. */
@@ -430,10 +460,13 @@ function DefaultModels({ features, models, config, onApply }: {
                   <IconBadge icon={g.icon} tone={g.tone} size="sm" />
                   <div className="min-w-0"><div className="text-sm font-medium">{g.label}</div><div className="truncate text-xs text-muted-foreground">{g.desc}</div></div>
                 </div>
-                <select value={current} onChange={(e) => onApply(keys, { model: e.target.value || null })} className="max-w-[44%] shrink-0 truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70">
-                  <option value="">{mixed ? "Mixed — set all…" : "Default (auto)"}</option>
-                  {pickable.map((m) => <option key={m.id} value={m.id}>{modelOption(m, g.priceTask)}</option>)}
-                </select>
+                <Select
+                  aria-label={g.label}
+                  value={current}
+                  className="h-9 w-auto max-w-[44%]"
+                  onChange={(id) => onApply(keys, { model: id || null })}
+                  options={modelOptions(pickable, g.priceTask, current, mixed ? "Mixed — set all…" : "Default (auto)")}
+                />
               </div>
               {hint && <div className="numeral pl-[2.9rem] text-xs text-muted-foreground">{hint}</div>}
             </div>
@@ -533,14 +566,13 @@ function FeatureCard({ feat, models, cfg, tones, onSave }: {
           <div>
             <label className="flex items-center justify-between gap-3 text-sm">
               <span className="text-muted-foreground">Model</span>
-              <select
+              <Select
+                aria-label={`Model for ${feat.label}`}
                 value={cfg.model ?? ""}
-                onChange={(e) => onSave({ model: e.target.value || null })}
-                className="max-w-[60%] truncate rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
-              >
-                <option value="">Default (auto)</option>
-                {pickable.map((m) => <option key={m.id} value={m.id}>{modelOption(m, feat.task)}</option>)}
-              </select>
+                className="h-9 w-auto max-w-[60%]"
+                onChange={(id) => onSave({ model: id || null })}
+                options={modelOptions(pickable, feat.task, cfg.model ?? "", "Default (auto)")}
+              />
             </label>
             {/* Priced in THIS feature's lane, so the number is what this feature
                 will actually cost — not a generic figure for the model. */}

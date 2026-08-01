@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@kova/domain";
-import { Button, Card, Badge, Field, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, NoData, Anchor, ActionCluster, CountUp, Group, Row, GroupNote } from "@4dl/ui";
+import { Button, Card, Badge, Field, Select, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, NoData, Anchor, ActionCluster, CountUp, Group, Row, GroupNote } from "@4dl/ui";
 import { personaLabel, personaTone } from "../../registry/index.js";
 import { api, errorText, todayLocal } from "../../api.js";
 import { FeatureLock, useCan } from "../../FeatureLock.js";
@@ -1123,7 +1123,13 @@ function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; 
               <input value={v.marker} onChange={(e) => setRow(i, { marker: e.target.value })} placeholder="Marker" className="min-w-0 flex-1 rounded-lg bg-surface-3 px-2.5 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
               <input value={v.value} onChange={(e) => setRow(i, { value: e.target.value })} placeholder="Value" className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
               <input value={v.unit} onChange={(e) => setRow(i, { unit: e.target.value })} placeholder="unit" className="w-14 rounded-lg bg-surface-3 px-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
-              <select value={v.flag} onChange={(e) => setRow(i, { flag: e.target.value as LabValue["flag"] })} className="rounded-lg bg-surface-3 px-1.5 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/70"><option value="low">low</option><option value="normal">ok</option><option value="high">high</option></select>
+              <Select
+                aria-label={`Flag for ${v.marker || "this marker"}`}
+                value={v.flag}
+                className="h-9 w-[4.75rem] shrink-0 px-2"
+                onChange={(flag) => setRow(i, { flag: flag as LabValue["flag"] })}
+                options={[{ value: "low", label: "low" }, { value: "normal", label: "ok" }, { value: "high", label: "high" }]}
+              />
             </div>
           ))}
           <button onClick={() => setValues((v) => [...v, { _id: rowId(), marker: "", value: "", unit: "", flag: "normal" }])} className="text-xs font-medium text-primary">+ Row</button>
