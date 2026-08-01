@@ -5,8 +5,19 @@
    `:root` blocks. */
 @import "./tokens.accents.css";
 
-/* Tailwind v4: scan the workspace UI package for class names. */
+/* Tailwind v4: scan every workspace package that RENDERS, for class names.
+   Tailwind only sees source it is pointed at, and a package resolved through
+   node_modules is not scanned by the automatic detection. Miss one and its
+   components still mount, still typecheck and still pass every test — they just
+   render with a subset of their classes, whichever ones some other file happened
+   to use too. That is how `PwaUpdatePrompt` lost its bottom offset and rendered
+   flush against the browser chrome with its buttons clipped: `@4dl/app-kit` was
+   not on this list.
+
+   Adding a workspace package with JSX in it? Add it here in the same commit. */
 @source "../../../packages/ui/src";
+@source "../../../packages/app-kit/src";
+@source "../../../packages/admin/src";
 
 @import "@fontsource/figtree/400.css";
 @import "@fontsource/figtree/500.css";

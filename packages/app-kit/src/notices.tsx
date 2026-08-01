@@ -261,6 +261,12 @@ export function PwaUpdatePrompt({
           ? "items-center justify-center bg-background/80 backdrop-blur-sm"
           // Otherwise it is a notice: it sits above the tab bar, takes no space
           // from the screen, and lets every tap through except its own.
+          //
+          // This offset only exists if the consuming app SCANS this package for
+          // class names — `@source "…/packages/app-kit/src"` in its stylesheet.
+          // Without it Tailwind emits no rule, the card loses its whole bottom
+          // offset and sits flush against the browser chrome with the buttons
+          // clipped. See the header of `apps/app/src/styles.css`.
           : "pointer-events-none items-end justify-center pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6",
       )}
     >
