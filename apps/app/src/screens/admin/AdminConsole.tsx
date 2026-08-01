@@ -825,7 +825,17 @@ interface ModelPricing {
   /** Credits per billed unit (one image, 1k chars…), after markup. */
   perUnit: { credits: number; kind: string } | null;
 }
-interface ModelRow { id: string; label: string; provider: string; task: string; input_rate: number | null; output_rate: number | null; unit_rate: number | null; unit_kind: string | null; markup: number | null; enabled: number; is_default: number; pricing?: ModelPricing }
+interface ModelRow { id: string; label: string; provider: string; task: string; input_rate: number | null; output_rate: number | null; unit_rate: number | null; unit_kind: string | null; markup: number | null; enabled: number; is_default: number; pricing?: ModelPricing; /** Generation lanes this app can actually run the model on — the server's `modelSupportsTask`, not a guess from `task`. Absent on a server too old to send it. */ supports?: string[] }
+
+/**
+ * The lanes whose membership the ENGINE can vet (`modelSupportsTask`).
+ *
+ * `speech` is deliberately outside it: TTS runs through its own call
+ * (`runGeminiTts`, `responseModalities: ["AUDIO"]`) rather than `generate()`,
+ * so `supports` says nothing about it and filtering the speech lane on that list
+ * would empty it.
+ */
+const VETTED_LANES = new Set(["text", "text-small", "vision", "image"]);
 
 /** The catalog lanes, in the order an operator thinks about them. A lane only
  *  renders if the catalog actually has models for it. */
@@ -1284,10 +1294,19 @@ function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy
     ?? null;
 
   const lanes = TASK_LANES.map((lane) => {
+    // `is_default` is scoped to a model's OWN task server-side (`UPDATE
+    // ai_models SET is_default = 0 WHERE task = ?`), so a lane can only ever pin
+    // a row of that exact task. This is not the same question as "which models
+    // can serve this kind of call" — Gemini reads images without any row being
+    // tagged `vision` — and conflating them would make "pin the vision default"
+    // silently rewrite the TEXT default.
     const inLane = models.filter((m) => m.task === lane.task);
     if (!inLane.length) return null;
-    // What may be CHOSEN: switched on, and nothing else.
-    const options = inLane.filter((m) => m.enabled === 1);
+    // What may be CHOSEN: switched on, AND runnable on this lane by this app.
+    // The second half matters for rows whose tag promises more than the code
+    // delivers — a Workers-AI `vision` model is in the vision lane and fails
+    // every call, because the Workers AI branch never attaches the image.
+    const options = inLane.filter((m) => m.enabled === 1 && (!VETTED_LANES.has(lane.task) || (m.supports ?? [lane.task]).includes(lane.task)));
     const pinned = options.find((m) => m.is_default === 1) ?? null;
     // What the engine falls back to when nothing is pinned: the first enabled
     // row of the lane (`modelForTask` orders by `is_default DESC`).
@@ -1342,13 +1361,25 @@ function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy
                 all, which outranks a stale pin, which outranks an unpinned but
                 working fallback. */}
             {!options.length ? (
-              // The consequence of trading the old "picking one switches it on"
-              // shortcut for an honest picker: when a lane is empty there is
-              // nothing to choose, so the row has to say where the fix is.
-              <p className="text-xs text-warning">
-                No {lane.label.toLowerCase()} is switched on, so this kind of call will fail. Switch one on in the
-                catalog below{fallback ? <>, or rely on <b className="text-foreground">{fallback.label}</b> (every Gemini model reads images)</> : null}.
-              </p>
+              fallback ? (
+                // The VISION lane, in practice always. No Gemini row is ever
+                // tagged `vision` (the pricing page has no such lane) and a
+                // Workers-AI vision row cannot be run here, so there is nothing
+                // to pin — and nothing wrong: every Gemini model reads images,
+                // and that is what answers the call.
+                <p className="text-xs text-muted-foreground">
+                  Nothing here can be pinned — <b className="text-foreground">{fallback.label}</b> answers it. Every
+                  Gemini model reads images, so this lane needs no default.
+                </p>
+              ) : (
+                // The consequence of trading the old "picking one switches it on"
+                // shortcut for an honest picker: when a lane is empty there is
+                // nothing to choose, so the row has to say where the fix is.
+                <p className="text-xs text-warning">
+                  Nothing in this lane is both switched on and runnable here, so this kind of call will fail. Switch one
+                  on in the catalog below.
+                </p>
+              )
             ) : staleDefault ? (
               <p className="text-xs text-warning">
                 <b className="text-foreground">{staleDefault.label}</b> is still marked as this lane&rsquo;s default but is
@@ -1374,8 +1405,8 @@ function DefaultModelPicker({ models, busy, onPick }: { models: ModelRow[]; busy
                 filter is indistinguishable from a missing model. */}
             {off > 0 && options.length > 0 && (
               <p className="text-xs text-muted-foreground">
-                {off} more in this lane {off === 1 ? "is" : "are"} switched off and not offered here. Switch{" "}
-                {off === 1 ? "it" : "one"} on in the catalog below to make {off === 1 ? "it" : "it"} selectable.
+                {off} more in this lane {off === 1 ? "is" : "are"} not offered here — switched off, or not runnable by
+                this app. The catalog below shows which.
               </p>
             )}
           </div>

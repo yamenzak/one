@@ -422,16 +422,33 @@ export function AiConfigSection() {
   );
 }
 
+/**
+ * Which models a feature may be pointed at.
+ *
+ * `m.tasks` is the SERVER's answer (`modelSupportsTask`), not a guess from
+ * `m.task` or the provider. These three lines used to guess, and got the same
+ * distinction wrong twice: `provider === "google"` offered every Gemini text
+ * model as an IMAGE model, and Gemini text models genuinely cannot return an
+ * image — `runGeminiImage` asks for `responseModalities: ["IMAGE"]` and the API
+ * refuses. Every cover image generated on that configuration failed.
+ *
+ * Reading an image is the opposite case and the same lesson: all Gemini models
+ * are multimodal on input, so a text model IS a valid Snap-a-Meal model. One
+ * server-side rule answers both, and the UI stops having an opinion.
+ */
+const pickableFor = (models: AiModelMeta[], task: string) => models.filter((m) => m.tasks.includes(task));
+
 /** Quick model picks — set the model for a whole category (text / vision /
  *  image) in one tap; it applies to every feature of that type. Individual
  *  features can still override below. */
-const MODEL_GROUPS: { key: string; label: string; desc: string; icon: LucideIcon; tone: Tone; priceTask: string; matchFeature: (t: string) => boolean; matchModel: (m: AiModelMeta) => boolean }[] = [
-  // `priceTask` is the lane the group is QUOTED in. The text group spans text
-  // and text-small features, so it is quoted on the larger of the two — a price
-  // that surprises upward is the one nobody wants.
-  { key: "text", label: "Text model", desc: "Plans, summaries, notes & writing.", icon: PencilLine, tone: "primary", priceTask: "text", matchFeature: (t) => t === "text" || t === "text-small", matchModel: (m) => m.task !== "vision" && m.task !== "image" },
-  { key: "vision", label: "Vision model", desc: "Reading meal photos, labels & lab reports.", icon: Camera, tone: "cardio", priceTask: "vision", matchFeature: (t) => t === "vision", matchModel: (m) => m.task === "vision" || m.provider === "google" },
-  { key: "image", label: "Image model", desc: "Generated cover, food & exercise images.", icon: ImageIcon, tone: "nutrition", priceTask: "image", matchFeature: (t) => t === "image", matchModel: (m) => m.task === "image" || m.provider === "google" },
+const MODEL_GROUPS: { key: string; label: string; desc: string; icon: LucideIcon; tone: Tone; priceTask: string; matchFeature: (t: string) => boolean }[] = [
+  // `priceTask` is the lane the group is QUOTED in AND the capability the models
+  // are filtered by. The text group spans text and text-small features, so it is
+  // quoted on the larger of the two — a price that surprises upward is the one
+  // nobody wants.
+  { key: "text", label: "Text model", desc: "Plans, summaries, notes & writing.", icon: PencilLine, tone: "primary", priceTask: "text", matchFeature: (t) => t === "text" || t === "text-small" },
+  { key: "vision", label: "Vision model", desc: "Reading meal photos, labels & lab reports.", icon: Camera, tone: "cardio", priceTask: "vision", matchFeature: (t) => t === "vision" },
+  { key: "image", label: "Image model", desc: "Generated cover, food & exercise images.", icon: ImageIcon, tone: "nutrition", priceTask: "image", matchFeature: (t) => t === "image" },
 ];
 
 function DefaultModels({ features, models, config, onApply }: {
@@ -439,7 +456,7 @@ function DefaultModels({ features, models, config, onApply }: {
 }) {
   const rows = MODEL_GROUPS.map((g) => {
     const keys = features.filter((f) => g.matchFeature(f.task)).map((f) => f.key);
-    const pickable = models.filter(g.matchModel);
+    const pickable = pickableFor(models, g.priceTask);
     if (!keys.length || !pickable.length) return null;
     const vals = new Set(keys.map((k) => config.features?.[k]?.model ?? ""));
     return { g, keys, pickable, current: vals.size === 1 ? [...vals][0]! : "", mixed: vals.size > 1 };
@@ -520,13 +537,10 @@ function FeatureCard({ feat, models, cfg, tones, onSave }: {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(cfg.system ?? "");
   const enabled = cfg.enabled !== false;
-  // Vision needs a multimodal model — a vision-tagged one, or any Gemini model
-  // (Gemini is multimodal). Text/text-small interchange; never image models.
-  const pickable = models.filter((m) =>
-    feat.task === "image" ? m.task === "image" || m.provider === "google"
-      : feat.task === "vision" ? m.task === "vision" || m.provider === "google"
-        : m.task !== "vision" && m.task !== "image",
-  );
+  // The server's capability list, not a guess from `task` + provider. See
+  // `pickableFor` — the guess offered text models for image generation, which
+  // fails on every call.
+  const pickable = pickableFor(models, feat.task);
 
   // The collapsed summary. Says what is actually set, so the common case — "is
   // this on, and on which model?" — needs no interaction at all.

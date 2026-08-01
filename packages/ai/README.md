@@ -16,6 +16,46 @@ resolve model → RESERVE a worst-case hold → run (Workers AI | Gemini | mock)
 | `media.ts` | Where a generated image goes. |
 | `schema.ts` | `ai_models`, `ai_generations`, `ai_cache`, `insight_feedback`. |
 
+## One `task` column, two image capabilities
+
+`ai_models.task` holds ONE lane per model, and a modern multimodal model does
+not fit in one. `modelSupportsTask` is the translation, and the two image
+capabilities are the part that keeps getting conflated:
+
+| | Who can | Where it is written |
+|---|---|---|
+| **Read** an image (`vision`) | every Gemini model | [image-understanding](https://ai.google.dev/gemini-api/docs/image-understanding) — "All Gemini model versions are multimodal" |
+| **Make** an image (`image`) | Google's image family only | [image-generation](https://ai.google.dev/gemini-api/docs/image-generation) — four models |
+| **Speak** (`speech`) | three `*-tts` models | [speech-generation](https://ai.google.dev/gemini-api/docs/speech-generation) |
+
+So a Gemini **text** model is a valid Snap-a-Meal model — Kova depends on it,
+because Google's pricing page has no `vision` lane and no Gemini row is ever
+tagged one — and is **not** a valid cover-image model: `runGeminiImage` asks for
+`responseModalities: ["IMAGE"]` and the API refuses on a model without that
+modality.
+
+The image test keys on **`unit_kind === "image"`**, not on the id, because that
+is what the sync already derives from the same pricing page (a row only becomes
+`task: "image"` when Google prices its output "$X per image"). A new model in the
+family therefore works the day it is synced, and a rename cannot reclassify
+anything by accident.
+
+It is also a **money** rule. `neuronsForUsage` charges for a generated image only
+`if (rate.unitRate)`, so an `image`-tagged row without one bills the prompt and
+gives the image away. The parser cannot produce such a row — it refuses the model
+rather than guess a price — so it only arrives by hand-edit or restored backup,
+which is exactly when a silently free lane goes unnoticed. Requiring the unit
+rate closes the capability hole and the billing hole with the same condition.
+
+`modelTasks()` inverts the rule into a list, and both `/api/settings/ai` and
+`/api/admin/ai/models` send it. Clients filter their pickers on that rather than
+on `task` — two frontends previously guessed with `provider === "google"` and
+offered text models for image generation, which failed on every call.
+
+TTS sits outside all of this: it runs through its own call
+(`responseModalities: ["AUDIO"]`), never through `generate()`, so
+`modelSupportsTask` says nothing about it.
+
 ## The mock lane is development-only, in every mode
 
 `shouldUseMockLane` puts the environment check on the **outside**, so a stored

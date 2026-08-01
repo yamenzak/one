@@ -21,7 +21,7 @@ import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
 
 const notifRole = (r: string | null | undefined): NotifRole => (r === "owner" || r === "trainer" || r === "assistant" || r === "client" ? r : "member");
 import { AI_FEATURES } from "./ai-features.js";
-import { listModels, modelCostPerRequest } from "./ai.js";
+import { listModels, modelCostPerRequest, modelTasks } from "./ai.js";
 
 export const settingsRoutes = new Hono<AppEnv>()
   .get("/settings", async (c) => {
@@ -316,7 +316,11 @@ export const settingsRoutes = new Hono<AppEnv>()
     // owner's currency, and a raw neuron rate card is not one. The markup and
     // the neuron rates that produce it stay server-side.
     const models = (await listModels(c.env.DB)).map((m) => ({
-      id: m.id, label: m.label, task: m.task, provider: m.provider, costPerRequest: modelCostPerRequest(m),
+      // `tasks` is the capability list, not the label. An owner picking a model
+      // for a cover image must be offered only models that GENERATE images —
+      // `task` alone cannot express that, because a Gemini text model reads
+      // images (so it is valid for Snap-a-Meal) and cannot make one.
+      id: m.id, label: m.label, task: m.task, tasks: modelTasks(m), provider: m.provider, costPerRequest: modelCostPerRequest(m),
     }));
     return c.json({ features: AI_FEATURES, models, tones: AI_TONES, voices: TTS_VOICES, config: parseJson(row?.ai_config_json, {}) });
   })
