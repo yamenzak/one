@@ -76,17 +76,34 @@ jobs:
           command: deploy
           preCommands: node build.mjs
 
-      # ── TESSA IS DELIBERATELY NOT DEPLOYED HERE ─────────────────────────
+      # ── Tessa ────────────────────────────────────────────────────────────
       #
-      # Its tests and typecheck run above (they are part of `turbo run`), and
-      # its SPA is built above, so this workflow fully GATES Tessa. What it does
-      # not do is ship it, because it cannot yet: every resource id in
-      # `apps/tessa/wrangler.jsonc` is still a placeholder
-      # (`…cafe`, `…00d1`) so that `wrangler dev` works with no Cloudflare
-      # account at all.
+      # Guarded rather than absent. Tessa's wrangler.jsonc ships PLACEHOLDER
+      # resource ids so `wrangler dev` needs no Cloudflare account at all, and
+      # deploying against those would not fail loudly — wrangler would bind or
+      # create something against ids that mean nothing, which is worse than not
+      # deploying.
       #
-      # Adding the deploy step before those are real would not fail loudly —
-      # wrangler would bind or create *something* against ids that mean nothing
-      # — which is a worse outcome than not deploying. Add the step in the same
-      # commit that replaces the ids; `apps/tessa/DEPLOY.md` §0.1 is the
-      # checklist.
+      # So the deploy is conditional on the ids being real. Run the
+      # "Provision Tessa on Cloudflare" workflow once: it creates the resources,
+      # commits the real ids, and that push turns this step on by itself. No
+      # second commit, and no window where this ships against placeholders.
+      - name: Is Tessa provisioned?
+        id: tessa
+        run: |
+          set -euo pipefail
+          if grep -q '0000000000000000000000000000cafe\|00000000-0000-0000-0000-0000000000d1' apps/tessa/wrangler.jsonc; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Tessa still has placeholder resource ids — skipping its deploy. Run the 'Provision Tessa on Cloudflare' workflow to create them."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy tessa worker
+        if: steps.tessa.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/tessa
+          command: deploy
