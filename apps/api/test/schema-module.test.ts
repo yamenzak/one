@@ -72,12 +72,19 @@ describe("the Kova schema module", () => {
     // email_templates (1 table, 1 ALTER) into @4dl/email and user_prefs,
     // notifications and digest_sent (3 tables, 2 indexes, 4 ALTERs) into
     // @4dl/notify.
+    //
+    // They also go UP when a column is added. +2 ALTERs for the Connect loss
+    // controls: `connect_disabled_reason` (Stripe's word for WHY an account
+    // can't charge — "not onboarded yet" and "restricted for fraud" were the
+    // same `charges_enabled = 0` before it) and `connect_created_at` (an account
+    // abandoned mid-onboarding bills a Radar per-account fee forever, and
+    // nothing recorded when it started).
     const ddl = schemaStatements(KOVA_SCHEMA);
     expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(34);
     expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(24);
     expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(6);
     expect(ddl.filter((s) => s.startsWith("DROP INDEX"))).toHaveLength(1);
-    expect(KOVA_SCHEMA.alters ?? []).toHaveLength(39);
+    expect(KOVA_SCHEMA.alters ?? []).toHaveLength(41);
   });
 
   it("names every backfill", () => {

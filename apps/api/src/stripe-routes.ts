@@ -92,6 +92,7 @@ const cancelOnConnectedFor = (db: D1Database): CancelOnConnectedAccount => async
 };
 import { resolveAndApplyPromo, bumpPromoRedemption, consumePromoRedemption, releasePromoRedemption } from "./promo-apply.js";
 import { updateSubscriptionRunway } from "./subscription-runway.js";
+import { MAX_PACKAGE_PRICE_CENTS } from "./commerce-routes.js";
 
 /**
  * A failed Stripe call must not become an information-free 500.
@@ -373,10 +374,16 @@ export const stripeRoutes = new Hono<AppEnv>()
         "metadata[kova_tenant]": who.tenantId,
       });
       accountId = account.id;
+      // Stamp WHEN. A connected account that is created and then abandoned
+      // mid-onboarding costs the platform a Radar per-account fee every month
+      // for as long as it exists, and it is invisible: `charges_enabled = 0`
+      // looks identical to a studio that simply has not got round to it yet.
+      // Without this column there is no way to tell a week-old account from a
+      // year-old one, and so no way to reap the dead ones.
       await c.env.DB.prepare(
-        "INSERT INTO tenant_settings (tenant_id, stripe_account_id, updated_at) VALUES (?, ?, ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = ?, updated_at = ?",
+        "INSERT INTO tenant_settings (tenant_id, stripe_account_id, connect_created_at, updated_at) VALUES (?, ?, ?, ?) ON CONFLICT(tenant_id) DO UPDATE SET stripe_account_id = ?, connect_created_at = COALESCE(tenant_settings.connect_created_at, ?), updated_at = ?",
       )
-        .bind(who.tenantId, accountId, nowIso(), accountId, nowIso())
+        .bind(who.tenantId, accountId, nowIso(), nowIso(), accountId, nowIso(), nowIso())
         .run();
     }
     const link = await stripeCall<{ url: string }>(cfg.secretKey, "account_links", {
@@ -420,6 +427,16 @@ export const stripeRoutes = new Hono<AppEnv>()
     const isSub = recurring || installN > 0;
     const amount = recurring ? monthly : installN ? Math.ceil((pkg.one_time_price_cents ?? 0) / installN) : (pkg.one_time_price_cents ?? 0);
     if (amount <= 0) return c.json({ error: "use /subscriptions/grant for $0 packages" }, 400);
+    // Re-check the ceiling HERE, at the charge, not only in the editor's schema.
+    // The editor bounds what can be written from today on; this bounds what can
+    // be CHARGED, which is the part that costs money. The two differ for any row
+    // written before the cap existed, and for any row that reached `packages` by
+    // some other path (an import, a fixture, a future bulk edit). Full exposure
+    // is the total, so an installment plan is measured on the whole one-time
+    // price rather than on one instalment.
+    if (Math.max(amount, pkg.one_time_price_cents ?? 0) > MAX_PACKAGE_PRICE_CENTS) {
+      return c.json({ error: "package price exceeds the platform maximum", maxCents: MAX_PACKAGE_PRICE_CENTS }, 400);
+    }
 
     // Optional platform cut — a basis-points application fee set by the platform
     // admin (default 0 = zero markup, tenant keeps 100%). Direct charge on the
@@ -493,6 +510,11 @@ export const stripeRoutes = new Hono<AppEnv>()
     if ((pkg.monthly_price_cents ?? 0) > 0 || (pkg.installment_months ?? 0) > 1) return c.json({ error: "use /connect/checkout for subscriptions" }, 400);
     let amount = pkg.one_time_price_cents ?? 0;
     if (amount <= 0) return c.json({ error: "use /subscriptions/grant for $0 packages" }, 400);
+    // The ceiling, before any promo — a discount must not be the thing that
+    // brings an over-cap package under it. See the note on the hosted path.
+    if (amount > MAX_PACKAGE_PRICE_CENTS) {
+      return c.json({ error: "package price exceeds the platform maximum", maxCents: MAX_PACKAGE_PRICE_CENTS }, 400);
+    }
     let promoId: string | null = null;
     let discountCents = 0;
     if (body.data.promoCode) {
@@ -589,17 +611,20 @@ export const stripeRoutes = new Hono<AppEnv>()
   // sync the stored flags, and report whether the tenant can sell yet.
   .get("/connect/status", async (c) => {
     const who = requireTenant(c)!;
-    const row = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled, payouts_enabled, details_submitted FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null; payouts_enabled: number | null; details_submitted: number | null }>();
-    if (!row?.stripe_account_id) return c.json({ connected: false, chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false });
+    const row = await c.env.DB.prepare("SELECT stripe_account_id, charges_enabled, payouts_enabled, details_submitted, connect_disabled_reason FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ stripe_account_id: string | null; charges_enabled: number | null; payouts_enabled: number | null; details_submitted: number | null; connect_disabled_reason: string | null }>();
+    if (!row?.stripe_account_id) return c.json({ connected: false, chargesEnabled: false, payoutsEnabled: false, detailsSubmitted: false, disabledReason: null });
     const cfg = await stripeConfig(c.env.DB);
     if (stripeEnabled(cfg)) {
       try {
-        const a = await stripeCall<{ charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean }>(cfg.secretKey, `accounts/${row.stripe_account_id}`);
+        // `requirements` comes back on the account object, so the poll learns the
+        // restriction reason on the same round-trip the flags arrive on — the
+        // webhook is not the only path that has to stay informed.
+        const a = await stripeCall<{ charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean; requirements?: { disabled_reason?: string | null } | null }>(cfg.secretKey, `accounts/${row.stripe_account_id}`);
         await syncConnectAccount(c.env.DB, { id: row.stripe_account_id, ...a });
-        return c.json({ connected: true, chargesEnabled: !!a.charges_enabled, payoutsEnabled: !!a.payouts_enabled, detailsSubmitted: !!a.details_submitted });
+        return c.json({ connected: true, chargesEnabled: !!a.charges_enabled, payoutsEnabled: !!a.payouts_enabled, detailsSubmitted: !!a.details_submitted, disabledReason: a.requirements?.disabled_reason ?? null });
       } catch { /* fall back to stored flags below */ }
     }
-    return c.json({ connected: true, chargesEnabled: !!row.charges_enabled, payoutsEnabled: !!row.payouts_enabled, detailsSubmitted: !!row.details_submitted });
+    return c.json({ connected: true, chargesEnabled: !!row.charges_enabled, payoutsEnabled: !!row.payouts_enabled, detailsSubmitted: !!row.details_submitted, disabledReason: row.connect_disabled_reason ?? null });
   })
 
   // Connect webhook — grants the client package on successful payment.
@@ -678,8 +703,17 @@ export const stripeRoutes = new Hono<AppEnv>()
       const subObj = event.data.object as { id?: string };
       if (subObj.id) await c.env.DB.prepare("UPDATE subject_subscriptions SET stripe_sub_id = NULL, payment_status = 'canceled', updated_at = ? WHERE stripe_sub_id = ?").bind(nowIso(), subObj.id).run();
     } else if (event.type === "account.updated") {
-      // Onboarding / capability changes for a connected account.
-      const a = event.data.object as { id?: string; charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean };
+      // Onboarding / capability changes for a connected account — and the one
+      // channel through which Stripe tells us it has RESTRICTED a seller. The
+      // reason rides on `requirements.disabled_reason`; dropping it left
+      // "hasn't onboarded" and "rejected for fraud" indistinguishable.
+      const a = event.data.object as {
+        id?: string;
+        charges_enabled?: boolean;
+        payouts_enabled?: boolean;
+        details_submitted?: boolean;
+        requirements?: { disabled_reason?: string | null } | null;
+      };
       if (a.id) await syncConnectAccount(c.env.DB, a);
     } else if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
       // Money-safe: don't guess which budget days to claw back (partial refunds,

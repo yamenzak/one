@@ -102,10 +102,43 @@ export async function cancelInstallmentSub(
   if (canceled) await db.prepare("UPDATE subject_subscriptions SET stripe_sub_id = NULL WHERE id = ?").bind(rowId).run();
 }
 
-/** Mirror a connected account's capability flags onto tenant_settings. */
-export async function syncConnectAccount(db: D1Database, a: { id?: string; charges_enabled?: boolean; payouts_enabled?: boolean; details_submitted?: boolean }): Promise<void> {
+/**
+ * Mirror a connected account's capability flags onto tenant_settings.
+ *
+ * ── Why the REASON is stored and not just the flags ─────────────────────────
+ *
+ * `charges_enabled = 0` is the same value whether the seller simply has not
+ * finished onboarding yet, or Stripe has restricted them for suspected fraud.
+ * Those two need opposite responses from the platform — one is a nudge, the
+ * other is the earliest warning we get that a seller may generate chargebacks
+ * we are liable for — and storing only the boolean makes them indistinguishable
+ * without a manual trip to the Stripe dashboard for each account.
+ *
+ * `requirements.disabled_reason` is Stripe's own word for which it is
+ * (`requirements.past_due`, `rejected.fraud`, `under_review`, …), so it is kept
+ * verbatim rather than interpreted here: a shared package should not be in the
+ * business of deciding which of Stripe's reasons are alarming. The app reads it
+ * and decides.
+ */
+export async function syncConnectAccount(
+  db: D1Database,
+  a: {
+    id?: string;
+    charges_enabled?: boolean;
+    payouts_enabled?: boolean;
+    details_submitted?: boolean;
+    requirements?: { disabled_reason?: string | null } | null;
+  },
+): Promise<void> {
   if (!a.id) return;
-  await db.prepare("UPDATE tenant_settings SET charges_enabled = ?, payouts_enabled = ?, details_submitted = ?, updated_at = ? WHERE stripe_account_id = ?")
-    .bind(a.charges_enabled ? 1 : 0, a.payouts_enabled ? 1 : 0, a.details_submitted ? 1 : 0, nowIso(), a.id)
+  await db.prepare("UPDATE tenant_settings SET charges_enabled = ?, payouts_enabled = ?, details_submitted = ?, connect_disabled_reason = ?, updated_at = ? WHERE stripe_account_id = ?")
+    .bind(
+      a.charges_enabled ? 1 : 0,
+      a.payouts_enabled ? 1 : 0,
+      a.details_submitted ? 1 : 0,
+      a.requirements?.disabled_reason ?? null,
+      nowIso(),
+      a.id,
+    )
     .run();
 }

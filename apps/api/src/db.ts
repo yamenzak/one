@@ -46,7 +46,7 @@ import { TENANCY_SCHEMA } from "@4dl/tenancy";
 
 export const KOVA_SCHEMA: SchemaModule = {
   id: "kova",
-  version: "2026-07-30c",
+  version: "2026-08-01a",
   ddl: [
 
     "CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT);",
@@ -250,6 +250,16 @@ export const KOVA_SCHEMA: SchemaModule = {
     "ALTER TABLE tenant_settings ADD COLUMN lapse_json TEXT",
     "ALTER TABLE tenant_settings ADD COLUMN payouts_enabled INTEGER DEFAULT 0",
     "ALTER TABLE tenant_settings ADD COLUMN details_submitted INTEGER DEFAULT 0",
+    // Stripe's own word for WHY a connected account cannot charge
+    // (`requirements.past_due`, `rejected.fraud`, `under_review`, …). Without it
+    // "not onboarded yet" and "restricted for suspected fraud" are the same
+    // `charges_enabled = 0`, and the platform carries the loss liability for the
+    // second one. Kept verbatim; the operator console interprets it.
+    "ALTER TABLE tenant_settings ADD COLUMN connect_disabled_reason TEXT",
+    // When we asked Stripe to create the account. An account that never reaches
+    // `details_submitted` still bills the platform a Radar per-account fee every
+    // month, forever, and nothing else records when it started.
+    "ALTER TABLE tenant_settings ADD COLUMN connect_created_at TEXT",
     // Body scan: sagittal posture screen (from the side view) + somatotype.
     "ALTER TABLE body_scans ADD COLUMN posture_cva_deg REAL",
     "ALTER TABLE body_scans ADD COLUMN posture_tilt_deg REAL",

@@ -28,11 +28,40 @@ import { updateSubscriptionRunway } from "./subscription-runway.js";
 const BudgetSpecs = z.array(z.object({ feature: z.enum(BUDGET_FEATURES), days: z.number().int().positive() }));
 const Visibility = z.enum(["private", "marketplace", "client_specific"]);
 
+/**
+ * The largest a studio may price one package, in cents (USD-equivalent).
+ *
+ * ── Why a ceiling exists at all ─────────────────────────────────────────────
+ *
+ * The platform Connect profile makes US responsible for losses from seller
+ * fraud. The textbook attack on any Connect platform is not subtle: sign up as
+ * a studio, price a package absurdly high, "sell" it to yourself on stolen
+ * cards, and take the payout before the chargebacks land. Every unbounded
+ * price field is a multiplier on that, and until now `oneTimePriceCents` was
+ * `min(0)` with no upper bound — a studio could write a $9,999,999 package.
+ *
+ * The cap does not stop fraud; it bounds the size of any single attempt, which
+ * is the part that decides whether a chargeback wave is an annoyance or an
+ * extinction event. Kova's own ladder tops out at $99.99/month, so $10,000 for
+ * one client package is already far outside the shape of the product — a real
+ * studio selling a year of premium coaching lands an order of magnitude below
+ * it.
+ *
+ * ── Why it is a constant and not a setting ──────────────────────────────────
+ *
+ * A limit an attacker can raise is not a limit. This one is deliberately not in
+ * `app_config`: a studio must not be able to lift it, and an operator lifting it
+ * per-tenant is a support conversation, not a form. If a legitimate studio ever
+ * needs more, that is a code change with a human in the loop — which is exactly
+ * the friction we want on this particular number.
+ */
+export const MAX_PACKAGE_PRICE_CENTS = 1_000_000; // $10,000.00
+
 const PackageBody = z.object({
   name: z.string().min(1).max(120),
   description: z.string().max(2000).nullish(),
-  oneTimePriceCents: z.number().int().min(0).nullish(),
-  monthlyPriceCents: z.number().int().min(0).nullish(),
+  oneTimePriceCents: z.number().int().min(0).max(MAX_PACKAGE_PRICE_CENTS).nullish(),
+  monthlyPriceCents: z.number().int().min(0).max(MAX_PACKAGE_PRICE_CENTS).nullish(),
   installmentMonths: z.number().int().min(2).max(24).nullish(),
   budgets: BudgetSpecs.default([]),
   flags: z.record(z.string(), z.boolean()).nullish(),
