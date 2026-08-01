@@ -426,21 +426,34 @@ editing it.
   everything it *did* read, so the next screen is a pre-filled confirmation
   rather than a blank form. The shelf computes `effectiveExpiry` per row and
   returns the winning clock alongside the date.
+- **Cases, and the trace read BACKWARDS** (`apps/tessa/src/case-routes.ts`,
+  `cases.ts`). A case is opened, consumed and opened into, and closed. Its
+  `/api/trace/case/:id` answers the reverse of the recall: what did this
+  procedure use, and — the reason it exists — is any of it from a load that has
+  since failed. A case correct on Tuesday can acquire a concern on Thursday
+  without anything about the case changing, so the query joins the trays to the
+  cycles rather than trusting a status stored at close time. A closed case
+  REFUSES new lines and can be reopened by a person; `reopen_count > 0` is what
+  marks an amended record as amended. `resolveCase` is the one guard both
+  writing routes run — an unchecked case id resolves to nothing and leaves the
+  trace quietly incomplete forever.
 - **The CSSD loop** (`apps/tessa/src/pack-routes.ts`): instruments, pack recipes,
   tray build, and the open transition that returns every member to the DIRTY
   pool. Building a tray goes through `applyEvents`, the plural chokepoint — one
   act over N+1 rows, all of it or none of it, with an unwind when a member loses
   its compare-and-set.
-- 72 app tests (12 conformance, 6 integration, 17 ledger, 9 stock, 13 packs,
-  15 cycles) + 78 in `@tessa/domain`. The recall's three load-bearing
-  behaviours — unreachable packs named rather than dropped, a contradicting
-  indicator refused, a cleared quarantine landing in `packed` — are verified by
-  mutation, not assumed.
+- 84 app tests (12 conformance, 6 integration, 17 ledger, 9 stock, 13 packs,
+  15 cycles, 12 cases) + 78 in `@tessa/domain`. The load-bearing behaviours are
+  verified by MUTATION rather than assumed: unreachable packs named rather than
+  dropped, a contradicting indicator refused, a cleared quarantine landing in
+  `packed`, the case guard, the preserved close time, and the concerns join.
 
-**Not built:** cases have a table and are referenced by an opened pack, but there
-are no case routes: no open-a-case, no close, no per-case picking list. Label
-PRINTING does not exist (§7.4). There is no SPA at all — every surface above is
-an API.
+**Not built:** label PRINTING does not exist (§7.4), so a pack's label code is
+typed rather than produced. No AI surfaces yet — the vision paths of §5 Phase 4
+are untouched, and Rule 3's `suggested_*` shape has nothing writing into it. No
+par levels, no expiry sweep, no reorder. **There is no SPA at all** — every
+surface above is an API, which is the largest single gap between what is built
+and what a clinic could use.
 
-Next: cases as a first-class surface (open → scan into → close), which is what
-turns the trace into the two-way one §1.1 describes.
+Next: the app. Everything above is reachable only by HTTP, and the product is a
+phone in a stock room.

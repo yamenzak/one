@@ -31,6 +31,7 @@ import { effectiveExpiry, expiryStatus, daysUntilExpiry } from "@tessa/domain";
 import { newId, nowIso } from "@4dl/core";
 import { type AppEnv, requireTenant, requirePermission } from "./auth-context.js";
 import { applyEvent, applyEvents, historyOf, type EventInput } from "./ledger.js";
+import { CASE_REFUSAL_TEXT, resolveCase } from "./cases.js";
 
 const FAILURE_STATUS: Record<string, 400 | 404 | 409> = {
   not_found: 404,
@@ -406,10 +407,10 @@ export const packRoutes = new Hono<AppEnv>()
 
     const pack = await c.env.DB.prepare("SELECT id, status, expiry FROM packs WHERE id = ? AND tenant_id = ?").bind(packId, who.tenantId).first<{ status: string; expiry: string | null }>();
     if (!pack) return c.json({ error: "not found" }, 404);
-    if (b.caseId) {
-      const cs = await c.env.DB.prepare("SELECT id FROM cases WHERE id = ? AND tenant_id = ?").bind(b.caseId, who.tenantId).first();
-      if (!cs) return c.json({ error: "unknown case" }, 404);
-    }
+    // Resolved, not trusted — and a CLOSED case refuses, because "closed" has to
+    // mean the record of what this procedure used is final. See cases.ts.
+    const cs = await resolveCase(c.env.DB, who.tenantId, b.caseId);
+    if (!cs.ok) return c.json({ error: CASE_REFUSAL_TEXT[cs.reason], reason: cs.reason }, cs.reason === "unknown_case" ? 404 : 409);
 
     /**
      * An expired tray is REPORTED, not refused.

@@ -67,6 +67,7 @@ function permissionFor(method: string, path: string): Grant | null {
   if (path.startsWith("/api/packs")) return { pack: ["read"] };
   if (path.startsWith("/api/recipes")) return { pack: ["read"] };
   if (path.startsWith("/api/cycles")) return { sterilisation: ["read"] };
+  if (path.startsWith("/api/cases")) return { case: ["read"] };
   // The recall report is READ-ONLY by nature, and `trace:read` is the one grant
   // an auditor holds — see access.ts. Keeping it off `sterilisation:read` is
   // what lets an inspection account see the recall and nothing else.

@@ -25,6 +25,7 @@ import { parseGs1, effectiveExpiry, expiryStatus, daysUntilExpiry } from "@tessa
 import { newId, nowIso } from "@4dl/core";
 import { type AppEnv, requireTenant, requirePermission } from "./auth-context.js";
 import { applyEvent, historyOf } from "./ledger.js";
+import { CASE_REFUSAL_TEXT, resolveCase } from "./cases.js";
 
 /** Map a chokepoint refusal onto an HTTP answer the UI can act on. */
 const FAILURE_STATUS: Record<string, 400 | 404 | 409> = {
@@ -198,6 +199,14 @@ export const stockRoutes = new Hono<AppEnv>()
     const who = requireTenant(c)!;
     type Body = { quantity?: number; toLocationId?: string; caseId?: string; note?: string };
     const b = await c.req.json<Body>().catch(() => ({}) as Body);
+
+    /**
+     * A case id is a foreign key into the trace, so it is resolved before it is
+     * written — never taken on trust. See cases.ts for what an unchecked one
+     * quietly does to the record.
+     */
+    const cs = await resolveCase(c.env.DB, who.tenantId, b.caseId);
+    if (!cs.ok) return c.json({ error: CASE_REFUSAL_TEXT[cs.reason], reason: cs.reason }, cs.reason === "unknown_case" ? 404 : 409);
 
     if (spec.event === "moved") {
       if (!b.toLocationId) return c.json({ error: "scan where it's going" }, 400);
