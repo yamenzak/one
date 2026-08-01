@@ -27,6 +27,19 @@ export function OfflinePill() {
  * The kit's update prompt. `enabled` is a BUILD question — a service worker
  * exists only in a production build — and Vite is the app's choice, not the
  * platform's, so the app answers it.
+ *
+ * **`blocking` is deliberately not passed.** A modal that refuses the app until
+ * the user reloads would discard whatever they had not saved, and Kova is used
+ * mid-set, mid-check-in, mid-meal-log — the same reason `skipWaiting` is off in
+ * `vite.config.ts`. Shipping a build is not a good enough reason to take a
+ * client's half-finished check-in away from them.
+ *
+ * The case that WOULD justify it is a running build the API can no longer serve,
+ * and Kova has no such signal today: the API is additive and versionless, so
+ * there is nothing that says "this bundle is too old". If that ever changes, the
+ * prompt takes `blocking` and this is where it is decided. Until then the real
+ * dead end — a stale bundle failing to load a chunk — lands in the
+ * `ErrorBoundary`, which carries its own hard-refresh escape.
  */
 export function PwaUpdatePrompt() {
   return <KitPwaUpdatePrompt enabled={import.meta.env.PROD} />;

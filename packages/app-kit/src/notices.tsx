@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { CloudOff, RefreshCw, WifiOff, Wrench, X, cn } from "@4dl/ui";
+import { CloudOff, RefreshCw, WifiOff, Wrench, X, cn, motion, settle } from "@4dl/ui";
 import type { Maintenance } from "@4dl/tenancy/model";
 
 /**
@@ -95,6 +95,18 @@ export function MaintenanceBanner({ state }: { state: Maintenance | null | undef
 const UPDATE_CHECK_MS = 60 * 60 * 1000;
 
 /**
+ * How long "Later" lasts.
+ *
+ * It used to be forever — `dismissed` was a boolean that nothing ever cleared,
+ * so one tap on the × meant a user could sit on a stale build for the rest of
+ * the tab's life. That is the wrong trade in the one direction that matters: the
+ * prompt exists because the build in front of them is old, and dismissing it
+ * does not make it newer. Twenty minutes is long enough to finish a workout and
+ * short enough that "later" means later rather than never.
+ */
+const SNOOZE_MS = 20 * 60 * 1000;
+
+/**
  * Registers the service worker and prompts when a new build is WAITING.
  *
  * The SW no longer calls skipWaiting (see vite.config.ts): activating a new
@@ -119,9 +131,26 @@ export function PwaUpdatePrompt({
   enabled,
   /** Where the built worker is served. */
   url = "/sw.js",
-}: { enabled: boolean; url?: string }) {
+  /**
+   * Refuse to let the app be used until the new build is applied.
+   *
+   * **Off by default, and it should stay off for "a new build exists".** The
+   * reason is the same one that turned `skipWaiting` off in the first place: a
+   * reload discards whatever the person had not saved, and this app is used
+   * mid-set, mid-check-in, mid-meal-log. Forcing it is not a neutral act, it is
+   * "lose your input, now, because we shipped something" — and a routine deploy
+   * almost never justifies that.
+   *
+   * Turn it on for the case it is actually for: the running build can no longer
+   * talk to the server. That is a different fact from "a newer build exists",
+   * and an app that knows it (a version the API refuses, a required migration)
+   * passes `blocking` then and only then.
+   */
+  blocking = false,
+}: { enabled: boolean; url?: string; blocking?: boolean }) {
   const [waiting, setWaiting] = useState<ServiceWorker | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  const [snoozedUntil, setSnoozedUntil] = useState(0);
+  const [applying, setApplying] = useState(false);
 
   useEffect(() => {
     // No SW in dev (none is built) and none without support — both no-op here.
@@ -134,7 +163,12 @@ export function PwaUpdatePrompt({
         // install the worker is "installed" too, but there is nothing stale to
         // warn about and nothing for the user to do.
         const announce = (sw: ServiceWorker | null) => {
-          if (sw && navigator.serviceWorker.controller) setWaiting(sw);
+          if (sw && navigator.serviceWorker.controller) {
+            setWaiting(sw);
+            // A NEWER build outranks an earlier "later": the snooze was about
+            // the build that was waiting then, not about this one.
+            setSnoozedUntil(0);
+          }
         };
         announce(reg.waiting);
         reg.addEventListener("updatefound", () => {
@@ -147,29 +181,90 @@ export function PwaUpdatePrompt({
     return () => { if (timer) clearInterval(timer); };
   }, [enabled, url]);
 
+  // Re-render when the snooze expires, so "later" comes back on its own rather
+  // than waiting for the next unrelated render to notice.
+  useEffect(() => {
+    if (!snoozedUntil) return;
+    const t = setTimeout(() => setSnoozedUntil(0), Math.max(0, snoozedUntil - Date.now()));
+    return () => clearTimeout(t);
+  }, [snoozedUntil]);
+
   const applyUpdate = () => {
     if (!waiting) return;
+    // Announced, because the gap between the tap and the reload is a real second
+    // or two — the worker has to take control first. Without this the button
+    // looked broken and people pressed it twice.
+    setApplying(true);
     // Reload only once the new worker is actually in control, otherwise the fresh
     // page would be served by the OLD worker and nothing would change.
     navigator.serviceWorker.addEventListener("controllerchange", () => location.reload(), { once: true });
     waiting.postMessage({ type: "SKIP_WAITING" });
   };
 
-  if (!waiting || dismissed) return null;
-  return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-24 z-[70] flex justify-center px-4 md:bottom-6">
-      <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-card/95 py-2 pl-4 pr-2 text-sm shadow-lg backdrop-blur">
-        <span className="font-medium">A new version is ready.</span>
+  if (!waiting || (!blocking && snoozedUntil > Date.now())) return null;
+
+  const card = (
+    <motion.div
+      variants={settle}
+      initial="hidden"
+      animate="show"
+      role={blocking ? "alertdialog" : "status"}
+      aria-live={blocking ? "assertive" : "polite"}
+      aria-label="A new version is ready"
+      className="pointer-events-auto w-full max-w-sm overflow-hidden rounded-3xl border border-border/60 bg-card/95 shadow-lg backdrop-blur-xl"
+    >
+      <div className="flex items-start gap-3 p-4">
+        {/* The mark, not a bare glyph. It gives the notice a subject at a glance
+            and matches how every other status surface in the language opens. */}
+        <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-2xl bg-primary/15 text-primary [&_svg]:size-[1.15rem]">
+          <RefreshCw className={cn(applying && "animate-spin")} />
+        </span>
+        <div className="min-w-0 flex-1 space-y-0.5">
+          <p className="text-sm font-semibold">A new version is ready</p>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {blocking
+              ? "This version can no longer talk to the server. Reload to carry on."
+              : "It'll be applied next time you open the app — or reload now. Anything you haven't saved will be lost."}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 border-t border-border/50 p-2">
+        {/* "Later" first and quiet, "Reload" last and loud: the destructive-ish
+            option is the one that discards unsaved input, so the safe choice sits
+            where the thumb rests and the deliberate one needs a reach. */}
+        {!blocking && (
+          <button
+            onClick={() => setSnoozedUntil(Date.now() + SNOOZE_MS)}
+            className="min-h-11 flex-1 rounded-2xl px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            Later
+          </button>
+        )}
         <button
           onClick={applyUpdate}
-          className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3 text-xs font-semibold text-primary-foreground [&_svg]:size-3.5"
+          disabled={applying}
+          className="min-h-11 flex-1 rounded-2xl bg-primary px-3 text-sm font-semibold text-primary-foreground transition-opacity disabled:opacity-70"
         >
-          <RefreshCw /> Reload
-        </button>
-        <button onClick={() => setDismissed(true)} aria-label="Dismiss" className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-secondary [&_svg]:size-4">
-          <X />
+          {applying ? "Reloading…" : "Reload now"}
         </button>
       </div>
+    </motion.div>
+  );
+
+  return (
+    <div
+      className={cn(
+        "fixed inset-0 z-[70] flex px-4",
+        blocking
+          // A scrim, and nothing behind it is reachable. Only ever rendered when
+          // the app genuinely cannot work — see `blocking`.
+          ? "items-center justify-center bg-background/80 backdrop-blur-sm"
+          // Otherwise it is a notice: it sits above the tab bar, takes no space
+          // from the screen, and lets every tap through except its own.
+          : "pointer-events-none items-end justify-center pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-6",
+      )}
+    >
+      {card}
     </div>
   );
 }

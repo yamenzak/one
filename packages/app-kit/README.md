@@ -12,6 +12,32 @@ The browser-side runtime every 4DL app would otherwise rewrite.
 | `Turnstile.tsx` | The Cloudflare human check. |
 | `ErrorBoundary.tsx` | A real error boundary that clears itself on route change. |
 | `hard-refresh.ts` | The escape hatch from a stale precached build. |
+| `notices.tsx` | The four runtime notices no screen owns: offline, queued write, **a new build waiting**, an uncaught rejection. |
+| `RefreshNote.tsx` | `hardRefresh()` as an affordance, for the screens a signed-out visitor can be stranded on. |
+
+## The update prompt is not blocking, and that is a decision
+
+`PwaUpdatePrompt` announces a waiting build; it does not force one. Two reasons,
+and the first is the same one that turned `skipWaiting` off in the app's Workbox
+config:
+
+- **A reload discards unsaved input.** These apps are used mid-task — mid-set,
+  mid-form. "We shipped something, lose your work now" is not a trade a routine
+  deploy earns. The waiting worker activates on its own the next time every tab
+  is closed, which is the moment that costs nobody anything.
+- **"A newer build exists" is not "your build is broken".** They get conflated
+  because the service worker only reports the first. Blocking on it treats every
+  deploy as an incident.
+
+So `blocking` is a prop, defaulted off, for the app that genuinely knows the
+second fact — an API that refuses the running bundle, a migration that requires
+a client change. Passing it renders the same card as an `alertdialog` over a
+scrim with no way past.
+
+"Later" is a **snooze, not a dismissal** (20 minutes, and a newer build clears
+it). The previous version had a × that set a boolean nothing ever reset, so one
+tap parked a user on a stale build for the life of the tab — the opposite of
+what the prompt is for.
 
 ## The three-way offline outcome
 
