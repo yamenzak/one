@@ -1,0 +1,93 @@
+{
+  // A new 4DL app. Rename `name`, replace the placeholder ids, and read the
+  // three warnings below before deploying — each one is a failure mode that has
+  // cost a real debugging session.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tessa",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  /**
+   * NO `routes` HERE — on purpose, and it is load-bearing for local dev.
+   *
+   * The two patterns a multi-tenant 4DL app needs are:
+   *
+   *   example.4dl.app/*     the root (a signpost), `setup.`, `admin.`
+   *   *.example.4dl.app/*   every tenant's subdomain
+   *
+   * Create them ONCE in the Cloudflare dashboard, not from here. Two reasons:
+   *
+   *  1. **Declaring routes breaks `wrangler dev`.** With a `routes` entry the dev
+   *     server discards the incoming Host and rewrites every request to the
+   *     route's hostname — `mf-original-hostname` included, so the original is
+   *     not recoverable. The tenant is resolved FROM the Host, so that collapses
+   *     every door onto the root: no tenant subdomain can be reached or tested.
+   *  2. **A route alone is worse than no route.** `*.example.4dl.app` is a
+   *     SECOND-level wildcard, which Universal SSL does not cover (it terminates
+   *     one level). It needs an ACM certificate and a proxied wildcard DNS
+   *     record; with the route but not those, every tenant subdomain fails the
+   *     TLS handshake before the worker runs — "all tenants down" on a green
+   *     deploy. Keeping all three in one dashboard checklist makes it impossible
+   *     to do by halves.
+   *
+   * `wrangler deploy` does not remove routes it did not declare, so deploys stay
+   * safe once the two exist.
+   */
+
+  // 15-min tick for sweeps; daily for the dunning ladder. Without the daily one
+  // the ladder never advances and a lapsed tenant stays fully served.
+  "triggers": { "crons": ["*/15 * * * *", "10 0 * * *"] },
+
+  "vars": {
+    // Platform super-admin allowlist — a separate axis from tenant RBAC.
+    "ADMIN_EMAILS": "",
+    // Canonical public origin of the ROOT door. Better Auth's baseURL is
+    // per-request (the hostname the user actually came through), so this is only
+    // the advertised origin and the fallback for jobs with no request.
+    "BETTER_AUTH_URL": "https://tessa.4dl.app",
+    // The apex tenants live under. Set it EXPLICITLY: deriving it silently
+    // reclassifies every tenant subdomain as a foreign custom domain, which
+    // fails closed as "every tenant 404s" with nothing naming the cause.
+    "ROOT_DOMAIN": "tessa.4dl.app"
+
+    // ⚠️ `ENVIRONMENT` MUST NEVER APPEAR IN THIS BLOCK. It is the *deployed*
+    // config, and `ENVIRONMENT=development` opens every dev lane at once: OTP
+    // codes into retained logs, the repo-public auth-secret fallback (forgeable
+    // sessions), and the AI mock — which fabricates output AND still bills the
+    // tenant credits for it. It belongs in `.dev.vars`, which is gitignored.
+
+    // BETTER_AUTH_SECRET is a wrangler secret: `openssl rand -base64 32`.
+  },
+
+  // Workers AI. Optional — the deterministic mock covers local dev with no
+  // credentials. Comment it out for a fully credential-free `wrangler dev`, or
+  // pass `--local`, which disables remote bindings without editing this file.
+  "ai": { "binding": "AI" },
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "BILLING", "class_name": "TenantBillingDO" },
+      { "name": "INBOX", "class_name": "InboxDO" }
+    ]
+  },
+  // ⚠️ The class NAMES below are permanent. A migration binds each to durable
+  // storage; renaming one orphans every tenant's balance / every user's inbox.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TenantBillingDO", "InboxDO"] }],
+
+  // The binding NAMES are the contract (`@4dl/core` bindings.ts). Every shared
+  // package matches on shape, so `DB`, `CACHE`, `MEDIA`, `AI`, `EMAIL` are fixed.
+  //
+  // The IDs below are placeholders and must be replaced before any remote
+  // deploy — `wrangler kv namespace create`, `wrangler d1 create`,
+  // `wrangler r2 bucket create`. They are deliberately VALID-SHAPED rather than
+  // `REPLACE_ME`: wrangler validates the config before Miniflare starts, so an
+  // invalid bucket name means `pnpm test` cannot even boot, and a template whose
+  // tests do not run is a template that rots. Local dev and the test suite
+  // simulate all three and never look at the values.
+  "kv_namespaces": [{ "binding": "CACHE", "id": "0000000000000000000000000000cafe" }],
+  "d1_databases": [{ "binding": "DB", "database_id": "00000000-0000-0000-0000-0000000000d1" }],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "tessa-media" }],
+  "send_email": [{ "name": "EMAIL" }]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "@4dl/tessa",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The starting point for a new 4DL app: every shared package wired up, nothing product-specific. Copy the directory, rename, and start adding routes.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo .wrangler dist *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@4dl/ai": "workspace:*",
+    "@4dl/auth": "workspace:*",
+    "@4dl/billing": "workspace:*",
+    "@4dl/commerce": "workspace:*",
+    "@4dl/core": "workspace:*",
+    "@4dl/email": "workspace:*",
+    "@4dl/notify": "workspace:*",
+    "@4dl/purge": "workspace:*",
+    "@4dl/storage": "workspace:*",
+    "@4dl/tenancy": "workspace:*",
+    "better-auth": "^1.6.23",
+    "hono": "^4.9.10"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.8.55",
+    "@cloudflare/workers-types": "^4.20251001.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.42.0"
+  }
+}
