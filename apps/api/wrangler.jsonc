@@ -105,7 +105,7 @@
 
   "kv_namespaces": [
     // External food/exercise API response cache + short-lived tokens.
-    { "binding": "CACHE", "id": "d45cc2d0725d4d9aab13c247f2a27e1a" }
+    { "binding": "CACHE", "id": "f3408df5412d473e9a43cacc0bb56b78" }
   ],
 
   "d1_databases": [
@@ -125,7 +125,7 @@
     // Keeping this id rather than creating a fresh database is deliberate: it
     // carries the platform config (Gemini key, email provider, Cloudflare-for-SaaS
     // token, Turnstile keys) that a nuclear reset preserves.
-    { "binding": "DB", "database_id": "7705a554-6bde-4223-83d4-f9b8de5bb223" }
+    { "binding": "DB", "database_id": "33ef2469-908b-4fac-816e-5d122c15aed1" }
   ],
 
   "r2_buckets": [
