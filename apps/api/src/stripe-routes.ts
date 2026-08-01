@@ -370,6 +370,25 @@ const CredentialBody = z.object({
 /** Admin Stripe config + catalog sync (platform-admin lane). */
 export const stripeAdminRoutes = new Hono<AppEnv>()
   /**
+   * The same handler `stripeRoutes` has, for the same reason — and its absence
+   * here was a real hole.
+   *
+   * These are the OPERATOR's routes: config, catalog sync, status. Every one of
+   * them calls Stripe, and `stripeCall` throws `new Error(stripe's own message)`
+   * — "No such product", "No such price", "Invalid API Key provided". Without a
+   * handler each of those became a bare HTTP 500 with an empty body, so the
+   * operator pressing **Sync catalog** saw "HTTP 500" and had nothing whatsoever
+   * to act on: not which object, not which lane, not whether it was their key.
+   *
+   * 502 rather than 500 for the same reason as the other router: the upstream
+   * refused, we did not break. The messages are Stripe's own and are safe to
+   * show a platform admin — they are the text Stripe puts in its own dashboard.
+   */
+  .onError((err, c) => {
+    console.error(`[stripe-admin] ${c.req.method} ${new URL(c.req.url).pathname}:`, err);
+    return c.json({ error: err instanceof Error ? err.message : "stripe request failed" }, 502);
+  })
+  /**
    * Write Stripe credentials into a LANE (`stripe.<lane>.*`), so test and live
    * can both be stored and flipping between them is a `mode` change with no
    * re-paste. Shapes accepted:

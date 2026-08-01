@@ -2351,12 +2351,20 @@ function StripeConfig() {
     setErr(null);
     setMsg(null);
     try {
-      const r = await api.post<{ plans: number; packs: number; renamed?: number }>("/api/admin/stripe/sync");
+      const r = await api.post<{ plans: number; packs: number; renamed?: number; renameFailed?: number }>("/api/admin/stripe/sync");
       // `renamed` is reported separately because "0 created" is the NORMAL
       // outcome of a rename-only sync, and without this line it reads as "the
       // button did nothing".
       const created = `Synced ${r.plans} plans + ${r.packs} credit packs into the ${status?.activeLane ?? "active"} lane.`;
-      setMsg(r.renamed ? `${created} Renamed ${r.renamed} existing product${r.renamed === 1 ? "" : "s"} in Stripe to match the catalog.` : created);
+      const renamedLine = r.renamed ? ` Renamed ${r.renamed} existing product${r.renamed === 1 ? "" : "s"} in Stripe to match the catalog.` : "";
+      // A rename that could not be applied is almost always a row carrying ids
+      // from the OTHER lane, or a product deleted in the Stripe dashboard. Say
+      // so: it is the single most useful diagnostic here, and it used to abort
+      // the whole sync with an unexplained 500 instead of being reported.
+      const failedLine = r.renameFailed
+        ? ` ${r.renameFailed} product${r.renameFailed === 1 ? " could" : "s could"} not be renamed — those rows point at Stripe products that don't exist in the ${status?.activeLane ?? "active"} lane. Use “Re-sync prices” to rebuild them.`
+        : "";
+      setMsg(`${created}${renamedLine}${failedLine}`);
     } catch (e) {
       setErr(errorText(e, "Catalog sync failed"));
     } finally {

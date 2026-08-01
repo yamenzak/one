@@ -405,11 +405,12 @@ export async function swapCatalogLane(db: D1Database, from: StripeLane, to: Stri
  * The ids are LANE-SPECIFIC — see `stripeCatalogStashKey` for what happens on a
  * mode flip.
  */
-export async function syncCatalog(db: D1Database, secretKey: string, branding: StripeBranding): Promise<{ plans: number; packs: number; renamed: number }> {
+export async function syncCatalog(db: D1Database, secretKey: string, branding: StripeBranding): Promise<{ plans: number; packs: number; renamed: number; renameFailed: number }> {
   const meta = stripeMetaKeys(branding);
   const plans = await db.prepare("SELECT id, name, price_usd_month, stripe_product_id, stripe_price_id FROM plans WHERE active = 1 AND price_usd_month > 0").all<{ id: string; name: string; price_usd_month: number; stripe_product_id: string | null; stripe_price_id: string | null }>();
   let planCount = 0;
   let renamed = 0;
+  let renameFailed = 0;
   for (const p of plans.results ?? []) {
     if (p.stripe_price_id) {
       /**
@@ -428,10 +429,27 @@ export async function syncCatalog(db: D1Database, secretKey: string, branding: S
        *
        * Only the name. A Stripe Price is immutable by design, so anything about
        * the AMOUNT still has to go through the null-the-ids path.
+       *
+       * ── Why this is best-effort and not allowed to throw ──────────────────
+       *
+       * A stored product id can be UNRESOLVABLE in the active lane: ids are
+       * lane-specific, so a row still carrying test ids while live is active
+       * gets "No such product", and so does a product an operator deleted in the
+       * Stripe dashboard. Letting that propagate made a single stale row abort
+       * the entire sync — no plan created, no pack created, nothing renamed, and
+       * (because the admin router had no error handler) an information-free 500.
+       *
+       * Creating what is missing is the job that MUST NOT be blocked by a
+       * cosmetic rename of something else. So a failed rename is counted and
+       * reported, and the loop carries on.
        */
       if (p.stripe_product_id) {
-        await stripeCall(secretKey, `products/${p.stripe_product_id}`, { name: `${branding.productPrefix} ${p.name}` });
-        renamed++;
+        try {
+          await stripeCall(secretKey, `products/${p.stripe_product_id}`, { name: `${branding.productPrefix} ${p.name}` });
+          renamed++;
+        } catch {
+          renameFailed++;
+        }
       }
       continue;
     }
@@ -449,11 +467,16 @@ export async function syncCatalog(db: D1Database, secretKey: string, branding: S
   let packCount = 0;
   for (const p of packs.results ?? []) {
     if (p.stripe_price_id) {
-      // Same reconcile as the plans above — a pack renamed in the admin console
-      // must not keep its old name on the buyer's receipt.
+      // Same reconcile as the plans above, and best-effort for the same reason:
+      // a pack renamed in the admin console must not keep its old name on the
+      // buyer's receipt, but a stale id must not abort the whole sync.
       if (p.stripe_product_id) {
-        await stripeCall(secretKey, `products/${p.stripe_product_id}`, { name: `${branding.productPrefix} — ${p.name}` });
-        renamed++;
+        try {
+          await stripeCall(secretKey, `products/${p.stripe_product_id}`, { name: `${branding.productPrefix} — ${p.name}` });
+          renamed++;
+        } catch {
+          renameFailed++;
+        }
       }
       continue;
     }
@@ -462,7 +485,7 @@ export async function syncCatalog(db: D1Database, secretKey: string, branding: S
     await db.prepare("UPDATE credit_packs SET stripe_product_id = ?, stripe_price_id = ? WHERE id = ?").bind(product.id, price.id, p.id).run();
     packCount++;
   }
-  return { plans: planCount, packs: packCount, renamed };
+  return { plans: planCount, packs: packCount, renamed, renameFailed };
 }
 
 export { setConfig };
