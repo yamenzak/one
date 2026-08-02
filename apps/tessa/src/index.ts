@@ -37,6 +37,8 @@ import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
 import { DUNNING_DAYS } from "@4dl/billing";
 import { periodKey } from "@4dl/core";
 import { billingAdminRoutes, billingRoutes, stripeWebhookRoutes } from "./billing-routes.js";
+import { aiRoutes } from "./ai-routes.js";
+import { settingsRoutes } from "./settings-routes.js";
 import { entitlements } from "./entitlements.js";
 import { listPlans, seedBilling } from "./billing-store.js";
 import { ensureSchema } from "./db.js";
@@ -156,6 +158,8 @@ app.route("/api", contextRoutes);
  * *deliberately*, not by accident of mount order.
  */
 app.route("/api", billingRoutes);
+app.route("/api", settingsRoutes);
+app.route("/api", aiRoutes);
 app.route("/api", stripeWebhookRoutes);
 app.route("/api", billingAdminRoutes);
 app.route("/api", stockRoutes);

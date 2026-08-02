@@ -20,6 +20,7 @@
 
 import {
   canonicalHost as tCanonicalHost,
+  invalidateTenantHosts as tInvalidateTenantHosts,
   provisionSubdomain as tProvisionSubdomain,
   resolveHost as tResolveHost,
   rootDomain as tRootDomain,
@@ -91,3 +92,19 @@ export const provisionSubdomain = (
 
 export const canonicalHost = (env: HostEnv, db: D1Database, tenantId: string): Promise<string> =>
   tCanonicalHost({ ...env, DB: db }, tenantId, tenancyConfig(env));
+
+/**
+ * Drop every cached host resolution for a tenant — its subdomain AND each of its
+ * custom domains.
+ *
+ * Call it on any change that alters what a host SERVES: branding, self-signup,
+ * a domain going live. `resolveHost` caches `branding_json` in KV, so without
+ * this a centre changes its accent, sees the save succeed, and the sign-in
+ * screen keeps the old one until the cache happens to expire.
+ *
+ * ⚠️ Not `invalidateHostCache` — that one takes a HOSTNAME. Handing it a tenant
+ * id type-checks (both are strings), deletes a key that was never written, and
+ * reports success.
+ */
+export const invalidateTenantHosts = (env: HostEnv, tenantId: string): Promise<void> =>
+  tInvalidateTenantHosts(env, tenantId, tenancyConfig(env));
