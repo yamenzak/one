@@ -40,12 +40,14 @@ import {
   Palette,
   Wallet,
   Wand2,
+  Users,
   type SettingsGroup,
 } from "@4dl/ui";
 import { billing as billingApi, fmt, settings as settingsApi, type AiSettings, type Branding } from "../data.js";
 import { useI18n, useT } from "../i18n.js";
+import { StaffSection } from "./Staff.js";
 
-type View = null | "brand" | "ai" | "plan";
+type View = null | "brand" | "ai" | "plan" | "staff";
 
 export function Settings({ onBack }: { onBack: () => void }) {
   const t = useT();
@@ -73,6 +75,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
   if (view === "brand") return <Screen><BrandSection initial={data.branding} onBack={() => setView(null)} /></Screen>;
   if (view === "ai") return <Screen><AiSection initial={data.ai} allowed={data.canUseAi} onBack={() => setView(null)} /></Screen>;
   if (view === "plan") return <Screen><PlanSection onBack={() => setView(null)} /></Screen>;
+  if (view === "staff") return <Screen><StaffSection onBack={() => setView(null)} /></Screen>;
 
   const groups: SettingsGroup[] = [
     {
@@ -97,6 +100,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
           trailing: data.canUseAi ? undefined : <Badge tone="neutral">{t("settings.plan.needed")}</Badge>,
           onClick: () => setView("ai"),
         },
+        { key: "staff", label: t("staff.title"), icon: Users, tone: "activity", sub: t("staff.intro"), onClick: () => setView("staff") },
         { key: "plan", label: t("settings.plan"), icon: CreditCard, tone: "cardio", onClick: () => setView("plan") },
       ],
     },

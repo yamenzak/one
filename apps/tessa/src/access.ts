@@ -124,22 +124,45 @@ export const roles = { owner, stockKeeper, cssd, clinical, auditor };
 export type RoleName = keyof typeof roles;
 
 /**
- * ⚠️ TESSA HAS NO CUSTOMER ROLE, and that is a real difference from the template.
+ * ⚠️ TWO CONSTANTS, and they used to be ONE — which quietly made the paragraph
+ * below false.
+ *
+ * `@4dl/auth` asks for two different things and they are easy to conflate:
+ *
+ *   FALLBACK_ROLE   the preset used when a member's role cannot be resolved. It
+ *                   must be the LEAST privileged one — failing open to
+ *                   `clinical` would let an unknown member consume stock.
+ *   CUSTOMER_ROLE   the role that does NOT consume a staff seat. It is the ONLY
+ *                   thing `customerRole` does: all four uses in the package are
+ *                   the seat lane (`seats.ts`, and the three invite/accept/
+ *                   promote hooks in `better-auth.ts`).
+ *
+ * Both were `auditor`. The fallback half was right; the seat half meant a centre
+ * could invite unlimited free auditors — read-everything accounts, uncounted —
+ * while this comment claimed "every member consumes a staff seat and there is no
+ * seat-free lane to grant by accident". The comment was the intent; the binding
+ * was the opposite.
+ *
+ * ── Tessa genuinely has no customer role ────────────────────────────────────
  *
  * Kova has clients who sign in; a clinic's patients do not. Everyone who touches
- * Tessa works at the centre, so **every member consumes a staff seat** and there
- * is no seat-free lane to grant by accident.
- *
- * `@4dl/auth` still wants a fallback role for a member whose grant cannot be
- * resolved, and it must be the LEAST privileged one — an unresolvable grant
- * failing open to `clinical` would let an unknown member consume stock. `auditor`
- * reads and writes nothing, which is the correct shape for "we are not sure who
- * this is".
+ * Tessa works at the centre — including an inspector holding an `auditor`
+ * account, who is a person in the building with a login. So `CUSTOMER_ROLE` is a
+ * SENTINEL that matches no role anybody can be assigned, and every member counts
+ * against the ceiling. `roles.test.ts` pins that: if this ever equals a real
+ * role name again, the seat-free lane is back.
  *
  * Deliberately NO org-admin statements on any role but owner. Spreading `adminAc`
  * wider would let a member reach Better Auth's own `/organization/*` endpoints
  * and remove, re-role or invite staff — a real hole, closed by omission rather
  * than by a check somewhere downstream.
  */
-export const CUSTOMER_ROLE: RoleName = "auditor";
+export const FALLBACK_ROLE: RoleName = "auditor";
 export const CREATOR_ROLE: RoleName = "owner";
+
+/**
+ * No member ever holds this, which is the point: `role != CUSTOMER_ROLE` in the
+ * seat query then matches every real member. Not a `RoleName` on purpose — the
+ * type would force it to be one of the five.
+ */
+export const CUSTOMER_ROLE = "__no_customer_role__";

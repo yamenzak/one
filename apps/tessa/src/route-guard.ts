@@ -75,6 +75,14 @@ function permissionFor(method: string, path: string): Grant | null {
   if (path.startsWith("/api/reports")) return { report: ["read"] };
   if (path.startsWith("/api/billing")) return write ? { billing: ["manage"] } : { billing: ["read"] };
   if (path.startsWith("/api/settings")) return write ? { settings: ["manage"] } : { settings: ["read"] };
+  /**
+   * Staff. The outer wall proves membership; `staff-routes.ts` proves OWNER on
+   * every write, because staff management is not a grant a centre can hand out —
+   * whoever can add staff can add themselves an owner. Reading the list is any
+   * member's: checking who holds release rights before a shift handover is not a
+   * privileged question.
+   */
+  if (path.startsWith("/api/staff")) return null;
   if (path.startsWith("/api/ai/")) return { ai: ["use"] };
   return null;
 }

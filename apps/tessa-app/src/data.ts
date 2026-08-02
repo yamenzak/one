@@ -337,3 +337,54 @@ export const ai = {
   readDocument: (text: string, locale: "de" | "en", question?: string) =>
     api.post<{ summary: string; credits: number }>("/api/ai/read-document", { text, locale, question }),
 };
+
+// ── Staff ───────────────────────────────────────────────────────────────────
+
+export interface StaffMember {
+  id: string;
+  userId: string;
+  role: string;
+  createdAt: string;
+  name: string | null;
+  email: string | null;
+}
+export interface StaffInvitation {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  expiresAt: string;
+}
+export interface RoleInfo {
+  name: string;
+  label: string;
+  blurb: string;
+  /** What the role may do, from the server's own registry — never restated here. */
+  grant: Record<string, readonly string[]>;
+}
+export interface Seats {
+  used: number;
+  /** A pending invitation RESERVES a seat. Shown, so "2 left" is not a lie. */
+  pending: number;
+  /** `-1` is unlimited — never compare it numerically. */
+  max: number;
+  remaining: number;
+}
+
+export const staff = {
+  read: () =>
+    api.get<{
+      members: StaffMember[];
+      invitations: StaffInvitation[];
+      seats: Seats;
+      roles: RoleInfo[];
+      catalog: Record<string, readonly string[]>;
+      canManage: boolean;
+    }>("/api/staff"),
+  /** Returns the link too, so an owner can hand it over when mail is misconfigured. */
+  invite: (email: string, role: string) =>
+    api.post<{ id: string; url: string; emailed: boolean; emailError: string | null }>("/api/staff/invite", { email, role }),
+  revoke: (id: string) => api.del<{ ok: boolean }>(`/api/staff/invitations/${id}`),
+  setRole: (userId: string, role: string) => api.patch<{ ok: boolean; role: string }>(`/api/staff/${userId}/role`, { role }),
+  remove: (userId: string) => api.del<{ ok: boolean }>(`/api/staff/${userId}`),
+};

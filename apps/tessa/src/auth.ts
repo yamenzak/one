@@ -46,8 +46,20 @@ const seatConfig = (env: AuthBindings): SeatConfig => ({
   quota: (tenantId, used) => withinQuota(env.DB, tenantId, "staffSeats", used),
 });
 
-export const checkStaffSeat = (db: D1Database, tenantId: string): Promise<SeatVerdict> =>
-  sharedCheckStaffSeat(db, tenantId, seatConfig({ DB: db } as AuthBindings));
+/**
+ * `countPending` is the subtlety and it must be passed through, not defaulted.
+ *
+ * A pending invitation is a RESERVED seat, so it counts when CREATING one — else
+ * a centre with a single seat left sends five invitations and four of them fail
+ * at the moment a real person clicks accept. It must NOT count when ACCEPTING
+ * one, because the invitation being accepted would count itself and refuse the
+ * last seat.
+ */
+export const checkStaffSeat = (
+  db: D1Database,
+  tenantId: string,
+  opts: { countPending?: boolean } = {},
+): Promise<SeatVerdict> => sharedCheckStaffSeat(db, tenantId, seatConfig({ DB: db } as AuthBindings), opts);
 
 /** Build the per-request auth instance. */
 export function createAuth(env: Env, origin?: string, shape?: HostShape): SharedAuth {
@@ -56,8 +68,13 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape): Shared
     roles,
     creatorRole: CREATOR_ROLE,
     customerRole: CUSTOMER_ROLE,
-    rpName: "Template",
-    cookiePrefix: "template",
+    // What the OS passkey prompt shows. It said "Template", so every staffer
+    // registering a passkey was asked to save a credential for a product that
+    // does not exist.
+    rpName: "Tessa",
+    // Safe to set now and expensive later: changing it invalidates every
+    // session cookie already issued under the old prefix.
+    cookiePrefix: "tessa",
     seats: seatConfig,
 
     async sendOtp(e, { email, otp, devLane }) {

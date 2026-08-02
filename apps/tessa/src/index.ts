@@ -39,6 +39,7 @@ import { periodKey } from "@4dl/core";
 import { billingAdminRoutes, billingRoutes, stripeWebhookRoutes } from "./billing-routes.js";
 import { aiAdminRoutes, aiRoutes } from "./ai-routes.js";
 import { settingsRoutes } from "./settings-routes.js";
+import { staffRoutes } from "./staff-routes.js";
 import { entitlements } from "./entitlements.js";
 import { listPlans, seedBilling } from "./billing-store.js";
 import { ensureSchema } from "./db.js";
@@ -159,6 +160,7 @@ app.route("/api", contextRoutes);
  */
 app.route("/api", billingRoutes);
 app.route("/api", settingsRoutes);
+app.route("/api", staffRoutes);
 app.route("/api", aiRoutes);
 app.route("/api", stripeWebhookRoutes);
 app.route("/api", billingAdminRoutes);

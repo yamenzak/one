@@ -25,7 +25,7 @@ import {
   type AuthVars,
 } from "@4dl/auth";
 import type { Maintenance } from "@4dl/tenancy";
-import { CUSTOMER_ROLE, statement } from "./access.js";
+import { FALLBACK_ROLE, roles, statement } from "./access.js";
 import { createAuth, type Auth } from "./auth.js";
 import { ensureSchema } from "./db.js";
 import { hostnameOf, resolveHost, shapeOf, type Branding, type HostContext } from "./host-context.js";
@@ -41,21 +41,59 @@ type PkgEnv = AuthEnv<Env, Auth, Branding>;
 
 /**
  * ROLE → what that role may do, with any stored per-member override INTERSECTED
- * against it.
+ * against it. Intersected, never unioned: a custom grant may narrow a role but
+ * can never widen it past its preset, so a stored blob cannot escalate.
  *
- * Intersected, never unioned: a custom grant may narrow a role but can never
- * widen it past its preset, so a stored blob cannot be used to escalate.
+ * ── The presets are DERIVED from `access.ts`, never restated ────────────────
+ *
+ * ⚠️ This block used to list `owner` and the fallback BY HAND, and the other
+ * three roles were simply absent — so `bindGrants` fell every one of them back
+ * to the read-only preset. `access.ts` defined `stockKeeper`, `cssd` and
+ * `clinical` carefully and none of them did anything: a CSSD member could not
+ * run the autoclave or perform a **Freigabe**, and a stock keeper could not
+ * receive stock. Only the owner worked, and nothing failed — the roles resolved,
+ * they just resolved to "read".
+ *
+ * Two registries that must agree, with nothing checking that they do, is the
+ * shape. Deriving removes the second registry;
+ * `apps/tessa/test/roles.test.ts` asserts every role still resolves to its own
+ * grant, so a role added to `access.ts` and forgotten here is a test failure
+ * rather than a member who can read and nothing else.
+ *
+ * Better Auth's `newRole` keeps the grant on `.statements`, which is the same
+ * object literal `access.ts` passed in.
  */
+const presets = Object.fromEntries(
+  Object.entries(roles).map(([name, role]) => [
+    name,
+    Object.fromEntries(
+      Object.entries((role as { statements: Record<string, readonly string[]> }).statements)
+        // Better Auth's own org statements (`organization`, `member`, …) ride
+        // along on the owner role. They are not in this app's catalog, and
+        // `sanitizeGrant` would drop them anyway — dropping them here keeps the
+        // resolved grant readable in a debugger.
+        .filter(([resource]) => resource in statement)
+        .map(([resource, actions]) => [resource, [...actions]]),
+    ),
+  ]),
+);
+
 const grants = bindGrants({
   catalog: statement as unknown as Record<string, readonly string[]>,
-  presets: {
-    owner: Object.fromEntries(Object.entries(statement).map(([k, v]) => [k, [...v]])),
-    // Least-privileged fallback: read-only, no AI. See access.ts.
-    [CUSTOMER_ROLE]: { catalog: ["read"], stock: ["read"], instrument: ["read"], pack: ["read"], sterilisation: ["read"], case: ["read"], trace: ["read"], report: ["read"] },
-  },
-  fallbackRole: CUSTOMER_ROLE,
+  presets,
+  fallbackRole: FALLBACK_ROLE,
   unboundedRoles: ["owner"],
 });
+
+/**
+ * The resolver, exposed for `roles.test.ts`.
+ *
+ * The middleware below is the only production caller; a test that reached for
+ * `bindGrants` itself would be re-deriving the presets and asserting against its
+ * own copy, which is exactly the duplication that caused the bug.
+ */
+export const resolveGrantFor = (role: string | null, permsJson: string | null): Record<string, string[]> =>
+  grants.resolve(role, permsJson);
 
 export const sessionMiddleware = buildSessionMiddleware<Env, Auth, Branding>({
   createAuth: (env, origin, shape) => createAuth(env, origin, shape),

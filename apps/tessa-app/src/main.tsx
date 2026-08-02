@@ -31,6 +31,7 @@ import { I18nProvider } from "./i18n.js";
 import { Shell } from "./Shell.js";
 import { Login } from "./screens/Login.js";
 import { NoStudio, RootSignpost, Start, WrongDoor } from "./screens/Doors.js";
+import { AcceptInvite } from "./screens/AcceptInvite.js";
 import { AdminDoor } from "./screens/Admin.js";
 import { Labels } from "./screens/Labels.js";
 import { Settings } from "./screens/Settings.js";
@@ -86,6 +87,22 @@ function App() {
   const { loading, ctx, host } = useSession();
   const location = useLocation();
   const screen = pickScreen(loading, ctx, host);
+
+  /**
+   * The invitation link BYPASSES `pickScreen`, and it has to.
+   *
+   * Whoever clicks it is by definition not yet a member of this centre, so
+   * `pickScreen` resolves `nostudio` — "no centre uses this address" — on the
+   * one screen whose entire job is to say the opposite. Guarded on `loading` so
+   * it does not flash before the host is known.
+   */
+  if (!loading && location.pathname.startsWith("/accept-invitation/")) {
+    return (
+      <Routes location={location}>
+        <Route path="/accept-invitation/:id" element={<AcceptInvite />} />
+      </Routes>
+    );
+  }
 
   if (screen !== "shell") {
     return (
