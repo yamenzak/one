@@ -976,12 +976,27 @@ point of splitting them.
 | Workflow | Trigger | What it does | Can it delete? |
 |---|---|---|---|
 | `ci.yml` | pull request | typecheck, tests, and one E2E job per registered suite | no |
-| `deploy.yml` | push to `main`, manual | builds every SPA, then deploys every app the registry marks deployable | **no** — ships code only. It deliberately never writes worker secrets: re-putting `BETTER_AUTH_SECRET` on every deploy would re-sign every cookie and log everyone out |
-| `provision.yml` | manual, takes an app id | creates the D1 / KV / R2 that are **missing**, commits the ids, deploys, mints `BETTER_AUTH_SECRET` if the worker has none, seeds email | **no** — every action is guarded by an existence check |
+| `deploy.yml` | push to `main`, manual | builds every SPA, deploys every app the registry marks deployable, then **probes each one's `/health`** | **no** — ships code only. It deliberately never writes worker secrets: re-putting `BETTER_AUTH_SECRET` on every deploy would re-sign every cookie and log everyone out |
+| `provision.yml` | manual, takes an app id | creates the D1 / KV / R2 that are **missing**, commits the ids, deploys, mints `BETTER_AUTH_SECRET` if the worker has none, seeds email, then probes `/health` | **no** — every action is guarded by an existence check |
 | `reset.yml` | manual | destroys and rebuilds everything | **YES** |
 
 So the steady state is: `deploy.yml` on every merge, `provision.yml` once per new
 app. Neither can lose data, so neither needs ceremony.
+
+**Both end by asking whether the app actually came up** (`scripts/boot-check.mjs`,
+against `BETTER_AUTH_URL` + `/health`), because "deployed" and "working" are not
+the same claim and this repo has had them disagree for a full day. Tessa deployed
+green from `deploy.yml` on every push while `createAuth` threw
+`BETTER_AUTH_SECRET is not set` in the *first* middleware — so every route 500'd,
+`/health` with them, and the SPA still loaded, because static assets come off the
+`assets` binding and never reach the worker. Nothing in CI, the deploy output or
+the app said a word. `/health` is the right probe precisely because it sits
+*behind* the whole middleware chain: reaching it proves the worker can resolve a
+host, apply its schema and build its auth instance.
+
+The one non-failure is a hostname that does not **resolve** — DNS and the ACM
+certificate are §11 dashboard steps and legitimately lag a first deploy, so that
+is a notice. An address that resolves and answers wrongly is a hard failure.
 
 **None of the three names an app.** All of them read [`apps.json`](apps.json), so
 shipping a second product is a registry entry, not four workflow edits. That is

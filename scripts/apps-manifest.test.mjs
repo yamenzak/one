@@ -17,9 +17,21 @@
  * check that needs the workspace installed cannot guard the install itself.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { apps, boundIds, discoverWorkerDirs, emailSql, isProvisioned, packageDir, registry, sender } from "./apps.mjs";
+import {
+  apps,
+  boundIds,
+  discoverWorkerDirs,
+  emailSql,
+  isProvisioned,
+  packageDir,
+  publicOrigin,
+  registry,
+  sender,
+  uncommented,
+  wranglerText,
+} from "./apps.mjs";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const problems = [];
@@ -76,6 +88,57 @@ for (const a of apps) {
     // `DO UPDATE` here would reset a live deployment's configured sender every
     // time somebody re-ran provisioning.
     if (!sql.includes("DO NOTHING")) fail(`"${a.id}" email seeding must not overwrite an existing value.`);
+  }
+}
+
+// ── The JSONC reader does not eat `//` inside a string ──────────────────────
+//
+// `uncommented` blanks comments so brackets can be matched and values read. The
+// naive version blanks from any `//` to end of line, which also destroys the one
+// inside `"https://kova.4dl.app"` — so the origin read back as `https:` and the
+// boot check below would have probed a nonsense URL and reported it unreachable.
+// Silent, and in the direction that looks like a real outage.
+{
+  const sample = '{ "url": "https://example.com/x", // a comment [ with a bracket\n  "n": 1 }';
+  const scrubbed = uncommented(sample);
+  if (scrubbed.length !== sample.length) fail("uncommented() must preserve length — positions are used to edit the real text.");
+  if (!scrubbed.includes("https://example.com/x")) fail("uncommented() ate a `//` inside a string literal.");
+  if (scrubbed.includes("a comment")) fail("uncommented() left a real comment in place.");
+}
+
+// ── Every app's public origin is usable, and the boot check is wired ─────────
+//
+// The origin is read from the worker's own `BETTER_AUTH_URL` rather than
+// duplicated into the registry, so there is nothing to drift — but a typo there
+// would make the boot check probe the wrong host and fail a healthy deploy.
+for (const a of apps) {
+  const origin = publicOrigin(a.id);
+  if (!origin) {
+    // Fine for a static site. Not fine for a worker that declares the var and
+    // has it mangled — distinguish the two.
+    if (/"BETTER_AUTH_URL"/.test(uncommented(existsSync(join(ROOT, a.dir, "wrangler.jsonc")) ? wranglerText(a.id) : ""))) {
+      fail(`"${a.id}" declares BETTER_AUTH_URL but publicOrigin() read nothing from it.`);
+    }
+    continue;
+  }
+  try {
+    const u = new URL(origin);
+    if (u.protocol !== "https:") fail(`"${a.id}" BETTER_AUTH_URL is ${origin} — the boot check needs an https origin.`);
+    if (u.pathname !== "/") fail(`"${a.id}" BETTER_AUTH_URL is ${origin} — it must be an origin, with no path.`);
+  } catch {
+    fail(`"${a.id}" BETTER_AUTH_URL is not a URL: ${JSON.stringify(origin)}.`);
+  }
+}
+
+// A deploy that cannot tell "shipped" from "working" is how Tessa stayed green
+// and dead for a day. Both workflows must run the check; a silent removal is
+// exactly the regression this file exists to catch.
+for (const wf of ["deploy.yml", "provision.yml"]) {
+  const path = join(ROOT, ".github/workflows", wf);
+  if (!existsSync(path)) {
+    fail(`.github/workflows/${wf} is missing.`);
+  } else if (!readFileSync(path, "utf8").includes("boot-check.mjs")) {
+    fail(`${wf} no longer runs scripts/boot-check.mjs — it can report success on a worker that 500s on every request.`);
   }
 }
 

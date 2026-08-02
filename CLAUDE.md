@@ -129,6 +129,7 @@ registry entry and a workflow run — not four YAML edits.
 |---|---|
 | `ci.yml` | every SPA to build before the unit lanes; one E2E job per registered Playwright suite |
 | `deploy.yml` | every app to deploy — and it **skips** one whose `wrangler.jsonc` still holds placeholder ids |
+| `boot-check.mjs` | each app's `BETTER_AUTH_URL`, probed at `/health` after deploy and after provisioning |
 | `provision.yml` | the app id you type: creates missing D1/KV/R2, commits the real ids, deploys, mints `BETTER_AUTH_SECRET` if absent, seeds email |
 
 `scripts/apps.mjs` is the reader (plain Node, no dependencies — the workflows
@@ -147,6 +148,16 @@ Sending is per-zone manual work, so sharing the address means a new app inherits
 one that already works instead of a plausible-looking one that bounces.
 Provisioning seeds it with `ON CONFLICT DO NOTHING` — an automation that upserted
 would reset a live deployment's configured sender on every re-run.
+
+**"Deployed" is not "working", and the workflows now check.** `scripts/apps.mjs
+ready` only asks whether an app binds REAL resource ids — a question about the
+*config*. Tessa passed it and shipped green from `deploy.yml` for a day while
+`createAuth` threw `BETTER_AUTH_SECRET is not set` in the first middleware, so
+every route 500'd including `/health`, and the SPA still loaded because static
+assets never reach the worker. `scripts/boot-check.mjs` closes that: both
+workflows probe `BETTER_AUTH_URL` + `/health` after deploying, and a hostname
+that does not *resolve* is a notice (DNS/ACM are dashboard steps) while one that
+resolves and answers wrongly is a failure.
 
 **Two dependency-free guards, and both are in `pnpm test`:**
 `scripts/apps-manifest.test.mjs` fails on anything under `apps/` with a

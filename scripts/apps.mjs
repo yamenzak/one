@@ -18,6 +18,7 @@
  *   node scripts/apps.mjs ids             # every app id, one per line
  *   node scripts/apps.mjs get <id>        # one app, as JSON
  *   node scripts/apps.mjs ready <id>      # exit 0 if its ids are real
+ *   node scripts/apps.mjs origin <id>     # its canonical public origin, or ""
  *   node scripts/apps.mjs email-sql <id>  # the seeding SQL for its sender
  */
 
@@ -63,8 +64,43 @@ export const wranglerText = (id) => readFileSync(join(ROOT, app(id).dir, "wrangl
  * Bracket-matching must ignore a `[` inside a comment, and blanking rather than
  * deleting keeps every index identical to the real text — so a position found
  * here can be used to edit there.
+ *
+ * ⚠️ STRING-AWARE, and it has to be. The obvious one-line version — a global
+ * replace of "slash slash to end of line" — also blanks the `//` inside a URL,
+ * so `"BETTER_AUTH_URL": "https://kova.4dl.app"` reads back as `https:` with the
+ * rest of the line erased. That was silent — the value looked configured, just
+ * truncated — and it would have taken the boot check below with it.
  */
-export const uncommented = (s) => s.replace(/\/\/[^\n]*/g, (m) => " ".repeat(m.length));
+export function uncommented(s) {
+  let out = "";
+  let inString = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inString) {
+      out += c;
+      if (c === "\\") {
+        out += s[++i] ?? "";
+      } else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      out += c;
+      continue;
+    }
+    if (c === "/" && s[i + 1] === "/") {
+      // Blank to end of line, keeping the newline so line numbers survive.
+      while (i < s.length && s[i] !== "\n") {
+        out += " ";
+        i++;
+      }
+      out += s[i] ?? "";
+      continue;
+    }
+    out += c;
+  }
+  return out;
+}
 
 /** The span of a `"key": [ … ]` array's contents, as [start, end), or null. */
 export function arraySpan(source, key) {
@@ -125,6 +161,25 @@ export function isProvisioned(id) {
   if (ids.length === 0) return false;
   return !ids.some(isPlaceholder);
 }
+
+/**
+ * A `vars` entry from the app's wrangler.jsonc, read as text.
+ *
+ * Comments are blanked first, so a value that only appears in a `//` line — the
+ * usual way a var is documented before it is set — does not read as configured.
+ */
+export const varOf = (id, name) =>
+  new RegExp(`"${name}"\\s*:\\s*"([^"]*)"`).exec(uncommented(wranglerText(id)))?.[1] ?? "";
+
+/**
+ * The app's canonical public origin, or "" for one that has none.
+ *
+ * `BETTER_AUTH_URL` is already the worker's own answer to "what address am I
+ * served at" — a second field in the registry would be a copy of it, and a copy
+ * that drifts silently is worse than no check at all. A static site has no such
+ * var and returns "", which every caller treats as "nothing to probe".
+ */
+export const publicOrigin = (id) => varOf(id, "BETTER_AUTH_URL").replace(/\/+$/, "");
 
 /**
  * The transactional sender for an app.
@@ -251,6 +306,9 @@ switch (cmd) {
       process.exit(1);
     }
     console.log(`${arg} is provisioned.`);
+    break;
+  case "origin":
+    console.log(publicOrigin(arg));
     break;
   case "email-sql":
     console.log(emailSql(arg) ?? "");

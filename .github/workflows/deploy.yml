@@ -120,3 +120,15 @@ jobs:
           workingDirectory: ${{ matrix.dir }}
           command: deploy
           preCommands: ${{ matrix.pre }}
+
+      # ── Did it come up? ───────────────────────────────────────────────────
+      #
+      # `ready` above asks "are the resource ids real?", which is a question
+      # about the CONFIG. It is blind to a worker that deploys perfectly and then
+      # throws on every request — which is not hypothetical: Tessa shipped green
+      # from this workflow for a day while every route 500'd. The script explains
+      # the failure in full; it is shared with the provisioning workflow so the
+      # two cannot drift.
+      - name: Verify it can actually boot
+        if: steps.ready.outputs.go == 'true'
+        run: node scripts/boot-check.mjs "${{ matrix.id }}"

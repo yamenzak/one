@@ -317,6 +317,15 @@ jobs:
           openssl rand -base64 32 | pnpm exec wrangler secret put BETTER_AUTH_SECRET
           echo "✓ Set. Random, never printed."
 
+      # Everything above can succeed and still leave an app that 500s on every
+      # request — that is exactly what happened to Tessa, whose secret step ran
+      # BEFORE there was a worker to read secrets from, took the correct
+      # "leave it alone" branch, and reported success. This is the step that
+      # would have caught it. Same script as `deploy.yml`, so the two cannot
+      # disagree about what "working" means.
+      - name: Verify it can actually boot
+        run: node scripts/boot-check.mjs "$APP"
+
       - name: What is left
         if: always()
         env:
