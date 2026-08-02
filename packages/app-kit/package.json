@@ -5,7 +5,8 @@
   "type": "module",
   "description": "The browser-side runtime every 4DL app repeats: the typed fetch layer with its offline/queued-write model, host resolution across the five doors, prefixed local storage, the passkey ceremony, Stripe.js + the inline payment sheet, Turnstile, the error boundary, and the deploy hard-refresh.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./pwa": "./src/pwa.ts"
   },
   "types": "./src/index.ts",
   "scripts": {

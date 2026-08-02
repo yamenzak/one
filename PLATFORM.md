@@ -33,7 +33,7 @@ It typechecks and its tests pass in this workspace, so it cannot rot.
 | [`@4dl/billing`](packages/billing/README.md) | the entitlement engine, the catalog STORE (seeding, plan/pack reads, quota + feature gates), credit metering, `CreditLedgerDO`, the Stripe client, the dunning ladder | quota + feature keys, and the catalog's CONTENTS |
 | [`@4dl/commerce`](packages/commerce/README.md) | what a tenant sells its own customers: budgets (queue, never sum), the customer-lapse ladder, discount codes | the scope list, the lapse copy |
 | [`@4dl/ai`](packages/ai/README.md) | the metered path: reserve → run → settle, the model catalog, pricing parsers, the dev-only mock lane | the feature registry (prompts), where images go |
-| [`@4dl/storage`](packages/storage/README.md) | R2 + the media ledger + the quota gate | the quota resolver (or nothing) |
+| [`@4dl/storage`](packages/storage/README.md) | R2 + the media ledger + the quota gate + the three media ROUTES (upload, meter, authed read) | the quota resolver, the closed `purpose` set, the scope check |
 | [`@4dl/email`](packages/email/README.md) | the provider decision, MIME, the tenant lane, the HTML component kit | brand + sender, and a meter if it resells sending |
 | [`@4dl/notify`](packages/notify/README.md) | the whole inbox: the channel algebra (role x category -> inbox/email, prefs, the owner's email veto), the one dispatch path, the four routes, `InboxDO` (hibernating WebSockets, push = "refetch") | the notification TYPES, their copy, and the two audience NAMES |
 | [`@4dl/purge`](packages/purge/README.md) | **erasure derived** from every module's `scoped` declaration, plus two conformance checks | the non-D1 side effects |

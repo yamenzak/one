@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { offlinePwa } from "@4dl/app-kit/pwa";
 import { createRequire } from "node:module";
 import { existsSync, readFileSync } from "node:fs";
 
@@ -78,83 +79,36 @@ export default defineConfig({
     // `injectRegister: null` because we register /sw.js ourselves (notices.tsx
     // PwaUpdatePrompt) — the plugin's injected registerSW.js only registers and has
     // no way to tell anyone an update is waiting.
-    VitePWA({
-      registerType: "prompt",
-      injectRegister: null,
-      manifest: false,
-      includeAssets: ["icon.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"],
-      workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,png,ico,woff,woff2}"],
+    /**
+     * The offline shell + the queued-write replay. Every rule in it — the `/`
+     * navigation fallback, clientsClaim-without-skipWaiting, the manifest
+     * rewrite — is `@4dl/app-kit/pwa`'s now, with the reasons attached, because
+     * each one was learned by breaking something in production.
+     *
+     * What stays here is Kova's: which writes are SAFE TO REPLAY.
+     */
+    VitePWA(
+      offlinePwa({
+        queueName: "kova-log-writes",
+        // Log-write POSTs: food/water/sets/activity/sleep/mood, check-ins,
+        // measurements, body scans, supplement + fasting toggles.
+        //
+        // `measurements` + `body-scans` were missing once, so a weigh-in or a
+        // body scan taken in a no-signal gym was lost permanently — the two
+        // forms most likely to be filled in exactly there. Every handler here is
+        // `INSERT … ON CONFLICT(client_id, date_local) DO UPDATE`, i.e.
+        // idempotent per client-day, so a replay upserts rather than
+        // double-counting. That is the property that makes queueing correct;
+        // see rule 3 in the package.
+        //
+        // Keep in lockstep with QUEUED_POST in src/api.ts.
+        queuedPaths: /^\/api\/(logs\/|check-ins|measurements|body-scans|supplements\/[^/]+\/log|fasting)/,
+        includeAssets: ["icon.svg", "apple-touch-icon.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"],
         // The MediaPipe wasm runtime + on-device models are many MB and load
         // lazily only for the body scan — never precache them.
         globIgnores: ["**/models/**", "**/mediapipe/**"],
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
-        cleanupOutdatedCaches: true,
-        // `clientsClaim` WITHOUT `skipWaiting` is the combination we want. Claiming
-        // only happens when a worker activates: on a FIRST install there's no old
-        // worker, so it activates at once and takes over the page — offline works
-        // from the very first visit. On an UPDATE, skipWaiting:false leaves the new
-        // worker parked until every tab on the old one closes, so it can never
-        // purge the precache under a live session (the mid-workout chunk 404).
-        clientsClaim: true,
-        skipWaiting: false,
-        // Serve the cached shell for client-side routes; never for the API,
-        // health, or the (worker-served) manifest.
-        //
-        // The fallback is `/`, NOT `/index.html`, and that is load-bearing.
-        // Cloudflare Workers Assets defaults to `html_handling:
-        // "auto-trailing-slash"`, which answers `/index.html` with a 307 to
-        // `/`. The navigation fallback is a precache handler: on a HIT it
-        // serves from Cache Storage and all is well, but on a MISS it falls
-        // back to the network — and a navigation `respondWith()`n a redirected
-        // response is rejected by the browser, so the whole page load dies as
-        // ERR_FAILED. That is not hypothetical: it took out every deep link
-        // (/admin, /settings, …) while `/` kept working, because `/` matches
-        // the precache route directly and never reaches this fallback.
-        //
-        // A precache miss is ordinary, not exotic — iOS evicts Cache Storage
-        // under pressure, and the in-app hard-refresh clears it on purpose.
-        // Pointing both the precached entry and the fallback at `/` (which the
-        // edge serves 200, see the wrangler `html_handling` note) means the
-        // miss path fetches a URL that does not redirect. Keep the two in step:
-        // `navigateFallback` must name a URL that is IN the manifest below.
-        navigateFallback: "/",
-        navigateFallbackDenylist: [/^\/api\//, /^\/health/, /^\/manifest\.webmanifest/],
-        manifestTransforms: [
-          (entries) => ({
-            manifest: entries.map((e) => (e.url === "index.html" ? { ...e, url: "/" } : e)),
-            warnings: [],
-          }),
-        ],
-        runtimeCaching: [
-          {
-            // Log-write POSTs (food/water/sets/activity/sleep/mood, check-ins,
-            // measurements, body scans, supplement + fasting toggles): try the
-            // network, and on failure (offline) enqueue for replay when
-            // connectivity returns.
-            //
-            // `measurements` + `body-scans` were missing, so a weigh-in or a body
-            // scan taken in a no-signal gym was lost permanently — the two forms
-            // most likely to be filled in exactly there. Both server handlers are
-            // `INSERT … ON CONFLICT(client_id, date_local) DO UPDATE`
-            // (log-routes.ts /measurements, body-scan-routes.ts /body-scans), i.e.
-            // idempotent per client-day, so a duplicate replay upserts rather than
-            // double-counting. Keep this in lockstep with QUEUED_POST in src/api.ts.
-            urlPattern: ({ url, request }: { url: URL; request: Request }) =>
-              request.method === "POST" &&
-              /^\/api\/(logs\/|check-ins|measurements|body-scans|supplements\/[^/]+\/log|fasting)/.test(url.pathname),
-            handler: "NetworkOnly",
-            method: "POST",
-            options: {
-              backgroundSync: {
-                name: "kova-log-writes",
-                options: { maxRetentionTime: 24 * 60 },
-              },
-            },
-          },
-        ],
-      },
-    }),
+      }),
+    ),
   ],
   server: {
     port: 5173,

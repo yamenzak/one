@@ -74,7 +74,9 @@ packages/
              # Durable Object (CreditLedgerDO — the class NAME is load-bearing),
              # the Stripe client, and the dunning ladder. See its README.
   storage/   # @4dl/storage — R2 + the media ledger + the quota gate (resolver
-             # injected, so it does not depend on billing). See its README.
+             # injected, so it does not depend on billing), plus the three media
+             # ROUTES: upload, the storage meter, the authed read. The closed
+             # `purpose` set is the app's — it is a path segment. See its README.
   email/     # @4dl/email — transactional mail: the provider decision, the MIME
              # builder, the tenant lane (platform | own Brevo key | off) and the
              # HTML component kit. Brand injected; the credit METER is a
@@ -116,7 +118,8 @@ packages/
              # three-way offline outcome (queued | offline | HTTP error), host
              # resolution across the five doors, prefixed storage, the passkey
              # ceremony + PasskeysCard, Stripe.js + PaymentSheet, Turnstile,
-             # ErrorBoundary, hard-refresh, and the INBOX SURFACE
+             # ErrorBoundary, hard-refresh, the OFFLINE build config
+             # (@4dl/app-kit/pwa), and the INBOX SURFACE
              # (NotificationBell + InboxScreen, registry injected). Router-free
              # on purpose — `onOpen` hands the notification back. See its README.
   i18n/      # @4dl/i18n — TRANSLATION, and deliberately small: typed dictionaries,
@@ -453,7 +456,7 @@ moves. Measured 2026-08-02, per package: **548 kova/api + 197 kova/domain +
 146 tessa/api + 87 tessa/domain + 85 tenancy + 70 kova/app + 54 commerce +
 48 ai + 47 ui + 45 billing + 35 billing-rail + 24 notify + 17 template +
 14 core + 14 purge + 13 tessa/app + 12 auth + 7 protocol + 7 i18n + 3 admin +
-3 app-kit + 3 storage + 3 email** (1,482 total, 31 skipped). The older figure
+3 app-kit + 21 storage + 3 email** (1,497 total, 31 skipped). The older figure
 quoted here counted Kova and the packages only — Tessa's 240 were never in it.
 The ui count DROPPED and the kova/app count rose by the same shape: Stage 0b
 moved Kova's eleven accent tones — and the contrast tests that guard them — out

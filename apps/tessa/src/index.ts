@@ -35,6 +35,7 @@ import { notifyRoutes } from "@4dl/notify/routes";
 // "mark all read", so the import is load-bearing even where `notify` is unused.
 import { notifyRole } from "./notify.js";
 import { accountRoutes, tenantCloseRoutes } from "./exit-routes.js";
+import { mediaRoutes } from "./media-routes.js";
 import { cycleRoutes } from "./cycle-routes.js";
 import { packRoutes } from "./pack-routes.js";
 import { stockRoutes } from "./stock-routes.js";
@@ -184,6 +185,12 @@ app.route("/api", staffRoutes);
  * a suspended centre had every write refused and no way to shut itself down.
  * `/api/me/*` is exempt for the same reason: a person may always leave.
  */
+/**
+ * Media. The bucket has been bound since day one and written to from exactly one
+ * place — `@4dl/ai`'s vision lane — so nobody could attach the autoclave
+ * printout that `/cycles/:id/end` has always accepted a key for.
+ */
+app.route("/api", mediaRoutes);
 app.route("/api", tenantCloseRoutes);
 app.route("/api", accountRoutes);
 app.route("/api", insightRoutes);

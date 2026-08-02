@@ -15,6 +15,7 @@
     "clean": "rm -rf .turbo *.tsbuildinfo"
   },
   "dependencies": {
+    "hono": "^4.9.10",
     "@4dl/core": "workspace:*"
   },
   "devDependencies": {

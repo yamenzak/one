@@ -87,6 +87,13 @@ function permissionFor(method: string, path: string): Grant | null {
    * privileged question.
    */
   if (path.startsWith("/api/staff")) return null;
+  /**
+   * Media. Reading is any member's — an evidence photo is part of a load's
+   * record, which is what everyone here works from. Every WRITE re-checks inside
+   * the route: the public `brand` prefix is owner-only, and the storage meter is
+   * a business figure rather than a fact about your own files.
+   */
+  if (path.startsWith("/api/media") || path === "/api/storage-usage") return null;
   if (path.startsWith("/api/ai/")) return { ai: ["use"] };
   return null;
 }

@@ -206,3 +206,34 @@ Empty ALLOW list. One exemption was added to the checker for this package:
 `PublicKeyCredential`. That list takes names a **spec or a vendor** chose, never
 one the codebase chose — contrast `@4dl/notify`, where the `WebSocketPair` halves
 were renamed rather than exempted, because those were ours to name.
+
+
+## `@4dl/app-kit/pwa` — the offline BUILD config
+
+`useInbox` and `api.ts` are the runtime half of offline; this is the other half,
+and it is the one carrying every expensive lesson. Four rules, each of which took
+out something real:
+
+1. **`navigateFallback` must be `/`, not `/index.html`.** Workers Assets answers
+   `/index.html` with a 307 to `/`, and a navigation `respondWith()`n a REDIRECTED
+   response is rejected by the browser — so on a precache MISS the page dies as
+   `ERR_FAILED`. That took out every deep link while `/` kept working, because
+   `/` matches the precache route directly and never reaches the fallback. A miss
+   is ordinary: iOS evicts Cache Storage, and the in-app hard-refresh clears it
+   deliberately.
+2. **`clientsClaim` WITHOUT `skipWaiting`.** First install activates at once, so
+   offline works from the first visit; an update parks until every old tab closes,
+   so a new worker can never purge the precache under a live session.
+3. **Only queue writes that are SAFE TO REPLAY.** `queuedPaths` is required and
+   has no default. Background Sync replays a POST hours later against a world
+   that has moved on: correct for an idempotent upsert, wrong for a state-machine
+   transition. "None of them" is a valid answer — the shell still precaches.
+4. **Keep `queuedPaths` in lockstep with `configureApi`.** Same set, expressed to
+   the service worker at build time and to the fetch layer at runtime; drift
+   means the UI says "saved, will sync" for a write nothing is queueing.
+
+**What this does NOT do: cache API reads.** Neither shipped app does. "Offline"
+here means the shell opens and queued writes survive — reads still fail. An app
+whose value offline is *reading* needs a staleness policy first, and for some
+products (anything where a stale record is a safety claim) the right answer is
+not to cache reads at all.

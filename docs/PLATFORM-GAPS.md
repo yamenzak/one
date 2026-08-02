@@ -279,7 +279,7 @@ Kova-shaped:
 | `session-routes` | list and revoke active sessions | absent |
 | `action-otp` | step-up confirmation for destructive acts | absent |
 | `audit` | who did what | absent |
-| `media-routes` | upload over `@4dl/storage` | absent — Tessa binds an R2 bucket it never writes to |
+| `media-routes` | upload over `@4dl/storage` | **DONE** — `@4dl/storage`'s `mediaRoutes`, mounted in Tessa |
 
 The `tenant-close` one is the sharpest: the ladder in `@4dl/tenancy` exempts
 `/api/tenant/close` from every gate *specifically* so that leaving is always
@@ -388,6 +388,27 @@ And one where Kova is ahead in a way that matters more for Tessa than for Kova:
   shop floor**, which is the environment where connectivity actually fails. The
   app that needs offline most is the one without it.
 
+  > ⚠️ **CORRECTION (2026-08-02).** That last sentence is wrong, and Tessa's own
+  > `vite.config.ts` already argued so before this list was written. Three
+  > things, checked:
+  >
+  > 1. **Nothing caches API reads** — in either app. `offlinePwa` precaches the
+  >    shell and queues writes, and that is all. A precached Tessa opens on a
+  >    dead radio into empty screens full of load errors.
+  > 2. **Caching reads is the part that would help, and here it is dangerous.**
+  >    A stale "sterile, expires November" for a tray recalled ten minutes ago is
+  >    exactly the failure the product exists to prevent. Kova can serve a stale
+  >    meal plan; a sterile-supply app cannot serve a stale disposition.
+  > 3. **No Tessa write is safe to replay.** Every one is a state-machine
+  >    transition through `applyEvents`; Kova's queued writes are idempotent
+  >    upserts keyed on (client, day). Background Sync replays against a world
+  >    that has moved on.
+  >
+  > So Tessa's offline story is a real design question about STALENESS and
+  > CONFLICT (TESSA.md §5), not a missing plugin. The MECHANISM is extracted —
+  > `@4dl/app-kit/pwa`'s `offlinePwa()`, carrying all four hard-won rules —
+  > which is the platform half and the half that was actually missing.
+
 ---
 
 ## What is NOT worth extracting
@@ -429,7 +450,17 @@ Ranked by (breakage prevented) ÷ (risk of the move):
    struck; `action-otp` and `audit` are mechanisms `@4dl/auth` already owns.
    What genuinely remains is a user-facing media UPLOAD route for Tessa, which
    is small and not urgent.
-6. **Offline into `@4dl/app-kit`**, and Kova onto `@4dl/i18n`.
+6. ~~**Offline into `@4dl/app-kit`**, and Kova onto `@4dl/i18n`.~~ **PARTLY DONE.**
+   The offline BUILD CONFIG is `@4dl/app-kit/pwa` (`offlinePwa()`), with the four
+   rules that each took out something real. Kova's config now calls it and emits
+   a byte-identical service worker. Tessa deliberately still does not adopt it —
+   see the correction above.
+
+   **Kova onto `@4dl/i18n` is PRODUCT work, not platform work**, and is left
+   undone on purpose. The package exists, works and has a consumer; what remains
+   is translating ~500 hard-coded strings across ~90 files, which is a real
+   multi-day task with no extraction in it. Half-doing it would leave the app in
+   two languages at once, which is worse than one.
 
 Nothing here is urgent in the sense of "production is broken". All of it is
 urgent in the sense that **the third app pays for every one of these twice** —
