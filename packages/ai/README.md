@@ -16,6 +16,27 @@ resolve model → RESERVE a worst-case hold → run (Workers AI | Gemini | mock)
 | `media.ts` | Where a generated image goes. |
 | `schema.ts` | `ai_models`, `ai_generations`, `ai_cache`, `insight_feedback`. |
 
+## The operator console's endpoints are here too
+
+`aiCatalogAdminRoutes({ isPlatformAdmin })` serves `/admin/ai/config`,
+`/admin/ai/models`, `/admin/ai/models/:id` and `/admin/ai/models/sync`, and
+`catalog-sync.ts` is the reconciliation behind the last one — it reads the two
+official pricing pages, parses them with this package's parsers, and writes this
+package's table.
+
+All of it was Kova's until a second app needed it. The cost of leaving it there
+was not theoretical: Tessa shipped `GET /admin/ai` and `POST /admin/ai` — two
+endpoints against eight — so its console could show a key field and a read-only
+model list and nothing else. Not because anyone decided that, but because
+reimplementing eight endpoints is a project and writing two is an afternoon.
+
+What stays in an app is what genuinely is the app's: a self-test that runs the
+product's own prompts through its own parsers, and whatever it does with user
+feedback on generated output. `onFirstProviderKey` is the one hook, for an app
+that caches something a keyless mock lane produced.
+
+The surface over these routes is `@4dl/admin`'s `PlatformAiSection`.
+
 ## One `task` column, two image capabilities
 
 `ai_models.task` holds ONE lane per model, and a modern multimodal model does

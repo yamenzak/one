@@ -37,17 +37,19 @@ import {
   Building2,
   CreditCard,
   Globe,
+  KeyRound,
   Palette,
   Wallet,
   Wand2,
   Users,
   type SettingsGroup,
 } from "@4dl/ui";
+import { PasskeysCard } from "@4dl/app-kit";
 import { billing as billingApi, fmt, settings as settingsApi, type AiSettings, type Branding } from "../data.js";
 import { useI18n, useT } from "../i18n.js";
 import { StaffSection } from "./Staff.js";
 
-type View = null | "brand" | "ai" | "plan" | "staff";
+type View = null | "brand" | "ai" | "plan" | "staff" | "security";
 
 export function Settings({ onBack }: { onBack: () => void }) {
   const t = useT();
@@ -76,6 +78,15 @@ export function Settings({ onBack }: { onBack: () => void }) {
   if (view === "ai") return <Screen><AiSection initial={data.ai} allowed={data.canUseAi} onBack={() => setView(null)} /></Screen>;
   if (view === "plan") return <Screen><PlanSection onBack={() => setView(null)} /></Screen>;
   if (view === "staff") return <Screen><StaffSection onBack={() => setView(null)} /></Screen>;
+  if (view === "security") {
+    return (
+      <Screen>
+        <SettingsPage title={t("settings.security")} description={t("settings.security.intro")} onBack={() => setView(null)}>
+          <PasskeysCard />
+        </SettingsPage>
+      </Screen>
+    );
+  }
 
   const groups: SettingsGroup[] = [
     {
@@ -102,6 +113,16 @@ export function Settings({ onBack }: { onBack: () => void }) {
         },
         { key: "staff", label: t("staff.title"), icon: Users, tone: "case", sub: t("staff.intro"), onClick: () => setView("staff") },
         { key: "plan", label: t("settings.plan"), icon: CreditCard, tone: "soiled", onClick: () => setView("plan") },
+      ],
+    },
+    {
+      header: t("settings.account"),
+      rows: [
+        /* Tessa had NO passkey surface at all — not here, not on the login
+           screen — while `@4dl/app-kit` shipped the whole ceremony. Its users
+           were on email codes only, on a platform whose own docs say
+           "email OTP + passkeys". The card is the package's now. */
+        { key: "security", label: t("settings.security"), icon: KeyRound, tone: "primary", sub: t("settings.security.sub"), onClick: () => setView("security") },
       ],
     },
     { header: t("settings.device"), rows: [{ key: "lang", label: t("settings.language"), icon: Globe, tone: "neutral", sub: t("settings.language.sub") }] },

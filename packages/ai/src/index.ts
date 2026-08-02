@@ -1,3 +1,5 @@
+export * from "./admin-routes.js";
+export * from "./catalog-sync.js";
 export * from "./generate.js";
 export * from "./media.js";
 export * from "./mock-lane.js";

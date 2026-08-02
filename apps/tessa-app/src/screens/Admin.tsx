@@ -22,6 +22,7 @@
 import { useCallback, useState } from "react";
 import {
   AdminConsole as Console,
+  PlatformAiSection,
   PlatformDomainsSection,
   PlatformEmailSection,
   PlatformMaintenanceSection,
@@ -86,7 +87,22 @@ const SECTIONS: ConsoleSection[] = [
   /* Without `google.gemini_key` the vision model is unreachable, so reading a
      label — the feature most likely to be why a centre bought the plan — fails
      with "unavailable" on a deployment that otherwise looks healthy. */
-  { key: "ai", label: "AI", blurb: "The Gemini key, the mock lane, and the model catalog", icon: Wand2, tone: "cycle", render: () => <AiConfig /> },
+  {
+    key: "ai", label: "AI", blurb: "The Gemini key, the mock lane, and the model catalog", icon: Wand2, tone: "cycle",
+    render: () => (
+      <PlatformAiSection
+        api={api}
+        errorText={errorText}
+        lanes={[
+          { task: "text", label: "Text", desc: "Pack notes, protocol drafts, summaries." },
+          { task: "text-small", label: "Text (small)", desc: "Short factual jobs — catalog metadata." },
+          { task: "vision", label: "Vision", desc: "Reading a sterilisation label or an IFU. Gemini only." },
+          { task: "image", label: "Image", desc: "Generated illustrations." },
+          { task: "speech", label: "Speech", desc: "Spoken output. Unused here." },
+        ]}
+      />
+    ),
+  },
   { key: "domains", label: "Custom domains", blurb: "Centre domains and their certificates", icon: Globe, tone: "case", render: () => <PlatformDomainsSection api={api} errorText={errorText} tenantNoun="centre" cnameExample="saas.4dl.app" /> },
   { key: "security", label: "Security", blurb: "The bot check on sign-in", icon: ShieldCheck, tone: "danger", render: () => <PlatformTurnstileSection api={api} errorText={errorText} /> },
   /* `@4dl/admin`'s own: who a deployment sends mail as is the shared email
@@ -198,85 +214,6 @@ function Centres() {
           </Row>
         ))}
       </Group>
-    </div>
-  );
-}
-
-function AiConfig() {
-  const load = useCallback(
-    () => api.get<{ geminiKeySet: boolean; mock: string; models: { id: string; label: string; task: string }[] }>("/api/admin/ai"),
-    [],
-  );
-  const { data, error, loading, reload } = useLoad(load, "AI config", errorText);
-  const { busy, msg, err, run } = useAction(errorText);
-  const [key, setKey] = useState("");
-
-  if (loading) {
-    return (
-      <Reveal
-        loading
-        className="space-y-4"
-        skeleton={
-          <>
-            <Card className="space-y-3 p-4">
-              <div className="flex items-center justify-between"><SkeletonLine w="6rem" h="text" /><Skeleton className="h-6 w-16 rounded-full" /></div>
-              <Skeleton className="h-12 w-full rounded-xl" />
-              <Skeleton className="h-12 w-full rounded-xl" />
-            </Card>
-            <RowsSkeleton rows={3} />
-          </>
-        }
-      >
-        {null}
-      </Reveal>
-    );
-  }
-  if (error || !data) return <LoadError what="AI config" error={error ?? "—"} onRetry={reload} />;
-
-  return (
-    <div className="space-y-4">
-      <Card className="space-y-3 p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-sm">Gemini key</span>
-          <Badge tone={data.geminiKeySet ? "success" : "danger"}>{data.geminiKeySet ? "set" : "missing"}</Badge>
-        </div>
-        {!data.geminiKeySet && (
-          <p className="text-xs text-muted-foreground">
-            Without it the vision model is unreachable and &ldquo;Read a label&rdquo; fails as unavailable — on a deployment that
-            otherwise looks healthy.
-          </p>
-        )}
-        <Field label="Set key" labelHidden placeholder="AIza… (blank keeps the stored one)" value={key} onChange={(e) => setKey(e.target.value)} />
-        <SaveBar
-          label="Save"
-          saving={busy === "key"}
-          dirty={key.trim().length > 0}
-          msg={msg}
-          err={err}
-          onSave={() =>
-            void run("key", async () => {
-              await api.post("/api/admin/ai", { geminiKey: key.trim() });
-              setKey("");
-              reload();
-              return "Saved.";
-            })
-          }
-        />
-      </Card>
-
-      <Card className="space-y-2 p-4">
-        <h3 className="text-sm font-medium">Models</h3>
-        {data.models.length === 0 ? (
-          <p className="text-xs text-muted-foreground">None seeded yet — they seed on the first AI call.</p>
-        ) : (
-          data.models.map((m) => (
-            <div key={m.id} className="flex items-center justify-between text-xs">
-              <span className="truncate">{m.label}</span>
-              <Badge tone="neutral">{m.task}</Badge>
-            </div>
-          ))
-        )}
-      </Card>
     </div>
   );
 }

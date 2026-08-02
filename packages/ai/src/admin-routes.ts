@@ -1,0 +1,174 @@
+/**
+ * THE AI OPERATOR CONSOLE'S ENDPOINTS.
+ *
+ * ── Why these moved ─────────────────────────────────────────────────────────
+ *
+ * They were Kova's, in `apps/api/src/ai-routes.ts`, and none of them was ever
+ * about Kova: the Gemini key, the mock lane, the credit markup and the model
+ * catalog are all THIS package's state. The consequence of leaving them in an
+ * app was not theoretical — Tessa shipped `GET /admin/ai` and `POST /admin/ai`,
+ * two endpoints against Kova's eight, so its AI console could show a key field
+ * and a read-only model list and nothing else. Not because anyone decided that,
+ * but because reimplementing eight endpoints from scratch is a project and
+ * writing two is an afternoon.
+ *
+ * What stays in the app is what genuinely is the app's: a self-test that runs
+ * the product's own prompts through its own parsers, and whatever it does with
+ * user feedback on generated output. Those need registries this package has no
+ * business knowing about. Everything here is provider mechanics.
+ *
+ * ── The mock lane is the dangerous one ──────────────────────────────────────
+ *
+ * `mockMode: "on"` outside development makes every AI call return fabricated
+ * output — and still bill the tenant credits for it. In a medical app that
+ * includes clinical values read off a label. The write is refused here so the
+ * console cannot create the state, AND the read point ignores a stored "on"
+ * (see `mock-lane.ts`), so a hand-edited `app_config` row or a restored backup
+ * cannot either. Two independent checks, because this route is only one of the
+ * ways that row can be set.
+ */
+
+import { Hono } from "hono";
+import { z } from "zod";
+import { getConfig, setConfig, type HasDb, type HasEnvironment } from "@4dl/core";
+import type { Context } from "hono";
+import { listModels, modelPricing, modelTasks, seedAiModels, type AiModelRow } from "./generate.js";
+import { mockModeSettable } from "./mock-lane.js";
+import { fetchPricingDoc, syncModelCatalog } from "./catalog-sync.js";
+
+/** The slice of an app's Hono env these routes actually read. */
+export type AiRouteEnv = {
+  Bindings: HasDb & HasEnvironment;
+  Variables: Record<string, unknown>;
+};
+
+/**
+ * 3× the real provider cost. High enough that a mispriced model cannot be sold
+ * at a loss, low enough that credits stay comprehensible.
+ */
+export const DEFAULT_AI_MARKUP = 3;
+
+export const globalMarkup = (cfg: Record<string, string>): number => {
+  const n = Number(cfg["ai.markup"]);
+  return n >= 1 && n <= 100 ? n : DEFAULT_AI_MARKUP;
+};
+
+export interface AiAdminDeps<E extends AiRouteEnv = AiRouteEnv> {
+  /** Platform operator — an allowlist, a separate axis from tenant RBAC. */
+  isPlatformAdmin: (c: Context<E>) => boolean;
+  /**
+   * Called once, when a real Gemini key is stored where there was none.
+   *
+   * Kova uses it to drop cached TTS cues: without a key those were voiced by the
+   * keyless mock lane (silent WAVs), so keeping them would leave an owner stuck
+   * with silence they had already "generated". Optional, because that is a
+   * consequence of one app's caching, not of storing a key.
+   */
+  onFirstProviderKey?: (db: D1Database) => Promise<void>;
+}
+
+export function aiCatalogAdminRoutes<E extends AiRouteEnv = AiRouteEnv>(deps: AiAdminDeps<E>) {
+  const forbidden = (c: Context<E>) => c.json({ error: "forbidden" }, 403);
+
+  return new Hono<E>()
+    .get("/admin/ai/config", async (c) => {
+      if (!deps.isPlatformAdmin(c)) return forbidden(c);
+      const cfg = await getConfig(c.env.DB);
+      const models = await listModels(c.env.DB);
+      // Never echo the key — only whether it's set.
+      return c.json({
+        geminiKeySet: !!cfg["google.gemini_key"],
+        mockMode: cfg["ai.mock"] ?? "auto",
+        markup: globalMarkup(cfg),
+        modelCount: models.length,
+      });
+    })
+
+    .post("/admin/ai/config", async (c) => {
+      if (!deps.isPlatformAdmin(c)) return forbidden(c);
+      const d = z
+        .object({
+          geminiKey: z.string().min(1).optional(),
+          mockMode: z.enum(["auto", "on", "off"]).optional(),
+          markup: z.number().min(1).max(100).optional(),
+        })
+        .safeParse(await c.req.json().catch(() => null));
+      if (!d.success) return c.json({ error: "invalid body" }, 400);
+
+      if (d.data.geminiKey) {
+        const prev = await getConfig(c.env.DB);
+        await setConfig(c.env.DB, "google.gemini_key", d.data.geminiKey.trim());
+        if (!prev["google.gemini_key"]) await deps.onFirstProviderKey?.(c.env.DB);
+      }
+
+      // See the header: refused here, and ignored at the read point.
+      if (d.data.mockMode) {
+        if (!mockModeSettable(d.data.mockMode, c.env.ENVIRONMENT === "development")) {
+          return c.json(
+            { error: "mock mode cannot be turned on outside development — it fabricates output and bills credits for it" },
+            400,
+          );
+        }
+        await setConfig(c.env.DB, "ai.mock", d.data.mockMode);
+      }
+
+      // Setting the global markup applies it to every model in the catalog so
+      // credit charges stay markup × real provider cost across the board.
+      if (d.data.markup !== undefined) {
+        await setConfig(c.env.DB, "ai.markup", String(d.data.markup));
+        await c.env.DB.prepare("UPDATE ai_models SET markup = ?").bind(d.data.markup).run();
+      }
+      return c.json({ ok: true });
+    })
+
+    /** The full catalog, disabled models included. */
+    .get("/admin/ai/models", async (c) => {
+      if (!deps.isPlatformAdmin(c)) return forbidden(c);
+      await seedAiModels(c.env.DB);
+      const rows = await c.env.DB.prepare("SELECT * FROM ai_models ORDER BY provider, task, label").all<AiModelRow>();
+      // Every row carries its price in CREDITS as well as its neuron rate card.
+      // Neurons are the cost basis and stay useful, but they are not the currency
+      // anyone spends — without the conversion the catalog cannot answer "is this
+      // model expensive?", which is the only question being asked of it.
+      //
+      // `supports` is what the lane pickers filter on. Filtering on `task` alone
+      // put every Gemini model out of the Vision lane (no Gemini row is ever
+      // tagged `vision`) while letting a Gemini text model into the Image lane —
+      // exactly backwards: they all read images, only the image family makes them.
+      const models = (rows.results ?? []).map((m) => ({ ...m, pricing: modelPricing(m), supports: modelTasks(m) }));
+      return c.json({ models });
+    })
+
+    /** Toggle / default / per-model markup override. */
+    .patch("/admin/ai/models/:id", async (c) => {
+      if (!deps.isPlatformAdmin(c)) return forbidden(c);
+      const d = z
+        .object({ enabled: z.boolean().optional(), isDefault: z.boolean().optional(), markup: z.number().min(1).max(100).optional() })
+        .safeParse(await c.req.json().catch(() => null));
+      if (!d.success) return c.json({ error: "invalid body" }, 400);
+      const id = c.req.param("id");
+
+      // Making a model the default for its task clears the previous default.
+      if (d.data.isDefault) {
+        const row = await c.env.DB.prepare("SELECT task FROM ai_models WHERE id = ?").bind(id).first<{ task: string }>();
+        if (row) await c.env.DB.prepare("UPDATE ai_models SET is_default = 0 WHERE task = ?").bind(row.task).run();
+      }
+      const sets: string[] = [];
+      const binds: unknown[] = [];
+      if (d.data.enabled !== undefined) (sets.push("enabled = ?"), binds.push(d.data.enabled ? 1 : 0));
+      if (d.data.isDefault !== undefined) (sets.push("is_default = ?"), binds.push(d.data.isDefault ? 1 : 0));
+      if (d.data.markup !== undefined) (sets.push("markup = ?"), binds.push(d.data.markup));
+      if (sets.length) await c.env.DB.prepare(`UPDATE ai_models SET ${sets.join(", ")} WHERE id = ?`).bind(...binds, id).run();
+      return c.json({ ok: true });
+    })
+
+    /** Refresh the catalog from the official pricing docs. */
+    .post("/admin/ai/models/sync", async (c) => {
+      if (!deps.isPlatformAdmin(c)) return forbidden(c);
+      const cfg = await getConfig(c.env.DB);
+      const report = await syncModelCatalog(c.env.DB, { markup: globalMarkup(cfg), fetchMd: fetchPricingDoc });
+      // 502 only when NEITHER provider produced a usable parse — a one-sided
+      // failure still applied real work and must return it, not a bare error.
+      return c.json(report, report.ok ? 200 : 502);
+    });
+}

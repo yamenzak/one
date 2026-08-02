@@ -249,6 +249,10 @@ export const en = {
   // ── Practice settings ────────────────────────────────────────────────────
   "settings.title": "Settings",
   "settings.practice": "Your practice",
+  "settings.account": "Your account",
+  "settings.security": "Passkeys & security",
+  "settings.security.sub": "How you sign in on this device",
+  "settings.security.intro": "A passkey signs you in with your face, fingerprint or screen lock — no code to wait for. Email codes always keep working.",
   "settings.device": "This device",
   "settings.saved": "Saved.",
   "settings.brand": "Look and feel",
@@ -608,6 +612,10 @@ export const de: Translation<TessaDict> = {
   // ── Einstellungen ────────────────────────────────────────────────────────
   "settings.title": "Einstellungen",
   "settings.practice": "Ihr Zentrum",
+  "settings.account": "Ihr Konto",
+  "settings.security": "Passkeys und Sicherheit",
+  "settings.security.sub": "Wie Sie sich auf diesem Gerät anmelden",
+  "settings.security.intro": "Ein Passkey meldet Sie mit Gesicht, Fingerabdruck oder Displaysperre an — ohne auf einen Code zu warten. E-Mail-Codes funktionieren weiterhin.",
   "settings.device": "Dieses Gerät",
   "settings.saved": "Gespeichert.",
   "settings.brand": "Erscheinungsbild",

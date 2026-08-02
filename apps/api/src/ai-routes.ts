@@ -1121,18 +1121,26 @@ export const aiRoutes = new Hono<AppEnv>()
     return c.json({ ok: true });
   });
 
-// ── Platform admin: AI provider config, markup + the model catalog ───────────
-const DEFAULT_MARKUP = 3;
-const globalMarkup = (cfg: Record<string, string>): number => { const n = Number(cfg["ai.markup"]); return n >= 1 && n <= 100 ? n : DEFAULT_MARKUP; };
-
+/**
+ * ── Platform admin: the two AI endpoints that really are Kova's ─────────────
+ *
+ * The provider key, the mock lane, the credit markup and the model catalog are
+ * `@4dl/ai`'s state, and their routes now live there (`aiCatalogAdminRoutes`,
+ * mounted alongside this tree in `index.ts`). They were here for no better
+ * reason than that Kova was the first app to need them — and the cost showed up
+ * the moment there was a second: Tessa had two AI admin endpoints against these
+ * eight, so its console could show a key field and a read-only model list and
+ * nothing else.
+ *
+ * What is left is what genuinely cannot move:
+ *
+ *   feedback  reads `insight_feedback` — Kova's table, about coach insights
+ *             clients rated.
+ *   selftest  runs the PRODUCT'S OWN prompts through the PRODUCT'S OWN parsers
+ *             and spends the switched-into studio's credits doing it. A shared
+ *             package has no prompts to run.
+ */
 export const aiAdminRoutes = new Hono<AppEnv>()
-  .get("/admin/ai/config", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const cfg = await getConfig(c.env.DB);
-    const models = await listModels(c.env.DB);
-    // Never echo the key — only whether it's set.
-    return c.json({ geminiKeySet: !!cfg["google.gemini_key"], mockMode: cfg["ai.mock"] ?? "auto", markup: globalMarkup(cfg), modelCount: models.length });
-  })
   /**
    * The 👍/👎 signal, aggregated per insight type.
    *
@@ -1162,94 +1170,6 @@ export const aiAdminRoutes = new Hono<AppEnv>()
     }));
     return c.json({ types, totalVotes: types.reduce((n, t) => n + t.total, 0) });
   })
-  .post("/admin/ai/config", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const d = z
-      .object({ geminiKey: z.string().min(1).optional(), mockMode: z.enum(["auto", "on", "off"]).optional(), markup: z.number().min(1).max(100).optional() })
-      .safeParse(await c.req.json().catch(() => null));
-    if (!d.success) return c.json({ error: "invalid body" }, 400);
-    if (d.data.geminiKey) {
-      const prev = await getConfig(c.env.DB);
-      await setConfig(c.env.DB, "google.gemini_key", d.data.geminiKey.trim());
-      // First real key configured → any cached TTS cues were necessarily voiced
-      // by the keyless mock lane (silent WAVs). Drop them so the owner
-      // regenerates a real voice pack instead of being stuck with silence.
-      if (!prev["google.gemini_key"]) await c.env.DB.prepare("DELETE FROM tts_cues").run().catch(() => undefined);
-    }
-    // `mockMode: "on"` is a DEVELOPMENT-ONLY override. Persisting it in
-    // production used to be a one-click switch that made every AI route return
-    // fabricated output — clinical `lab-extract` markers included — and bill the
-    // tenant credits for it. Refuse the write here (so the console can't create
-    // the state) AND ignore a stored "on" at the read point in ai.ts (so a
-    // hand-edited app_config row or a restored backup can't either). Defence in
-    // depth: this route is only one of the ways the row can be set.
-    if (d.data.mockMode) {
-      if (!mockModeSettable(d.data.mockMode, c.env.ENVIRONMENT === "development")) {
-        return c.json({ error: "mock mode cannot be turned on outside development — it fabricates output (including lab values) and bills credits for it" }, 400);
-      }
-      await setConfig(c.env.DB, "ai.mock", d.data.mockMode);
-    }
-    // Setting the global markup applies it to every model in the catalog so
-    // credit charges stay markup × real provider cost across the board.
-    if (d.data.markup !== undefined) {
-      await setConfig(c.env.DB, "ai.markup", String(d.data.markup));
-      await c.env.DB.prepare("UPDATE ai_models SET markup = ?").bind(d.data.markup).run();
-    }
-    return c.json({ ok: true });
-  })
-
-  /** The full model catalog (platform admin) — includes disabled models. */
-  .get("/admin/ai/models", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const { seedAiModels } = await import("./ai.js");
-    await seedAiModels(c.env.DB);
-    const rows = await c.env.DB.prepare("SELECT * FROM ai_models ORDER BY provider, task, label").all<AiModelRow>();
-    // Every row carries its price in CREDITS as well as its neuron rate card.
-    // The neuron figures are the cost basis and stay useful to an operator, but
-    // they are not the currency anyone spends — without the credit conversion
-    // the catalog cannot answer "is this model expensive?", which is the only
-    // question being asked of it.
-    // `supports` is what the LANE PICKERS filter on. Filtering on `task` alone
-    // put every Gemini model out of the Vision lane (no Gemini row is ever
-    // tagged `vision`) while letting a Gemini text model into the Image lane,
-    // which is exactly backwards: they all read images, only the image family
-    // makes them.
-    const models = (rows.results ?? []).map((m) => ({ ...m, pricing: modelPricing(m), supports: modelTasks(m) }));
-    return c.json({ models });
-  })
-
-  /** Toggle / default / per-model markup override. */
-  .patch("/admin/ai/models/:id", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const d = z.object({ enabled: z.boolean().optional(), isDefault: z.boolean().optional(), markup: z.number().min(1).max(100).optional() }).safeParse(await c.req.json().catch(() => null));
-    if (!d.success) return c.json({ error: "invalid body" }, 400);
-    const id = c.req.param("id");
-    // Making a model the default for its task clears the previous default.
-    if (d.data.isDefault) {
-      const row = await c.env.DB.prepare("SELECT task FROM ai_models WHERE id = ?").bind(id).first<{ task: string }>();
-      if (row) await c.env.DB.prepare("UPDATE ai_models SET is_default = 0 WHERE task = ?").bind(row.task).run();
-    }
-    const sets: string[] = [], binds: unknown[] = [];
-    if (d.data.enabled !== undefined) (sets.push("enabled = ?"), binds.push(d.data.enabled ? 1 : 0));
-    if (d.data.isDefault !== undefined) (sets.push("is_default = ?"), binds.push(d.data.isDefault ? 1 : 0));
-    if (d.data.markup !== undefined) (sets.push("markup = ?"), binds.push(d.data.markup));
-    if (sets.length) await c.env.DB.prepare(`UPDATE ai_models SET ${sets.join(", ")} WHERE id = ?`).bind(...binds, id).run();
-    return c.json({ ok: true });
-  })
-
-  /**
-   * Refresh the catalog from the official pricing docs (Cloudflare Workers AI +
-   * Google Gemini). See `syncModelCatalog` for exactly what it does.
-   */
-  .post("/admin/ai/models/sync", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const cfg = await getConfig(c.env.DB);
-    const report = await syncModelCatalog(c.env.DB, { markup: globalMarkup(cfg), fetchMd: fetchPricingDoc });
-    // 502 only when NEITHER provider produced a usable parse — a one-sided
-    // failure still applied real work and must return it, not a bare error.
-    return c.json(report, report.ok ? 200 : 502);
-  })
-
   /**
    * AI self-test (platform admin) — the plan. What the suite would run against
    * the chosen scope, and what it will COST, so the operator sees the bill
@@ -1314,153 +1234,6 @@ export const aiAdminRoutes = new Hono<AppEnv>()
       stopped,
     });
   });
-
-// ── Model-catalog sync ───────────────────────────────────────────────────────
-
-export const PRICING_SOURCES = {
-  "workers-ai": "https://developers.cloudflare.com/workers-ai/platform/pricing/index.md",
-  google: "https://ai.google.dev/gemini-api/docs/pricing.md.txt",
-} as const;
-
-export interface FetchedDoc { md: string | null; error: string | null }
-
-/** Fetch one pricing doc. Separated from the sync so the sync's reconciliation
- *  logic is testable without the network. */
-export async function fetchPricingDoc(url: string): Promise<FetchedDoc> {
-  try {
-    const r = await fetch(url, { headers: { accept: "text/markdown" } });
-    if (!r.ok) return { md: null, error: `HTTP ${r.status}` };
-    return { md: await r.text(), error: null };
-  } catch (e) {
-    return { md: null, error: e instanceof Error ? e.message : String(e) };
-  }
-}
-
-export interface ProviderSyncReport {
-  provider: "workers-ai" | "google";
-  source: string;
-  /** The doc was fetched AND parsed into at least one model. */
-  ok: boolean;
-  /** Models priced from the page. */
-  parsed: number;
-  /** Ids that were not in the catalog before this sync. */
-  added: number;
-  addedIds: string[];
-  /** Existing ids whose rates/label were refreshed. */
-  updated: number;
-  /** Enabled ids that vanished from the source and were switched off. */
-  disabled: number;
-  disabledIds: string[];
-  /** Rows the page lists but the catalog cannot price, and why. */
-  unpriceable: SkippedModel[];
-  error: string | null;
-}
-
-export interface SyncReport {
-  ok: boolean;
-  providers: ProviderSyncReport[];
-  total: number;
-  errors: string[];
-}
-
-/**
- * Reconcile the model catalog against the two official pricing docs.
- *
- * Per provider, independently (a Cloudflare failure must never touch a single
- * Gemini row, and vice versa):
- *   • DISCOVER — every priceable row on the page is upserted. New ids land in
- *     the catalog; runnable lanes (text / text-small / vision / image / speech)
- *     arrive ENABLED, the rest (embedding / transcribe / tts / classify) arrive
- *     disabled, because no code path here can execute them.
- *   • REFRESH — an existing row's label + rates are updated. `task`, `enabled`,
- *     `is_default` and `markup` are NOT touched: those are operator/seed
- *     decisions and the page's own lane guess would silently re-route traffic
- *     (it used to retask `gemini-2.5-flash` to text-small, pushing every text
- *     feature onto the ~8× pricier `gemini-2.5-pro`).
- *   • RECONCILE — an ENABLED row of that provider that is absent from a good
- *     parse is switched off (`enabled = 0, is_default = 0`). Never deleted: a
- *     tenant's `ai_config_json` may still name it and `ai_generations` history
- *     must stay readable. Only runs when that provider's fetch AND parse
- *     succeeded, so a 404 on one doc cannot disable the other provider's models.
- *
- * A provider that fetched but parsed ZERO models is treated as a parse failure,
- * not as "the provider has no models" — a doc-format change would otherwise
- * disable the whole catalog in one click.
- */
-export async function syncModelCatalog(
-  db: D1Database,
-  opts: { markup: number; fetchMd: (url: string) => Promise<FetchedDoc> },
-): Promise<SyncReport> {
-  await seedAiModels(db);
-  const existing = await db.prepare("SELECT id, provider, enabled FROM ai_models").all<{ id: string; provider: string; enabled: number }>();
-  const known = new Map((existing.results ?? []).map((r) => [r.id, r]));
-
-  const providers: ProviderSyncReport[] = [];
-  const errors: string[] = [];
-
-  for (const provider of ["workers-ai", "google"] as const) {
-    const source = PRICING_SOURCES[provider];
-    const report: ProviderSyncReport = { provider, source, ok: false, parsed: 0, added: 0, addedIds: [], updated: 0, disabled: 0, disabledIds: [], unpriceable: [], error: null };
-    providers.push(report);
-
-    const doc = await opts.fetchMd(source);
-    if (!doc.md) {
-      report.error = `couldn't fetch the pricing page (${doc.error ?? "unknown error"}) — every ${provider} model was left exactly as it was`;
-      errors.push(`${provider}: ${report.error}`);
-      continue;
-    }
-    const parsedDoc = provider === "workers-ai" ? parseWorkersAiCatalog(doc.md) : parseGeminiCatalog(doc.md);
-    report.unpriceable = parsedDoc.skipped;
-    report.parsed = parsedDoc.models.length;
-    if (parsedDoc.models.length === 0) {
-      report.error = "the page fetched but 0 models parsed — the doc format has probably changed; nothing was written or disabled";
-      errors.push(`${provider}: ${report.error}`);
-      continue;
-    }
-
-    for (const m of parsedDoc.models) {
-      if (known.has(m.id)) report.updated++;
-      else { report.added++; report.addedIds.push(m.id); }
-    }
-
-    await db.batch(parsedDoc.models.map((m) =>
-      db.prepare(
-        `INSERT INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-         ON CONFLICT(id) DO UPDATE SET label = excluded.label, provider = excluded.provider,
-           input_rate = excluded.input_rate, output_rate = excluded.output_rate, unit_rate = excluded.unit_rate, unit_kind = excluded.unit_kind`,
-      ).bind(m.id, m.task, m.label, m.provider, m.inputRate, m.outputRate, m.unitRate, m.unitKind, opts.markup, isRunnableTask(m.task) ? 1 : 0),
-    ));
-
-    const live = new Set(parsedDoc.models.map((m) => m.id));
-    const gone = (existing.results ?? []).filter((r) => r.provider === provider && r.enabled === 1 && !live.has(r.id)).map((r) => r.id);
-    if (gone.length) {
-      const ph = gone.map(() => "?").join(",");
-      await db.prepare(`UPDATE ai_models SET enabled = 0, is_default = 0 WHERE id IN (${ph})`).bind(...gone).run();
-      report.disabled = gone.length;
-      report.disabledIds = gone;
-    }
-    report.ok = true;
-  }
-
-  // Guarantee a default per generation task (cheapest output among enabled).
-  // Runs AFTER reconciliation so a task whose default was just switched off
-  // immediately re-elects instead of leaving the lane defaultless.
-  //
-  // The vision lane is Gemini-only (`modelSupportsTask`), so its election is
-  // constrained to Google rows. Unconstrained, this loop would happily crown the
-  // cheapest vision-tagged row whatever its provider — and a Workers-AI one
-  // fails every call with "model cannot read images", i.e. the sync itself could
-  // break the lane. The `db.ts` migration retags those rows, but the election
-  // must not be able to recreate the situation from a hand-edited catalog.
-  for (const task of ["text", "text-small", "vision"]) {
-    const providerClause = task === "vision" ? " AND provider = 'google'" : "";
-    const has = await db.prepare(`SELECT 1 x FROM ai_models WHERE task = ? AND enabled = 1 AND is_default = 1${providerClause}`).bind(task).first();
-    if (!has) await db.prepare(`UPDATE ai_models SET is_default = 1 WHERE id = (SELECT id FROM ai_models WHERE task = ? AND enabled = 1${providerClause} ORDER BY output_rate ASC LIMIT 1)`).bind(task).run();
-  }
-
-  return { ok: providers.some((p) => p.ok), providers, total: (await listModels(db)).length, errors };
-}
 
 // ── AI self-test (platform admin) ────────────────────────────────────────────
 //

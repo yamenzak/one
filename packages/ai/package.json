@@ -17,7 +17,9 @@
   },
   "dependencies": {
     "@4dl/billing": "workspace:*",
-    "@4dl/core": "workspace:*"
+    "@4dl/core": "workspace:*",
+    "hono": "^4.9.10",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@4dl/core": "workspace:*",

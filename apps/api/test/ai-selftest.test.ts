@@ -43,7 +43,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 import worker from "../src/index.js";
 import { ensureSchema } from "../src/db.js";
 import { seedAiModels } from "../src/ai.js";
-import { syncModelCatalog, evaluateSelfTestOutput, selfTestCheck, SELF_TEST_CHECKS, PRICING_SOURCES, type FetchedDoc } from "../src/ai-routes.js";
+// The catalog sync moved to `@4dl/ai` — it reads two public pricing pages and
+// writes that package's own table, and nothing about it was ever Kova's. The
+// tests follow it: they now cover the shared implementation every app runs.
+import { syncModelCatalog, PRICING_SOURCES, type FetchedDoc } from "@4dl/ai";
+import { evaluateSelfTestOutput, selfTestCheck, SELF_TEST_CHECKS } from "../src/ai-routes.js";
 import type { AiModelRow } from "../src/ai.js";
 
 const ORIGIN = "http://setup.localhost:8787";

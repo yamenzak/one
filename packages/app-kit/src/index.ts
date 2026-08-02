@@ -6,6 +6,7 @@ export * from "./theme.js";
 export * from "./notices.js";
 export * from "./inbox.js";
 export * from "./passkey.js";
+export { PasskeysCard, type PasskeysCardProps } from "./PasskeysCard.js";
 export * from "./stripe.js";
 export * from "./hard-refresh.js";
 export * from "./RefreshNote.js";

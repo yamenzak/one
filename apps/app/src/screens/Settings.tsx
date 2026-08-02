@@ -29,7 +29,7 @@ import { PreferencesEditorCard } from "./PreferencesEditor.js";
 import { INSIGHT_LABELS, mutedInsights, unmuteInsight } from "./client/InsightFeedback.js";
 import { useTheme } from "../theme.js";
 import { api, errorText, uploadMedia } from "../api.js";
-import { enrollPasskey, listPasskeys, removePasskey, passkeySupported, passkeyErrorMessage, deviceLabel } from "../passkey.js";
+import { PasskeysCard } from "@4dl/app-kit";
 import { usePasskey } from "../PasskeyPrompt.js";
 import { AiConfigSection } from "./AiSettings.js";
 import { SectionSplit } from "./SectionSplit.js";
@@ -792,62 +792,17 @@ function LoginPreview({ brandName, logoUrl, tagline, headline, subtext, bgImageU
   );
 }
 
-/** Passkey enrollment + removal — personal, per signed-in user. Each passkey is
- *  one device/credential; removing one unregisters that device (email codes stay
- *  as the fallback). */
+/**
+ * Passkeys — `@4dl/app-kit`'s card.
+ *
+ * The ceremony was already that package's (`enrollPasskey`, `listPasskeys`,
+ * `removePasskey`, the conditional-UI probe); the SCREEN was Kova's, which is
+ * why the second app shipped with no passkey UI at all. `usePasskey().refresh`
+ * stays here — the "add a passkey?" prompt is Kova's idea, not part of passkeys.
+ */
 function SecuritySection() {
-  const [passkeys, setPasskeys] = useState<{ id: string; name: string | null; createdAt: string }[]>([]);
-  const [enrolling, setEnrolling] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [toRemove, setToRemove] = useState<{ id: string; name: string } | null>(null);
   const pk = usePasskey();
-  const load = useCallback(() => { if (passkeySupported()) void listPasskeys().then(setPasskeys).catch(() => undefined); }, []);
-  useEffect(() => { load(); }, [load]);
-  const addPasskey = async () => {
-    setEnrolling(true); setMsg(null);
-    try { await enrollPasskey(deviceLabel()); setPasskeys(await listPasskeys()); pk?.refresh(); setMsg("Passkey added — next time, sign in with a tap."); }
-    catch (e) { setMsg(passkeyErrorMessage(e)); }
-    finally { setEnrolling(false); }
-  };
-  const remove = async (id: string) => {
-    setMsg(null);
-    try { await removePasskey(id); setPasskeys(await listPasskeys()); pk?.refresh(); setMsg("Passkey removed from your account."); }
-    catch { setMsg("Couldn't remove that passkey — try again."); }
-    finally { setToRemove(null); }
-  };
-  const fmtAdded = (iso: string) => { const d = new Date(iso); return isNaN(+d) ? "" : d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); };
-  return (
-    <section>
-      <Card className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div><div className="font-medium">Passkeys</div><div className="text-sm text-muted-foreground">One-tap sign-in with Face ID / fingerprint.</div></div>
-          <Badge tone={passkeys.length ? "success" : "neutral"}>{passkeys.length}</Badge>
-        </div>
-        {passkeys.map((p) => (
-          <div key={p.id} className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2.5">
-            <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary [&_svg]:size-4"><KeyRound /></div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium">{p.name ?? "Passkey"}</div>
-              {fmtAdded(p.createdAt) && <div className="text-xs text-muted-foreground">Added {fmtAdded(p.createdAt)}</div>}
-            </div>
-            <Button size="icon" variant="ghost" aria-label={`Remove ${p.name ?? "passkey"}`} onClick={() => setToRemove({ id: p.id, name: p.name ?? "this passkey" })}><Trash2 /></Button>
-          </div>
-        ))}
-        {passkeySupported() ? <Button variant="tonal" className="w-full" disabled={enrolling} onClick={() => void addPasskey()}><KeyRound /> {enrolling ? "Waiting for your device…" : passkeys.length ? "Add another passkey" : "Add a passkey"}</Button> : <p className="text-sm text-muted-foreground">This device doesn't support passkeys — you'll keep using email codes.</p>}
-        <ActionResult msg={msg} err={null} />
-      </Card>
-
-      <ConfirmDialog
-        open={!!toRemove}
-        onOpenChange={(o) => !o && setToRemove(null)}
-        title={toRemove ? `Remove ${toRemove.name}?` : "Remove passkey?"}
-        description="That device won't be able to sign in with a tap anymore — it'll need an email code. You can add a passkey again anytime."
-        confirmLabel="Remove"
-        destructive
-        onConfirm={() => { if (toRemove) void remove(toRemove.id); }}
-      />
-    </section>
-  );
+  return <section><PasskeysCard onChanged={() => pk?.refresh()} /></section>;
 }
 
 /**

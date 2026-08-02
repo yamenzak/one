@@ -38,6 +38,7 @@ import { DUNNING_DAYS } from "@4dl/billing";
 import { periodKey } from "@4dl/core";
 import { billingAdminRoutes, billingRoutes, stripeWebhookRoutes } from "./billing-routes.js";
 import { aiAdminRoutes, aiRoutes } from "./ai-routes.js";
+import { aiCatalogAdminRoutes } from "@4dl/ai";
 import { settingsRoutes } from "./settings-routes.js";
 import { insightRoutes } from "./insight-routes.js";
 import { staffRoutes } from "./staff-routes.js";
@@ -167,6 +168,9 @@ app.route("/api", aiRoutes);
 app.route("/api", stripeWebhookRoutes);
 app.route("/api", billingAdminRoutes);
 app.route("/api", aiAdminRoutes);
+// The provider key, mock lane, credit markup and model catalog are
+// `@4dl/ai`'s state, so their console endpoints are `@4dl/ai`'s routes.
+app.route("/api", aiCatalogAdminRoutes({ isPlatformAdmin: (c) => isPlatformAdmin(c as never) }) as unknown as Hono<AppEnv>);
 app.route("/api", stockRoutes);
 app.route("/api", packRoutes);
 app.route("/api", cycleRoutes);

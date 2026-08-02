@@ -10,7 +10,7 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { maintenanceMiddleware } from "@4dl/tenancy";
-import { sessionMiddleware, type AppEnv } from "./auth-context.js";
+import { isPlatformAdmin, sessionMiddleware, type AppEnv } from "./auth-context.js";
 import { routeGuard } from "./route-guard.js";
 import { ensureSchema, parseJson } from "./db.js";
 import { seedBilling, listPlans, getSubscription } from "./billing-store.js";
@@ -35,6 +35,7 @@ import { goalRoutes } from "./goal-routes.js";
 import { commerceRoutes } from "./commerce-routes.js";
 import { paymentsRoutes, paymentsWebhook } from "./payments-routes.js";
 import { aiRoutes, aiAdminRoutes } from "./ai-routes.js";
+import { aiCatalogAdminRoutes } from "@4dl/ai";
 import { healthRoutes } from "./health-routes.js";
 import { bodyScanRoutes } from "./body-scan-routes.js";
 import { contentHubRoutes, marketplaceRoutes } from "./content-routes.js";
@@ -144,6 +145,15 @@ app.route("/api", paymentsRoutes);
 app.route("/api", paymentsWebhook);
 app.route("/api", aiRoutes);
 app.route("/api", aiAdminRoutes);
+// The provider key, mock lane, credit markup and model catalog are
+// `@4dl/ai`'s state, so their console endpoints are `@4dl/ai`'s routes.
+app.route("/api", aiCatalogAdminRoutes({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  // Kova's own consequence of a first key: cached TTS cues were voiced by the
+  // keyless mock lane (silent WAVs), so keeping them leaves an owner stuck with
+  // silence they already "generated".
+  onFirstProviderKey: async (db) => { await db.prepare("DELETE FROM tts_cues").run().catch(() => undefined); },
+}) as unknown as Hono<AppEnv>);
 app.route("/api", healthRoutes);
 app.route("/api", bodyScanRoutes);
 app.route("/api", contentHubRoutes);

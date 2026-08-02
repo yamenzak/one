@@ -14,6 +14,7 @@ The operator console every 4DL app puts on its `admin.` door.
 | `sections/stripe.tsx` | The platform rail: two lanes, the flip, write-only keys, catalog sync and price rebuild. |
 | `sections/domains.tsx` | Cloudflare for SaaS: token, zone, CNAME target, worker-name override. |
 | `sections/turnstile.tsx` | The bot check on sign-in — including the one combination that locks everybody out. |
+| `sections/ai.tsx` | Provider key, mock lane, credit markup, catalog sync, and the per-lane default-model picker. |
 
 ## The sections are the app's; the frame is not
 
@@ -76,6 +77,12 @@ Only configuration a **shared package already owns**. Five qualify today:
 - **Turnstile** — `@4dl/auth`'s. A secret stored with no site key locks *every*
   4DL app out of its own sign-in, so the warning belongs with the package that
   owns the check, not with whoever remembers to write it.
+- **AI** — over `@4dl/ai`'s `aiCatalogAdminRoutes`. An app's own pieces ride in
+  as slots: `extraSub` for a live self-test (which needs the product's prompts)
+  and `extraBelowCatalog` for whatever it does with user feedback. `extraSub`'s
+  `render` is *handed* the loaded catalog rather than fetching it — an app asking
+  `/api/admin/ai/models` for itself is exactly what the conformance check below
+  refuses, and it caught that during this extraction.
 
 Kova's own sections — studios, plans, promo codes, the starter exercise library,
 the platform reset — stay in the app, and always will. Two of those ride along as

@@ -354,45 +354,16 @@ function toneLine(tone: string): string {
 }
 
 /**
- * The OPERATOR's AI lane, on the `admin.` door.
+ * The AI features this app exposes, for the operator console's model picker.
  *
- * Two settings and a model list. Small, and the small one is load-bearing:
- * without `google.gemini_key` the vision model is unreachable, so `read-label`
- * — the feature most likely to be the reason a centre bought the plan — fails
- * with "unavailable" on a deployment that otherwise looks healthy. Kova
- * shipped exactly that state and it was documented rather than fixed for
- * months.
+ * Everything else an operator configures about AI — the provider key, the mock
+ * lane, the credit markup, the model catalog and its sync — is `@4dl/ai`'s, and
+ * `aiCatalogAdminRoutes` serves it. This app used to reimplement two of those
+ * endpoints by hand and skip the other six, which is why Tessa's AI console
+ * could show a key field and a read-only list and nothing else.
  */
 export const aiAdminRoutes = new Hono<AppEnv>()
-  .get("/admin/ai", async (c) => {
+  .get("/admin/ai/features", async (c) => {
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const cfg = await getConfig(c.env.DB);
-    return c.json({
-      // The key itself is NEVER returned. A console that renders a secret makes
-      // every screenshot and every screen-share a disclosure.
-      geminiKeySet: !!(cfg["google.gemini_key"] ?? "").trim(),
-      mock: cfg["ai.mock"] ?? "auto",
-      models: await listModels(c.env.DB),
-      features: AI_FEATURES.map((f) => ({ key: f.key, label: f.label, task: f.task })),
-    });
-  })
-
-  .post("/admin/ai", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const body = z
-      .object({
-        geminiKey: z.string().max(400).optional(),
-        mock: z.enum(["auto", "on", "off"]).optional(),
-      })
-      .safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid body" }, 400);
-
-    // A blank field PRESERVES what is stored — the key is write-only, so the
-    // console can report "set" without ever reading one back.
-    const key = body.data.geminiKey?.trim();
-    if (key) await setConfig(c.env.DB, "google.gemini_key", key);
-    if (body.data.mock) await setConfig(c.env.DB, "ai.mock", body.data.mock);
-
-    const cfg = await getConfig(c.env.DB);
-    return c.json({ geminiKeySet: !!(cfg["google.gemini_key"] ?? "").trim(), mock: cfg["ai.mock"] ?? "auto" });
+    return c.json({ features: AI_FEATURES.map((f) => ({ key: f.key, label: f.label, task: f.task })) });
   });

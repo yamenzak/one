@@ -15,6 +15,18 @@ The browser-side runtime every 4DL app would otherwise rewrite.
 | `notices.tsx` | The four runtime notices no screen owns: offline, queued write, **a new build waiting**, an uncaught rejection. |
 | `RefreshNote.tsx` | `hardRefresh()` as an affordance, for the screens a signed-out visitor can be stranded on. |
 
+## Passkeys ship with a screen now
+
+`passkey.ts` has had the whole ceremony since Stage 8 — enroll, list, remove,
+sign-in, the conditional-UI probe. What it never had was a surface, so every app
+wrote its own, and the second app didn't: Tessa had no passkey UI anywhere, and
+its users were on email codes only, on a platform whose own documentation says
+"100% passwordless: email OTP + passkeys".
+
+`PasskeysCard` is that surface. One optional prop, `onChanged`, because deciding
+whether to nag someone to add a passkey is an app's idea rather than part of
+passkeys.
+
 ## The update prompt is not blocking, and that is a decision
 
 `PwaUpdatePrompt` announces a waiting build; it does not force one. Two reasons,
