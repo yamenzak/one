@@ -31,10 +31,12 @@ import { I18nProvider } from "./i18n.js";
 import { Shell } from "./Shell.js";
 import { Login } from "./screens/Login.js";
 import { NoStudio, RootSignpost, Start, WrongDoor } from "./screens/Doors.js";
+import { AdminDoor } from "./screens/Admin.js";
 import { Labels } from "./screens/Labels.js";
+import { Settings } from "./screens/Settings.js";
 import { Recall } from "./screens/Recall.js";
 
-export type ScreenName = "boot" | "login" | "signpost" | "nostudio" | "wrongdoor" | "start" | "shell";
+export type ScreenName = "boot" | "login" | "signpost" | "nostudio" | "wrongdoor" | "start" | "admin" | "shell";
 
 export function pickScreen(
   loading: boolean,
@@ -52,6 +54,15 @@ export function pickScreen(
       return "signpost";
     case "setup":
       return ctx ? "start" : "login";
+    /**
+     * The OPERATOR door. It has no tenant by construction, so without this case
+     * it fell into `default` below, failed `!host.tenant`, and rendered "no
+     * centre at this address" — while `/api/admin/*` answered underneath it.
+     * Signed out, it shows the sign-in form: this is a platform door and the
+     * server will issue a code for it.
+     */
+    case "admin":
+      return ctx ? "admin" : "login";
     default: {
       if (!host.tenant) return "nostudio";
       if (!ctx) return "login";
@@ -85,6 +96,7 @@ function App() {
         {screen === "wrongdoor" && <WrongDoor />}
         {screen === "login" && <Login />}
         {screen === "start" && <Start />}
+        {screen === "admin" && <AdminDoor />}
       </>
     );
   }
@@ -101,6 +113,10 @@ function App() {
       {/* Also a route rather than a sheet: printing is a full-page act, and the
           print stylesheet needs the sheet to be the whole document. */}
       <Route path="/labels" element={<Labels />} />
+      {/* A ROUTE, not a Shell tab: settings is a place you go and come back
+          from, and the account menu already navigates here. It used to match the
+          catch-all below and render the app chrome over an empty body. */}
+      <Route path="/settings" element={<Settings onBack={() => history.back()} />} />
       <Route path="*" element={<Shell />} />
     </Routes>
   );

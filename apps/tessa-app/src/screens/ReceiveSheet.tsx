@@ -16,9 +16,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@4dl/app-kit";
-import { Archive, Button, Callout, Check, Field, Label, Select, Sheet, Spinner, useAction } from "@4dl/ui";
+import { Archive, Button, Callout, Card, Check, Field, Label, Select, Sheet, Spinner, useAction } from "@4dl/ui";
 import { api } from "@4dl/app-kit";
-import { fmt, stock, type Location, type UnknownProduct } from "../data.js";
+import { ai, fmt, stock, type LabelReading, type Location, type UnknownProduct } from "../data.js";
 import { useT } from "../i18n.js";
 
 export function ReceiveSheet({ barcode, onClose, onDone }: { barcode: string; onClose: () => void; onDone: () => void }) {
@@ -124,6 +124,8 @@ export function ReceiveSheet({ barcode, onClose, onDone }: { barcode: string; on
       }
     >
       <div className="space-y-4">
+        {unknown && <LabelReader onRead={(l) => { if (l.name) setNewName(l.name); }} />}
+
         {unknown && (
           <Callout tone="warning" icon={Archive}>
             <div className="space-y-1">
@@ -170,5 +172,74 @@ export function ReceiveSheet({ barcode, onClose, onDone }: { barcode: string; on
         {act.err && <Callout tone="danger" live="alert">{act.err}</Callout>}
       </div>
     </Sheet>
+  );
+}
+
+/**
+ * THE PHOTO FALLBACK, and only a fallback.
+ *
+ * It appears in the branch where the barcode did NOT identify the product,
+ * which is exactly when a photo is worth taking — a creased code, a handwritten
+ * lot, an expiry printed as "Verw. bis 03/2027". The scanner stays the fast
+ * path.
+ *
+ * ⚠️ It fills the form. It does not submit it, and the fields stay editable with
+ * the model's own confidence next to them. A wrong expiry on a sterile item is a
+ * patient-safety failure, so the last check is a person's — which is also what
+ * MPBetreibV requires of the record.
+ */
+function LabelReader({ onRead }: { onRead: (l: LabelReading) => void }) {
+  const t = useT();
+  const act = useAction(fmt);
+  const [read, setRead] = useState<{ label: LabelReading; confidence: number | null } | null>(null);
+
+  const onFile = (file: File) =>
+    void act.run("read", async () => {
+      const data = await new Promise<string>((resolve, reject) => {
+        const r = new FileReader();
+        // `readAsDataURL` gives `data:image/jpeg;base64,…`; the API wants the
+        // payload alone.
+        r.onload = () => resolve(String(r.result).split(",")[1] ?? "");
+        r.onerror = () => reject(new Error("Couldn't read that file."));
+        r.readAsDataURL(file);
+      });
+      const r = await ai.readLabel(data, file.type);
+      setRead({ label: r.label, confidence: r.confidence });
+      onRead(r.label);
+    }, t("ai.label.failed"));
+
+  return (
+    <Card className="space-y-2 p-3">
+      <label className="flex items-center justify-between gap-3">
+        <span className="min-w-0">
+          <span className="block text-sm font-medium">{t("ai.label")}</span>
+          <span className="block text-caption text-muted-foreground">{t("ai.label.sub")}</span>
+        </span>
+        {/* `capture="environment"` opens the rear camera directly on a phone,
+            which is the only way this is faster than typing. */}
+        <input
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="w-32 text-xs"
+          disabled={act.busy !== null}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
+        />
+      </label>
+      {act.busy && <p className="text-caption text-muted-foreground">{t("ai.working")}</p>}
+      {act.err && <p className="text-caption text-danger">{act.err}</p>}
+      {read && (
+        <div className="space-y-1 text-caption">
+          <div className="text-muted-foreground">
+            {[read.label.name, read.label.lot && `Ch.-B. ${read.label.lot}`, read.label.expiry].filter(Boolean).join(" · ") || t("ai.label.nothing")}
+          </div>
+          {/* Named, not hidden: low confidence is the model's own signal that a
+              human should look, and it is the useful half of the answer. */}
+          <div className="text-warning">
+            {t("ai.label.check", { pct: read.confidence == null ? "—" : Math.round(read.confidence * 100) })}
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }

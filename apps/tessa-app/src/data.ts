@@ -245,3 +245,95 @@ export function expiryTextWith(
   if (d === 0) return t("expiry.today");
   return t("expiry.left", { days: d });
 }
+
+// ── Practice settings, billing and AI ───────────────────────────────────────
+
+export interface Branding {
+  primary: string | null;
+  logoUrl: string | null;
+  headline: string | null;
+  subtext: string | null;
+}
+export interface Prefs {
+  locale: "de" | "en";
+  theme: "system" | "light" | "dark";
+}
+export interface AiSettings {
+  features: Record<string, boolean>;
+  tone: string;
+  catalog: { key: string; label: string; description: string }[];
+}
+
+export const settings = {
+  read: () => api.get<{ branding: Branding; prefs: Prefs; ai: AiSettings; canUseAi: boolean }>("/api/settings"),
+  /** Partial by section — the server merges, so one control never clears another. */
+  save: (patch: { branding?: Partial<Branding>; prefs?: Partial<Prefs>; ai?: { features?: Record<string, boolean>; tone?: string } }) =>
+    api.patch<{ branding: Branding; prefs: Prefs; ai: AiSettings }>("/api/settings", patch),
+};
+
+export interface Balance {
+  balance: number;
+  purchased: number;
+  granted: number;
+  held: number;
+  available: number;
+}
+export interface PlanOption {
+  id: string;
+  name: string;
+  priceUsdMonth: number;
+  entitlements: { quotas: Record<string, number>; features: Record<string, boolean>; aiCredits: { monthlyGrant: number }; trialDays: number };
+  synced: boolean;
+}
+export interface PackOption {
+  id: string;
+  name: string;
+  credits: number;
+  priceUsd: number;
+}
+
+export const billing = {
+  read: () =>
+    api.get<{
+      subscription: { plan_id: string; status: string; current_period_end: string | null } | null;
+      plans: PlanOption[];
+      packs: PackOption[];
+      entitlements: PlanOption["entitlements"];
+      balance: Balance | null;
+      /** False on a deployment with no payment rail — a legitimate configuration,
+       *  and the difference between hiding a buy button and showing a dead one. */
+      payable: boolean;
+    }>("/api/billing"),
+  checkoutPlan: (planId: string) =>
+    api.post<{ url: string; trialDays: number }>("/api/billing/checkout-plan", { planId, returnUrl: location.origin + "/settings" }),
+  checkoutPack: (packId: string) =>
+    api.post<{ url: string }>("/api/billing/checkout-pack", { packId, returnUrl: location.origin + "/settings" }),
+  portal: () => api.post<{ url: string }>("/api/billing/portal", { returnUrl: location.origin + "/settings" }),
+};
+
+export interface LabelReading {
+  name: string | null;
+  manufacturer: string | null;
+  gtin: string | null;
+  lot: string | null;
+  expiry: string | null;
+  quantity: number | null;
+}
+
+export const ai = {
+  features: () =>
+    api.get<{
+      allowed: boolean;
+      tone: string;
+      balance: Balance | null;
+      features: { key: string; label: string; description: string; task: string; enabled: boolean }[];
+    }>("/api/ai/features"),
+  /** A photo of packaging → fields for a form the person CONFIRMS. Never written directly. */
+  readLabel: (image: string, mimeType: string) =>
+    api.post<{ label: LabelReading; confidence: number | null; credits: number; mocked: boolean }>("/api/ai/read-label", { image, mimeType }),
+  reorder: () => api.post<{ briefing: string | null; empty?: boolean; itemsConsidered?: number; credits: number }>("/api/ai/reorder-advisor", {}),
+  recallReport: (cycleId: string) =>
+    api.post<{ report: string; summary: { quarantined: number; alreadyQuarantined: number; unreachable: number }; credits: number }>("/api/ai/recall-report", { cycleId }),
+  readDocument: (text: string, locale: "de" | "en", question?: string) =>
+    api.post<{ summary: string; credits: number }>("/api/ai/read-document", { text, locale, question }),
+};

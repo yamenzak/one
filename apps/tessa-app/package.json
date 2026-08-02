@@ -12,6 +12,7 @@
     "clean": "rm -rf .turbo dist *.tsbuildinfo"
   },
   "dependencies": {
+    "@4dl/admin": "workspace:*",
     "@4dl/app-kit": "workspace:*",
     "@4dl/i18n": "workspace:*",
     "@4dl/tenancy": "workspace:*",

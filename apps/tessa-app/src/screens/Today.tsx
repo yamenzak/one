@@ -17,11 +17,12 @@
  * not need to know it holds 412 items; it needs to know which four are a problem.
  */
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertTriangle, Archive, Button, Callout, CircleCheck, ClipboardList, Group, LoadError, Row, ScanLine, Screen, Section, Skeleton, Tile, TileGrid, Timer, useLoad } from "@4dl/ui";
+import { AlertTriangle, Archive, Button, Callout, CircleCheck, ClipboardList, Group, LoadError, Row, ScanLine, Screen, Section, Skeleton, Tile, TileGrid, Timer, Wand2, useLoad } from "@4dl/ui";
 import { cases, cssd, fmt, stock, type Cycle, type Lot, type Pack } from "../data.js";
 import { useExpiryText, useT } from "../i18n.js";
+import { AssistantsSheet } from "./Assistants.js";
 
 interface Snapshot {
   lots: Lot[];
@@ -31,6 +32,9 @@ interface Snapshot {
 }
 
 export function Today({ onScan }: { onScan: () => void }) {
+  // A sheet rather than a tab: the assistants are something you ask, not
+  // somewhere you live.
+  const [assistants, setAssistants] = useState(false);
   const nav = useNavigate();
   const t = useT();
   const expiryText = useExpiryText();
@@ -93,8 +97,10 @@ export function Today({ onScan }: { onScan: () => void }) {
           <Tile icon={Timer} label={t("today.awaiting")} value={t("today.awaiting.count", { count: awaiting.length })} onClick={() => nav("/cssd")} />
           <Tile icon={Archive} label={t("today.shelf")} value={t("today.shelf.count", { count: data.lots.length })} onClick={() => nav("/stock")} />
           <Tile icon={ClipboardList} label={t("today.openCases")} value={`${data.openCases}`} onClick={() => nav("/cases")} />
+          <Tile icon={Wand2} label={t("ai.title")} value={t("ai.tile.sub")} onClick={() => setAssistants(true)} />
         </TileGrid>
       </Section>
+      {assistants && <AssistantsSheet onClose={() => setAssistants(false)} />}
 
       {awaiting.length > 0 && (
         <Section title={t("today.waiting")}>

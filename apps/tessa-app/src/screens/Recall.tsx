@@ -23,10 +23,10 @@
  * someone waiting for a name that is never coming.
  */
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { AlertTriangle, ArrowLeft, Badge, Button, Callout, Group, ListChecks, LoadError, RotateCcw, Row, Screen, Section, ShieldCheck, Skeleton, Tile, TileGrid, useLoad } from "@4dl/ui";
-import { fmt, trace } from "../data.js";
+import { AlertTriangle, ArrowLeft, Badge, Button, Callout, Card, Group, ListChecks, LoadError, RotateCcw, Row, Screen, Section, ShieldCheck, Skeleton, Tile, TileGrid, useAction, useLoad } from "@4dl/ui";
+import { ai, fmt, trace } from "../data.js";
 import { useT } from "../i18n.js";
 
 export function Recall() {
@@ -65,6 +65,10 @@ export function Recall() {
           <Tile icon={ShieldCheck} label={t("recall.quarantined")} value={`${summary.quarantined}`} />
           <Tile icon={RotateCcw} label={t("recall.alreadyFrozen")} value={`${summary.alreadyQuarantined}`} />
         </TileGrid>
+      </Section>
+
+      <Section>
+        <ReportDrafter cycleId={cycleId} />
       </Section>
 
       <Section title={t("recall.unreachable.title")}>
@@ -140,5 +144,55 @@ export function Recall() {
         )}
       </Section>
     </Screen>
+  );
+}
+
+/**
+ * DRAFT THE WRITTEN ACCOUNT.
+ *
+ * A recall report is what a centre hands an inspector, and writing one under
+ * time pressure, in German, about a patient-safety event is where mistakes
+ * happen. The model is given the SAME disposition this screen renders — not the
+ * raw tables — so the prose cannot name a different set of trays from the
+ * numbers above it.
+ *
+ * It produces a DRAFT. Nothing is stored, nothing is signed, and the copy says
+ * so: under MPBetreibV the account is a named person's, and this is a first
+ * pass they edit.
+ */
+function ReportDrafter({ cycleId }: { cycleId: string }) {
+  const t = useT();
+  const act = useAction(fmt);
+  const [report, setReport] = useState<string | null>(null);
+
+  return (
+    <Card className="space-y-3 p-4">
+      <div>
+        <h3 className="text-body-lg">{t("ai.recall")}</h3>
+        <p className="text-caption text-muted-foreground">{t("ai.recall.sub")}</p>
+      </div>
+      {act.err && <p className="text-caption text-danger">{act.err}</p>}
+      <Button
+        variant="secondary"
+        className="w-full"
+        disabled={act.busy !== null}
+        onClick={() => void act.run("report", async () => setReport((await ai.recallReport(cycleId)).report), t("ai.recall.failed"))}
+      >
+        {act.busy ? t("ai.working") : t("ai.recall.draft")}
+      </Button>
+      {report && (
+        <>
+          <pre className="whitespace-pre-wrap rounded-lg bg-surface-2 p-3 text-sm">{report}</pre>
+          <p className="text-caption text-warning">{t("ai.recall.unsigned")}</p>
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={() => void navigator.clipboard?.writeText(report)}
+          >
+            {t("action.copy")}
+          </Button>
+        </>
+      )}
+    </Card>
   );
 }

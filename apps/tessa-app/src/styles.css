@@ -13,6 +13,7 @@
    `tailwind-sources.conformance.test.ts` makes forgetting a test failure. */
 @source "../../../packages/ui/src";
 @source "../../../packages/app-kit/src";
+@source "../../../packages/admin/src";
 
 @import "@fontsource/figtree/400.css";
 @import "@fontsource/figtree/500.css";
