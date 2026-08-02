@@ -100,9 +100,11 @@ const CACHE_TTL = 60;
  *   `stripe.*.webhook_secret`  a signing secret per Stripe ENDPOINT, and each
  *                              app has its own webhook URL. Sharing it makes
  *                              every incoming event fail verification.
- *   `cf.saas.zone_id` / `.cname_target` / `.worker_name`
- *                              the app's own zone and its own worker. Only the
- *                              account TOKEN is common.
+ *   `cf.saas.worker_name`      the script a custom hostname's route points at.
+ *                              The zone and the CNAME target ARE shared (every
+ *                              4DL app is under one apex), but this is per-app
+ *                              by definition — and it is the one value whose
+ *                              wrong setting fails SILENTLY.
  *   `platform.maintenance*`    closing Kova is not closing Tessa. That one is
  *                              the whole reason this is an allow-list.
  *
@@ -124,9 +126,17 @@ export const SHARED_CONFIG_KEYS: readonly string[] = [
   "email.provider",
   "email.platform_from",
   "email.credits_per_email",
-  // One Cloudflare account token. Zone, CNAME target and worker name are
-  // per-app and stay out.
+  // Cloudflare for SaaS. All 4DL apps live under ONE apex, so they share one
+  // zone and one fallback origin — a tenant's custom hostname is registered in
+  // the same zone and CNAMEs to the same target whichever product it belongs
+  // to. What sends it to the right worker is the per-hostname worker ROUTE, and
+  // `cf.saas.worker_name` names the script that route points at. That one is
+  // genuinely per-app, and it is the value whose wrong setting fails silently:
+  // the route is created, the certificate issues, the domain reports active,
+  // and every request lands on a script that is not there. So it stays out.
   "cf.saas.api_token",
+  "cf.saas.zone_id",
+  "cf.saas.cname_target",
   // ONE STRIPE ACCOUNT, MANY APPS — see @4dl/billing-rail. The lane and the
   // account credentials are common; the per-endpoint webhook secret is not.
   // Both the lane-scoped names and the pre-lane legacy pair are listed, because

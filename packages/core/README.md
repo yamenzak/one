@@ -121,7 +121,7 @@ Four keys look shareable and are not, each for a specific reason:
 |---|---|
 | `email.from` | carries the app's display **name**. The address is shared; the sender line is the product's. |
 | `stripe.*.webhook_secret` | a signing secret per Stripe **endpoint**, and each app has its own webhook URL. Shared, every event fails verification. |
-| `cf.saas.zone_id` / `.cname_target` / `.worker_name` | the app's own zone and worker. Only the account **token** is common. |
+| `cf.saas.worker_name` | the script a custom hostname's route points at. The zone, the token and the CNAME target are all shared — every 4DL app is under one apex — but this one is per-app, and it is the value whose wrong setting fails **silently**. |
 | `platform.maintenance*` | closing one product is not closing the others. |
 
 `schema:*`, `plans.catalog_version` and `stripe.catalog_stash.*` are absent for a

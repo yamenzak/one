@@ -82,6 +82,9 @@ export interface CustomHostname {
   id: string;
   status: string; // pending | active | ...  (hostname/ownership status)
   sslStatus: string | null; // pending_validation | active | ...
+  /** `http` | `txt` — which DCV method this hostname was issued under. A `txt`
+   *  hostname predates the switch to `http` and is migrated on the next poll. */
+  sslMethod: string | null;
   /** The FIRST validation record, kept for callers that only render one. */
   verify: VerifyRecord;
   /**
@@ -113,6 +116,7 @@ interface CfHostname {
   status: string;
   ssl?: {
     status?: string;
+    method?: string;
     validation_records?: { txt_name?: string; txt_value?: string }[];
     validation_errors?: { message: string }[];
   };
@@ -145,14 +149,43 @@ function normalize(h: CfHostname): CustomHostname {
     ...(h.verification_errors ?? []),
     ...((h.ssl?.validation_errors ?? []).map((e) => e.message)),
   ].filter(Boolean);
-  return { id: h.id, status: h.status, sslStatus: h.ssl?.status ?? null, verify, verifyAll, errors };
+  return { id: h.id, status: h.status, sslStatus: h.ssl?.status ?? null, sslMethod: h.ssl?.method ?? null, verify, verifyAll, errors };
 }
 
-/** Register a hostname; CF returns the DCV record(s) to validate ownership. */
+/**
+ * THE VALIDATION METHOD, and why it is `http`.
+ *
+ * `txt` DCV makes the tenant add three records by hand — two `_acme-challenge`
+ * TXTs with opaque values and a `_cf-custom-hostname` ownership TXT — on top of
+ * the CNAME. Four records, three of them meaningless to the person typing them,
+ * every one a chance to paste the wrong value into the wrong field, and no
+ * feedback until a certificate silently fails to issue.
+ *
+ * `http` DCV needs NONE of them. The CA fetches a token over port 80 at the
+ * hostname itself, which already resolves to Cloudflare the moment the CNAME is
+ * in place — so pointing the CNAME *is* the proof of control. One record, and
+ * the thing the tenant has to do is the thing they already understand.
+ *
+ * The trade-off is real and it is the reason `txt` is the API default: `http`
+ * cannot pre-validate. A hostname already serving live traffic somewhere else
+ * can, with `txt`, have its certificate issued BEFORE the cutover, so the
+ * switch is instant and there is no window without HTTPS. With `http` the
+ * certificate begins issuing after the CNAME moves, and that window exists —
+ * usually under a minute, occasionally a few.
+ *
+ * We take that trade because it does not apply to this product's actual case. A
+ * tenant points a NEW subdomain (`coaching.theirgym.com`, `app.theirstudio.de`)
+ * at us; there is nothing to cut over and no window to protect. Meanwhile the
+ * TXT dance failed for real, repeatedly, for a reason that had nothing to do
+ * with the tenant being careless — see dns-check.ts.
+ */
+const SSL = { method: "http", type: "dv", settings: { min_tls_version: "1.2" } } as const;
+
+/** Register a hostname. With `http` DCV the CNAME is the only record needed. */
 export async function createCustomHostname(cfg: SaasConfig, hostname: string): Promise<CustomHostname> {
   const env = await cf<CfHostname>(cfg, "/custom_hostnames", {
     method: "POST",
-    body: JSON.stringify({ hostname, ssl: { method: "txt", type: "dv", settings: { min_tls_version: "1.2" } } }),
+    body: JSON.stringify({ hostname, ssl: SSL }),
   });
   if (!env.success || !env.result) throw new Error(env.errors?.[0]?.message ?? "cloudflare create failed");
   return normalize(env.result);
@@ -163,6 +196,26 @@ export async function getCustomHostname(cfg: SaasConfig, id: string): Promise<Cu
   const env = await cf<CfHostname>(cfg, `/custom_hostnames/${id}`);
   if (!env.success || !env.result) throw new Error(env.errors?.[0]?.message ?? "cloudflare get failed");
   return normalize(env.result);
+}
+
+/**
+ * Move a hostname that is still on `txt` DCV onto `http`, in place.
+ *
+ * Every domain added before the switch above is parked waiting for TXT records
+ * its owner may never manage to publish. Telling them to delete and re-add is
+ * asking them to redo the step that already failed, so the migration happens
+ * on the next status poll instead — no screen, no instruction, no action.
+ *
+ * Guarded on `pending`, deliberately. An `active` hostname has a working
+ * certificate, and reissuing it to change a validation method it no longer uses
+ * risks a live domain to tidy up a field nobody can see.
+ */
+export async function useHttpValidation(cfg: SaasConfig, id: string): Promise<CustomHostname | null> {
+  const env = await cf<CfHostname>(cfg, `/custom_hostnames/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ ssl: SSL }),
+  });
+  return env.success && env.result ? normalize(env.result) : null;
 }
 
 /** Deregister a custom hostname (best-effort; ignore if already gone). */

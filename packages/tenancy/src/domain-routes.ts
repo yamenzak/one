@@ -30,9 +30,10 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { getConfig, nowIso, parseJson, setConfig } from "@4dl/core";
 import type { ConfigSource } from "@4dl/core";
-import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, createWorkerRoute, deleteWorkerRoute, WORKER_NAME_RE, type CustomHostname } from "./cloudflare.js";
+import { saasConfig, createCustomHostname, getCustomHostname, useHttpValidation, deleteCustomHostname, createWorkerRoute, deleteWorkerRoute, WORKER_NAME_RE, type CustomHostname } from "./cloudflare.js";
 import { canonicalHost, invalidateHostCache, isPlatformDoor, shapeOf, type RootDomainEnv, type TenancyConfig } from "./host-context.js";
 import { caaFixFromErrors } from "./dcv.js";
+import { checkCname } from "./dns-check.js";
 import { setupHostname } from "./hosts.js";
 import { MAINTENANCE_OFF } from "./maintenance.js";
 import type { RouteEnv, RouteGuards } from "./route-deps.js";
@@ -276,6 +277,25 @@ export function domainRoutes(deps: RouteGuards, opts: DomainRouteConfig) {
   })
 
   // Force a status re-poll (owner clicks "Check now").
+  /**
+   * Re-poll one domain — and, when it is not working, say WHY in the owner's
+   * own terms rather than Cloudflare's.
+   *
+   * Three things happen here and the order matters:
+   *
+   *  1. A hostname still on `txt` DCV is migrated to `http` in place. Every
+   *     domain added before that switch is parked waiting for TXT records its
+   *     owner may never manage to publish, and "delete it and start again" asks
+   *     them to redo the step that already failed.
+   *  2. Cloudflare's status is folded into the row as before.
+   *  3. DNS is READ, live, whenever the domain is not active — because
+   *     Cloudflare's "custom hostname does not CNAME to this zone" is true and
+   *     unactionable, and the commonest cause by a distance is a registrar that
+   *     appended its own zone to the Host field. See dns-check.ts.
+   *
+   * The DNS read is skipped for an active domain: it is a network round trip to
+   * confirm something already proven by a working certificate.
+   */
   .post("/domains/:hostname/refresh", async (c) => {
     const guard = deps.requirePermission(c, { settings: ["manage"] });
     if (guard) return guard;
@@ -284,10 +304,15 @@ export function domainRoutes(deps: RouteGuards, opts: DomainRouteConfig) {
     if (!row) return c.json({ error: "not found" }, 404);
     const cfg = await saas(c.env);
     if (cfg && row.cf_hostname_id) {
-      const ch = await getCustomHostname(cfg, row.cf_hostname_id).catch(() => null);
+      let ch = await getCustomHostname(cfg, row.cf_hostname_id).catch(() => null);
+      if (ch && ch.sslMethod === "txt" && ch.sslStatus !== "active") {
+        ch = (await useHttpValidation(cfg, row.cf_hostname_id).catch(() => null)) ?? ch;
+      }
       if (ch) { row.status = await syncStatus(c.env, row, ch); row.ssl_status = ch.sslStatus; if (ch.verify.name) { row.verify_name = ch.verify.name; row.verify_value = ch.verify.value; } }
     }
-    return c.json({ domain: present(row) });
+    const target = row.cname_target ?? cfg?.cnameTarget ?? null;
+    const dns = row.status !== "active" && target ? await checkCname(row.hostname, target).catch(() => null) : null;
+    return c.json({ domain: present(row), dns });
   })
 
   // Remove a custom hostname (deregisters it at Cloudflare too).

@@ -1,6 +1,7 @@
 export * from "./close-routes.js";
 export * from "./cloudflare.js";
 export * from "./dcv.js";
+export * from "./dns-check.js";
 export * from "./domain-routes.js";
 export * from "./host-context.js";
 export * from "./maintenance.js";

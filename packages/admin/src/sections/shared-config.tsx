@@ -98,8 +98,8 @@ const GROUPS: { title: string; hint: string; keys: string[] }[] = [
   },
   {
     title: "Custom domains",
-    hint: "The Cloudflare account token. Zone, CNAME target and worker name are per-app.",
-    keys: ["cf.saas.api_token"],
+    hint: "One Cloudflare account, one zone, one fallback origin — every app's tenants CNAME to the same target. Only the WORKER NAME is per-app, and it stays on each app's own Custom domains panel.",
+    keys: ["cf.saas.api_token", "cf.saas.zone_id", "cf.saas.cname_target"],
   },
 ];
 
@@ -121,6 +121,8 @@ const LABELS: Record<string, string> = {
   "stripe.secret_key": "Secret key (legacy)",
   "stripe.publishable_key": "Publishable key (legacy)",
   "cf.saas.api_token": "Cloudflare API token",
+  "cf.saas.zone_id": "SaaS zone id",
+  "cf.saas.cname_target": "CNAME target",
 };
 
 export function PlatformSharedConfigSection({ api, errorText }: AdminDeps) {

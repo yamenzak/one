@@ -439,9 +439,9 @@ section 6.
 | `stripe.platform_fee_bps` | `0` | Zero application fee on tenant→client payments (the advertised "zero markup") | Platform admin → **Stripe** |
 | `turnstile.site_key` | *(empty)* | Login shows no bot check | Platform admin → **Security** |
 | `turnstile.secret` | *(empty)* | **Turnstile is off** — OTP send is unthrottled per-IP | Platform admin → **Security** |
-| `cf.saas.api_token` | *(empty)* | Tenant custom domains can't be registered | Platform admin → **Domains** |
-| `cf.saas.zone_id` | *(empty)* | Same | Platform admin → **Domains** |
-| `cf.saas.cname_target` | *(empty)* | Tenants get no CNAME to point at | Platform admin → **Domains** |
+| `cf.saas.api_token` | *(empty)* | Tenant custom domains can't be registered | **Shared platform config**, or per-app Domains |
+| `cf.saas.zone_id` | *(empty)* | Same | **Shared platform config**, or per-app Domains |
+| `cf.saas.cname_target` | *(empty)* | Tenants get no CNAME to point at | **Shared platform config**, or per-app Domains |
 | `cf.saas.worker_name` | `kova` | Per-hostname routes point at a missing script — **silently**: the certificate issues, the domain reports active, and every request serves nothing | Platform admin → **Domains** (blank = the default) |
 | `platform.maintenance` | `off` | Nothing is withheld. `readonly` refuses every write; `full` withholds the app and disables sign-in | Platform admin → **Maintenance** |
 | `platform.maintenance.message` | *(empty)* | The app shows its own wording instead of yours. Max 300 chars | Platform admin → **Maintenance** |
@@ -879,24 +879,47 @@ and bills per hostname beyond it. Check the current figure on Cloudflare's prici
 page before you promise custom domains on a plan tier — this doc deliberately does
 not quote a number that will go stale.
 
+### A tenant adds ONE record
+
+Custom hostnames are created with **`http` DCV**, so the CNAME is the whole
+instruction: point it, and the certificate issues once it resolves. No
+`_acme-challenge` TXTs, no `_cf-custom-hostname` ownership record.
+
+That was not always true — the API's default is `txt`, which makes the tenant add
+three more records with opaque values — and the change came out of watching the
+TXT flow fail on a real domain for a reason that had nothing to do with the
+tenant being careless (obstacle 1 below took out all four records at once). Any
+domain still parked on `txt` migrates itself the next time anyone presses
+**Check now**; nobody has to delete and re-add.
+
+The trade is that `http` cannot pre-validate: a hostname already serving live
+traffic somewhere else gets a short window without HTTPS after the cutover,
+where `txt` could have had the certificate ready in advance. Tenants here point
+a *new* subdomain, so there is nothing to cut over.
+
 ### What a tenant hits, and what the screen now tells them
 
-Three obstacles account for nearly every domain stuck at "Pending". The app
-surfaces Cloudflare's own error text plus a ready-to-add record for the CAA case,
-so an owner should not need this section — it is here for when they ask you.
+Two obstacles account for nearly every domain stuck at "Pending". The app now
+diagnoses both — the first from a live DNS read, the second from Cloudflare's own
+error text plus a ready-to-add record — so an owner should not need this section.
+It is here for when they ask you.
 
-**1. The host field got the full hostname.** Most registrars append the zone, so
-`coaching.byshujaa.com` in Namecheap's Host field creates
-`coaching.byshujaa.com.byshujaa.com`. The record exists, just not where anyone is
-looking. Enter the relative name: `coaching`, `_acme-challenge.coaching`.
+**1. The Host field got the full hostname.** Most registrars append the zone, so
+`coaching.byshujaa.com` in Namecheap's Host field publishes
+`coaching.byshujaa.com.byshujaa.com`. The record exists, is correct, and is one
+level too deep; every checker then reports the hostname as simply absent, and
+Cloudflare says "custom hostname does not CNAME to this zone" — true, and no
+help at all. Enter the relative name: `coaching`.
 
-**2. Only one `_acme-challenge` TXT was added.** Cloudflare can require TWO — same
-name, different values — when it is issuing more than one certificate, and NONE of
-them validate until ALL are present. DNS allows multiple TXT records at one name;
-they go in as separate rows, not one replacing the other. (The app used to show
-only the first — fixed; it now labels them "record 1 of 2".)
+This obstacle was documented here, in these exact words, before it happened to a
+real domain. It still cost hours, because the person editing DNS reads the
+*screen*, not DEPLOY.md. So **Check now** now resolves the hostname itself
+(`packages/tenancy/src/dns-check.ts`): on NXDOMAIN it probes each candidate
+zone-suffixed name, and when it finds the record one level down it says where it
+went and what the Host field should have said. The lesson generalises — an
+obstacle a doc explains is an obstacle the product has not handled.
 
-**3. A CAA allow-list blocks Cloudflare's CA.** If the tenant's domain has CAA
+**2. A CAA allow-list blocks Cloudflare's CA.** If the tenant's domain has CAA
 records naming specific authorities, and Cloudflare's is not among them, issuance
 is refused outright:
 
@@ -909,6 +932,11 @@ the list:
 | Type | Host | Flags | Tag | Value |
 |------|------|-------|-----|-------|
 | CAA | `@` | `0` | `issue` | `ssl.com` (whatever Cloudflare named) |
+
+Note the Host: `@`, the zone apex — and subject to exactly the same relative-Host
+trap as obstacle 1. Typing the domain name into that field publishes the CAA at
+`yourdomain.com.yourdomain.com`, where it neither blocks nor permits anything,
+and the original block stays in force.
 
 It **cannot** go on the custom hostname itself: that name is a CNAME, and DNS
 forbids other records alongside a CNAME. It has to be the apex.

@@ -262,8 +262,8 @@ remote bindings without editing the config (this is what the E2E suite does).
     by blanking it — give that app its own value, or do not share the key.
   - **`SHARED_CONFIG_KEYS` is an explicit allow-list**, enforced on read AND
     write. `email.from` (per-app display name), `stripe.*.webhook_secret`
-    (per-endpoint), `cf.saas.zone_id`/`.cname_target`/`.worker_name` (per-app
-    zone and worker) and `platform.maintenance*` are deliberately excluded; so
+    (per-endpoint), `cf.saas.worker_name` (the script a custom hostname's route
+    points at) and `platform.maintenance*` are deliberately excluded; so
     are `schema:*`, `plans.catalog_version` and `stripe.catalog_stash.*`, which
     would corrupt state rather than merely misconfigure it.
   - **`admin.<app>` is not going away.** Every app's console writes the same

@@ -45,7 +45,7 @@ function fakeKv(initial?: Record<string, string>, opts: { failGet?: boolean } = 
 
 describe("the shared-key allow list", () => {
   it("carries the credentials one account issues for the whole platform", () => {
-    for (const k of ["google.gemini_key", "turnstile.secret", "cf.saas.api_token", "stripe.test.secret_key"]) {
+    for (const k of ["google.gemini_key", "turnstile.secret", "cf.saas.api_token", "cf.saas.zone_id", "stripe.test.secret_key"]) {
       expect(isSharedConfigKey(k), k).toBe(true);
     }
   });
@@ -55,17 +55,16 @@ describe("the shared-key allow list", () => {
    * state rather than merely misconfigure it. Asserted by NAME because the cost
    * of each is specific: a shared `email.from` sends every product's mail under
    * one product's name, a shared webhook secret fails signature verification on
-   * every incoming event, a shared `platform.maintenance` closes every app when
-   * one is migrated, and a shared `schema:` marker convinces one database it ran
-   * another's migrations.
+   * every incoming event, a shared `cf.saas.worker_name` routes one product's
+   * custom domains at another product's worker, a shared `platform.maintenance`
+   * closes every app when one is migrated, and a shared `schema:` marker
+   * convinces one database it ran another's migrations.
    */
   it("excludes everything two apps could legitimately disagree about", () => {
     for (const k of [
       "email.from",
       "stripe.test.webhook_secret",
       "stripe.live.webhook_secret",
-      "cf.saas.zone_id",
-      "cf.saas.cname_target",
       "cf.saas.worker_name",
       "platform.maintenance",
       "platform.maintenance.message",
@@ -80,7 +79,7 @@ describe("the shared-key allow list", () => {
     for (const k of SHARED_CONFIG_KEYS.filter((x) => /secret|token|_key$/.test(x))) {
       // Publishable keys are public by Stripe's own definition, and a site key
       // is handed to the browser — neither is a secret.
-      if (k.includes("publishable") || k === "turnstile.site_key") continue;
+      if (k.includes("publishable") || k === "turnstile.site_key" || k === "cf.saas.zone_id") continue;
       expect(isSecretConfigKey(k), k).toBe(true);
     }
     expect(isSecretConfigKey("stripe.mode")).toBe(false);

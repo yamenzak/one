@@ -1566,6 +1566,20 @@ interface DomainInfo {
   caa?: { name: string; authority: string; value: string } | null;
 }
 
+/**
+ * What DNS actually says, read live by the server on `Check now`.
+ *
+ * The shape is `@4dl/tenancy`'s `DnsFinding`, re-declared rather than imported:
+ * the tenancy package is a Worker module and the browser bundle takes only
+ * `@4dl/tenancy/model`. Three fields, and the whole value is in `hostShouldBe`
+ * — the one keystroke that fixes the commonest failure there is.
+ */
+interface DnsFinding {
+  code: "ok" | "double-suffix" | "wrong-target" | "not-a-cname" | "missing" | "unknown";
+  message: string;
+  hostShouldBe?: string;
+}
+
 /** A single copyable DNS field (label + monospace value + copy affordance). */
 function CopyField({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
@@ -1581,7 +1595,23 @@ function CopyField({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** A DNS record laid out the way providers ask for it: Type · Name · Value. */
+/**
+ * A DNS record laid out the way providers ask for it: Type · Name · Value.
+ *
+ * The note under the Host field is not padding. Namecheap, GoDaddy, Hostinger
+ * and Squarespace all treat **Host** as relative to the zone, so pasting the
+ * full name publishes the record one level too deep —
+ * `coaching.byshujaa.com.byshujaa.com` — and every checker on earth then
+ * reports the hostname as simply absent. It has happened on a real domain here,
+ * to all four records at once, and cost hours: the values were right, the
+ * screen was right, and nothing said where they had gone.
+ *
+ * The wording stays generic ("the part before your domain") rather than naming
+ * the label, because working out where the domain ends needs a public-suffix
+ * list and a guess of "last two labels" gives actively wrong advice on
+ * `something.co.uk`. After **Check now** the server reports the exact label,
+ * derived from what actually resolved rather than guessed — see dns-check.ts.
+ */
 function DnsRecord({ type, name, value, hint }: { type: string; name: string; value: string; hint: string }) {
   return (
     <div className="rounded-xl bg-surface-3 p-3">
@@ -1593,6 +1623,10 @@ function DnsRecord({ type, name, value, hint }: { type: string; name: string; va
         <CopyField label="Name / Host" value={name} />
         <CopyField label={type === "CNAME" ? "Target" : "Value"} value={value} />
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Most providers add your domain to the Host field for you. If yours does, enter only the part{" "}
+        <span className="font-medium text-foreground">before</span> your domain name — not the whole thing.
+      </p>
     </div>
   );
 }
@@ -1605,6 +1639,14 @@ function DomainSection() {
   const [err, setErr] = useState<string | null>(null);
   const [domainToRemove, setDomainToRemove] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  /**
+   * What DNS actually says, per hostname, as of the last `Check now`.
+   *
+   * Kept in state rather than on the domain row because it is a live read, not
+   * stored state: it is true as of a moment, and showing a stale one after a
+   * reload would be worse than showing none.
+   */
+  const [dns, setDns] = useState<Record<string, DnsFinding>>({});
 
   const load = useCallback(async () => {
     setLoadFailed(false);
@@ -1621,7 +1663,11 @@ function DomainSection() {
     catch (e) { setErr(e instanceof Error ? e.message : "Couldn't add that domain."); }
     finally { setBusy(false); }
   };
-  const refresh = async (h: string) => { await api.post(`/api/domains/${encodeURIComponent(h)}/refresh`); await load(); };
+  const refresh = async (h: string) => {
+    const r = await api.post<{ dns?: DnsFinding | null }>(`/api/domains/${encodeURIComponent(h)}/refresh`);
+    setDns((d) => (r?.dns ? { ...d, [h]: r.dns } : Object.fromEntries(Object.entries(d).filter(([k]) => k !== h))));
+    await load();
+  };
   const remove = async (h: string) => { await api.del(`/api/domains/${encodeURIComponent(h)}`); await load(); };
 
   // Platform hasn't turned on Cloudflare for SaaS — hide the section entirely.
@@ -1662,6 +1708,28 @@ function DomainSection() {
                     gets named. "does not CNAME to this zone" is filtered while the
                     CNAME is still propagating, because it is the normal state for
                     the first few minutes and reads as a failure. */}
+                {/* What DNS actually says. FIRST, and above Cloudflare's own
+                    message, because the two describe the same failure at
+                    different distances: Cloudflare reports "does not CNAME to
+                    this zone" — the symptom — while this names the cause and
+                    the keystroke that fixes it. `ok` is not rendered: a
+                    correct CNAME with a pending certificate is the ordinary
+                    state for the first minute or two and reads as an alarm. */}
+                {dns[d.hostname] && dns[d.hostname]!.code !== "ok" && (
+                  <div className="flex gap-2.5 rounded-xl bg-warning/10 p-3" role="status">
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                    <div className="min-w-0 space-y-1">
+                      <div className="text-sm font-medium text-warning">
+                        {dns[d.hostname]!.code === "double-suffix" ? "The record is in the wrong place" : "We couldn't find the record"}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{dns[d.hostname]!.message}</p>
+                      {dns[d.hostname]!.hostShouldBe && (
+                        <div className="pt-1"><CopyField label="Host should be" value={dns[d.hostname]!.hostShouldBe!} /></div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {(() => {
                   const shown = (d.errors ?? []).filter((e) => !/does not CNAME to this zone/i.test(e));
                   if (!shown.length) return null;
