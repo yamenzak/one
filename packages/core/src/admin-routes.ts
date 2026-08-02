@@ -134,5 +134,34 @@ export function sharedConfigRoutes(guards: SharedConfigGuards) {
 
       await writeSharedConfig(kv, clean);
       return c.json({ ok: true });
+    })
+
+    /**
+     * Drop THIS app's own value for a shared key, so the shared one takes over.
+     *
+     * Without this the whole feature only helps the NEXT app. Kova and Tessa
+     * already hold a local row for every credential they use, and a local row
+     * wins — so an operator can set the Gemini key centrally, watch both
+     * consoles report "overridden here", and have no way to act on it. Most of
+     * the per-app panels cannot clear their own field either: the AI panel only
+     * writes a non-empty key, and the email panel's sender is validated against
+     * a regex an empty string fails. The one place that knows a key is
+     * overridden is the one place that can un-override it.
+     *
+     * DELETE, not `setConfig(key, "")`. They behave identically today — an
+     * empty local row falls through to the shared value by design — but only
+     * one of them is honest about what happened, and a blank row is a row a
+     * future reader has to reason about.
+     *
+     * Confined to the allow-list. This is a config-row delete reachable from an
+     * HTTP route, so the set of rows it can touch is the security boundary:
+     * `schema:kova` must not be one keystroke from a route that removes it.
+     */
+    .delete("/admin/shared-config/local/:key", async (c) => {
+      if (!guards.isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
+      const key = c.req.param("key");
+      if (!isSharedConfigKey(key)) return c.json({ error: `"${key}" is not a shared key.` }, 400);
+      await c.env.DB.prepare("DELETE FROM app_config WHERE key = ?").bind(key).run();
+      return c.json({ ok: true });
     });
 }

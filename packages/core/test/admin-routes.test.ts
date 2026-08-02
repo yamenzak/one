@@ -34,13 +34,29 @@ function fakeKv(initial?: Record<string, string>) {
 
 function mount(opts: { local?: Record<string, string>; shared?: Record<string, string>; wired?: boolean; admin?: boolean }) {
   const { kv, read } = fakeKv(opts.shared ?? {});
-  const env = { DB: fakeDb(opts.local ?? {}), PLATFORM_CONFIG: opts.wired === false ? undefined : kv };
+  const deleted: string[] = [];
+  const rows = opts.local ?? {};
+  const db = {
+    prepare: (sql: string) => ({
+      all: async () => ({ results: Object.entries(rows).map(([key, value]) => ({ key, value })) }),
+      bind: (...args: unknown[]) => ({
+        run: async () => {
+          if (/^DELETE/i.test(sql)) deleted.push(String(args[0]));
+          return { success: true };
+        },
+      }),
+    }),
+  } as unknown as D1Database;
+  const env = { DB: db, PLATFORM_CONFIG: opts.wired === false ? undefined : kv };
   const app = new Hono().route("/api", sharedConfigRoutes({ isPlatformAdmin: () => opts.admin !== false }) as never);
   return {
     read,
+    deleted,
     get: () => app.request("/api/admin/shared-config", {}, env),
     post: (patch: unknown) =>
       app.request("/api/admin/shared-config", { method: "POST", body: JSON.stringify({ patch }) }, env),
+    dropLocal: (key: string) =>
+      app.request(`/api/admin/shared-config/local/${encodeURIComponent(key)}`, { method: "DELETE" }, env),
   };
 }
 
@@ -137,5 +153,45 @@ describe("POST /admin/shared-config", () => {
     const m = mount({ shared: { "google.gemini_key": "g", "stripe.mode": "test" } });
     await m.post({ "stripe.mode": "live" });
     expect(m.read()).toEqual({ "google.gemini_key": "g", "stripe.mode": "live" });
+  });
+});
+
+/**
+ * Handing a key back to the shared store.
+ *
+ * The action that decides whether this feature helps the apps that already
+ * exist or only the next one: both live apps hold a local row for every
+ * credential they use, a local row wins, and most per-app panels cannot clear
+ * their own field.
+ */
+describe("DELETE /admin/shared-config/local/:key", () => {
+  it("refuses anyone who is not a platform operator", async () => {
+    expect((await mount({ admin: false }).dropLocal("stripe.mode")).status).toBe(403);
+  });
+
+  it("deletes this app's own row so the shared value takes over", async () => {
+    const m = mount({ local: { "stripe.mode": "test" }, shared: { "stripe.mode": "live" } });
+    expect((await m.dropLocal("stripe.mode")).status).toBe(200);
+    expect(m.deleted).toEqual(["stripe.mode"]);
+  });
+
+  /**
+   * The security boundary on this route. It is a config-row delete reachable
+   * over HTTP, so the set of rows it can touch is the whole of what stops it
+   * being a way to remove a schema marker or the plan catalog stamp.
+   */
+  it("refuses any key that is not shareable, and deletes nothing", async () => {
+    for (const k of ["schema:kova", "plans.catalog_version", "platform.maintenance", "email.from"]) {
+      const m = mount({ local: { [k]: "x" } });
+      expect((await m.dropLocal(k)).status, k).toBe(400);
+      expect(m.deleted, k).toEqual([]);
+    }
+  });
+
+  /** Nothing shared bound is not a reason to refuse: dropping a local override
+   *  is a change to THIS app's table and is meaningful on its own. */
+  it("works even when the shared store is not wired", async () => {
+    const m = mount({ wired: false, local: { "stripe.mode": "test" } });
+    expect((await m.dropLocal("stripe.mode")).status).toBe(200);
   });
 });

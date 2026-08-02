@@ -24,6 +24,15 @@ export interface AdminApi {
    * for the sake of a narrower interface.
    */
   patch: <T>(path: string, body?: unknown) => Promise<T>;
+  /**
+   * DELETE, for the one panel that removes a row rather than blanking it: the
+   * shared-config screen hands a key back to the platform store by deleting
+   * this app's own override. `setConfig(key, "")` would behave identically —
+   * an empty local row falls through by design — but only a delete is honest
+   * about what happened, and a blank row is one a future reader has to reason
+   * about.
+   */
+  del: <T>(path: string) => Promise<T>;
 }
 
 export interface AdminDeps {

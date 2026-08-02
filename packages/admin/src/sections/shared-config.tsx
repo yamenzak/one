@@ -173,6 +173,23 @@ function SharedConfig() {
       return `Saved to the shared store — ${changed.length === 1 ? "1 setting" : `${changed.length} settings`} now apply to every app.`;
     }, "Couldn't save the shared platform config.");
 
+  /**
+   * Hand one key back to the shared store.
+   *
+   * The action the model needed and could not express: a local row wins, so an
+   * app that already has its own value ignores whatever is set here — and most
+   * of the per-app panels cannot clear their own field (the AI panel only
+   * writes a non-empty key; the email panel validates its sender against a
+   * regex a blank fails). This screen is the one that knows a key is overridden,
+   * so it is the one that can un-override it.
+   */
+  const useShared = (k: string) =>
+    act.run(`drop:${k}`, async () => {
+      await api.del(`/api/admin/shared-config/local/${encodeURIComponent(k)}`);
+      reload();
+      return `${LABELS[k] ?? k}: this app now uses the shared value.`;
+    }, "Couldn't hand that setting back to the shared store.");
+
   const set = (k: string, v: string) => setDraft((d) => ({ ...d, [k]: v }));
   const shown = (e: Entry) => draft[e.key] ?? (e.secret ? "" : (e.value ?? ""));
 
@@ -249,10 +266,13 @@ function SharedConfig() {
                             hint={e.secret ? undefined : `Stored as ${k}`}
                           />
                           {e.overriddenHere && (
-                            <p className="text-xs text-muted-foreground">
-                              <Badge tone="warning">overridden here</Badge> This app has its own value and ignores the
-                              shared one.
-                            </p>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              <Badge tone="warning">overridden here</Badge>
+                              <span className="min-w-0 flex-1">This app has its own value and ignores the shared one.</span>
+                              <Button size="sm" variant="outline" disabled={act.busy !== null} onClick={() => void useShared(k)}>
+                                {act.busy === `drop:${k}` ? <><Spinner className="size-3" /> …</> : "Use shared"}
+                              </Button>
+                            </div>
                           )}
                         </div>
                       );

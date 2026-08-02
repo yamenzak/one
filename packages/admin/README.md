@@ -71,7 +71,13 @@ any other screen:
 
 - **This app's own value still wins.** Each row carries `overriddenHere`, so
   "I set it centrally and this app still uses the old one" has a visible cause.
-  Without it the override is a database row nobody is looking at.
+  Without it the override is a database row nobody is looking at. The badge
+  comes with a **Use shared** button, and that button is what makes the feature
+  reach the apps that already exist rather than only the next one: every live
+  app holds a local row for every credential it uses, and most per-app panels
+  cannot clear their own field (the AI panel only writes a non-empty key; the
+  email panel validates its sender against a regex a blank fails). The screen
+  that knows a key is overridden is the only one that can un-override it.
 - **The per-app panels are literal.** A key set in the shared store and not
   overridden reads as *unset* on the AI / Email / Stripe / Turnstile panels,
   because those report only what the app holds of its own.

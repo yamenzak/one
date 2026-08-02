@@ -138,6 +138,15 @@ should not. `setConfig` deliberately takes only a `D1Database`: it writes the
 layer that OVERRIDES the shared one, and a writer accepting either store would
 eventually be handed the wrong one.
 
+### Adopting it on an app that is already configured
+
+A local row wins, and a live app has one for every credential it uses — so
+setting a key centrally changes nothing until the local one goes. Most per-app
+panels cannot clear their own field, so `DELETE /admin/shared-config/local/:key`
+exists and the console's shared panel puts a **Use shared** button on every row
+it reports as overridden. Confined to the allow-list: it is a config-row delete
+reachable over HTTP, and the set of rows it can touch is the security boundary.
+
 ### Provisioning
 
 The namespace is **absent from every `wrangler.jsonc` until it is real**. A
