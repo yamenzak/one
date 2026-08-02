@@ -16,6 +16,52 @@ resolve model → RESERVE a worst-case hold → run (Workers AI | Gemini | mock)
 | `media.ts` | Where a generated image goes. |
 | `schema.ts` | `ai_models`, `ai_generations`, `ai_cache`, `insight_feedback`. |
 
+## The catalog is the platform's; the selection is the app's
+
+`ai_models` holds two different kinds of thing, and only one of them is any
+single app's:
+
+| columns | what it is | whose |
+|---|---|---|
+| `id`, `label`, `provider`, `input_rate`, `output_rate`, `unit_rate`, `unit_kind` | parsed from Cloudflare's and Google's **public pricing pages** | the platform's |
+| `enabled`, `is_default` | which models this product turns on, and its default per lane | the app's |
+
+Every app used to fetch the same two URLs, run the same parsers and write the
+same numbers — and a brand-new app lived on `DEFAULT_MODELS`, twelve hardcoded
+rows, until somebody remembered to press Sync.
+
+So a successful sync now **publishes** what it parsed to `@4dl/core`'s shared
+platform store (`shared-catalog.ts`), and two things follow:
+
+- **A new app seeds the whole priced catalog on first boot.** Opening its AI
+  panel populates `ai_models` from the published catalog, no Sync, no operator
+  action. `DEFAULT_MODELS` goes back to being what it was always meant to be: a
+  floor so an app can meter *something*, not a catalog.
+- **A total parse failure is survivable.** When both pricing pages fail — a doc
+  format change, a bad day at a provider — the sync falls back to the last
+  published catalog instead of reporting failure and applying nothing.
+
+`enabled` and `is_default` never cross. One product reads food photos, another
+reads sterilisation labels, and a third has no use for the speech lane at all.
+
+### Why publish a blob, when config is read-through
+
+`getConfig`'s shared layer merges per key on every request, because that is how
+config is used. This is the opposite shape: `ai_models` is joined, ordered and
+filtered on the hot path, several times inside one `generate()`. So the shared
+store is the **source** and the local table is the **applied result** — the same
+relationship a package's schema has to a database. Publishing is best-effort and
+can never fail a sync that already worked.
+
+### `ai.markup` is a default, not the authority
+
+Metering reads `ai_models.markup`, a per-row column. The `ai.markup` config key
+is what the sync binds into every INSERT — so setting it in the shared store
+decides what **new** models cost across the platform, while a per-model price an
+operator set on one app's AI panel is never overwritten. Existing rows keep what
+they hold.
+
+
 ## The operator console's endpoints are here too
 
 `aiCatalogAdminRoutes({ isPlatformAdmin })` serves `/admin/ai/config`,

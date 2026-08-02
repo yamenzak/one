@@ -30,7 +30,7 @@ import {
 } from "@4dl/ui";
 import {
   AdminConsole as Console, PlatformAiSection, PlatformDomainsSection, providerLabel, type AiCatalogModel, PlatformEmailSection, PlatformMaintenanceSection,
-  PlatformStripeSection, PlatformTurnstileSection, PlatformSharedConfigSection, type ConsoleSection,
+  PlatformStripeSection, PlatformTurnstileSection, PlatformSharedConfigSection, PlatformRailSection, type ConsoleSection,
 } from "@4dl/admin";
 import { SectionSplit } from "../SectionSplit.js";
 import { api, errorText } from "../../api.js";
@@ -86,6 +86,11 @@ const ADMIN_SECTIONS: ConsoleSection[] = [
      about Stripe, not about Kova — and Tessa, facing the same three endpoints,
      had reinvented them as a `JSON.stringify` dump and three text boxes. */
   { key: "stripe", label: "Stripe", blurb: "Keys, webhooks, and what is synced", icon: Wallet, tone: "supplement", render: () => <PlatformStripeSection api={api} errorText={errorText} platformName="Kova" /> },
+  /* The Stripe rail's DEAD LETTER. One account serves every 4DL app, so an
+     event that matched no product is the platform's problem, not this app's —
+     and it means money was captured with nothing granted. The rail has parked
+     these since it shipped; nothing could read one back until now. */
+  { key: "rail", label: "Unattributed payments", blurb: "Stripe events that matched no app — money in, nothing granted", icon: Wallet, tone: "danger", render: () => <PlatformRailSection api={api} errorText={errorText} /> },
   { key: "promos", label: "Promo codes", blurb: "Platform-wide discounts on plans and packs", icon: Tag, tone: "activity", render: () => <PlatformPromos /> },
   /* `@4dl/admin`'s. `domainAdminRoutes` has been `@4dl/tenancy`'s since Stage
      10a, so every app that mounts it — the template included — had a working

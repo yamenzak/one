@@ -109,9 +109,11 @@ packages/
              # primitives. No product vocabulary, no router. See its README.
   billing-rail/ # @4dl/billing-rail — ONE STRIPE ACCOUNT, MANY APPS: event→app
              # attribution (metadata.app, legacy <prefix>_* keys, or an app's own
-             # `claims` lookup), the app-tagged catalog, and rail_parked_events —
+             # `claims` lookup), the app-tagged catalog, rail_parked_events —
              # the dead letter an unattributable event lands in INSTEAD of being
-             # answered 200 and forgotten. See its README.
+             # answered 200 and forgotten — and the OPERATOR ROUTES over it,
+             # because a dead letter nobody can read is the same silent success
+             # with an extra table. See its README.
   admin/     # @4dl/admin — the OPERATOR CONSOLE on every app's `admin.` door:
              # the router-free section-registry shell, plus panels for config a
              # shared package owns (email delivery, maintenance). The SECTIONS
@@ -274,6 +276,16 @@ remote bindings without editing the config (this is what the E2E suite does).
     permanent override on the next save.
   - **Unbound changes nothing.** No binding, no behaviour change — which is what
     every `wrangler dev` and the whole test suite run.
+- **The AI model CATALOG is the platform's; the SELECTION is the app's.** The
+  rates in `ai_models` are parsed from two public pricing pages and are identical
+  everywhere, so a successful sync PUBLISHES them to the shared store
+  (`@4dl/ai` shared-catalog.ts) — a new app then seeds its whole priced catalog
+  when its AI panel is first opened, instead of living on `DEFAULT_MODELS`'
+  twelve hardcoded rows until somebody presses Sync. `enabled`/`is_default`
+  never cross: which models a product turns on is a product decision. When both
+  pricing pages fail, the sync applies the last published catalog rather than
+  applying nothing. `ai.markup` is the DEFAULT bound into new rows, not the
+  authority — metering reads the per-row `ai_models.markup` column.
 - **Row-level scope**: every coaching route goes through
   `requireClientAccess(c, clientId)` in `clients.ts` — owner/assistant = tenant
   match, trainer = `client_trainers` assignment, client = own record. This is

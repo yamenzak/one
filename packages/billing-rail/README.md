@@ -9,6 +9,38 @@ One Stripe account, many 4DL apps.
 | `catalog.ts` | The account's products, grouped by owning app, with the unclaimed ones called out. |
 | `schema.ts` | `rail_parked_events` — the dead letter queue. |
 
+## The dead letter has a screen now
+
+`rail_parked_events` shipped with a table, an index, a writer and two reader
+functions that had **zero callers anywhere in the repo** — under a comment in
+the app's webhook handler asserting that "the operator console counts it". It
+did not. Nothing did.
+
+That is this package's own failure mode, reintroduced one level up. The handler
+this replaced answered an unroutable event `200 {received: true}` with its id
+already claimed, so Stripe never retried: money captured, nothing granted, no
+signal. Parking the event fixes the "no signal" half only if somebody can read
+the park.
+
+`admin-routes.ts` is that surface — `@4dl/admin`'s `PlatformRailSection` renders
+it — and three decisions in it follow from what a parked row means:
+
+- **The payload is one request away, not on the list row.** It carries the
+  customer id and the amount, which is everything needed to work out who paid
+  for what; it is also kilobytes of JSON per row.
+- **Closing one REQUIRES a note**, refused server-side if blank. "Resolved"
+  alone records that somebody looked, not whether the customer ever got what
+  they paid for — which turns a known problem into an unknown one.
+- **A second close is a 409, not an overwrite.** Two operators working the same
+  queue would otherwise lose the first account of what happened.
+
+**There is no replay button, deliberately.** Re-running a handler against an
+object whose world has moved on, on a rail whose entire job is exactly-once
+attribution, risks granting twice for one payment — strictly worse than the
+under-granting the screen exists to reveal. The fix is made in Stripe or in the
+app that should have owned the event, and recorded here.
+
+
 ## The bug this exists to prevent
 
 Kova's platform webhook handler is a switch over `event.type` whose branches are

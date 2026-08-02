@@ -80,6 +80,10 @@ export interface ParkedEvent {
   reason: string;
   candidates: string[];
   createdAt: string;
+  /** Set once an operator closed it; null while it is still open. */
+  resolvedAt?: string | null;
+  resolvedBy?: string | null;
+  resolutionNote?: string | null;
 }
 
 export async function park(db: D1Database, event: RailEvent, result: Extract<RouteResult, { unroutable: true }>, payload: string): Promise<void> {
@@ -89,20 +93,76 @@ export async function park(db: D1Database, event: RailEvent, result: Extract<Rou
     .run();
 }
 
-/** Open parked events, newest first. */
-export async function listParked(db: D1Database, limit = 50): Promise<ParkedEvent[]> {
+interface ParkedRow {
+  id: string; event_id: string | null; event_type: string; reason: string; candidates: string;
+  created_at: string; resolved_at: string | null; resolved_by: string | null; resolution_note: string | null;
+}
+
+const toParked = (r: ParkedRow): ParkedEvent => ({
+  id: r.id,
+  eventId: r.event_id,
+  eventType: r.event_type,
+  reason: r.reason,
+  candidates: ((): string[] => { try { return JSON.parse(r.candidates) as string[]; } catch { return []; } })(),
+  createdAt: r.created_at,
+  resolvedAt: r.resolved_at,
+  resolvedBy: r.resolved_by,
+  resolutionNote: r.resolution_note,
+});
+
+const PARKED_COLS =
+  "id, event_id, event_type, reason, candidates, created_at, resolved_at, resolved_by, resolution_note";
+
+/**
+ * Parked events, newest first.
+ *
+ * `open` defaults to true because an unattended dead letter is the only thing
+ * anybody needs a list for. Resolved ones stay readable on purpose: "what did
+ * we do about the last one of these" is the first question the second occurrence
+ * raises, and a queue that empties itself out of sight cannot answer it.
+ */
+export async function listParked(db: D1Database, opts: { limit?: number; open?: boolean } = {}): Promise<ParkedEvent[]> {
+  const where = opts.open === false ? "" : "WHERE resolved_at IS NULL ";
   const rows = await db
-    .prepare("SELECT id, event_id, event_type, reason, candidates, created_at FROM rail_parked_events WHERE resolved_at IS NULL ORDER BY created_at DESC LIMIT ?")
-    .bind(limit)
-    .all<{ id: string; event_id: string | null; event_type: string; reason: string; candidates: string; created_at: string }>();
-  return (rows.results ?? []).map((r) => ({
-    id: r.id,
-    eventId: r.event_id,
-    eventType: r.event_type,
-    reason: r.reason,
-    candidates: ((): string[] => { try { return JSON.parse(r.candidates) as string[]; } catch { return []; } })(),
-    createdAt: r.created_at,
-  }));
+    .prepare(`SELECT ${PARKED_COLS} FROM rail_parked_events ${where}ORDER BY created_at DESC LIMIT ?`)
+    .bind(opts.limit ?? 50)
+    .all<ParkedRow>();
+  return (rows.results ?? []).map(toParked);
+}
+
+/**
+ * One parked event WITH its stored payload.
+ *
+ * Separate from the list, and the reason is the payload: it is the whole Stripe
+ * event, so it carries the customer id, the amount and whatever metadata the
+ * object did or did not have — everything needed to work out who paid for what.
+ * That is also why it is not in the list: an operator scanning a queue does not
+ * need five kilobytes of JSON per row, and this endpoint is a deliberate,
+ * per-event act.
+ */
+export async function getParked(db: D1Database, id: string): Promise<(ParkedEvent & { payload: string | null }) | null> {
+  const r = await db
+    .prepare(`SELECT ${PARKED_COLS}, payload FROM rail_parked_events WHERE id = ?`)
+    .bind(id)
+    .first<ParkedRow & { payload: string | null }>();
+  return r ? { ...toParked(r), payload: r.payload } : null;
+}
+
+/**
+ * Close one, with a note saying what was actually done.
+ *
+ * The note is required by the ROUTE rather than here, so a caller with its own
+ * rules is not fought. What this refuses is re-resolving something already
+ * closed: two operators working the same queue would otherwise overwrite each
+ * other's account of what happened, and the second note is the one that would
+ * survive.
+ */
+export async function resolveParked(db: D1Database, id: string, by: string, note: string): Promise<boolean> {
+  const r = await db
+    .prepare("UPDATE rail_parked_events SET resolved_at = ?, resolved_by = ?, resolution_note = ? WHERE id = ? AND resolved_at IS NULL")
+    .bind(nowIso(), by, note, id)
+    .run();
+  return (r.meta?.changes ?? 0) > 0;
 }
 
 export async function countParked(db: D1Database): Promise<number> {

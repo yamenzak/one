@@ -116,17 +116,24 @@ const CACHE_TTL = 60;
 export const SHARED_CONFIG_KEYS: readonly string[] = [
   // One Google account.
   "google.gemini_key",
-  // The dev lane — read by `generate()` on every call, so sharing it works.
-  //
-  // `ai.markup` is deliberately NOT here, and the reason is worth recording:
-  // the row exists, the AI panel writes it, and NOTHING meters against it. The
-  // credit math reads `ai_models.markup`, a per-row column the same panel
-  // bulk-updates in the same request. Sharing the config row would therefore
-  // have changed what one screen DISPLAYS and not one cent of what anybody is
-  // charged — a control that appears to work and does not, which is worse than
-  // no control. It belongs with the model catalog; see the catalog-sharing
-  // note in the README.
+  // The dev lane — read by `generate()` on every call.
   "ai.mock",
+  /**
+   * The credit markup — the platform DEFAULT, not the authority.
+   *
+   * Worth spelling out, because it was briefly listed here while doing nothing
+   * at all. Metering reads `ai_models.markup`, a per-row column, so a shared
+   * config value only ever reaches rows at the moment they are written: the
+   * catalog sync binds it into every INSERT. That is now a real effect (the
+   * sync reads the MERGED config), and it is the right one — a per-model markup
+   * an operator set on one app's AI panel must not be overwritten by a platform
+   * default, and existing rows keep whatever they hold.
+   *
+   * So: this decides what NEW models cost across the platform. Changing what
+   * existing ones cost is each app's AI panel, which is where per-model pricing
+   * lives.
+   */
+  "ai.markup",
   // One Turnstile widget, hostname-scoped across the whole apex.
   "turnstile.secret",
   "turnstile.site_key",

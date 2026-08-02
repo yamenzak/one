@@ -6,3 +6,4 @@ export * from "./mock-lane.js";
 export * from "./pricing.js";
 export * from "./registry.js";
 export * from "./schema.js";
+export { readSharedCatalog, publishSharedCatalog, SHARED_CATALOG_KEY, type SharedCatalog } from "./shared-catalog.js";

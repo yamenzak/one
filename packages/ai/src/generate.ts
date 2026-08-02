@@ -22,6 +22,8 @@
 import { type BalanceView, creditsForUsage, creditsPerMillionTokens, creditsPerUnit, referenceCredits, REFERENCE_USAGE, type ModelRate, type Usage } from "@4dl/billing/model";
 import type { HasAi, HasDb, HasEnvironment, HasPlatformConfig } from "@4dl/core";
 import { getConfig, newId, nowMs } from "@4dl/core";
+import { isRunnableTask } from "./pricing.js";
+import { readSharedCatalog } from "./shared-catalog.js";
 import { shouldUseMockLane } from "./mock-lane.js";
 import { aiRegistry, type AiTone, type TenantAiConfig } from "./registry.js";
 import { putMedia, storageUsage } from "./media.js";
@@ -84,6 +86,16 @@ export interface AiModelRow {
   enabled: number;
   is_default: number;
 }
+
+/**
+ * The markup a seeded row carries.
+ *
+ * 3× the real provider cost, the same figure `@4dl/ai`'s admin routes default
+ * to. Named rather than repeated as a literal, because a seed and a sync
+ * disagreeing about it would show up only as an unexplained price difference
+ * between models added at different times.
+ */
+export const DEFAULT_SEED_MARKUP = 3;
 
 /** Seed text models (Workers AI rates in neurons per 1M tokens, markup 3). */
 const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
@@ -244,9 +256,56 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
  *  check skips the ~11-write batch once populated, so a single generate() (which
  *  resolves models 2-3×) doesn't re-attempt the whole seed each time. New
  *  catalog entries are picked up by an explicit admin re-sync. */
-export async function seedAiModels(db: D1Database): Promise<void> {
+export async function seedAiModels(db: D1Database, env?: HasPlatformConfig): Promise<void> {
   const already = await db.prepare("SELECT 1 AS x FROM ai_models LIMIT 1").first<{ x: number }>().catch(() => null);
   if (already) return;
+
+  /**
+   * Prefer a catalog the platform has already parsed.
+   *
+   * This is the whole payoff of publishing it. `DEFAULT_MODELS` below is twelve
+   * hand-maintained rows that exist so an app can meter SOMETHING before anyone
+   * presses Sync — it is a floor, not a catalog, and a brand-new app used to
+   * live on it until an operator remembered. With a shared catalog present, a
+   * first boot arrives with every priced model the platform knows about and no
+   * operator action at all.
+   *
+   * `enabled` follows the same rule the sync uses — runnable lanes on, the rest
+   * off — because a task no code path here can execute must not be selectable.
+   * `is_default` is left to the sync's election, which picks the cheapest
+   * enabled model per lane rather than whatever happened to be first.
+   */
+  const shared = env ? await readSharedCatalog(env) : null;
+  if (shared) {
+    const ok = await db
+      .batch(
+        shared.models.map((m) =>
+          db
+            .prepare(
+              "INSERT OR IGNORE INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+            )
+            .bind(m.id, m.task, m.label, m.provider, m.inputRate, m.outputRate, m.unitRate, m.unitKind, DEFAULT_SEED_MARKUP, isRunnableTask(m.task) ? 1 : 0),
+        ),
+      )
+      .then(() => true)
+      .catch(() => false);
+    // Elect a default per lane; without one, `modelForTask` orders by
+    // `is_default DESC` across rows that are all zero and picks arbitrarily.
+    if (ok) {
+      for (const task of ["text", "text-small", "vision", "image", "speech"]) {
+        const clause = task === "vision" ? " AND provider = 'google'" : "";
+        await db
+          .prepare(`UPDATE ai_models SET is_default = 1 WHERE id = (SELECT id FROM ai_models WHERE task = ? AND enabled = 1${clause} ORDER BY output_rate ASC, unit_rate ASC LIMIT 1)`)
+          .bind(task)
+          .run()
+          .catch(() => undefined);
+      }
+      return;
+    }
+    // A failed batch falls through to the hardcoded floor rather than leaving
+    // the table empty — an app with no models cannot meter anything at all.
+  }
+
   await db
     .batch(
       DEFAULT_MODELS.map((m, i) =>

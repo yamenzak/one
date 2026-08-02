@@ -12,7 +12,7 @@
  * whatever it does with user feedback. Everything here is provider mechanics.
  */
 
-import type { SkippedModel } from "./pricing.js";
+import type { ModelSeed, SkippedModel } from "./pricing.js";
 import { isRunnableTask, parseGeminiCatalog, parseWorkersAiCatalog } from "./pricing.js";
 import { listModels, seedAiModels } from "./generate.js";
 
@@ -53,10 +53,24 @@ export interface ProviderSyncReport {
   disabledIds: string[];
   /** Rows the page lists but the catalog cannot price, and why. */
   unpriceable: SkippedModel[];
+  /** Where the models came from: the provider's own page, or a shared catalog
+   *  another app already parsed. Reported because "synced" meaning two
+   *  different things is exactly the ambiguity an operator screen must not
+   *  have. (`source` above is the URL; this is the lane.) */
+  from: "pricing page" | "shared catalog";
   error: string | null;
 }
 
 export interface SyncReport {
+  /**
+   * Every model this run parsed, across providers.
+   *
+   * Carried out so the caller can publish it to the platform store without
+   * parsing the pages a second time. Stripped before the report is serialised
+   * to the console — it is the input to a side effect, not something an
+   * operator screen has any use for.
+   */
+  parsedModels: ModelSeed[];
   ok: boolean;
   providers: ProviderSyncReport[];
   total: number;
@@ -87,33 +101,59 @@ export interface SyncReport {
  * not as "the provider has no models" — a doc-format change would otherwise
  * disable the whole catalog in one click.
  */
-export async function syncModelCatalog(
-  db: D1Database,
-  opts: { markup: number; fetchMd: (url: string) => Promise<FetchedDoc> },
-): Promise<SyncReport> {
+export interface SyncOptions {
+  markup: number;
+  /** Fetch a pricing doc. Unused when `from` is supplied. */
+  fetchMd: (url: string) => Promise<FetchedDoc>;
+  /**
+   * Apply an ALREADY-PARSED catalog instead of reading the pricing pages.
+   *
+   * This is how a catalog parsed once by one app reaches the others — and how a
+   * deployment survives a doc-format change or a bad day at a provider: the
+   * route falls back to the last published catalog rather than reporting total
+   * failure and leaving a fresh app on its twelve-row hardcoded seed. See
+   * shared-catalog.ts.
+   */
+  from?: ModelSeed[];
+}
+
+export async function syncModelCatalog(db: D1Database, opts: SyncOptions): Promise<SyncReport> {
   await seedAiModels(db);
   const existing = await db.prepare("SELECT id, provider, enabled FROM ai_models").all<{ id: string; provider: string; enabled: number }>();
   const known = new Map((existing.results ?? []).map((r) => [r.id, r]));
 
   const providers: ProviderSyncReport[] = [];
+  const parsedModels: ModelSeed[] = [];
   const errors: string[] = [];
 
   for (const provider of ["workers-ai", "google"] as const) {
     const source = PRICING_SOURCES[provider];
-    const report: ProviderSyncReport = { provider, source, ok: false, parsed: 0, added: 0, addedIds: [], updated: 0, disabled: 0, disabledIds: [], unpriceable: [], error: null };
+    const report: ProviderSyncReport = { provider, source, from: "pricing page", ok: false, parsed: 0, added: 0, addedIds: [], updated: 0, disabled: 0, disabledIds: [], unpriceable: [], error: null };
     providers.push(report);
 
-    const doc = await opts.fetchMd(source);
-    if (!doc.md) {
-      report.error = `couldn't fetch the pricing page (${doc.error ?? "unknown error"}) — every ${provider} model was left exactly as it was`;
-      errors.push(`${provider}: ${report.error}`);
-      continue;
+    let parsedDoc: { models: ModelSeed[]; skipped: SkippedModel[] };
+    if (opts.from) {
+      // Already parsed elsewhere. `skipped` is empty by construction: whatever
+      // could not be priced was dropped by the app that did the parsing, and
+      // re-reporting it here would attribute another app's parse warnings to a
+      // run that never read a page.
+      parsedDoc = { models: opts.from.filter((m) => m.provider === provider), skipped: [] };
+      report.from = "shared catalog";
+    } else {
+      const doc = await opts.fetchMd(source);
+      if (!doc.md) {
+        report.error = `couldn't fetch the pricing page (${doc.error ?? "unknown error"}) — every ${provider} model was left exactly as it was`;
+        errors.push(`${provider}: ${report.error}`);
+        continue;
+      }
+      parsedDoc = provider === "workers-ai" ? parseWorkersAiCatalog(doc.md) : parseGeminiCatalog(doc.md);
     }
-    const parsedDoc = provider === "workers-ai" ? parseWorkersAiCatalog(doc.md) : parseGeminiCatalog(doc.md);
     report.unpriceable = parsedDoc.skipped;
     report.parsed = parsedDoc.models.length;
     if (parsedDoc.models.length === 0) {
-      report.error = "the page fetched but 0 models parsed — the doc format has probably changed; nothing was written or disabled";
+      report.error = opts.from
+        ? `the shared catalog carries no ${provider} models — nothing was written or disabled`
+        : "the page fetched but 0 models parsed — the doc format has probably changed; nothing was written or disabled";
       errors.push(`${provider}: ${report.error}`);
       continue;
     }
@@ -140,6 +180,7 @@ export async function syncModelCatalog(
       report.disabled = gone.length;
       report.disabledIds = gone;
     }
+    parsedModels.push(...parsedDoc.models);
     report.ok = true;
   }
 
@@ -159,5 +200,5 @@ export async function syncModelCatalog(
     if (!has) await db.prepare(`UPDATE ai_models SET is_default = 1 WHERE id = (SELECT id FROM ai_models WHERE task = ? AND enabled = 1${providerClause} ORDER BY output_rate ASC LIMIT 1)`).bind(task).run();
   }
 
-  return { ok: providers.some((p) => p.ok), providers, total: (await listModels(db)).length, errors };
+  return { parsedModels, ok: providers.some((p) => p.ok), providers, total: (await listModels(db)).length, errors };
 }

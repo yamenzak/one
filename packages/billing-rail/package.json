@@ -6,7 +6,8 @@
   "description": "One Stripe account, many 4DL apps: event->app routing, the app-tagged product catalog, and a dispatcher where an event belonging to no known app parks loudly instead of being silently accepted.",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./src/schema.ts"
+    "./schema": "./src/schema.ts",
+    "./admin-routes": "./src/admin-routes.ts"
   },
   "types": "./src/index.ts",
   "scripts": {

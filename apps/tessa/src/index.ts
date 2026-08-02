@@ -21,7 +21,7 @@
 
 import { Hono } from "hono";
 import { newId, nowIso } from "@4dl/core";
-import { sessionMiddleware, requirePermission, requireTenant, isPlatformAdmin, type AppEnv } from "./auth-context.js";
+import { sessionMiddleware, requirePermission, requireTenant, isPlatformAdmin, type AppContext, type AppEnv } from "./auth-context.js";
 import type { Env } from "./env.js";
 import { createAuth } from "./auth.js";
 import { guard } from "./route-guard.js";
@@ -41,6 +41,7 @@ import { packRoutes } from "./pack-routes.js";
 import { stockRoutes } from "./stock-routes.js";
 import { emailAdminRoutes } from "@4dl/email/admin-routes";
 import { sharedConfigRoutes } from "@4dl/core/admin-routes";
+import { railAdminRoutes } from "@4dl/billing-rail/admin-routes";
 import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
 import { DUNNING_DAYS } from "@4dl/billing";
 import { periodKey } from "@4dl/core";
@@ -201,7 +202,7 @@ app.route("/api", billingAdminRoutes);
 app.route("/api", aiAdminRoutes);
 // The provider key, mock lane, credit markup and model catalog are
 // `@4dl/ai`'s state, so their console endpoints are `@4dl/ai`'s routes.
-app.route("/api", aiCatalogAdminRoutes({ isPlatformAdmin: (c) => isPlatformAdmin(c as never) }) as unknown as Hono<AppEnv>);
+app.route("/api", aiCatalogAdminRoutes({ isPlatformAdmin: (c) => isPlatformAdmin(c as never), appName: "Tessa" }) as unknown as Hono<AppEnv>);
 app.route("/api", stockRoutes);
 app.route("/api", packRoutes);
 app.route("/api", cycleRoutes);
@@ -239,6 +240,23 @@ app.route("/api", emailAdminRoutes(
  * rows still win — see `packages/core/src/config.ts`.
  */
 app.route("/api", sharedConfigRoutes({ isPlatformAdmin: (c) => isPlatformAdmin(c as never) }) as unknown as Hono<AppEnv>);
+
+/**
+ * The Stripe rail's DEAD LETTER, on the operator door.
+ *
+ * The rail parks an event it cannot attribute to any app — money captured,
+ * nothing granted — and until now nothing in the repo could read one back. One
+ * Stripe account serves every 4DL product, so the queue is the platform's
+ * rather than this app's; it answers on whichever worker Stripe delivered to.
+ */
+app.route("/api", railAdminRoutes({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  // The audit line on a closed event. Identifying the operator is the app's
+  // business — this package has never seen its auth.
+  // `c.get("user").email` is the same field `isPlatformAdmin` checks against
+  // ADMIN_EMAILS, so the audit line names whoever the allowlist let in.
+  operatorRef: (c) => (c as unknown as AppContext).get("user")?.email ?? "operator",
+}) as unknown as Hono<AppEnv>);
 
 /**
  * The maintenance switch, on the operator door.

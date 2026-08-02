@@ -10,7 +10,7 @@
 import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import { maintenanceMiddleware } from "@4dl/tenancy";
-import { isPlatformAdmin, sessionMiddleware, type AppEnv } from "./auth-context.js";
+import { isPlatformAdmin, sessionMiddleware, type AppContext, type AppEnv } from "./auth-context.js";
 import { routeGuard } from "./route-guard.js";
 import { ensureSchema, parseJson } from "./db.js";
 import { seedBilling, listPlans, getSubscription } from "./billing-store.js";
@@ -25,6 +25,7 @@ import { notifyRoutes } from "@4dl/notify/routes";
 import { billingRoutes, adminRoutes, emailConfigRoutes } from "./billing-routes.js";
 import { maintenanceRoutes } from "./maintenance.js";
 import { sharedConfigRoutes } from "@4dl/core/admin-routes";
+import { railAdminRoutes } from "@4dl/billing-rail/admin-routes";
 import { downgradeRoutes } from "./downgrade-routes.js";
 import { clientRoutes } from "./clients.js";
 import { memberRoutes } from "./member-routes.js";
@@ -145,6 +146,23 @@ app.route("/api", emailConfigRoutes);
  * rows still win — see `packages/core/src/config.ts`.
  */
 app.route("/api", sharedConfigRoutes({ isPlatformAdmin: (c) => isPlatformAdmin(c as never) }) as unknown as Hono<AppEnv>);
+
+/**
+ * The Stripe rail's DEAD LETTER, on the operator door.
+ *
+ * The rail parks an event it cannot attribute to any app — money captured,
+ * nothing granted — and until now nothing in the repo could read one back. One
+ * Stripe account serves every 4DL product, so the queue is the platform's
+ * rather than this app's; it answers on whichever worker Stripe delivered to.
+ */
+app.route("/api", railAdminRoutes({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  // The audit line on a closed event. Identifying the operator is the app's
+  // business — this package has never seen its auth.
+  // `c.get("user").email` is the same field `isPlatformAdmin` checks against
+  // ADMIN_EMAILS, so the audit line names whoever the allowlist let in.
+  operatorRef: (c) => (c as unknown as AppContext).get("user")?.email ?? "operator",
+}) as unknown as Hono<AppEnv>);
 app.route("/api", maintenanceRoutes as unknown as Hono<AppEnv>);
 app.route("/api", clientRoutes);
 app.route("/api", memberRoutes);
@@ -169,6 +187,9 @@ app.route("/api", aiAdminRoutes);
 // `@4dl/ai`'s state, so their console endpoints are `@4dl/ai`'s routes.
 app.route("/api", aiCatalogAdminRoutes({
   isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  // Stamped on a catalog this app publishes for the platform, so another app's
+  // console can say where its model rates came from.
+  appName: "Kova",
   // Kova's own consequence of a first key: cached TTS cues were voiced by the
   // keyless mock lane (silent WAVs), so keeping them leaves an owner stuck with
   // silence they already "generated".

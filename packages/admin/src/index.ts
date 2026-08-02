@@ -9,3 +9,4 @@ export { PlatformAiSection, providerLabel, type AiSectionProps, type AiLane, typ
 export { PlatformDomainsSection, type DomainsSectionProps } from "./sections/domains.js";
 export { PlatformTurnstileSection, type TurnstileSectionProps } from "./sections/turnstile.js";
 export { PlatformSharedConfigSection } from "./sections/shared-config.js";
+export { PlatformRailSection } from "./sections/rail.js";

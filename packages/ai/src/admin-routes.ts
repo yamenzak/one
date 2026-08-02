@@ -30,15 +30,16 @@
 
 import { Hono } from "hono";
 import { z } from "zod";
-import { getConfig, setConfig, type HasDb, type HasEnvironment } from "@4dl/core";
+import { getConfig, nowIso, setConfig, type HasDb, type HasEnvironment, type HasPlatformConfig } from "@4dl/core";
 import type { Context } from "hono";
 import { listModels, modelPricing, modelTasks, seedAiModels, type AiModelRow } from "./generate.js";
 import { mockModeSettable } from "./mock-lane.js";
 import { fetchPricingDoc, syncModelCatalog } from "./catalog-sync.js";
+import { publishSharedCatalog, readSharedCatalog } from "./shared-catalog.js";
 
 /** The slice of an app's Hono env these routes actually read. */
 export type AiRouteEnv = {
-  Bindings: HasDb & HasEnvironment;
+  Bindings: HasDb & HasEnvironment & HasPlatformConfig;
   Variables: Record<string, unknown>;
 };
 
@@ -56,6 +57,13 @@ export const globalMarkup = (cfg: Record<string, string>): number => {
 export interface AiAdminDeps<E extends AiRouteEnv = AiRouteEnv> {
   /** Platform operator — an allowlist, a separate axis from tenant RBAC. */
   isPlatformAdmin: (c: Context<E>) => boolean;
+  /**
+   * This app's name, stamped on a catalog it publishes for the platform.
+   *
+   * Only ever read back by another app's console, to say where its catalog came
+   * from. Optional because a deployment with no shared store never publishes.
+   */
+  appName?: string;
   /**
    * Called once, when a real Gemini key is stored where there was none.
    *
@@ -124,7 +132,11 @@ export function aiCatalogAdminRoutes<E extends AiRouteEnv = AiRouteEnv>(deps: Ai
     /** The full catalog, disabled models included. */
     .get("/admin/ai/models", async (c) => {
       if (!deps.isPlatformAdmin(c)) return forbidden(c);
-      await seedAiModels(c.env.DB);
+      // Seeded WITH the env, so a fresh app opening this screen arrives with the
+      // whole priced catalog the platform already parsed rather than the twelve
+      // hardcoded rows that exist only as a floor. This is where a new product's
+      // catalog now comes from — no Sync, no operator action.
+      await seedAiModels(c.env.DB, c.env);
       const rows = await c.env.DB.prepare("SELECT * FROM ai_models ORDER BY provider, task, label").all<AiModelRow>();
       // Every row carries its price in CREDITS as well as its neuron rate card.
       // Neurons are the cost basis and stay useful, but they are not the currency
@@ -162,13 +174,46 @@ export function aiCatalogAdminRoutes<E extends AiRouteEnv = AiRouteEnv>(deps: Ai
       return c.json({ ok: true });
     })
 
-    /** Refresh the catalog from the official pricing docs. */
+    /**
+     * Refresh the catalog from the official pricing docs — and share the result.
+     *
+     * The rates on those two pages are a fact about what the providers charge,
+     * identical in every deployment, and every app used to fetch and parse them
+     * for itself. So a successful sync PUBLISHES what it parsed to the platform
+     * store, and two things follow:
+     *
+     *   • a brand-new app seeds its whole priced catalog on first boot with no
+     *     operator action, instead of living on twelve hardcoded rows until
+     *     somebody remembers to press this button;
+     *   • when both pages fail — a doc-format change, a provider having a bad
+     *     day — this falls back to the last published catalog rather than
+     *     reporting total failure and applying nothing.
+     *
+     * Publishing is best-effort and never turns a good sync into an error: the
+     * app that ran it already has the fresh rows, and the next sync republishes.
+     */
     .post("/admin/ai/models/sync", async (c) => {
       if (!deps.isPlatformAdmin(c)) return forbidden(c);
-      const cfg = await getConfig(c.env.DB);
-      const report = await syncModelCatalog(c.env.DB, { markup: globalMarkup(cfg), fetchMd: fetchPricingDoc });
-      // 502 only when NEITHER provider produced a usable parse — a one-sided
-      // failure still applied real work and must return it, not a bare error.
-      return c.json(report, report.ok ? 200 : 502);
+      // The MERGED config, so a markup set once for the platform reaches the
+      // rows this sync inserts. (It is the default for NEW rows; existing rows
+      // keep their own column, which is what the per-model control edits.)
+      const cfg = await getConfig(c.env);
+      const markup = globalMarkup(cfg);
+
+      let report = await syncModelCatalog(c.env.DB, { markup, fetchMd: fetchPricingDoc });
+      let published = false;
+
+      if (report.ok) {
+        published = await publishSharedCatalog(c.env, report.parsedModels, deps.appName ?? "an app", nowIso());
+      } else {
+        const shared = await readSharedCatalog(c.env);
+        if (shared) report = await syncModelCatalog(c.env.DB, { markup, fetchMd: fetchPricingDoc, from: shared.models });
+      }
+
+      // 502 only when NEITHER provider produced a usable parse AND no shared
+      // catalog could stand in — a one-sided failure still applied real work
+      // and must return it, not a bare error.
+      const { parsedModels: _dropped, ...body } = report;
+      return c.json({ ...body, published }, report.ok ? 200 : 502);
     });
 }

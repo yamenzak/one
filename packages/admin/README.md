@@ -16,6 +16,7 @@ The operator console every 4DL app puts on its `admin.` door.
 | `sections/turnstile.tsx` | The bot check on sign-in — including the one combination that locks everybody out. |
 | `sections/ai.tsx` | Provider key, mock lane, credit markup, catalog sync, and the per-lane default-model picker. |
 | `sections/shared-config.tsx` | **The shared platform store** — the keys every 4DL app reads, set once instead of once per product. |
+| `sections/rail.tsx` | **Unattributed payments** — Stripe events the rail could not match to any app. Money in, nothing granted. |
 
 ## The sections are the app's; the frame is not
 
@@ -97,7 +98,7 @@ nobody knows is set.
 
 ## What a panel may live here
 
-Only configuration a **shared package already owns**. Six qualify today:
+Only configuration a **shared package already owns**. Seven qualify today:
 
 - **Email delivery** — `email.provider`, `email.from`, `email.platform_from` and
   `email.credits_per_email` are `@4dl/email`'s keys, read by nothing else, and
@@ -112,6 +113,10 @@ Only configuration a **shared package already owns**. Six qualify today:
 - **Stripe** — `/admin/stripe/{status,config,sync}` are `@4dl/billing`'s, and
   identical in every app that has them. Two lanes, the mismatch alarm and the
   price rebuild are facts about Stripe, not about any product.
+- **Unattributed payments** — `@4dl/billing-rail` owns `rail_parked_events`.
+  One Stripe account serves every app, so an event that matched no product is
+  the platform's problem by definition; an app-owned screen would mean N of
+  them, each blind to the others.
 - **Shared platform config** — `@4dl/core` owns the store, the allow-list and
   `sharedConfigRoutes`. Which credentials the whole platform has in common is a
   fact about the platform, and no product has an opinion about it.

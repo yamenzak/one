@@ -29,13 +29,14 @@ import {
   PlatformStripeSection,
   PlatformTurnstileSection,
   PlatformSharedConfigSection,
+  PlatformRailSection,
   useConsoleSection,
   type ConsoleSection,
 } from "@4dl/admin";
 import { api, errorText } from "@4dl/app-kit";
 import {
   Badge, Building2, Button, Card, CreditCard, Field, Globe, Group, LoadError, Mail, Reveal, Row, SaveBar,
-  ShieldCheck, Skeleton, SkeletonLine, Spinner, Wand2, Wrench, useAction, useLoad,
+  ShieldCheck, Skeleton, SkeletonLine, Spinner, Wallet, Wand2, Wrench, useAction, useLoad,
 } from "@4dl/ui";
 import { useSession } from "../session.js";
 
@@ -104,6 +105,11 @@ const SECTIONS: ConsoleSection[] = [
       />
     ),
   },
+  /* The Stripe rail's DEAD LETTER. One account serves every 4DL app, so an
+     event that matched no product is the platform's problem, not this app's —
+     and it means money was captured with nothing granted. The rail has parked
+     these since it shipped; nothing could read one back until now. */
+  { key: "rail", label: "Unattributed payments", blurb: "Stripe events that matched no app — money in, nothing granted", icon: Wallet, tone: "danger", render: () => <PlatformRailSection api={api} errorText={errorText} /> },
   { key: "domains", label: "Custom domains", blurb: "Centre domains and their certificates", icon: Globe, tone: "case", render: () => <PlatformDomainsSection api={api} errorText={errorText} tenantNoun="centre" cnameExample="saas.4dl.app" /> },
   { key: "security", label: "Security", blurb: "The bot check on sign-in", icon: ShieldCheck, tone: "danger", render: () => <PlatformTurnstileSection api={api} errorText={errorText} /> },
   /* The SHARED store: one value, read by every 4DL app. It sits beside the
