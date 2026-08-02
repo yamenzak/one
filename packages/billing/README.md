@@ -9,6 +9,7 @@ What the platform charges a tenant, and what that buys them.
 | `credit-do.ts` | `CreditLedgerDO` — the per-tenant Durable Object that is the authoritative balance. |
 | `stripe.ts` | Lane config (test/live + mismatch detection), webhook signature verification, catalog sync, customer creation. |
 | `dunning.ts` | The ladder: 7 days → read-only, 30 → blocked, 37 → purged. |
+| `store.ts` | The catalog STORE: version-stamped seeding, the plan/pack reads, subscription resolution and the two ceilings. The catalog's *contents* are injected. |
 | `schema.ts` | `plans`, `subscriptions`, `credit_packs`, `credit_ledger`, `stripe_events`. |
 
 Two entry points: **`@4dl/billing`** for the worker, **`@4dl/billing/model`** for
@@ -77,14 +78,62 @@ declaring `interface Quotas { staffSeats: number }` — which is what you want, 
 autocomplete and typo protection — would not satisfy a Record constraint. The
 engine narrows internally; the app keeps precise types at every call site.
 
-## What has NOT moved yet
+## `store.ts` — the catalog's SHAPE, not its contents
 
-`stripe-routes.ts`, `billing-routes.ts` and `downgrade-routes.ts` are still in
-`apps/api`. They mix two rails: the **platform rail** (we bill tenants) belongs
-here, and the **Connect rail** (a tenant bills its own customers) belongs to
-`@4dl/commerce`, which does not exist until Stage 4. Splitting a 1,500-line route
-file down the middle before its other half has a home is how you get a package
-that owns half a flow. They move in Stage 4.
+The line, and it is not "billing is shared":
+
+> **The catalog's CONTENTS are the product's. Its SHAPE is not.**
+
+One app sells a four-rung ladder because a solo trainer and a twelve-coach studio
+are different businesses; the other sells one plan because a practice with three
+treatment rooms and one with eight are not. That stays in the app as a
+`CatalogSeed`. What both then need — the ordered active-only list, the by-id
+lookup that must still resolve a retired tier, the version-stamped migration, the
+entitlement merge, the two ceilings, the ledger mirror — was written twice,
+near-identically, across 817 lines with 11 of 13 exports sharing a name.
+
+```ts
+const store = bindBillingStore<Entitlements>({
+  entitlements,                                  // the engine, already bound
+  catalog: { plans, retired, packs, version },   // the product's decisions
+  defaultSubscription: { plan_id, status },      // what a tenant holds before a row exists
+  materialiseOnRead,                             // whether a read WRITES that row
+})
+```
+
+**Both seams exist because the apps genuinely differ, not to be configurable.**
+Kova's default is `free`/`active`; Tessa's is `free`/`incomplete`, because its
+gate needs "never chose a plan" apart from "cancelled" — nothing was taken from
+the first and there is no arrears to settle, so the copy cannot be shared.
+Kova materialises the row from its `/api/context` hot path; Tessa writes it once
+at tenant creation. Hard-coding either silently re-gates the other's tenants.
+
+**Three rules in `applyPlanCatalog`, and each is silent when broken:**
+
+1. A **price change NULLS the Stripe id pair** before writing the new price.
+   `syncCatalog` skips any plan that already has a `stripe_price_id`, so without
+   this a repriced plan keeps charging the OLD amount forever.
+2. **Live plans reconcile in full** — name, price, entitlements, `ord`, `active`.
+   `active` is bound from the seed rather than hard-coded to 1, because one app
+   carries a row at `active: 0` in this list.
+3. **Retired plans are only deactivated.** Never their entitlements or price: a
+   grandfathered tenant keeps what they were sold, and one of the real retired
+   tiers has a storage ceiling 2.5× the current one. Nobody is migrated off a
+   retired tier by this code.
+
+**A failed read is not an answer.** `getPlan` and `readSubscription` let a D1
+error propagate rather than catching it into `null`. The two apps disagreed and
+one was wrong: `null` means "no such plan", which resolves to the free baseline,
+so laundering a transient failure into it silently downgrades a *paying* tenant
+and shows them the finish-setting-up gate. A 500 is visible and retried.
+
+## What has NOT moved
+
+The **route trees** — `stripe-routes.ts`, `billing-routes.ts`,
+`downgrade-routes.ts` — are still each app's. Their handlers are woven through
+product authorization and the app's notification registry; only the
+reconciliation logic moved (`webhook.ts`, below). See PLATFORM.md's contribution
+rules before moving one.
 
 ## Boundary
 

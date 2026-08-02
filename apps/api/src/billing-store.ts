@@ -1,48 +1,22 @@
 /**
- * Platform billing store (SPEC §5) — plans, tenant subscriptions, credit
- * packs, config, and the D1 mirror of the DO credit ledger. Seed data is
- * admin-editable at runtime; these are the ship defaults.
+ * THE CATALOG — what Kova sells (SPEC §5).
+ *
+ * The STORE around it is `@4dl/billing`'s `bindBillingStore`: the ordered
+ * active-only list, the by-id lookup that must still resolve a grandfathered
+ * tier, the version-stamped catalog migration, the entitlement merge, the two
+ * ceilings and the ledger mirror. All of it was written twice, near-identically,
+ * in this app and in Tessa — 817 lines with 11 of 13 exports sharing a name.
+ *
+ * What stays here is what could never be shared: how many tiers there are, what
+ * they cost, and what a tier includes. Seed data is admin-editable at runtime;
+ * these are the ship defaults.
  */
 
-import { resolveEntitlements, mergeOverrides, clampEntitlementsForStatus, type Entitlements } from "@kova/domain";
-import { newId, nowIso, nowMs } from "./ids.js";
-import { getConfig, setConfig } from "@4dl/core";
+import { bindBillingStore, getConfig, setConfig, type PackRow, type PlanSeed } from "@4dl/billing";
+import { entitlementsEngine, type Entitlements } from "@kova/domain";
 import { j } from "./db.js";
 
-export interface PlanRow {
-  id: string;
-  name: string;
-  price_usd_month: number;
-  entitlements_json: string | null;
-  stripe_product_id: string | null;
-  stripe_price_id: string | null;
-  ord: number;
-  active: number;
-}
-
-export interface SubscriptionRow {
-  tenant_id: string;
-  plan_id: string;
-  status: string;
-  comp: number;
-  stripe_customer_id: string | null;
-  stripe_sub_id: string | null;
-  pending_plan_id: string | null;
-  current_period_end: string | null;
-  past_due_at: string | null;
-  suspend_at: string | null;
-  delete_at: string | null;
-  overrides_json: string | null;
-}
-
-export interface PackRow {
-  id: string;
-  name: string;
-  credits: number;
-  price_usd: number;
-  ord: number;
-  active: number;
-}
+export type { PackRow, PlanRow, SubscriptionRow } from "@4dl/billing";
 
 /**
  * ── Monthly AI credit grants: how these four numbers were derived ────────────
@@ -99,7 +73,7 @@ export interface PackRow {
  * No plan here enables a `reserved: true` feature (`chat`, `integrations`) —
  * those do not exist, and `plan-catalog.test.ts` enforces it.
  */
-export const DEFAULT_PLANS: Omit<PlanRow, "stripe_product_id" | "stripe_price_id">[] = [
+export const DEFAULT_PLANS: PlanSeed[] = [
   {
     /**
      * The id stays `solo` on purpose — it is stamped into Stripe metadata
@@ -212,7 +186,7 @@ export const DEFAULT_PLANS: Omit<PlanRow, "stripe_product_id" | "stripe_price_id
  * production row that already carries them keeps them until an admin edits it.
  * Both are inert: `RESERVED_FEATURES` is unenforced by construction.
  */
-export const GRANDFATHERED_PLANS: Omit<PlanRow, "stripe_product_id" | "stripe_price_id">[] = [
+export const GRANDFATHERED_PLANS: PlanSeed[] = [
   {
     /**
      * NOT A TIER — the parking state of a tenant that has never chosen a plan.
@@ -325,207 +299,46 @@ export const DEFAULT_PACKS: PackRow[] = [
  *        payment rail serves.
  */
 export const PLAN_CATALOG_VERSION = "3";
-const PLAN_CATALOG_KEY = "plans.catalog_version";
 
-/**
- * Bring the plan catalog to `PLAN_CATALOG_VERSION`. Idempotent and safe to run
- * concurrently from several isolates (every statement is an upsert or a guarded
- * UPDATE), and it never runs twice for the same version.
- *
- * Three rules, in this order:
- *
- * 1. **A price change invalidates the Stripe price id.** `syncCatalog` skips any
- *    plan row that already has a `stripe_price_id`, so a repriced plan would keep
- *    charging the OLD amount forever — a silent money bug. Null the id pair out
- *    *before* writing the new price, so the next "Sync catalog" recreates the
- *    product + price at the current amount. (The orphaned Stripe price stays
- *    live, which is correct: tenants already subscribed to it keep their price
- *    until they re-subscribe.)
- * 2. **Live plans are reconciled to the ship defaults** (name/price/quotas/
- *    features/grant/trial/ord/active).
- * 3. **Retired plans are only deactivated.** `active = 0` + `ord`, never their
- *    entitlements or price — grandfathered tenants must keep exactly what they
- *    have. Nobody is migrated off a retired tier by this code.
- */
-async function applyPlanCatalog(db: D1Database): Promise<void> {
-  const stmts: D1PreparedStatement[] = [];
-  const insert = (p: Omit<PlanRow, "stripe_product_id" | "stripe_price_id">) =>
-    db
-      .prepare(
-        "INSERT OR IGNORE INTO plans (id, name, price_usd_month, entitlements_json, ord, active) VALUES (?, ?, ?, ?, ?, ?)",
-      )
-      .bind(p.id, p.name, p.price_usd_month, p.entitlements_json, p.ord, p.active);
+const store = bindBillingStore<Entitlements>({
+  entitlements: entitlementsEngine,
+  catalog: {
+    plans: DEFAULT_PLANS,
+    retired: GRANDFATHERED_PLANS,
+    packs: DEFAULT_PACKS,
+    version: PLAN_CATALOG_VERSION,
+  },
+  /**
+   * Every studio implicitly starts on the free plan, ACTIVE.
+   *
+   * Not `incomplete`: Kova's unpaid state is decided by `statusOf` reading the
+   * plan id, not by this status, and writing `incomplete` here would put a
+   * second, differently-shaped copy of that rule in the row itself.
+   */
+  defaultSubscription: { plan_id: "free", status: "active" },
+  /**
+   * Reading a studio's entitlements MATERIALISES its row. This has always been
+   * true here — `/api/context` is what creates the row for most studios — and
+   * changing it is not this move's call: something downstream may rely on the
+   * row existing, and finding that out in production is an outage, not a
+   * refactor.
+   */
+  materialiseOnRead: true,
+});
 
-  for (const p of DEFAULT_PLANS) {
-    stmts.push(insert(p));
-    // (1) price moved → drop the stale Stripe ids so the next Sync recreates them.
-    stmts.push(
-      db
-        .prepare(
-          "UPDATE plans SET stripe_product_id = NULL, stripe_price_id = NULL WHERE id = ? AND (price_usd_month IS NULL OR price_usd_month <> ?) AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)",
-        )
-        .bind(p.id, p.price_usd_month),
-    );
-    // (2) reconcile the row to the ship defaults.
-    stmts.push(
-      db
-        .prepare("UPDATE plans SET name = ?, price_usd_month = ?, entitlements_json = ?, ord = ?, active = 1 WHERE id = ?")
-        .bind(p.name, p.price_usd_month, p.entitlements_json, p.ord, p.id),
-    );
-  }
-  for (const p of GRANDFATHERED_PLANS) {
-    stmts.push(insert(p));
-    // (3) retire it — nothing else. Entitlements and price stay as found.
-    stmts.push(db.prepare("UPDATE plans SET active = 0, ord = ? WHERE id = ?").bind(p.ord, p.id));
-  }
-  stmts.push(
-    ...DEFAULT_PACKS.map((p) =>
-      db
-        .prepare(
-          "INSERT OR IGNORE INTO credit_packs (id, name, credits, price_usd, ord, active) VALUES (?, ?, ?, ?, ?, ?)",
-        )
-        .bind(p.id, p.name, p.credits, p.price_usd, p.ord, p.active),
-    ),
-  );
-  await db.batch(stmts);
-}
+export const {
+  seedBilling,
+  listPlans,
+  listPacks,
+  getPlan,
+  tenantEntitlements,
+  hasFeature,
+  withinQuota,
+  appendLedger,
+} = store;
 
-/** Seed / migrate the billing catalog. The fast path is a single indexed lookup
- *  of the version stamp (same cost as the old `SELECT 1 FROM plans`), so the
- *  /api/context hot path doesn't re-attempt writes on every load. No
- *  module-level guard — that would skip seeding into fresh per-test storage. */
-export async function seedBilling(db: D1Database): Promise<void> {
-  const stamp = await db
-    .prepare("SELECT value FROM app_config WHERE key = ?")
-    .bind(PLAN_CATALOG_KEY)
-    .first<{ value: string }>()
-    .catch(() => null);
-  if (stamp?.value === PLAN_CATALOG_VERSION) return;
-  try {
-    await applyPlanCatalog(db);
-  } catch {
-    // A transient failure must NOT stamp the version, or the migration is
-    // skipped forever and the catalog stays half-applied. Leave it unstamped so
-    // the next call retries; every statement is idempotent.
-    return;
-  }
-  await setConfig(db, PLAN_CATALOG_KEY, PLAN_CATALOG_VERSION).catch(() => undefined);
-}
-
-/** The plans a tenant may CHOOSE — active only, so retired tiers are never
- *  offered to anyone new. Backs `GET /billing`'s picker, `check-downgrade`,
- *  `checkout-plan` and `plan-intent`. A grandfathered tenant's own plan is
- *  resolved by id (`getPlan` / `tenantEntitlements`), not through this. */
-export async function listPlans(db: D1Database): Promise<PlanRow[]> {
-  const r = await db.prepare("SELECT * FROM plans WHERE active = 1 ORDER BY ord").all<PlanRow>();
-  return r.results ?? [];
-}
-
-/** Any plan by id, active or grandfathered. Use this — never `listPlans` — when
- *  resolving a plan a tenant is ALREADY on, or an admin comp/support action; a
- *  tenant sitting on a retired tier must not become unresolvable. */
-export async function getPlan(db: D1Database, planId: string): Promise<PlanRow | null> {
-  return db.prepare("SELECT * FROM plans WHERE id = ?").bind(planId).first<PlanRow>();
-}
-
-export async function listPacks(db: D1Database): Promise<PackRow[]> {
-  const r = await db.prepare("SELECT * FROM credit_packs WHERE active = 1 ORDER BY ord").all<PackRow>();
-  return r.results ?? [];
-}
-
-export async function getSubscription(db: D1Database, tenantId: string): Promise<SubscriptionRow> {
-  const row = await db
-    .prepare("SELECT * FROM subscriptions WHERE tenant_id = ?")
-    .bind(tenantId)
-    .first<SubscriptionRow>();
-  if (row) return row;
-  // Every tenant implicitly starts on the free plan.
-  const fresh: SubscriptionRow = {
-    tenant_id: tenantId,
-    plan_id: "free",
-    status: "active",
-    comp: 0,
-    stripe_customer_id: null,
-    stripe_sub_id: null,
-    pending_plan_id: null,
-    current_period_end: null,
-    past_due_at: null,
-    suspend_at: null,
-    delete_at: null,
-    overrides_json: null,
-  };
-  await db
-    .prepare(
-      "INSERT OR IGNORE INTO subscriptions (tenant_id, plan_id, status, comp, updated_at) VALUES (?, 'free', 'active', 0, ?)",
-    )
-    .bind(tenantId, nowIso())
-    .run()
-    .catch(() => undefined);
-  return fresh;
-}
-
-/** Resolve a tenant's effective entitlements: plan blob + per-tenant overrides,
- *  then CLAMPED by subscription status — a suspended/canceled/unpaid tenant
- *  falls back to free (see `clampEntitlementsForStatus`). This clamp is the one
- *  place delinquency bites: every `hasFeature`/`withinQuota` gate and the
- *  client-flag intersection resolve through here, so the passthrough is total. */
-export async function tenantEntitlements(db: D1Database, tenantId: string): Promise<Entitlements> {
-  const sub = await getSubscription(db, tenantId);
-  const plan = await db
-    .prepare("SELECT entitlements_json FROM plans WHERE id = ?")
-    .bind(sub.plan_id)
-    .first<{ entitlements_json: string | null }>();
-  const resolved = mergeOverrides(resolveEntitlements(plan?.entitlements_json), sub.overrides_json);
-  return clampEntitlementsForStatus(resolved, sub.status);
-}
-
-/** True when the tenant's plan (or a gift) includes `feature`. The single gate
- *  helper every capability route calls — keeps the 403 shape uniform. */
-export async function hasFeature(
-  db: D1Database,
-  tenantId: string,
-  feature: keyof Entitlements["features"],
-): Promise<boolean> {
-  const ent = await tenantEntitlements(db, tenantId);
-  return ent.features[feature];
-}
-
-/** Count of a tenant's usage against a quota ceiling. `-1` ceilings are
- *  unlimited; returns whether ONE MORE of `resource` is allowed.
- *
- *  Note what this deliberately does NOT do: it never looks at rows that already
- *  exist. Every call site (`POST /clients`, the self-signup pending-client
- *  reserve in `otp-guard.ts`, staff invite/accept in `auth.ts`, template create
- *  in `plan-routes.ts`) consults it only on a CREATE. So a tenant left over a
- *  lowered ceiling — e.g. an existing `solo` tenant holding 25 clients after the
- *  v2 catalog cut `solo.activeClients` to 1 — keeps every client fully readable
- *  and writable; they simply cannot add another until they upgrade or archive.
- *  Nothing archives, hides or bricks over-quota rows, and no path re-checks a
- *  ceiling retroactively. Verified by `plan-catalog.test.ts`. */
-export async function withinQuota(
-  db: D1Database,
-  tenantId: string,
-  quota: keyof Entitlements["quotas"],
-  currentCount: number,
-): Promise<{ ok: boolean; max: number }> {
-  const ent = await tenantEntitlements(db, tenantId);
-  const max = ent.quotas[quota];
-  if (max < 0) return { ok: true, max }; // unlimited
-  return { ok: currentCount < max, max };
-}
-
-/** Append-only D1 mirror of the DO ledger (invoices/history). */
-export async function appendLedger(
-  db: D1Database,
-  entry: { tenant_id: string; delta: number; balance: number; reason: string; ref: string | null },
-): Promise<void> {
-  await db
-    .prepare(
-      "INSERT INTO credit_ledger (id, tenant_id, delta, balance, reason, ref, at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    )
-    .bind(newId("led"), entry.tenant_id, entry.delta, entry.balance, entry.reason, entry.ref, nowMs())
-    .run();
-}
+/** Always resolves — a studio with no row is stamped onto `free` and returned. */
+export const getSubscription = store.ensureSubscription;
 
 // `app_config` is core's table (the schema runner bootstraps it), so its
 // accessors live there. Re-exported from here because ~20 call sites import them

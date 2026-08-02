@@ -164,6 +164,15 @@ export const SUSPENDED_STATUSES: ReadonlySet<string> = new Set(["suspended", "ca
  *  merge below fail closed on an unknown key. */
 const engine = bindEntitlements<Entitlements>(FREE_ENTITLEMENTS, { suspendedStatuses: SUSPENDED_STATUSES });
 
+/**
+ * The bound engine itself, for `@4dl/billing`'s catalog store.
+ *
+ * The five named wrappers below stay — they read better at a call site and every
+ * one of them is used — but the store needs the engine as a VALUE, because it is
+ * generic over an app's entitlement shape and cannot import Kova's.
+ */
+export const entitlementsEngine = engine;
+
 /** Clamp resolved entitlements down to free when the status suspends service. */
 export const clampEntitlementsForStatus = (resolved: Entitlements, status: string): Entitlements =>
   engine.clamp(resolved, status);

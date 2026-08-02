@@ -152,6 +152,40 @@ reads it moves.
 
 This is the single largest remaining duplication on the server.
 
+**DONE (2026-08-02).** `bindBillingStore` in `@4dl/billing/store.ts`. The apps'
+two files went 817 → 490 lines, and what is left in them is almost entirely the
+catalog data and the comments explaining why each tier is priced as it is —
+which is what should have been there all along.
+
+Two seams, and both exist because the apps genuinely differ rather than to be
+configurable. `defaultSubscription` is `free`/`active` in one and
+`free`/`incomplete` in the other, because the second's gate needs "never chose a
+plan" apart from "cancelled". `materialiseOnRead` says whether resolving
+entitlements for a tenant with no row WRITES one — one app has always done that
+from its `/api/context` hot path, the other writes it once at tenant creation.
+Dropping the write would be tidier and was explicitly not this move's call.
+
+Two things the move settled that reading either file alone could not:
+
+- **A failed read was being laundered into "no plan" in one app.** `getPlan` and
+  `getSubscription` caught D1 errors into `null` in Tessa and propagated in Kova.
+  `null` resolves to the free baseline, so the catching version silently
+  downgrades a PAYING tenant during a D1 blip and shows them the
+  finish-setting-up gate. Both propagate now; "the database was briefly
+  unavailable" and "you have not bought anything" must not be the same answer on
+  the money path.
+- **`active` was hard-coded to 1 in the reconcile.** Harmless in the app it was
+  written for — every row in that list is active — and wrong for the other, whose
+  parking state sits in the same list at `active: 0`. It is bound from the seed
+  now, and Tessa's `free` moved to the `retired` list where "insert it, hold it
+  inactive, never reconcile it" is what actually happens.
+
+`packages/billing/test/store.test.ts` is 18 tests against a recording fake D1.
+It exists for the three rules that are invisible from outside a route: the
+price-change Stripe-id null-out (miss it and a repriced plan charges the old
+amount forever, with no error anywhere), retired plans being deactivated and
+nothing else, and a failed read never becoming an answer.
+
 ### Staff and members — two route trees over the same Better Auth tables
 
 ```
@@ -292,8 +326,9 @@ Ranked by (breakage prevented) ÷ (risk of the move):
    and it stops the divergence everything else on this list is an example of.
 2. ~~**The notification surface.**~~ **DONE** — closed a live dead-capability,
    and the DO name was already permanent.
-3. **`billing-store` into `@4dl/billing`.** Largest prize, highest care — it is
-   the money path, and the catalog/store split has to be drawn precisely.
+3. ~~**`billing-store` into `@4dl/billing`.**~~ **DONE** — largest prize, highest
+   care. It is the money path, and the catalog/store split had to be drawn
+   precisely.
 4. **Staff/members into `@4dl/auth`.** Take Tessa's shape (it has invitations),
    give Kova the flow it lacks.
 5. **The five generic surfaces**, cheapest first: `tenant-close` (an invariant

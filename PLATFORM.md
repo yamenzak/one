@@ -30,7 +30,7 @@ It typechecks and its tests pass in this workspace, so it cannot rot.
 | [`@4dl/core`](packages/core/README.md) | ids, defensive JSON, the **bindings contract**, the **composed schema runner**, the boundary checker | its `SchemaModule`s |
 | [`@4dl/tenancy`](packages/tenancy/README.md) | the five doors, host→tenant + KV cache, custom domains (CF for SaaS + DCV), the standing/gate model, the deployment-wide maintenance switch | root domain, reserved labels, `statusOf` |
 | [`@4dl/auth`](packages/auth/README.md) | passwordless identity (OTP + passkeys), the request identity, the **five-gate route guard**, the grant algebra, staff seats, step-up codes | the RBAC registry, the route table, brand, seat quota |
-| [`@4dl/billing`](packages/billing/README.md) | the entitlement engine, credit metering, `CreditLedgerDO`, the Stripe client, the dunning ladder | quota + feature keys, the plan catalog |
+| [`@4dl/billing`](packages/billing/README.md) | the entitlement engine, the catalog STORE (seeding, plan/pack reads, quota + feature gates), credit metering, `CreditLedgerDO`, the Stripe client, the dunning ladder | quota + feature keys, and the catalog's CONTENTS |
 | [`@4dl/commerce`](packages/commerce/README.md) | what a tenant sells its own customers: budgets (queue, never sum), the customer-lapse ladder, discount codes | the scope list, the lapse copy |
 | [`@4dl/ai`](packages/ai/README.md) | the metered path: reserve → run → settle, the model catalog, pricing parsers, the dev-only mock lane | the feature registry (prompts), where images go |
 | [`@4dl/storage`](packages/storage/README.md) | R2 + the media ledger + the quota gate | the quota resolver (or nothing) |

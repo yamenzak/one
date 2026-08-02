@@ -23,7 +23,7 @@ import { env, SELF } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ensureSchema } from "../src/db.js";
 import type { TenantBillingDO } from "../src/billing-do.js";
-import { DEFAULT_PACKS, DEFAULT_PLANS, seedBilling, tenantEntitlements, withinQuota } from "../src/billing-store.js";
+import { DEFAULT_PACKS, DEFAULT_PLANS, RETIRED_PLANS, seedBilling, tenantEntitlements, withinQuota } from "../src/billing-store.js";
 import { FREE } from "../src/entitlements.js";
 
 const db = () => env.DB as D1Database;
@@ -42,7 +42,10 @@ describe("the catalog", () => {
     await seedBilling(db());
 
     const plans = await db().prepare("SELECT id, name, price_usd_month, active FROM plans ORDER BY ord").all<{ id: string; name: string; price_usd_month: number; active: number }>();
-    expect(plans.results?.length).toBe(DEFAULT_PLANS.length);
+    // Both lists land as rows. `free` moved from DEFAULT_PLANS to RETIRED_PLANS
+    // when the store was extracted — same row, same values, but declared where
+    // "insert it, hold it inactive, never reconcile it again" is what happens.
+    expect(plans.results?.length).toBe(DEFAULT_PLANS.length + RETIRED_PLANS.length);
 
     // Exactly one plan is offered. `free` exists so a tenant already parked on
     // it still resolves, but it must never appear in a picker.

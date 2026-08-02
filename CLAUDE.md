@@ -66,9 +66,11 @@ packages/
              # customers: budgets (queue, never sum), the customer-lapse ladder,
              # website-native discount codes. See its README.
   billing/   # @4dl/billing — the entitlement ENGINE (quotas/gates/grants, keys
-             # injected), credit metering, the per-tenant credit Durable Object
-             # (CreditLedgerDO — the class NAME is load-bearing), the Stripe
-             # client, and the dunning ladder. See its README.
+             # injected), the catalog STORE (version-stamped seeding, plan/pack
+             # reads, subscription resolution, the two ceilings — the catalog's
+             # CONTENTS are the app's), credit metering, the per-tenant credit
+             # Durable Object (CreditLedgerDO — the class NAME is load-bearing),
+             # the Stripe client, and the dunning ladder. See its README.
   storage/   # @4dl/storage — R2 + the media ledger + the quota gate (resolver
              # injected, so it does not depend on billing). See its README.
   email/     # @4dl/email — transactional mail: the provider decision, the MIME
@@ -446,9 +448,9 @@ handlers are woven through Kova's notification registry, entitlement gates and
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
 moves. Measured 2026-08-02, per package: **539 kova/api + 197 kova/domain +
 140 tessa/api + 87 tessa/domain + 85 tenancy + 70 kova/app + 54 commerce +
-48 ai + 47 ui + 35 billing-rail + 27 billing + 24 notify + 17 template +
+48 ai + 47 ui + 45 billing + 35 billing-rail + 24 notify + 17 template +
 14 core + 14 purge + 13 tessa/app + 12 auth + 7 protocol + 7 i18n + 3 admin +
-3 app-kit + 3 storage + 3 email** (1,449 total, 31 skipped). The older figure
+3 app-kit + 3 storage + 3 email** (1,467 total, 31 skipped). The older figure
 quoted here counted Kova and the packages only — Tessa's 240 were never in it.
 The ui count DROPPED and the kova/app count rose by the same shape: Stage 0b
 moved Kova's eleven accent tones — and the contrast tests that guard them — out
