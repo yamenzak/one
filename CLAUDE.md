@@ -60,7 +60,9 @@ packages/
              # mock lane, pricing parsers. Prompts are the app's. See its README.
   auth/      # @4dl/auth — PASSWORDLESS identity + authorization: the Better Auth
              # factory (email OTP + passkeys, org = tenant), the request identity,
-             # the five-gate route-guard ENGINE, the grant algebra, staff seats,
+             # the five-gate route-guard ENGINE, the grant algebra, staff seats +
+             # the staff ROUTES (roster with pending invitations, invite, revoke,
+             # re-role, remove — roles, copy and the invite email injected),
              # step-up codes. Nothing here depends on billing. See its README.
   commerce/  # @4dl/commerce — the ACCESS ECONOMY a tenant sells to its own
              # customers: budgets (queue, never sum), the customer-lapse ladder,
@@ -446,11 +448,11 @@ handlers are woven through Kova's notification registry, entitlement gates and
 `requireClientAccess`. Only the reconciliation logic moved.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured 2026-08-02, per package: **539 kova/api + 197 kova/domain +
+moves. Measured 2026-08-02, per package: **548 kova/api + 197 kova/domain +
 140 tessa/api + 87 tessa/domain + 85 tenancy + 70 kova/app + 54 commerce +
 48 ai + 47 ui + 45 billing + 35 billing-rail + 24 notify + 17 template +
 14 core + 14 purge + 13 tessa/app + 12 auth + 7 protocol + 7 i18n + 3 admin +
-3 app-kit + 3 storage + 3 email** (1,467 total, 31 skipped). The older figure
+3 app-kit + 3 storage + 3 email** (1,476 total, 31 skipped). The older figure
 quoted here counted Kova and the packages only — Tessa's 240 were never in it.
 The ui count DROPPED and the kova/app count rose by the same shape: Stage 0b
 moved Kova's eleven accent tones — and the contrast tests that guard them — out

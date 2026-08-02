@@ -1,39 +1,53 @@
 /**
- * Staff management — roster, role changes, custom permission grants, invite.
+ * Staff management — roster, PENDING INVITATIONS, role changes, removal, and
+ * custom permission grants.
  *
- * Both mutating paths here can be refused by the plan's `staffSeats` ceiling —
- * inviting reserves a seat, promoting a client-role member to staff claims one —
- * and the server's message names the fix ("free a seat or upgrade"). Show it
- * verbatim: a bare "Invite failed" hides a billing decision behind a shrug.
+ * `/api/staff` is `@4dl/auth`'s, so the seat arithmetic, the guards and the
+ * shape all come from one place. Three things on this screen did not exist
+ * before that: a pending invitation was invisible (the old roster read joined
+ * `member` alone), there was no way to revoke one, and no way to remove a
+ * member at all. An invite to a mistyped address was permanent until it expired.
+ *
+ * The seat counters come from the SERVER now rather than being derived here.
+ * The derived version could not see pending invitations, so it reported a free
+ * seat that the invite button would then refuse — the exact number a coach uses
+ * to decide whether to upgrade.
+ *
+ * Every mutating path can be refused by the plan's `staffSeats` ceiling, and the
+ * server's message names the fix. Show it verbatim: a bare "Invite failed" hides
+ * a billing decision behind a shrug.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { PERMISSION_CATALOG } from "@kova/domain";
-import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, Plus, Group, Row, Anchor, CountUp } from "@4dl/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, UserMinus, Plus, Group, Row, Anchor, CountUp } from "@4dl/ui";
 import { personaLabel, personaTone } from "../../registry/index.js";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useCan } from "../../FeatureLock.js";
 
 interface Member { userId: string; role: string; name: string | null; email: string | null; customGrant?: Record<string, string[]> | null }
+interface Invitation { id: string; email: string; role: string; expiresAt: string }
+interface Seats { used: number; pending: number; max: number; remaining: number }
+interface StaffPayload { members: Member[]; invitations: Invitation[]; seats: Seats; canManage: boolean }
 // Labels + tones read from the persona registry — `trainer` shows as "Coach".
 const roleOption = (value: string) => ({ value, label: personaLabel(value) });
 
 export function Staff() {
   const { ctx } = useSession();
-  const [members, setMembers] = useState<Member[] | null>(null);
+  const [data, setData] = useState<StaffPayload | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"trainer" | "assistant">("trainer");
   const [msg, setMsg] = useState<string | null>(null);
   const [permMember, setPermMember] = useState<Member | null>(null);
   const [pendingRole, setPendingRole] = useState<{ member: Member; role: string } | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<Member | null>(null);
 
   // The assistant SEAT is half of what `frontDesk` sells (SPEC §5), so a studio
   // without it should not be offered the role. `sessions` is the registry's
-  // frontDesk spec. NB this is currently the UI half only — the promotion route
-  // is still ungated (see the AUDIT FINDING in member-routes.ts), so this stops
-  // the studio walking into a role it wasn't sold, not a determined caller.
+  // frontDesk spec. This is the UI half; the server's `checkRole` closes the
+  // INVITE and the PROMOTION alike, so this only saves a coach the round trip.
   // Members already holding it stay listed and selectable (a grandfathered
   // assistant must remain demotable).
   const canAssistant = useCan("sessions");
@@ -42,27 +56,45 @@ export function Staff() {
       .filter((r) => r !== "assistant" || canAssistant || current === "assistant")
       .map(roleOption);
 
-  const load = useCallback(async () => setMembers((await api.get<{ members: Member[] }>("/api/members")).members), []);
+  const load = useCallback(async () => setData(await api.get<StaffPayload>("/api/staff")), []);
   useEffect(() => void load(), [load]);
+  const members = data?.members ?? null;
 
   // The seat ceiling was invisible until an invite bounced off it. It is the one
   // number on this tab a coach acts on — "can I add someone, or do I need to
-  // upgrade first" — so it is the anchor (§1). Both halves are already in hand:
-  // the roster is this screen's own read, and the quota rides on the session
-  // context, so this costs no request.
-  const seatCap = ctx?.entitlements?.quotas?.staffSeats ?? null;
-  const seatsUsed = members ? members.filter((m) => m.role !== "client").length : null;
-  const seatsLeft = seatCap != null && seatsUsed != null ? Math.max(0, seatCap - seatsUsed) : null;
+  // upgrade first" — so it is the anchor (§1).
+  //
+  // Counted on the SERVER, because a pending invitation HOLDS a seat and this
+  // screen cannot know that from the roster. Deriving it here reported a free
+  // seat the invite button would then refuse.
+  const seatCap = data ? (data.seats.max < 0 ? null : data.seats.max) : null;
+  const seatsUsed = data ? data.seats.used : null;
+  const seatsPending = data?.seats.pending ?? 0;
+  const seatsLeft = data ? (data.seats.max < 0 ? null : data.seats.remaining) : null;
 
   const [busy, setBusy] = useState(false);
   const changeRole = async (userId: string, newRole: string) => {
     setBusy(true);
     setMsg(null);
-    try { await api.patch(`/api/members/${userId}/role`, { role: newRole }); await load(); }
+    try { await api.patch(`/api/staff/${userId}/role`, { role: newRole }); await load(); }
     catch (e) {
       // The seat-ceiling 403 and the last-owner 409 both carry usable copy.
       setMsg(e instanceof Error && e.message.includes("last owner") ? "Can't demote the last owner." : errorText(e, "Couldn't change role."));
     }
+    finally { setBusy(false); }
+  };
+  const removeMember = async (userId: string) => {
+    setBusy(true);
+    setMsg(null);
+    try { await api.del(`/api/staff/${userId}`); await load(); }
+    catch (e) { setMsg(errorText(e, "Couldn't remove them.")); }
+    finally { setBusy(false); }
+  };
+  const revokeInvite = async (id: string) => {
+    setBusy(true);
+    setMsg(null);
+    try { await api.del(`/api/staff/invitations/${id}`); await load(); }
+    catch (e) { setMsg(errorText(e, "Couldn't revoke that invitation.")); }
     finally { setBusy(false); }
   };
   const ROLE_LABEL = (r: string) => personaLabel(r);
@@ -70,7 +102,16 @@ export function Staff() {
   const invite = async () => {
     setBusy(true);
     setMsg(null);
-    try { await api.post("/api/auth/organization/invite-member", { email, role }); setMsg(`Invite sent to ${email}.`); setInviteOpen(false); setEmail(""); }
+    try {
+      const r = await api.post<{ emailed: boolean; emailError: string | null }>("/api/staff/invite", { email, role });
+      // A send failure does NOT lose the invitation — the row is the invitation
+      // and the link still works. Saying "sent" when it bounced is the lie; so
+      // is rolling it back and leaving nothing behind.
+      setMsg(r.emailed ? `Invite sent to ${email}.` : `Invitation created, but the email didn't send (${r.emailError ?? "unknown"}). You can resend it or share the link.`);
+      setInviteOpen(false);
+      setEmail("");
+      await load();
+    }
     catch (e) { setMsg(errorText(e, "Invite failed — check the email and try again.")); }
     finally { setBusy(false); }
   };
@@ -85,8 +126,8 @@ export function Staff() {
           eyebrow="Staff seats"
           className="pt-1"
           sub={seatCap == null ? (seatsUsed === 1 ? "person on the team" : "people on the team")
-            : seatsLeft === 0 ? `of ${seatCap} · none left`
-            : `of ${seatCap} · ${seatsLeft} left`}
+            : seatsLeft === 0 ? `of ${seatCap} · none left${seatsPending ? ` (${seatsPending} invited)` : ""}`
+            : `of ${seatCap} · ${seatsLeft} left${seatsPending ? ` (${seatsPending} invited)` : ""}`}
         >
           <CountUp value={seatsUsed} />
         </Anchor>
@@ -111,6 +152,9 @@ export function Staff() {
                 trailing={
                   <>
                     {m.role !== "owner" && <Button size="icon" variant="secondary" aria-label={`Permissions for ${m.name || m.email}`} onClick={() => setPermMember(m)}><ShieldCheck /></Button>}
+                    {m.userId !== myUserId && (
+                      <Button size="icon" variant="ghost" aria-label={`Remove ${m.name || m.email}`} disabled={busy} onClick={() => setPendingRemove(m)}><UserMinus /></Button>
+                    )}
                     {/* `Select` has no disabled prop, so gate the mutation itself on
                         `busy` — a second role change mid-flight would race the roster
                         reload and show a stale role. */}
@@ -126,6 +170,36 @@ export function Staff() {
               </Row>
             ))}
           </Group>
+          {/**
+            * PENDING INVITATIONS — invisible before this screen read `/api/staff`.
+            *
+            * Each one holds a seat, so a roster that omits them explains neither
+            * the seat count nor a refusal at the invite button. And an invite to
+            * a mistyped address was unrevokable: it simply sat there, holding a
+            * seat, until it expired.
+            */}
+          {data && data.invitations.length > 0 && (
+            <>
+              <SectionHeader icon={Mail} tone="nutrition" title="Invited" />
+              <Group>
+                {data.invitations.map((inv) => (
+                  <Row
+                    key={inv.id}
+                    leading={<Avatar name={inv.email} seed={inv.email} className="size-10" />}
+                    sub={`Invited as ${personaLabel(inv.role)} · expires ${new Date(inv.expiresAt).toLocaleDateString()}`}
+                    trailing={
+                      <Button size="sm" variant="ghost" disabled={busy} onClick={() => void revokeInvite(inv.id)}>Revoke</Button>
+                    }
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="truncate">{inv.email}</span>
+                      <Badge tone="warning">Pending</Badge>
+                    </span>
+                  </Row>
+                ))}
+              </Group>
+            </>
+          )}
           {/* At the ceiling the Invite button still works — the server's refusal
               names the fix — but a coach should not have to press it to find
               out. Now that the seat count is on screen, saying nothing here
@@ -161,6 +235,19 @@ export function Staff() {
         confirmLabel="Change role"
         destructive={pendingRole?.role === "client" || pendingRole?.role === "assistant"}
         onConfirm={() => { if (pendingRole) void changeRole(pendingRole.member.userId, pendingRole.role); }}
+      />
+      <ConfirmDialog
+        open={!!pendingRemove}
+        onOpenChange={(o) => !o && setPendingRemove(null)}
+        title="Remove from staff?"
+        description={
+          pendingRemove
+            ? `${pendingRemove.name || pendingRemove.email || "This person"} loses access to the studio immediately. Their history stays — anything they logged or wrote keeps their name on it.`
+            : undefined
+        }
+        confirmLabel="Remove"
+        destructive
+        onConfirm={() => { if (pendingRemove) void removeMember(pendingRemove.userId); }}
       />
     </Page>
   );

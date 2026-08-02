@@ -338,7 +338,7 @@ describe("staffSeats ceiling holds on every path that claims a seat", () => {
     void clientCookie;
 
     const promote = (role: string) =>
-      SELF.fetch(`${B}/api/members/${userId}/role`, { method: "PATCH", headers: J(owner), body: JSON.stringify({ role }) });
+      SELF.fetch(`${B}/api/staff/${userId}/role`, { method: "PATCH", headers: J(owner), body: JSON.stringify({ role }) });
 
     const denied = await promote("trainer");
     expect(denied.status).toBe(403);
@@ -387,7 +387,7 @@ describe("staffSeats ceiling holds on every path that claims a seat", () => {
       .bind("mbr_assist_client", tenantId, userId, "client", "2026-01-01")
       .run();
     const setRole = (role: string) =>
-      SELF.fetch(`${B}/api/members/${userId}/role`, { method: "PATCH", headers: J(owner), body: JSON.stringify({ role }) });
+      SELF.fetch(`${B}/api/staff/${userId}/role`, { method: "PATCH", headers: J(owner), body: JSON.stringify({ role }) });
     const invite = (role: string) =>
       SELF.fetch(`${B}/api/auth/organization/invite-member`, {
         method: "POST",

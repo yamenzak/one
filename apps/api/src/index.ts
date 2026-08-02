@@ -27,6 +27,7 @@ import { maintenanceRoutes } from "./maintenance.js";
 import { downgradeRoutes } from "./downgrade-routes.js";
 import { clientRoutes } from "./clients.js";
 import { memberRoutes } from "./member-routes.js";
+import { staffRoutes } from "./staff-routes.js";
 import { planRoutes } from "./plan-routes.js";
 import { planVariantRoutes } from "./plan-variants.js";
 import { attentionRoutes } from "./attention-routes.js";
@@ -137,6 +138,10 @@ app.route("/api", emailConfigRoutes);
 app.route("/api", maintenanceRoutes as unknown as Hono<AppEnv>);
 app.route("/api", clientRoutes);
 app.route("/api", memberRoutes);
+// The staff screen: the roster WITH pending invitations, invite, revoke,
+// re-role and remove. `memberRoutes` keeps the custom per-member grant, which
+// is Kova's alone.
+app.route("/api", staffRoutes);
 app.route("/api", planRoutes);
 app.route("/api", planVariantRoutes);
 app.route("/api", attentionRoutes);

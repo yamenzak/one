@@ -7,6 +7,7 @@ export * from "./otp-guard.js";
 export * from "./route-guard.js";
 export * from "./schema.js";
 export * from "./seats.js";
+export * from "./staff-routes.js";
 export * from "./route-deps.js";
 export * from "./turnstile.js";
 export * from "./turnstile-routes.js";

@@ -143,6 +143,14 @@ export function permissionFor(method: string, path: string): Record<string, stri
   // Members / staff management.
   if (path === "/api/members" && !isGet) return { member: ["create"] };
   if (path.startsWith("/api/members")) return { member: [read ? "read" : "update"] };
+  /**
+   * `@4dl/auth`'s staff routes. The outer wall proves you may SEE the roster —
+   * which is any member's business, since checking who holds a capability before
+   * a handover is not a privileged question. Every WRITE re-checks OWNER inside
+   * the route, because staff management is not a grant a studio can hand out:
+   * whoever can add staff can add themselves an owner.
+   */
+  if (path.startsWith("/api/staff")) return { member: ["read"] };
 
   // Reports.
   if (path.startsWith("/api/reports")) return { report: ["read"] };

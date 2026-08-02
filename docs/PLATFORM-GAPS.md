@@ -194,8 +194,25 @@ grep -oE '\.(get|post|patch|delete)\("[^"]+"' apps/api/src/member-routes.ts apps
 
 Kova: list, re-role, set-permissions. Tessa: list, **invite**, **revoke
 invitation**, re-role, remove. 429 lines, one job, and the two disagree about
-what the job includes — Tessa's is the more complete one, and Kova has no
-invitation flow at all.
+what the job includes.
+
+> ⚠️ **CORRECTION (2026-08-02).** This section first said "Kova has no invitation
+> flow at all". That is **wrong**, and the user caught it. Kova has had staff
+> invitations all along: `Staff.tsx` posts to Better Auth's
+> `organization/invite-member`, `auth.ts`'s `sendInvitation` delivers a branded
+> email on the studio's own rail, `beforeCreateInvitation` holds the seat
+> (counting pending, correctly), and `/api/context` auto-accepts a matching
+> invite as a belt-and-braces second path. None of that was missing.
+>
+> The real gap was narrower and entirely on the far side of *sending*: Kova could
+> not SEE a pending invitation (`GET /members` joins `member` alone), could not
+> REVOKE one, and could not remove a member at all. So an invite to a mistyped
+> address was invisible, held a seat, and stayed until it expired.
+>
+> The lesson is about this document, not about the code: "Tessa has routes Kova
+> does not" was read as "Kova cannot do the thing", and the two are not the same
+> — Kova reached the same capability through the auth plugin instead of through
+> its own route tree. An audit that greps for routes finds route-shaped answers.
 
 Worth naming plainly: I wrote Tessa's from scratch earlier in this same session,
 having read Kova's member routes days before. Knowing about the duplication is
@@ -203,6 +220,32 @@ not the same as being stopped from creating it.
 
 `@4dl/auth` already owns the seat quota, the three Better Auth seat hooks and
 the grant algebra. The routes belong with them, with the role catalog injected.
+
+**DONE (2026-08-02).** `staffRoutes` in `@4dl/auth`, taking Tessa's shape. The
+apps' halves went 499 → 291 lines, and what is left in each is its roles, its
+role copy, and its invitation email.
+
+Kova gains the three it lacked — pending invitations in the roster, revoke, and
+remove — plus server-side seat counters, so the screen stops deriving a number it
+could not compute (the derived version could not see pending invitations, and
+therefore reported a free seat that the invite button would refuse).
+
+Four seams, and each exists because the two apps genuinely differ:
+
+| seam | why |
+|---|---|
+| `assignableRoles` | Kova demotes to `client`, a valid re-role target that must never be invitable — a `client` membership from the staff invite is a member with no client record |
+| `checkRole` | `frontDesk` sells the assistant role. Returns a **Response**, not a message, so Kova hands over its existing `gateFeature` unchanged and the refusal body keeps naming the feature — that is what lets a client tell a plan refusal from a seat refusal, since both are 403 |
+| `claimsSeat` | Kova has a seat-free customer role, so only `client → staff` claims a seat. Tessa's roles are all seats, so the default is never |
+| `copy` | one calls its tenant a studio and the other a centre |
+
+Retiring Kova's own `PATCH /members/:userId/role` closed an escalation surface
+rather than just a duplicate: it was gated by `member:update`, a grant an owner
+can hand to staff, so it needed its own "only an actual owner may hand out the
+owner role" check. The shared route requires OWNER for every write, so that class
+of self-escalation is gone by construction. `/members` keeps the plain roster
+read (`ClientManage` picks a coach from it) and the custom per-member grant,
+which is a Kova permission feature and not a staff-management primitive.
 
 ### Five generic surfaces Kova has and Tessa simply does not
 
@@ -329,8 +372,9 @@ Ranked by (breakage prevented) ÷ (risk of the move):
 3. ~~**`billing-store` into `@4dl/billing`.**~~ **DONE** — largest prize, highest
    care. It is the money path, and the catalog/store split had to be drawn
    precisely.
-4. **Staff/members into `@4dl/auth`.** Take Tessa's shape (it has invitations),
-   give Kova the flow it lacks.
+4. ~~**Staff/members into `@4dl/auth`.**~~ **DONE** — took Tessa's shape, gave
+   Kova the three parts it lacked (see the correction above: it was never the
+   invitation itself).
 5. **The five generic surfaces**, cheapest first: `tenant-close` (an invariant
    is currently unenforceable), then account, sessions, step-up OTP, audit,
    media.

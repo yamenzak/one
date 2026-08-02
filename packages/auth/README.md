@@ -12,6 +12,7 @@ the rest coherent: there is no password to phish, reset, reuse or store, and
 | `route-guard.ts` | The five-gate outer wall. Route tables and the standing gate are injected. |
 | `grants.ts` | The permission algebra — sanitize, intersect, satisfy, resolve-bounded-by-role. |
 | `seats.ts` | Staff-seat accounting across all three doors that claim one. |
+| `staff-routes.ts` | The staff SCREEN's endpoints: roster + pending invitations + seat counters, invite, revoke, re-role, remove. Roles and copy injected. |
 | `otp-guard.ts` | The one gate in front of the sign-in code: human check → cooldown → per-source ceiling → eligibility → deliverability. |
 | `action-otp.ts` | Step-up confirmation codes for irreversible actions. |
 | `audit.ts` | The auth trail, which is also the rate limiter's store. |
@@ -105,3 +106,42 @@ the guard returned `no_studio` and `studio_read_only`. Error codes are the worst
 kind of leak, because they are a *contract*: every consuming app's client would
 have to match on a noun from a fitness product to detect "this tenant is behind
 on its bill". They are `no_tenant` and `tenant_read_only`.
+
+
+## `staff-routes.ts` — why these are ours and not Better Auth's
+
+The org plugin ships `invite-member`, `update-member-role` and `remove-member`,
+and using them is less code. Two reasons not to, and both are lockouts rather
+than preferences:
+
+1. **The tenant comes from the HOST, never from the session.** Better Auth
+   resolves the organization from `session.activeOrganizationId`, which
+   `better-auth.ts` stamps as the user's FIRST membership by `createdAt`. For
+   anyone in two tenants that is the wrong one — an owner standing on tenant-B's
+   subdomain could invite into tenant-A.
+2. **The guards it does not have.** Nothing in the plugin stops an owner demoting
+   the last owner, or changing their own role. Both lock a tenant out of its own
+   billing and settings, permanently, with a 200.
+
+ACCEPTANCE still goes through Better Auth, so `beforeAcceptInvitation` re-checks
+the seat at the moment it is actually claimed.
+
+**A pending invitation is a RESERVED seat.** `GET /staff` reports
+`{ used, pending, max, remaining }` and the invite counts pending against the
+ceiling. Without that a tenant with one seat left sends five invitations and four
+fail when a real person clicks accept — and a screen that derives the count from
+the roster cannot see them at all.
+
+**A failed send does NOT roll the invitation back.** The row *is* the invitation;
+the email is only how the link travelled. `sendInvite` returns the accept `url`
+and it is echoed in the response, so a misconfigured mailer leaves a manager a
+working link to hand over in person rather than a toast.
+
+### The four seams, and why each exists
+
+| seam | default | why an app overrides it |
+|---|---|---|
+| `assignableRoles` | `roleNames` | an app that demotes to a customer role needs a re-role target that is never invitable |
+| `checkRole` | none | a capability the plan sells has to close on the INVITE and the PROMOTION; gating one leaves the other. Returns a **Response**, so an app's existing entitlement gate is handed over unchanged and its body keeps naming the feature — otherwise a plan refusal and a seat refusal are both an opaque 403 |
+| `claimsSeat` | never | correct where every role is a staff seat: a sideways move consumes nothing, so a tenant on its ceiling can still reshuffle. An app with a seat-free customer role counts only customer → staff |
+| `copy` | English | one app's tenant is a studio, another's a centre, and one runs `@4dl/i18n` |
