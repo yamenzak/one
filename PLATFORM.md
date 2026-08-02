@@ -16,6 +16,13 @@ It typechecks and its tests pass in this workspace, so it cannot rot.
 
 ---
 
+> **Where the next extraction is.** [docs/PLATFORM-GAPS.md](docs/PLATFORM-GAPS.md)
+> is the two-app assessment: what is still an app's that should be here, measured
+> rather than guessed, with the commands to re-check every claim. Read it before
+> proposing a new package — most of what looks missing is already listed there,
+> and some of what looks extractable is argued against.
+
+
 ## The packages
 
 | Package | What it owns | What the APP supplies |
