@@ -57,14 +57,35 @@ four tables that nothing on earth reaches.
 This is the most expensive shape of the pattern, because a DO class name is
 permanent: it is already load-bearing for a feature that does not exist.
 
-`@4dl/notify` is 143 lines — the smallest package here — because the inbox
-*plumbing* moved and the *notification types*, the dispatch calls, the bell and
-the inbox screen all stayed in Kova (211 lines of `notify.ts` plus
-`NotificationBell`, `notif-ui`, and a conformance test).
+`@4dl/notify` is 143 lines — the smallest package here — and a closer look says
+why. **The model is not missing, it is in the wrong package**:
 
-**Extract:** the bell + inbox surface into `@4dl/app-kit` (it already owns
-`useInbox`), and the dispatch helper into `@4dl/notify` with the type registry
-injected — the same shape `@4dl/ai` uses for its feature registry.
+```
+wc -l packages/domain/src/notifications.ts   # 441 — in @kova/domain
+wc -l packages/notify/src/model.ts           #   1 — a re-export of the schema
+```
+
+`@kova/domain/notifications.ts` holds the channel algebra: `resolveChannels`
+(role × category → inbox/email), the stored-preference and tenant-policy
+parsers, the transactional set that never consults preferences. None of that is
+about coaching. What IS Kova's, in the same file, is the vocabulary the algebra
+runs on — thirteen categories named "Check-ins & feedback" and "Client
+activity", four roles, and the `NOTIF_TYPES` registry.
+
+So the split is the one `@4dl/ai` already uses, and the work is bigger than
+"move the bell":
+
+| moves to `@4dl/notify` | stays in the app |
+|---|---|
+| `resolveChannels`, prefs/policy parsing, the transactional set | `NOTIF_CATEGORIES`, `NOTIF_ROLES`, `NOTIF_TYPES` |
+| `notify()` / `notifyOwners()` dispatch, with the registry injected | the call sites |
+| the three `/notifications` routes + `/inbox/ws` | — |
+| the bell + inbox surface → `@4dl/app-kit` (it already owns `useInbox`) | per-type icons and labels |
+
+**~810 lines to work through**, and the D1 rows, the DO and the schema are
+already shared, so an app that adopts it inherits a working inbox rather than an
+empty one. That last part is the whole point: moving only the bell would give
+Tessa a box with nothing in it.
 
 ---
 
