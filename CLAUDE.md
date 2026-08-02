@@ -542,10 +542,18 @@ it (Platform admin → **Email delivery**, `@4dl/admin`'s panel over
 could: reaching it needs a platform-admin session, which needs an OTP, which
 needs email. **Provisioning now seeds those rows** (`ON CONFLICT DO NOTHING`,
 sender `noreply@4dl.app`), which is what breaks it — a workflow with database
-access can do what a screen behind a login cannot. Seeding the row is not the
-same as being able to send: the address still has to be **verified** in
-Cloudflare → Email → Email Sending, which is per-zone and done once for the whole
-platform. The vision suite is still dead until `google.gemini_key` is set
+access can do what a screen behind a login cannot.
+
+**`noreply@4dl.app` is verified and DELIVERING — this is done, do not raise it
+again.** The owner of `4dl.app` confirmed it on 2026-08-02 by receiving a Tessa
+sign-in OTP at the address, which exercises the whole path end to end: the seeded
+`app_config` rows, the Cloudflare Email Sending sender, and DNS on the zone.
+Verification is per-zone and was done once for the whole platform, so every app
+here inherits a working sender — that is the entire reason the address is shared
+rather than per-app. The steps in DEPLOY.md §6 remain correct for a NEW zone;
+they are not outstanding work on this one.
+
+The vision suite is still dead until `google.gemini_key` is set
 (Platform admin → AI).
 
 See SPEC §13 for the phase map.
