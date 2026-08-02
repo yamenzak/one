@@ -340,9 +340,18 @@ plumbing that took Kova months already exists.
 price makes the customer ration access to a safety system, which is the wrong
 incentive and an easy objection to lose on.
 
-Tiers by number of sites and catalog size, with AI credits on top. The
-sterilisation module is a feature flag: a centre that outsources reprocessing
-does not pay for CSSD.
+**Shipped as ONE plan, not a ladder.** A practice with three treatment rooms and
+one with eight run the same loop, receive the same stock and answer to the same
+regulator — so a tier ladder would make a clinic choose by counting rooms, and
+re-choose every time it opened one. Instead: one plan sized so nobody meets a
+ceiling doing ordinary work, with **AI credits as the axis that scales with
+use**, which is the honest one. `catalogItems` is deliberately unlimited; a
+ceiling there would make a centre choose which instruments to track, defeating
+the trace the product exists to produce.
+
+A sterilisation feature flag is still available in the entitlement registry if a
+centre that outsources reprocessing ever asks not to pay for CSSD — but nothing
+sells it today, and an unsold flag is inert by construction.
 
 ---
 
@@ -474,22 +483,53 @@ editing it.
   mutation — reverting the `isPersonal` fix or dropping the unreachable tray each
   fails a spec.
 
-**Not built:** no AI surfaces — the vision paths of §5 Phase 4 are untouched, and
-Rule 3's `suggested_*` shape has nothing writing into it. No par levels, no
-expiry sweep, no reorder. No offline lane (Phase 3): the app has no service
-worker, deliberately, because caching a shell before the offline WRITE path
-exists would fail every mutation the moment it was used without signal. **No
-billing** — Tessa has no Stripe rail at all; every centre sits on the default
-entitlements (see `apps/tessa/DEPLOY.md` §4).
+- **Billing** (§6.2). ONE paid plan, `practice`, at $39/month with a 14-day
+  trial and a 2,000-credit monthly grant, plus three credit packs. `free` is the
+  PARKING STATE of a centre that has not chosen, not a tier anyone is sold.
+  Stripe rides the shared `@4dl/billing-rail` under `metadata.app = "tessa"`;
+  the webhook is at `/api/webhooks/stripe`, which the route guard already exempts
+  in the four places a provider callback has to survive. `dailySweep` drives the
+  ladder — past_due → 7d read-only → 30d blocked → 37d purged — and reads are
+  never gated at any rung, because withholding a centre's sterilisation records
+  over an invoice puts a recall out of reach of the people who have to run it.
+- **The four AI surfaces** (§5 Phase 4 opened). `read-label` (photo → GTIN, lot,
+  expiry, when the barcode will not scan), `reorder-advisor`, `recall-report`
+  and `read-document`, on Workers AI + Gemini through `@4dl/ai`'s metered
+  reserve → run → settle. Three gates before a credit is spent: the plan, a
+  per-feature switch in Practice Settings, and the `ai:use` grant.
+  **None of them writes a record.** `read-label` fills a form a person confirms;
+  the narratives are drafts a named person signs. That is Rule 3 and MPBetreibV,
+  not caution about model quality.
+- **Practice Settings + the operator console.** Branding (accent, logo, sign-in
+  copy), the assistant switches, plan and credits; and `admin.tessa.4dl.app` now
+  renders the console rather than "no centre at this address".
+
+**Not built:** Rule 3's `suggested_*` shape still has nothing writing into it —
+the label reader returns fields to a form rather than a suggestion row. No
+expiry sweep. No offline lane (Phase 3): the app has no service worker,
+deliberately, because caching a shell before the offline WRITE path exists would
+fail every mutation the moment it was used without signal.
 
 **Two honest gaps in the translation.** `@4dl/ui`'s own strings — "Couldn't load
 …", "Try again", the date formats — are English and are NOT covered: translating
 the design system is a separate piece of work that affects Kova too. And nothing
 yet sets a centre's DEFAULT locale; the browser decides, and a person overrides.
 
-**Never deployed.** `apps/tessa/DEPLOY.md` is written and every resource id in
-`wrangler.jsonc` is still a placeholder. Data residency (§7.1) is unanswered and
-is the one open item that could change the architecture rather than the config.
+**Provisioned, not yet reachable.** The D1/KV/R2 exist and their real ids are
+committed; `deploy.yml` ships the worker on every push to `main`. What is left is
+two dashboard steps nobody can automate: the `<root>/*` and `*.<root>/*` routes,
+and verifying `noreply@4dl.app` under Cloudflare → Email → Email Sending (done
+once for the whole platform — if Kova can send, so can Tessa). The Gemini key is
+also unset, so `read-label` is the one assistant that cannot run yet; the
+operator console says so on its AI panel rather than failing as "unavailable".
 
-Next: a native reader over the German, then either the AI vision surfaces or the
-offline lane.
+Data residency (§7.1) is unanswered and is the one open item that could change
+the architecture rather than the config.
+
+**The $39 price is a starting position, not a finding.** Something had to be set
+for the catalog to exist; it is defensible against what the product replaces (a
+paper Freigabe log and a spreadsheet) and it is admin-editable at runtime. The
+credit GRANT is derived rather than guessed — see the per-action cost table in
+`apps/tessa/src/billing-store.ts`.
+
+Next: a native reader over the German, then the offline lane.

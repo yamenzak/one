@@ -89,15 +89,30 @@ the *deployed* config; `ENVIRONMENT=development` there would put sign-in OTPs in
 retained logs, accept the repo-public auth-secret fallback, and enable the dev
 platform-admin convenience. It belongs in `.dev.vars`, which is gitignored.
 
-## 4. What Tessa does NOT need that Kova does
+## 4. Stripe and the Gemini key
 
-- **No Stripe.** Tessa has no billing rail wired: no plans, no catalog sync, no
-  webhook. `@4dl/billing`'s entitlement engine is present through the template
-  scaffolding and every tenant sits on the default. Charging for Tessa is a
-  future piece of work, and it is worth knowing it is *absent* rather than
-  *configured and free* — see `entitlements.ts`.
-- **No Gemini key.** No AI surface exists yet (TESSA.md §5 Phase 4). The `ai`
-  binding is declared and unused.
+Both are configured from the operator console (`admin.<root>`), not from a file.
+
+- **Stripe.** Paste the keys under **Stripe**, then press **Sync catalog** — that
+  creates the Stripe product and price for the one plan (`practice`) and the
+  three credit packs. Until it runs, `/billing` reports `synced: false` and
+  checkout refuses with `409 plan not synced` rather than charging against a
+  price that does not exist. Point the Stripe webhook at
+  `https://<root>/api/webhooks/stripe`.
+  - The webhook is on the SHARED rail: one Stripe account serves every 4DL app,
+    and Tessa's events are attributed by `metadata.app = "tessa"`. An event the
+    rail cannot attribute is parked in `rail_parked_events`, never answered
+    `200` with its id claimed — that shape is money captured and nothing granted,
+    because Stripe does not retry a 200.
+  - Nothing is gated on Stripe being configured. A deployment with no payment
+    rail is a legitimate configuration (a self-host, the test suite): the plan
+    picker reports `payable: false` and the app serves the free baseline rather
+    than stranding every centre over our misconfiguration.
+- **The Gemini key.** Set it under **AI**. Without it the vision model is
+  unreachable, so **"Read a label" fails as unavailable** on a deployment that
+  otherwise looks completely healthy. The AI panel shows `missing` in red for
+  exactly this reason. The other three assistants run on Workers AI and need no
+  key.
 
 ## 5. Data residency — read before promising anything
 
