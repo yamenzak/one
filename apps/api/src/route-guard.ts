@@ -260,12 +260,18 @@ function allowedWhileReadOnly(path: string): boolean {
     // A person may always leave, and always take their data with them, whatever
     // the studio owes. `/api/me/` covers a client deleting their own account.
     path.startsWith("/api/me/") ||
-    path.startsWith("/api/tenant/close") ||
     // …and this covers the OWNER closing the studio. It was missing, which made
     // a suspended studio a trap: every write refused, the copy saying "pay to
     // restore", and no way to shut the thing down and end the relationship
     // instead. Paying must be A way out, not the ONLY way out.
-    path.startsWith("/api/inbox/")
+    path.startsWith("/api/tenant/close") ||
+    // The inbox is PERSONAL, and both halves of it belong here. The header above
+    // has claimed "notification read-receipts" since this function was written;
+    // only the socket was actually listed, so a suspended studio's bell filled
+    // up with a badge nobody could clear for seven days. Both writes are scoped
+    // to `recipient_user_id`, so neither can touch the studio's data.
+    path.startsWith("/api/inbox/") ||
+    path.startsWith("/api/notifications/")
   );
 }
 

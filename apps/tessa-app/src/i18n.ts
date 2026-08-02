@@ -70,6 +70,22 @@ export const en = {
   "shell.settings": "Settings",
   "shell.signOut": "Sign out",
 
+  // ── Notifications ────────────────────────────────────────────────────────
+  // The strings `@4dl/app-kit`'s bell and inbox render. The kit defaults to
+  // English; passing these is what makes the German half of the app complete.
+  "notif.title": "Notifications",
+  "notif.markAll": "Mark all read",
+  "notif.seeAll": "See all",
+  "notif.empty": "You're all caught up.",
+  "notif.emptyHint": "Failed loads, releases and recalls show up here.",
+  "notif.offline": "You're offline — notifications will update when you reconnect.",
+  "notif.failed": "Couldn't load notifications. We'll keep trying.",
+  "notif.errorTitle": "Couldn't load notifications",
+  "notif.errorBody": "Something went wrong fetching your inbox. Check your connection and try again.",
+  "notif.retry": "Try again",
+  "notif.today": "Today",
+  "notif.yesterday": "Yesterday",
+
   // ── Today ────────────────────────────────────────────────────────────────
   "today.scan.sub": "Receive, use, open",
   "today.awaiting": "Awaiting release",
@@ -440,6 +456,20 @@ export const de: Translation<TessaDict> = {
   "shell.account": "Konto",
   "shell.settings": "Einstellungen",
   "shell.signOut": "Abmelden",
+
+  // ── Benachrichtigungen ───────────────────────────────────────────────────
+  "notif.title": "Benachrichtigungen",
+  "notif.markAll": "Alle als gelesen markieren",
+  "notif.seeAll": "Alle anzeigen",
+  "notif.empty": "Nichts Neues.",
+  "notif.emptyHint": "Fehlgeschlagene Chargen, Freigaben und Rückrufe erscheinen hier.",
+  "notif.offline": "Du bist offline — Benachrichtigungen werden aktualisiert, sobald du wieder verbunden bist.",
+  "notif.failed": "Benachrichtigungen konnten nicht geladen werden. Wir versuchen es weiter.",
+  "notif.errorTitle": "Benachrichtigungen konnten nicht geladen werden",
+  "notif.errorBody": "Beim Laden ist etwas schiefgelaufen. Prüfe deine Verbindung und versuche es erneut.",
+  "notif.retry": "Erneut versuchen",
+  "notif.today": "Heute",
+  "notif.yesterday": "Gestern",
 
   "today.scan.sub": "Annehmen, entnehmen, öffnen",
   "today.awaiting": "Warten auf Freigabe",

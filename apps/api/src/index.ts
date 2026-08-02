@@ -21,6 +21,7 @@ import {
 import { DUNNING_DAYS } from "@4dl/billing";
 import { periodKey } from "./ids.js";
 import { contextRoutes } from "./context-routes.js";
+import { notifyRoutes } from "@4dl/notify/routes";
 import { billingRoutes, adminRoutes, emailConfigRoutes } from "./billing-routes.js";
 import { maintenanceRoutes } from "./maintenance.js";
 import { downgradeRoutes } from "./downgrade-routes.js";
@@ -121,6 +122,10 @@ app.post("/api/auth/forget-password/email-otp", (c) => c.json({ error: "not_foun
 app.on(["GET", "POST"], "/api/auth/*", (c) => c.get("auth").handler(c.req.raw));
 
 app.route("/api", contextRoutes);
+// The inbox: /notifications, /notifications/:id/read, /notifications/read-all
+// and the InboxDO socket. The surface scoping of "mark all read" comes from the
+// notification registry `@kova/domain` configures, not from anything here.
+app.route("/api", notifyRoutes<AppEnv>({ currentUserId: (c) => c.get("user")?.id ?? null }));
 app.route("/api", billingRoutes);
 // MUST stay ahead of `stripeRoutes`: downgradeRoutes registers pass-through
 // guards on POST /billing/plan-intent + /billing/checkout-plan that refuse an

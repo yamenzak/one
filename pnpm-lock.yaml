@@ -584,6 +584,9 @@ importers:
       '@4dl/commerce':
         specifier: workspace:*
         version: link:../commerce
+      '@4dl/notify':
+        specifier: workspace:*
+        version: link:../notify
       '@4dl/tenancy':
         specifier: workspace:*
         version: link:../tenancy
@@ -634,6 +637,9 @@ importers:
       '@4dl/core':
         specifier: workspace:*
         version: link:../core
+      hono:
+        specifier: ^4.9.10
+        version: 4.12.29
     devDependencies:
       '@cloudflare/workers-types':
         specifier: ^4.20251001.0

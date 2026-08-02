@@ -197,7 +197,9 @@ export const settingsRoutes = new Hono<AppEnv>()
     // Studio-wide email allow-list, merged category-by-category (unknown keys dropped).
     if (d.notifPolicy) {
       const cur = parseNotifPolicy((await c.env.DB.prepare("SELECT notif_policy_json FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ notif_policy_json: string | null }>())?.notif_policy_json ?? null);
-      const emailAudience: Record<string, Record<string, boolean>> = { ...(cur.emailAudience as Record<string, Record<string, boolean>> ?? {}) };
+      // sanitizeEmailPolicy is keyed by an open category string now that the
+      // model is shared, so the map it produces is Partial. Same values, wider key.
+      const emailAudience: Record<string, Record<string, boolean | undefined>> = { ...(cur.emailAudience as Record<string, Record<string, boolean | undefined>> ?? {}) };
       for (const a of ["client", "staff"] as const) {
         if (d.notifPolicy[a]) emailAudience[a] = { ...(emailAudience[a] ?? {}), ...sanitizeEmailPolicy(d.notifPolicy[a]!) };
       }

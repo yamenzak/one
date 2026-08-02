@@ -29,6 +29,11 @@ import { domainAdminRoutes, domainRoutes } from "./domain-routes.js";
 import { orgCreateGuard, orgUpdateGuard } from "./org-guard.js";
 import { caseRoutes } from "./case-routes.js";
 import { contextRoutes } from "./context-routes.js";
+import { notifyRoutes } from "@4dl/notify/routes";
+// Importing the binding is also what INSTALLS the registry (`notifications.ts`
+// calls `configureNotify` at module scope). The routes below read it to scope
+// "mark all read", so the import is load-bearing even where `notify` is unused.
+import { notifyRole } from "./notify.js";
 import { cycleRoutes } from "./cycle-routes.js";
 import { packRoutes } from "./pack-routes.js";
 import { stockRoutes } from "./stock-routes.js";
@@ -151,6 +156,14 @@ app.post("/api/catalog", async (c) => {
  * already made correctly.
  */
 app.route("/api", contextRoutes);
+/**
+ * The inbox: the list, the two mark-read writes, and the `InboxDO` socket.
+ *
+ * This app exported the DO, bound it in `wrangler.jsonc`, pinned its class name
+ * in a migration and applied four tables — and had no way to reach any of it,
+ * for as long as these four routes lived inside the other app's context tree.
+ */
+app.route("/api", notifyRoutes<AppEnv>({ currentUserId: (c) => c.get("user")?.id ?? null }));
 /**
  * Billing: the picker, the two checkouts, the portal — and the webhook.
  *
@@ -302,18 +315,45 @@ async function dailySweep(env: Env): Promise<void> {
     }
   });
 
+  /**
+   * Who is about to move down a rung. Read BEFORE the update, because the
+   * `WHERE` that selects them is the same one that stops selecting them.
+   *
+   * A rung that arrives unannounced is the complaint every dunning ladder
+   * generates: the centre discovers it is read-only by trying to record a load,
+   * which in a CSSD is the worst possible moment to find out. `dedupeKey` is the
+   * rung itself, so a sweep that runs twice in a day sends once.
+   */
+  const aboutToFall = async (from: string, cutoffDays: number): Promise<string[]> => {
+    const rows = await env.DB
+      .prepare("SELECT tenant_id FROM subscriptions WHERE status = ? AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?")
+      .bind(from, dunningCutoff(nowMs, cutoffDays))
+      .all<{ tenant_id: string }>()
+      .catch(() => ({ results: [] as { tenant_id: string }[] }));
+    return (rows.results ?? []).map((r) => r.tenant_id);
+  };
+
   // 2) Rung one — read-only. The centre keeps the whole app and loses the
   //    ability to write to it. `comp = 0` excludes centres the operator comped.
   await step("dunning-read-only", async () => {
+    const falling = await aboutToFall("past_due", DUNNING_DAYS.readOnly);
     await env.DB
       .prepare("UPDATE subscriptions SET status = 'suspended', suspend_at = ?, updated_at = ? WHERE status = 'past_due' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?")
       .bind(nowStamp, nowStamp, dunningCutoff(nowMs, DUNNING_DAYS.readOnly))
       .run();
+    for (const tenantId of falling) {
+      await notifyRole(env, tenantId, "owner", {
+        type: "billing_suspended",
+        message: `Tessa is read-only until the invoice is settled. Your records stay readable — a recall is never withheld — but nothing new can be recorded. ${DUNNING_DAYS.blocked - DUNNING_DAYS.readOnly} days from now the app itself is withheld.`,
+        dedupeKey: `dun_suspended_${tenantId}`,
+      });
+    }
   });
 
   // 3) Rung two — blocked. The app itself is withheld, and the purge clock is
   //    stamped so the centre (and this sweep) can both see the deadline.
   await step("dunning-blocked", async () => {
+    const falling = await aboutToFall("suspended", DUNNING_DAYS.blocked);
     await env.DB
       .prepare("UPDATE subscriptions SET status = 'blocked', delete_at = ?, updated_at = ? WHERE status = 'suspended' AND comp = 0 AND past_due_at IS NOT NULL AND past_due_at < ?")
       .bind(
@@ -322,6 +362,14 @@ async function dailySweep(env: Env): Promise<void> {
         dunningCutoff(nowMs, DUNNING_DAYS.blocked),
       )
       .run();
+    for (const tenantId of falling) {
+      await notifyRole(env, tenantId, "owner", {
+        type: "billing_canceled",
+        title: "Tessa is now withheld",
+        message: `Your centre's data is intact and is deleted in ${DUNNING_DAYS.purge - DUNNING_DAYS.blocked} days unless the invoice is settled. Settling restores everything.`,
+        dedupeKey: `dun_blocked_${tenantId}`,
+      });
+    }
   });
 
   // 4) Rung three — PURGE, 37 days after the first missed payment.

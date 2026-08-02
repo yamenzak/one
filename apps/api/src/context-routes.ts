@@ -10,7 +10,7 @@ import {
   type PersonaRefRole,
 } from "./context-helpers.js";
 import type { PersonaRef, SessionContext } from "@kova/protocol";
-import { resolvePermissions, resolveUnits, overallDaysRemaining, NOTIF_TYPES, notifVisibleInSurface, type UnitPrefs, type NotifType } from "@kova/domain";
+import { resolvePermissions, resolveUnits, overallDaysRemaining, type UnitPrefs } from "@kova/domain";
 import { type AppEnv, isPlatformAdmin, requireTenant } from "./auth-context.js";
 import type { RoleName } from "./access.js";
 import { clientForUser, countClientSeats, PENDING_SIGNUP } from "./clients.js";
@@ -315,54 +315,10 @@ export const contextRoutes = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
 
-  .get("/notifications", async (c) => {
-    const who = requireTenant(c);
-    if (!who) return c.json({ error: "unauthenticated" }, 401);
-    const rows = await c.env.DB.prepare(
-      "SELECT * FROM notifications WHERE recipient_user_id = ? ORDER BY created_at DESC LIMIT 50",
-    )
-      .bind(who.userId)
-      .all();
-    return c.json({ notifications: rows.results ?? [] });
-  })
-
-  // Real-time notification push (SPEC §8.10): a per-user WebSocket via InboxDO.
-  // User-scoped (not tenant-scoped) — the bell is personal across tenancies.
-  .get("/inbox/ws", (c) => {
-    const user = c.get("user");
-    if (!user) return c.json({ error: "unauthenticated" }, 401);
-    if (c.req.header("Upgrade") !== "websocket") return c.json({ error: "expected websocket" }, 426);
-    const stub = c.env.INBOX.get(c.env.INBOX.idFromName(user.id));
-    return stub.fetch(c.req.raw);
-  })
-
-  .post("/notifications/:id/read", async (c) => {
-    const who = requireTenant(c);
-    if (!who) return c.json({ error: "unauthenticated" }, 401);
-    await c.env.DB.prepare("UPDATE notifications SET read = 1 WHERE id = ? AND recipient_user_id = ?")
-      .bind(c.req.param("id"), who.userId)
-      .run();
-    return c.json({ ok: true });
-  })
-
-  // Mark every unread notification read. Scoped to the current SURFACE when one
-  // is given (train mode clears only client notifications, coach mode only
-  // staff/owner) so "mark all read" respects the mode you're in.
-  .post("/notifications/read-all", async (c) => {
-    const who = requireTenant(c);
-    if (!who) return c.json({ error: "unauthenticated" }, 401);
-    const body = (await c.req.json().catch(() => ({}))) as { surface?: string };
-    const surface = body.surface === "client" || body.surface === "staff" ? body.surface : null;
-    if (surface) {
-      const types = (Object.keys(NOTIF_TYPES) as NotifType[]).filter((t) => notifVisibleInSurface(t, surface));
-      if (types.length === 0) return c.json({ ok: true });
-      const ph = types.map(() => "?").join(",");
-      await c.env.DB.prepare(`UPDATE notifications SET read = 1 WHERE recipient_user_id = ? AND read = 0 AND type IN (${ph})`).bind(who.userId, ...types).run();
-    } else {
-      await c.env.DB.prepare("UPDATE notifications SET read = 1 WHERE recipient_user_id = ? AND read = 0").bind(who.userId).run();
-    }
-    return c.json({ ok: true });
-  })
+  // The four inbox routes that used to live here are `notifyRoutes` from
+  // @4dl/notify now, mounted on /api alongside this tree in index.ts. They were
+  // never about context — they were here because this is where they were first
+  // written, and Tessa shipped the DO, the schema and no way to reach either.
 
   // Personal unit preferences (cross-tenant) — any signed-in user.
   .patch("/me/units", async (c) => {

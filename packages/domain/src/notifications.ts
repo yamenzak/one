@@ -8,6 +8,9 @@
  * invites, receipts, disputes) always sends and never consults preferences.
  */
 
+import { configureNotify } from "@4dl/notify/model";
+import type { NotifCategoryMeta as Meta, NotifTemplate as Tpl, NotifTypeMeta as TypeMeta } from "@4dl/notify/model";
+
 export type NotifRole = "owner" | "trainer" | "assistant" | "client" | "member";
 
 export type NotifCategory =
@@ -25,12 +28,7 @@ export type NotifCategory =
   | "billing"
   | "digest";
 
-export interface ChannelPref {
-  inbox: boolean;
-  email: boolean;
-}
-
-export interface NotifCategoryMeta {
+export interface NotifCategoryMeta extends Meta {
   key: NotifCategory;
   label: string;
   blurb: string;
@@ -58,12 +56,6 @@ export const NOTIF_CATEGORIES: NotifCategoryMeta[] = [
   { key: "digest", label: "Weekly digest", blurb: "Your week, summarised, every Monday", roles: ALL },
 ];
 
-const CATEGORY_KEYS = new Set(NOTIF_CATEGORIES.map((c) => c.key));
-
-/** True when `k` is a known notification category (guards owner-policy writes). */
-export function isNotifCategory(k: string): k is NotifCategory {
-  return CATEGORY_KEYS.has(k as NotifCategory);
-}
 
 // ── Notification TYPES (the atom) ─────────────────────────────────────────────
 // Every notification `notify()` emits has a stable TYPE. The type is the SSOT
@@ -142,7 +134,6 @@ export interface NotifTypeMeta {
  *                staff types this is where the client's name already appears)
  *   message    — the one-line detail the caller passed, if any
  */
-export const UNIVERSAL_NOTIF_VARS = ["studioName", "title", "message"] as const;
 
 export const NOTIF_TYPES: Record<NotifType, NotifTypeMeta> = {
   check_in: { category: "check-ins", to: "staff", // title interpolates client name
@@ -218,224 +209,79 @@ export const NOTIF_TYPES: Record<NotifType, NotifTypeMeta> = {
     template: { subject: "A payment didn't match the package price", body: "<p>{{message}}</p><p>Your client's access has started as normal. Check the payment link on that package — it may be pointing at the wrong price.</p>" }, vars: ["message"] },
 };
 
-/** The category that governs a notification type's delivery preferences. */
-export function notifCategoryOf(type: NotifType): NotifCategory {
-  return NOTIF_TYPES[type].category;
-}
+// ── The algebra is `@4dl/notify`'s ──────────────────────────────────────────
+//
+// Everything below this line used to be here: resolveChannels, the preference
+// and policy parsers, the surface filter, the template renderer. None of it was
+// about coaching — it is "a type has a category, a category plus a role decides
+// inbox and email, a stored preference overrides the default, the owner may veto
+// email" — and keeping it here is why Tessa shipped an InboxDO with nothing
+// flowing through it.
+//
+// What stays above is the part that IS Kova's: thirteen categories with Kova's
+// copy, the roles, and the thirty-odd types. The registry is handed over once,
+// here, and every function below reads it.
+//
+// Re-exported rather than re-implemented, so no call site in the app changed.
 
-// ── Audience + surface (persona / mode-aware in-app filtering) ────────────────
-// A user can be BOTH staff and a client (a coach who trains themselves). The app
-// switches between two surfaces — the client surface ("train" mode) and the staff
-// surface ("coach" mode) — and the notification bell should show only what belongs
-// to the surface you're currently in. Audience is the type's `to` field; the
-// surface→audience mapping is: the client surface shows `client` notifications,
-// the staff surface shows `staff` + `owner` notifications. This is the single
-// source the bell/inbox filter on (pure — the app supplies the current surface).
-
-export type NotifSurface = "client" | "staff";
-
-/** Who a type is addressed to. Unknown types fall back to `staff` (never hidden
- *  by accident from staff, who can act on anything). */
-export function notifAudienceOf(type: NotifType): NotifTypeMeta["to"] {
-  return NOTIF_TYPES[type]?.to ?? "staff";
-}
-
-/** Whether a notification of `type` belongs in the given surface. An unknown
- *  type is shown everywhere rather than silently dropped. */
-export function notifVisibleInSurface(type: NotifType, surface: NotifSurface): boolean {
-  const meta = NOTIF_TYPES[type];
-  if (!meta) return true;
-  return surface === "client" ? meta.to === "client" : meta.to === "staff" || meta.to === "owner";
-}
-
-/** Count unread notifications visible in a surface — the bell's per-surface badge. */
-export function unreadInSurface(items: { type: NotifType; read: boolean | number }[], surface: NotifSurface): number {
-  return items.filter((n) => !n.read && notifVisibleInSurface(n.type, surface)).length;
-}
-
-/** The default title for a type (from the registry), or null if it must be
- *  supplied at the call site (name-interpolating titles). */
-export function notifTitleOf(type: NotifType): string | null {
-  return NOTIF_TYPES[type].title ?? null;
-}
-
-/** The default link for a type (from the registry), or null when the link is
- *  contextual (client-scoped) and supplied at the call site. */
-export function notifLinkOf(type: NotifType): string | null {
-  return NOTIF_TYPES[type].link ?? null;
-}
-
-/** The default email template for a type, or null (falls back to the generic card). */
-export function notifTemplateOf(type: NotifType): NotifTemplate | null {
-  return NOTIF_TYPES[type]?.template ?? null;
-}
-
-/** The variable names a type's template exposes (for the tenant editor). */
-export function notifVarsOf(type: NotifType): readonly string[] {
-  return NOTIF_TYPES[type]?.vars ?? [];
-}
-
-/**
- * Substitute `{{variable}}` placeholders in a template string. Unknown or
- * missing variables render as empty (never a stray `{{x}}`). Pure — presentation
- * agnostic: the caller pre-escapes VALUES when substituting into HTML, and passes
- * raw values for plain-text subjects.
- */
-export function renderTemplate(template: string, vars: Record<string, string | number | null | undefined>): string {
-  return template.replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (_m, key: string) => {
-    const v = vars[key];
-    return v === undefined || v === null ? "" : String(v);
-  });
-}
-
-/** Categories a role can see/tune. */
-export function categoriesForRole(role: NotifRole): NotifCategoryMeta[] {
-  return NOTIF_CATEGORIES.filter((c) => c.roles.includes(role));
-}
-
-/** Whether a category even applies to a role (both channels off otherwise). */
-export function categoryAppliesTo(category: NotifCategory, role: NotifRole): boolean {
-  return NOTIF_CATEGORIES.find((c) => c.key === category)?.roles.includes(role) ?? false;
-}
-
-/**
- * The default channel choice for a (role, category). Inbox is on for every
- * applicable category; email is on for actionable ones and off (digest-only) for
- * high-frequency signals — coach check-ins/activity/content/sales, client content.
- */
-export function defaultChannels(role: NotifRole, category: NotifCategory): ChannelPref {
-  if (!categoryAppliesTo(category, role)) return { inbox: false, email: false };
-  if (category === "digest") return { inbox: false, email: true }; // email-only
-  const staff = role === "owner" || role === "trainer" || role === "assistant";
-  let email = true;
-  if (staff && (category === "check-ins" || category === "activity" || category === "content" || category === "sales")) email = false;
-  if (role === "client" && category === "content") email = false;
-  return { inbox: true, email };
-}
-
-/** Stored prefs shape: category → partial channel choice (only what the user changed). */
-export type StoredNotifPrefs = Partial<Record<NotifCategory, Partial<ChannelPref>>>;
-
-export function parseNotifPrefs(json: string | null | undefined): StoredNotifPrefs {
-  if (!json) return {};
-  try {
-    const raw = JSON.parse(json);
-    if (!raw || typeof raw !== "object") return {};
-    const out: StoredNotifPrefs = {};
-    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
-      if (!CATEGORY_KEYS.has(k as NotifCategory) || !v || typeof v !== "object") continue;
-      const cv = v as Record<string, unknown>;
-      const pref: Partial<ChannelPref> = {};
-      if (typeof cv.inbox === "boolean") pref.inbox = cv.inbox;
-      if (typeof cv.email === "boolean") pref.email = cv.email;
-      out[k as NotifCategory] = pref;
+configureNotify({
+  categories: NOTIF_CATEGORIES,
+  types: NOTIF_TYPES,
+  customerRole: "client",
+  /**
+   * Kova's names for the two policy audiences, and they are LOAD-BEARING: every
+   * tenant's stored `notif_policy_json` is keyed `emailAudience.client` /
+   * `emailAudience.staff`, and the bell sends one of these two strings as its
+   * surface. The package defaults to `customer`/`member`; renaming Kova's would
+   * orphan every studio's saved policy.
+   */
+  audiences: { customer: "client", member: "staff" },
+  /** `{{studioName}}` — the variable every Kova email template can use. */
+  tenantVar: "studioName",
+  /**
+   * Kova's one departure from the baseline: staff email is OFF for the
+   * high-frequency categories, and clients get content in-app only.
+   *
+   * A coach with thirty clients would otherwise receive thirty emails a day and
+   * turn the entire channel off — losing the actionable ones with the noise.
+   * The weekly digest is what carries these instead.
+   */
+  defaultChannels: (role, category) => {
+    const staff = role === "owner" || role === "trainer" || role === "assistant";
+    if (staff && (category === "check-ins" || category === "activity" || category === "content" || category === "sales")) {
+      return { inbox: true, email: false };
     }
-    return out;
-  } catch {
-    return {};
-  }
-}
+    if (role === "client" && category === "content") return { inbox: true, email: false };
+    return null;
+  },
+});
 
-/**
- * The user's effective channels for a category = defaults overlaid by their
- * stored choice — EXCEPT that a category the role cannot receive stays off no
- * matter what is stored. A stored preference is a preference, not a grant: a
- * client who once had `roster` written into their row (or who was a coach and
- * was demoted) must not carry the old value forward into a role that shouldn't
- * have it. Role is re-checked here, at read time, every time.
- */
-export function resolveChannels(role: NotifRole, stored: StoredNotifPrefs, category: NotifCategory): ChannelPref {
-  if (!categoryAppliesTo(category, role)) return { inbox: false, email: false };
-  const def = defaultChannels(role, category);
-  const s = stored[category];
-  return { inbox: s?.inbox ?? def.inbox, email: s?.email ?? def.email };
-}
-
-/** Full resolved preference matrix for the categories a role can see (for the settings UI). */
-export function resolveAllChannels(role: NotifRole, stored: StoredNotifPrefs): Record<string, ChannelPref> {
-  const out: Record<string, ChannelPref> = {};
-  for (const c of categoriesForRole(role)) out[c.key] = resolveChannels(role, stored, c.key);
-  return out;
-}
-
-// ── Tenant-level EMAIL policy (owner control) ────────────────────────────────
-// A member decides, per category, whether it reaches their inbox and/or email.
-// On top of that, the tenant OWNER governs which categories are allowed to be
-// EMAILED to their studio's members at all — an opt-out allow-list. The inbox is
-// never gated (members always keep in-app delivery); the owner only governs the
-// email channel. Effective email = member's email choice AND owner allows it.
-
-/** The two audiences an owner's email policy can target separately: clients vs
- *  the studio's own staff (owner/trainer/assistant). */
-export type NotifAudience = "client" | "staff";
-
-/** Owner-set policy: whether email is permitted, per category, and now per
- *  AUDIENCE (email clients about X separately from emailing staff). Backward
- *  compatible: `emailCategories` is the legacy all-audiences map; `emailAudience`
- *  overrides it for a specific audience when present. Absent everywhere = allowed. */
-export interface TenantNotifPolicy {
-  emailCategories?: Partial<Record<NotifCategory, boolean>>;
-  emailAudience?: Partial<Record<NotifAudience, Partial<Record<NotifCategory, boolean>>>>;
-}
-
-function parseCatBoolMap(src: unknown): Partial<Record<NotifCategory, boolean>> {
-  const out: Partial<Record<NotifCategory, boolean>> = {};
-  if (src && typeof src === "object") {
-    for (const [k, v] of Object.entries(src as Record<string, unknown>)) {
-      if (CATEGORY_KEYS.has(k as NotifCategory) && typeof v === "boolean") out[k as NotifCategory] = v;
-    }
-  }
-  return out;
-}
-
-export function parseNotifPolicy(json: string | null | undefined): TenantNotifPolicy {
-  if (!json) return {};
-  try {
-    const raw = JSON.parse(json) as { emailCategories?: unknown; emailAudience?: unknown };
-    const out: TenantNotifPolicy = {};
-    const legacy = parseCatBoolMap(raw?.emailCategories);
-    if (Object.keys(legacy).length) out.emailCategories = legacy;
-    const aud = raw?.emailAudience;
-    if (aud && typeof aud === "object") {
-      const parsed: TenantNotifPolicy["emailAudience"] = {};
-      for (const a of ["client", "staff"] as NotifAudience[]) {
-        const m = parseCatBoolMap((aud as Record<string, unknown>)[a]);
-        if (Object.keys(m).length) parsed[a] = m;
-      }
-      if (Object.keys(parsed).length) out.emailAudience = parsed;
-    }
-    return out;
-  } catch {
-    return {};
-  }
-}
-
-/** Keep only known category → boolean pairs (sanitizes an owner-supplied patch). */
-export function sanitizeEmailPolicy(patch: Record<string, unknown>): Partial<Record<NotifCategory, boolean>> {
-  return parseCatBoolMap(patch);
-}
-
-/** Which audience a role belongs to for policy purposes (owner/assistant = staff). */
-export function audienceForRole(role: NotifRole): NotifAudience {
-  return role === "client" ? "client" : "staff";
-}
-
-/** Whether the tenant permits EMAIL for a category (default: yes). When an
- *  `audience` is given, an audience-specific setting wins over the legacy
- *  all-audiences map. */
-export function emailAllowedByPolicy(policy: TenantNotifPolicy, category: NotifCategory, audience?: NotifAudience): boolean {
-  if (audience) {
-    const a = policy.emailAudience?.[audience];
-    if (a && category in a) return a[category]!;
-  }
-  return policy.emailCategories?.[category] ?? true;
-}
-
-/** The effective email allow-map across every category, for the owner's UI.
- *  With no audience it returns the legacy single map; with one it returns that
- *  audience's effective map. */
-export function resolveEmailPolicy(policy: TenantNotifPolicy, audience?: NotifAudience): Record<string, boolean> {
-  const out: Record<string, boolean> = {};
-  for (const c of NOTIF_CATEGORIES) out[c.key] = emailAllowedByPolicy(policy, c.key, audience);
-  return out;
-}
+export {
+  audienceForRole,
+  categoriesForRole,
+  categoryAppliesTo,
+  defaultChannels,
+  emailAllowedByPolicy,
+  isNotifCategory,
+  notifAudienceOf,
+  notifCategoryOf,
+  notifLinkOf,
+  notifTemplateOf,
+  notifTitleOf,
+  notifVarsOf,
+  notifVisibleInSurface,
+  parseNotifPolicy,
+  parseNotifPrefs,
+  renderTemplate,
+  resolveAllChannels,
+  resolveChannels,
+  resolveEmailPolicy,
+  sanitizeEmailPolicy,
+  unreadInSurface,
+  universalNotifVars,
+  type ChannelPref,
+  type NotifAudience,
+  type NotifSurface,
+  type StoredNotifPrefs,
+  type TenantNotifPolicy,
+} from "@4dl/notify/model";

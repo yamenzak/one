@@ -35,6 +35,7 @@ import { AcceptInvite } from "./screens/AcceptInvite.js";
 import { AdminDoor } from "./screens/Admin.js";
 import { Labels } from "./screens/Labels.js";
 import { Settings } from "./screens/Settings.js";
+import { Inbox } from "./Notifications.js";
 import { Recall } from "./screens/Recall.js";
 
 export type ScreenName = "boot" | "login" | "signpost" | "nostudio" | "wrongdoor" | "start" | "admin" | "shell";
@@ -134,6 +135,10 @@ function App() {
           from, and the account menu already navigates here. It used to match the
           catch-all below and render the app chrome over an empty body. */}
       <Route path="/settings" element={<Settings onBack={() => history.back()} />} />
+      {/* Also a route: a notification's deep link has to survive being opened
+          from an email in a fresh browser, and the bell's "See all" needs
+          somewhere to go that a back button can return from. */}
+      <Route path="/inbox" element={<Inbox />} />
       <Route path="*" element={<Shell />} />
     </Routes>
   );

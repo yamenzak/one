@@ -22,6 +22,7 @@
     "@4dl/auth": "workspace:*",
     "@4dl/billing": "workspace:*",
     "@4dl/commerce": "workspace:*",
+    "@4dl/notify": "workspace:*",
     "@4dl/tenancy": "workspace:*"
   }
 }

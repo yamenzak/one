@@ -27,6 +27,7 @@ import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AppBar, Archive, Avatar, Badge, BottomTabs, Button, ClipboardList, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Home, RotateCcw, ScanLine, TrendingUp, type TabDef } from "@4dl/ui";
 import { useSession } from "./session.js";
+import { NotificationBell } from "./Notifications.js";
 import { useI18n, useT } from "./i18n.js";
 import { Insights } from "./screens/Insights.js";
 import { ScanSheet } from "./screens/ScanSheet.js";
@@ -73,6 +74,10 @@ export function Shell() {
              * matter and is handled before the Shell ever mounts.
              */}
             {gate?.readOnly && <Badge tone="warning">{t("shell.readOnly")}</Badge>}
+            {/* The bell. A CSSD is a place where the thing you most need to know
+                — a load failed its biological, and trays are already out — is
+                learned by somebody who is not at the machine. */}
+            <NotificationBell />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="rounded-full" aria-label={t("shell.account")}>

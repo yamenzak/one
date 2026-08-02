@@ -15,7 +15,7 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { NOTIF_TYPES, UNIVERSAL_NOTIF_VARS, notifTemplateOf, notifVarsOf, renderTemplate, type NotifType } from "@kova/domain";
+import { NOTIF_TYPES, universalNotifVars, notifTemplateOf, notifVarsOf, renderTemplate, type NotifType } from "@kova/domain";
 
 const TYPES = Object.keys(NOTIF_TYPES) as NotifType[];
 const varsIn = (s: string): string[] => [...s.matchAll(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g)].map((m) => m[1]!);
@@ -42,7 +42,7 @@ describe("every notification is customizable", () => {
     // three are always present. This asserts the ones a template LEANS on are
     // universal, which is what makes a type customizable without its callers
     // having to know.
-    const universal = new Set<string>(UNIVERSAL_NOTIF_VARS);
+    const universal = new Set<string>(universalNotifVars());
     for (const t of TYPES) {
       const tpl = notifTemplateOf(t)!;
       // The subject is what someone sees in their inbox list — it must never be

@@ -11,7 +11,7 @@ headings so any claim can be re-checked, and the numbers will drift.
 
 ## The pattern that keeps recurring
 
-Four times now, in four unrelated subsystems, the same thing has happened:
+Five times now, in five unrelated subsystems, the same thing has happened:
 
 > A shared package ships a **mechanism**. No package ships the **surface**. So
 > the first app writes one, the second app writes a worse one or none at all,
@@ -28,8 +28,13 @@ Four times now, in four unrelated subsystems, the same thing has happened:
 - `@4dl/app-kit` shipped the entire passkey ceremony at Stage 8; the card was
   missing, so Tessa had no passkey UI anywhere and its users were on email codes
   only — on a platform whose own README says "email OTP + passkeys".
+- `@4dl/notify` shipped `InboxDO`, four tables and a permanent DO-name migration;
+  the model, the routes and the bell were missing, so Tessa carried the whole
+  apparatus and could reach none of it. This is the fifth, it is Tier 1 below,
+  and it is the most expensive shape of the pattern — a Durable Object class name
+  is permanent, so it was already load-bearing for a feature that did not exist.
 
-All four are now closed. The lesson is not "we forgot four panels", it is that
+All five are now closed. The lesson is not "we forgot five panels", it is that
 **a mechanism with no surface reads as done and is not**, and nothing in the
 repo could see it. The `@4dl/admin/conformance` check is the first thing that
 can, for one class of it.
@@ -86,6 +91,39 @@ So the split is the one `@4dl/ai` already uses, and the work is bigger than
 already shared, so an app that adopts it inherits a working inbox rather than an
 empty one. That last part is the whole point: moving only the bell would give
 Tessa a box with nothing in it.
+
+**DONE (2026-08-02).** The split above is the split that landed.
+`@4dl/notify` grew `model.ts` (the algebra, with `configureNotify`),
+`dispatch.ts` (`dispatchNotification`, email as an optional hook) and `routes.ts`
+(the four endpoints); `@4dl/app-kit` grew `NotificationBell` + `InboxScreen`.
+Kova's registry — thirteen categories, four roles, thirty-odd types — stayed put
+and its call sites did not change.
+
+Tessa now has five categories, twelve types, and dispatch on the four events
+that actually reach somebody who is not standing at the machine: a load that
+failed its fast evidence, a **recall** on a late biological failure, a load
+waiting on a Freigabe, and a release given. Plus the two dunning rungs, which
+used to arrive unannounced — a centre discovered it was read-only by trying to
+record a load, which in a CSSD is the worst possible moment to find out.
+
+Three things worth recording, because each was found by a check rather than by
+reading:
+
+- **The boundary checker caught the extraction mid-move.** Nine violations: the
+  package had acquired `client`, `staff` and `studioName` as string literals
+  along with the model. The fix is `audiences: { customer, member }` in the
+  registry — and those names turn out to be load-bearing rather than cosmetic,
+  because they are the keys a tenant's stored email policy is written under.
+- **A comment was already promising a fix nobody had made.** Kova's
+  `allowedWhileReadOnly` header has said "personal, non-tenant surfaces like
+  notification read-receipts" since it was written; only the *socket* was in the
+  list. A suspended studio's bell filled with a badge nobody could clear for
+  seven days. Both apps now exempt `/api/notifications/`.
+- **`@4dl/notify` had no test of its own.** Kova's 30 notification tests
+  exercised the same code, but only ever proved it worked for the vocabulary it
+  was extracted *from*. `test/model.test.ts` runs the algebra against a library —
+  `borrower`/`librarian`, `{{branchName}}` — and three of its assertions fail if
+  any Kova noun survives as a literal.
 
 ---
 
@@ -250,11 +288,10 @@ Equally important, and a shorter list than it looks:
 
 Ranked by (breakage prevented) ÷ (risk of the move):
 
-1. **UI conformance into `@4dl/ui`.** One file, no runtime change, and it stops
-   the divergence everything else on this list is an example of. Do this first
-   even though it is not the biggest.
-2. **The notification surface.** Closes a live dead-capability, and the DO name
-   is already permanent.
+1. ~~**UI conformance into `@4dl/ui`.**~~ **DONE** — one file, no runtime change,
+   and it stops the divergence everything else on this list is an example of.
+2. ~~**The notification surface.**~~ **DONE** — closed a live dead-capability,
+   and the DO name was already permanent.
 3. **`billing-store` into `@4dl/billing`.** Largest prize, highest care — it is
    the money path, and the catalog/store split has to be drawn precisely.
 4. **Staff/members into `@4dl/auth`.** Take Tessa's shape (it has invitations),

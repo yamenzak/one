@@ -10,6 +10,7 @@
 import { resolveChannels, parseNotifPrefs, parseNotifPolicy, emailAllowedByPolicy, audienceForRole, notifCategoryOf, notifTitleOf, notifLinkOf, notifTemplateOf, renderTemplate, NOTIF_CATEGORIES, type NotifType, type NotifRole, type NotifCategory } from "@kova/domain";
 import type { Env } from "./env.js";
 import { notifyUser } from "./inbox-do.js";
+import { dispatchNotification, dispatchToRole, type ResolvedNotification } from "@4dl/notify";
 import { sendTenantEmail } from "./email-provider.js";
 import { sendEmail, emailShell, emailButton, escapeHtml, safeColor, KOVA_BRAND, type BrandKit } from "./mailer.js";
 import { nowIso } from "./ids.js";
@@ -69,7 +70,7 @@ export async function tenantBrandKit(db: D1Database, tenantId: string): Promise<
 /** The friendly category kicker shown as an eyebrow above every notif email —
  *  a small premium touch that orients the reader ("Personal record", "Body
  *  composition") before they read the headline. */
-function categoryEyebrow(category: NotifCategory): string | undefined {
+function categoryEyebrow(category: string): string | undefined {
   return NOTIF_CATEGORIES.find((c) => c.key === category)?.label;
 }
 
@@ -88,49 +89,37 @@ function notifEmailHtml(env: Env, brand: BrandKit, tenantId: string, r: { title:
   return emailShell(escapeHtml(r.title), body, { brand, preheader: r.message ?? r.title, footnote: r.footnote ?? undefined, eyebrow: r.eyebrow });
 }
 
-/** Deliver a notification to one user, honoring their preferences. */
+
+/**
+ * Deliver one notification.
+ *
+ * The channel resolution and the inbox write are `@4dl/notify`'s now — the same
+ * in every app, and keeping them here is why Tessa shipped an InboxDO with
+ * nothing flowing through it. What stays is the EMAIL half below: a tenant
+ * white-label template store, a per-type mute, a signature, and the rail choice
+ * — Kova's own billing mail goes out unmetered under Kova's identity while
+ * everything else is the tenant's own message on the tenant's rail. None of that
+ * is a fact about notifications; it is a fact about how Kova bills.
+ */
 export async function notify(env: Env, input: NotifyInput): Promise<void> {
-  if (!input.userId) return;
-  const userId = input.userId;
-  const category = notifCategoryOf(input.type);
-  // Title + link derive from the type's record unless the call site overrides
-  // (name-interpolating titles / client-scoped links). Title always resolves to
-  // something (registry default → type id) so a row is never blank.
-  const title = input.title ?? notifTitleOf(input.type) ?? input.type;
-  const link = input.link ?? notifLinkOf(input.type);
-  // Best-effort in full: notification delivery must NEVER reject its caller — a
-  // transient error in the preference lookup would otherwise 500 an operation
-  // (plan publish, goal set, …) that already committed. Swallow everything.
-  try {
-  let channels = { inbox: true, email: false };
-  if (input.force) {
-    channels = { inbox: true, email: true };
-  } else {
-    const [role, prefRow, polRow] = await Promise.all([
-      userRole(env.DB, input.tenantId, userId),
-      env.DB.prepare("SELECT notif_json FROM user_prefs WHERE user_id = ?").bind(userId).first<{ notif_json: string | null }>(),
-      env.DB.prepare("SELECT notif_policy_json FROM tenant_settings WHERE tenant_id = ?").bind(input.tenantId).first<{ notif_policy_json: string | null }>(),
-    ]);
-    channels = resolveChannels(role, parseNotifPrefs(prefRow?.notif_json ?? null), category);
-    // The owner can disable email for a category studio-wide, now per AUDIENCE
-    // (clients vs staff); the member's inbox choice is never overridden, only
-    // their email channel.
-    if (channels.email && !emailAllowedByPolicy(parseNotifPolicy(polRow?.notif_policy_json ?? null), category, audienceForRole(role))) {
-      channels.email = false;
-    }
-  }
+  await dispatchNotification(
+    {
+      db: env.DB,
+      poke: (userId) => notifyUser(env, userId),
+      roleOf: userRole,
+      sendEmail: (n) => sendNotifEmail(env, n),
+    },
+    input,
+  );
+}
 
-  if (channels.inbox) {
-    const id = input.dedupeKey ? `ntf_${input.dedupeKey}_${userId}` : `ntf_${crypto.randomUUID()}`;
-    await env.DB.prepare(
-      "INSERT OR IGNORE INTO notifications (id, tenant_id, recipient_user_id, category, type, title, message, link, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    ).bind(id, input.tenantId, userId, category, input.type, title, input.message ?? null, link ?? null, nowIso()).run().catch(() => undefined);
-    await notifyUser(env, userId);
-  }
-
-  if (channels.email) {
-    const user = await env.DB.prepare("SELECT email FROM \"user\" WHERE id = ?").bind(userId).first<{ email: string | null }>();
-    if (user?.email) {
+/** The email half. Runs only when the resolved channels say email. */
+async function sendNotifEmail(env: Env, n: ResolvedNotification<NotifyInput>): Promise<void> {
+  const { category, title, link } = n;
+  const input = n;
+  const user = await env.DB.prepare("SELECT email FROM \"user\" WHERE id = ?").bind(n.userId).first<{ email: string | null }>();
+  if (!user?.email) return;
+  {
       // Studio-billing (Kova → tenant) emails send on the PLATFORM rail with
       // Kova's own identity, unmetered — a studio's suspension notice is from
       // Kova, not the studio, and shouldn't cost the studio a credit. Everything
@@ -198,9 +187,8 @@ export async function notify(env: Env, input: NotifyInput): Promise<void> {
         }
       }
     }
-  }
-  } catch { /* notification is best-effort; never surface to the caller */ }
 }
+
 
 /** Fan a notification out to every OWNER of a tenant (billing / sales / roster). */
 export async function notifyOwners(env: Env, tenantId: string, input: Omit<NotifyInput, "tenantId" | "userId">): Promise<void> {

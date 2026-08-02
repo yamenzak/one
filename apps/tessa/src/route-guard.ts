@@ -118,7 +118,15 @@ const isPersonal = (path: string): boolean => path === "/api/context" || path ==
 
 /** Writes that survive a read-only tenant. Leaving is always allowed. */
 const allowedWhileReadOnly = (path: string): boolean =>
-  path.startsWith("/api/webhooks/") || path.startsWith("/api/me") || path === "/api/tenant/close";
+  path.startsWith("/api/webhooks/") ||
+  path.startsWith("/api/me") ||
+  path === "/api/tenant/close" ||
+  // The inbox is PERSONAL — both writes are scoped to `recipient_user_id` and
+  // touch no centre data. A centre spends up to seven days read-only, and a bell
+  // whose badge cannot be cleared for a week trains people to ignore it, which
+  // is the last thing you want of the surface that carries a recall.
+  path.startsWith("/api/inbox/") ||
+  path.startsWith("/api/notifications/");
 
 /**
  * Paths that answer even while the DEPLOYMENT is closed for maintenance.

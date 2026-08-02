@@ -75,9 +75,13 @@ packages/
              # builder, the tenant lane (platform | own Brevo key | off) and the
              # HTML component kit. Brand injected; the credit METER is a
              # parameter, not a global. `@4dl/email/model` is the pure half.
-  notify/    # @4dl/notify — the inbox: InboxDO (one DO per user, hibernating
-             # WebSockets, push = "refetch"), notifications + per-user prefs.
-             # The notification TYPES are the app's. See its README.
+  notify/    # @4dl/notify — the inbox, whole: the CHANNEL ALGEBRA (role ×
+             # category → inbox/email, prefs, the owner's email veto), the one
+             # DISPATCH path (email is an optional hook), the four ROUTES, and
+             # InboxDO (one DO per user, hibernating WebSockets, push =
+             # "refetch"). The TYPES and their copy are the app's, handed over
+             # once via `configureNotify`. The BELL is `@4dl/app-kit`'s.
+             # See its README.
   purge/     # @4dl/purge — ERASURE DERIVED from every module's `scoped`
              # declaration, plus the two conformance checks that make a
              # forgotten table and a renamed column test failures instead of
@@ -106,8 +110,10 @@ packages/
   app-kit/   # @4dl/app-kit — the BROWSER runtime: the typed fetch layer and its
              # three-way offline outcome (queued | offline | HTTP error), host
              # resolution across the five doors, prefixed storage, the passkey
-             # ceremony, Stripe.js + PaymentSheet, Turnstile, ErrorBoundary,
-             # hard-refresh. See its README.
+             # ceremony + PasskeysCard, Stripe.js + PaymentSheet, Turnstile,
+             # ErrorBoundary, hard-refresh, and the INBOX SURFACE
+             # (NotificationBell + InboxScreen, registry injected). Router-free
+             # on purpose — `onOpen` hands the notification back. See its README.
   i18n/      # @4dl/i18n — TRANSLATION, and deliberately small: typed dictionaries,
              # `{name}` interpolation, one plural rule (en/de share it), a locale
              # from the browser that the person can override. No ICU, no lazy
@@ -438,14 +444,17 @@ handlers are woven through Kova's notification registry, entitlement gates and
 `requireClientAccess`. Only the reconciliation logic moved.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured most recently, per package: **519 API + 197 domain + 84 tenancy +
-83 app + 43 ui + 35 billing-rail + 32 ai + 25 commerce + 21 billing + 17 template +
-14 core + 14 purge + 12 auth + 7 protocol + 3 admin + 3 app-kit +
-3 storage + 3 email + 3 notify** (1,118 total, 38 skipped). The ui count DROPPED and the app count rose by the
-same shape: Stage 0b moved Kova's eleven accent tones — and the contrast tests
-that guard them — out of `@4dl/ui` and into the app. The template's 17 are 11
-conformance (plain Node, no fixtures) + 6 integration (the real worker through
-Miniflare, on the real `*.localhost` host topology).
+moves. Measured 2026-08-02, per package: **539 kova/api + 197 kova/domain +
+140 tessa/api + 87 tessa/domain + 85 tenancy + 70 kova/app + 54 commerce +
+48 ai + 47 ui + 35 billing-rail + 27 billing + 24 notify + 17 template +
+14 core + 14 purge + 13 tessa/app + 12 auth + 7 protocol + 7 i18n + 3 admin +
+3 app-kit + 3 storage + 3 email** (1,449 total, 31 skipped). The older figure
+quoted here counted Kova and the packages only — Tessa's 240 were never in it.
+The ui count DROPPED and the kova/app count rose by the same shape: Stage 0b
+moved Kova's eleven accent tones — and the contrast tests that guard them — out
+of `@4dl/ui` and into the app. The template's 17 are 11 conformance (plain Node,
+no fixtures) + 6 integration (the real worker through Miniflare, on the real
+`*.localhost` host topology).
 Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
 `@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
 The pricing and normalizer suites live

@@ -42,6 +42,13 @@ export interface Inbox<N> {
   items: N[];
   /** True when the last load failed — the bell can say so rather than show zero. */
   failed: boolean;
+  /**
+   * True until the first load settles, either way. A full-screen list needs it:
+   * an empty `items` before the first response is indistinguishable from an
+   * empty inbox, and "You're all caught up" is the wrong thing to show someone
+   * whose notifications are still in flight.
+   */
+  loading: boolean;
   reload: () => Promise<void>;
   /** Patch the local list without a round-trip, for optimistic mark-read. */
   patch: (fn: (items: N[]) => N[]) => void;
@@ -54,6 +61,7 @@ export interface Inbox<N> {
 export function useInbox<N>({ online, path = "/api/notifications", wsPath = "/api/inbox/ws" }: InboxOptions): Inbox<N> {
   const [items, setItems] = useState<N[]>([]);
   const [failed, setFailed] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
     try {
@@ -61,6 +69,8 @@ export function useInbox<N>({ online, path = "/api/notifications", wsPath = "/ap
       setFailed(false);
     } catch {
       setFailed(true);
+    } finally {
+      setLoading(false);
     }
   }, [path]);
 
@@ -99,5 +109,5 @@ export function useInbox<N>({ online, path = "/api/notifications", wsPath = "/ap
 
   const patch = useCallback((fn: (items: N[]) => N[]) => setItems(fn), []);
 
-  return { items, failed, reload, patch };
+  return { items, failed, loading, reload, patch };
 }

@@ -149,8 +149,38 @@ an ungated backoff-reconnect plus a 90-second poll grinds against a dead radio
 for an entire session — draining the battery in exactly the scenario the offline
 support exists for.
 
-The rendering, the surface filtering and the per-type icons stay in the app: they
-are a registry, and a hook that returned JSX would be the design system's job.
+## `NotificationBell` / `InboxScreen` — the surface
+
+This header used to end "the rendering, the surface filtering and the per-type
+icons stay in the app: they are a registry". With two apps live that did not
+survive contact. What actually reads a registry is four things — the per-type
+icon and tone, which surface a type belongs to, where a click goes, and the
+strings. Everything else was 200 lines of dropdown, day-grouping, empty states
+and optimistic mark-read that no product has an opinion about, and the second
+app's copy of it was **zero** lines, because it never got written.
+
+So the registry stays injected and the surface moved:
+
+| the app injects | the component owns |
+|---|---|
+| `coding` — icon + tone per type | the badge, the row, the unread dot |
+| `visible` + `surface` — the filter | filtering, the count, mark-all scoping |
+| `onOpen` — what a click means | marking read, on the wire and optimistically |
+| `labels` — every string, defaulted to English | layout, grouping, three empty states |
+
+`onOpen` does not navigate, and this package stays router-free like `@4dl/ui`
+and `@4dl/admin`. That is not only a dependency preference: one app's
+click-through switches TENANT and flips a persona mode before it navigates,
+which no router API could express.
+
+**Three empty states, deliberately not one.** Offline, failed and genuinely
+empty look identical if you collapse them, and the collapsed version tells
+someone with unread messages that they are all caught up. That bug was found and
+fixed once, in one app's inbox screen; keeping the distinction here is how the
+fix reaches every app instead of one.
+
+`InboxScreen` needs `useInbox`'s `loading` flag for exactly the same reason — an
+empty list before the first response is not an empty inbox.
 
 ## What did NOT move, and why
 

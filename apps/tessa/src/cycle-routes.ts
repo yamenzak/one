@@ -35,6 +35,18 @@ import { biologicalOutcome, recallDisposition, releaseCheck, summariseRecall, ty
 import { newId, nowIso } from "@4dl/core";
 import { type AppEnv, requireTenant, requirePermission } from "./auth-context.js";
 import { applyEvents, type EventInput } from "./ledger.js";
+import { notifyCategoryAudience } from "./notify.js";
+
+/**
+ * How a load is named to somebody who was not standing at the machine.
+ *
+ * "Load 47 on Autoclave 2" is what a person says out loud; a `cyc_…` id is not.
+ * The cycle number is optional in the schema (some centres do not keep one), so
+ * the machine carries the sentence when it is absent.
+ */
+function loadName(cycle: { machine?: string | null; cycle_number?: string | null }): string {
+  return cycle.cycle_number ? `Load ${cycle.cycle_number} on ${cycle.machine ?? "the autoclave"}` : `The load on ${cycle.machine ?? "the autoclave"}`;
+}
 
 /** Copy for the refusals `releaseCheck` can produce. Sentences, not enums. */
 const BLOCK_TEXT: Record<string, string> = {
@@ -50,6 +62,9 @@ const BLOCK_TEXT: Record<string, string> = {
 interface CycleRow {
   id: string;
   status: string;
+  /** Both only for naming the load in a notification — see `loadName`. */
+  machine?: string | null;
+  cycle_number?: string | null;
   physical_ok: number | null;
   chemical_ok: number | null;
   biological_ok: number | null;
@@ -252,6 +267,17 @@ export const cycleRoutes = new Hono<AppEnv>()
       // in this load has been used yet, so `unreachable` should be empty; it is
       // still reported rather than assumed.
       const recall = await quarantineLoad(c.env.DB, who.tenantId, who.userId, cycle.id, `cycle failed: ${!b.physicalOk ? "physical" : "chemical"} indicator`);
+      // `force` — a failed load is not a preference. Nothing here has been used,
+      // so this is the cheap kind of bad news, but the people who plan the day's
+      // sets need it before they go looking for trays that are frozen.
+      await notifyCategoryAudience(c.env, who.tenantId, {
+        type: "cycle_failed",
+        title: `${loadName(cycle)} failed`,
+        message: `The ${!b.physicalOk ? "machine's printout" : "chemical indicator"} did not pass. ${recall.frozen.length} tray(s) are quarantined and cannot be used.`,
+        link: `/cycles/${cycle.id}`,
+        dedupeKey: `cycfail_${cycle.id}`,
+        force: true,
+      });
       return c.json({ status: "failed", ...recall });
     }
 
@@ -268,6 +294,16 @@ export const cycleRoutes = new Hono<AppEnv>()
         .map((p): EventInput => ({ tenantId: who.tenantId, actorUserId: who.userId, event: "sterilised", trackedKind: "pack", trackedId: p.id, cycleId: cycle.id })),
     );
     if (!r.ok) return c.json({ error: "Couldn't record that load.", reason: r.reason }, 409);
+    // The Freigabe is frequently not the person who ran the machine, and until
+    // they give it the trays are sterile and unusable. A load sitting in
+    // `awaiting_release` overnight is the ordinary way a centre runs short.
+    await notifyCategoryAudience(c.env, who.tenantId, {
+      type: "release_pending",
+      title: `${loadName(cycle)} is waiting on a release`,
+      message: `${packs.length} tray(s) came out clean and can't be used until somebody signs for the load.`,
+      link: `/cycles/${cycle.id}`,
+      dedupeKey: `cycend_${cycle.id}`,
+    });
     return c.json({ status: "ended", packs: packs.length, release: releaseCheck({ ...evidenceOf(cycle), status: "ended", physicalOk: true, chemicalOk: true }, { requireBiological: cycle.require_biological === 1 }) });
   })
 
@@ -338,6 +374,14 @@ export const cycleRoutes = new Hono<AppEnv>()
       .bind(at, who.tenantId, who.tenantId, ...events.map((e) => e.trackedId))
       .run();
 
+    await notifyCategoryAudience(c.env, who.tenantId, {
+      type: "load_released",
+      title: `${loadName(cycle)} was released`,
+      message: `${events.length} tray(s) are now usable.${verdict.biologicalPending ? " The biological indicator is still incubating." : ""}`,
+      link: `/cycles/${cycle.id}`,
+      dedupeKey: `cycrel_${cycle.id}`,
+    });
+
     return c.json({ ok: true, released: events.length, biologicalPending: verdict.biologicalPending });
   })
 
@@ -389,6 +433,23 @@ export const cycleRoutes = new Hono<AppEnv>()
       .bind(at, at, cycle.id, who.tenantId)
       .run();
     const recall = await quarantineLoad(c.env.DB, who.tenantId, who.userId, cycle.id, "biological indicator failed");
+    /**
+     * The one notification in this app that is genuinely urgent, and the reason
+     * the whole inbox is worth wiring: this load may already have been released,
+     * and `recall.unreachable` is the list of trays that were opened over a
+     * patient. `force` bypasses every preference — nobody opts out of this.
+     */
+    await notifyCategoryAudience(c.env, who.tenantId, {
+      type: "recall_issued",
+      title: `RECALL — ${loadName(cycle)} failed its biological indicator`,
+      message:
+        recall.unreachable.length > 0
+          ? `${recall.frozen.length} tray(s) frozen. ${recall.unreachable.length} were already opened and cannot be recalled — open the report for their case references.`
+          : `${recall.frozen.length} tray(s) frozen. Nothing from this load had been opened.`,
+      link: `/cycles/${cycle.id}`,
+      dedupeKey: `cycbio_${cycle.id}`,
+      force: true,
+    });
     return c.json({ outcome, ...recall });
   })
 
