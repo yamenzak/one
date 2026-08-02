@@ -27,6 +27,7 @@
 import type { Context } from "hono";
 import type { HostContext, RootDomainEnv, TenancyBindings } from "./host-context.js";
 import type { Maintenance } from "./maintenance.js";
+import type { ConfigSource } from "@4dl/core";
 
 /** The bindings any tenancy route needs. */
 export type RouteBindings = TenancyBindings & RootDomainEnv;
@@ -81,5 +82,5 @@ export interface RouteGuards {
    * Reported by the host probe because that is the one endpoint a client reads
    * before it has a session — not because tenancy has an opinion about bots.
    */
-  turnstile?: (db: D1Database) => Promise<{ siteKey: string | null; enabled: boolean } | null>;
+  turnstile?: (src: ConfigSource) => Promise<{ siteKey: string | null; enabled: boolean } | null>;
 }

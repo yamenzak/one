@@ -23,6 +23,7 @@
 
 import { stripeConfig, stripeEnabled } from "@4dl/billing";
 import type { SessionContext } from "@kova/protocol";
+import type { HasDb, HasPlatformConfig } from "@4dl/core";
 import {
   canonicalHost as tCanonicalHost,
   invalidateTenantHosts as tInvalidateTenantHosts,
@@ -94,8 +95,8 @@ export const KOVA_RESERVED_LABELS: ReadonlySet<string> = new Set([
  * an operator granting a studio access is precisely the case where the absence
  * of a payment is intentional.
  */
-async function statusOf(db: D1Database, tenantId: string): Promise<string | null> {
-  const row = await db
+async function statusOf(env: HasDb & HasPlatformConfig, tenantId: string): Promise<string | null> {
+  const row = await env.DB
     .prepare(
       `SELECT s.status, s.comp, p.price_usd_month
        FROM subscriptions s LEFT JOIN plans p ON p.id = s.plan_id
@@ -129,7 +130,7 @@ async function statusOf(db: D1Database, tenantId: string): Promise<string | null
    * Read LAST and only on this branch: a healthy deployment has a paid plan and
    * returned above, so the extra config read never touches the hot path.
    */
-  const cfg = await stripeConfig(db).catch(() => null);
+  const cfg = await stripeConfig(env).catch(() => null);
   if (!cfg || !stripeEnabled(cfg)) return row?.status ?? null;
   return "incomplete";
 }

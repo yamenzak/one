@@ -94,6 +94,14 @@
   // invalid bucket name means `pnpm test` cannot even boot, and a template whose
   // tests do not run is a template that rots. Local dev and the test suite
   // simulate all three and never look at the values.
+  // `PLATFORM_CONFIG` is deliberately ABSENT here and in every app's config
+  // until provisioning writes it. It is the one namespace that is NOT per-app —
+  // the same id in every 4DL worker, holding the credentials the platform
+  // shares (packages/core/src/config.ts) — and a placeholder for it would be
+  // worse than nothing: `apps.mjs ready` reads every id in the file, so a fake
+  // one marks the app un-provisioned and `deploy.yml` SKIPS it. The binding is
+  // optional in code, so an app without it behaves exactly as it did before the
+  // shared store existed.
   "kv_namespaces": [{ "binding": "CACHE", "id": "0000000000000000000000000000cafe" }],
   "d1_databases": [{ "binding": "DB", "database_id": "00000000-0000-0000-0000-0000000000d1" }],
   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "template-media" }],

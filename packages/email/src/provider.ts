@@ -8,7 +8,7 @@
  * Keys never leave the server — the GET returns only whether a key is set.
  */
 
-import type { HasDb, HasEmail, HasEnvironment } from "@4dl/core";
+import type { HasDb, HasEmail, HasEnvironment, HasPlatformConfig } from "@4dl/core";
 import { getConfig, isDevLane, parseJson } from "@4dl/core";
 import { sendEmail, bareAddress, PLATFORM_FROM_DEFAULT, type SendResult } from "./mailer.js";
 
@@ -86,7 +86,7 @@ export interface EmailMeter {
  * remember?" the difference between a metered send and a free one.
  */
 export async function sendTenantEmail(
-  env: HasDb & HasEmail & HasEnvironment,
+  env: HasDb & HasEmail & HasEnvironment & HasPlatformConfig,
   tenantId: string,
   msg: EmailMsg,
   meter?: EmailMeter | null,
@@ -115,7 +115,7 @@ export async function sendTenantEmail(
   }
 
   // Platform: meter credits first (no-op charge skips the send when short).
-  const conf = await getConfig(env.DB);
+  const conf = await getConfig(env);
   const perEmail = Number(conf["email.credits_per_email"] ?? "1");
   const metered = meter && perEmail > 0 ? meter : null;
   if (metered) {

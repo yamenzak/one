@@ -1,6 +1,6 @@
 # @4dl/core
 
-The floor every 4DL package stands on. Four things, and nothing else will be
+The floor every 4DL package stands on. Five things, and nothing else will be
 added here that any single app could own.
 
 | Module | What it is |
@@ -9,6 +9,8 @@ added here that any single app could own.
 | `json.ts` | `j` / `parseJson` — JSON columns read defensively, never throwing. |
 | `bindings.ts` | The **bindings contract**: `HasDb`, `HasCache`, `HasMedia`, `HasAi`, `HasEmail`, `HasEnvironment`, `isDevLane`. |
 | `schema.ts` | The **composed schema runner**: `SchemaModule`, `applySchema`, `schemaGate`. |
+| `config.ts` | `app_config` — the operator-tunable settings table — **and the shared platform-config store underneath it**. |
+| `admin-routes.ts` | The operator routes over that shared store, exported from `@4dl/core/admin-routes`. |
 | `boundary.ts` | The **package boundary checker**. Node-only, exported from `@4dl/core/boundary` so it can never reach a Worker bundle. |
 
 ## The bindings contract
@@ -59,6 +61,92 @@ is why `apps/api/test/schema-module.test.ts` asserts them:
 
 Declare `scoped` next to the DDL so erasure can be derived rather than
 hand-maintained (Stage 7).
+
+## Config: two layers, and the app's own wins
+
+`getConfig` reads `app_config` whole and hands back one object. That much is
+unchanged. What is new is a second, **optional** store underneath it: a single
+KV namespace (`PLATFORM_CONFIG`) bound with the **same id into every 4DL
+worker**, holding one JSON object.
+
+```
+app_config row (non-empty)  →  wins, always
+shared blob                 →  the fallback
+neither                     →  unset, exactly as before
+```
+
+The problem it solves is arithmetic. There is one Google account, one Stripe
+account, one Cloudflare account and one Turnstile widget behind every product
+here — and before this, one copy of each credential *per app*, typed in by hand
+on each app's `admin.` door. Every new product multiplied the configuration
+instead of inheriting it, and a rotated key had to be re-pasted N times or one
+app silently kept using the old one.
+
+### Why a shared STORE and not a central config API
+
+The obvious design is a central admin worker that pushes config into each app's
+D1. It cannot be built the way it sounds: a worker cannot write another worker's
+database, so "pushes config" means **a privileged config-write HTTP endpoint in
+every app**, authenticated by a machine token, accepting Stripe secret keys.
+That is strictly worse than the passkey-and-OTP human session guarding the doors
+today — it adds a second, weaker way in, to every product, for the most valuable
+data any of them holds.
+
+Sharing the store instead has three properties that design does not: no worker
+writes another worker's database, existing rows keep winning so nothing migrates,
+and an unbound namespace changes nothing at all.
+
+### "Non-empty wins", not "present wins"
+
+Every consumer already treats `""` as unconfigured — `if (!apiToken)`, `.trim()`
+then a falsy check, `Boolean(cfg["turnstile.secret"])`. If a present-but-empty
+row won, clearing a key on one app's console would mask the shared value with
+nothing anywhere naming why: the panel shows a configured key and the app
+reports "not configured".
+
+So an empty local row falls through. The cost is real and worth stating — you
+cannot switch a shared key off for one app by blanking it. Give that app its own
+value, or do not share the key.
+
+### The allow-list is the blast radius
+
+`SHARED_CONFIG_KEYS` is explicit, and the write path refuses anything else.
+A shared store that accepted `schema:kova` or `platform.maintenance` would let
+one console's typo take out every product at once — and blast radius is the
+whole argument against the cross-worker design in the first place.
+
+Four keys look shareable and are not, each for a specific reason:
+
+| key | why it stays app-local |
+|---|---|
+| `email.from` | carries the app's display **name**. The address is shared; the sender line is the product's. |
+| `stripe.*.webhook_secret` | a signing secret per Stripe **endpoint**, and each app has its own webhook URL. Shared, every event fails verification. |
+| `cf.saas.zone_id` / `.cname_target` / `.worker_name` | the app's own zone and worker. Only the account **token** is common. |
+| `platform.maintenance*` | closing one product is not closing the others. |
+
+`schema:*`, `plans.catalog_version` and `stripe.catalog_stash.*` are absent for a
+harder reason: sharing any of the three corrupts state rather than merely
+misconfiguring it.
+
+### Threading it
+
+`getConfig` takes a `ConfigSource` — either a bare `D1Database` (app-local only,
+which is right for the schema runner's markers and Stripe's parked catalog ids)
+or an env carrying `DB` and an optional `PLATFORM_CONFIG`. Pass the env from any
+consumer that should see the shared layer; pass the database from anything that
+should not. `setConfig` deliberately takes only a `D1Database`: it writes the
+layer that OVERRIDES the shared one, and a writer accepting either store would
+eventually be handed the wrong one.
+
+### Provisioning
+
+The namespace is **absent from every `wrangler.jsonc` until it is real**. A
+placeholder would be worse than nothing: `apps.mjs ready` reads every id in the
+file, so a fake one marks the app un-provisioned and `deploy.yml` skips it.
+Actions → *Provision an app on Cloudflare* finds-or-creates the namespace by
+title and writes the binding in the same run. Until then every app reads its own
+`app_config` exactly as before.
+
 
 ## The boundary checker
 

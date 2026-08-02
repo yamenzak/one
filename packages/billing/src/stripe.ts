@@ -23,6 +23,7 @@
  */
 
 import { getConfig, setConfig } from "@4dl/core";
+import type { ConfigSource } from "@4dl/core";
 
 export type StripeMode = "disabled" | "test" | "live";
 export type StripeLane = "test" | "live";
@@ -94,8 +95,8 @@ export function resolveStripeConfig(raw: Record<string, string | undefined>): St
   return { mode, lane, ...values, sources };
 }
 
-export async function stripeConfig(db: D1Database): Promise<StripeConfig> {
-  return resolveStripeConfig(await getConfig(db));
+export async function stripeConfig(src: ConfigSource): Promise<StripeConfig> {
+  return resolveStripeConfig(await getConfig(src));
 }
 
 export function stripeEnabled(cfg: StripeConfig): boolean {

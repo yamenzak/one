@@ -20,7 +20,7 @@
  */
 
 import { type BalanceView, creditsForUsage, creditsPerMillionTokens, creditsPerUnit, referenceCredits, REFERENCE_USAGE, type ModelRate, type Usage } from "@4dl/billing/model";
-import type { HasAi, HasDb, HasEnvironment } from "@4dl/core";
+import type { HasAi, HasDb, HasEnvironment, HasPlatformConfig } from "@4dl/core";
 import { getConfig, newId, nowMs } from "@4dl/core";
 import { shouldUseMockLane } from "./mock-lane.js";
 import { aiRegistry, type AiTone, type TenantAiConfig } from "./registry.js";
@@ -60,7 +60,7 @@ export interface CreditAuthorityNamespace {
   get(id: DurableObjectId): CreditAuthorityStub;
 }
 
-export type AiBindings = HasDb & HasEnvironment & HasAi & {
+export type AiBindings = HasDb & HasEnvironment & HasAi & HasPlatformConfig & {
   /**
    * The per-tenant credit authority.
    *
@@ -826,7 +826,7 @@ export async function generate(env: AiBindings, input: GenerateInput): Promise<G
   const enabled = fcfg.enabled ?? toggles[input.feature] ?? true;
   if (enabled === false) return { ok: false, error: "unavailable", detail: `feature "${input.feature}" is turned off in AI settings` };
 
-  const cfg = await getConfig(env.DB);
+  const cfg = await getConfig(env);
   const geminiKey = cfg["google.gemini_key"];
 
   // Model: a tenant's per-feature override (task-compatible) wins, else the
@@ -1062,7 +1062,7 @@ export async function generateImage(env: AiBindings, input: GenerateImageInput):
   // (kept, not replaced) — same additive rule as the text features.
   const prompt = fcfg.system && fcfg.system.trim() ? `${input.prompt}\n\nAdditional instruction: ${fcfg.system.trim()}` : input.prompt;
 
-  const cfg = await getConfig(env.DB);
+  const cfg = await getConfig(env);
   const geminiKey = cfg["google.gemini_key"];
   const mockMode = cfg["ai.mock"] ?? "auto";
   // Dev-only in every mode (incl. an explicit `ai.mock = "on"`); production
@@ -1193,7 +1193,7 @@ const TTS_FALLBACK_RATE: ModelRate = { inputRate: 45_455, outputRate: 909_091, m
  * hold on failure. Caller stores + reuses the bytes; mock lane returns silence.
  */
 export async function generateSpeech(env: AiBindings, input: { tenantId: string; feature: string; text: string; voice?: string }): Promise<GenerateSpeechResult> {
-  const cfg = await getConfig(env.DB);
+  const cfg = await getConfig(env);
   const geminiKey = cfg["google.gemini_key"];
   const mockMode = cfg["ai.mock"] ?? "auto";
   // Mock (silent WAV) is dev-only in every mode; production fails closed on a

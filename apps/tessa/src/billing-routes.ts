@@ -101,7 +101,7 @@ export const billingRoutes = new Hono<AppEnv>()
       listPacks(c.env.DB),
       tenantEntitlements(c.env.DB, who.tenantId),
       balanceOf(c.env, who.tenantId).catch(() => null),
-      stripeConfig(c.env.DB),
+      stripeConfig(c.env),
     ]);
     return c.json({
       // Spread the whole subscription shape rather than hand-picking fields:
@@ -127,7 +127,7 @@ export const billingRoutes = new Hono<AppEnv>()
     const who = requireTenant(c);
     if (!who) return c.json({ error: "unauthenticated" }, 401);
     if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
     const body = z.object({ planId: z.string(), returnUrl: z.string().url() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
@@ -166,7 +166,7 @@ export const billingRoutes = new Hono<AppEnv>()
     const who = requireTenant(c);
     if (!who) return c.json({ error: "unauthenticated" }, 401);
     if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
     const body = z.object({ packId: z.string(), returnUrl: z.string().url() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
@@ -198,7 +198,7 @@ export const billingRoutes = new Hono<AppEnv>()
     const who = requireTenant(c);
     if (!who) return c.json({ error: "unauthenticated" }, 401);
     if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
     const body = z.object({ returnUrl: z.string().url() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
@@ -224,7 +224,7 @@ export const billingRoutes = new Hono<AppEnv>()
  * Adding a fifth path shape would mean remembering all four.
  */
 export const stripeWebhookRoutes = new Hono<AppEnv>().post("/webhooks/stripe", async (c) => {
-  const cfg = await stripeConfig(c.env.DB);
+  const cfg = await stripeConfig(c.env);
   const payload = await c.req.text();
   const sig = c.req.header("stripe-signature") ?? "";
   const outcome = await dispatchEvent(
@@ -463,7 +463,7 @@ export const billingAdminRoutes = new Hono<AppEnv>()
   /** Create the Stripe products + prices for every plan and pack that has none. */
   .post("/admin/stripe/sync", async (c) => {
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
     await seedBilling(c.env.DB);
     return c.json(await syncCatalog(c.env.DB, cfg.secretKey));

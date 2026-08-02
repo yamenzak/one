@@ -7,6 +7,9 @@ name: Provision an app on Cloudflare
 # its first sign-in code", in one run and with no copy-paste:
 #
 #   1. creates the D1 database / KV namespace / R2 bucket it binds, if missing
+#   1b. finds-or-creates the ONE platform-wide config namespace and binds it —
+#      the same id in every app, so a credential the whole platform shares is
+#      set once rather than once per product (packages/core/src/config.ts)
 #   2. WRITES the real ids into its wrangler.jsonc and commits them
 #   3. builds its SPA and deploys the worker
 #   4. mints BETTER_AUTH_SECRET, but only if the worker has none
@@ -90,6 +93,7 @@ jobs:
             echo "kv=$(get .provision.kv)"
             echo "r2=$(get .provision.r2)"
             echo "email=$(get .email.name)"
+            echo "shared_title=$(node scripts/apps.mjs shared-config-title)"
           } >> "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@v4
@@ -105,6 +109,7 @@ jobs:
         env:
           D1_NAME: ${{ steps.app.outputs.d1 }}
           KV_TITLE: ${{ steps.app.outputs.kv }}
+          SHARED_TITLE: ${{ steps.app.outputs.shared_title }}
           R2_BUCKET: ${{ steps.app.outputs.r2 }}
         run: |
           set -uo pipefail
@@ -192,6 +197,32 @@ jobs:
             fail=1
           fi
 
+          # ── The SHARED config namespace ───────────────────────────────────
+          # NOT per-app: one namespace, the same id in every 4DL worker, holding
+          # the credentials the whole platform has in common. Whichever app is
+          # provisioned first creates it; every app after that finds it by title
+          # and binds the SAME id. That is the entire mechanism — there is no
+          # cross-worker call anywhere, only a shared store.
+          #
+          # `wrangler kv namespace create` prefixes the worker name onto the
+          # title, so this matches by SUFFIX exactly like the per-app KV above.
+          SHARED_ID=""
+          if [ -z "$SHARED_TITLE" ]; then
+            echo "No shared config namespace declared — skipping."
+          elif kv=$(require_list "KV namespaces" pnpm exec wrangler kv namespace list); then
+            SHARED_ID=$(printf '%s' "$kv" | jq -r --arg t "$SHARED_TITLE" '.[]? | select(.title | endswith($t)) | .id' | head -1)
+            if [ -n "$SHARED_ID" ]; then
+              echo "✓ Shared config namespace ending in '$SHARED_TITLE' exists ($SHARED_ID) — binding it."
+            else
+              echo "Creating the shared config namespace '$SHARED_TITLE'…"
+              pnpm exec wrangler kv namespace create "$SHARED_TITLE" >/dev/null 2>&1 || fail=1
+              SHARED_ID=$(pnpm exec wrangler kv namespace list 2>/dev/null | json_only | jq -r --arg t "$SHARED_TITLE" '.[]? | select(.title | endswith($t)) | .id' | head -1)
+              [ -n "$SHARED_ID" ] || { echo "::error::Created '$SHARED_TITLE' but could not read its id back."; fail=1; }
+            fi
+          else
+            fail=1
+          fi
+
           # ── R2 ────────────────────────────────────────────────────────────
           # No id to write back: R2 binds by NAME, so the config is already
           # right and only the bucket has to exist. "Already exists" is fine —
@@ -214,12 +245,17 @@ jobs:
           {
             echo "d1_id=$D1_ID"
             echo "kv_id=$KV_ID"
+            echo "shared_id=$SHARED_ID"
           } >> "$GITHUB_OUTPUT"
 
       # Structural, verified, and LOUD on failure — see the script's header for
       # why this is not two `sed -i` lines.
       - name: Write the ids into wrangler.jsonc
-        run: node scripts/bind-resource-ids.mjs "$APP" --d1 "${{ steps.create.outputs.d1_id }}" --kv "${{ steps.create.outputs.kv_id }}"
+        run: |
+          node scripts/bind-resource-ids.mjs "$APP" \
+            --d1 "${{ steps.create.outputs.d1_id }}" \
+            --kv "${{ steps.create.outputs.kv_id }}" \
+            --shared-config "${{ steps.create.outputs.shared_id }}"
 
       - name: Commit them
         env:

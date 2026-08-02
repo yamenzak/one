@@ -20,15 +20,25 @@
  * re-serialised.
  *
  * Usage:
- *   node scripts/bind-resource-ids.mjs <app> [--d1 <uuid>] [--kv <hex>]
+ *   node scripts/bind-resource-ids.mjs <app> [--d1 <uuid>] [--kv <hex>] [--shared-config <hex>]
  *
  * Exit 0 means the config now binds exactly what was passed — whether this run
  * changed it or it was already right. Any other exit means it does not.
+ *
+ * ── `--shared-config` INSERTS, the others only update ───────────────────────
+ *
+ * The platform-wide config namespace is the one binding that is deliberately
+ * absent from a config until it is real. A placeholder would be worse than
+ * nothing here: `isProvisioned` reads every id in the file, so a fake one marks
+ * the whole app un-provisioned and `deploy.yml` SKIPS it — which would take two
+ * live products off deploys the moment this landed, to wire a feature that
+ * degrades to nothing when unbound. So the entry appears the same run its id
+ * does, and this script grows an insert path for it.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { app, arraySpan, boundIds } from "./apps.mjs";
+import { app, arraySpan, boundIds, registry } from "./apps.mjs";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 
@@ -87,8 +97,51 @@ function bind(key, binding, field, value, label) {
   if (hits === 1) text = text.slice(0, start) + next + text.slice(end);
 }
 
+/**
+ * Set `field` on the `binding` entry, ADDING the entry when it is not there.
+ *
+ * Only used for the shared config namespace, and only because that entry is
+ * absent by design until its id exists (see the header). Everything else must
+ * keep failing loudly on a missing entry: a binding the config never declared
+ * is a config someone needs to look at, not one this script should invent.
+ */
+function bindOrAdd(key, binding, field, value, label, comment) {
+  const span = arraySpan(text, key);
+  if (!span) return problems.push(`no "${key}" array in ${a.dir}/wrangler.jsonc — nothing to bind ${label} into.`);
+  if (new RegExp(`"binding"\\s*:\\s*"${binding}"`).test(text.slice(...span))) return bind(key, binding, field, value, label);
+
+  const [start, end] = span;
+  const block = text.slice(start, end);
+  const entries = block.trim();
+  // Match the file's own indentation for the array's first entry, so the result
+  // reads like the hand-written JSONC around it rather than a machine's paste.
+  const indent = /\n(\s+)\S/.exec(block)?.[1] ?? "    ";
+  const added = `${entries ? `${entries.replace(/,\s*$/, "")},\n` : "\n"}${comment
+    .split("\n")
+    .map((l) => indent + l)
+    .join("\n")}\n${indent}{ "binding": "${binding}", "${field}": "${value}" }\n${indent.slice(0, -2)}`;
+  text = text.slice(0, start) + `\n${indent}` + added + text.slice(end);
+  notes.push(`${label}: added, bound to ${value}`);
+}
+
 if (opts.d1) bind("d1_databases", boundIds(id).d1Binding, "database_id", opts.d1, "D1");
 if (opts.kv) bind("kv_namespaces", a.provision?.kv ?? "CACHE", "id", opts.kv, "KV");
+if (opts["shared-config"] && registry.sharedConfig) {
+  bindOrAdd(
+    "kv_namespaces",
+    registry.sharedConfig.binding,
+    "id",
+    opts["shared-config"],
+    "shared config",
+    [
+      "// The SHARED platform config store — the SAME namespace id in every 4DL",
+      "// app, holding the credentials the whole platform has in common (the",
+      "// Google key, the Stripe account, the Cloudflare token, the Turnstile",
+      "// widget). This app's own `app_config` rows still win. Written here by",
+      "// provisioning; see packages/core/src/config.ts.",
+    ].join("\n"),
+  );
+}
 
 if (problems.length) {
   for (const p of problems) console.error(`BAD  ${p}`);

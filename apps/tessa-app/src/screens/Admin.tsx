@@ -28,6 +28,7 @@ import {
   PlatformMaintenanceSection,
   PlatformStripeSection,
   PlatformTurnstileSection,
+  PlatformSharedConfigSection,
   useConsoleSection,
   type ConsoleSection,
 } from "@4dl/admin";
@@ -105,6 +106,12 @@ const SECTIONS: ConsoleSection[] = [
   },
   { key: "domains", label: "Custom domains", blurb: "Centre domains and their certificates", icon: Globe, tone: "case", render: () => <PlatformDomainsSection api={api} errorText={errorText} tenantNoun="centre" cnameExample="saas.4dl.app" /> },
   { key: "security", label: "Security", blurb: "The bot check on sign-in", icon: ShieldCheck, tone: "danger", render: () => <PlatformTurnstileSection api={api} errorText={errorText} /> },
+  /* The SHARED store: one value, read by every 4DL app. It sits beside the
+     per-app panels rather than replacing them, because the two answer different
+     questions — "what does the platform use" and "what does THIS app use
+     instead". A save here reaches every product, which is why its panel is the
+     only settings surface in this console that confirms first. */
+  { key: "platform", label: "Shared platform config", blurb: "Keys every 4DL app reads — set once, not once per product", icon: Globe, tone: "case", render: () => <PlatformSharedConfigSection api={api} errorText={errorText} /> },
   /* `@4dl/admin`'s own: who a deployment sends mail as is the shared email
      package's subject, not Tessa's. */
   { key: "email", label: "Email delivery", blurb: "How this deployment sends mail", icon: Mail, tone: "primary", render: () => <PlatformEmailSection api={api} errorText={errorText} /> },

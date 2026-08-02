@@ -29,7 +29,7 @@
  *              dunning apparatus is absent rather than stubbed.
  */
 
-import type { HasCache, HasDb } from "@4dl/core";
+import type { HasCache, HasDb, HasPlatformConfig } from "@4dl/core";
 import { parseJson } from "@4dl/core";
 import { classifyHost, tenantHostname, type SlugOptions, type HostShape } from "./hosts.js";
 import { resolveHostGate, type HostGate } from "./standing.js";
@@ -52,11 +52,11 @@ export interface TenancyConfig {
    * app that does not bill its tenants, and it is why the host gate is not a hard
    * dependency on a billing package.
    */
-  statusOf?: (db: D1Database, tenantId: string) => Promise<string | null>;
+  statusOf?: (env: HasDb & HasPlatformConfig, tenantId: string) => Promise<string | null>;
 }
 
 /** Bindings this module reads. KV is optional — without it, no host cache. */
-export type TenancyBindings = HasDb & Partial<HasCache>;
+export type TenancyBindings = HasDb & Partial<HasCache> & HasPlatformConfig;
 
 /** The environment fields that locate the root domain. */
 export interface RootDomainEnv {
@@ -350,7 +350,7 @@ export async function resolveHost<B = unknown>(
 
   if (!tenant) return bare;
 
-  const status = cfg.statusOf ? await cfg.statusOf(env.DB, tenant.tenantId) : null;
+  const status = cfg.statusOf ? await cfg.statusOf(env, tenant.tenantId) : null;
   const fresh: HostTenant<B> = { ...tenant, subscriptionStatus: status };
   return { ...bare, tenant: fresh, gate: resolveHostGate(status) };
 }

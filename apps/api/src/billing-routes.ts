@@ -65,7 +65,7 @@ export const billingRoutes = new Hono<AppEnv>()
     // and the platform holds no account for it to report on. Its setup lives on
     // `/api/payments/settings`, which is that provider's business and not this
     // endpoint's — this one describes the studio's standing with US.
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     const csubs = await c.env.DB.prepare("SELECT budgets_json FROM subject_subscriptions WHERE tenant_id = ? AND status IN ('active','paused')").bind(who.tenantId).all<{ budgets_json: string | null }>();
     const now = nowIso();
     let lapsed = 0, expiringSoon = 0;
@@ -141,7 +141,7 @@ export const billingRoutes = new Hono<AppEnv>()
   .post("/billing/portal", async (c) => {
     const who = requireTenant(c)!;
     if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
     const body = z.object({ returnUrl: z.string().url() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);

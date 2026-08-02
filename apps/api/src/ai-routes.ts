@@ -1613,7 +1613,7 @@ export interface SelfTestPlanRun {
 /** What the chosen scope would run, and the upper bound it would spend. */
 async function planSelfTest(env: Env, s: SelfTestScopeInput) {
   const enabled = await listModels(env.DB);
-  const cfg = await getConfig(env.DB);
+  const cfg = await getConfig(env);
   const geminiKeySet = !!cfg["google.gemini_key"];
   const mockMode = cfg["ai.mock"] ?? "auto";
   const isDevelopment = env.ENVIRONMENT === "development";

@@ -37,6 +37,22 @@ export interface HasCache {
   CACHE: KVNamespace;
 }
 
+/**
+ * The SHARED config store — one KV namespace, the same id in every 4DL app.
+ *
+ * OPTIONAL, and it has to be. A deployment that has not provisioned it (and
+ * every `wrangler dev`, and the whole test suite) simply does not bind it, and
+ * `getConfig` behaves exactly as it did before this existed. The mechanism must
+ * not be the thing that decides whether an app boots.
+ *
+ * It is also the one binding that is deliberately NOT per-app: the point is that
+ * `google.gemini_key` is set once rather than once per product. See config.ts
+ * for what may live in it and what may not.
+ */
+export interface HasPlatformConfig {
+  PLATFORM_CONFIG?: KVNamespace;
+}
+
 /** R2 — the media bucket. */
 export interface HasMedia {
   MEDIA: R2Bucket;

@@ -110,7 +110,7 @@ export const stripeRoutes = new Hono<AppEnv>()
   // ── Platform rail ──────────────────────────────────────────────────────────
   .post("/billing/checkout-plan", async (c) => {
     const who = requireTenant(c)!;
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
     const body = z.object({ planId: z.string(), returnUrl: z.string().url() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
@@ -146,7 +146,7 @@ export const stripeRoutes = new Hono<AppEnv>()
 
   .post("/billing/checkout-pack", async (c) => {
     const who = requireTenant(c)!;
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
     const body = z.object({ packId: z.string(), returnUrl: z.string().url() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
@@ -175,7 +175,7 @@ export const stripeRoutes = new Hono<AppEnv>()
   // remain as a fallback.
   .post("/billing/pack-intent", async (c) => {
     const who = requireTenant(c)!;
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
     const body = z.object({ packId: z.string(), promoCode: z.string().optional() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
@@ -235,7 +235,7 @@ export const stripeRoutes = new Hono<AppEnv>()
 
   .post("/billing/plan-intent", async (c) => {
     const who = requireTenant(c)!;
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
     const body = z.object({ planId: z.string() }).safeParse(await c.req.json().catch(() => null));
     if (!body.success) return c.json({ error: "invalid body" }, 400);
@@ -320,7 +320,7 @@ export const stripeRoutes = new Hono<AppEnv>()
    * parked events that work today.
    */
   .post("/stripe/webhook", async (c) => {
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     const payload = await c.req.text();
     const sig = c.req.header("stripe-signature") ?? "";
     const outcome = await dispatchEvent(
@@ -497,7 +497,7 @@ export const stripeAdminRoutes = new Hono<AppEnv>()
   // Orphaned Stripe prices are left alone on purpose — tenants already
   // subscribed on one keep that price until they re-subscribe.
   .post("/admin/stripe/sync", async (c) => {
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
     const body = z.object({ resyncPrices: z.boolean().default(false) }).safeParse(await c.req.json().catch(() => ({})));
     await seedBilling(c.env.DB);

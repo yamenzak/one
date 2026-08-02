@@ -28,6 +28,7 @@ import { guard } from "./route-guard.js";
 import { domainAdminRoutes, domainRoutes } from "./domain-routes.js";
 import { orgCreateGuard, orgUpdateGuard } from "./org-guard.js";
 import { emailAdminRoutes } from "@4dl/email/admin-routes";
+import { sharedConfigRoutes } from "@4dl/core/admin-routes";
 import { maintenanceAdminRoutes, maintenanceMiddleware } from "@4dl/tenancy";
 import type { MiddlewareHandler } from "hono";
 
@@ -118,6 +119,16 @@ app.route("/api", emailAdminRoutes(
   { isPlatformAdmin: (c) => isPlatformAdmin(c as never) },
   { from: "Template <noreply@template.local>" },
 ) as unknown as Hono<AppEnv>);
+
+/**
+ * The SHARED platform config store, on the operator door.
+ *
+ * Every app's console writes the SAME namespace, which is the point: the Google
+ * key, the Stripe account, the Cloudflare token and the Turnstile widget are one
+ * fact about the platform, not one per product. This app's own `app_config` rows
+ * still win — see `packages/core/src/config.ts`.
+ */
+app.route("/api", sharedConfigRoutes({ isPlatformAdmin: (c) => isPlatformAdmin(c as never) }) as unknown as Hono<AppEnv>);
 
 /**
  * The maintenance switch, on the operator door.

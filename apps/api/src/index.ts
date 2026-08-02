@@ -24,6 +24,7 @@ import { contextRoutes } from "./context-routes.js";
 import { notifyRoutes } from "@4dl/notify/routes";
 import { billingRoutes, adminRoutes, emailConfigRoutes } from "./billing-routes.js";
 import { maintenanceRoutes } from "./maintenance.js";
+import { sharedConfigRoutes } from "@4dl/core/admin-routes";
 import { downgradeRoutes } from "./downgrade-routes.js";
 import { clientRoutes } from "./clients.js";
 import { memberRoutes } from "./member-routes.js";
@@ -135,6 +136,15 @@ app.route("/api", billingRoutes);
 app.route("/api", downgradeRoutes);
 app.route("/api", adminRoutes);
 app.route("/api", emailConfigRoutes);
+/**
+ * The SHARED platform config store, on the operator door.
+ *
+ * Every app's console writes the SAME namespace, which is the point: the Google
+ * key, the Stripe account, the Cloudflare token and the Turnstile widget are one
+ * fact about the platform, not one per product. This app's own `app_config`
+ * rows still win — see `packages/core/src/config.ts`.
+ */
+app.route("/api", sharedConfigRoutes({ isPlatformAdmin: (c) => isPlatformAdmin(c as never) }) as unknown as Hono<AppEnv>);
 app.route("/api", maintenanceRoutes as unknown as Hono<AppEnv>);
 app.route("/api", clientRoutes);
 app.route("/api", memberRoutes);

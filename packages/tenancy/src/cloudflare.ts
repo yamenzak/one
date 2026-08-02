@@ -21,6 +21,7 @@
  */
 
 import { getConfig } from "@4dl/core";
+import type { ConfigSource } from "@4dl/core";
 
 const API = "https://api.cloudflare.com/client/v4";
 
@@ -62,8 +63,8 @@ export interface SaasConfig {
  * `defaultWorkerName` is the app's own script name, used when the operator has
  * not overridden it.
  */
-export async function saasConfig(db: D1Database, defaultWorkerName = FALLBACK_WORKER_NAME): Promise<SaasConfig | null> {
-  const cfg = await getConfig(db);
+export async function saasConfig(src: ConfigSource, defaultWorkerName = FALLBACK_WORKER_NAME): Promise<SaasConfig | null> {
+  const cfg = await getConfig(src);
   const apiToken = cfg["cf.saas.api_token"];
   const zoneId = cfg["cf.saas.zone_id"];
   const cnameTarget = cfg["cf.saas.cname_target"];

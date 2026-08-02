@@ -296,7 +296,7 @@ export const downgradeRoutes = new Hono<AppEnv>()
     if ("response" in r) return r.response;
     if (!r.report.eligible) return c.json({ error: "downgrade_blocked", ...r.report }, 409);
 
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     if (stripeEnabled(cfg) && sub.stripe_sub_id) {
       return target.price_usd_month > 0
         ? c.json({ ok: false, requiresCheckout: true, ...r.report })

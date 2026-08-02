@@ -19,6 +19,7 @@
  */
 
 import { stripeConfig, stripeEnabled } from "@4dl/billing";
+import type { HasDb, HasPlatformConfig } from "@4dl/core";
 import {
   canonicalHost as tCanonicalHost,
   invalidateTenantHosts as tInvalidateTenantHosts,
@@ -81,8 +82,8 @@ export const APP_RESERVED_LABELS: ReadonlySet<string> = new Set(["tessa", "tesse
  * house rule, the same one Kova states at length: fail CLOSED on their
  * non-payment, fail OPEN on ours.
  */
-async function statusOf(db: D1Database, tenantId: string): Promise<string | null> {
-  const row = await db
+async function statusOf(env: HasDb & HasPlatformConfig, tenantId: string): Promise<string | null> {
+  const row = await env.DB
     .prepare("SELECT s.status, s.comp, p.price_usd_month FROM subscriptions s LEFT JOIN plans p ON p.id = s.plan_id WHERE s.tenant_id = ?")
     .bind(tenantId)
     .first<{ status: string | null; comp: number | null; price_usd_month: number | null }>()
@@ -91,7 +92,7 @@ async function statusOf(db: D1Database, tenantId: string): Promise<string | null
   // here and the config read below never touches the hot path.
   if (row?.comp) return row.status ?? null;
   if (Number(row?.price_usd_month) > 0) return row?.status ?? null;
-  const cfg = await stripeConfig(db).catch(() => null);
+  const cfg = await stripeConfig(env).catch(() => null);
   if (!cfg || !stripeEnabled(cfg)) return row?.status ?? null;
   return "incomplete";
 }

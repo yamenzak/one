@@ -9,6 +9,7 @@
  */
 
 import { saasConfig as tSaasConfig, type SaasConfig } from "@4dl/tenancy";
+import type { ConfigSource } from "@4dl/core";
 
 export {
   createCustomHostname,
@@ -26,4 +27,4 @@ export {
 export const DEFAULT_WORKER_NAME = "kova";
 
 /** Read + validate the CF for SaaS config. Returns null when not configured. */
-export const saasConfig = (db: D1Database): Promise<SaasConfig | null> => tSaasConfig(db, DEFAULT_WORKER_NAME);
+export const saasConfig = (src: ConfigSource): Promise<SaasConfig | null> => tSaasConfig(src, DEFAULT_WORKER_NAME);

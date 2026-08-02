@@ -30,7 +30,7 @@ export const settingsRoutes = new Hono<AppEnv>()
       .bind(who.tenantId)
       .first<{ branding_json: string | null; ai_toggles_json: string | null; marketplace_json: string | null; integrations_json: string | null; email_config_json: string | null; notif_policy_json: string | null; lapse_json: string | null; stripe_account_id: string | null }>();
     const ent = await tenantEntitlements(c.env.DB, who.tenantId);
-    const platformFrom = (await getConfig(c.env.DB))["email.platform_from"] || PLATFORM_FROM_DEFAULT;
+    const platformFrom = (await getConfig(c.env))["email.platform_from"] || PLATFORM_FROM_DEFAULT;
     return c.json({
       branding: parseJson(row?.branding_json, { accent: null, logoUrl: null, welcome: null }),
       aiToggles: parseJson(row?.ai_toggles_json, {}),
@@ -45,7 +45,7 @@ export const settingsRoutes = new Hono<AppEnv>()
       // What ONE email costs on the Kova lane. Brevo is the studio's own
       // account and costs them nothing here, so the number is only meaningful
       // for the platform provider — the UI shows it only there.
-      emailCreditsEach: Number((await getConfig(c.env.DB))["email.credits_per_email"] ?? "1"),
+      emailCreditsEach: Number((await getConfig(c.env))["email.credits_per_email"] ?? "1"),
       // Owner-governed studio-wide email allow-list, by category AND audience
       // (email clients vs staff about a category, separately).
       notifCategories: NOTIF_CATEGORIES,

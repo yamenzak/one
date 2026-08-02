@@ -15,6 +15,7 @@ The operator console every 4DL app puts on its `admin.` door.
 | `sections/domains.tsx` | Cloudflare for SaaS: token, zone, CNAME target, worker-name override. |
 | `sections/turnstile.tsx` | The bot check on sign-in — including the one combination that locks everybody out. |
 | `sections/ai.tsx` | Provider key, mock lane, credit markup, catalog sync, and the per-lane default-model picker. |
+| `sections/shared-config.tsx` | **The shared platform store** — the keys every 4DL app reads, set once instead of once per product. |
 
 ## The sections are the app's; the frame is not
 
@@ -54,9 +55,43 @@ after `pushState` deliberately: routers subscribe to `popstate` and `pushState`
 fires no event, so without it a mounted router's `location` goes stale the moment
 a section opens.
 
+## The shared-config panel is the one that saves to every app
+
+Every other panel here writes THIS app's `app_config`. `sections/shared-config.tsx`
+writes `@4dl/core`'s shared KV namespace, which every 4DL worker binds by the
+same id — so a save on `admin.kova.4dl.app` is a save for Tessa too.
+
+That is the feature (one Google account should not need configuring twice) and
+it is also the risk, so this is the only settings surface in the console that
+**confirms before saving**, and the dialog names the blast radius rather than
+burying it in a tooltip.
+
+Two things the panel exists to make visible, because neither is inferable from
+any other screen:
+
+- **This app's own value still wins.** Each row carries `overriddenHere`, so
+  "I set it centrally and this app still uses the old one" has a visible cause.
+  Without it the override is a database row nobody is looking at.
+- **The per-app panels are literal.** A key set in the shared store and not
+  overridden reads as *unset* on the AI / Email / Stripe / Turnstile panels,
+  because those report only what the app holds of its own.
+
+That second one looks like a bug to fix by making those panels show the merged
+value. It is not: they **save every field they display**, so a merged read plus
+one save would silently copy the shared value into this app as a permanent local
+override — turning a display fix into the exact drift the shared store exists to
+remove.
+
+Labels and grouping live in the panel, not in core. Which keys are safe to share
+is a fact about the platform's architecture; what to call them is copy. A key
+that reaches the API with no label here still renders, under "Other", spelled as
+its raw key — an unlabelled setting is a nuisance, an invisible one is a setting
+nobody knows is set.
+
+
 ## What a panel may live here
 
-Only configuration a **shared package already owns**. Five qualify today:
+Only configuration a **shared package already owns**. Six qualify today:
 
 - **Email delivery** — `email.provider`, `email.from`, `email.platform_from` and
   `email.credits_per_email` are `@4dl/email`'s keys, read by nothing else, and
@@ -71,6 +106,9 @@ Only configuration a **shared package already owns**. Five qualify today:
 - **Stripe** — `/admin/stripe/{status,config,sync}` are `@4dl/billing`'s, and
   identical in every app that has them. Two lanes, the mismatch alarm and the
   price rebuild are facts about Stripe, not about any product.
+- **Shared platform config** — `@4dl/core` owns the store, the allow-list and
+  `sharedConfigRoutes`. Which credentials the whole platform has in common is a
+  fact about the platform, and no product has an opinion about it.
 - **Custom domains** — `@4dl/tenancy` has owned `domainAdminRoutes` since Stage
   10a, so every app that mounts it (the template included) had a working
   custom-domain feature and no way to configure it.

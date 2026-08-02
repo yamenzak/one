@@ -28,9 +28,19 @@
     "             always noreply@4dl.app — one verified sender for the platform,",
     "             so a new app inherits a working one instead of a plausible-",
     "             looking dead one.",
-    "  e2e        workspace package running its Playwright suite, or null"
+    "  e2e        workspace package running its Playwright suite, or null",
+    "",
+    "`sharedConfig` below is the one resource that is NOT per-app: a single KV",
+    "namespace bound with the SAME id into every worker, holding the credentials",
+    "the whole platform shares (see packages/core/src/config.ts). Provisioning",
+    "creates it once — whichever app runs first — and binds the id it finds into",
+    "every app after that. `binding` is the name every worker's Env expects, and",
+    "`title` is what the namespace is called on Cloudflare; the workflow matches",
+    "it as a SUFFIX, because `wrangler kv namespace create` prefixes the worker",
+    "name onto whatever title it is given."
   ],
   "defaultEmailAddress": "noreply@4dl.app",
+  "sharedConfig": { "binding": "PLATFORM_CONFIG", "title": "4dl-platform-config" },
   "apps": [
     {
       "id": "kova",

@@ -52,9 +52,12 @@ apps/
              # Typechecks + tests in this workspace so it cannot rot. Copy it.
 packages/
   core/      # @4dl/core — the floor every 4DL package stands on: ids, defensive
-             # JSON columns, the STRUCTURAL BINDINGS CONTRACT (HasDb/HasMedia/…)
-             # and the COMPOSED SCHEMA RUNNER (SchemaModule/applySchema), plus
-             # the boundary checker at @4dl/core/boundary. See its README.
+             # JSON columns, the STRUCTURAL BINDINGS CONTRACT (HasDb/HasMedia/…),
+             # the COMPOSED SCHEMA RUNNER (SchemaModule/applySchema), the
+             # app_config table AND the SHARED PLATFORM-CONFIG STORE under it
+             # (one KV, same id in every worker — set the Google key once, not
+             # once per product), plus the boundary checker at
+             # @4dl/core/boundary. See its README.
   ai/        # @4dl/ai — the METERED generation path: model catalog, Workers AI +
              # Gemini, reserve→run→settle against the credit DO, the dev-only
              # mock lane, pricing parsers. Prompts are the app's. See its README.
@@ -156,6 +159,14 @@ filesystem path, not a package dependency. A missing build makes the worker's
 Miniflare suite abort reporting **"no tests"**, which reads as a pass. That is
 what turned the merge adding `apps/tessa-app` red; naming the SPA here is the fix.
 
+**One resource in the registry is NOT per-app: `sharedConfig`.** A single KV
+namespace bound with the same id into every worker, holding the credentials the
+whole platform has in common. Provisioning creates it once — whichever app runs
+first — and binds the id it finds into every app after that. It is deliberately
+ABSENT from a `wrangler.jsonc` until its id is real: `apps.mjs ready` reads every
+id in the file, so a placeholder would mark a live app un-provisioned and
+`deploy.yml` would silently SKIP it.
+
 **Email is one address for the whole platform: `noreply@4dl.app`**, with a per-app
 display name (`Kova <noreply@4dl.app>`). Onboarding a sender in Cloudflare Email
 Sending is per-zone manual work, so sharing the address means a new app inherits
@@ -235,6 +246,34 @@ remote bindings without editing the config (this is what the E2E suite does).
   injected (`gate: (c) => c.get("host").gate`), which is what keeps auth
   independent of billing. Read `packages/auth/README.md` before changing any of
   the five — particularly the three seat doors and the grant-bounding rule.
+- **Two config layers, and the app's own wins.** `getConfig` reads this app's
+  `app_config` first and falls back to a SHARED KV (`PLATFORM_CONFIG`) bound with
+  the same id into every 4DL worker. There is one Google account, one Stripe
+  account, one Cloudflare account and one Turnstile widget behind every product,
+  and each app used to hold its own copy — so a rotated key had to be re-pasted
+  per app or one app quietly kept the old one. The store is SHARED; no worker
+  writes another worker's database. The alternative (a central admin that pushes
+  config into each app) is a privileged config-write endpoint in every product,
+  authenticated by a machine token, accepting Stripe secret keys — strictly worse
+  than the passkey/OTP human session on the doors today.
+  - **Non-empty wins, not present wins.** Every consumer already reads `""` as
+    unconfigured, so a blank local row falls THROUGH rather than masking the
+    shared value. The consequence: you cannot switch a shared key off for one app
+    by blanking it — give that app its own value, or do not share the key.
+  - **`SHARED_CONFIG_KEYS` is an explicit allow-list**, enforced on read AND
+    write. `email.from` (per-app display name), `stripe.*.webhook_secret`
+    (per-endpoint), `cf.saas.zone_id`/`.cname_target`/`.worker_name` (per-app
+    zone and worker) and `platform.maintenance*` are deliberately excluded; so
+    are `schema:*`, `plans.catalog_version` and `stripe.catalog_stash.*`, which
+    would corrupt state rather than merely misconfigure it.
+  - **`admin.<app>` is not going away.** Every app's console writes the same
+    shared store — that is what removes the "configure it N times" problem — but
+    maintenance, the plan catalog and custom domains are genuinely per-app. The
+    per-app panels stay LOCAL-only on purpose: they save every field they display,
+    so showing the merged value would copy a shared key into one app as a
+    permanent override on the next save.
+  - **Unbound changes nothing.** No binding, no behaviour change — which is what
+    every `wrangler dev` and the whole test suite run.
 - **Row-level scope**: every coaching route goes through
   `requireClientAccess(c, clientId)` in `clients.ts` — owner/assistant = tenant
   match, trainer = `client_trainers` assignment, client = own record. This is

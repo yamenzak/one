@@ -11,6 +11,17 @@ export interface Env {
   DB: D1Database;
   /** External-provider response cache + short-lived tokens. */
   CACHE: KVNamespace;
+  /**
+   * The SHARED platform config store — one KV namespace, the SAME id in every
+   * 4DL worker. Optional: unbound, `getConfig` reads only this app's own
+   * `app_config` and nothing changes.
+   *
+   * It exists so a credential the whole platform shares — the Google key, the
+   * Stripe account, the Cloudflare token, the Turnstile widget — is set once
+   * rather than once per product. This app's own rows still win. See
+   * `packages/core/src/config.ts`.
+   */
+  PLATFORM_CONFIG?: KVNamespace;
   /** Media library (exercise media, food images, progress photos, labs). */
   MEDIA: R2Bucket;
   /** Workers AI. Optional in local dev → AI falls back to the mock. */

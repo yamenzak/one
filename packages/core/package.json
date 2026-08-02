@@ -3,10 +3,11 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The floor every 4DL package stands on: time-sortable ids, defensive JSON columns, the structural bindings contract, and the composed schema-module runner. No product vocabulary, no I/O beyond D1.",
+  "description": "The floor every 4DL package stands on: time-sortable ids, defensive JSON columns, the structural bindings contract, the composed schema-module runner, and the shared platform-config store. No product vocabulary, no I/O beyond D1 and the one config KV.",
   "exports": {
     ".": "./src/index.ts",
-    "./boundary": "./src/boundary.ts"
+    "./boundary": "./src/boundary.ts",
+    "./admin-routes": "./src/admin-routes.ts"
   },
   "types": "./src/index.ts",
   "scripts": {
@@ -14,6 +15,9 @@
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "hono": "^4.9.10"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251001.0",

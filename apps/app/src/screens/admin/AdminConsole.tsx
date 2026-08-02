@@ -30,7 +30,7 @@ import {
 } from "@4dl/ui";
 import {
   AdminConsole as Console, PlatformAiSection, PlatformDomainsSection, providerLabel, type AiCatalogModel, PlatformEmailSection, PlatformMaintenanceSection,
-  PlatformStripeSection, PlatformTurnstileSection, type ConsoleSection,
+  PlatformStripeSection, PlatformTurnstileSection, PlatformSharedConfigSection, type ConsoleSection,
 } from "@4dl/admin";
 import { SectionSplit } from "../SectionSplit.js";
 import { api, errorText } from "../../api.js";
@@ -96,6 +96,12 @@ const ADMIN_SECTIONS: ConsoleSection[] = [
      email package's subject, not Kova's. Before it existed the endpoints behind
      it had no caller at all, and a fresh deploy could not send the sign-in code
      that is the only way in — DEPLOY.md carried it as a hand-edit-D1 step. */
+  /* The SHARED store: one value, read by every 4DL app. It sits beside the
+     per-app panels rather than replacing them, because the two answer different
+     questions — "what does the platform use" and "what does THIS app use
+     instead". A save here reaches every product, which is why its panel is the
+     only settings surface in this console that confirms first. */
+  { key: "platform", label: "Shared platform config", blurb: "Keys every 4DL app reads — set once, not once per product", icon: Globe, tone: "activity", render: () => <PlatformSharedConfigSection api={api} errorText={errorText} /> },
   { key: "email", label: "Email delivery", blurb: "How this deployment sends mail, and what a tenant pays per send", icon: Mail, tone: "primary", render: () => <PlatformEmailSection api={api} errorText={errorText} /> },
   /* Also `@4dl/admin`'s: closing a deployment for a migration is not a thing
      Kova does differently from any other app on the platform. Last but one, next

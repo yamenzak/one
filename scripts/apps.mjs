@@ -20,6 +20,7 @@
  *   node scripts/apps.mjs ready <id>      # exit 0 if its ids are real
  *   node scripts/apps.mjs origin <id>     # its canonical public origin, or ""
  *   node scripts/apps.mjs email-sql <id>  # the seeding SQL for its sender
+ *   node scripts/apps.mjs shared-config-title   # the platform-wide KV title
  */
 
 import { readFileSync, readdirSync, existsSync, realpathSync } from "node:fs";
@@ -312,6 +313,12 @@ switch (cmd) {
     break;
   case "email-sql":
     console.log(emailSql(arg) ?? "");
+    break;
+  // The ONE resource that is not per-app: a single KV namespace bound with the
+  // same id into every worker. Printed rather than repeated in the workflow,
+  // for the same reason nothing else here is repeated.
+  case "shared-config-title":
+    console.log(registry.sharedConfig?.title ?? "");
     break;
   case undefined:
     break;

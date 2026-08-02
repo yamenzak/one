@@ -29,6 +29,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { getConfig, nowIso, parseJson, setConfig } from "@4dl/core";
+import type { ConfigSource } from "@4dl/core";
 import { saasConfig, createCustomHostname, getCustomHostname, deleteCustomHostname, createWorkerRoute, deleteWorkerRoute, WORKER_NAME_RE, type CustomHostname } from "./cloudflare.js";
 import { canonicalHost, invalidateHostCache, isPlatformDoor, shapeOf, type RootDomainEnv, type TenancyConfig } from "./host-context.js";
 import { caaFixFromErrors } from "./dcv.js";
@@ -103,7 +104,7 @@ async function syncStatus(env: { DB: D1Database; CACHE?: KVNamespace }, row: Dom
 }
 
 export function domainRoutes(deps: RouteGuards, opts: DomainRouteConfig) {
-  const saas = (db: D1Database) => saasConfig(db, opts.workerName);
+  const saas = (src: ConfigSource) => saasConfig(src, opts.workerName);
   return new Hono<RouteEnv>()
   /**
    * Public: "which door am I, and whose?"
@@ -168,7 +169,7 @@ export function domainRoutes(deps: RouteGuards, opts: DomainRouteConfig) {
        * tell "not in maintenance" from "this server is too old to say".
        */
       maintenance: c.get("maintenance") ?? MAINTENANCE_OFF,
-      turnstile: (await deps.turnstile?.(c.env.DB)) ?? null,
+      turnstile: (await deps.turnstile?.(c.env)) ?? null,
     });
   })
 
@@ -185,7 +186,7 @@ export function domainRoutes(deps: RouteGuards, opts: DomainRouteConfig) {
     if (guard) return guard;
     const who = deps.requireTenant(c)!;
     const rows = (await c.env.DB.prepare("SELECT * FROM tenant_domains WHERE tenant_id = ? AND kind = 'custom' ORDER BY created_at").bind(who.tenantId).all<DomainRow>()).results ?? [];
-    const cfg = await saas(c.env.DB);
+    const cfg = await saas(c.env);
     const out = [];
     for (const row of rows) {
       if (cfg && row.cf_hostname_id && row.status !== "active") {
@@ -233,7 +234,7 @@ export function domainRoutes(deps: RouteGuards, opts: DomainRouteConfig) {
       return c.json({ error: `${hostname} belongs to the platform. Add a domain you own, e.g. train.yourgym.com.` }, 400);
     }
 
-    const cfg = await saas(c.env.DB);
+    const cfg = await saas(c.env);
     if (!cfg) return c.json({ error: "custom domains aren't enabled on this platform yet" }, 503);
 
     // One tenant per hostname (the PK also enforces this at the DB).
@@ -281,7 +282,7 @@ export function domainRoutes(deps: RouteGuards, opts: DomainRouteConfig) {
     const who = deps.requireTenant(c)!;
     const row = await c.env.DB.prepare("SELECT * FROM tenant_domains WHERE hostname = ? AND tenant_id = ?").bind(c.req.param("hostname").toLowerCase(), who.tenantId).first<DomainRow>();
     if (!row) return c.json({ error: "not found" }, 404);
-    const cfg = await saas(c.env.DB);
+    const cfg = await saas(c.env);
     if (cfg && row.cf_hostname_id) {
       const ch = await getCustomHostname(cfg, row.cf_hostname_id).catch(() => null);
       if (ch) { row.status = await syncStatus(c.env, row, ch); row.ssl_status = ch.sslStatus; if (ch.verify.name) { row.verify_name = ch.verify.name; row.verify_value = ch.verify.value; } }
@@ -299,7 +300,7 @@ export function domainRoutes(deps: RouteGuards, opts: DomainRouteConfig) {
     // subdomain is not a custom domain, and it is the address the tenant is
     // reachable at, so this route must never be able to remove it.
     if (!row) return c.json({ error: "not found" }, 404);
-    const cfg = await saas(c.env.DB);
+    const cfg = await saas(c.env);
     // Both sides, or the zone accumulates routes pointing at hostnames nobody
     // owns any more — and a tenant re-adding the domain later would collide.
     if (cfg && row.cf_hostname_id) await deleteCustomHostname(cfg, row.cf_hostname_id);

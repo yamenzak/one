@@ -27,7 +27,7 @@ It typechecks and its tests pass in this workspace, so it cannot rot.
 
 | Package | What it owns | What the APP supplies |
 |---|---|---|
-| [`@4dl/core`](packages/core/README.md) | ids, defensive JSON, the **bindings contract**, the **composed schema runner**, the boundary checker | its `SchemaModule`s |
+| [`@4dl/core`](packages/core/README.md) | ids, defensive JSON, the **bindings contract**, the **composed schema runner**, `app_config` + the **shared platform-config store**, the boundary checker | its `SchemaModule`s |
 | [`@4dl/tenancy`](packages/tenancy/README.md) | the five doors, host→tenant + KV cache, custom domains (CF for SaaS + DCV), the standing/gate model, the deployment-wide maintenance switch, the tenant-CLOSE routes | root domain, reserved labels, `statusOf`, the close transition |
 | [`@4dl/auth`](packages/auth/README.md) | passwordless identity (OTP + passkeys), the request identity, the **five-gate route guard**, the grant algebra, staff seats + the staff ROUTES, step-up codes + the self-DELETE route | the RBAC registry, the route table, brand, seat quota, the role copy, the invite email, the purge |
 | [`@4dl/billing`](packages/billing/README.md) | the entitlement engine, the catalog STORE (seeding, plan/pack reads, quota + feature gates), credit metering, `CreditLedgerDO`, the Stripe client, the dunning ladder | quota + feature keys, and the catalog's CONTENTS |
@@ -96,7 +96,7 @@ in its dependency graph.
 
 ---
 
-## Five invariants to know before you touch anything
+## Six invariants to know before you touch anything
 
 **The host IS the tenancy.** Every hostname is classified into five doors, and
 the tenant is pinned from it *before* the session is read — so a session pointed
@@ -120,6 +120,17 @@ not the only one.
 Hand-picking fields is how `blocked` reached the model, the resolver and the
 server while the client still read `{ readOnly, reason }` and rendered the
 ordinary read-only app for a tenant whose access was withheld.
+
+**Config is two layers, and the app's own wins.** `getConfig` reads this app's
+`app_config` and falls back to a shared KV bound with the same id into every
+worker. One Google account, one Stripe account, one Cloudflare account — one
+place to set each. The store is SHARED; no worker writes another worker's
+database, because "a central admin pushes config to each app" means a privileged
+config-write endpoint in every product, holding a machine token, accepting
+secret keys. A **non-empty** local row wins (a blank falls through, since every
+consumer already reads `""` as unconfigured), and `SHARED_CONFIG_KEYS` is an
+explicit allow-list because one console's typo must not be able to take out every
+product at once.
 
 **Erasure is derived.** `@4dl/purge` computes both cascades from every module's
 `scoped` declaration. Do not write a table list: a purge must swallow delete

@@ -88,7 +88,7 @@ export const onboardingRoutes = new Hono<AppEnv>()
     // A brand-new deployment may not have seeded the catalog yet (the /context
     // bootstrap normally does it, but the wizard can be deep-linked).
     await seedBilling(c.env.DB).catch(() => undefined);
-    const [plans, cfg] = await Promise.all([listPlans(c.env.DB), stripeConfig(c.env.DB)]);
+    const [plans, cfg] = await Promise.all([listPlans(c.env.DB), stripeConfig(c.env)]);
 
     // When the caller already has a tenant (resuming after the studio was created,
     // or a half-finished onboarding), tell the picker where it left off so the
@@ -153,7 +153,7 @@ export const onboardingRoutes = new Hono<AppEnv>()
     const plan = plans.find((p) => p.id === body.data.planId);
     if (!plan) return c.json({ error: "unknown_plan" }, 400);
 
-    const cfg = await stripeConfig(c.env.DB);
+    const cfg = await stripeConfig(c.env);
     const enabled = stripeEnabled(cfg);
 
     // Make sure the row exists before UPDATE-ing it (a brand-new tenant has none

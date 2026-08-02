@@ -40,6 +40,7 @@ import { cycleRoutes } from "./cycle-routes.js";
 import { packRoutes } from "./pack-routes.js";
 import { stockRoutes } from "./stock-routes.js";
 import { emailAdminRoutes } from "@4dl/email/admin-routes";
+import { sharedConfigRoutes } from "@4dl/core/admin-routes";
 import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
 import { DUNNING_DAYS } from "@4dl/billing";
 import { periodKey } from "@4dl/core";
@@ -228,6 +229,16 @@ app.route("/api", emailAdminRoutes(
   // not use — this said `Template <noreply@template.local>` until now.
   { from: PLATFORM_FROM_DEFAULT },
 ) as unknown as Hono<AppEnv>);
+
+/**
+ * The SHARED platform config store, on the operator door.
+ *
+ * Every app's console writes the SAME namespace, which is the point: the Google
+ * key, the Stripe account, the Cloudflare token and the Turnstile widget are one
+ * fact about the platform, not one per product. This app's own `app_config`
+ * rows still win — see `packages/core/src/config.ts`.
+ */
+app.route("/api", sharedConfigRoutes({ isPlatformAdmin: (c) => isPlatformAdmin(c as never) }) as unknown as Hono<AppEnv>);
 
 /**
  * The maintenance switch, on the operator door.

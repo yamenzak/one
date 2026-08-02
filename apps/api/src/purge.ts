@@ -161,7 +161,7 @@ export async function purgeClient(env: Env, tenantId: string, clientId: string):
 async function purgeTenantDomains(env: Env, tenantId: string): Promise<void> {
   const rows = (await env.DB.prepare("SELECT hostname, cf_hostname_id FROM tenant_domains WHERE tenant_id = ?").bind(tenantId).all<{ hostname: string; cf_hostname_id: string | null }>().catch(() => ({ results: [] as { hostname: string; cf_hostname_id: string | null }[] }))).results ?? [];
   if (!rows.length) return;
-  const cfg = await saasConfig(env.DB).catch(() => null);
+  const cfg = await saasConfig(env).catch(() => null);
   for (const r of rows) {
     if (cfg && r.cf_hostname_id) await deleteCustomHostname(cfg, r.cf_hostname_id).catch(() => undefined);
     await invalidateHostCache(env, r.hostname);
@@ -173,7 +173,7 @@ async function cancelTenantStripe(env: Env, tenantId: string): Promise<void> {
   try {
     const sub = await env.DB.prepare("SELECT stripe_sub_id FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<{ stripe_sub_id: string | null }>();
     if (!sub?.stripe_sub_id) return;
-    const cfg = await stripeConfig(env.DB);
+    const cfg = await stripeConfig(env);
     if (!stripeEnabled(cfg)) return;
     await stripeCall(cfg.secretKey, `subscriptions/${sub.stripe_sub_id}`, undefined, { method: "DELETE" });
   } catch { /* teardown proceeds even if Stripe is unreachable */ }
@@ -207,7 +207,7 @@ async function cancelClientStripe(env: Env, tenantId: string, clientId?: string)
       .catch(() => null);
     // No connected account means no Connect-rail subscription can exist.
     if (!acct?.stripe_account_id) return { canceled, failed };
-    const cfg = await stripeConfig(env.DB);
+    const cfg = await stripeConfig(env);
     if (!stripeEnabled(cfg)) return { canceled, failed };
 
     const rows = (await env.DB

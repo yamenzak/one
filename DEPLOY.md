@@ -316,6 +316,18 @@ login now returns a real error instead of a silent "code sent".
 4. Configure the runtime keys you need from the platform-admin console — see
    the reference table in section 9. At minimum, set `google.gemini_key`
    (**AI** tab) or the entire vision suite is dead.
+5. **Or set the shared ones once, for every app.** Platform admin → **Shared
+   platform config** writes a KV namespace that every 4DL worker binds by the
+   same id, so the Gemini key, the Stripe account credentials, the Cloudflare
+   API token and the Turnstile widget are entered ONCE rather than once per
+   product. This app's own `app_config` still wins wherever it holds a value, so
+   nothing you have already set changes.
+
+   The namespace is created and bound by the provisioning workflow; until then
+   the panel reports *not wired* and every app reads its own settings exactly as
+   before. Four things stay per-app on purpose and the panel says so: the sender
+   display name (`email.from`), each app's Stripe **webhook** secret, the
+   Cloudflare zone/CNAME/worker for custom domains, and maintenance mode.
 
 ---
 
@@ -1087,8 +1099,10 @@ re-issuing them.
 2. **Sign in** at `setup.<root>` and reach the console at `admin.<root>`. Your
    address must be in `ADMIN_EMAILS` (`wrangler.jsonc` vars — unchanged by the
    reset).
-3. **Gemini** → Platform admin → AI. Paste the same key; the whole vision suite
-   is dead until you do. Then **Sync catalog** to repopulate `ai_models`, and
+3. **Gemini** → Platform admin → AI, *or* → Shared platform config if you keep
+   it there (the shared KV is a separate namespace and a D1 reset does not touch
+   it — check the shared panel before re-typing anything). Paste the same key;
+   the whole vision suite is dead until you do. Then **Sync catalog** to repopulate `ai_models`, and
    switch on the models you want (a fresh sync arrives with runnable lanes
    enabled, everything else off).
 4. **Stripe** → Platform admin → Stripe. For each lane you use, paste the four

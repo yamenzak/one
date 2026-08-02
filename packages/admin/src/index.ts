@@ -8,3 +8,4 @@ export { PlatformStripeSection, type StripeSectionProps } from "./sections/strip
 export { PlatformAiSection, providerLabel, type AiSectionProps, type AiLane, type AiCatalogModel } from "./sections/ai.js";
 export { PlatformDomainsSection, type DomainsSectionProps } from "./sections/domains.js";
 export { PlatformTurnstileSection, type TurnstileSectionProps } from "./sections/turnstile.js";
+export { PlatformSharedConfigSection } from "./sections/shared-config.js";

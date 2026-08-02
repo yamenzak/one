@@ -14,7 +14,7 @@
  * domain, provided the Turnstile widget lists (or allows) that domain.
  */
 
-import type { HasDb } from "@4dl/core";
+import type { ConfigSource, HasDb, HasPlatformConfig } from "@4dl/core";
 import { getConfig } from "@4dl/core";
 
 const SITEVERIFY = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
@@ -26,8 +26,8 @@ export interface TurnstileConfig {
 }
 
 /** Public Turnstile config for the login screen (never leaks the secret). */
-export async function turnstileConfig(db: D1Database): Promise<TurnstileConfig> {
-  const cfg = await getConfig(db).catch(() => ({}) as Record<string, string>);
+export async function turnstileConfig(src: ConfigSource): Promise<TurnstileConfig> {
+  const cfg = await getConfig(src).catch(() => ({}) as Record<string, string>);
   return { siteKey: cfg["turnstile.site_key"] || null, enabled: Boolean(cfg["turnstile.secret"]) };
 }
 
@@ -38,8 +38,8 @@ export interface TurnstileResult { ok: boolean; hostname?: string }
  * configured (disabled) so nothing is blocked before setup. When configured, a
  * missing/failed/host-mismatched token yields `{ ok: false }`.
  */
-export async function verifyTurnstile(env: HasDb, token: string | null, ip: string | undefined, host: string): Promise<TurnstileResult> {
-  const cfg = await getConfig(env.DB).catch(() => ({}) as Record<string, string>);
+export async function verifyTurnstile(env: HasDb & HasPlatformConfig, token: string | null, ip: string | undefined, host: string): Promise<TurnstileResult> {
+  const cfg = await getConfig(env).catch(() => ({}) as Record<string, string>);
   const secret = cfg["turnstile.secret"];
   if (!secret) return { ok: true }; // disabled → pass
   if (!token) return { ok: false };

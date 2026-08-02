@@ -18,6 +18,7 @@
  * Everything is re-exported PRE-BOUND, so call sites never see the config.
  */
 
+import type { HasDb } from "@4dl/core";
 import {
   canonicalHost as tCanonicalHost,
   provisionSubdomain as tProvisionSubdomain,
@@ -57,8 +58,8 @@ export const APP_RESERVED_LABELS: ReadonlySet<string> = new Set(["template", "4d
  * function** (and drop it from the config below) if the app does not bill its
  * tenants; the gate then resolves `ok` and nothing else changes.
  */
-async function statusOf(db: D1Database, tenantId: string): Promise<string | null> {
-  const row = await db
+async function statusOf(env: HasDb, tenantId: string): Promise<string | null> {
+  const row = await env.DB
     .prepare("SELECT status FROM subscriptions WHERE tenant_id = ?")
     .bind(tenantId)
     .first<{ status: string | null }>()
