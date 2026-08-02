@@ -59,11 +59,11 @@ export function AdminDoor() {
 
 const SECTIONS: ConsoleSection[] = [
   { key: "centres", label: "Centres", blurb: "Every practice, its plan, credits and standing", icon: Building2, tone: "primary", render: () => <Centres /> },
-  { key: "stripe", label: "Stripe", blurb: "Keys, the lane, and syncing the catalog", icon: CreditCard, tone: "cardio", render: () => <StripeConfig /> },
+  { key: "stripe", label: "Stripe", blurb: "Keys, the lane, and syncing the catalog", icon: CreditCard, tone: "soiled", render: () => <StripeConfig /> },
   /* Without `google.gemini_key` the vision model is unreachable, so reading a
      label — the feature most likely to be why a centre bought the plan — fails
      with "unavailable" on a deployment that otherwise looks healthy. */
-  { key: "ai", label: "AI", blurb: "The Gemini key, the mock lane, and the model catalog", icon: Wand2, tone: "nutrition", render: () => <AiConfig /> },
+  { key: "ai", label: "AI", blurb: "The Gemini key, the mock lane, and the model catalog", icon: Wand2, tone: "cycle", render: () => <AiConfig /> },
   /* `@4dl/admin`'s own: who a deployment sends mail as is the shared email
      package's subject, not Tessa's. */
   { key: "email", label: "Email delivery", blurb: "How this deployment sends mail", icon: Mail, tone: "primary", render: () => <PlatformEmailSection api={api} errorText={errorText} /> },

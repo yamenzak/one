@@ -73,6 +73,10 @@ function permissionFor(method: string, path: string): Grant | null {
   // what lets an inspection account see the recall and nothing else.
   if (path.startsWith("/api/trace")) return { trace: ["read"] };
   if (path.startsWith("/api/reports")) return { report: ["read"] };
+  // Insights are a REPORT. `report:read` is one of the two grants an inspection
+  // account holds, so an auditor sees the throughput and release-rate numbers —
+  // which is exactly who those numbers are for.
+  if (path.startsWith("/api/insights")) return { report: ["read"] };
   if (path.startsWith("/api/billing")) return write ? { billing: ["manage"] } : { billing: ["read"] };
   if (path.startsWith("/api/settings")) return write ? { settings: ["manage"] } : { settings: ["read"] };
   /**

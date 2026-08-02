@@ -25,9 +25,10 @@
 
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { AppBar, Archive, Avatar, Badge, BottomTabs, Button, ClipboardList, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Home, RotateCcw, ScanLine, type TabDef } from "@4dl/ui";
+import { AppBar, Archive, Avatar, Badge, BottomTabs, Button, ClipboardList, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Home, RotateCcw, ScanLine, TrendingUp, type TabDef } from "@4dl/ui";
 import { useSession } from "./session.js";
 import { useI18n, useT } from "./i18n.js";
+import { Insights } from "./screens/Insights.js";
 import { ScanSheet } from "./screens/ScanSheet.js";
 import { Today } from "./screens/Today.js";
 import { Stock } from "./screens/Stock.js";
@@ -51,6 +52,7 @@ export function Shell() {
     { key: "stock", label: t("nav.stock"), icon: Archive },
     { key: "cssd", label: t("nav.cssd"), icon: RotateCcw },
     { key: "cases", label: t("nav.cases"), icon: ClipboardList },
+    { key: "insights", label: t("nav.insights"), icon: TrendingUp },
   ];
   const tab = location.pathname.split("/")[1] || "today";
   const gate = ctx?.active?.gate;
@@ -101,6 +103,7 @@ export function Shell() {
       {tab === "stock" && <Stock />}
       {tab === "cssd" && <Cssd />}
       {tab === "cases" && <Cases />}
+      {tab === "insights" && <Insights />}
 
       {/**
        * The scan button, floating above the tab bar. Deliberately NOT a fifth

@@ -388,3 +388,39 @@ export const staff = {
   setRole: (userId: string, role: string) => api.patch<{ ok: boolean; role: string }>(`/api/staff/${userId}/role`, { role }),
   remove: (userId: string) => api.del<{ ok: boolean }>(`/api/staff/${userId}`),
 };
+
+// ── Insights ────────────────────────────────────────────────────────────────
+
+export interface InsightHeadline {
+  loads: number;
+  failed: number;
+  /** `null` when nothing ran — a rate over zero loads is not 100%. */
+  releaseRate: number | null;
+  /** Mean hours from a load ending to a named person releasing it. */
+  turnaroundHours: number | null;
+  running: number;
+  awaitingRelease: number;
+  openCases: number;
+  soiled: number;
+  expiringSoon: number;
+}
+export type ExpiryBucket = "expired" | "week" | "month" | "quarter" | "later";
+
+export const insights = {
+  read: (days: number) =>
+    api.get<{
+      window: { days: number; from: string };
+      headline: InsightHeadline;
+      series: {
+        days: string[];
+        loads: number[];
+        failures: number[];
+        /** `null` on a day with no release — zero would read as "released instantly". */
+        turnaround: (number | null)[];
+        consumption: number[];
+      };
+      expiry: { bucket: ExpiryBucket; n: number }[];
+      activity: Record<string, number>;
+      instruments: { id: string; serial: string | null; cycle_count: number; name: string | null }[];
+    }>(`/api/insights?days=${days}`),
+};

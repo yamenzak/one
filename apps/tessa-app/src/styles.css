@@ -1,5 +1,10 @@
 @import "tailwindcss";
 @import "@4dl/ui/tokens.css";
+/* Tessa's own accents. `@4dl/ui` owns surfaces, the brand primary and the four
+   status tones; it may not own `cycle` and `soiled`, because a coaching app has
+   neither. Read the file header before changing a value — both modes are
+   validated, not chosen by eye. */
+@import "./tokens.accents.css";
 
 /* Tailwind v4: scan every workspace package that RENDERS, for class names.
    Tailwind only sees source it is pointed at, and a package resolved through

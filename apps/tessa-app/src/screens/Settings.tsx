@@ -95,16 +95,16 @@ export function Settings({ onBack }: { onBack: () => void }) {
           key: "ai",
           label: t("settings.ai"),
           icon: Wand2,
-          tone: "nutrition",
+          tone: "cycle",
           sub: data.canUseAi ? t("settings.ai.on") : t("settings.ai.locked"),
           trailing: data.canUseAi ? undefined : <Badge tone="neutral">{t("settings.plan.needed")}</Badge>,
           onClick: () => setView("ai"),
         },
-        { key: "staff", label: t("staff.title"), icon: Users, tone: "activity", sub: t("staff.intro"), onClick: () => setView("staff") },
-        { key: "plan", label: t("settings.plan"), icon: CreditCard, tone: "cardio", onClick: () => setView("plan") },
+        { key: "staff", label: t("staff.title"), icon: Users, tone: "case", sub: t("staff.intro"), onClick: () => setView("staff") },
+        { key: "plan", label: t("settings.plan"), icon: CreditCard, tone: "soiled", onClick: () => setView("plan") },
       ],
     },
-    { header: t("settings.device"), rows: [{ key: "lang", label: t("settings.language"), icon: Globe, tone: "sleep", sub: t("settings.language.sub") }] },
+    { header: t("settings.device"), rows: [{ key: "lang", label: t("settings.language"), icon: Globe, tone: "neutral", sub: t("settings.language.sub") }] },
   ];
 
   return (

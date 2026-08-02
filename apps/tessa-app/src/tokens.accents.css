@@ -1,0 +1,82 @@
+/**
+ * TESSA'S ACCENT TOKENS — the colours this product codes information with.
+ *
+ * ⚠️ This file exists because Tessa was using KOVA'S vocabulary. `cardio`,
+ * `nutrition`, `activity`, `sleep` — none of which Tessa ever defined. `@4dl/ui`
+ * resolves an unknown tone by CONVENTION (`foo` → `var(--foo)` /
+ * `bg-foo-soft text-foo`), so those calls did not error: they resolved to an
+ * undefined custom property and a Tailwind class that was never generated. The
+ * icon badges rendered uncoloured, and nothing anywhere said why. Borrowing a
+ * design vocabulary without registering it is the same class of bug as the grant
+ * presets that listed two of five roles.
+ *
+ * ── Four slots, and why only four ───────────────────────────────────────────
+ *
+ * `sterile` is the brand PRIMARY, not a new token. Sterile supply is what the
+ * product is about, so the brand colour is the right identity for it — and one
+ * fewer hue is one fewer chance of a collision.
+ *
+ * The other three are the states a centre actually sorts things into: a load in
+ * the machine, a procedure that consumed something, and the dirty side.
+ *
+ * A fifth was tried (`stock`, an olive-green) and cut: against `soiled`'s orange
+ * it failed the protanopia separation at ΔE 2.9 and the normal-vision floor at
+ * 14.7 — two colours a full-colour reader struggles to tell apart, let alone a
+ * red-blind one. Consumables wear `primary` alongside sterile, which is honest:
+ * they are the same subject at different stages.
+ *
+ * ── Both modes are VALIDATED, not eyeballed ─────────────────────────────────
+ *
+ * Checked with the data-viz palette validator (lightness band, chroma floor,
+ * CVD separation, normal-vision floor, contrast vs surface) as a categorical
+ * set, in each mode against that mode's surface:
+ *
+ *   light  #008152 #455dc9 #a43c92 #ac4800   all five checks PASS
+ *          worst adjacent CVD ΔE 9.3 (protan), normal-vision ΔE 18.3
+ *   dark   #00ae79 #6b89f9 #ca66c3 #dd7438   all five checks PASS, no WARN
+ *
+ * The `-soft` tints were then stepped DOWN until tone-coloured ink on its own
+ * tint clears WCAG AA — 0.32 measured 4.02:1 for `cycle`, which looks generous
+ * and is not, because OKLCH lightness is perceptual. `tokens.accents.test.ts`
+ * measures it rather than trusting the eye. That pair is a different check from
+ * the validator's: it is ink on a tint, not a fill on the chart surface.
+ *
+ * The dark column is SELECTED, not an automatic flip of the light one: the dark
+ * band is L 0.48–0.67 against a dark surface, so the same hues are re-stepped.
+ * Kova's accents sit at L 0.74–0.80, which reads well as icon ink but is outside
+ * the band for a chart FILL — and these serve both, so they are stepped for the
+ * harder job. Re-run the validator if any value here changes.
+ */
+
+@theme inline {
+  --color-cycle: var(--cycle);
+  --color-cycle-soft: var(--cycle-soft);
+  --color-case: var(--case);
+  --color-case-soft: var(--case-soft);
+  --color-soiled: var(--soiled);
+  --color-soiled-soft: var(--soiled-soft);
+}
+
+/* Dark is the default, matching `@4dl/ui`'s dark-first tokens. */
+:root {
+  --cycle: oklch(0.66 0.17 270);
+  --cycle-soft: oklch(0.28 0.07 270);
+  --case: oklch(0.66 0.17 330);
+  --case-soft: oklch(0.26 0.07 330);
+  --soiled: oklch(0.67 0.15 48);
+  --soiled-soft: oklch(0.28 0.07 48);
+}
+
+/**
+ * Light mode. The foreground steps are darker so tone-coloured text and icons on
+ * their own pale `-soft` tint clear WCAG AA — the dark-mode values wash out on
+ * white. The `-soft` backgrounds stay pale.
+ */
+:root[data-theme="light"] {
+  --cycle: oklch(0.52 0.17 270);
+  --cycle-soft: oklch(0.94 0.05 270);
+  --case: oklch(0.53 0.17 330);
+  --case-soft: oklch(0.94 0.05 330);
+  --soiled: oklch(0.525 0.15 48);
+  --soiled-soft: oklch(0.94 0.06 48);
+}
