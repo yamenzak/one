@@ -165,12 +165,23 @@ arbitrary text sizes, no hand-rolled anchors — but that is because the app is
 six days old, not because anything is stopping it. Kova's numbers were small
 once too.
 
-**Extract:** the seven lints into `@4dl/ui` as a parameterised checker
-(`uiConformance(srcDir, { exempt })`), asserted by a four-line test in each app.
-`@4dl/admin/conformance` is the working precedent for exactly this shape.
+**DONE (2026-08-02).** The seven rules are `@4dl/ui/conformance`, as data rather
+than as seven test files, each carrying the samples that prove it still fires.
+Both apps assert them; each keeps its own waivers. Tessa's four violations were
+all in its label PRINT sheet — black ink on white adhesive stock, where the
+tokens are actively wrong — and now carry stated exemptions instead of being
+invisible.
 
-This is the highest-leverage item on the list. It is the difference between "we
-have a design system" and "every app actually uses it", and it costs one file.
+Two clauses were nearly lost in the move and are worth recording, because they
+are the reason to re-read an extraction rather than trust it: `motion` skips
+lines carrying `repeat:` (an ambient loop has no start or end for the duration
+scale to describe) and `primitive` skips comment lines (a comment explaining why
+`<select>` is banned is not a `<select>`). Dropping them turned ten correct
+animations and two comments into failures.
+
+`save-lifecycle` still runs over Kova's four settings screens rather than the
+whole app, unchanged. Widening it surfaces nine pre-existing instances — worth
+doing, worth doing on its own rather than inside a move.
 
 ---
 

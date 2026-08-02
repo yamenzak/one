@@ -6,7 +6,8 @@
   "description": "The 4DL design system (UI-LANGUAGE.md): tonal tokens + product-agnostic primitives \u2014 rings, stat cards, chips, sheets, settings pattern, timeline feed. No product vocabulary \u2014 see README.md.",
   "exports": {
     ".": "./src/index.ts",
-    "./tokens.css": "./src/tokens.css"
+    "./tokens.css": "./src/tokens.css",
+    "./conformance": "./src/conformance.ts"
   },
   "types": "./src/index.ts",
   "scripts": {
@@ -39,10 +40,11 @@
     "react": "^19.0.0"
   },
   "devDependencies": {
+    "@4dl/core": "workspace:*",
+    "@types/node": "^22.10.2",
     "@types/react": "^19.2.14",
     "react": "^19.2.0",
     "typescript": "^5.9.3",
-    "vitest": "^3.2.4",
-    "@4dl/core": "workspace:*"
+    "vitest": "^3.2.4"
   }
 }

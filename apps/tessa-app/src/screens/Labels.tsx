@@ -141,16 +141,26 @@ export function Labels() {
        * Sized in millimetres rather than in the app's spacing scale — a label has
        * to come out of the printer at a size that matches the adhesive stock,
        * which no `rem` can promise.
+       *
+       * design-tokens-exempt: PAPER IS NOT A THEME. Everything below is printed
+       * on white adhesive stock, so black ink and physical units are the only
+       * correct choices — the tokens describe a screen that follows a tenant's
+       * brand, and a label that followed a pale brand colour would come out of
+       * the printer unreadable. The exemption is scoped to this block; every
+       * on-screen surface in this file is still checked.
        */}
       <div className="hidden print:block">
         <div className="grid grid-cols-2 gap-0">
           {selected.map((l) => (
+            /* design-tokens-exempt: the cut guide, printed. */
             <div key={l.id} className="flex h-[30mm] w-[70mm] flex-col justify-between overflow-hidden border border-dashed border-black/20 p-[3mm]">
+              {/* design-tokens-exempt: black ink on white stock. */}
               <div className="text-[9pt] leading-tight text-black">
                 <div className="font-semibold">{l.code}</div>
                 <div className="truncate">{l.title}</div>
               </div>
               <Barcode value={l.code} height={40} className="h-[10mm] w-full" />
+              {/* design-tokens-exempt: black ink on white stock. */}
               {l.sub && <div className="text-[7pt] leading-none text-black">{l.sub}</div>}
             </div>
           ))}
