@@ -26,8 +26,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       e2e: ${{ steps.registry.outputs.e2e }}
+      any: ${{ steps.registry.outputs.any }}
     steps:
+      # FULL history: the E2E filter below diffs this PR against its base, and a
+      # shallow clone cannot resolve one.
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
 
       # Both guards go BEFORE install: a check that needs the workspace
       # installed cannot guard the workspace's own install, and both of these
@@ -40,6 +44,8 @@ jobs:
       # An app that is not in the registry is not built and not deployed, and
       # nothing reports it — see the header.
       - run: node scripts/apps-manifest.test.mjs
+      # The same filter `deploy.yml` ships with, guarded the same way.
+      - run: node scripts/affected.test.mjs
 
       # No version — read from package.json's packageManager.
       - uses: pnpm/action-setup@v4
@@ -69,8 +75,34 @@ jobs:
 
       - run: pnpm turbo run typecheck test
 
+      # ── Which Playwright suites does this PR actually need? ───────────────
+      #
+      # Unit tests above run WHOLE, every time — they are the safety net and
+      # narrowing them is how a cross-package break gets through. E2E is the
+      # different case: it is the slow lane (a Chromium download plus a real
+      # browser against a real worker, per product), and a PR touching one
+      # product has no reason to drive the other's golden paths.
+      #
+      # Same filter as the deploy, plus one addition: an E2E suite's own files
+      # count as a change to it. The deploy filter deliberately ignores a spec
+      # edit — it must not mint a Worker version — but it must absolutely be run.
+      #
+      # Fails open exactly as the deploy does: an unresolvable base runs
+      # everything.
       - id: registry
-        run: echo "e2e=$(node scripts/apps.mjs e2e-matrix)" >> "$GITHUB_OUTPUT"
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            m=$(node scripts/apps.mjs e2e-matrix)
+          else
+            m=$(node scripts/affected.mjs "$BASE" --e2e)
+          fi
+          echo "e2e=$m" >> "$GITHUB_OUTPUT"
+          n=$(printf '%s' "$m" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(String(JSON.parse(s).include.length)))")
+          echo "any=$([ "$n" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          [ "$n" -gt 0 ] || echo "::notice::No E2E suite is affected by this PR."
 
   # One job per registered Playwright suite — Kova's three golden paths
   # (SPEC §12), Tessa's recall and scan paths — in a real browser against the
@@ -87,6 +119,9 @@ jobs:
   # Workers AI, Stripe, or an external provider.
   e2e:
     needs: validate
+    # An EMPTY include is a workflow ERROR in GitHub's matrix expansion, not an
+    # empty job list — so "nothing to run" is expressed here, not by the matrix.
+    if: needs.validate.outputs.any == 'true'
     runs-on: ubuntu-latest
     strategy:
       # One product's flake must not hide the other's real failure.

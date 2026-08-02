@@ -1,9 +1,20 @@
 name: Deploy
 
-# Every push to main typechecks, tests, builds every SPA, and deploys every app
-# that `apps.json` says is deployable. Adding an app is a REGISTRY ENTRY, not an
+# Every push to main typechecks, tests and builds EVERYTHING, then deploys only
+# the apps the push actually changed. Adding an app is a REGISTRY ENTRY, not an
 # edit here — every deployment problem this repo has had was a per-app step
 # somebody forgot to duplicate.
+#
+# ── Why the gate is whole and only the DEPLOY is filtered ───────────────────
+#
+# The tests are the safety net; narrowing them to "what changed" is how a
+# cross-package break slips through, and they are not the expensive part. What
+# is wasteful is redeploying a product that did not change: every deploy is a
+# new Worker version, a cold start in every colo on its first request, and a
+# version-history entry recording that nothing happened. `scripts/affected.mjs`
+# decides, through the workspace dependency graph, and fails OPEN — every
+# ambiguity deploys everything, because a fix that silently does not ship is
+# far worse than a redeploy nobody needed.
 #
 # Requires exactly TWO repo secrets:
 #   CLOUDFLARE_API_TOKEN   — Workers/D1/KV/R2 edit permissions
@@ -17,6 +28,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      all:
+        description: "Deploy every app, even the ones this commit did not change"
+        type: boolean
+        default: true
 
 concurrency:
   group: deploy-${{ github.ref }}
@@ -34,8 +50,13 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.registry.outputs.matrix }}
+      any: ${{ steps.registry.outputs.any }}
     steps:
+      # FULL history: the deploy filter diffs this push against its base, and a
+      # shallow clone cannot resolve one. It would fail open and deploy
+      # everything, which is safe but makes the filter pointless.
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
 
       # Before install: a check that needs the workspace installed cannot guard
       # the workspace. Both are dependency-free Node, and both guard failures
@@ -44,6 +65,10 @@ jobs:
       # reports "no tests", which reads as a pass. Both have happened here.
       - run: node .github/workflows/workflows-parse.test.mjs
       - run: node scripts/apps-manifest.test.mjs
+      # The deploy filter decides whether a fix ships, so it is guarded like the
+      # other two: before install, dependency-free, and asserting that every
+      # ambiguity resolves to "deploy everything".
+      - run: node scripts/affected.test.mjs
 
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
@@ -67,14 +92,144 @@ jobs:
 
       - run: pnpm turbo run typecheck test
 
+      # ── Which apps does this push actually change? ────────────────────────
+      #
+      # A manual run deploys everything by default: somebody pressing the button
+      # is asking for a deploy, not for an opinion about what changed. It is the
+      # way to re-ship an app whose last deploy failed, since the commit that
+      # would have triggered it is now in the past.
       - id: registry
-        run: echo "matrix=$(node scripts/apps.mjs matrix)" >> "$GITHUB_OUTPUT"
+        env:
+          BASE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "push" ] || [ "${{ inputs.all }}" = "true" ]; then
+            m=$(node scripts/apps.mjs matrix)
+            echo "::notice::Deploying every app (manual run)."
+          else
+            node scripts/affected.mjs "$BASE" --why
+            m=$(node scripts/affected.mjs "$BASE")
+          fi
+          echo "matrix=$m" >> "$GITHUB_OUTPUT"
+          # An EMPTY include is a workflow error in GitHub's matrix expansion,
+          # not an empty job list — so the deploy job is gated on this instead.
+          n=$(printf '%s' "$m" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>process.stdout.write(String(JSON.parse(s).include.length)))")
+          echo "any=$([ "$n" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          [ "$n" -gt 0 ] || echo "::notice::Nothing to deploy — this push changed no app."
+
+
+  # ── Bind the platform-wide resources, so nobody has to be asked to ────────
+  #
+  # `PLATFORM_CONFIG` is the one namespace that is NOT per-app: the same id in
+  # every worker, holding the credentials the whole platform shares
+  # (packages/core/src/config.ts). It is deliberately absent from a
+  # `wrangler.jsonc` until its id is real — `apps.mjs ready` reads every id in
+  # the file, so a placeholder would mark a live app un-provisioned and the
+  # deploy below would silently SKIP it — which used to make wiring it a manual
+  # "go and run the provisioning workflow" step.
+  #
+  # It is not one any more. Find-or-create by title, write the id into every
+  # app's config, commit. Three things make that safe to do on the deploy path,
+  # where creating D1 or R2 would NOT be:
+  #
+  #   • the worst case is an empty KV namespace, not a second database with a
+  #     tenant's data missing from it;
+  #   • it is idempotent — matched by title suffix, created only when the list
+  #     comes back without it, exactly like the provisioning workflow;
+  #   • a commit pushed with GITHUB_TOKEN does not trigger another workflow run,
+  #     so this cannot loop.
+  #
+  # It FAILS OPEN in every direction. No token, no permission, a list that
+  # errors — the job reports a notice and the deploy proceeds unbound, which is
+  # precisely the behaviour of every deployment before the shared store existed.
+  # A config feature must never be the reason an app stops shipping.
+  wire:
+    needs: gate
+    if: needs.gate.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      shared: ${{ steps.shared.outputs.id }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: ${{ github.ref_name }} }
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - id: shared
+        name: Find or create the shared config namespace
+        run: |
+          set -uo pipefail
+          title=$(node scripts/apps.mjs shared-config-title)
+          if [ -z "$title" ] || [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "::notice::No shared config namespace to wire — deploying as-is."
+            exit 0
+          fi
+
+          # Wrangler prints a version banner to STDOUT before the JSON, so drop
+          # everything before the first line that opens an array or object.
+          json_only() { awk 'f || /^[[:space:]]*[[{]/ { f = 1; print }'; }
+
+          if ! out=$(pnpm exec wrangler kv namespace list 2>&1); then
+            echo "::notice::Cannot list KV namespaces (the API token is probably missing KV:Edit) — deploying without the shared config store."
+            printf '%s' "$out" | tail -3
+            exit 0
+          fi
+
+          # Matched by SUFFIX: `wrangler kv namespace create` prefixes the
+          # worker name onto whatever title it is given, so whichever app
+          # created it, every app after that finds the SAME namespace.
+          id=$(printf '%s' "$out" | json_only | jq -r --arg t "$title" '.[]? | select(.title | endswith($t)) | .id' | head -1)
+          if [ -z "$id" ]; then
+            echo "Creating the shared config namespace '$title'…"
+            pnpm exec wrangler kv namespace create "$title" >/dev/null 2>&1 || true
+            id=$(pnpm exec wrangler kv namespace list 2>/dev/null | json_only | jq -r --arg t "$title" '.[]? | select(.title | endswith($t)) | .id' | head -1)
+          fi
+          if [ -z "$id" ]; then
+            echo "::notice::Could not create or read back '$title' — deploying without the shared config store."
+            exit 0
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "::notice::Shared config namespace: $id"
+
+      - name: Bind it into every app, and record it
+        if: steps.shared.outputs.id != ''
+        run: |
+          set -euo pipefail
+          for app in $(node scripts/apps.mjs ids); do
+            # A static site binds nothing; `--shared-config` on it is a no-op
+            # that reports "no kv_namespaces array", so it is skipped by asking
+            # the registry rather than by name.
+            has=$(node --input-type=module -e "import {app} from './scripts/apps.mjs'; process.stdout.write(app('$app').provision ? '1' : '')")
+            [ -n "$has" ] || continue
+            node scripts/bind-resource-ids.mjs "$app" --shared-config "${{ steps.shared.outputs.id }}"
+          done
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Every app already binds it — nothing to commit."
+            exit 0
+          fi
+          git commit -am "Bind the shared platform config namespace [skip ci]"
+          # GITHUB_TOKEN pushes do not start another workflow run, so this
+          # cannot loop back into the deploy that made it.
+          git push origin HEAD:${{ github.ref_name }}
 
   # ── One job per deployable app. ──────────────────────────────────────────
   #
   # `fail-fast: false` so one app's failure does not strand the others.
   deploy:
-    needs: gate
+    needs: [gate, wire]
+    if: needs.gate.outputs.any == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -88,6 +243,14 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      # `wire` committed the binding, but this job checked out the SHA that
+      # triggered the run — which is the commit BEFORE that one. Re-applying it
+      # here (idempotent, not committed) is what makes THIS deploy carry the
+      # binding rather than the next one.
+      - name: Apply the shared config binding
+        if: needs.wire.outputs.shared != ''
+        run: node scripts/bind-resource-ids.mjs "${{ matrix.id }}" --shared-config "${{ needs.wire.outputs.shared }}"
 
       # An app still binding PLACEHOLDER ids is SKIPPED, not failed. Deploying
       # against them does not error — wrangler binds or creates *something* —

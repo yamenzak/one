@@ -323,9 +323,12 @@ login now returns a real error instead of a silent "code sent".
    product. This app's own `app_config` still wins wherever it holds a value, so
    nothing you have already set changes.
 
-   The namespace is created and bound by the provisioning workflow; until then
-   the panel reports *not wired* and every app reads its own settings exactly as
-   before. Four things stay per-app on purpose and the panel says so: the sender
+   You do not have to do anything to turn this on. Every deploy's `wire` job
+   find-or-creates the namespace, binds it into each app's `wrangler.jsonc` and
+   commits the id — so the first push after this landed wires it, and the panel
+   stops saying *not wired* on its own. (The provisioning workflow does the same
+   thing; neither is required now.) Until it is wired, every app reads its own
+   settings exactly as before — nothing is broken in the meantime. Four things stay per-app on purpose and the panel says so: the sender
    display name (`email.from`), each app's Stripe **webhook** secret, the
    Cloudflare zone/CNAME/worker for custom domains, and maintenance mode.
 

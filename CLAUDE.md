@@ -146,14 +146,39 @@ registry entry and a workflow run — not four YAML edits.
 
 | Workflow | Reads the registry for |
 |---|---|
-| `ci.yml` | every SPA to build before the unit lanes; one E2E job per registered Playwright suite |
-| `deploy.yml` | every app to deploy — and it **skips** one whose `wrangler.jsonc` still holds placeholder ids |
+| `ci.yml` | every SPA to build before the unit lanes; one E2E job per **affected** Playwright suite |
+| `deploy.yml` | every app **the push actually changed** — and it **skips** one whose `wrangler.jsonc` still holds placeholder ids |
 | `boot-check.mjs` | each app's `BETTER_AUTH_URL`, probed at `/health` after deploy and after provisioning |
 | `provision.yml` | the app id you type: creates missing D1/KV/R2, commits the real ids, deploys, mints `BETTER_AUTH_SECRET` if absent, seeds email |
 
 `scripts/apps.mjs` is the reader (plain Node, no dependencies — the workflows
 call it *before* `pnpm install`). `scripts/bind-resource-ids.mjs` is what writes
 a resource id into a JSONC config, structurally and verified.
+`scripts/affected.mjs` is what decides which apps a push touched.
+
+**Only what changed is deployed, and the filter FAILS OPEN.** A push to main
+still typechecks, tests and builds EVERYTHING — narrowing the safety net is how
+a cross-package break gets through, and it is not the expensive part. What is
+wasteful is redeploying a product that did not change: a new Worker version, a
+cold start in every colo, a history entry recording that nothing happened.
+`affected.mjs` walks the workspace dependency graph (`packages/ui` → both SPAs →
+both apps; `apps/api` → Kova alone) and resolves **every** ambiguity to "deploy
+everything" — an unresolvable base, an unrecognised path, any root-level file.
+Under-deploying is a fix that silently does not ship behind a green run, which
+is the failure class every other guard here exists to catch, so
+`scripts/affected.test.mjs` asserts each fail-open path by name and runs in
+`pnpm gate`. A manual `deploy.yml` run deploys everything by default: pressing
+the button is a request, not a question — and it is how to re-ship an app whose
+last deploy failed.
+
+**The shared config namespace binds itself.** `deploy.yml`'s `wire` job
+find-or-creates `PLATFORM_CONFIG` by title, writes the id into every app's
+config and commits it — so nobody has to be told to go and run provisioning for
+it. Safe on the deploy path where creating D1 or R2 would not be: the worst case
+is an empty KV, it is idempotent, and a commit pushed with `GITHUB_TOKEN` starts
+no new workflow run, so it cannot loop. It fails OPEN in every direction (no
+token, no permission, a failed list) — a config feature must never be the reason
+an app stops shipping.
 
 **`spa` is the field that bites.** The worker serves its app through an `assets`
 binding, and turbo **cannot** infer that dependency — an `assets.directory` is a
@@ -186,10 +211,12 @@ workflows probe `BETTER_AUTH_URL` + `/health` after deploying, and a hostname
 that does not *resolve* is a notice (DNS/ACM are dashboard steps) while one that
 resolves and answers wrongly is a failure.
 
-**Two dependency-free guards, and both are in `pnpm test`:**
+**Three dependency-free guards, and all are in `pnpm test`:**
 `scripts/apps-manifest.test.mjs` fails on anything under `apps/` with a
-`wrangler.jsonc` and no registry entry (`_template` exempt), and
-`.github/workflows/workflows-parse.test.mjs` on a workflow that would not parse —
+`wrangler.jsonc` and no registry entry (`_template` exempt),
+`scripts/affected.test.mjs` on a deploy filter that would skip an app it should
+have shipped, and `.github/workflows/workflows-parse.test.mjs` on a workflow
+that would not parse —
 a broken workflow does not *fail*, it does not *run*, and GitHub lists it by
 filename with nothing saying why. Both guard failures that are silent rather than
 loud, which is the only kind this repo has actually had.
