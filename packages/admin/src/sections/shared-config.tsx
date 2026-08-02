@@ -69,8 +69,8 @@ interface SharedConfigStatus {
 const GROUPS: { title: string; hint: string; keys: string[] }[] = [
   {
     title: "AI",
-    hint: "One Google account behind every app's vision and text lanes.",
-    keys: ["google.gemini_key", "ai.markup", "ai.mock"],
+    hint: "One Google account behind every app's vision and text lanes. The credit MARKUP is not here — it is a column on each app's model rows, set from that app's AI panel.",
+    keys: ["google.gemini_key", "ai.mock"],
   },
   {
     title: "Email delivery",
@@ -105,7 +105,6 @@ const GROUPS: { title: string; hint: string; keys: string[] }[] = [
 
 const LABELS: Record<string, string> = {
   "google.gemini_key": "Gemini API key",
-  "ai.markup": "Credit markup",
   "ai.mock": "Mock lane",
   "email.provider": "Provider",
   "email.platform_from": "Platform sender",

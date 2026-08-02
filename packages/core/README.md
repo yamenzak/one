@@ -123,6 +123,7 @@ Four keys look shareable and are not, each for a specific reason:
 | `stripe.*.webhook_secret` | a signing secret per Stripe **endpoint**, and each app has its own webhook URL. Shared, every event fails verification. |
 | `cf.saas.worker_name` | the script a custom hostname's route points at. The zone, the token and the CNAME target are all shared — every 4DL app is under one apex — but this one is per-app, and it is the value whose wrong setting fails **silently**. |
 | `platform.maintenance*` | closing one product is not closing the others. |
+| `ai.markup` | looks perfectly shareable and would have been inert: the credit math meters against `ai_models.markup`, a per-row column, and the config row is only what the AI panel displays. A shared control that changes a screen and not a charge is worse than none. |
 
 `schema:*`, `plans.catalog_version` and `stripe.catalog_stash.*` are absent for a
 harder reason: sharing any of the three corrupts state rather than merely

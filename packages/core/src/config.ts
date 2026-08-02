@@ -116,8 +116,16 @@ const CACHE_TTL = 60;
 export const SHARED_CONFIG_KEYS: readonly string[] = [
   // One Google account.
   "google.gemini_key",
-  // The platform's own margin, and its dev lane — set once, applied everywhere.
-  "ai.markup",
+  // The dev lane — read by `generate()` on every call, so sharing it works.
+  //
+  // `ai.markup` is deliberately NOT here, and the reason is worth recording:
+  // the row exists, the AI panel writes it, and NOTHING meters against it. The
+  // credit math reads `ai_models.markup`, a per-row column the same panel
+  // bulk-updates in the same request. Sharing the config row would therefore
+  // have changed what one screen DISPLAYS and not one cent of what anybody is
+  // charged — a control that appears to work and does not, which is worse than
+  // no control. It belongs with the model catalog; see the catalog-sharing
+  // note in the README.
   "ai.mock",
   // One Turnstile widget, hostname-scoped across the whole apex.
   "turnstile.secret",
