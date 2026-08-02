@@ -31,7 +31,20 @@ import type { SchemaModule } from "@4dl/core";
 
 export const COMMERCE_SCHEMA: SchemaModule = {
   id: "commerce",
-  version: "2",
+  /**
+   * ⚠️ BUMP THIS WHENEVER A STATEMENT BELOW CHANGES. Nothing detects intent.
+   *
+   * `2 → 3` because the tenant payment rail added `purchase_intents` and
+   * `tenant_payment_settings` (plus the `pay_link` ALTER) while leaving the
+   * version at "2" — a version already applied in production. The marker row
+   * short-circuits the whole module, so on every LIVE database those tables were
+   * never created, and "Getting paid" answered HTTP 500 on both its panels.
+   *
+   * The direction of the failure is what makes it nasty: a FRESH database runs
+   * the module in full, so every test and every Miniflare run had the tables and
+   * was green. Only databases with history were broken — i.e. only production.
+   */
+  version: "3",
   ddl: [
     "CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, tenant_id TEXT, name TEXT, description TEXT, one_time_price_cents INTEGER, monthly_price_cents INTEGER, installment_months INTEGER, currency TEXT DEFAULT 'usd', budgets_json TEXT, addons_json TEXT, flags_json TEXT, visibility TEXT DEFAULT 'private', restricted_subject_id TEXT, once_per_customer INTEGER DEFAULT 0, stripe_product_id TEXT, stripe_price_id TEXT, stripe_monthly_price_id TEXT, active INTEGER DEFAULT 1, created_at TEXT);",
     "CREATE INDEX IF NOT EXISTS idx_packages_tenant ON packages(tenant_id, active);",
