@@ -5,7 +5,8 @@
   "type": "module",
   "description": "The operator console every 4DL app needs on its `admin.` door: the section-registry shell, and the panels for configuration that a shared package owns rather than the app. No product vocabulary \u2014 see README.md.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./conformance": "./src/conformance.ts"
   },
   "types": "./src/index.ts",
   "scripts": {
