@@ -1,3 +1,4 @@
+export * from "./close-routes.js";
 export * from "./cloudflare.js";
 export * from "./dcv.js";
 export * from "./domain-routes.js";

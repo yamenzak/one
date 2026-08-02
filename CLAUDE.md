@@ -92,9 +92,10 @@ packages/
              # silent no-ops. Pure. See its README.
   tenancy/   # @4dl/tenancy — multi-tenant ADDRESSING: the five doors, host→tenant
              # resolution + KV cache, custom domains (Cloudflare for SaaS + DCV),
-             # the standing/host-gate model, and the deployment-wide MAINTENANCE
-             # switch. `@4dl/tenancy/model` is the pure half the browser may
-             # import. See its README.
+             # the standing/host-gate model, the deployment-wide MAINTENANCE
+             # switch, and the tenant-CLOSE routes (leaving is always allowed —
+             # the state transition is the app's). `@4dl/tenancy/model` is the
+             # pure half the browser may import. See its README.
   domain/    # @kova/domain — Kova's pure logic (no I/O): nutrition/TDEE, body-fat,
              # activity/workout math, progress, plus the product registries
              # (entitlements, perms, budgets, notifications, features). Tested.
@@ -449,10 +450,10 @@ handlers are woven through Kova's notification registry, entitlement gates and
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
 moves. Measured 2026-08-02, per package: **548 kova/api + 197 kova/domain +
-140 tessa/api + 87 tessa/domain + 85 tenancy + 70 kova/app + 54 commerce +
+146 tessa/api + 87 tessa/domain + 85 tenancy + 70 kova/app + 54 commerce +
 48 ai + 47 ui + 45 billing + 35 billing-rail + 24 notify + 17 template +
 14 core + 14 purge + 13 tessa/app + 12 auth + 7 protocol + 7 i18n + 3 admin +
-3 app-kit + 3 storage + 3 email** (1,476 total, 31 skipped). The older figure
+3 app-kit + 3 storage + 3 email** (1,482 total, 31 skipped). The older figure
 quoted here counted Kova and the packages only — Tessa's 240 were never in it.
 The ui count DROPPED and the kova/app count rose by the same shape: Stage 0b
 moved Kova's eleven accent tones — and the contrast tests that guard them — out

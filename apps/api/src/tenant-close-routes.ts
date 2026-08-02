@@ -1,55 +1,41 @@
 /**
- * Studio close + wipe (owner, `/api/tenant/close`). An OTP emailed to the owner
- * confirms it; on verify we cancel the Kova subscription immediately (charging
- * stops) and mark the studio for deletion in 7 days. The daily cron hard-purges
- * it (R2 + D1 + billing DO + member identities) once the hold lapses; the owner
- * can undo within the window.
+ * Kova's binding of the shared tenant close (`/api/tenant/close*`).
+ *
+ * The routes, the owner gate and the step-up ceremony are `@4dl/tenancy`'s.
+ * What is Kova's is the state transition, and it is genuinely Kova's: closing a
+ * studio cancels the KOVA subscription (charging stops) *and* every client
+ * subscription on the studio's own payment rail — because billing a client for
+ * coaching that has already ended is not something a grace window should cover.
+ * The 7-day hold then runs to `purgeTenant` on the daily sweep, and the owner
+ * can undo inside the window.
  */
 
-import { Hono } from "hono";
-import { z } from "zod";
-import { type AppEnv, requireTenant } from "./auth-context.js";
+import { tenantCloseRoutes as sharedCloseRoutes } from "@4dl/tenancy";
+import type { AppEnv } from "./auth-context.js";
 import { sendActionOtp, verifyActionOtp } from "./action-otp.js";
 import { scheduleTenantClose, cancelTenantClose } from "./purge.js";
 import { tenantBrandKit } from "./notify.js";
 
-const PURPOSE = "tenant_close";
-
-export const tenantCloseRoutes = new Hono<AppEnv>()
-  // Is a close already scheduled? (drives the danger-zone UI)
-  .get("/tenant/close/status", async (c) => {
-    const who = requireTenant(c)!;
-    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
-    const row = await c.env.DB.prepare("SELECT status, delete_at FROM subscriptions WHERE tenant_id = ?").bind(who.tenantId).first<{ status: string; delete_at: string | null }>();
-    return c.json({ closing: row?.status === "closing", deleteAt: row?.status === "closing" ? row?.delete_at ?? null : null });
-  })
-
-  // Email the owner a confirmation code.
-  .post("/tenant/close/request-otp", async (c) => {
-    const who = requireTenant(c)!;
-    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
-    const email = c.get("user")?.email;
-    if (!email) return c.json({ error: "no email on file" }, 400);
-    const brand = await tenantBrandKit(c.env.DB, who.tenantId);
-    await sendActionOtp(c.env, { subject: `${PURPOSE}:${who.tenantId}`, purpose: PURPOSE, email, actionLabel: `closing ${brand.name}`, brand });
-    return c.json({ ok: true });
-  })
-
-  // Verify + schedule the close (cancels billing now, purge in 7 days).
-  .post("/tenant/close", async (c) => {
-    const who = requireTenant(c)!;
-    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
-    const parsed = z.object({ code: z.string().min(4).max(12) }).safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return c.json({ error: "invalid body" }, 400);
-    if (!(await verifyActionOtp(c.env, { subject: `${PURPOSE}:${who.tenantId}`, purpose: PURPOSE, code: parsed.data.code }))) return c.json({ error: "invalid_code" }, 403);
-    const { deleteAt } = await scheduleTenantClose(c.env, who.tenantId);
-    return c.json({ ok: true, deleteAt });
-  })
-
-  // Undo a pending close within the grace window.
-  .post("/tenant/close/cancel", async (c) => {
-    const who = requireTenant(c)!;
-    if (c.get("role") !== "owner") return c.json({ error: "forbidden" }, 403);
-    await cancelTenantClose(c.env, who.tenantId);
-    return c.json({ ok: true });
-  });
+export const tenantCloseRoutes = sharedCloseRoutes<AppEnv>({
+  actorOf: (c) => {
+    const user = c.get("user");
+    const tenantId = c.get("tenantId");
+    return user && tenantId ? { tenantId, userId: user.id, role: c.get("role") ?? "", email: user.email ?? null } : null;
+  },
+  creatorRole: "owner",
+  statusOf: async (c, tenantId) => {
+    const row = await c.env.DB
+      .prepare("SELECT status, delete_at FROM subscriptions WHERE tenant_id = ?")
+      .bind(tenantId)
+      .first<{ status: string; delete_at: string | null }>();
+    const closing = row?.status === "closing";
+    return { closing, deleteAt: closing ? (row?.delete_at ?? null) : null };
+  },
+  schedule: (c, tenantId) => scheduleTenantClose(c.env, tenantId),
+  cancel: (c, tenantId) => cancelTenantClose(c.env, tenantId),
+  sendOtp: (c, opts) => sendActionOtp(c.env, opts),
+  verifyOtp: (c, opts) => verifyActionOtp(c.env, opts),
+  // The studio's own brand name, so the code says "confirm closing Hale Studio"
+  // rather than naming a tenant id nobody recognises.
+  actionLabel: async (c, tenantId) => `closing ${(await tenantBrandKit(c.env.DB, tenantId)).name}`,
+});

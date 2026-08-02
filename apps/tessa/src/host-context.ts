@@ -18,6 +18,7 @@
  * Everything is re-exported PRE-BOUND, so call sites never see the config.
  */
 
+import { stripeConfig, stripeEnabled } from "@4dl/billing";
 import {
   canonicalHost as tCanonicalHost,
   invalidateTenantHosts as tInvalidateTenantHosts,
@@ -58,13 +59,41 @@ export const APP_RESERVED_LABELS: ReadonlySet<string> = new Set(["tessa", "tesse
  * function** (and drop it from the config below) if the app does not bill its
  * tenants; the gate then resolves `ok` and nothing else changes.
  */
+/**
+ * The centre's standing with the platform.
+ *
+ * ⚠️ **NO ROW IS NOT `ok`.** The subscription row is written lazily — the first
+ * time anything opens `/api/billing` — so a centre that has never looked at
+ * billing has none at all, and `resolveHostGate(null)` falls through every
+ * branch to full service. The `incomplete` rung, which exists precisely to hold
+ * an unconfigured centre read-only until it chooses a plan, could therefore
+ * never fire: the paywall was open for exactly the centres it is for.
+ *
+ * Found by an integration test that suspended a centre and watched an ordinary
+ * write succeed anyway. A missing row and "never chose a plan" are the same
+ * fact, so they resolve to the same status.
+ *
+ * ── …but only where a payment can actually be TAKEN ─────────────────────────
+ *
+ * Gating on "has not paid" when this deployment has no payment rail configured
+ * would strand every centre over OUR misconfiguration — a self-host, anything
+ * before the Stripe step in DEPLOY.md, and the whole integration suite. The
+ * house rule, the same one Kova states at length: fail CLOSED on their
+ * non-payment, fail OPEN on ours.
+ */
 async function statusOf(db: D1Database, tenantId: string): Promise<string | null> {
   const row = await db
-    .prepare("SELECT status FROM subscriptions WHERE tenant_id = ?")
+    .prepare("SELECT s.status, s.comp, p.price_usd_month FROM subscriptions s LEFT JOIN plans p ON p.id = s.plan_id WHERE s.tenant_id = ?")
     .bind(tenantId)
-    .first<{ status: string | null }>()
+    .first<{ status: string | null; comp: number | null; price_usd_month: number | null }>()
     .catch(() => null);
-  return row?.status ?? null;
+  // Comped, or on a paid plan: nothing to decide. The steady state, so it stops
+  // here and the config read below never touches the hot path.
+  if (row?.comp) return row.status ?? null;
+  if (Number(row?.price_usd_month) > 0) return row?.status ?? null;
+  const cfg = await stripeConfig(db).catch(() => null);
+  if (!cfg || !stripeEnabled(cfg)) return row?.status ?? null;
+  return "incomplete";
 }
 
 export const rootDomain = (env: RootDomainEnv): string => tRootDomain(env) || DEFAULT_ROOT;

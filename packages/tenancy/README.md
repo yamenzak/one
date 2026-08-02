@@ -9,6 +9,7 @@ that tenant's whole origin is currently writable.
 | `standing.ts` | `resolveStanding` (what a person may do in one tenancy) and `resolveHostGate` (does this tenant's host serve a working app), plus the dunning ladder. Pure. |
 | `maintenance.ts` | The same question for the WHOLE deployment, from an operator's switch rather than anyone's subscription: `off` / `readonly` / `full`. Pure. |
 | `maintenance-routes.ts` | That switch over `app_config` — the per-request middleware and the two operator routes. D1 + Hono. |
+| `close-routes.ts` | A tenant CLOSING itself: status, step-up code, schedule, undo. The state transition is injected. D1 + Hono. |
 | `dcv.ts` | Turning Cloudflare's certificate errors into a record an owner can add. Pure. |
 | `host-context.ts` | Host → tenant resolution, the KV identity cache, subdomain provisioning, `canonicalHost`. D1. |
 | `cloudflare.ts` | The Cloudflare for SaaS custom-hostname + worker-route client. |
@@ -81,6 +82,15 @@ Three things this package refuses to guess. All of them arrive through
 | `root` | `rootDomain()` returns `""` when neither `ROOT_DOMAIN` nor `BETTER_AUTH_URL` is set. A shared package guessing a hostname is how every tenant 404s — the shipped default belongs to the app that ships it. |
 | `reserved` | `RESERVED_LABELS` covers what is true of any product on any zone (other doors, mail autoconfig, ACME, Workers plumbing, money words). An app's own brand names are its own: `"kova"` means nothing to a warehouse app, and a shared list accumulating every app's brands is one nobody can safely edit. |
 | `statusOf` | The tenant's standing lives in a **billing** table this package must not read. **Omit it and every gate resolves `ok`** — which is the correct behaviour for an app that never takes a payment, and the reason the host gate is not a hard dependency on `@4dl/billing`. |
+
+⚠️ **`statusOf` returning `null` resolves to `ok`, not to `incomplete`.** That is
+correct for an app with no billing and a trap for one that has it: if the
+subscription row is written LAZILY, a tenant that never opened billing has no
+row, so the `incomplete` rung — which exists to hold an unconfigured tenant
+read-only until it picks a plan — never fires. It shipped that way in one app.
+An app whose row is lazy must map "no row" to unpaid inside its own `statusOf`,
+and both live apps now do, both with the fail-open rule: closed on the tenant's
+non-payment, open on the deployment's misconfiguration.
 
 Branding is a type parameter (`HostTenant<B>`): tenancy stores and returns
 whatever blob the app puts in `tenant_settings.branding_json` and has no opinion
@@ -163,3 +173,31 @@ ACTIVE, and every request reaches a script that is not there.
 `orgSlugGuards(config, noun)` needs no guards at all — Better Auth decides who
 may create or rename an organization; these only decide what a slug may BE. That
 is why they could move first.
+
+
+## `close-routes.ts` — leaving is always allowed, and that has to be true
+
+`standing.ts`'s ladder exempts the exit path from every rung *specifically* so
+that paying is A way out and not the ONLY one. An invariant only one app
+implements is not an invariant: in the other, the route the guard exempted did
+not exist, so the exemption protected nothing and a suspended tenant was in a
+trap — every write refused, the copy saying "settle the invoice", no way to shut
+the thing down instead.
+
+**Two mistakes this file's shape prevents, both of which shipped:**
+
+- **The exemption needs a PREFIX, not an equality.** Scheduling a close flips
+  the tenant to `closing`, which is itself a read-only rung — so an exact match
+  on `/api/tenant/close` refuses `/close/cancel`, `/close/request-otp` and
+  `/close/status`. The undo is unreachable exactly when it is needed, and a
+  close you cannot cancel is not a grace window.
+- **`cancel` takes NO step-up code.** Undoing a destructive act is not itself
+  destructive; a second factor in front of the undo is how a mistake becomes
+  permanent because the confirmation email was slow.
+
+Close is SCHEDULED, not immediate: billing stops at once — nobody should be
+charged for a product they have ended — and the data is held so a 2am decision
+can be undone and an accountant can take one last export.
+
+The state transition is injected because it is genuinely the app's: it cancels
+subscriptions on rails this package knows nothing about.

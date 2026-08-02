@@ -15,6 +15,7 @@ the rest coherent: there is no password to phish, reset, reuse or store, and
 | `staff-routes.ts` | The staff SCREEN's endpoints: roster + pending invitations + seat counters, invite, revoke, re-role, remove. Roles and copy injected. |
 | `otp-guard.ts` | The one gate in front of the sign-in code: human check → cooldown → per-source ceiling → eligibility → deliverability. |
 | `action-otp.ts` | Step-up confirmation codes for irreversible actions. |
+| `account-routes.ts` | A person deleting their own account: step-up code, a double-checked block, erasure. |
 | `audit.ts` | The auth trail, which is also the rate limiter's store. |
 | `turnstile.ts` | The optional human check. |
 
@@ -145,3 +146,18 @@ working link to hand over in person rather than a toast.
 | `checkRole` | none | a capability the plan sells has to close on the INVITE and the PROMOTION; gating one leaves the other. Returns a **Response**, so an app's existing entitlement gate is handed over unchanged and its body keeps naming the feature — otherwise a plan refusal and a seat refusal are both an opaque 403 |
 | `claimsSeat` | never | correct where every role is a staff seat: a sideways move consumes nothing, so a tenant on its ceiling can still reshuffle. An app with a seat-free customer role counts only customer → staff |
 | `copy` | English | one app's tenant is a studio, another's a centre, and one runs `@4dl/i18n` |
+
+
+## `account-routes.ts` — the erasure every app owes
+
+Two reasons this is the platform's rather than a product's. It is the route a
+GDPR/DSGVO request lands on, and an app with no mechanism has an obligation it
+cannot discharge. And "leaving is always allowed" is a documented invariant of
+`@4dl/tenancy`'s standing ladder, which exempts the exit paths from every rung —
+an invariant one app implements is not one.
+
+`blockedReason` is checked **twice**: before the code is sent and again before
+the erasure. Somebody can be made an owner in the minutes a confirmation email
+takes to arrive, and an owner deleting themselves leaves a tenant nobody can
+administer, still billing, holding other people's data. It returns a CODE rather
+than a sentence, so the app can turn it into a link to the tenant-close flow.

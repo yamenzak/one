@@ -249,6 +249,26 @@ which is a Kova permission feature and not a staff-management primitive.
 
 ### Five generic surfaces Kova has and Tessa simply does not
 
+> ⚠️ **CORRECTION (2026-08-02).** Three of the six rows below are wrong or
+> mis-stated, and re-checking them before planning is the only reason the real
+> work was found. Verified against the code:
+>
+> - **`session-routes` is not session management.** It is trainer-session
+>   BOOKINGS consumed from a client's add-on balance — a Kova product feature.
+>   Neither app has device-session listing/revocation. Nothing to extract.
+> - **`account-routes` is not "change your name / avatar".** It is the GDPR
+>   self-delete, behind a step-up code. The gap is real and much sharper than the
+>   row said: a Tessa user could not delete their own account at all.
+> - **`media-routes`: Tessa does write to R2**, through `@4dl/ai`'s media hook.
+>   What it lacks is a user-facing UPLOAD route, which is a smaller claim.
+>
+> And two rows are not extractions at all: `action-otp` and `audit` already have
+> their mechanism in `@4dl/auth`. Kova's files are thin bindings; Tessa simply
+> had no destructive action that needed one — until now.
+>
+> What survives is one coherent thing, and it is the sharpest item on this page:
+> **leaving**.
+
 798 lines, all of them things any multi-tenant app needs and none of them
 Kova-shaped:
 
@@ -265,6 +285,34 @@ The `tenant-close` one is the sharpest: the ladder in `@4dl/tenancy` exempts
 `/api/tenant/close` from every gate *specifically* so that leaving is always
 possible, and in Tessa that route does not exist. The exemption protects
 nothing.
+
+**DONE (2026-08-02).** `tenantCloseRoutes` in `@4dl/tenancy` and `accountRoutes`
+in `@4dl/auth`, both with the step-up OTP, the purge and the email injected.
+Tessa mounts both, and gained the pieces it was missing to do so: an
+`action-otp` binding, `scheduleTenantClose`/`cancelTenantClose`, `purgeUser` and
+`isOwnerAnywhere`.
+
+Writing the test that puts a centre on the read-only rung and then closes it
+surfaced **three live bugs in Tessa**, none of which any existing test could see:
+
+1. **A centre with no `subscriptions` row resolved to `ok`, not `incomplete`.**
+   The row is written lazily — the first `/api/billing` read — so a centre that
+   never opened billing had none, and `resolveHostGate(null)` falls through
+   every branch to full service. The `incomplete` rung exists precisely to hold
+   an unconfigured centre read-only until it picks a plan, and it could never
+   fire: **the setup paywall was open for exactly the centres it is for.**
+   `statusOf` now treats a missing row as unpaid, with Kova's fail-open rule —
+   closed on their non-payment, open on ours.
+2. **The read-only exemption used `===` where it needed a prefix.** Scheduling a
+   close flips the centre to `closing`, which is itself a read-only rung — so
+   `/tenant/close/cancel`, `/close/request-otp` and `/close/status` were all
+   refused by the very state they exist to get out of. A close you cannot cancel
+   is not a grace window. (Kova's has always been a prefix.)
+3. The route did not exist at all, which is the item as written.
+
+Each one is invisible from a typecheck and from every route-shaped survey. They
+were found by asserting the INVARIANT — "a suspended centre can still leave" —
+rather than the routes.
 
 ---
 
@@ -375,9 +423,12 @@ Ranked by (breakage prevented) ÷ (risk of the move):
 4. ~~**Staff/members into `@4dl/auth`.**~~ **DONE** — took Tessa's shape, gave
    Kova the three parts it lacked (see the correction above: it was never the
    invitation itself).
-5. **The five generic surfaces**, cheapest first: `tenant-close` (an invariant
-   is currently unenforceable), then account, sessions, step-up OTP, audit,
-   media.
+5. ~~**The five generic surfaces.**~~ **PARTLY DONE** — see the correction above:
+   three rows were wrong. `tenant-close` + the self-delete are done (and took
+   three live Tessa bugs with them); `session-routes` was a misreading and is
+   struck; `action-otp` and `audit` are mechanisms `@4dl/auth` already owns.
+   What genuinely remains is a user-facing media UPLOAD route for Tessa, which
+   is small and not urgent.
 6. **Offline into `@4dl/app-kit`**, and Kova onto `@4dl/i18n`.
 
 Nothing here is urgent in the sense of "production is broken". All of it is

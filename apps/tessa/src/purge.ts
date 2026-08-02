@@ -75,3 +75,83 @@ export async function purgeTenant(env: Env, tenantId: string): Promise<void> {
     await env.INBOX.get(env.INBOX.idFromName(m.userId)).wipe().catch(() => undefined);
   }
 }
+
+/**
+ * How long a closed centre's data is HELD before it is destroyed.
+ *
+ * Seven days, and the window is the feature rather than a hedge. Somebody has to
+ * be able to undo a decision made at the end of a bad week — and in a medical
+ * centre the practice's own accountant frequently needs one last export after
+ * the owner has already pressed the button. Billing stops immediately either
+ * way; it is only the erasure that waits.
+ */
+export const TENANT_CLOSE_GRACE_DAYS = 7;
+
+/**
+ * Schedule a close: stop the billing NOW, hold the data, hand back the date the
+ * purge runs. The daily sweep is what finally calls `purgeTenant`.
+ *
+ * Deliberately NOT immediate. Nobody should be charged for a product they have
+ * ended, so the subscription is marked at once — but an irreversible wipe with
+ * no way back is how a mis-click becomes a support ticket nobody can answer.
+ */
+export async function scheduleTenantClose(env: Env, tenantId: string): Promise<{ deleteAt: string }> {
+  const deleteAt = new Date(Date.now() + TENANT_CLOSE_GRACE_DAYS * 86_400_000).toISOString();
+  await run(
+    env.DB,
+    "UPDATE subscriptions SET status = 'closing', suspend_at = ?, delete_at = ? WHERE tenant_id = ?",
+    new Date().toISOString(),
+    deleteAt,
+    tenantId,
+  );
+  return { deleteAt };
+}
+
+/** Undo a pending close inside the window. The centre stays; billing has to be
+ *  re-established separately, because the subscription was already ended. */
+export async function cancelTenantClose(env: Env, tenantId: string): Promise<void> {
+  await run(
+    env.DB,
+    "UPDATE subscriptions SET status = 'active', suspend_at = NULL, delete_at = NULL WHERE tenant_id = ? AND status = 'closing'",
+    tenantId,
+  );
+}
+
+/** True when this user runs any centre. An owner cannot self-delete out from
+ *  under one — they close it, which stops the billing and wipes the tenant. */
+export async function isOwnerAnywhere(db: D1Database, userId: string): Promise<boolean> {
+  const row = await db
+    .prepare('SELECT 1 AS x FROM "member" WHERE userId = ? AND role = ? LIMIT 1')
+    .bind(userId, "owner")
+    .first<{ x: number }>()
+    .catch(() => null);
+  return !!row;
+}
+
+/**
+ * Erase a USER (the DSGVO self-delete).
+ *
+ * Their MEMBERSHIPS go and their identity goes. What does NOT go is the trace:
+ * `ledger.actor_user_id` and `sterilisation_cycles.released_by` name whoever
+ * performed an act, and a Freigabe with no named releaser is not a record — it
+ * is the absence of one. Under MPBetreibV that trace is the thing being kept,
+ * and it is a legitimate-interest basis that outlives an erasure request. The
+ * columns hold an opaque id whose subject row is gone, which is precisely the
+ * pseudonymisation the obligation and the right are both satisfied by.
+ *
+ * Guarded by the caller: never reached while this user still owns a centre.
+ */
+export async function purgeUser(env: Env, userId: string): Promise<void> {
+  await run(env.DB, 'DELETE FROM "member" WHERE userId = ?', userId);
+  for (const sql of [
+    'DELETE FROM "user" WHERE id = ?',
+    'DELETE FROM "session" WHERE userId = ?',
+    'DELETE FROM "account" WHERE userId = ?',
+    'DELETE FROM "passkey" WHERE userId = ?',
+    "DELETE FROM user_prefs WHERE user_id = ?",
+    "DELETE FROM digest_sent WHERE user_id = ?",
+    "DELETE FROM notifications WHERE recipient_user_id = ?",
+    "DELETE FROM action_otps WHERE subject = ?",
+  ]) await run(env.DB, sql, userId);
+  await env.INBOX.get(env.INBOX.idFromName(userId)).wipe().catch(() => undefined);
+}

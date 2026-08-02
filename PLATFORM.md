@@ -28,8 +28,8 @@ It typechecks and its tests pass in this workspace, so it cannot rot.
 | Package | What it owns | What the APP supplies |
 |---|---|---|
 | [`@4dl/core`](packages/core/README.md) | ids, defensive JSON, the **bindings contract**, the **composed schema runner**, the boundary checker | its `SchemaModule`s |
-| [`@4dl/tenancy`](packages/tenancy/README.md) | the five doors, host→tenant + KV cache, custom domains (CF for SaaS + DCV), the standing/gate model, the deployment-wide maintenance switch | root domain, reserved labels, `statusOf` |
-| [`@4dl/auth`](packages/auth/README.md) | passwordless identity (OTP + passkeys), the request identity, the **five-gate route guard**, the grant algebra, staff seats + the staff ROUTES (invite, revoke, re-role, remove), step-up codes | the RBAC registry, the route table, brand, seat quota, the role copy and the invite email |
+| [`@4dl/tenancy`](packages/tenancy/README.md) | the five doors, host→tenant + KV cache, custom domains (CF for SaaS + DCV), the standing/gate model, the deployment-wide maintenance switch, the tenant-CLOSE routes | root domain, reserved labels, `statusOf`, the close transition |
+| [`@4dl/auth`](packages/auth/README.md) | passwordless identity (OTP + passkeys), the request identity, the **five-gate route guard**, the grant algebra, staff seats + the staff ROUTES, step-up codes + the self-DELETE route | the RBAC registry, the route table, brand, seat quota, the role copy, the invite email, the purge |
 | [`@4dl/billing`](packages/billing/README.md) | the entitlement engine, the catalog STORE (seeding, plan/pack reads, quota + feature gates), credit metering, `CreditLedgerDO`, the Stripe client, the dunning ladder | quota + feature keys, and the catalog's CONTENTS |
 | [`@4dl/commerce`](packages/commerce/README.md) | what a tenant sells its own customers: budgets (queue, never sum), the customer-lapse ladder, discount codes | the scope list, the lapse copy |
 | [`@4dl/ai`](packages/ai/README.md) | the metered path: reserve → run → settle, the model catalog, pricing parsers, the dev-only mock lane | the feature registry (prompts), where images go |

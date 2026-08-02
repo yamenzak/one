@@ -34,6 +34,7 @@ import { notifyRoutes } from "@4dl/notify/routes";
 // calls `configureNotify` at module scope). The routes below read it to scope
 // "mark all read", so the import is load-bearing even where `notify` is unused.
 import { notifyRole } from "./notify.js";
+import { accountRoutes, tenantCloseRoutes } from "./exit-routes.js";
 import { cycleRoutes } from "./cycle-routes.js";
 import { packRoutes } from "./pack-routes.js";
 import { stockRoutes } from "./stock-routes.js";
@@ -176,6 +177,15 @@ app.route("/api", notifyRoutes<AppEnv>({ currentUserId: (c) => c.get("user")?.id
 app.route("/api", billingRoutes);
 app.route("/api", settingsRoutes);
 app.route("/api", staffRoutes);
+/**
+ * LEAVING. `route-guard.ts` has exempted `/api/tenant/close` from the read-only
+ * gate since it was written — the ladder is built so that paying is A way out
+ * and not the ONLY one — and until now the route it exempted did not exist, so
+ * a suspended centre had every write refused and no way to shut itself down.
+ * `/api/me/*` is exempt for the same reason: a person may always leave.
+ */
+app.route("/api", tenantCloseRoutes);
+app.route("/api", accountRoutes);
 app.route("/api", insightRoutes);
 app.route("/api", aiRoutes);
 app.route("/api", stripeWebhookRoutes);

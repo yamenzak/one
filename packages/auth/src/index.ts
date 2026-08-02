@@ -1,3 +1,4 @@
+export * from "./account-routes.js";
 export * from "./action-otp.js";
 export * from "./audit.js";
 export * from "./better-auth.js";

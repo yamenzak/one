@@ -120,7 +120,14 @@ const isPersonal = (path: string): boolean => path === "/api/context" || path ==
 const allowedWhileReadOnly = (path: string): boolean =>
   path.startsWith("/api/webhooks/") ||
   path.startsWith("/api/me") ||
-  path === "/api/tenant/close" ||
+  /**
+   * PREFIX, not equality. `/api/tenant/close` schedules the close and flips the
+   * centre to `closing`, which is itself a read-only rung — so with an exact
+   * match the UNDO (`/close/cancel`), the confirmation code (`/close/request-otp`)
+   * and the status read were all refused by the very state they exist to get out
+   * of. A close you cannot cancel is not a grace window.
+   */
+  path.startsWith("/api/tenant/close") ||
   // The inbox is PERSONAL — both writes are scoped to `recipient_user_id` and
   // touch no centre data. A centre spends up to seven days read-only, and a bell
   // whose badge cannot be cleared for a week trains people to ignore it, which
