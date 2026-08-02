@@ -77,18 +77,42 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      # ── The single biggest lever on this workflow's runtime ────────────────
+      #
+      # Measured on this repo, from cold: typecheck 1m17s, tests 4m25s, the SPA
+      # builds 24s. Warm, all of it is 0.5s — turbo hashes each task's inputs and
+      # replays the outputs. CI threw that cache away on every run and paid the
+      # ~6 minutes again.
+      #
+      # Restoring it is SAFE in a way a build cache usually is not: the key is
+      # the content of a task's inputs, so a package that changed misses and
+      # re-runs. A stale cache cannot make a broken commit pass — it can only
+      # fail to save time.
+      #
+      # Keyed by SHA so every run writes a fresh entry (GitHub caches are
+      # immutable per key, so a fixed key would freeze on the first run), and
+      # restored by prefix so it picks up the newest. 540 KB an entry.
+      - uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
+
       # EVERY SPA, from the registry. Each worker serves its app through an
       # `assets` binding. Turbo cannot infer this — an `assets.directory` is a
       # filesystem path, not a package dependency — so it must be explicit, and
       # deriving it from the registry is what stops it being explicit-and-stale.
+      # Through TURBO, not `pnpm --filter`. Same builds, but inside the graph:
+      # they hash, they cache, and a run that changed no SPA replays them in
+      # milliseconds instead of spending 24 seconds on vite. The list still comes
+      # from the registry — `turbo.json` now declares each worker suite's edge to
+      # its SPA, but the explicit build is what covers an app whose suite has not
+      # been given one yet.
       - name: Build every SPA
         run: |
           set -euo pipefail
-          for pkg in $(node scripts/apps.mjs spas); do
-            echo "::group::build $pkg"
-            pnpm --filter "$pkg" build
-            echo "::endgroup::"
-          done
+          filters=$(node scripts/apps.mjs spas | sed 's/^/--filter=/' | tr '\n' ' ')
+          pnpm turbo run build $filters
 
       - run: pnpm turbo run typecheck test
 
@@ -244,6 +268,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      # Read-only here: `gate` built this SPA minutes ago and saved the cache, so
+      # the build below replays it instead of running vite again. Nothing is
+      # written back — this job produces nothing the next run wants.
+      - uses: actions/cache/restore@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
+
       # `wire` committed the binding, but this job checked out the SHA that
       # triggered the run — which is the commit BEFORE that one. Re-applying it
       # here (idempotent, not committed) is what makes THIS deploy carry the
@@ -271,7 +304,7 @@ jobs:
         run: |
           set -euo pipefail
           spa=$(node --input-type=module -e "import {app} from './scripts/apps.mjs'; process.stdout.write(app('${{ matrix.id }}').spa ?? '')")
-          if [ -n "$spa" ]; then pnpm --filter "$spa" build; fi
+          if [ -n "$spa" ]; then pnpm turbo run build --filter="$spa"; fi
 
       # No secrets are set here — see the header.
       - name: Deploy

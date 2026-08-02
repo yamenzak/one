@@ -13,8 +13,24 @@
       "dependsOn": ["^build"],
       "outputs": ["coverage/**"]
     },
+    // ⚠️ A worker's integration suite depends on its SPA's BUILD, and turbo
+    // cannot infer that: an `assets.directory` is a filesystem path, not a
+    // package dependency, so nothing in the graph connects the two. Without the
+    // edge the suite boots Miniflare against a missing directory and aborts
+    // reporting "no tests" — a PASS-shaped result. That is what turned the merge
+    // adding `apps/tessa-app` red, and it is why both CI workflows also build
+    // every SPA explicitly.
+    //
+    // Declaring it here is what makes a bare `turbo run test` correct, and — the
+    // reason it was worth doing now — CACHEABLE: the SPA build lands in turbo's
+    // cache with everything else instead of being a 24-second `pnpm --filter`
+    // outside the graph on every run.
     "@kova/api#test": {
       "dependsOn": ["^build", "@kova/app#build"],
+      "outputs": ["coverage/**"]
+    },
+    "@4dl/tessa#test": {
+      "dependsOn": ["^build", "@tessa/app#build"],
       "outputs": ["coverage/**"]
     },
     "e2e": {

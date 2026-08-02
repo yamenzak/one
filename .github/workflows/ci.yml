@@ -57,6 +57,27 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # ── The single biggest lever on this workflow's runtime ────────────────
+      #
+      # Measured on this repo, from cold: typecheck 1m17s, tests 4m25s, the SPA
+      # builds 24s. Warm, all of it is 0.5s — turbo hashes each task's inputs and
+      # replays the outputs. CI threw that cache away on every run and paid the
+      # ~6 minutes again.
+      #
+      # Restoring it is SAFE in a way a build cache usually is not: the key is
+      # the content of a task's inputs, so a package that changed misses and
+      # re-runs. A stale cache cannot make a broken commit pass — it can only
+      # fail to save time.
+      #
+      # Keyed by SHA so every run writes a fresh entry (GitHub caches are
+      # immutable per key, so a fixed key would freeze on the first run), and
+      # restored by prefix so it picks up the newest. 540 KB an entry.
+      - uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
+
       # EVERY SPA, from the registry. Each worker serves its app through an
       # `assets` binding, and the Miniflare integration suites report "no tests"
       # — a PASS-shaped result — when the directory is missing. Turbo cannot
@@ -64,14 +85,17 @@ jobs:
       # dependency, so nothing in the graph connects a worker's tests to its
       # app's build. Deriving the list from `apps.json` is what stops it being
       # explicit-and-stale, which is exactly how Tessa's went missing.
+      # Through TURBO, not `pnpm --filter`. Same builds, but inside the graph:
+      # they hash, they cache, and a run that changed no SPA replays them in
+      # milliseconds instead of spending 24 seconds on vite. The list still comes
+      # from the registry — `turbo.json` now declares each worker suite's edge to
+      # its SPA, but the explicit build is what covers an app whose suite has not
+      # been given one yet.
       - name: Build every SPA
         run: |
           set -euo pipefail
-          for pkg in $(node scripts/apps.mjs spas); do
-            echo "::group::build $pkg"
-            pnpm --filter "$pkg" build
-            echo "::endgroup::"
-          done
+          filters=$(node scripts/apps.mjs spas | sed 's/^/--filter=/' | tr '\n' ' ')
+          pnpm turbo run build $filters
 
       - run: pnpm turbo run typecheck test
 
@@ -137,15 +161,37 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      # Chromium only — every suite runs one project, and --with-deps pulls the
-      # system libraries headless Chromium needs on a bare ubuntu runner.
-      - run: pnpm --filter ${{ matrix.e2e }} exec playwright install --with-deps chromium
+      # The BROWSER is cached; the system libraries are not, and cannot be —
+      # `--with-deps` is an apt install, which lands outside any path a cache
+      # action can carry. So a hit still runs `install-deps`, and only the ~40 MB
+      # Chromium download is skipped.
+      #
+      # Keyed on the lockfile: Playwright pins a browser revision per version, so
+      # a bumped dependency must not replay the old binary against the new
+      # client — that combination fails at launch with a version-mismatch error
+      # that reads like a broken test.
+      - uses: actions/cache@v4
+        id: browsers
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - if: steps.browsers.outputs.cache-hit == 'true'
+        run: pnpm --filter ${{ matrix.e2e }} exec playwright install-deps chromium
+      - if: steps.browsers.outputs.cache-hit != 'true'
+        run: pnpm --filter ${{ matrix.e2e }} exec playwright install --with-deps chromium
 
       # The worker under test serves the built SPA through its `assets` binding,
       # so the directory has to exist before Playwright's webServer boots it.
+      - uses: actions/cache/restore@v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
+
       - name: Build its SPA
         if: matrix.spa != ''
-        run: pnpm --filter ${{ matrix.spa }} build
+        run: pnpm turbo run build --filter=${{ matrix.spa }}
 
       - run: pnpm --filter ${{ matrix.e2e }} e2e
 

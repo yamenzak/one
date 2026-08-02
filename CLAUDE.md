@@ -211,6 +211,18 @@ workflows probe `BETTER_AUTH_URL` + `/health` after deploying, and a hostname
 that does not *resolve* is a notice (DNS/ACM are dashboard steps) while one that
 resolves and answers wrongly is a failure.
 
+**CI runtime is turbo's cache, and it is the whole story.** Measured on this
+repo from cold: tests 4m25s, typecheck 1m17s, the SPA builds 24s. Warm, all of it
+replays in under a second. Both workflows now persist `.turbo/cache` between runs
+(`actions/cache`, ~16 MB), so a push that changed one app pays for that app only —
+a Tessa-only change went 5m → **27s**. Restoring a build cache is safe here in a
+way it usually is not: turbo keys each task on the content of its inputs, so a
+package that changed misses and re-runs. A stale cache cannot make a broken
+commit pass; it can only fail to save time. The one lane it does not shrink is
+`@kova/api`'s own suite — 548 tests, each provisioning its world through real
+OTP sign-ins — which is ~2.5 min whenever Kova's API changes, and is the price of
+the coverage.
+
 **Three dependency-free guards, and all are in `pnpm test`:**
 `scripts/apps-manifest.test.mjs` fails on anything under `apps/` with a
 `wrangler.jsonc` and no registry entry (`_template` exempt),
@@ -227,13 +239,15 @@ loud, which is the only kind this repo has actually had.
 - `pnpm typecheck` / `pnpm test` — across the workspace
 - `pnpm --filter @kova/api test` — the Miniflare integration suite. **Build the
   SPA first** (`pnpm --filter @kova/app build`) — the worker's `assets` dir is
-  `apps/app/dist`, and Miniflare aborts (reporting "no tests") without it.
-  ⚠️ **The same is true of `@4dl/tessa` and `@tessa/app`**, and turbo cannot
-  infer either: an `assets.directory` is a filesystem path, not a package
-  dependency, so nothing in the graph connects a worker's tests to its app's
-  build. Both CI workflows build both SPAs explicitly for exactly this reason —
-  forgetting Tessa's is what turned the merge that added `apps/tessa-app` red. The
-  root `pnpm test` handles this automatically (turbo builds the app first).
+  `apps/app/dist`, and Miniflare aborts (reporting "no tests") without it. The
+  same holds for `@4dl/tessa` and `@tessa/app`.
+  ⚠️ An `assets.directory` is a filesystem path, not a package dependency, so
+  nothing in the graph connects a worker's tests to its app's build — forgetting
+  Tessa's is what turned the merge that added `apps/tessa-app` red. `turbo.json`
+  now declares BOTH edges by hand (`@kova/api#test`, `@4dl/tessa#test`), so
+  anything going through turbo — the root `pnpm test`, `pnpm turbo run test`, both
+  CI workflows — builds the SPA first and CACHES it. `pnpm --filter <pkg> test`
+  bypasses turbo and still does not.
   ⚠️ Under a *parallel* root `pnpm test` this suite can fail with
   `Isolated storage failed` — Miniflare storage contention with the sibling
   tasks, not a real failure. Re-run it on its own filter before believing it.
