@@ -58,8 +58,15 @@
   "triggers": { "crons": ["*/15 * * * *", "10 0 * * *"] },
 
   "vars": {
-    // Platform super-admin allowlist — a separate axis from tenant RBAC.
-    "ADMIN_EMAILS": "",
+    // Platform super-admin allowlist — a separate axis from tenant RBAC, and the
+    // only thing that opens the `admin.` door.
+    //
+    // ⚠️ EMPTY MEANS NOBODY, outside development. `isPlatformAdminFor` fails
+    // closed on an unset list rather than promoting every signed-in user, so a
+    // blank here is not "not configured yet" — it is a console no one can reach,
+    // reported as "you're signed in, but you are not an operator". Tessa
+    // scaffolded from the template with this blank and shipped that way.
+    "ADMIN_EMAILS": "zakhouryamen@gmail.com",
     // Canonical public origin of the ROOT door. Better Auth's baseURL is
     // per-request (the hostname the user actually came through), so this is only
     // the advertised origin and the fallback for jobs with no request.

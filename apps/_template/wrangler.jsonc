@@ -41,7 +41,15 @@
   "triggers": { "crons": ["*/15 * * * *", "10 0 * * *"] },
 
   "vars": {
-    // Platform super-admin allowlist — a separate axis from tenant RBAC.
+    // Platform super-admin allowlist — a separate axis from tenant RBAC, and the
+    // only thing that opens the `admin.` door.
+    //
+    // ⚠️ FILL THIS IN. Empty means NOBODY outside development:
+    // `isPlatformAdminFor` fails closed rather than promoting every signed-in
+    // user, so a blank here ships a console its own owner cannot open — it just
+    // says "you're signed in, but you are not an operator". Tessa shipped that
+    // way. `apps-manifest.test.mjs` fails on a REGISTERED app that leaves it
+    // blank; the template is exempt because it has no owner to name yet.
     "ADMIN_EMAILS": "",
     // Canonical public origin of the ROOT door. Better Auth's baseURL is
     // per-request (the hostname the user actually came through), so this is only

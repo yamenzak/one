@@ -130,6 +130,26 @@ for (const a of apps) {
   }
 }
 
+// ── An operator console nobody can open is not a console ────────────────────
+//
+// `ADMIN_EMAILS` empty means NOBODY outside development — `isPlatformAdminFor`
+// fails closed rather than promoting every signed-in user, which is the right
+// call and also means a blank value is indistinguishable from a considered one.
+// Tessa scaffolded from the template with it blank and shipped that way: the
+// `admin.` door answered "you're signed in, but you are not an operator" to the
+// person who owns the deployment.
+//
+// Only apps that DECLARE the var are checked. Not declaring it is a coherent
+// statement ("this app has no operator console"); declaring it empty is not.
+for (const a of apps) {
+  if (!existsSync(join(ROOT, a.dir, "wrangler.jsonc"))) continue;
+  const text = uncommented(wranglerText(a.id));
+  const m = /"ADMIN_EMAILS"\s*:\s*"([^"]*)"/.exec(text);
+  if (m && !m[1].trim()) {
+    fail(`"${a.id}" declares ADMIN_EMAILS but leaves it empty — its admin. door is unreachable by anyone in production.`);
+  }
+}
+
 // A deploy that cannot tell "shipped" from "working" is how Tessa stayed green
 // and dead for a day. Both workflows must run the check; a silent removal is
 // exactly the regression this file exists to catch.
