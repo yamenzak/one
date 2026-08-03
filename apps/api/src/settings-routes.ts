@@ -96,10 +96,17 @@ export const settingsRoutes = new Hono<AppEnv>()
             // after a colour change throws the studio's choices away.
             mark: z.object({
               monogram: z.string().max(3).nullish(),
+              plate: z.enum(["accent", "tint", "none"]).nullish(),
               accentHead: z.number().int().min(0).max(60).nullish(),
               accentTail: z.number().int().min(0).max(60).nullish(),
               softHead: z.number().int().min(0).max(60).nullish(),
               softTail: z.number().int().min(0).max(60).nullish(),
+              icon: z.object({
+                accentHead: z.number().int().min(0).max(60).nullish(),
+                accentTail: z.number().int().min(0).max(60).nullish(),
+                softHead: z.number().int().min(0).max(60).nullish(),
+                softTail: z.number().int().min(0).max(60).nullish(),
+              }).nullish(),
             }).nullish(),
             aiAvatarUrl: z.string().max(500).nullish(),
             aiName: z.string().max(40).nullish(),

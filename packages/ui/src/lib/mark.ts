@@ -81,10 +81,31 @@ export interface WordmarkStyle {
   softTail?: number | null;
 }
 
-/** The generation inputs a studio keeps: the icon's letters and the two moves above. */
+/**
+ * What sits behind an icon's letters.
+ *
+ *   accent   a solid plate in the brand colour, letters knocked out of it. Works
+ *            on any background because it brings its own.
+ *   tint     the brand colour at low alpha. Reads as the studio's colour over
+ *            whatever is behind it, light or dark, because it IS translucent.
+ *   none     bare letterforms. The most restrained and the only one that needs
+ *            two files, since letters in the foreground colour vanish when the
+ *            surface flips.
+ */
+export type MarkPlate = "accent" | "tint" | "none";
+
+/** How far the `tint` plate is faded. Exported so a DOM preview matches the canvas. */
+export const MARK_TINT_ALPHA = 0.16;
+
+/** The generation inputs a studio keeps: the icon's letters, its plate, and the
+ *  character styling of each of the two marks. The four `WordmarkStyle` keys at
+ *  the top level are the WORDMARK's — the icon keeps its own under `icon`, so
+ *  the two can be styled independently. */
 export interface MarkStyle extends WordmarkStyle {
   /** The letters a generated icon uses. Blank = derive from the name. */
   monogram?: string | null;
+  plate?: MarkPlate | null;
+  icon?: WordmarkStyle | null;
 }
 
 /** A stretch of the name that shares one colour and one weight. */
@@ -135,12 +156,15 @@ export interface MarkOptions {
   bg: string;
   /** The letterform colour. */
   fg: string;
-  /** The colour for accented runs of a wordmark. Defaults to `fg`. */
+  /** The colour for accented runs. Defaults to `fg` — which is what a solid
+   *  accent plate wants, since the plate has already spent that colour. */
   accent?: string;
   /** A wide transparent wordmark instead of a square plate. */
   wide?: boolean;
-  /** Which characters are accented or quieted. Wordmark only — an icon is two
-   *  letters on a coloured plate and has nothing to contrast against. */
+  /** What sits behind an icon's letters. Ignored for a wordmark, which is
+   *  always bare. Defaults to the solid plate. */
+  plate?: MarkPlate | null;
+  /** Which characters are accented or quieted. Applies to both shapes. */
   style?: WordmarkStyle | null;
   /** Square edge in px. The manifest's install tile is 512. */
   size?: number;
@@ -170,24 +194,25 @@ export async function renderMarkPng(opts: MarkOptions): Promise<File | null> {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  if (!opts.wide) {
+  const plate: MarkPlate = opts.plate ?? "accent";
+  if (!opts.wide && plate !== "none") {
     const r = size * (opts.radius ?? 0.22);
     ctx.fillStyle = opts.bg;
+    ctx.globalAlpha = plate === "tint" ? MARK_TINT_ALPHA : 1;
     ctx.beginPath();
     // `roundRect` is everywhere we run (Safari 16+), but a mark is not worth a
     // hard failure — fall back to the square, which a launcher masks anyway.
     if (typeof ctx.roundRect === "function") ctx.roundRect(0, 0, size, size, r);
     else ctx.rect(0, 0, size, size);
     ctx.fill();
+    ctx.globalAlpha = 1;
   }
 
   // The page's own font, which is the whole reason this is a canvas: the mark
   // has to be set in the product's typeface, not the viewer's guess at one.
   const family = getComputedStyle(document.body).fontFamily || "system-ui, sans-serif";
   const text = opts.text.trim();
-  // An icon is one run by construction: two letters on a coloured plate, with
-  // nothing for a second colour to contrast against.
-  const runs = opts.wide ? markRuns(text, opts.style) : [{ text, accent: false, soft: false }];
+  const runs = markRuns(text, opts.style);
   const fontFor = (run: MarkRun, px: number) => `${run.soft ? MARK_WEIGHT.soft : MARK_WEIGHT.normal} ${px}px ${family}`;
   // Measured run by run and summed. That loses the kerning pair across a run
   // boundary, which is unavoidable — two runs are two `fillText` calls — and

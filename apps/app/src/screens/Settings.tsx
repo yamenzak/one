@@ -6,7 +6,7 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, monogramFor, renderMarkPng, markRuns, MARK_WEIGHT, MARK_SOFT_ALPHA, RefreshCw, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type WordmarkStyle, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
+import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, monogramFor, renderMarkPng, markRuns, MARK_WEIGHT, MARK_SOFT_ALPHA, MARK_TINT_ALPHA, RefreshCw, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type WordmarkStyle, type MarkPlate, type MarkRun, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
 import { personaLabel, personaTone } from "../registry/index.js";
 import { KOVA_TOKEN_GROUPS, DEFAULT_ACCENT_TOKENS, MACRO_SPEC } from "../registry/tones.js";
 
@@ -347,7 +347,7 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
   /** One line per section page — what it governs. The index rows say what is
    *  INSIDE; this says what the section is FOR. Never both on one screen. */
   const INTRO: Record<string, string> = {
-    identity: "The name on every screen, every email and every browser tab. Your web address does not change.",
+    identity: "The name on every screen, every email and every browser tab. Your web address doesn't change.",
     brand: "Every screen your clients see is themed from these — not from per-screen styling.",
     signin: "The front door: your login link, the copy on it, and whether passkeys are offered.",
     ai: "Which model answers each AI action, what it costs your balance, and the voice it writes in.",
@@ -560,21 +560,18 @@ function StudioIdentitySection() {
 
   return (
     <section className="space-y-4">
-      <Card className="space-y-3">
+      <Card>
+        {/* The section's one line of context is the page intro (§7). Nothing
+            here repeats it — the address is named in that line, and a paragraph
+            explaining a control this screen does not offer is furniture. */}
         <Field
           label="Studio name"
           value={name}
           maxLength={60}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && dirty && void save()}
-          hint="Exactly as you write it — capitals, spacing and punctuation are kept."
+          hint={slug ? `Your address stays ${slug}` : undefined}
         />
-        {slug && (
-          <p className="text-caption text-muted-foreground">
-            Your web address stays <code className="rounded bg-surface-2 px-1">{slug}</code> whatever you call the
-            studio. Changing that is a separate move — it breaks every saved link.
-          </p>
-        )}
       </Card>
       <SaveBar label="Save name" saving={act.busy === "save"} msg={act.msg} err={act.err} onSave={() => void save()} disabled={!dirty} />
     </section>
@@ -868,7 +865,7 @@ function LightVariant({ label, url, fallback, wide, onUpload, onClear }: {
       <div className="min-w-0 flex-1">
         <div className="text-xs font-medium">{label}</div>
         <div className="text-xs text-muted-foreground">
-          {url ? "Used on light backgrounds." : "Optional — the mark above is used unless it disappears on white."}
+          {url ? "Used on light backgrounds." : "Optional — the mark above is used otherwise."}
         </div>
       </div>
       <div className="flex shrink-0 gap-1.5">
@@ -2127,6 +2124,17 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
     softHead: initial?.mark?.softHead ?? 0,
     softTail: initial?.mark?.softTail ?? 0,
   }));
+  /** The icon's own two decisions: what sits behind the letters, and which of
+   *  them are not like the others. Kept separate from the wordmark's — a
+   *  two-letter mark and a nine-character name want different answers. */
+  const [plate, setPlate] = useState<MarkPlate>(initial?.mark?.plate ?? "accent");
+  const [iconStyle, setIconStyle] = useState<WordmarkStyle>(() => ({
+    accentHead: initial?.mark?.icon?.accentHead ?? 0,
+    accentTail: initial?.mark?.icon?.accentTail ?? 0,
+    softHead: initial?.mark?.icon?.softHead ?? 0,
+    softTail: initial?.mark?.icon?.softTail ?? 0,
+  }));
+  const [drawing, setDrawing] = useState<"icon" | "wordmark">("icon");
   const [aiAvatarUrl, setAiAvatarUrl] = useState<string | null>(initial?.aiAvatarUrl ?? null);
   const [aiName, setAiName] = useState<string>(initial?.aiName ?? "");
   const [advanced, setAdvanced] = useState(false);
@@ -2151,30 +2159,57 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
    * image from that point on — same media store, same quota, same public URL,
    * and no consumer anywhere needs to know it was drawn rather than designed.
    *
-   * The ICON needs no light variant: it carries its own coloured plate, so it
-   * reads on any background. The WORDMARK is bare letterforms and does not, so
-   * both are drawn — the studio's foreground token per mode, which is exactly
-   * the pair of files the light-variant slots exist to hold.
+   * ── FOUR FILES, ALWAYS ──────────────────────────────────────────────────
+   *
+   * Both marks are drawn twice, once per side of the theme, and it is not
+   * belt-and-braces. Every ingredient is a per-mode token: the brand primary is
+   * a different lightness in light mode (0.52 vs 0.74 — a button fill has to
+   * clear AA on a white surface), and the foreground inverts outright. A
+   * wordmark drawn once is therefore correct on exactly one background and
+   * either washed out or invisible on the other; so is a bare-letterform icon.
+   *
+   * Only a SOLID accent plate is genuinely mode-independent, because it brings
+   * its own background — and it is one of three choices, so the generator
+   * cannot rely on it. Drawing both costs two more uploads and removes the
+   * whole class of "my logo disappears in light mode".
    */
   const generateMarks = () =>
     void marks.run("marks", async () => {
       const letters = monogram.trim() || monogramFor(studioName);
-      const hex = (v: string | undefined, fallback: string) =>
-        v ? (v.startsWith("#") ? v : oklchStringToHex(v) || fallback) : fallback;
-      const bg = seedHex;
-      const onBrand = hex(tokens.dark?.["--primary-foreground"], "#0b1220");
-      const icon = await renderMarkPng({ text: letters, bg, fg: onBrand });
-      if (icon) await uploadAsset(icon, setIconUrl);
+      const dark = markPaint(tokens, "dark", seedHex);
+      const light = markPaint(tokens, "light", seedHex);
 
-      const darkFg = hex(tokens.dark?.["--foreground"], "#e8eaed");
-      const lightFg = hex(tokens.light?.["--foreground"], "#0b1220");
-      const wide = { text: studioName, bg, wide: true as const, accent: bg, style: markStyle };
-      const wideDark = await renderMarkPng({ ...wide, fg: darkFg });
+      // The icon. On a solid plate the accent has already been spent on the
+      // plate itself, so accented runs stay in the knockout colour — which is
+      // why the editor hides those steppers rather than offering a no-op.
+      const iconOf = (p: ReturnType<typeof markPaint>) => ({
+        text: letters,
+        bg: p.primary,
+        fg: plate === "accent" ? p.onPrimary : p.fg,
+        accent: plate === "accent" ? p.onPrimary : p.primary,
+        plate,
+        style: iconStyle,
+      });
+      const iconDark = await renderMarkPng(iconOf(dark));
+      if (iconDark) await uploadAsset(iconDark, setIconUrl);
+      const iconLight = await renderMarkPng(iconOf(light));
+      if (iconLight) await uploadAsset(iconLight, setIconUrlLight);
+
+      // The wordmark — always bare letterforms, so always two.
+      const wideOf = (p: ReturnType<typeof markPaint>) => ({
+        text: studioName,
+        bg: p.primary,
+        fg: p.fg,
+        accent: p.primary,
+        wide: true as const,
+        style: markStyle,
+      });
+      const wideDark = await renderMarkPng(wideOf(dark));
       if (wideDark) await uploadAsset(wideDark, setLogoUrl);
-      const wideLight = await renderMarkPng({ ...wide, fg: lightFg });
+      const wideLight = await renderMarkPng(wideOf(light));
       if (wideLight) await uploadAsset(wideLight, setLogoUrlLight);
-      return "Marks generated from your name and accent. Save to keep them.";
-    }, "Couldn't generate the marks.");
+      return "Drawn for light and dark. Save to keep them.";
+    }, "Couldn't draw the marks.");
 
   const uploadAsset = async (file: File, setter: (url: string) => void) => {
     setMsg(null);
@@ -2212,7 +2247,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const save = () =>
     act.run("save", async () => {
       // Tokens carry everything now — null out legacy preset/primary fields.
-      await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, tintedNav, ambient, logoUrl, iconUrl, logoUrlLight, iconUrlLight, aiAvatarUrl, aiName: aiName.trim() || null, mark: { monogram: monogram.trim() || null, ...markStyle }, preset: null, primary: null, primaryForeground: null } });
+      await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, tintedNav, ambient, logoUrl, iconUrl, logoUrlLight, iconUrlLight, aiAvatarUrl, aiName: aiName.trim() || null, mark: { monogram: monogram.trim() || null, plate, icon: iconStyle, ...markStyle }, preset: null, primary: null, primaryForeground: null } });
       onSaved();
       setMsg(null);
       return "Branding saved.";
@@ -2225,36 +2260,83 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
             business name, and the fallback initial-in-a-square works in the nav
             and nowhere that matters — the browser tab, the installed icon, the
             top of every email a client opens all want an image. */}
+        {/*
+          ── ONE STUDIO, TWO MARKS, EDITED ONE AT A TIME ────────────────────
+
+          This was a single stack: letters, then four steppers, then a button
+          that made both marks — so the steppers appeared to belong to the
+          letters above them, and nothing said which mark you were shaping.
+
+          A segmented control instead, because the two are genuinely different
+          objects with different questions. The icon asks what sits behind two
+          letters; the wordmark asks which characters of a name stand out.
+          Neither preview belongs on the other's screen.
+
+          The one thing that stays shared is the SUBMIT: both marks are drawn by
+          one press, in both modes, because a studio whose icon and wordmark
+          were generated from different settings is not a brand.
+        */}
         <div className="space-y-3 rounded-xl border border-dashed border-border/70 p-3">
           <div className="text-sm font-medium">No logo yet? <span className="font-normal text-muted-foreground">Draw one from your name</span></div>
-          <div className="flex items-end gap-3">
-            <div className="grid size-14 shrink-0 place-items-center rounded-2xl" style={{ background: seedHex }}>
-              <span className="text-lg font-black" style={{ color: oklchStringToHex(tokens.dark?.["--primary-foreground"] ?? "") || "#0b1220" }}>
-                {monogram.trim() || monogramFor(studioName)}
-              </span>
-            </div>
-            <Field
-              label="Icon letters"
-              className="flex-1"
-              value={monogram}
-              maxLength={3}
-              onChange={(e) => setMonogram(e.target.value)}
-              placeholder={monogramFor(studioName)}
-              hint={`Suggested from “${studioName}”. Yours to change.`}
-            />
-          </div>
 
-          {/* The wordmark, set live. Same `markRuns` the canvas uses, so this is
-              the output and not an impression of it. */}
-          <WordmarkStudio name={studioName} style={markStyle} onChange={setMarkStyle} accent={seedHex} />
+          <SegmentedControl
+            value={drawing}
+            onChange={(v) => setDrawing(v as "icon" | "wordmark")}
+            options={[{ value: "icon", label: "App icon" }, { value: "wordmark", label: "Wordmark" }]}
+          />
+
+          {drawing === "icon" ? (
+            <div className="space-y-2.5">
+              <MarkStage
+                runs={markRuns(monogram.trim() || monogramFor(studioName), iconStyle)}
+                tokens={tokens}
+                seedHex={seedHex}
+                plate={plate}
+              />
+              <Field
+                label="Letters"
+                value={monogram}
+                maxLength={3}
+                onChange={(e) => setMonogram(e.target.value)}
+                placeholder={monogramFor(studioName)}
+                hint={`Suggested from “${studioName}”`}
+              />
+              <PreviewPicker
+                label="Behind the letters"
+                value={plate}
+                onChange={(v) => setPlate(v as MarkPlate)}
+                options={PLATES.map((p) => ({
+                  value: p.value,
+                  label: p.label,
+                  preview: (
+                    <span
+                      aria-hidden
+                      className="block size-6 rounded-lg border border-border/60"
+                      style={{ background: p.value === "none" ? "transparent" : seedHex, opacity: p.value === "tint" ? MARK_TINT_ALPHA + 0.1 : 1 }}
+                    />
+                  ),
+                }))}
+              />
+              <CharCounts
+                name={monogram.trim() || monogramFor(studioName)}
+                style={iconStyle}
+                onChange={setIconStyle}
+                /* A solid plate has already spent the brand colour, so an
+                   accented letter would be identical to an unaccented one.
+                   Hiding the control is honest; offering a no-op is not. */
+                accentable={plate !== "accent"}
+              />
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              <MarkStage runs={markRuns(studioName, markStyle)} tokens={tokens} seedHex={seedHex} wide />
+              <CharCounts name={studioName} style={markStyle} onChange={setMarkStyle} accentable />
+            </div>
+          )}
 
           <Button size="sm" variant="secondary" disabled={marks.busy !== null} onClick={() => void generateMarks()}>
-            {marks.busy ? <><Spinner className="size-4" /> Drawing…</> : <><Wand2 /> Generate icon + wordmark</>}
+            {marks.busy ? <><Spinner className="size-4" /> Drawing…</> : <><Wand2 /> Draw both, light and dark</>}
           </Button>
-          <p className="text-xs text-muted-foreground">
-            Uses your accent and your studio name, and fills the slots below — including a light-mode wordmark. Replace
-            any of them with a real file whenever you have one.
-          </p>
           <ActionResult msg={marks.msg} err={marks.err} />
         </div>
 
@@ -2568,44 +2650,137 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
  * output rather than an impression of it — a preview computed by different code
  * from the thing it previews is a preview that eventually lies.
  */
-function WordmarkStudio({ name, style, onChange, accent }: {
+export const PLATES: { value: MarkPlate; label: string }[] = [
+  { value: "accent", label: "Brand colour" },
+  { value: "tint", label: "Soft tint" },
+  { value: "none", label: "Nothing" },
+];
+
+/**
+ * The colours a generated mark uses on ONE side of the theme.
+ *
+ * Every one of them is a per-mode token, which is the reason both marks are
+ * drawn twice. `--primary` is a different lightness in light mode (0.52, not
+ * 0.74 — a button fill has to clear AA on a white surface) and `--foreground`
+ * inverts outright, so a mark drawn once is correct on one background and
+ * either washed out or invisible on the other.
+ */
+function markPaint(tokens: BrandTokens, mode: "light" | "dark", seedHex: string) {
+  const hex = (v: string | undefined, fallback: string) =>
+    v ? (v.startsWith("#") ? v : oklchStringToHex(v) || fallback) : fallback;
+  const dark = mode === "dark";
+  return {
+    primary: hex(tokens[mode]?.["--primary"], seedHex),
+    onPrimary: hex(tokens[mode]?.["--primary-foreground"], dark ? "#0b1220" : "#ffffff"),
+    fg: hex(tokens[mode]?.["--foreground"], dark ? "#e8eaed" : "#0b1220"),
+    surface: hex(tokens[mode]?.["--background"], dark ? "#0b0c0e" : "#ffffff"),
+  };
+}
+
+/** `#rrggbb` at an alpha, for the translucent plate. The canvas draws it with
+ *  `globalAlpha`; CSS needs the colour to carry it. */
+function withAlpha(hex: string, alpha: number): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return hex;
+  const n = parseInt(m[1]!, 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+/**
+ * THE MARK, ON BOTH BACKGROUNDS IT WILL LIVE ON.
+ *
+ * A preview against one surface is how a text logo ships invisible: the studio
+ * is looking at a dark app, the mark is drawn in the light foreground colour,
+ * and it disappears on the phone of every member whose OS is set to light —
+ * which is most of them, and the browser tab always.
+ *
+ * Both plates are drawn from the studio's OWN `--background` tokens rather than
+ * from white and black, so this is the real pairing and not an approximation of
+ * one. The runs come from the same `markRuns` the canvas uses, so what is on
+ * screen is the output rather than an impression of it.
+ */
+function MarkStage({ runs, tokens, seedHex, plate, wide }: {
+  runs: MarkRun[];
+  tokens: BrandTokens;
+  seedHex: string;
+  plate?: MarkPlate;
+  wide?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {(["dark", "light"] as const).map((mode) => {
+        const paint = markPaint(tokens, mode, seedHex);
+        const solid = plate === "accent";
+        const fg = solid ? paint.onPrimary : paint.fg;
+        const accent = solid ? paint.onPrimary : paint.primary;
+        const letters = (
+          <span className={wide ? "truncate text-body-lg" : "text-body-lg"}>
+            {runs.map((run, i) => (
+              <span
+                key={i}
+                style={{
+                  color: run.accent ? accent : fg,
+                  fontWeight: run.soft ? MARK_WEIGHT.soft : MARK_WEIGHT.normal,
+                  opacity: run.soft ? MARK_SOFT_ALPHA : 1,
+                }}
+              >
+                {run.text}
+              </span>
+            ))}
+          </span>
+        );
+        return (
+          <div key={mode} className="space-y-1">
+            <div
+              className="grid min-h-18 place-items-center overflow-hidden rounded-xl border border-border/60 px-2"
+              style={{ background: paint.surface }}
+            >
+              {wide ? letters : (
+                <span
+                  className="grid size-14 place-items-center rounded-2xl"
+                  style={{
+                    background: plate === "none" ? undefined : plate === "tint" ? withAlpha(paint.primary, MARK_TINT_ALPHA) : paint.primary,
+                  }}
+                >
+                  {letters}
+                </span>
+              )}
+            </div>
+            <div className="text-center text-micro uppercase text-muted-foreground">{mode}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * WHICH CHARACTERS ARE NOT LIKE THE OTHERS — as counts from each end.
+ *
+ * Never a list of characters. A per-character selection silently slides onto
+ * the wrong letters the moment the owner fixes a typo in their own name, and
+ * nothing tells them; counts survive a rename. The full reasoning is in
+ * `@4dl/ui` mark.ts.
+ */
+function CharCounts({ name, style, onChange, accentable }: {
   name: string;
   style: WordmarkStyle;
   onChange: (s: WordmarkStyle) => void;
-  accent: string;
+  /** False on a solid accent plate, where the brand colour is already the
+   *  background and an accented letter would look identical to a plain one. */
+  accentable: boolean;
 }) {
   const len = [...name].length;
-  const runs = markRuns(name, style);
   const set = (key: keyof WordmarkStyle, value: number) => onChange({ ...style, [key]: Math.max(0, Math.min(len, value)) });
   const count = (key: keyof WordmarkStyle) => Math.max(0, Math.min(len, style[key] ?? 0));
   return (
-    <div className="space-y-2">
-      <div className="grid min-h-16 place-items-center overflow-hidden rounded-xl bg-surface-2 px-3">
-        <span className="truncate text-title-2">
-          {runs.map((run, i) => (
-            <span
-              key={i}
-              style={{
-                color: run.accent ? accent : undefined,
-                fontWeight: run.soft ? MARK_WEIGHT.soft : MARK_WEIGHT.normal,
-                opacity: run.soft ? MARK_SOFT_ALPHA : 1,
-              }}
-            >
-              {run.text}
-            </span>
-          ))}
-        </span>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-2 gap-2">
+      {accentable && <>
         <CharCount label="Accent · first" value={count("accentHead")} max={len} onChange={(n) => set("accentHead", n)} />
         <CharCount label="Accent · last" value={count("accentTail")} max={len} onChange={(n) => set("accentTail", n)} />
-        <CharCount label="Quieter · first" value={count("softHead")} max={len} onChange={(n) => set("softHead", n)} />
-        <CharCount label="Quieter · last" value={count("softTail")} max={len} onChange={(n) => set("softTail", n)} />
-      </div>
-      <p className="text-xs text-muted-foreground">
-        How many characters at each end pick up your brand colour, or step back. A trailing full stop is one; a lowercase
-        prefix like “by” is two.
-      </p>
+      </>}
+      <CharCount label="Quieter · first" value={count("softHead")} max={len} onChange={(n) => set("softHead", n)} />
+      <CharCount label="Quieter · last" value={count("softTail")} max={len} onChange={(n) => set("softTail", n)} />
     </div>
   );
 }

@@ -80,10 +80,22 @@ export interface TenantBranding {
    */
   mark?: {
     monogram?: string | null;
+    /** What sits behind the icon's letters: the brand colour, a soft tint, or
+     *  nothing at all. */
+    plate?: "accent" | "tint" | "none" | null;
+    /** The four counts at this level are the WORDMARK's; the icon keeps its own
+     *  under `icon`, because two letters and a nine-character name want
+     *  different answers. */
     accentHead?: number | null;
     accentTail?: number | null;
     softHead?: number | null;
     softTail?: number | null;
+    icon?: {
+      accentHead?: number | null;
+      accentTail?: number | null;
+      softHead?: number | null;
+      softTail?: number | null;
+    } | null;
   } | null;
   /** Studio's avatar for the AI coach persona; falls back to a bottts robot. */
   aiAvatarUrl?: string | null;
