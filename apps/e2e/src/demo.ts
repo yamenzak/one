@@ -6,7 +6,7 @@
  * review was a review of EMPTY STATES. The carousels, the day agenda, the
  * roster, the diary, the trend charts and the plan editor had never once been
  * looked at with something in them — which is exactly where cramming, bad
- * wrapping and confusing copy live (UI-LANGUAGE §15).
+ * wrapping and confusing copy live (UI-LANGUAGE §16).
  *
  * So this builds one studio with a plausible amount of plausible data and hands
  * it to the capture specs. Three properties are load-bearing:

@@ -2,7 +2,7 @@
  * Kova's binding of `@4dl/app-kit`'s fetch layer.
  *
  * The transport — same-origin cookies, JSON in/out, the 401 re-auth hook, the
- * tour interceptor, and the three-way offline outcome (queued / offline / real
+ * three-way offline outcome (queued / offline / real
  * HTTP error) — is the platform's. One thing is Kova's, and it is bound here:
  * WHICH writes the service worker parks in its Background-Sync queue.
  *

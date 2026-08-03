@@ -461,12 +461,12 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
             />
           </Stagger>
 
-          <Stagger data-tour="today-hero">
+          <Stagger>
             <WidgetCarousel catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_CLIENT_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />
           </Stagger>
 
           {isToday && (
-          <Stagger data-tour="today-agenda">
+          <Stagger>
             <TodayAgenda clientId={clientId} date={date} bundle={data} agenda={agenda} onChanged={() => void load()} onNavigate={onOpen} onCheckIn={() => setCheckInOpen(true)} onStartWorkout={onStart} />
           </Stagger>
           )}

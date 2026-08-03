@@ -19,6 +19,7 @@ import { Button, Callout } from "./primitives.js";
 import { Eyebrow } from "./metrics.js";
 import { EmptyState } from "./shell.js";
 import { cn } from "./lib/utils.js";
+import { toast } from "./toast.js";
 
 /** Formats a thrown value into something a person can read. */
 export type ErrorFormatter = (e: unknown, fallback: string) => string;
@@ -191,10 +192,36 @@ export function SaveBar({ label, saving, dirty = true, disabled, onSave, msg, er
   );
 }
 
-/** The outcome of the last action in a section — announced, never silent. */
+/**
+ * The outcome of the last action — ANNOUNCED, never placed.
+ *
+ * Both halves go to the toaster, and the component renders nothing. That looks
+ * strange and it is the point: every call site in the product already hands its
+ * result to this component, so routing from HERE converts all of them at once,
+ * including the ones holding their own `err`/`msg` state rather than a
+ * `useAction`. A change inside the hook would have missed those, and the ones it
+ * missed would have gone silent.
+ *
+ * ── Why inline is the wrong place, for failures AND confirmations ───────────
+ *
+ * The old rule was "a write that fails says so, in the place it failed", which
+ * is right about NOT BEING SILENT and wrong about the place. Inline text is
+ * wherever the section happens to be: on a long settings page, in a sheet
+ * scrolled to its footer, on a row three screens down — i.e. frequently
+ * off-screen at the moment it appears. The reader sees no change and no message,
+ * which is indistinguishable from the write having worked. It also pushes the
+ * layout down under the thumb, moving the button they were about to press again.
+ *
+ * A toast appears in the same place every time, cannot be scrolled away from,
+ * interrupts a screen reader when it is a failure, and moves nothing.
+ */
 export function ActionResult({ msg, err }: { msg: string | null; err: string | null }) {
-  if (err) return <Callout tone="danger" icon={AlertTriangle} live="alert">{err}</Callout>;
-  if (msg) return <Callout tone="success" icon={CircleCheck} live="status">{msg}</Callout>;
+  useEffect(() => {
+    if (err) toast.error(err);
+  }, [err]);
+  useEffect(() => {
+    if (msg) toast.success(msg);
+  }, [msg]);
   return null;
 }
 

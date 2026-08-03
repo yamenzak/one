@@ -42,7 +42,6 @@ import { NotificationBell } from "./NotificationBell.js";
 import { MaintenanceBanner, OfflinePill, StudioPausedBanner } from "./notices.js";
 import { StudioSwitcher } from "./StudioSwitcher.js";
 import { ErrorBoundary } from "./ErrorBoundary.js";
-import { TourProvider, useTour, type TourId } from "./tour.js";
 
 const CLIENT_TABS: TabDef[] = [
   { key: "today", label: "Today", icon: Home, tone: "primary" },
@@ -50,13 +49,6 @@ const CLIENT_TABS: TabDef[] = [
   { key: "eat", label: "Eat", icon: Utensils, tone: "nutrition" },
   { key: "wellness", label: "Wellness", icon: HeartPulse, tone: "sleep" },
   { key: "progress", label: "Progress", icon: LineChart, tone: "cardio" },
-];
-
-/** The guided tours offered from the Help menu (client surface). */
-const HELP_TOURS: { id: TourId; icon: typeof Home; tone: Tone; title: string; sub: string }[] = [
-  { id: "app", icon: Hand, tone: "primary", title: "App walkthrough", sub: "A hands-on tour of everything, with sample data." },
-  { id: "workout", icon: Dumbbell, tone: "activity", title: "Workout player", sub: "Days, sets, rest timers and logging." },
-  { id: "meal", icon: Utensils, tone: "nutrition", title: "Meal plan & shopping", sub: "Options, macros, recipes and your list." },
 ];
 
 /** Am I currently looking at the client surface? (client role, or train mode.) */
@@ -126,7 +118,7 @@ export function Shell() {
   }
 
   return (
-    <TourProvider>
+    <>
     {/* Backstop boundary: a crash in any full-screen route (admin, settings,
         plan builder…) recovers here instead of white-screening the app. Keyed by
         pathname so navigating away clears the error. */}
@@ -180,7 +172,7 @@ export function Shell() {
       </Route>
     </Routes>
     </ErrorBoundary>
-    </TourProvider>
+    </>
   );
 }
 
@@ -197,15 +189,6 @@ function TabLayout() {
   const barMark = brandMark(ctx!.branding, themeMode, "logo");
   const barWordmark = hasWordmark(ctx!.branding, themeMode);
   const railMark = brandMark(ctx!.branding, themeMode, "icon");
-  const { tour: activeTour, start: startTour, startIfNew } = useTour();
-
-  // First-run interactive tour — once per device, for the client surface.
-  useEffect(() => {
-    if (!clientSurface) return;
-    const t = setTimeout(() => startIfNew("app"), 700);
-    return () => clearTimeout(t);
-  }, [clientSurface, startIfNew]);
-
   const tabs: TabDef[] = clientSurface
     ? CLIENT_TABS
     : [
@@ -332,29 +315,6 @@ function TabLayout() {
                 <BookOpen className="size-[1.15rem]" />
               </button>
             )}
-            {clientSurface && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="grid size-9 place-items-center rounded-full text-muted-foreground outline-none ring-ring transition-colors hover:bg-secondary hover:text-foreground focus-visible:ring-2" aria-label="Help &amp; guided tours">
-                    <LifeBuoy className="size-[1.15rem]" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuLabel>Guided tours</DropdownMenuLabel>
-                  {HELP_TOURS.map((t) => (
-                    <DropdownMenuItem key={t.id} onSelect={() => startTour(t.id)}>
-                      <span className="grid size-8 shrink-0 place-items-center rounded-lg" style={{ backgroundColor: `color-mix(in oklch, ${toneVar[t.tone]} 15%, transparent)` }}>
-                        <t.icon style={{ color: toneVar[t.tone] }} />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block font-medium leading-tight">{t.title}</span>
-                        <span className="block text-xs text-muted-foreground">{t.sub}</span>
-                      </span>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
             <NotificationBell />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -443,9 +403,6 @@ function TabLayout() {
         </div>
       )}
 
-      {/* Remount the routed content when the APP tour toggles, so screens refetch
-          through the (mock ↔ live) api interceptor. The workout/meal tours annotate
-          the real screen in place, so they must NOT remount it. */}
       {/*
         THE CONTENT COLUMN — UI-LANGUAGE §2, §11.
 
@@ -464,7 +421,7 @@ function TabLayout() {
         canvas, a two-pane roster) opt out with `data-fullbleed` on their own
         root, which the negative margins below release.
       */}
-      <main key={activeTour === "app" ? "tour" : "live"} className="column [&>[data-fullbleed]]:max-w-none">
+      <main className="column [&>[data-fullbleed]]:max-w-none">
         <ErrorBoundary resetKey={loc.pathname}><Outlet /></ErrorBoundary>
       </main>
       </div>

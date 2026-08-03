@@ -16,7 +16,6 @@ import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
-import { useTour } from "../../tour.js";
 import { Markdown } from "../../Markdown.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
 import { AiAvatar } from "../../AiAvatar.js";
@@ -59,7 +58,6 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const reqRef = useRef(0);
   const units = useUnits();
   const { ctx } = useSession();
-  const { startIfNew, start: startTour, active: tourActive, tour, stepSelector } = useTour();
   // The recipe suggestion is the aiMealTools feature (aiSuite ⊕ the client's
   // package flag) — the same gate /ai/recipe enforces, so the button never shows
   // when the server would 403.
@@ -80,13 +78,6 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const shopKey = active ? `kova.shop.${active.id}` : null;
   const shopReady = useRef<string | null>(null);
 
-  // First time a client opens their meal plan, walk them through it.
-  useEffect(() => {
-    if (!plan || tourActive) return;
-    const t = setTimeout(() => startIfNew("meal"), 550);
-    return () => clearTimeout(t);
-  }, [plan, tourActive, startIfNew]);
-
   // Shopping list persists on-device per plan — what you've got vs still need,
   // and how many days of each option you're buying. Hydrate when the plan loads.
   useEffect(() => {
@@ -99,29 +90,13 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
     } catch { setCounts({}); setChecked(new Set()); }
     shopReady.current = shopKey;
   }, [shopKey]);
-  // Persist on change (never while the tour is driving sample state).
+  // Persist on change.
   useEffect(() => {
-    if (!shopKey || shopReady.current !== shopKey || tourActive) return;
+    if (!shopKey || shopReady.current !== shopKey) return;
     try { localStorage.setItem(shopKey, JSON.stringify({ counts, checked: [...checked] })); } catch { /* private mode */ }
   }, [counts, checked]); // eslint-disable-line react-hooks/exhaustive-deps
   const resetShop = () => { setCounts({}); setChecked(new Set()); if (shopKey) try { localStorage.removeItem(shopKey); } catch { /* ignore */ } };
 
-  // During the meal tour, drive the view (and seed a few days) so the shopping
-  // list is populated when its steps come up.
-  useEffect(() => {
-    if (tour !== "meal" || !stepSelector) return;
-    if (stepSelector === "mp-shop-add" || stepSelector === "mp-shop-item" || stepSelector === "mp-shop-reset") {
-      setView("shop");
-      // The check-off / reset steps need at least one item to point at, in case
-      // the "add a day" step was skipped.
-      if (stepSelector !== "mp-shop-add") {
-        const first = (plan?.body.mealOptions ?? []).findIndex((o) => !o.isFree);
-        setCounts((c) => (Object.values(c).some((n) => n > 0) || first < 0 ? c : { [first]: 1 }));
-      }
-    } else if (stepSelector.startsWith("mp-")) {
-      setView("plan");
-    }
-  }, [tour, stepSelector, plan]);
 
   const load = useCallback(async () => {
     const rid = ++reqRef.current;
@@ -139,7 +114,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
     setTargets(today.goal?.targets ?? null);
     setLoggedIdx(new Set((log.entries ?? []).filter((e) => e.meal_plan_id === published?.id && e.meal_option_index != null).map((e) => e.meal_option_index as number)));
   }, [clientId, date]);
-  useEffect(() => void load(), [load, tourActive]); // reload through the api interceptor when a tour toggles
+  useEffect(() => void load(), [load]);
 
   // On a client switch, reset to the loading state so the previous client's plan
   // doesn't linger under the new one while the reload is in flight.
@@ -237,7 +212,6 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
       <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border/40 bg-background/85 px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 backdrop-blur-xl">
         <button onClick={onClose} aria-label="Close" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><ArrowLeft /></button>
         <div className="min-w-0 flex-1"><div className="truncate text-body-lg">{isPast ? "Past plan" : "Meal plan"}</div></div>
-        <button onClick={() => startTour("meal")} aria-label="Replay meal plan tour" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><LifeBuoy /></button>
         {pastPlans.length > 0 && <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button>}
       </div>
 
@@ -280,7 +254,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
               are context for the number, not a competing one.
             */}
             <Anchor
-              data-tour="mp-hero"
+             
               eyebrow={<span className={isPast ? undefined : "text-nutrition"}>{isPast ? "Past plan" : active?.name}</span>}
               sub={`${groups.length === 1 ? "meal a day" : "meals a day"} · ${active?.body.mealOptions?.length ?? 0} option${(active?.body.mealOptions?.length ?? 0) === 1 ? "" : "s"}`}
               below={isPast ? (
@@ -295,7 +269,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
               <CountUp value={groups.length} />
             </Anchor>
 
-            <div data-tour="mp-tabs"><SegmentedControl options={[{ value: "plan", label: "My meals" }, { value: "shop", label: "Shopping list" }]} value={view} onChange={setView} /></div>
+            <div><SegmentedControl options={[{ value: "plan", label: "My meals" }, { value: "shop", label: "Shopping list" }]} value={view} onChange={setView} /></div>
 
             {view === "plan" ? (
               groups.length === 0 ? <EmptyState icon={Utensils} title="No options yet" /> : (
@@ -304,7 +278,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                   {groups.map(([type, opts], gi) => {
                     const meta = metaFor(type);
                     return (
-                      <section key={type} data-tour={gi === 0 ? "mp-section" : undefined} className="space-y-2.5">
+                      <section key={type} className="space-y-2.5">
                         <div className="flex items-center gap-2 px-1">
                           <span className="grid size-7 place-items-center rounded-xl bg-nutrition-soft text-nutrition [&_svg]:size-4"><meta.icon /></span>
                           <span className="font-semibold">{meta.label}</span>
@@ -328,7 +302,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                 <p className="-mt-1 px-1 text-sm text-muted-foreground">How many days will you eat each option this week? We'll total up your shopping list.</p>
                 {(active?.body.mealOptions ?? []).map((opt, index) => (
                   opt.isFree ? null : (
-                    <div key={index} data-tour={index === firstShopIdx ? "mp-shop-days" : undefined} className="flex items-center gap-3 rounded-2xl bg-card px-3 py-2.5">
+                    <div key={index} className="flex items-center gap-3 rounded-2xl bg-card px-3 py-2.5">
                       <FoodThumb src={opt.foods.map((mf) => foods.get(mf.foodId)?.image_url).find(Boolean)} size={38} />
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-medium">{opt.mealName || `Option ${index + 1}`}</div>
@@ -337,7 +311,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                       <div className="flex items-center gap-2">
                         <Button size="icon-sm" variant="secondary" disabled={(counts[index] ?? 0) === 0} onClick={() => bump(index, -1)} aria-label="Fewer days"><Minus /></Button>
                         <span className="numeral w-5 text-center font-semibold">{counts[index] ?? 0}</span>
-                        <Button size="icon-sm" variant="secondary" data-tour={index === firstShopIdx ? "mp-shop-add" : undefined} onClick={() => bump(index, 1)} aria-label="More days"><Plus /></Button>
+                        <Button size="icon-sm" variant="secondary" onClick={() => bump(index, 1)} aria-label="More days"><Plus /></Button>
                       </div>
                     </div>
                   )
@@ -356,18 +330,18 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                 <div className="flex items-center justify-between px-1 pt-1">
                   <div className="text-micro uppercase text-muted-foreground">Shopping list</div>
                   <div className="flex items-center gap-2">
-                    {(weekTotals.days > 0 || checked.size > 0) && <button data-tour="mp-shop-reset" onClick={() => setConfirmReset(true)} className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-3.5"><RotateCcw /> Start over</button>}
+                    {(weekTotals.days > 0 || checked.size > 0) && <button onClick={() => setConfirmReset(true)} className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-3.5"><RotateCcw /> Start over</button>}
                     {grocery.length > 0 && <Badge tone="nutrition">{grocery.filter((g) => !checked.has(g.id)).length} to buy</Badge>}
                   </div>
                 </div>
                 {grocery.length === 0 ? (
                   <EmptyState icon={ShoppingCart} title="Nothing yet" description="Add days to some options above." />
                 ) : (
-                  <Card data-tour="mp-shop-list" className="space-y-0.5 p-2">
+                  <Card className="space-y-0.5 p-2">
                     {grocery.map((g, gi) => {
                       const done = checked.has(g.id);
                       return (
-                        <button key={g.id} data-tour={gi === 0 ? "mp-shop-item" : undefined} onClick={() => setChecked((s) => { const n = new Set(s); n.has(g.id) ? n.delete(g.id) : n.add(g.id); return n; })} className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-surface-2">
+                        <button key={g.id} onClick={() => setChecked((s) => { const n = new Set(s); n.has(g.id) ? n.delete(g.id) : n.add(g.id); return n; })} className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-surface-2">
                           <span className={cn("grid size-5 shrink-0 place-items-center rounded-full border transition-colors [&_svg]:size-3", done ? "border-nutrition bg-nutrition text-[var(--tone-foreground)]" : "border-border")}>{done && <Check strokeWidth={3} />}</span>
                           <FoodThumb src={g.img} size={32} />
                           <span className={cn("min-w-0 flex-1 truncate text-sm transition-colors", done && "text-muted-foreground line-through")}>{g.name}</span>
@@ -459,7 +433,7 @@ function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, on
   totals: { calories: number; proteinG: number; carbsG: number; fatG: number }; logged: boolean; logging: boolean; onLog: () => void; onOpen: () => void; readOnly?: boolean; anchor?: boolean;
 }) {
   return (
-    <div data-tour={anchor ? "mp-option" : undefined} className="w-[74%] shrink-0 snap-start sm:w-[52%]">
+    <div className="w-[74%] shrink-0 snap-start sm:w-[52%]">
       <div className={cn("overflow-hidden rounded-2xl bg-card", logged && "ring-1 ring-nutrition/50")}>
         <button onClick={onOpen} className="relative block h-36 w-full text-left transition-opacity active:opacity-90">
           {image ? <img src={image} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-nutrition/20 to-surface-2 text-nutrition/50 [&_svg]:size-9"><Utensils /></div>}
@@ -481,7 +455,7 @@ function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, on
         {readOnly ? (
           <button onClick={onOpen} className="w-full px-2.5 py-2 text-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">View details</button>
         ) : (
-          <div data-tour={anchor ? "mp-log" : undefined} className="p-2.5">
+          <div className="p-2.5">
             <Button size="sm" className="w-full" variant={logged ? "secondary" : opt.isFree ? "tonal" : "default"} disabled={logging} onClick={onLog}>{logging ? "…" : logged ? "Log again" : "Log this"}</Button>
           </div>
         )}

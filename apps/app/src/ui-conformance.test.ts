@@ -53,7 +53,6 @@ const MEDIA_OVERLAYS = [
   "apps/app/src/screens/coach/WorkoutBuilder.tsx",
   "apps/app/src/screens/coach/MealBuilder.tsx",
   // Full-screen modal scrims (black dimming is correct in both modes).
-  "apps/app/src/tour.tsx",
 ];
 
 describe("Kova's UI conformance (UI-LANGUAGE.md)", () => {

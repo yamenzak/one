@@ -11,12 +11,11 @@ import {
   Button, Card, Badge, Field, Input, Label, Sheet, SubCard, ProgressRing, EmptyState,
   Reveal, Skeleton, SkeletonLine, SkeletonList, useModalOverlay,
   Anchor, CountUp, Atmosphere, stagger, rowStagger, rowIn, DUR, EASE_OUT,
-  AlertTriangle, ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, LifeBuoy, Plus, Minus, RotateCcw, cn,
+  AlertTriangle, ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, Plus, Minus, RotateCcw, cn,
 } from "@4dl/ui";
 import { api, todayLocal, errorText } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
-import { useTour } from "../../tour.js";
 import { Markdown } from "../../Markdown.js";
 import { ExerciseRow, ExerciseThumb, metaText, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 
@@ -76,22 +75,6 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
       return null;
     }
   }, [clientId, date]);
-  const { startIfNew, start: startTour, active: tourActive } = useTour();
-
-  // First time a client actually trains, walk them through the session player.
-  useEffect(() => {
-    if (dayIndex == null || !plan || tourActive) return;
-    const t = setTimeout(() => startIfNew("workout"), 550);
-    return () => clearTimeout(t);
-  }, [dayIndex, plan, tourActive, startIfNew]);
-
-  // During the tour, land on a real training day of the (sample) plan so the
-  // exercise/set/timer highlights always have something to point at.
-  useEffect(() => {
-    if (!tourActive || !plan) return;
-    const training = plan.body.days.findIndex((d) => !d.isRestDay);
-    setDayIndex(training >= 0 ? training : 0);
-  }, [tourActive, plan]);
 
   // Guards stale writes when clientId/date change mid-flight (fast client swap
   // in coach view): only the newest request is allowed to commit its result.
@@ -124,7 +107,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
     ].filter(Boolean);
     if (missing.length) setLoadWarning(`Couldn't load ${missing.join(" or ")}. Logging still works.`);
   }, [clientId, date]);
-  useEffect(() => void load(), [load, tourActive, reloadKey]); // reload through the api interceptor when a tour toggles
+  useEffect(() => void load(), [load, reloadKey]);
 
   // On a client switch, clear the previous client's plan/session/bests so their
   // data can't linger under the new client while the reload is in flight.
@@ -208,7 +191,6 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
         <HeaderBar title={isPast ? "Past plan" : "Workout plan"} onBack={onExit}
           right={
             <div className="flex items-center gap-2">
-              <button onClick={() => startTour("workout")} aria-label="Replay workout plan tour" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><LifeBuoy /></button>
               {pastPlans.length > 0 && <button onClick={() => setHistOpen(true)} aria-label="Past plans" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-[1.15rem]"><History /></button>}
             </div>
           } />
@@ -361,7 +343,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   return (
     <PlanShell onEscape={() => setDayIndex(null)}>
       <HeaderBar title={day.name || `Day ${dayIndex + 1}`} subtitle={`${loggedSets} of ${totalSets} set${totalSets === 1 ? "" : "s"} logged`} onBack={() => setDayIndex(null)}
-        right={<span data-tour="wp-progress"><ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={40} strokeWidth={5} tone="activity" value={<span className="text-xs font-semibold">{loggedSets}</span>} /></span>} />
+        right={<span><ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={40} strokeWidth={5} tone="activity" value={<span className="text-xs font-semibold">{loggedSets}</span>} /></span>} />
 
       {loadWarning && (
         <div role="status" className="column flex items-center justify-between gap-3 px-4 pt-3">
@@ -395,8 +377,8 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                   const mods = slotModifiers(step.slot, units);
                   return (
                   // Rich single-exercise card — thumbnail, per-set dots + rest clocks, actions.
-                  <div data-tour={i === 0 ? "wp-exercise" : undefined} className={cn("overflow-hidden rounded-2xl bg-card ring-1 ring-inset transition-colors", done ? "ring-activity/25" : "ring-border/50")}>
-                    <button data-tour={i === 0 ? "wp-details" : undefined} onClick={() => setDetailSlot(step.slot)} className="flex w-full items-center gap-3 p-2.5 text-left transition-opacity active:opacity-80">
+                  <div className={cn("overflow-hidden rounded-2xl bg-card ring-1 ring-inset transition-colors", done ? "ring-activity/25" : "ring-border/50")}>
+                    <button onClick={() => setDetailSlot(step.slot)} className="flex w-full items-center gap-3 p-2.5 text-left transition-opacity active:opacity-80">
                       <ExerciseThumb thumb={ex?.thumb_url} thumb2={ex?.thumb2_url} size={60} className="rounded-xl" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1 font-semibold"><span className="truncate">{ex?.name ?? "Exercise"}</span><Info className="size-3.5 shrink-0 text-muted-foreground" /></div>
@@ -406,7 +388,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                     {/* Prescription — one dot per set with its target beneath, a tappable
                         rest clock in every gap, then the loading/effort modifiers. */}
                     <div className="px-2.5 pb-1">
-                      <div data-tour={i === 0 ? "wp-sets" : undefined} className="flex flex-wrap items-start gap-x-1.5 gap-y-2">
+                      <div className="flex flex-wrap items-start gap-x-1.5 gap-y-2">
                         {step.slot.sets.map((set, k) => (
                           <Fragment key={k}>
                             <div className="flex flex-col items-center gap-1">
@@ -422,7 +404,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                     </div>
                     <div className="mt-2 flex items-center gap-2 border-t border-border/50 p-2">
                       {canSwap && <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex: step.blockIndex, slotIndex: step.slotIndex, exerciseId: step.slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>}
-                      <Button data-tour={i === 0 ? "wp-log" : undefined} size="sm" className="flex-1" variant={done ? "secondary" : "default"} onClick={() => setLogSlot({ blockIndex: step.blockIndex, slotIndex: step.slotIndex, slot: step.slot })}>{done ? <><Check /> Done</> : `Log · ${logged}/${step.slot.sets.length}`}</Button>
+                      <Button size="sm" className="flex-1" variant={done ? "secondary" : "default"} onClick={() => setLogSlot({ blockIndex: step.blockIndex, slotIndex: step.slotIndex, slot: step.slot })}>{done ? <><Check /> Done</> : `Log · ${logged}/${step.slot.sets.length}`}</Button>
                     </div>
                   </div>
                   ); })() : (
@@ -444,7 +426,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                   </div>
                 )}
                 {!last && (
-                  <div data-tour={i === 0 ? "wp-timer" : undefined} className="mt-2.5 flex items-center gap-2 pl-0.5">
+                  <div className="mt-2.5 flex items-center gap-2 pl-0.5">
                     <span className="h-px w-4 bg-border/60" />
                     <RestTimer seconds={single ? stepRestSeconds(step.block, step.slot) : stepRestSeconds(step.block)} label
                       autoStart={restSignals.get(single ? `${step.blockIndex}:${step.slotIndex}` : `g:${step.blockIndex}`)} />

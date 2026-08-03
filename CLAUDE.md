@@ -275,7 +275,7 @@ loud, which is the only kind this repo has actually had.
   `pro` plan, a ten-person roster, six weeks of a client's history, a published
   plan — and photographs every surface at phone/desktop × light/dark. The images
   are the marketing site, the Help Center and the design review, and they are
-  all the same images, which is what keeps them honest (UI-LANGUAGE §15).
+  all the same images, which is what keeps them honest (UI-LANGUAGE §16).
   Output: `apps/e2e/shots-out/<project>/<shot-id>.png`, gitignored; the ones
   that ship are copied out by id (`docs/help/README.md`).
   ⚠️ Separate from `pnpm e2e` on purpose: that is the launch gate and runs on

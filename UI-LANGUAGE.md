@@ -407,18 +407,48 @@ geometry exactly — a skeleton that does not match is worse than a spinner) ·
 `ActionResult` (the outcome of the last write in a section) · `SaveBar`
 (result + button, in that order).
 
-### A write that fails says so, in the place it failed
+### Every outcome is a toast. Nothing is announced in place.
 
-Not a global toast, and never nothing. Two hooks make it structural, and which
-one applies depends on whether the control has a Save button:
+**After an action, the answer appears in one place — the toaster at the top —
+and it is the same place every time.** Success and failure both.
+
+This replaces an earlier rule ("a write that fails says so, in the place it
+failed"), which was right that a silent failure is the worst outcome and wrong
+about where to say it. Inline text lands wherever the section happens to be: at
+the bottom of a long settings page, in a sheet scrolled to its footer, on a row
+three screens down. It is frequently OFF-SCREEN at the moment it appears, so the
+reader sees no change and no message — indistinguishable from the write having
+worked. It also pushes the layout down under the thumb, moving the button they
+were about to press again.
+
+- **`ActionResult` routes both** and renders nothing. Every existing call site
+  already hands it a `msg`/`err`, which is why the conversion is one component
+  and not a hundred screens.
+- **`toast.error` is assertive and dwells 8s** — the reader has to read it,
+  understand what did not happen, and decide what to do. `toast.success` is
+  polite and 3.5s.
+- **Identical messages collapse** rather than stack. One problem firing from
+  three rows at once is one toast.
+- **`<Toaster/>` mounts once, at the app root**, outside the router and outside
+  every screen transition. A toast that unmounts with the screen that caused it
+  is the bug this replaces.
+- **A validation error on a FIELD is not this.** It stays under its own field,
+  because it names which input is wrong and the reader is looking at that input.
+  Toasts are for the outcome of an ACTION.
+- **A persistent STATE is not this either.** "Your studio is paused" is a
+  banner: it is true until something changes, and a toast that disappears would
+  be a worse account of it.
+
+### A write that fails is never silent — two hooks make that structural
+
+The rule above says WHERE the outcome appears. This one says that there is
+always an outcome, and it is the older half of the same idea. Which hook applies
+depends on whether the control has a Save button:
 
 | The control | Use | Because |
 |---|---|---|
-| has a Save button | `useAction` | `try { await …} finally { setSaving(false) }` with no catch rejects into the app-wide error toast — generic words, wrong place, and identical to a failed *read*. `run` cannot leave a rejection unhandled or a button stuck busy. |
+| has a Save button | `useAction` | `try { await …} finally { setSaving(false) }` with no catch rejects into the app-wide "something didn't load" notice — generic words, and identical to a failed *read*. `run` cannot leave a rejection unhandled or a button stuck busy, and its result is what the toaster announces. |
 | is instant (toggle, segmented picker) | `useConfirmedState` | `setState(next)` + a swallowed write leaves the control showing a value the server refused, until a reload silently reverts it. `commit` rolls back to the pre-apply snapshot and reports. |
-
-The result goes **above** the button, not below: below is where a phone keyboard
-covers it, and above is where the eye already is.
 
 **Enforced by a lint.** `apps/app/src/save-lifecycle.conformance.test.ts` fails on
 either hand-rolled shape in a settings surface. Escape with
@@ -559,6 +589,62 @@ The shape every phone OS converged on, and why each half works:
   spellings of one idea. The consequence belongs on the confirmation, at the
   moment you are asked to accept it — not two taps earlier where it is only
   furniture.
+
+### A component ships its own loading state, or it is not finished
+
+**Loading is part of a component's definition, not something a screen bolts on.**
+A component that renders data owes a `Skeleton` in the same file, exported
+beside it, matching its real geometry — same heights, same gaps, same column
+edges — so the arrival is a fill, not a re-layout.
+
+- **Never a spinner where a skeleton fits.** A spinner throws the page away and
+  rebuilds it; the reader loses their place every time. A spinner is for an
+  action in flight inside a control, not for a surface.
+- **The skeleton is the layout, not a grey blob.** Wrong geometry is worse than
+  none: it teaches the eye a shape and then moves everything.
+- **A failed load renders the FAILURE, never an endless shimmer.** `useLoad` and
+  `LoadError` exist for this; a skeleton with no timeout is a screen that lies
+  about still trying.
+- **Screens do not hand-roll skeletons.** If a screen needs one the component
+  did not ship, the component is unfinished — fix it there, where every other
+  app gets the fix too.
+
+### Motion comes from the registry, never from a number
+
+Every duration, easing and spring in the product is in `lib/animation.ts`, and
+**a hand-written `duration:` or `type: "spring"` is a lint failure** (§8, and
+the `motion` rule in `@4dl/ui/conformance`). This is not pedantry: motion is how
+an app feels consistent, and three screens with three timings feel like three
+apps. Use the tier variants (`anchorIn`, `contentIn`, `chromeIn`,
+`contentStagger`) so entrances are choreographed rather than simultaneous, and
+respect `prefers-reduced-motion` through `MotionConfig` — never by branching in
+a component.
+
+### Collections: search, view, and a preference that is remembered
+
+Any surface that lists things a person accumulates — people, plans, files,
+templates — is a COLLECTION, and they all behave the same way. Consistency here
+is worth more than per-screen cleverness: the reader learns one set of controls
+and then knows every list in the product.
+
+- **Search appears when the list outgrows the screen, and not before.** A search
+  box above four rows is a control asking to be used on a list you can already
+  see. Above the fold once scrolling is the alternative.
+- **List and grid are both first-class**, and the choice is the reader's. A list
+  favours identity and status; a grid favours images and scanning. Neither is
+  correct for everyone, which is why it is a toggle and not a decision.
+- **The choice is REMEMBERED, per collection, per device.** A view that resets
+  on every visit is a view nobody switches twice. It is a display preference —
+  it survives sign-out, like the theme, and it is never account data.
+- **One header row holds them all**: search, the view toggle, and at most one
+  primary action. The Revolut pattern this borrows from puts them on one line
+  above a single grouped card, and that is the shape.
+- **Every collection has four states and owes all four**: loading (skeleton in
+  the chosen view's geometry), empty (one line of why, one action), no-results
+  (different from empty — the reader typed something, so offer to clear it), and
+  failed (what broke, and a retry).
+- **Sort and filter are additive, never the default experience.** If the list
+  needs a filter to be useful, the wrong things are in it.
 
 ### Sectioning: how a long screen becomes a short one
 
@@ -1261,11 +1347,46 @@ Every screen, before it is called done:
 - [ ] Nothing hand-rolled that §13 already ships
 - [ ] Every string is within its budget (§10)
 - [ ] Screenshot-ready with real data: no empty state, no lorem, no placeholder
-      name, nothing cut off (§15)
+      name, nothing cut off (§16)
 
 ---
 
-## 15. Screens as evidence
+## 15. The upgrade, page by page
+
+The product is being brought up to this document one surface at a time, and the
+method matters as much as the standard — a sweep that changes forty screens
+shallowly leaves forty screens still wrong.
+
+**One page per pass, and the pass is not done until all of it is done:**
+
+1. **Read the screen against §0 and the review checklist.** Name what is wrong
+   before touching anything.
+2. **Whatever is generic goes to `@4dl/ui` first.** If the fix is a component,
+   it is built or extended in the package — not in the screen. Every other app
+   gets it in the same commit. A fix that lands in a screen is a fix the next
+   app re-invents.
+3. **Rebuild the screen on the shared components.** Delete the local
+   equivalents; a leftover local copy is what drift is made of.
+4. **All four states**: loading (skeleton, real geometry), empty, error, full.
+5. **Both themes, both widths.**
+6. **Photograph it** (§16 below) and look at the images. The suite finds what
+   the browser you built it in does not.
+7. **Document it** — the Help Center topic for that surface, with those images.
+
+The order is deliberate: the shared component before the screen, the screen
+before the picture, the picture before the words. Reverse any two and the
+documentation describes something that is about to change.
+
+**The reference for feel is a modern consumer finance app** — Revolut in
+particular: one grouped card holding a list, generous rows, a search and the
+view controls on a single line above it, an identity mark at 44–56px with a
+small status badge over its corner, the value stack on the right, and a floating
+pill tab bar. Not to copy pixel for pixel; to match the standard of restraint
+and the amount of air.
+
+---
+
+## 16. Screens as evidence
 
 Every screen is photographed. Not occasionally — **systematically**, by the
 screenshot suite, in both themes and both widths, on a studio seeded with a

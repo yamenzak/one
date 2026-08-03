@@ -23,7 +23,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { MotionConfig } from "motion/react";
-import { Screen, Spinner } from "@4dl/ui";
+import { Screen, Spinner, Toaster } from "@4dl/ui";
 import { ErrorBoundary, ThemeProvider } from "@4dl/app-kit";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
@@ -158,6 +158,10 @@ createRoot(document.getElementById("root")!).render(
               <ErrorBoundary>
                 <App />
               </ErrorBoundary>
+              {/* Every outcome the shared components announce lands here. An app
+                  that ships without it loses them all — `ActionResult` renders
+                  nothing on its own by design. */}
+              <Toaster />
             </I18nProvider>
           </ThemeProvider>
         </SessionProvider>

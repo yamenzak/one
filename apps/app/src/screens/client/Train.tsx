@@ -205,7 +205,7 @@ export function Train({ clientId }: { clientId: string }) {
       {/* Everything plan-shaped follows `workoutPlan`. */}
       {canPlan && <LaneSwitcher clientId={clientId} variants={variants} currentVariantId={currentVariantId} defaultLabel={defaultLabel} onSwitched={() => void load()} />}
       {canPlan && (published ? (
-        <Stagger data-tour="train-hero">
+        <Stagger>
           <button onClick={() => start()} className="w-full text-left">
             <Card interactive className="relative overflow-hidden">
               <div className="pointer-events-none absolute -right-8 -top-8 size-32 rounded-full bg-primary/10 blur-2xl" />

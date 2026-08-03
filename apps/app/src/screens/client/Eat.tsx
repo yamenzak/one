@@ -45,7 +45,7 @@ export function Eat({ clientId }: { clientId: string }) {
   const [waterMl, setWaterMl] = useState(0);
   const [logMeal, setLogMeal] = useState<string | undefined>(undefined);
   const [logOpen, setLogOpen] = useState(false);
-  const [planOpen, setPlanOpen] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("tour") === "meal");
+  const [planOpen, setPlanOpen] = useState(false);
   const [mealPlan, setMealPlan] = useState<{ name: string; meals: number; options: number } | null>(null);
   const [variants, setVariants] = useState<Lane[]>([]);
   const [currentVariantId, setCurrentVariantId] = useState<string | null>(null);
@@ -226,7 +226,7 @@ export function Eat({ clientId }: { clientId: string }) {
         <Eyebrow>Today</Eyebrow>
 
         {/* Hero — today's intake, the visual anchor */}
-        <Stagger data-tour="eat-hero">
+        <Stagger>
           <Card className="relative overflow-hidden">
             <div className="pointer-events-none absolute -right-12 -top-12 size-40 rounded-full bg-calories/10 blur-2xl" />
             {/*

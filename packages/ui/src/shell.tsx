@@ -62,14 +62,13 @@ export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[];
   const activeTone = tabs.find((t) => t.key === active)?.tone;
   const onFg = tinted && activeTone && activeTone !== "primary" ? "var(--tone-foreground)" : "var(--primary-foreground)";
   return (
-    <motion.nav initial="hidden" animate="show" variants={chromeIn} className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] md:hidden">
-      <div data-tour="navbar" className="pointer-events-auto flex max-w-full items-center gap-0.5 rounded-full border border-border/60 bg-card/75 p-1.5 shadow-lg backdrop-blur-2xl">
+    <motion.nav aria-label="Sections" initial="hidden" animate="show" variants={chromeIn} className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] md:hidden">
+      <div className="pointer-events-auto flex max-w-full items-center gap-0.5 rounded-full border border-border/60 bg-card/75 p-1.5 shadow-lg backdrop-blur-2xl">
         {tabs.map((t) => {
           const on = active === t.key;
           return (
             <button
               key={t.key}
-              data-tour={`tab-${t.key}`}
               onClick={() => onSelect(t.key)}
               aria-label={t.label}
               aria-current={on ? "page" : undefined}
@@ -117,7 +116,6 @@ export function NavRail({ tabs, active, onSelect, footer, brand, tinted }: { tab
           return (
             <button
               key={t.key}
-              data-tour={`tab-${t.key}`}
               onClick={() => onSelect(t.key)}
               aria-current={on ? "page" : undefined}
               className="group relative flex w-full flex-col items-center gap-1 rounded-2xl py-2.5 transition-colors"

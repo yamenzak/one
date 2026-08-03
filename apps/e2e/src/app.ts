@@ -1,21 +1,17 @@
 /**
  * Shared page setup + the flows every golden path starts from.
  *
- * Two pieces of app behaviour would otherwise fire in the middle of a test and
- * cover the UI, so both are switched off in an init script BEFORE the app boots:
+ * One piece of app behaviour would otherwise fire in the middle of a test and
+ * cover the UI, so it is switched off in an init script BEFORE the app boots:
  *
- *  1. The first-run product tour (`tour.tsx`) auto-starts 700 ms after the client
- *     surface mounts, swaps the API layer for a mock, and puts a spotlight
- *     overlay over the screen. It is gated on `localStorage`, so marking it seen
- *     is the app's own opt-out rather than a hack.
- *  2. The passkey enrolment nudge (`PasskeyPrompt.tsx`) opens a modal whenever
+ *  1. The passkey enrolment nudge (`PasskeyPrompt.tsx`) opens a modal whenever
  *     WebAuthn is supported and the user holds no passkey — which is always true
  *     for a freshly created account in headless Chromium. Deleting
  *     `window.PublicKeyCredential` makes `passkeySupported()` false, which is the
  *     documented "this device can't do it" branch, so the modal never opens and
  *     the login screen skips conditional-UI autofill too.
  *
- * Neither is what these paths are testing, and neither is worth an app-source
+ * It is not what these paths are testing, and it is not worth an app-source
  * `data-testid` to work around.
  */
 
@@ -79,15 +75,7 @@ function syntheticIp(): string {
 /** Install the pre-boot switches described above. Call once per page. */
 export async function prepare(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    // 1. Tours: already seen. Keys come from tour.tsx's `doneKey`.
-    for (const id of ["app", "workout", "meal"]) {
-      try {
-        localStorage.setItem(`kova.tour.v1.${id}.done`, "1");
-      } catch {
-        /* storage unavailable — the app treats that as "seen" anyway */
-      }
-    }
-    // 2. WebAuthn: unsupported, so the enrolment modal never auto-opens.
+    // WebAuthn: unsupported, so the enrolment modal never auto-opens.
     try {
       Reflect.deleteProperty(window, "PublicKeyCredential");
     } catch {
@@ -254,7 +242,7 @@ export function tab(
   page: Page,
   name: "Today" | "Train" | "Eat" | "Wellness" | "Progress" | "Clients" | "Library" | "Business" | "Sessions",
 ) {
-  return page.locator('[data-tour="navbar"]').getByRole("button", { name, exact: true });
+  return page.getByRole("navigation", { name: "Sections" }).getByRole("button", { name, exact: true });
 }
 
 /**

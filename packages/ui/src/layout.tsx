@@ -151,7 +151,7 @@ export function Screen({
  * bypassed for two concrete reasons, both now fixed. Its spacing was stale
  * (`gap-2 pb-2 pt-6`, from before the anchor sat under the app bar) while the
  * screens had all converged on the tighter set; and it spread no props, so a
- * screen needing `data-tour` had no way in.
+ * screen needing its own attributes had no way in.
  *
  * The lesson is in the file header: the value of these components is that the
  * hierarchy becomes structural. That only holds while they are the path of

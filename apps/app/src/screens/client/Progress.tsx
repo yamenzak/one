@@ -191,7 +191,7 @@ function Overview({ data, units, dateLabel, canNutrition, canTraining }: { data:
         defect this rewrite keeps finding. The three stats beside it were never
         the redundant part, so they get the whole card and the width to breathe.
       */}
-      <Stagger data-tour="progress-hero">
+      <Stagger>
         <Card className="relative space-y-3 overflow-hidden">
           <div className="pointer-events-none absolute -right-10 -top-10 size-40 rounded-full bg-cardio/10 blur-3xl" />
           <div className="relative space-y-3">

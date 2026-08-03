@@ -307,7 +307,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         Wellness is four subjects on one surface (sleep, mood, water, fasting),
         which looks like a screen with more than one job — but it isn't: those
         four are the INPUTS, and the wellness score is the one noun they add up
-        to. The tour has always said as much ("one number for how you're really
+        to ("one number for how you're really
         doing"); it just wasn't the largest thing on the screen. It is now, and
         the pillar breakdown drops to T3 where a breakdown belongs.
 
@@ -317,7 +317,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
         for that state, so say it instead and keep the numeral for a real number.
       */}
       <Anchor
-        data-tour="wellness-hero"
+       
         eyebrow="Wellness score"
         word={score && score.score > 0 ? undefined : score ? WELLNESS_BAND[score.band].label : "Not scored yet"}
         sub={score && score.score > 0

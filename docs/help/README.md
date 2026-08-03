@@ -102,5 +102,5 @@ light page, and a dark screenshot on a light page reads as a photograph of
 something else. Marketing picks per campaign; docs default to `phone-light`.
 
 **Every image carries a caption** saying what the reader is looking at
-(UI-LANGUAGE §15). An uncaptioned screenshot is decoration, and decoration is
+(UI-LANGUAGE §16). An uncaptioned screenshot is decoration, and decoration is
 what a reader skips.

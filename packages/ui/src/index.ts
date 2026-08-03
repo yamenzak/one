@@ -16,6 +16,7 @@ export * from "./media.js";
 export * from "./shell.js";
 export * from "./settings.js";
 export * from "./patterns.js";
+export * from "./toast.js";
 export * from "./controls.js";
 export * from "./dates.js";
 export * from "./tiles.js";

@@ -179,7 +179,7 @@ export async function populateRoster(studio: Studio, names: readonly string[] = 
  * A plausible address for a seeded client — because the roster SHOWS it.
  *
  * It used to be `e2e-roster-3-pitr6d@kova.test`, which was fine while these
- * rows were only ever asserted on. They are now photographed (UI-LANGUAGE §15),
+ * rows were only ever asserted on. They are now photographed (UI-LANGUAGE §16),
  * and a screenshot with a placeholder in it teaches the reader that the product
  * is a demo. Derived from the name, so it is also the right LENGTH — the thing
  * a roster row actually has to survive.

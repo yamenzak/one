@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { Atmosphere, anchorIn, brandMark, contentIn, contentStagger, DUR, hasIcon } from "@4dl/ui";
+import { Atmosphere, anchorIn, brandMark, contentIn, contentStagger, DUR, hasIcon, Toaster } from "@4dl/ui";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
 import { bootBrand, ThemeProvider, useTheme } from "./theme.js";
@@ -191,6 +191,10 @@ function App() {
           is torn down by a screen transition. */}
       <UnhandledErrorToast />
       <PwaUpdatePrompt />
+      {/* Every refused write in the app lands here. Outside AnimatePresence and
+          outside the router on purpose: a toast that unmounts with the screen
+          that caused it is the failure this replaces. */}
+      <Toaster />
     </>
   );
 }
