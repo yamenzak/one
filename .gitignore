@@ -32,6 +32,14 @@ pnpm-debug.log*
 # Test / coverage
 coverage/
 .nyc_output/
+playwright-report/
+test-results/
+
+# The screenshot suite's output (`pnpm --filter @kova/e2e shots`). Regenerated
+# on demand, so it is not history — the handful of images that actually ship
+# (Help Center, marketing) are copied out by id and committed where they are
+# used. See docs/help/README.md.
+apps/e2e/shots-out/
 
 # OS / editor
 .DS_Store

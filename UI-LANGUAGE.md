@@ -560,6 +560,115 @@ The shape every phone OS converged on, and why each half works:
   moment you are asked to accept it — not two taps earlier where it is only
   furniture.
 
+### Sectioning: how a long screen becomes a short one
+
+A screen is long because it holds a lot, and that is allowed. A screen is
+*unusable* because the reader cannot tell where one idea ends and the next
+begins, and that is not. The rules below are what turn the first into a
+navigable page instead of the second.
+
+**The ladder, in order.** Reach for the smallest unit that works, and only step
+up when the one below it has actually run out:
+
+| The content is | Use | Never |
+|---|---|---|
+| one value or one switch | a `Row` in a `Group` | a card with a heading |
+| 2–7 related controls | a `Group` under a `Section` title | seven cards |
+| 2–5 groups on one topic | a `Section` | a page |
+| more than 5 groups, or unrelated topics | an INDEX and a page each (above) | a longer page |
+
+- **Seven is the chunking limit, everywhere.** More than seven rows in a group
+  needs a "See all"; more than seven sections on an index needs grouping; more
+  than seven items in a sentence needs a list. §1 sets it, and it applies to
+  prose as well as to elements.
+- **A section title is a NOUN PHRASE naming what is inside**, in sentence case,
+  and it earns its place only when there is more than one section. "Rest timers"
+  is a title. "Settings", on the settings page, is furniture.
+- **Two levels of heading, at most, on any screen.** Section, then sub-section.
+  A third level means the screen is two screens.
+- **A sub-section has no chrome of its own.** It is a `caption`-weight label and
+  the gap above it — not a card inside a card, not a second border, not an
+  eyebrow. The gap is what makes it a sub-section; the box is what makes it
+  noise.
+- **Order by what the reader came for, then by what they change most.** Never by
+  what the data model happens to return, and never alphabetically unless the
+  reader arrives knowing the name.
+- **Every section is independently comprehensible.** If a section only makes
+  sense after reading the one above it, they are one section with a bad break in
+  the middle.
+
+### Cards are a boundary, not decoration
+
+A `Card` says "these things belong together and are separate from what is around
+them". That is its whole meaning, and it is spent the moment everything is a
+card.
+
+- **One idea per card** (§0.1). If it needs a sub-heading, it is two cards — or,
+  far more often, it is a `Group` of rows and never needed the card.
+- **A card with one control is a row.** The border adds a rectangle and no
+  information.
+- **Two levels of nesting, maximum**, and the second level must be a different
+  shape (a group inside a card, not a card inside a card).
+- **A card does not repeat the page.** If the page is titled "Notifications",
+  the card is not headed "Notifications" — see the storefront case above, which
+  stacked five names for one thing above two switches.
+- **Sequential steps are not cards.** A flow is a flow: one thing at a time,
+  with a way back. A column of five bordered boxes is a form pretending to be a
+  wizard.
+- **A card is not a way to add padding.** If something needs air, give it air.
+
+### The component you want already exists
+
+The registry (§13) is the answer to "how do I build this". Before writing a
+`div`, find the row in that table. Hand-rolling is how the same idea ends up
+with three spellings, and the drift is never noticed at the moment it happens —
+it is noticed a year later, as "the app feels inconsistent", with no single
+change to point at.
+
+| You are about to build | Use instead |
+|---|---|
+| a bordered box with a title and children | `Card` + `Section` |
+| a list of label→value lines | `Group` of `Row`s |
+| a `<select>` | `Select` — it cannot render a value that is not in its options |
+| a loading spinner over a whole screen | `Skeleton` matching the real geometry |
+| a "no data yet" paragraph | `Empty` — one line of why, one action |
+| a toast for a failed save | the section's own `ActionResult` (§7) |
+| a modal for a sub-task | `Sheet` (§7) |
+| a coloured dot for status | a `Badge` with a WORD in it |
+| a number rendered large | `Anchor` or `Stat` |
+| a tab strip over settings | an index and a page each (above) |
+
+If nothing fits, the language needs a change — propose the component, do not
+add a local one. A component that exists in one screen is a component that will
+be re-invented differently in the next.
+
+### It has to feel like an app, not a website with an account
+
+This is the difference between "works" and "good", and it is almost entirely
+about what happens between the tap and the result.
+
+- **A tap gets a response inside one frame.** Not the result — the
+  acknowledgement: the pressed state, the disabled button, the optimistic value.
+  Anything that waits for the network to acknowledge a tap feels like a web page.
+- **Never a full-screen spinner where a skeleton fits.** A skeleton in the
+  real layout keeps the reader oriented; a spinner throws the page away and
+  rebuilds it, and the reader loses their place every time.
+- **A sub-task is a sheet, not a navigation.** Going somewhere and coming back
+  is for changing subject. Picking a value, confirming, editing one field —
+  those happen in front of the screen you are on, so the context stays visible
+  and Back does what Back means.
+- **Back never surprises.** Every overlay, sub-page and step is addressable and
+  closes in the order it opened. A Back that exits the whole surface from three
+  levels in is the single most disorienting thing an app can do.
+- **State survives the trip.** Scroll position, the open section, the typed
+  draft. Losing them on a rotate, a reload or a Back is what "web page" feels
+  like.
+- **Nothing moves after the reader starts reading.** Content that arrives late
+  reserves its space first (§9). A layout that reflows under the thumb causes
+  mis-taps, and a mis-tap on a destructive row is a bug report.
+- **One primary action per screen, and it is reachable by thumb.** If two things
+  compete for primary, one of them is not.
+
 ### Two rules about repetition
 
 - **A glyph repeated down a list is texture, not identity.** An icon earns its
@@ -736,6 +845,11 @@ ship:
   enumerate in full — in the component whose job that is — or say "3 features
   locked" and let the full list be one scroll away. Half a list is worse than
   none.
+- **Say what it DOES, not what it IS.** Every string on a control answers "what
+  happens if I use this", from the reader's side. "Clients can sign themselves
+  up" beats "Self-registration enabled"; "Nobody can sign in until this is set"
+  beats "Required field". A description of the mechanism is documentation
+  written in the wrong place.
 - **A 1–5 scale must say which end is which.** Five faces with no endpoint
   captions is only guessable for mood; on Energy it is a coin flip and on Stress
   it was *wrong*, because the stored direction (5 = worst) was the opposite of
@@ -743,6 +857,31 @@ ship:
   chosen step in words, and any inverted scale renders inverted everywhere it
   is read back. The words live in one registry — `screens/client/scales.ts` —
   because three surfaces render them and they diverged the moment they didn't.
+
+### Budgets — the numbers that make "concise" enforceable
+
+"Be concise" is advice nobody has ever failed to agree with and nobody can be
+held to. These can be counted, which is the point. Over budget is not a style
+opinion; it is a defect with a number attached.
+
+| Where | Budget | If you are over |
+|---|---|---|
+| Section intro | **1 sentence**, ≤ 15 words, and only on a section page | the sections are named wrong — fix the names |
+| Field hint | **≤ 12 words**, one line at 375px | the label is wrong, or it belongs in the Help Center |
+| Empty state | **1 line of why + 1 action** | you are writing documentation inside a screen |
+| Error | **1 sentence**: what happened, then what to do | split the causes and say the one that happened |
+| Confirmation | **1 sentence naming the consequence** + the verb on the button | the action is doing more than one thing |
+| Row sub-line | **the current value**, not a description | you have put the index's job on the page |
+| Tooltip | **≤ 10 words** | it is not a tooltip |
+
+Two rules that outrank all of them:
+
+- **Nothing explains a control the reader can just try.** Reversible, obvious
+  actions get no prose. Prose is for what is IRREVERSIBLE, what costs money, and
+  what will not be obvious afterwards.
+- **When it genuinely needs more, it needs a different surface.** A paragraph on
+  a settings page is a Help Center article that lost its way. Link to it; do not
+  inline it.
 
 ---
 
@@ -1117,3 +1256,44 @@ Every screen, before it is called done:
 - [ ] Works at 200% text scale
 - [ ] Correct in both themes
 - [ ] Correct at 375, 768, 1100 and 1400
+- [ ] ≤2 heading levels; every section independently comprehensible
+- [ ] Every card holds one idea; no card with a single control
+- [ ] Nothing hand-rolled that §13 already ships
+- [ ] Every string is within its budget (§10)
+- [ ] Screenshot-ready with real data: no empty state, no lorem, no placeholder
+      name, nothing cut off (§15)
+
+---
+
+## 15. Screens as evidence
+
+Every screen is photographed. Not occasionally — **systematically**, by the
+screenshot suite, in both themes and both widths, on a studio seeded with a
+realistic amount of realistic data. Those images are the marketing site, the
+Help Center, and the design review, and they are all the same images.
+
+This is a design rule, not a tooling note, because of what it forces:
+
+- **A screen you cannot screenshot is not finished.** If it only looks right
+  with three items and the real number is thirty; if the copy wraps to four
+  lines at 375px; if a name longer than "Sam" breaks the row — the screenshot
+  shows it, every time, and it shows it before a customer finds it.
+- **Empty states are photographed too, and separately.** They are a real state
+  with real readers (day one of every account) and they are the state every
+  review used to be conducted in by accident. Both are captured; neither stands
+  in for the other.
+- **The data is plausible, never uniform.** Perfectly regular seed data hides
+  layout problems — every row the same width, every number the same digit count.
+  Missed days, drifting values, one very long name and one very short one: that
+  is where cramming and bad wrapping live.
+- **No placeholder ever reaches an image.** No "Lorem", no "Test Client 1", no
+  `1234`. A screenshot with a placeholder in it teaches the reader that the
+  product is a demo.
+- **The same screen, both themes, side by side.** Half of what breaks in light
+  mode is invisible to whoever built it in dark, and the pairing is the only
+  reliable way to see it.
+
+**A caption is part of the screenshot.** An image in the Help Center or on the
+marketing site carries one line saying what the reader is looking at and what
+they would do next. An uncaptioned screenshot is decoration, and decoration is
+what a reader skips.

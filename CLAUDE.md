@@ -270,6 +270,21 @@ loud, which is the only kind this repo has actually had.
   each spec creates its own studio + users, so runs never collide. Stop any
   `wrangler dev` you started with `pnpm dev` first — it shares `.wrangler` state.
   `E2E_SERVER_LOGS=1 pnpm e2e` un-mutes the worker's request log.
+- `pnpm --filter @kova/e2e shots` — the SCREENSHOT suite (`apps/e2e/shots`,
+  `shots.config.ts`). Seeds one demo studio through the real API — a comped
+  `pro` plan, a ten-person roster, six weeks of a client's history, a published
+  plan — and photographs every surface at phone/desktop × light/dark. The images
+  are the marketing site, the Help Center and the design review, and they are
+  all the same images, which is what keeps them honest (UI-LANGUAGE §15).
+  Output: `apps/e2e/shots-out/<project>/<shot-id>.png`, gitignored; the ones
+  that ship are copied out by id (`docs/help/README.md`).
+  ⚠️ Separate from `pnpm e2e` on purpose: that is the launch gate and runs on
+  every push; this takes minutes and is run when images are wanted. It is also
+  the ONE suite that sets `ADMIN_EMAILS:` empty, because comping the demo studio
+  onto a plan goes through the operator route — the gate must never do that.
+  ⚠️ `src/d1.ts` demands EXACTLY ONE Miniflare D1 file, so a stale database from
+  an older run fails the seed with a confusing "found: 2". `rm -rf
+  apps/api/.wrangler/state` and re-run.
 
 **Local dev needs no Cloudflare account** — but it needs one file. Copy
 `apps/api/.dev.vars.example` → `apps/api/.dev.vars` before your first `pnpm dev`.

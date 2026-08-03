@@ -163,7 +163,7 @@ export const ROSTER_NAMES = [
 export async function populateRoster(studio: Studio, names: readonly string[] = ROSTER_NAMES): Promise<string[]> {
   const ids: string[] = [];
   for (const [i, displayName] of names.entries()) {
-    const email = `e2e-roster-${i}-${Math.random().toString(36).slice(2, 8)}@kova.test`;
+    const email = rosterEmail(displayName, i);
     try {
       const created = await callJson<{ client: { id: string } }>(studio.page, studio.base, "/api/clients", { email, displayName });
       ids.push(created.client.id);
@@ -173,6 +173,30 @@ export async function populateRoster(studio: Studio, names: readonly string[] = 
     }
   }
   return ids;
+}
+
+/**
+ * A plausible address for a seeded client — because the roster SHOWS it.
+ *
+ * It used to be `e2e-roster-3-pitr6d@kova.test`, which was fine while these
+ * rows were only ever asserted on. They are now photographed (UI-LANGUAGE §15),
+ * and a screenshot with a placeholder in it teaches the reader that the product
+ * is a demo. Derived from the name, so it is also the right LENGTH — the thing
+ * a roster row actually has to survive.
+ *
+ * `@example.com` is reserved by RFC 2606 and can never be delivered to, which
+ * matters because these are real invitations on a real send path.
+ */
+function rosterEmail(displayName: string, i: number): string {
+  const local = displayName
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z]+/g, ".")
+    .replace(/^\.|\.$/g, "");
+  // A suffix, because the suite runs repeatedly against one dev database and an
+  // address that already exists is a different (and correct) refusal.
+  return `${local}.${Math.random().toString(36).slice(2, 5)}@example.com`;
 }
 
 async function callJson<T>(page: Page, base: string, path: string, body: unknown): Promise<T> {
@@ -296,6 +320,38 @@ export async function grantEntitlements(
         `PATCH overrides -> ${out.status} ${out.text}` +
           (out.status === 403 ? " (run with E2E_DEV_ADMIN=1)" : ""),
       );
+    }
+  } finally {
+    await page.close();
+  }
+}
+
+/**
+ * Put a studio on a real PLAN, comped — no Stripe, no card, the same row the
+ * webhook would have written.
+ *
+ * Distinct from `grantEntitlements` above, and the difference matters for a
+ * screenshot run: an override raises the ceilings but leaves the studio with no
+ * SUBSCRIPTION, so every screen keeps its "No subscription — choose a plan"
+ * banner. That banner is honest and it is also in every image, which makes the
+ * product look permanently unfinished. Comping puts the studio in the state a
+ * paying customer is actually in, and the entitlements then come from the plan
+ * the way they do for that customer, rather than from a grant nobody bought.
+ */
+export async function compOntoPlan(studio: Studio, planId: string): Promise<void> {
+  await carrySessionTo(studio.context, SETUP_URL, `admin.${ROOT_DOMAIN}`);
+  const page = await studio.context.newPage();
+  try {
+    await page.goto(`${ADMIN_URL}/health`);
+    const out = await page.evaluate(
+      async ([path, body]: [string, string]) => {
+        const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body });
+        return { ok: res.ok, status: res.status, text: await res.text() };
+      },
+      [`/api/admin/tenants/${studio.tenantId}/plan`, JSON.stringify({ planId, comp: true })] as [string, string],
+    );
+    if (!out.ok) {
+      throw new Error(`POST comp plan -> ${out.status} ${out.text}` + (out.status === 403 ? " (run with E2E_DEV_ADMIN=1)" : ""));
     }
   } finally {
     await page.close();
