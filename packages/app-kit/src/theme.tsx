@@ -12,7 +12,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { applyBranding, applyMode, resolveMode, oklchStringToHex, type Branding, type ThemeMode } from "@4dl/ui";
+import { applyBranding, applyMode, brandMark, resolveMode, oklchStringToHex, type Branding, type ThemeMode } from "@4dl/ui";
 
 interface ThemeCtx {
   mode: ThemeMode;
@@ -50,10 +50,16 @@ export function ThemeProvider({ branding, children }: { branding: Branding | nul
   // White-label the browser chrome from branding: favicon + apple-touch-icon
   // (the square app icon, falling back to the wordmark). A PWA manifest is
   // themed server-side per host; this covers the live tab on any origin.
+  //
+  // Tracks the MODE as well as the branding. Browser chrome is the one surface
+  // a studio does not theme: a tab strip is light on a light OS whatever the
+  // app is set to, so a mark drawn for the dark app can vanish in the one place
+  // its owner looks at all day. `brandMark` picks the light variant when there
+  // is one, and the dark mark unchanged when there is not.
   useEffect(() => {
     if (typeof document === "undefined") return;
     const undo: (() => void)[] = [];
-    const icon = branding?.iconUrl || branding?.logoUrl;
+    const icon = brandMark(branding, mode, "icon");
     if (icon) {
       for (const rel of ["icon", "apple-touch-icon"]) {
         let link = document.querySelector<HTMLLinkElement>(`link[rel="${rel}"]`);
@@ -65,7 +71,7 @@ export function ThemeProvider({ branding, children }: { branding: Branding | nul
       }
     }
     return () => undo.forEach((f) => f());
-  }, [branding]);
+  }, [branding, mode]);
 
   // The theme-color meta (the brand primary) tints the mobile toolbar / installed
   // title bar — it must track the active MODE, since a brand's primary token can

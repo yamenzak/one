@@ -38,8 +38,9 @@ import {
   TierAnchor,
   TierContent,
   motion,
+  brandMark,
 } from "@4dl/ui";
-import { RefreshNote } from "@4dl/app-kit";
+import { RefreshNote, useTheme } from "@4dl/app-kit";
 import { api, ApiError } from "../api.js";
 import { useSession } from "../session.js";
 import { passkeySupported, signInWithPasskey, conditionalPasskeyAvailable } from "../passkey.js";
@@ -49,7 +50,8 @@ export function Login() {
   const { refresh, host } = useSession();
   const tenant = host?.tenant ?? null;
   const brandName = tenant?.name ?? "Kova";
-  const logoUrl = tenant?.branding?.logoUrl ?? null;
+  const { mode } = useTheme();
+  const logoUrl = brandMark(tenant?.branding, mode, "logo");
   const login = tenant?.branding?.login ?? null;
   const bgImageUrl = login?.bgImageUrl || null;
   const showPasskey = login?.showPasskey !== false;

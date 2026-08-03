@@ -76,16 +76,64 @@ export interface Branding {
   /** Wash each page's hero in its section's domain token. Studio-wide for the
    *  same reason as `tintedNav`. Defaults on. */
   ambient?: boolean | null;
-  /** Wide wordmark/logo (app bar). */
+  /** Wide wordmark/logo (app bar), for a DARK surface. */
   logoUrl?: string | null;
-  /** Square app icon/mark (nav rail, favicon). */
+  /** Square app icon/mark (nav rail, favicon), for a DARK surface. */
   iconUrl?: string | null;
+  /** The same two for a LIGHT surface. Absent = use the dark one. */
+  logoUrlLight?: string | null;
+  iconUrlLight?: string | null;
   /** Avatar for the AI coach persona (falls back to a bottts robot). */
   aiAvatarUrl?: string | null;
   /** Name for the AI coach persona (falls back to "Coach"). */
   aiName?: string | null;
   /** Granular token overrides (e.g. from a pasted shadcn theme). */
   tokens?: BrandTokens | null;
+}
+
+/**
+ * The mark to draw on the surface currently showing.
+ *
+ * ONE resolver, because "logo, or icon, or the other one, or nothing" was
+ * already spelled out at five call sites before a second variant existed —
+ * boot splash, login, the doors list, the switcher, the favicon — and each
+ * ordered the fallbacks slightly differently. Adding a light variant to five
+ * hand-written chains is how four of them end up right.
+ *
+ * `kind` is which SHAPE the surface wants. A wide wordmark in a 40px square
+ * looks broken, and a square mark stretched across an app bar looks worse, so
+ * the caller says which it is and the resolver falls back WITHIN that
+ * preference first.
+ *
+ * A studio with one full-colour mark uploads nothing extra and this returns it
+ * for both modes — the light variant is an override, never a requirement.
+ */
+export interface BrandMarks {
+  logoUrl?: string | null;
+  iconUrl?: string | null;
+  logoUrlLight?: string | null;
+  iconUrlLight?: string | null;
+}
+
+export function brandMark(
+  /**
+   * Just the four URLs, not a `Branding`.
+   *
+   * Callers hold several near-identical branding shapes — the design system's,
+   * the wire type, a persona row on the studio switcher — and none is assignable
+   * to another. Taking the fields this actually reads means no call site has to
+   * cast, and a cast is exactly how a resolver like this ends up handed the
+   * wrong object.
+   */
+  b: BrandMarks | null | undefined,
+  mode: ThemeMode,
+  kind: "logo" | "icon" = "icon",
+): string | null {
+  if (!b) return null;
+  const light = mode === "light";
+  const logo = (light && b.logoUrlLight) || b.logoUrl || null;
+  const icon = (light && b.iconUrlLight) || b.iconUrl || null;
+  return kind === "logo" ? logo || icon : icon || logo;
 }
 
 /**

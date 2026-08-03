@@ -88,6 +88,9 @@ export const settingsRoutes = new Hono<AppEnv>()
             ambient: z.boolean().nullish(),
             logoUrl: z.string().max(500).nullish(),
             iconUrl: z.string().max(500).nullish(),
+            // The same two marks for a light surface. Absent = use the dark one.
+            logoUrlLight: z.string().max(500).nullish(),
+            iconUrlLight: z.string().max(500).nullish(),
             aiAvatarUrl: z.string().max(500).nullish(),
             aiName: z.string().max(40).nullish(),
             tokens: z.object({ light: tokenMap.nullish(), dark: tokenMap.nullish() }).nullish(),

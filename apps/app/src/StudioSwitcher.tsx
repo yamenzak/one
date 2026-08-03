@@ -32,13 +32,15 @@
 
 import { useState } from "react";
 import type { PersonaRef } from "@kova/protocol";
-import { Badge, Button, Card, Sheet, Check, ChevronsUpDown, Store, Spinner, cn } from "@4dl/ui";
+import { Badge, Button, Card, Sheet, Check, ChevronsUpDown, Store, Spinner, brandMark, cn } from "@4dl/ui";
 import { personaLabel, personaTone } from "./registry/index.js";
 import { useSession } from "./session.js";
+import { useTheme } from "./theme.js";
 
 /** The mark for a studio: its uploaded icon, else its initial on its own colour. */
 function StudioMark({ persona, className }: { persona: PersonaRef; className?: string }) {
-  const icon = persona.iconUrl || persona.logoUrl;
+  const { mode } = useTheme();
+  const icon = brandMark(persona, mode, "icon");
   // A studio that has set a brand colour wears it here even when the app is
   // currently themed by a DIFFERENT studio — that is the whole point of the
   // switcher: you are looking at other businesses, not at this one's palette.

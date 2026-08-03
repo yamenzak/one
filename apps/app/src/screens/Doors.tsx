@@ -41,7 +41,9 @@ import {
   Section,
   Store,
   TierContent,
+  brandMark,
 } from "@4dl/ui";
+import { useTheme } from "../theme.js";
 import { RefreshNote } from "@4dl/app-kit";
 import { studioUrl, useSession } from "../session.js";
 
@@ -72,6 +74,7 @@ function AddressAnchor({ label, host, sub }: { label: string; host: string; sub?
  * about the product with no route back into their own studio.
  */
 export function RootSignpost() {
+  const { mode } = useTheme();
   const { ctx, host } = useSession();
   const root = host?.rootDomain ?? location.hostname;
   const personas = ctx?.personas ?? [];
@@ -95,8 +98,8 @@ export function RootSignpost() {
                 sub={`${p.tenantSlug}.${root}`}
                 leading={
                   <span aria-hidden className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-sm bg-primary/15 text-body-lg font-bold text-primary">
-                    {p.iconUrl || p.logoUrl ? (
-                      <img src={p.iconUrl || p.logoUrl || ""} alt="" className="size-full object-cover" />
+                    {brandMark(p, mode, "icon") ? (
+                      <img src={brandMark(p, mode, "icon") ?? ""} alt="" className="size-full object-cover" />
                     ) : (
                       p.tenantName.charAt(0).toUpperCase()
                     )}

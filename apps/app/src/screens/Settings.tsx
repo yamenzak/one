@@ -764,6 +764,59 @@ function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBr
 
 /** A compact, faithful mock of the login screen using live theme tokens — so
  *  the owner sees their brand + copy exactly as clients will. */
+/**
+ * The optional light-surface override for a mark.
+ *
+ * Rendered on a LIGHT plate whatever mode the editor is in, because that is the
+ * entire question being asked: a one-colour mark drawn for the dark app is pale
+ * and disappears the moment a member switches to light, and the only way to
+ * know whether yours does is to see it on white. Showing the dark mark here as
+ * the fallback preview is the feature — if it looks fine, upload nothing.
+ *
+ * Deliberately quiet and secondary. Most studios use a full-colour mark that
+ * needs no second file, and a slot that shouts implies a step everyone owes.
+ */
+function LightVariant({ label, url, fallback, wide, onUpload, onClear }: {
+  label: string;
+  url: string | null;
+  /** The dark mark, previewed on white when no override is set. */
+  fallback: string | null;
+  wide?: boolean;
+  onUpload: (f: File) => void;
+  onClear: () => void;
+}) {
+  const shown = url || fallback;
+  // design-tokens-exempt: sits on the literal-white plate below, where a themed
+  // muted token would be invisible in light mode.
+  const emptyMark = <ImageIcon className="size-4 text-black/30" />;
+  return (
+    <div className="flex items-center gap-3 rounded-xl bg-surface-2/60 p-2.5">
+      {/* design-tokens-exempt: the plate is LITERAL white on purpose. This preview
+          asks one question — does your mark survive a light background? — and a
+          token surface would follow the theme and answer it only half the time,
+          which is the failure the whole control exists to catch. */}
+      <div className={cn("grid shrink-0 place-items-center overflow-hidden rounded-lg border border-black/10 bg-white", wide ? "h-12 w-20" : "size-12")}>
+        {shown
+          ? <img src={shown} alt="" className={wide ? "max-h-10 max-w-18 object-contain" : "size-full object-cover"} />
+          : emptyMark}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-xs font-medium">{label}</div>
+        <div className="text-xs text-muted-foreground">
+          {url ? "Used on light backgrounds." : "Optional — the mark above is used unless it disappears on white."}
+        </div>
+      </div>
+      <div className="flex shrink-0 gap-1.5">
+        <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3 text-xs font-medium transition-colors hover:bg-surface-3 [&_svg]:size-3.5">
+          <Upload /> {url ? "Replace" : "Add"}
+          <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
+        </label>
+        {url && <Button size="icon" variant="secondary" className="size-8" aria-label={`Remove ${label}`} onClick={onClear}><Trash2 /></Button>}
+      </div>
+    </div>
+  );
+}
+
 function LoginPreview({ brandName, logoUrl, tagline, headline, subtext, bgImageUrl, showPasskey }: {
   brandName: string; logoUrl: string | null; tagline: string; headline: string; subtext: string; bgImageUrl: string | null; showPasskey: boolean;
 }) {
@@ -1985,6 +2038,10 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const [ambient, setAmbient] = useState<boolean>(initial?.ambient ?? true);
   const [logoUrl, setLogoUrl] = useState<string | null>(initial?.logoUrl ?? null);
   const [iconUrl, setIconUrl] = useState<string | null>(initial?.iconUrl ?? null);
+  // The light-surface overrides. Null is the normal state and means "the mark
+  // above works on both", which is true of any full-colour logo.
+  const [logoUrlLight, setLogoUrlLight] = useState<string | null>(initial?.logoUrlLight ?? null);
+  const [iconUrlLight, setIconUrlLight] = useState<string | null>(initial?.iconUrlLight ?? null);
   const [aiAvatarUrl, setAiAvatarUrl] = useState<string | null>(initial?.aiAvatarUrl ?? null);
   const [aiName, setAiName] = useState<string>(initial?.aiName ?? "");
   const [advanced, setAdvanced] = useState(false);
@@ -2038,7 +2095,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const save = () =>
     act.run("save", async () => {
       // Tokens carry everything now — null out legacy preset/primary fields.
-      await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, tintedNav, ambient, logoUrl, iconUrl, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } });
+      await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, tintedNav, ambient, logoUrl, iconUrl, logoUrlLight, iconUrlLight, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } });
       onSaved();
       setMsg(null);
       return "Branding saved.";
@@ -2062,6 +2119,14 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
               {logoUrl && <Button size="icon" variant="secondary" aria-label="Remove logo" onClick={() => setLogoUrl(null)}><Trash2 /></Button>}
             </div>
           </div>
+          <LightVariant
+            label="Light-mode logo"
+            url={logoUrlLight}
+            fallback={logoUrl}
+            wide
+            onUpload={(f) => void uploadAsset(f, setLogoUrlLight)}
+            onClear={() => setLogoUrlLight(null)}
+          />
         </div>
 
         {/* App icon (square mark, shown in the nav rail + browser tab) */}
@@ -2079,6 +2144,13 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
               {iconUrl && <Button size="icon" variant="secondary" aria-label="Remove icon" onClick={() => setIconUrl(null)}><Trash2 /></Button>}
             </div>
           </div>
+          <LightVariant
+            label="Light-mode icon"
+            url={iconUrlLight}
+            fallback={iconUrl}
+            onUpload={(f) => void uploadAsset(f, setIconUrlLight)}
+            onClear={() => setIconUrlLight(null)}
+          />
         </div>
 
         {/* AI identity — the avatar + name shown on every AI surface (bottts /

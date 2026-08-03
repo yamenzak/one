@@ -2,10 +2,10 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { Atmosphere, anchorIn, contentIn, contentStagger, DUR} from "@4dl/ui";
+import { Atmosphere, anchorIn, brandMark, contentIn, contentStagger, DUR} from "@4dl/ui";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
-import { ThemeProvider } from "./theme.js";
+import { ThemeProvider, useTheme } from "./theme.js";
 import { Login } from "./screens/Login.js";
 import { Start } from "./screens/Start.js";
 import { Shell } from "./Shell.js";
@@ -35,8 +35,9 @@ import { stripReloadParam } from "./hard-refresh.js";
  */
 function BootSplash() {
   const { host, ctx } = useSession();
+  const { mode } = useTheme();
   const branding = ctx?.branding ?? host?.tenant?.branding;
-  const logo = branding?.iconUrl || branding?.logoUrl || null;
+  const logo = brandMark(branding, mode, "icon");
   const name = host?.tenant?.name ?? null;
   return (
     <div className="relative grid min-h-dvh place-items-center overflow-hidden bg-background">

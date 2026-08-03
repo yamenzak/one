@@ -49,8 +49,27 @@ export interface TenantBranding {
   primaryForeground?: string | null;
   radius?: number | null;
   defaultMode?: "dark" | "light" | null;
+  /**
+   * The wordmark and the square app mark, for a DARK surface.
+   *
+   * `logoUrl`/`iconUrl` stay the defaults — every studio already has them and
+   * they were uploaded against the shipped dark theme — so a studio that never
+   * touches the light variants looks exactly as it did.
+   */
   logoUrl?: string | null;
   iconUrl?: string | null;
+  /**
+   * The same two marks for a LIGHT surface, when the dark ones do not survive
+   * the swap.
+   *
+   * A logo is usually one colour, so a mark drawn for a dark app is pale and
+   * turns invisible the moment a member switches to light — or opens the studio
+   * on a phone set to light, which is most of them. Optional because a
+   * full-colour mark works on both and nobody should be made to upload a file
+   * twice to prove it; absent means "use the dark one".
+   */
+  logoUrlLight?: string | null;
+  iconUrlLight?: string | null;
   /** Studio's avatar for the AI coach persona; falls back to a bottts robot. */
   aiAvatarUrl?: string | null;
   /** Studio's name for its AI (e.g. "Nova", "Coach K"); falls back to "Coach". */
