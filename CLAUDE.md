@@ -255,8 +255,14 @@ loud, which is the only kind this repo has actually had.
   CI workflows — builds the SPA first and CACHES it. `pnpm --filter <pkg> test`
   bypasses turbo and still does not.
   ⚠️ Under a *parallel* root `pnpm test` this suite can fail with
-  `Isolated storage failed` — Miniflare storage contention with the sibling
-  tasks, not a real failure. Re-run it on its own filter before believing it.
+  `Isolated storage failed` — or `Network connection lost` thrown from
+  `updateStackedStorage` / `onAfterTryTask`, which is the same fault with a
+  different message: Miniflare storage contention with the sibling tasks, not a
+  real failure. All three Workers-pool configs (`apps/api`, `apps/tessa`,
+  `apps/_template`) now set `retry: 1`, which absorbs it — ONE retry, so a
+  genuine assertion failure still fails twice and turns the run red. If a
+  failure survives the retry, re-run the suite on its own filter before
+  believing it.
 - `pnpm --filter @kova/app build` — build the SPA (the api worker serves `apps/app/dist`)
 - `pnpm e2e` — the Playwright golden paths (`apps/e2e`). One command from a clean
   checkout: turbo builds the SPA, Playwright boots `wrangler dev --local` on :8787
