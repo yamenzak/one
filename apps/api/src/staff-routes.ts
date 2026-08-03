@@ -109,7 +109,7 @@ export const staffRoutes = sharedStaffRoutes<AppEnv>({
          <p style="margin:0">Accept to set up your account — you'll sign in with a one-time code, no password to create.</p>
          ${emailButton("Accept invitation", url, brand)}
          <p style="margin:18px 0 0;color:#8b9099;font-size:13px;line-height:1.6">If you weren't expecting this, you can safely ignore this email.</p>`,
-        { brand, preheader: `Join ${brand.name} on Kova`, eyebrow: "Staff invitation" },
+        { brand, preheader: `Join ${brand.name}`, eyebrow: "Staff invitation" },
       ),
       text: `You've been invited to join ${orgName} as ${roleLabel}. Accept your invitation: ${url}`,
       brandName: brand.name,
