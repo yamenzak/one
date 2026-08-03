@@ -16,7 +16,7 @@
 
 import { describe, expect, it } from "vitest";
 import { brandMark, hasWordmark } from "../src/lib/theme.js";
-import { monogramFor } from "../src/lib/mark.js";
+import { markRuns, monogramFor } from "../src/lib/mark.js";
 
 const full = { logoUrl: "/logo.png", iconUrl: "/icon.png", logoUrlLight: "/logo-light.png", iconUrlLight: "/icon-light.png" };
 
@@ -104,6 +104,73 @@ describe("hasWordmark", () => {
     expect(hasWordmark(null, "dark")).toBe(false);
     expect(hasWordmark(undefined, "light")).toBe(false);
     expect(hasWordmark({}, "dark")).toBe(false);
+  });
+});
+
+/**
+ * COUNTS FROM EACH END, NOT A LIST OF CHARACTERS.
+ *
+ * A text logo is the name plus two moves: a piece in the brand colour, a piece
+ * that steps back. Expressed as head/tail counts so it survives the owner
+ * fixing a typo in their own name — a per-character selection would silently
+ * slide onto the wrong letters and say nothing.
+ *
+ * Every count is clamped, because these come from a stepper the owner drives
+ * and from a stored value that may predate a rename that shortened the name.
+ */
+describe("markRuns", () => {
+  const flat = (runs: { text: string }[]) => runs.map((r) => r.text).join("");
+
+  it("puts the trailing character in the accent and the prefix in the quiet run", () => {
+    // The case this was built for: "by" quieter, the full stop in the accent.
+    expect(markRuns("byShujaa.", { softHead: 2, accentTail: 1 })).toEqual([
+      { text: "by", accent: false, soft: true },
+      { text: "Shujaa", accent: false, soft: false },
+      { text: ".", accent: true, soft: false },
+    ]);
+  });
+
+  it("merges neighbours that share a style, so the canvas draws one run not nine", () => {
+    expect(markRuns("Iron Temple", { accentHead: 4 })).toEqual([
+      { text: "Iron", accent: true, soft: false },
+      { text: " Temple", accent: false, soft: false },
+    ]);
+  });
+
+  it("lets the two moves overlap on the same characters", () => {
+    expect(markRuns("Kova", { accentHead: 2, softHead: 2 })).toEqual([
+      { text: "Ko", accent: true, soft: true },
+      { text: "va", accent: false, soft: false },
+    ]);
+  });
+
+  it("clamps a count longer than the name instead of throwing", () => {
+    const runs = markRuns("Kova", { accentHead: 99, accentTail: 99 });
+    expect(runs).toEqual([{ text: "Kova", accent: true, soft: false }]);
+    expect(flat(runs)).toBe("Kova");
+  });
+
+  it("ignores nonsense counts", () => {
+    expect(markRuns("Kova", { accentHead: -3, softTail: 1.7 })).toEqual([
+      { text: "Kov", accent: false, soft: false },
+      { text: "a", accent: false, soft: true },
+    ]);
+  });
+
+  it("never drops or reorders a character", () => {
+    for (const style of [{}, { accentHead: 1 }, { accentTail: 3, softHead: 2 }, { softHead: 9 }]) {
+      expect(flat(markRuns("byShujaa.", style))).toBe("byShujaa.");
+    }
+  });
+
+  it("counts by code point, so an emoji is one character and not two halves", () => {
+    expect(markRuns("🏋️x", { accentHead: 1 })[0]!.text).toBe("🏋");
+  });
+
+  it("is empty for an empty name, and plain with no style at all", () => {
+    expect(markRuns("", { accentHead: 2 })).toEqual([]);
+    expect(markRuns("Kova")).toEqual([{ text: "Kova", accent: false, soft: false }]);
+    expect(markRuns("Kova", null)).toEqual([{ text: "Kova", accent: false, soft: false }]);
   });
 });
 

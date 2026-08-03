@@ -70,6 +70,21 @@ export interface TenantBranding {
    */
   logoUrlLight?: string | null;
   iconUrlLight?: string | null;
+  /**
+   * How a GENERATED mark was set: the icon's letters, and how many characters at
+   * each end of the name take the accent colour or step back.
+   *
+   * Generation input, not a runtime token — the output is an ordinary uploaded
+   * PNG. Stored so that coming back to regenerate after a colour change keeps
+   * the studio's choices instead of silently handing back the default.
+   */
+  mark?: {
+    monogram?: string | null;
+    accentHead?: number | null;
+    accentTail?: number | null;
+    softHead?: number | null;
+    softTail?: number | null;
+  } | null;
   /** Studio's avatar for the AI coach persona; falls back to a bottts robot. */
   aiAvatarUrl?: string | null;
   /** Studio's name for its AI (e.g. "Nova", "Coach K"); falls back to "Coach". */

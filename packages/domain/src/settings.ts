@@ -31,6 +31,12 @@ export interface SettingsSectionMeta {
 
 /** The studio (owner) settings sections, in display order. */
 export const STUDIO_SETTINGS_SECTIONS: SettingsSectionMeta[] = [
+  // Deliberately NOT behind `branding`. A studio's name is not a branding
+  // feature it can be sold — it is the thing it was called when it signed up,
+  // and a typo in it (a missing full stop, a wrong capital) has to be fixable on
+  // every plan. The onboarding wizard has always told owners they can "rename it
+  // any time in Settings"; until this section there was nowhere to do it.
+  { key: "identity", label: "Studio name", scope: "studio", blurb: "What clients see — in the app, on email, in the tab" },
   { key: "brand", label: "Brand", scope: "studio", requiresFeature: "branding", blurb: "Colour, corners, logos, your AI coach" },
   { key: "signin", label: "Sign-in", scope: "studio", blurb: "Your login link, its copy, passkeys" },
   { key: "ai", label: "AI", scope: "studio", requiresFeature: "aiSuite", blurb: "Models, cost per action, house voice" },

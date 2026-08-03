@@ -26,7 +26,7 @@
 
 import type { MiddlewareHandler } from "hono";
 import { checkSlug, slugRejectionMessage, type SlugRejection } from "./hosts.js";
-import { moveSubdomain, provisionSubdomain, type RootDomainEnv, type TenancyConfig } from "./host-context.js";
+import { invalidateTenantHosts, moveSubdomain, provisionSubdomain, type RootDomainEnv, type TenancyConfig } from "./host-context.js";
 import type { RouteEnv } from "./route-deps.js";
 
 /**
@@ -119,6 +119,12 @@ export function orgSlugGuards(
    * passkey registered on a CUSTOM domain is unaffected while one registered on the
    * subdomain keeps working (rpID is the root, not the label). The old hostname is
    * deleted rather than kept as an alias — see `moveSubdomain`.
+   *
+   * A NAME change reaches this endpoint too, and needs the second half: the
+   * tenant's display name is inside the cached host resolution, so `/api/host`,
+   * the pre-auth sign-in screen and the PWA manifest would keep serving the old
+   * name for up to a minute after a rename that the app reports as saved. Sixty
+   * seconds of "did that work?" on the one screen an owner checks it on.
    */
   const update: MiddlewareHandler<RouteEnv> = async (c, next) => {
     const body = await peekBody(c);
@@ -131,13 +137,22 @@ export function orgSlugGuards(
 
     await next();
 
-    if (wanted === null || c.res.status < 200 || c.res.status >= 300) return;
+    if (c.res.status < 200 || c.res.status >= 300) return;
     const updated = await peekResponse(c.res);
     const id = typeof updated?.id === "string" ? updated.id : null;
-    const slug = typeof updated?.slug === "string" ? updated.slug : wanted;
     if (!id) return;
-    await moveSubdomain(c.env, id, slug, config(c.env)).catch((e) =>
-      console.error(`[orgUpdateGuard] subdomain move failed for ${id}/${slug}:`, e),
+    const cfg = config(c.env);
+    if (wanted !== null) {
+      const slug = typeof updated?.slug === "string" ? updated.slug : wanted;
+      await moveSubdomain(c.env, id, slug, cfg).catch((e) =>
+        console.error(`[orgUpdateGuard] subdomain move failed for ${id}/${slug}:`, e),
+      );
+    }
+    // Unconditional, because ANY field this endpoint writes could be one the
+    // host resolution carries — today the name, and the next one added will not
+    // come back here to remember.
+    await invalidateTenantHosts(c.env, id, cfg).catch((e) =>
+      console.error(`[orgUpdateGuard] host cache invalidation failed for ${id}:`, e),
     );
   };
 

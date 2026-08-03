@@ -6,7 +6,7 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, monogramFor, renderMarkPng, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
+import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, monogramFor, renderMarkPng, markRuns, MARK_WEIGHT, MARK_SOFT_ALPHA, RefreshCw, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type WordmarkStyle, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
 import { personaLabel, personaTone } from "../registry/index.js";
 import { KOVA_TOKEN_GROUPS, DEFAULT_ACCENT_TOKENS, MACRO_SPEC } from "../registry/tones.js";
 
@@ -329,6 +329,7 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
   const [params, setParams] = useSearchParams();
   const closeSection = useCloseSection();
   const render: Record<string, () => ReactNode> = {
+    identity: () => <StudioIdentitySection />,
     brand: () => <BrandingEditor initial={(ctx?.branding ?? null) as Branding | null} onPreview={preview} onSaved={() => void refresh()} />,
     signin: () => <SignInSettings canBrand={canBrand} branding={ctx?.branding ?? null} slug={ctx?.active?.tenantSlug ?? null} onSaved={() => void refresh()} />,
     ai: () => <AiConfigSection />,
@@ -346,6 +347,7 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
   /** One line per section page — what it governs. The index rows say what is
    *  INSIDE; this says what the section is FOR. Never both on one screen. */
   const INTRO: Record<string, string> = {
+    identity: "The name on every screen, every email and every browser tab. Your web address does not change.",
     brand: "Every screen your clients see is themed from these — not from per-screen styling.",
     signin: "The front door: your login link, the copy on it, and whether passkeys are offered.",
     ai: "Which model answers each AI action, what it costs your balance, and the voice it writes in.",
@@ -513,6 +515,69 @@ function LapseSection() {
         {saved ? <><Check /> Saved</> : busy ? "Saving…" : "Save rule"}
       </Button>
     </div>
+  );
+}
+
+/**
+ * THE STUDIO'S NAME — the one thing about a studio that had no way to change.
+ *
+ * The server has always allowed it (Better Auth's `organization/update`, owner
+ * only), the onboarding wizard has always PROMISED it — "rename it any time in
+ * Settings" — and there was no screen. So a studio that signed up as "byShujaa"
+ * and meant "byShujaa." was stuck with the typo on every screen, every email
+ * and every browser tab it will ever have.
+ *
+ * ── The name is not the address ─────────────────────────────────────────────
+ *
+ * Renaming touches `organization.name` and nothing else. The SLUG — the label
+ * in `<slug>.kova.4dl.app` — is a separate field on the same endpoint, and this
+ * screen deliberately does not send it: moving it deletes the old hostname
+ * rather than aliasing it, so every bookmark, every emailed link and every
+ * passkey on a custom domain breaks at once (see `@4dl/tenancy` org-guard.ts).
+ * That is a different, much heavier decision, and pairing it with fixing a
+ * missing full stop is how somebody makes it by accident.
+ */
+function StudioIdentitySection() {
+  const { ctx, refresh } = useSession();
+  const current = (ctx?.active?.tenantName ?? "").trim();
+  const slug = ctx?.active?.tenantSlug ?? null;
+  const [name, setName] = useState(current);
+  const act = useAction();
+
+  // Adopt whatever the server ended up with, rather than keeping the typed
+  // string: after a save the context re-resolves, and the field must show what
+  // the studio is actually called — including if it came back normalised.
+  useEffect(() => { setName(current); }, [current]);
+
+  const next = name.trim();
+  const dirty = next.length > 0 && next !== current;
+  const save = () =>
+    act.run("save", async () => {
+      await api.post("/api/auth/organization/update", { data: { name: next } });
+      await refresh();
+      return `Renamed to ${next}.`;
+    }, `Couldn't rename your studio — it is still called ${current || "what it was"}.`);
+
+  return (
+    <section className="space-y-4">
+      <Card className="space-y-3">
+        <Field
+          label="Studio name"
+          value={name}
+          maxLength={60}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && dirty && void save()}
+          hint="Exactly as you write it — capitals, spacing and punctuation are kept."
+        />
+        {slug && (
+          <p className="text-caption text-muted-foreground">
+            Your web address stays <code className="rounded bg-surface-2 px-1">{slug}</code> whatever you call the
+            studio. Changing that is a separate move — it breaks every saved link.
+          </p>
+        )}
+      </Card>
+      <SaveBar label="Save name" saving={act.busy === "save"} msg={act.msg} err={act.err} onSave={() => void save()} disabled={!dirty} />
+    </section>
   );
 }
 
@@ -2050,7 +2115,18 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
    * Seeded from the studio name and never normalised: "byShujaa" is capitalised
    * that way on purpose, so "bS" is their brand where "BS" is subtly not.
    */
-  const [monogram, setMonogram] = useState(() => monogramFor(studioName));
+  const [monogram, setMonogram] = useState(() => initial?.mark?.monogram?.trim() || monogramFor(studioName));
+  /**
+   * Which characters of the name are not like the others — the accent run and
+   * the quiet run, as counts from each end (see `@4dl/ui` mark.ts for why counts
+   * rather than a list of characters).
+   */
+  const [markStyle, setMarkStyle] = useState<WordmarkStyle>(() => ({
+    accentHead: initial?.mark?.accentHead ?? 0,
+    accentTail: initial?.mark?.accentTail ?? 0,
+    softHead: initial?.mark?.softHead ?? 0,
+    softTail: initial?.mark?.softTail ?? 0,
+  }));
   const [aiAvatarUrl, setAiAvatarUrl] = useState<string | null>(initial?.aiAvatarUrl ?? null);
   const [aiName, setAiName] = useState<string>(initial?.aiName ?? "");
   const [advanced, setAdvanced] = useState(false);
@@ -2092,9 +2168,10 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
 
       const darkFg = hex(tokens.dark?.["--foreground"], "#e8eaed");
       const lightFg = hex(tokens.light?.["--foreground"], "#0b1220");
-      const wideDark = await renderMarkPng({ text: studioName, bg, fg: darkFg, wide: true });
+      const wide = { text: studioName, bg, wide: true as const, accent: bg, style: markStyle };
+      const wideDark = await renderMarkPng({ ...wide, fg: darkFg });
       if (wideDark) await uploadAsset(wideDark, setLogoUrl);
-      const wideLight = await renderMarkPng({ text: studioName, bg, fg: lightFg, wide: true });
+      const wideLight = await renderMarkPng({ ...wide, fg: lightFg });
       if (wideLight) await uploadAsset(wideLight, setLogoUrlLight);
       return "Marks generated from your name and accent. Save to keep them.";
     }, "Couldn't generate the marks.");
@@ -2135,7 +2212,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const save = () =>
     act.run("save", async () => {
       // Tokens carry everything now — null out legacy preset/primary fields.
-      await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, tintedNav, ambient, logoUrl, iconUrl, logoUrlLight, iconUrlLight, aiAvatarUrl, aiName: aiName.trim() || null, preset: null, primary: null, primaryForeground: null } });
+      await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, tintedNav, ambient, logoUrl, iconUrl, logoUrlLight, iconUrlLight, aiAvatarUrl, aiName: aiName.trim() || null, mark: { monogram: monogram.trim() || null, ...markStyle }, preset: null, primary: null, primaryForeground: null } });
       onSaved();
       setMsg(null);
       return "Branding saved.";
@@ -2148,7 +2225,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
             business name, and the fallback initial-in-a-square works in the nav
             and nowhere that matters — the browser tab, the installed icon, the
             top of every email a client opens all want an image. */}
-        <div className="space-y-2.5 rounded-xl border border-dashed border-border/70 p-3">
+        <div className="space-y-3 rounded-xl border border-dashed border-border/70 p-3">
           <div className="text-sm font-medium">No logo yet? <span className="font-normal text-muted-foreground">Draw one from your name</span></div>
           <div className="flex items-end gap-3">
             <div className="grid size-14 shrink-0 place-items-center rounded-2xl" style={{ background: seedHex }}>
@@ -2166,6 +2243,11 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
               hint={`Suggested from “${studioName}”. Yours to change.`}
             />
           </div>
+
+          {/* The wordmark, set live. Same `markRuns` the canvas uses, so this is
+              the output and not an impression of it. */}
+          <WordmarkStudio name={studioName} style={markStyle} onChange={setMarkStyle} accent={seedHex} />
+
           <Button size="sm" variant="secondary" disabled={marks.busy !== null} onClick={() => void generateMarks()}>
             {marks.busy ? <><Spinner className="size-4" /> Drawing…</> : <><Wand2 /> Generate icon + wordmark</>}
           </Button>
@@ -2239,10 +2321,21 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
                 <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload avatar
                   <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setAiAvatarUrl)} />
                 </label>
-                {aiAvatarUrl && <Button size="icon" variant="secondary" aria-label="Reset to bottts" onClick={() => setAiAvatarUrl(null)}><Trash2 /></Button>}
+                {/* Keep pressing until one of them is right.
+                    The robot is drawn deterministically from a SEED, so the
+                    studio's default has always been one specific robot with no
+                    way past it — you either liked the one your slug produced or
+                    you drew an avatar. This just tries another seed, and stores
+                    the resulting URL exactly where an uploaded avatar goes, so
+                    nothing downstream learns a new case. */}
+                <Button size="sm" variant="secondary" onClick={() => setAiAvatarUrl(dicebearUrl(Math.random().toString(36).slice(2, 10), "bottts"))}>
+                  <RefreshCw /> Shuffle
+                </Button>
+                {aiAvatarUrl && <Button size="icon" variant="secondary" aria-label="Back to this studio's default robot" onClick={() => setAiAvatarUrl(null)}><Trash2 /></Button>}
               </div>
             </div>
           </div>
+          <p className="text-xs text-muted-foreground">Shuffle draws a different robot each press — stop when one fits, then save.</p>
         </div>
 
   </>);
@@ -2454,6 +2547,82 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
       })) }]} />
       {saveBar}
     </section>
+  );
+}
+
+/**
+ * A TEXT LOGO IS NOT THE NAME IN ONE COLOUR.
+ *
+ * What makes a wordmark read as a logo rather than as a caption is almost
+ * always the same two moves: part of it carries the brand colour, and part of
+ * it is quieter than the rest. "by" small and grey against "Shujaa"; a full
+ * stop in the accent. Without them the generator produces the studio's name set
+ * in the app font, which is honest and completely forgettable.
+ *
+ * Four counts, from each end — never a list of characters. The reasoning is in
+ * `@4dl/ui` mark.ts: a per-character selection silently lands on the wrong
+ * letters the moment the owner fixes a typo in their name, and nothing tells
+ * them. Counts survive a rename.
+ *
+ * The preview is drawn from the SAME `markRuns` the canvas uses, so it is the
+ * output rather than an impression of it — a preview computed by different code
+ * from the thing it previews is a preview that eventually lies.
+ */
+function WordmarkStudio({ name, style, onChange, accent }: {
+  name: string;
+  style: WordmarkStyle;
+  onChange: (s: WordmarkStyle) => void;
+  accent: string;
+}) {
+  const len = [...name].length;
+  const runs = markRuns(name, style);
+  const set = (key: keyof WordmarkStyle, value: number) => onChange({ ...style, [key]: Math.max(0, Math.min(len, value)) });
+  const count = (key: keyof WordmarkStyle) => Math.max(0, Math.min(len, style[key] ?? 0));
+  return (
+    <div className="space-y-2">
+      <div className="grid min-h-16 place-items-center overflow-hidden rounded-xl bg-surface-2 px-3">
+        <span className="truncate text-title-2">
+          {runs.map((run, i) => (
+            <span
+              key={i}
+              style={{
+                color: run.accent ? accent : undefined,
+                fontWeight: run.soft ? MARK_WEIGHT.soft : MARK_WEIGHT.normal,
+                opacity: run.soft ? MARK_SOFT_ALPHA : 1,
+              }}
+            >
+              {run.text}
+            </span>
+          ))}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <CharCount label="Accent · first" value={count("accentHead")} max={len} onChange={(n) => set("accentHead", n)} />
+        <CharCount label="Accent · last" value={count("accentTail")} max={len} onChange={(n) => set("accentTail", n)} />
+        <CharCount label="Quieter · first" value={count("softHead")} max={len} onChange={(n) => set("softHead", n)} />
+        <CharCount label="Quieter · last" value={count("softTail")} max={len} onChange={(n) => set("softTail", n)} />
+      </div>
+      <p className="text-xs text-muted-foreground">
+        How many characters at each end pick up your brand colour, or step back. A trailing full stop is one; a lowercase
+        prefix like “by” is two.
+      </p>
+    </div>
+  );
+}
+
+/** How many characters, from one end. A stepper rather than a number field: the
+ *  useful range is nought to about three and typing is the slower way to get there. */
+function CharCount({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (n: number) => void }) {
+  const step = "grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-sm transition-colors hover:bg-surface-3 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring/70";
+  return (
+    <div className="flex items-center justify-between gap-1.5 rounded-xl border border-border/60 py-1.5 pl-2.5 pr-1.5">
+      <span className="min-w-0 truncate text-xs text-muted-foreground">{label}</span>
+      <span className="flex shrink-0 items-center gap-1">
+        <button type="button" className={step} aria-label={`${label}: one fewer`} disabled={value <= 0} onClick={() => onChange(value - 1)}>−</button>
+        <span className="w-4 text-center text-sm tabular-nums">{value}</span>
+        <button type="button" className={step} aria-label={`${label}: one more`} disabled={value >= max} onClick={() => onChange(value + 1)}>+</button>
+      </span>
+    </div>
   );
 }
 

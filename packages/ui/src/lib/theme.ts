@@ -7,6 +7,8 @@
  * the whole shadcn token system re-skins live and stays mode-aware.
  */
 
+import type { MarkStyle } from "./mark.js";
+
 export type ThemeMode = "dark" | "light";
 
 export interface BrandPreset {
@@ -83,6 +85,16 @@ export interface Branding {
   /** The same two for a LIGHT surface. Absent = use the dark one. */
   logoUrlLight?: string | null;
   iconUrlLight?: string | null;
+  /**
+   * How a GENERATED mark was set — the icon's letters and which characters of
+   * the name carry the accent or sit quieter.
+   *
+   * Generation INPUT, never a runtime token: the output is an ordinary uploaded
+   * PNG and every consumer reads that. It is stored for the same reason
+   * `neutral` is — without it, coming back to regenerate after a colour change
+   * silently discards the studio's choices and hands back the default.
+   */
+  mark?: MarkStyle | null;
   /** Avatar for the AI coach persona (falls back to a bottts robot). */
   aiAvatarUrl?: string | null;
   /** Name for the AI coach persona (falls back to "Coach"). */

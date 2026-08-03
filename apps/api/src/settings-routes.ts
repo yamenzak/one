@@ -91,6 +91,16 @@ export const settingsRoutes = new Hono<AppEnv>()
             // The same two marks for a light surface. Absent = use the dark one.
             logoUrlLight: z.string().max(500).nullish(),
             iconUrlLight: z.string().max(500).nullish(),
+            // How a generated mark is drawn. Generator input only — the mark
+            // itself is an uploaded PNG — but it has to persist or regenerating
+            // after a colour change throws the studio's choices away.
+            mark: z.object({
+              monogram: z.string().max(3).nullish(),
+              accentHead: z.number().int().min(0).max(60).nullish(),
+              accentTail: z.number().int().min(0).max(60).nullish(),
+              softHead: z.number().int().min(0).max(60).nullish(),
+              softTail: z.number().int().min(0).max(60).nullish(),
+            }).nullish(),
             aiAvatarUrl: z.string().max(500).nullish(),
             aiName: z.string().max(40).nullish(),
             tokens: z.object({ light: tokenMap.nullish(), dark: tokenMap.nullish() }).nullish(),
