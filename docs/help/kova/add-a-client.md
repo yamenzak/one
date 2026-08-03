@@ -21,11 +21,11 @@ rest themselves the first time they sign in.
 ## Add them
 
 1. Open **Clients** from the tab bar.
-2. Tap **Add client**.
+2. Tap **+** at the top right — it is labelled *Add client*.
 3. Type their email address.
 4. Tap **Send invite**.
 
-![The Clients screen, showing the roster and the Add client button.](images/coach-roster.png)
+![The Clients screen, showing the roster with search, the view toggle and the add button above it.](images/coach-roster.png)
 
 *Clients — every person you coach, with anything that needs your attention
 called out on their row. Someone who has not signed in yet shows as **Invited**.*

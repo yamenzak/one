@@ -648,8 +648,12 @@ and then knows every list in the product.
   on every visit is a view nobody switches twice. It is a display preference —
   it survives sign-out, like the theme, and it is never account data.
 - **One header row holds them all**: search, the view toggle, and at most one
-  primary action. The Revolut pattern this borrows from puts them on one line
-  above a single grouped card, and that is the shape.
+  primary action — the last as an ICON BUTTON, not a full-width filled one. A
+  full-width primary above a collection is the loudest thing on a screen whose
+  subject is the list, and it pushes that list a whole row down. The reader who
+  needs the label is the one with an EMPTY collection, and the empty state
+  already carries a labelled button; anyone with a list in front of them knows
+  how it got there.
 - **Every collection has four states and owes all four**: loading (skeleton in
   the chosen view's geometry), empty (one line of why, one action), no-results
   (different from empty — the reader typed something, so offer to clear it), and

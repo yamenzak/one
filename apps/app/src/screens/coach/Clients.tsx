@@ -212,10 +212,6 @@ export function Clients() {
         <CountUp value={clients?.length ?? 0} />
       </Anchor>
 
-      <Stagger className="pb-1">
-        <Button size="lg" className="w-full" onClick={() => setCreateOpen(true)}><Plus /> Add client</Button>
-      </Stagger>
-
       {freeing && (
         <Card className="space-y-2.5 border border-primary/25" role="status" aria-live="polite">
           <div className="flex items-center gap-2 font-medium"><Users className="size-4 text-primary" /> Freeing seats for a smaller plan</div>
@@ -256,6 +252,17 @@ export function Clients() {
         view={view}
         onView={setView}
         thumb={44}
+        /*
+          A COMPACT ACTION, ON THE SAME LINE.
+
+          This was a full-width filled button sitting on its own row above the
+          search. It is the loudest thing on a screen whose subject is the
+          roster, it pushed the list a whole row further down, and the studio
+          that needs it most — one with zero clients — has a labelled button in
+          the EMPTY STATE anyway. A coach who already has a roster knows how
+          they got it. Same shape the Library has used all along.
+        */
+        action={<Button variant="tonal" aria-label="Add client" onClick={() => setCreateOpen(true)}><Plus /></Button>}
         empty={{
           icon: Users,
           title: "No clients yet",
