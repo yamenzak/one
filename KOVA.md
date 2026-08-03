@@ -1219,11 +1219,11 @@ scope and powers, never screens.
 | Subtab | File |
 | --- | --- |
 | `today` | `client/Today.tsx:116` |
-| `plans` | `coach/CoachPlans.tsx:44` |
-| `goals` | `coach/GoalManager.tsx:59` |
-| `progress` | `client/Progress.tsx:50` |
-| `report` | `coach/ClientReport.tsx:35` |
-| `manage` | `coach/ClientManage.tsx:43` — prefs, supplements, labs, archive/delete |
+| `plans` | `coach/CoachPlans.tsx:61` |
+| `goals` | `coach/GoalManager.tsx:129` |
+| `progress` | `client/Progress.tsx:51` |
+| `report` | `coach/ClientReport.tsx:37` |
+| `manage` | `coach/ClientManage.tsx:48` — prefs, supplements, labs, archive/delete |
 
 **Business** (in-component state, not routes): Overview `coach/Business.tsx:96` ·
 Packages `coach/Packages.tsx:44` (feature `commerce`) · Staff `coach/Staff.tsx:22`.
@@ -1261,7 +1261,7 @@ None of these are routes. They live inside their parent's file.
 | `client/WellnessDetails.tsx:168` | Lab markers |
 | `client/SupplementGuide.tsx:18` | Prescribed supplements |
 | `client/CoachNote.tsx:20` | The AI/coach insight line |
-| `client/LaneSwitcher.tsx:14` | Switch plan lanes |
+| `client/LaneSwitcher.tsx:23` | Switch plan lanes (per surface — workout and meal are separate) |
 | `screens/widget-kit.tsx:113` | Reorder/toggle home widgets |
 
 #### Coach / owner
@@ -1277,8 +1277,12 @@ None of these are routes. They live inside their parent's file.
 | `coach/WorkoutBuilder.tsx:745` · `coach/MealBuilder.tsx:579` | AI-draft a plan |
 | `coach/WorkoutBuilder.tsx:765` · `coach/MealBuilder.tsx:542` | Start from a template |
 | `coach/WorkoutBuilder.tsx:802` | Save plan as a template |
-| `coach/ClientPrefsStrip.tsx:17` | Client prefs summary, in builders |
-| `coach/ClientManage.tsx:721` | Delete / archive a client |
+| `coach/ClientPrefsStrip.tsx:17` | Client prefs summary — plan builders + the goal composer |
+| `coach/CoachPlans.tsx:226` | Pick / rename / archive a client's plan lanes |
+| `coach/CoachPlans.tsx:337` | One plan's lifecycle actions |
+| `coach/GoalManager.tsx:476` | A past goal phase, in full |
+| `coach/GoalManager.tsx:498` | Set a new goal phase (the composer) |
+| `coach/ClientManage.tsx:738` | Restore / archive / delete a client |
 | `coach/ClientManage.tsx:973` · `:998` | Prescribe a supplement · AI suggestions |
 | `coach/ClientManage.tsx:1052` · `:1077` | Request a lab · review results |
 | `coach/ClientManage.tsx:1145` | Generate a client report |

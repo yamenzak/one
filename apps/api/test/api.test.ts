@@ -2654,6 +2654,35 @@ describe("plan lifecycle — publish supersedes, restore, draft-only delete", ()
     expect(after.currentVariantId).toBeNull();
   });
 
+  it("a lane belongs to one surface: a workout lane never appears on meals", async () => {
+    const client = await mkClient();
+    const lane = async (label: string, kind: string) =>
+      ((await (await SELF.fetch(`${ORIGIN}/api/clients/${client}/variants`, { method: "POST", headers: H(), body: JSON.stringify({ label, kind }) })).json()) as { id: string }).id;
+    const wLane = await lane("Night shift", "workout");
+    const mLane = await lane("Fasting week", "meal");
+
+    const lanesFor = async (surface: string) =>
+      (await (await SELF.fetch(`${ORIGIN}/api/${surface}-plans?clientId=${client}`, { headers: H() })).json()) as
+        { variants: { id: string; label: string }[]; currentVariantId: string | null };
+
+    // Each surface sees only its own.
+    expect((await lanesFor("workout")).variants.map((v) => v.label)).toEqual(["Night shift"]);
+    expect((await lanesFor("meal")).variants.map((v) => v.label)).toEqual(["Fasting week"]);
+
+    // Switching the workout lane leaves the meal lane where it was — the whole
+    // point of the split. The old shared model moved both.
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${client}/current-variant`, { method: "PATCH", headers: H(), body: JSON.stringify({ variantId: wLane, kind: "workout" }) })).status).toBe(200);
+    expect((await lanesFor("workout")).currentVariantId).toBe(wLane);
+    expect((await lanesFor("meal")).currentVariantId).toBeNull();
+
+    // …and a surface cannot be parked on the other's lane, which would leave it
+    // resolving no plan at all.
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${client}/current-variant`, { method: "PATCH", headers: H(), body: JSON.stringify({ variantId: mLane, kind: "workout" }) })).status).toBe(400);
+    expect((await SELF.fetch(`${ORIGIN}/api/clients/${client}/current-variant`, { method: "PATCH", headers: H(), body: JSON.stringify({ variantId: mLane, kind: "meal" }) })).status).toBe(200);
+    expect((await lanesFor("meal")).currentVariantId).toBe(mLane);
+    expect((await lanesFor("workout")).currentVariantId).toBe(wLane);
+  });
+
   it("creates a client plan from a template, copying the template body", async () => {
     const client = await mkClient();
     const tpl = (await (await SELF.fetch(`${ORIGIN}/api/workout-templates`, { method: "POST", headers: H(), body: JSON.stringify({ name: "PPL Template", visibility: "tenant", body: { days: [{ name: "Push", blocks: [] }, { name: "Pull", blocks: [] }] } }) })).json()) as { template: { id: string } };

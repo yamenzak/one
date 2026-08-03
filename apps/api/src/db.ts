@@ -46,7 +46,7 @@ import { TENANCY_SCHEMA } from "@4dl/tenancy";
 
 export const KOVA_SCHEMA: SchemaModule = {
   id: "kova",
-  version: "2026-08-01a",
+  version: "2026-08-04a",
   ddl: [
 
     "CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT);",
@@ -288,6 +288,19 @@ export const KOVA_SCHEMA: SchemaModule = {
     // Rep count for bodyweight moves logged as activities (push-ups →
     // reps rather than distance/duration).
     "ALTER TABLE activity_logs ADD COLUMN reps INTEGER",
+    // Lanes became PER SURFACE: a client can run two workout lanes and a single
+    // meal plan, which the shared model could not express — creating a lane
+    // created it on both tabs whether or not it was wanted there.
+    //   NULL  = created under the old shared model, still applies to BOTH.
+    //   'workout' / 'meal' = created since, and belongs to that surface only.
+    // Treating NULL as "both" is what makes this migration lossless: every lane
+    // that existed keeps appearing exactly where it did, and every meal plan
+    // already pointing at one keeps resolving.
+    "ALTER TABLE plan_variants ADD COLUMN kind TEXT",
+    // The lane the client is on, per surface. `current_variant_id` stays the
+    // WORKOUT side (it is what every existing row means); this is its meal twin,
+    // backfilled from it below so nothing moves on the day it ships.
+    "ALTER TABLE clients ADD COLUMN current_meal_variant_id TEXT",
   ],
   backfills: [
     {
@@ -321,6 +334,15 @@ export const KOVA_SCHEMA: SchemaModule = {
       name: "workers-ai-vision-to-text",
       sql: `UPDATE ai_models SET task = 'text', is_default = 0
              WHERE provider = 'workers-ai' AND task IN ('vision', 'image')`,
+    },
+    {
+      // Splitting the lane a client is on into a workout side and a meal side
+      // must not MOVE anyone: whichever lane they were on applied to both
+      // surfaces, so the meal side starts where the shared value already was.
+      // The guard makes it a no-op after the first run.
+      name: "meal-lane-from-shared-lane",
+      sql: `UPDATE clients SET current_meal_variant_id = current_variant_id
+             WHERE current_meal_variant_id IS NULL AND current_variant_id IS NOT NULL`,
     },
   ],
   /**

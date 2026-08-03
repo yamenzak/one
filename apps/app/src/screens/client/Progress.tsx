@@ -100,15 +100,15 @@ export function Progress({ clientId }: { clientId: string }) {
           sharing chrome, and each names a different subject. "Progress" itself is
           navigation — the tab bar already says it — so it is an eyebrow here
           rather than the largest thing on a screen it does not describe. */}
-      <p className="px-1 text-caption text-muted-foreground">Progress</p>
-      {/* Lens tabs collapse to icons (active one keeps its label, navbar-style)
-          so the whole row — tabs + range — fits the Progress column. The range
-          control has ONE height for its whole life: a custom window takes its
-          own cell here and is edited in a sheet, so nothing below ever moves. */}
-      <div className="flex flex-wrap items-center gap-2">
-        <IconTabs items={lenses} value={tab} onChange={setTab} />
-        <RangePicker className="ml-auto" format={shortDate} {...range.props} />
-      </div>
+      {/* The range rides in the header's action slot, NOT on the lens row.
+          Presets plus a calendar button is ~200px of chrome; next to the lens
+          rail on a 390px phone it wrapped, so the screen opened with two rows
+          of controls stacked above any content. One chip fits, and everything
+          it used to show is in the sheet it opens. */}
+      <Eyebrow action={<RangePicker format={shortDate} {...range.props} />}>Progress</Eyebrow>
+      {/* Lens tabs collapse to icons — the active one keeps its label,
+          navbar-style — so the four lenses fit one row on their own. */}
+      <IconTabs items={lenses} value={tab} onChange={setTab} />
 
       {error && !data ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load progress" description="Something went wrong loading your analytics. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />

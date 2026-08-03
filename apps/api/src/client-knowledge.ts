@@ -73,6 +73,7 @@ export interface KnowledgeClient {
   intake_json: string | null;
   preferences_json?: string | null;
   current_variant_id?: string | null;
+  current_meal_variant_id?: string | null;
   created_at?: string | null;
 }
 
@@ -219,7 +220,7 @@ export interface ClientKnowledge {
   supplementsTakenToday: number;
   supplementSlotsToday: number;
   labs: { name: string; status: string; flags: string[] }[];
-  plans: { workout: KnowledgePlanSummary | null; meal: KnowledgePlanSummary | null; lanes: { id: string; label: string; active: boolean }[]; currentLaneId: string | null };
+  plans: { workout: KnowledgePlanSummary | null; meal: KnowledgePlanSummary | null; lanes: { id: string; label: string; kind: "workout" | "meal" | "both"; active: boolean }[]; currentLaneId: string | null; currentMealLaneId: string | null };
   /** Changes when anything material changes → the personalized-message cache key. */
   signalHash: string;
 }
@@ -289,7 +290,7 @@ export async function loadClientKnowledge(
     db.prepare("SELECT p.exercise_id, p.best_e1rm, p.weight_kg, p.reps, e.name FROM exercise_prs p LEFT JOIN exercises e ON e.id=p.exercise_id WHERE p.client_id=? ORDER BY p.best_e1rm DESC LIMIT 6").bind(cid).all<{ exercise_id: string; best_e1rm: number | null; weight_kg: number | null; reps: number | null; name: string | null }>(),
     db.prepare("SELECT id, name, body_json, variant_id FROM workout_plans WHERE client_id=? AND status='published' ORDER BY published_at DESC LIMIT 1").bind(cid).first<{ id: string; name: string; body_json: string | null; variant_id: string | null }>(),
     db.prepare("SELECT id, name, body_json, variant_id FROM meal_plans WHERE client_id=? AND status='published' ORDER BY published_at DESC LIMIT 1").bind(cid).first<{ id: string; name: string; body_json: string | null; variant_id: string | null }>(),
-    db.prepare("SELECT id, label, archived FROM plan_variants WHERE client_id=? ORDER BY ord ASC").bind(cid).all<{ id: string; label: string; archived: number }>(),
+    db.prepare("SELECT id, label, archived, kind FROM plan_variants WHERE client_id=? ORDER BY ord ASC").bind(cid).all<{ id: string; label: string; archived: number; kind: string | null }>(),
   ]);
 
   // ── Identity / body ────────────────────────────────────────────────────────
@@ -446,8 +447,17 @@ export async function loadClientKnowledge(
   const plans: ClientKnowledge["plans"] = {
     workout: wplan ? { id: wplan.id, name: wplan.name, variantId: wplan.variant_id, summary: `${wTrainDays.length} training day${wTrainDays.length === 1 ? "" : "s"}${wTrainDays.length ? `: ${wTrainDays.map((d) => d.name || "day").join(", ")}` : ""}` } : null,
     meal: mplan ? { id: mplan.id, name: mplan.name, variantId: mplan.variant_id, summary: mealTypes.length ? `meals: ${mealTypes.join(", ")}` : "no meals yet" } : null,
-    lanes: laneRows.map((l) => ({ id: l.id, label: l.label, active: l.id === (client.current_variant_id ?? null) })),
+    // Lanes are per surface, so the assistant is told WHICH surface each one is
+    // on and which is live there. `kind: null` is a pre-split lane and applies
+    // to both — see plan-variants.ts.
+    lanes: laneRows.map((l) => ({
+      id: l.id,
+      label: l.label,
+      kind: (l.kind as "workout" | "meal" | null) ?? "both",
+      active: l.id === (client.current_variant_id ?? null) || l.id === (client.current_meal_variant_id ?? null),
+    })),
     currentLaneId: client.current_variant_id ?? null,
+    currentMealLaneId: client.current_meal_variant_id ?? null,
   };
 
   const memberSinceDays = client.created_at ? Math.max(0, Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(client.created_at)) / 86_400_000)) : null;
@@ -521,7 +531,7 @@ export async function loadClientKnowledge(
       tr: { a: activeDays.size, l: training.weeklyLoad, pr: prsThisWeek },
       w: { s: wellness.score, sl: avgSleep },
       su: `${suppLogs?.n ?? 0}/${suppSlots}`,
-      pl: [plans.workout?.id, plans.meal?.id, plans.currentLaneId],
+      pl: [plans.workout?.id, plans.meal?.id, plans.currentLaneId, plans.currentMealLaneId],
       lc: wellnessBlock.latestCheckIn?.date,
       cf: wellnessBlock.latestCheckIn?.coachFeedback,
     }),

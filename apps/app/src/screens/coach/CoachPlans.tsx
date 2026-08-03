@@ -1,11 +1,28 @@
-/** Coach: workout + meal plans for a client — list, create, open builder.
- *  Plans are organized into lanes (schedules): "Work week" vs "Off week", etc.
- *  A client can run one published plan per lane in parallel; the lane chips here
- *  filter the list and set which lane a new plan is created in. */
+/**
+ * Coach: workout + meal plans for a client — list, create, open builder.
+ *
+ * Plans are organised into LANES: "Work week" vs "Off week", "Night shift" vs
+ * "Morning shift". A client runs one published plan per lane in parallel, and
+ * lanes belong to ONE surface — a workout lane does not put an empty tab on
+ * their meals (see `plan-variants.ts`).
+ *
+ * ── Why this screen was rebuilt ─────────────────────────────────────────────
+ *
+ * It was the one tab in the client set that did not look like the others.
+ * Goals, Progress and Report all open with an eyebrow naming the surface and a
+ * single quiet control in its action slot; this one opened on a bare segmented
+ * control, then a horizontally-scrolling row of lane chips, then a
+ * `SectionHeader`, then a stack of bespoke `Card`s — four different chrome
+ * devices before the first plan, and a list that was not the app's list.
+ *
+ * Now: one eyebrow with the lane picker in it (the same shape `RangePicker`
+ * uses on Progress and Report), the surface toggle and the add button on one
+ * row, and the plans as a `Group` of `Row`s.
+ */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Badge, Chip, Field, Sheet, Reveal, SkeletonList, SegmentedControl, Page, Stagger, EmptyState, SectionHeader, cn, AlertTriangle, Dumbbell, Utensils, Plus, Ellipsis, Trash2, Archive, History, Zap, PencilLine } from "@4dl/ui";
+import { Button, Badge, Field, Sheet, Reveal, SkeletonList, SegmentedControl, Page, Stagger, EmptyState, Eyebrow, Group, Row, GroupNote, ConfirmDialog, ArrowLeftRight, AlertTriangle, Dumbbell, Utensils, Plus, Check, Ellipsis, Trash2, Archive, History, Zap, PencilLine } from "@4dl/ui";
 import { api, errorText } from "../../api.js";
 
 interface Plan {
@@ -97,69 +114,90 @@ export function CoachPlans({ clientId }: { clientId: string }) {
 
   return (
     <Page className="column space-y-3 p-4 pb-28">
-      <SegmentedControl options={[{ value: "workout", label: "Workout" }, { value: "meal", label: "Meal" }]} value={kind} onChange={setKind} />
+      {/* The lane rides in the header's action slot — the same slot Progress and
+          Report hang their range picker off. It replaces a scrolling chip row
+          that was permanently on screen to answer a question most clients never
+          ask, and it scales past three lanes without scrolling. */}
+      <Eyebrow action={
+        <Button size="sm" variant="secondary" onClick={() => setLanesOpen(true)}>
+          <ArrowLeftRight aria-hidden /> {liveLanes.length > 0 ? laneName : "Lanes"}
+        </Button>
+      }>Plans</Eyebrow>
 
-      {/* Lane (schedule) chips — filter + the lane a new plan lands in. Shown
-          once there's a second lane; a coach can always add one. */}
-      {(liveLanes.length > 0) && (
-        <div className="-mx-1 flex items-center gap-2 overflow-x-auto px-1 no-scrollbar">
-          <Chip selected={laneId === null} onClick={() => setLaneId(null)}>{defaultLabel}</Chip>
-          {liveLanes.map((l) => (
-            <Chip key={l.id} selected={laneId === l.id} onClick={() => setLaneId(l.id)}>{l.label}</Chip>
-          ))}
-          <Chip onClick={() => setLanesOpen(true)}><PencilLine className="size-3.5" /> Edit</Chip>
-        </div>
-      )}
+      {/* Surface + the one primary action, on one row — the roster's shape. */}
+      <div className="flex items-center gap-2">
+        <SegmentedControl
+          fill
+          className="min-w-0 flex-1"
+          options={[{ value: "workout", label: "Workout" }, { value: "meal", label: "Meal" }]}
+          value={kind}
+          onChange={setKind}
+        />
+        <Button size="icon" variant="tonal" className="shrink-0" aria-label={`New ${kind} plan`} onClick={() => setCreateOpen(true)}><Plus /></Button>
+      </div>
 
-      <SectionHeader
-        icon={kind === "workout" ? Dumbbell : Utensils}
-        tone={kind === "workout" ? "activity" : "nutrition"}
-        title={liveLanes.length > 0 ? `${laneName} · ${kind === "workout" ? "Workout" : "Meal"}` : `${kind === "workout" ? "Workout" : "Meal"} plans`}
-        action={<Button size="sm" onClick={() => setCreateOpen(true)}><Plus /> New</Button>}
-      />
       {loadError && !plans ? (
         <EmptyState icon={AlertTriangle} title={`Couldn't load ${kind} plans`} description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
       ) : (
       <Reveal loading={!plans} skeleton={<SkeletonList card rows={5} thumb={0} />}>
         {plans && (shown.length === 0 ? (
-          <EmptyState icon={kind === "workout" ? Dumbbell : Utensils} title={`No ${kind} plans${liveLanes.length > 0 ? ` in ${laneName}` : ""}`} description={liveLanes.length > 0 ? "New plans you create land in this lane." : (kind === "workout" ? "Create one and build it — or use the AI draft inside the builder." : "Create one and build the options bank.")} action={liveLanes.length === 0 ? undefined : <Button variant="secondary" size="sm" onClick={() => setLanesOpen(true)}>Manage lanes</Button>} />
+          <EmptyState
+            icon={kind === "workout" ? Dumbbell : Utensils}
+            title={`No ${kind} plans${liveLanes.length > 0 ? ` in ${laneName}` : ""}`}
+            description={liveLanes.length > 0
+              ? "New plans land in this lane. Switch lanes from the header."
+              : (kind === "workout" ? "Create one and build it — or use the AI draft inside the builder." : "Create one and build the options bank.")}
+            action={<Button onClick={() => setCreateOpen(true)}><Plus /> New plan</Button>}
+          />
         ) : (
-          <Stagger className="space-y-2">
-            {shown.map((p) => (
-              <Card key={p.id} interactive onClick={() => open(p.id)} className="flex items-center justify-between gap-2">
-                <div className="min-w-0"><div className="truncate font-semibold">{p.name}</div>{planSummary(p) && <div className="truncate text-xs text-muted-foreground">{planSummary(p)}</div>}</div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <Badge tone={p.status === "published" ? "success" : p.status === "draft" ? "neutral" : "warning"}>{PLAN_STATUS[p.status] ?? p.status}</Badge>
-                  <button onClick={(e) => { e.stopPropagation(); setMenuFor(p); }} aria-label="Plan actions" className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><Ellipsis /></button>
-                </div>
-              </Card>
-            ))}
+          <Stagger>
+            <Group>
+              {shown.map((p) => (
+                <Row
+                  key={p.id}
+                  icon={kind === "workout" ? Dumbbell : Utensils}
+                  iconTone={kind === "workout" ? "activity" : "nutrition"}
+                  onClick={() => open(p.id)}
+                  sub={planSummary(p) ?? undefined}
+                  trailing={
+                    <span className="flex shrink-0 items-center gap-1">
+                      <Badge tone={p.status === "published" ? "success" : p.status === "draft" ? "neutral" : "warning"}>{PLAN_STATUS[p.status] ?? p.status}</Badge>
+                      <Button size="icon" variant="ghost" className="text-muted-foreground" aria-label={`Actions for ${p.name}`} onClick={(e) => { e.stopPropagation(); setMenuFor(p); }}><Ellipsis /></Button>
+                    </span>
+                  }
+                >
+                  {p.name}
+                </Row>
+              ))}
+            </Group>
+            {liveLanes.length === 0 && (
+              <GroupNote>Two parallel plans — an off week, night shifts? Add a lane from the header.</GroupNote>
+            )}
           </Stagger>
         ))}
       </Reveal>
       )}
 
-      {/* A quiet "add a schedule" entry when the client has no lanes yet. */}
-      {liveLanes.length === 0 && plans && (
-        /* Buttons are verbs (§10). The parenthetical was the button explaining
-           itself inside its own label — that is a caption's job. */
-        <div className="space-y-1.5">
-          <button onClick={() => setLanesOpen(true)} className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-2.5 text-sm text-muted-foreground transition-colors hover:bg-surface-2">
-            <Plus className="size-4" /> Add a schedule
-          </button>
-          <p className="px-1 text-center text-xs text-muted-foreground/80">A separate set of plans for a different rhythm — an off week, night shifts, a holiday.</p>
-        </div>
-      )}
-
       <Sheet open={createOpen} onClose={() => { setCreateOpen(false); setCreateErr(null); }} title={`New ${kind} plan${liveLanes.length > 0 ? ` · ${laneName}` : ""}`} footer={<Button size="lg" className="w-full" disabled={name.trim().length < 2 || creating} onClick={() => void create()}>{creating ? "Creating…" : <>Create &amp; build</>}</Button>}>
         <div className="space-y-4">
           <Field label="Plan name" icon={kind === "workout" ? Dumbbell : Utensils} value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "workout" ? "Push Pull Legs" : "Cutting Plan"} />
-          {liveLanes.length > 0 && <p className="text-xs text-muted-foreground">Lands in the <span className="font-medium text-foreground">{laneName}</span> schedule.</p>}
+          {liveLanes.length > 0 && <p className="text-caption text-muted-foreground">Lands in the <span className="font-medium text-foreground">{laneName}</span> lane.</p>}
           {createErr && <p className="text-sm text-warning" role="alert">{createErr}</p>}
         </div>
       </Sheet>
 
-      {lanesOpen && <LaneManager clientId={clientId} variants={variants} defaultLabel={defaultLabel} onClose={() => setLanesOpen(false)} onChanged={() => void load()} />}
+      {lanesOpen && (
+        <LaneManager
+          clientId={clientId}
+          kind={kind}
+          variants={variants}
+          defaultLabel={defaultLabel}
+          selected={laneId}
+          onSelect={(id) => { setLaneId(id); setLanesOpen(false); }}
+          onClose={() => setLanesOpen(false)}
+          onChanged={() => void load()}
+        />
+      )}
 
       {menuFor && (
         <PlanActions
@@ -174,60 +212,117 @@ export function CoachPlans({ clientId }: { clientId: string }) {
   );
 }
 
-/** Create / rename / archive a client's plan lanes (schedules). */
-function LaneManager({ clientId, variants, defaultLabel, onClose, onChanged }: { clientId: string; variants: Lane[]; defaultLabel: string; onClose: () => void; onChanged: () => void }) {
+/**
+ * The lane sheet — PICK one, and manage the set from the same place.
+ *
+ * It used to be management only, reached from a pencil chip at the end of a
+ * scrolling chip row, so choosing a lane and editing one were two different
+ * controls in two different places. They are the same question ("which lane?")
+ * asked twice, so they are one sheet: tap a lane to work in it, or rename and
+ * archive it in place.
+ */
+function LaneManager({ clientId, kind, variants, defaultLabel, selected, onSelect, onClose, onChanged }: {
+  clientId: string;
+  kind: Kind;
+  variants: Lane[];
+  defaultLabel: string;
+  selected: string | null;
+  onSelect: (id: string | null) => void;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
   const [adding, setAdding] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [label, setLabel] = useState("");
+  const [toArchive, setToArchive] = useState<Lane | null>(null);
   const live = variants.filter((v) => !v.archived);
 
   const add = async () => {
     if (adding.trim().length < 1 || busy) return;
     setBusy(true);
-    try { await api.post(`/api/clients/${clientId}/variants`, { label: adding.trim() }); setAdding(""); onChanged(); }
+    try { await api.post(`/api/clients/${clientId}/variants`, { label: adding.trim(), kind }); setAdding(""); onChanged(); }
     finally { setBusy(false); }
   };
   const patch = async (id: string, body: { label?: string; archived?: boolean }) => { await api.patch(`/api/clients/${clientId}/variants/${id}`, body); onChanged(); };
-  const renameDefault = async (label: string) => { await api.patch(`/api/clients/${clientId}/default-lane`, { label }); onChanged(); };
+  const renameDefault = async (l: string) => { await api.patch(`/api/clients/${clientId}/default-lane`, { label: l }); onChanged(); };
+  const startEdit = (id: string, current: string) => { setLabel(current); setEditing(id); };
+  const commitEdit = (id: string, current: string) => {
+    setEditing(null);
+    const next = label.trim();
+    if (!next || next === current) return;
+    void (id === "__default" ? renameDefault(next) : patch(id, { label: next }));
+  };
+
+  const laneRow = (id: string | null, name: string, isDefault: boolean) => {
+    const key = id ?? "__default";
+    if (editing === key) {
+      return (
+        <div key={key} className="flex items-center gap-2 px-4 py-2.5">
+          <Field
+            label="Lane name"
+            labelHidden
+            className="min-w-0 flex-1"
+            value={label}
+            autoFocus
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") commitEdit(key, name); if (e.key === "Escape") setEditing(null); }}
+          />
+          <Button size="sm" onClick={() => commitEdit(key, name)}>Save</Button>
+        </div>
+      );
+    }
+    return (
+      <Row
+        key={key}
+        icon={kind === "workout" ? Dumbbell : Utensils}
+        iconTone={id === selected ? (kind === "workout" ? "activity" : "nutrition") : undefined}
+        sub={isDefault ? "The lane every plan starts in" : undefined}
+        onClick={() => onSelect(id)}
+        chevron={false}
+        trailing={
+          <span className="flex shrink-0 items-center gap-0.5">
+            {id === selected && <Check aria-label="Working in this lane" className="mr-1 size-4 text-primary" />}
+            <Button size="icon" variant="ghost" className="text-muted-foreground" aria-label={`Rename ${name}`} onClick={(e) => { e.stopPropagation(); startEdit(key, name); }}><PencilLine /></Button>
+            {!isDefault && (
+              <Button size="icon" variant="ghost" className="text-muted-foreground" aria-label={`Archive ${name}`} onClick={(e) => { e.stopPropagation(); setToArchive({ id: id!, label: name, archived: false }); }}><Archive /></Button>
+            )}
+          </span>
+        }
+      >
+        {name}
+      </Row>
+    );
+  };
 
   return (
-    <Sheet open onClose={onClose} title="Schedules" size="tall">
+    <Sheet open onClose={onClose} title={kind === "workout" ? "Workout lanes" : "Meal lanes"} size="tall">
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">Lanes let a client run parallel plans — a "Work week" and an "Off week", or "Night shift" and "Morning shift". Each lane keeps its own published plan; the client switches between them.</p>
-        <div className="space-y-2">
-          {/* The default lane — renameable, but can't be archived (it always exists). */}
-          <LaneRow lane={{ id: "__default", label: defaultLabel, archived: false }} isDefault onRename={(label) => void renameDefault(label)} onArchive={() => undefined} />
-          {live.map((l) => (
-            <LaneRow key={l.id} lane={l} onRename={(label) => void patch(l.id, { label })} onArchive={() => void patch(l.id, { archived: true })} />
-          ))}
-        </div>
+        <Group>
+          {laneRow(null, defaultLabel, true)}
+          {live.map((l) => laneRow(l.id, l.label, false))}
+        </Group>
+        <GroupNote>
+          A lane is a parallel version of the plan — a work week and an off week, night shifts and mornings.
+          Each keeps its own published plan and the client switches between them.
+          {" "}These lanes are {kind === "workout" ? "for training only; meals have their own." : "for meals only; training has its own."}
+        </GroupNote>
+
         <div className="flex items-end gap-2">
-          <Field label="Add a schedule" className="flex-1" value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="Off week" onKeyDown={(e) => { if (e.key === "Enter") void add(); }} />
+          <Field label="Add a lane" className="flex-1" value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="Off week" onKeyDown={(e) => { if (e.key === "Enter") void add(); }} />
           <Button disabled={adding.trim().length < 1 || busy} onClick={() => void add()}><Plus /> Add</Button>
         </div>
       </div>
-    </Sheet>
-  );
-}
 
-function LaneRow({ lane, isDefault, onRename, onArchive }: { lane: Lane; isDefault?: boolean; onRename: (label: string) => void; onArchive: () => void }) {
-  const [editing, setEditing] = useState(false);
-  const [label, setLabel] = useState(lane.label);
-  return (
-    <div className="flex items-center gap-2 rounded-xl bg-secondary/50 px-3 py-2">
-      {editing ? (
-        <>
-          <input value={label} onChange={(e) => setLabel(e.target.value)} className="min-w-0 flex-1 rounded-lg bg-card px-2 py-1 text-sm outline-none ring-ring focus:ring-2" autoFocus />
-          <button onClick={() => { setEditing(false); if (label.trim() && label.trim() !== lane.label) onRename(label.trim()); }} className="text-sm font-medium text-primary">Save</button>
-        </>
-      ) : (
-        <>
-          <span className="min-w-0 flex-1 truncate text-sm font-medium">{lane.label}</span>
-          {isDefault && <span className="text-xs text-muted-foreground">default</span>}
-          <button onClick={() => { setLabel(lane.label); setEditing(true); }} aria-label="Rename" className="grid size-7 place-items-center rounded-full text-muted-foreground hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><PencilLine /></button>
-          {!isDefault && <button onClick={onArchive} aria-label="Archive" className="grid size-7 place-items-center rounded-full text-muted-foreground hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><Archive /></button>}
-        </>
-      )}
-    </div>
+      <ConfirmDialog
+        open={toArchive != null}
+        onOpenChange={(o) => { if (!o) setToArchive(null); }}
+        title={`Archive ${toArchive?.label ?? "this lane"}?`}
+        description="Its plans are kept and stop running. A client on this lane goes back to the default one."
+        confirmLabel="Archive"
+        onConfirm={() => { const l = toArchive; setToArchive(null); if (l) void patch(l.id, { archived: true }); }}
+      />
+    </Sheet>
   );
 }
 
@@ -242,29 +337,28 @@ function PlanActions({ plan, endpoint, onClose, onOpen, onChanged }: { plan: Pla
   const [confirmDel, setConfirmDel] = useState(false);
   const act = (fn: () => Promise<unknown>) => async () => { setBusy(true); try { await fn(); onChanged(); } catch { setBusy(false); } };
   const isOld = plan.status === "superseded" || plan.status === "archived";
-  const status = (s: string) => api.post(`/api/${endpoint}/${plan.id}/status`, { status: s });
+  const status = (sv: string) => api.post(`/api/${endpoint}/${plan.id}/status`, { status: sv });
   return (
     <Sheet open onClose={onClose} title={plan.name}>
-      <div className="space-y-1">
-        <ActionRow icon={PencilLine} label="Open in builder" onClick={onOpen} />
-        {isOld && <ActionRow icon={Zap} label="Make active again" hint="Re-publishes this plan and supersedes the current one in its lane" disabled={busy} onClick={act(() => api.post(`/api/${endpoint}/${plan.id}/publish`, {}))} />}
-        {isOld && <ActionRow icon={History} label="Roll back to draft" hint="Make it editable again" disabled={busy} onClick={act(() => status("draft"))} />}
-        {(plan.status === "published" || plan.status === "superseded") && <ActionRow icon={Archive} label="Archive" hint="Hide it without deleting" disabled={busy} onClick={act(() => status("archived"))} />}
-        {plan.status === "draft" && (
-          confirmDel
-            ? <ActionRow icon={Trash2} label={busy ? "Deleting…" : "Tap again to delete"} danger disabled={busy} onClick={act(() => api.del(`/api/${endpoint}/${plan.id}`))} />
-            : <ActionRow icon={Trash2} label="Delete draft" danger onClick={() => setConfirmDel(true)} />
-        )}
-      </div>
-    </Sheet>
-  );
-}
+      {/* The app's rows, not a local button list — same menu grammar as every
+          other sheet that offers a set of actions (§7). */}
+      <Group>
+        <Row icon={PencilLine} iconTone="primary" onClick={onOpen} chevron={false}>Open in builder</Row>
+        {isOld && <Row icon={Zap} iconTone="success" sub="Re-publishes it and supersedes the current one in its lane" disabled={busy} onClick={act(() => api.post(`/api/${endpoint}/${plan.id}/publish`, {}))} chevron={false}>Make active again</Row>}
+        {isOld && <Row icon={History} sub="Make it editable again" disabled={busy} onClick={act(() => status("draft"))} chevron={false}>Roll back to draft</Row>}
+        {(plan.status === "published" || plan.status === "superseded") && <Row icon={Archive} sub="Hide it without deleting" disabled={busy} onClick={act(() => status("archived"))} chevron={false}>Archive</Row>}
+        {plan.status === "draft" && <Row icon={Trash2} tone="danger" disabled={busy} onClick={() => setConfirmDel(true)} chevron={false}>Delete draft</Row>}
+      </Group>
 
-function ActionRow({ icon: Icon, label, hint, danger, disabled, onClick }: { icon: (p: { className?: string }) => ReactNode; label: string; hint?: string; danger?: boolean; disabled?: boolean; onClick: () => void }) {
-  return (
-    <button disabled={disabled} onClick={onClick} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors disabled:opacity-50 [&_svg]:size-[1.15rem]", danger ? "text-danger hover:bg-danger-soft" : "hover:bg-surface-2")}>
-      <Icon className="shrink-0" />
-      <div className="min-w-0 flex-1"><div className="text-sm font-medium">{label}</div>{hint && <div className="text-xs text-muted-foreground">{hint}</div>}</div>
-    </button>
+      <ConfirmDialog
+        open={confirmDel}
+        onOpenChange={(o) => { if (!o) setConfirmDel(false); }}
+        title={`Delete ${plan.name}?`}
+        description="It was never published, so nothing the client has seen is affected. This cannot be undone."
+        confirmLabel={busy ? "Deleting…" : "Delete"}
+        destructive
+        onConfirm={act(() => api.del(`/api/${endpoint}/${plan.id}`))}
+      />
+    </Sheet>
   );
 }

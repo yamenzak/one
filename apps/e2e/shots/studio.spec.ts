@@ -95,9 +95,18 @@ test("the coach's studio", async () => {
     await page.keyboard.press("Escape");
   });
 
-  await test.step("the plan", async () => {
-    await visit(page, `${base}/clients/${world.client.id}/train`, shell);
-    await shoot(page, project, "coach-client-plan");
+  // `/train` is not one of the client's subtabs — `ClientDetail` falls back to
+  // `today` for anything it does not recognise, so this shot was a SECOND
+  // picture of Today filed under the name of the plans screen. The tab values
+  // are `today | plans | goals | progress | report | manage`.
+  await test.step("the plans", async () => {
+    await visit(page, `${base}/clients/${world.client.id}/plans`, shell);
+    await shoot(page, project, "coach-client-plans");
+  });
+
+  await test.step("the report", async () => {
+    await visit(page, `${base}/clients/${world.client.id}/report`, shell);
+    await shoot(page, project, "coach-client-report", { settle: 1200 });
   });
 
   await test.step("the library", async () => {

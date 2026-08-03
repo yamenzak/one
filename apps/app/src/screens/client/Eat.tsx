@@ -188,7 +188,7 @@ export function Eat({ clientId }: { clientId: string }) {
         {entries && (
         <>
       {/* Lane switching only means something with a meal plan (`mealPlan`). */}
-      {canMealPlan && <LaneSwitcher clientId={clientId} variants={variants} currentVariantId={currentVariantId} defaultLabel={defaultLabel} onSwitched={() => void load()} />}
+      {canMealPlan && <LaneSwitcher clientId={clientId} kind="meal" variants={variants} currentVariantId={currentVariantId} defaultLabel={defaultLabel} onSwitched={() => void load()} />}
       {/* Your meal plan — the primary entry (parity with Train's active-plan hero) */}
       {canMealPlan && mealPlan && (
         <Stagger>

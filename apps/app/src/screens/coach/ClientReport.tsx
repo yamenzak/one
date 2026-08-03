@@ -1,16 +1,17 @@
 /**
- * Coach client report — the per-client decision view: an on-demand AI status
+ * Coach client report — the per-client decision view: the studio assistant's
  * summary (current phase, adherence, trajectory, next action), a compliance
  * grid, the weight trajectory, wellness averages, and a top-lifts leaderboard.
- * Reads the pure-domain report aggregate; the AI summary spends a credit, so
- * it's generated on demand.
+ * Reads the pure-domain report aggregate. The assistant's summary is generated
+ * ON ARRIVAL and cached server-side on the client's signal hash, so opening the
+ * tab is free and only a material change (or Refresh) spends a credit.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { kgToDisplay, weightLabel } from "@kova/domain";
 import {
   Button, Card, Badge, RangePicker, useDateRange, Page, Stagger, StatCard, ChartCard, AreaChart, SectionHeader, Eyebrow, GlanceStrip, Sparkline, toneVar,
-  Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList,
+  Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, SkeletonLine,
   Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, TrendingUp, Percent, cn,
 } from "@4dl/ui";
 import { api, errorText, todayLocal } from "../../api.js";
@@ -55,13 +56,31 @@ export function ClientReport({ clientId }: { clientId: string }) {
   // answer. Hide the card instead, and surface real failures as an error.
   const canAi = useCan("aiSuite");
   const [summaryErr, setSummaryErr] = useState<string | null>(null);
-  const genSummary = async () => {
+  const genSummary = useCallback(async (fresh: boolean) => {
     setSummaryBusy(true);
     setSummaryErr(null);
-    try { setSummary((await api.post<{ summary: string }>("/api/ai/client-summary", { clientId, today })).summary); }
-    catch (e) { setSummaryErr(errorText(e, "Couldn't generate the status — try again.")); }
+    try { setSummary((await api.post<{ summary: string }>("/api/ai/client-summary", { clientId, today, fresh })).summary); }
+    // A failure the coach did not ask for stays QUIET — the card falls back to
+    // its "no read yet" line. Auto-generation must not turn a studio with no AI
+    // provider configured into an error message on every client they open; only
+    // pressing Refresh is a request, and only a request gets an answer back.
+    catch (e) { if (fresh) setSummaryErr(errorText(e, "Couldn't generate the status — try again.")); }
     finally { setSummaryBusy(false); }
-  };
+  }, [clientId, today]);
+
+  /*
+   * Generated on arrival, like every other note this assistant writes.
+   *
+   * It used to sit behind a Generate button, which made the studio's assistant
+   * the one thing on a client screen that only spoke when asked — and the
+   * coach's read of a client is exactly what they came to this tab for. The
+   * route caches on the client's signal hash for an hour, so arriving is free
+   * and only a material change (or Refresh) pays again.
+   */
+  useEffect(() => {
+    if (!canAi) return;
+    void genSummary(false);
+  }, [canAi, genSummary]);
 
   const weight = report?.weightSeries ?? [];
   const weightVals = weight.map((w) => kgToDisplay(w.kg, units));
@@ -73,31 +92,35 @@ export function ClientReport({ clientId }: { clientId: string }) {
 
   return (
     <Page className="column space-y-4 p-4 pb-28">
-      <RangePicker format={shortDate} {...range.props} />
+      {/* Every client surface names itself in an eyebrow and hangs its one
+          quiet control off the same slot (§7). This tab had neither — it opened
+          on a bare segmented control, which is the only screen in the set that
+          did. */}
+      <Eyebrow action={<RangePicker format={shortDate} {...range.props} />}>Report</Eyebrow>
 
       {canAi && (
       <Stagger>
         <Card className="space-y-3">
           {/* The studio's assistant, by name and face. "AI status" behind a
               sparkle said nothing about whose read this is or what it contains;
-              the avatar already appears on the button and on the summary itself,
-              so leading with it makes the whole card one voice. */}
+              the avatar already appears on the summary itself, so leading with
+              it makes the whole card one voice. */}
           <div className="flex items-center gap-2.5">
             <AiAvatar className="size-9" />
             <h2 className="min-w-0 flex-1 truncate font-semibold">{ai.name}&rsquo;s read</h2>
-            <Button size="sm" variant="tonal" disabled={summaryBusy} onClick={() => void genSummary()}>{summary ? "Refresh" : "Generate"}</Button>
+            <Button size="sm" variant="tonal" disabled={summaryBusy} onClick={() => void genSummary(true)}>Refresh</Button>
           </div>
-          {summaryBusy ? (
-            <p className="text-sm text-muted-foreground">Reading this client's context…</p>
+          {summaryBusy && !summary ? (
+            <div className="space-y-2"><SkeletonLine w="100%" /><SkeletonLine w="92%" /><SkeletonLine w="60%" /></div>
           ) : summary ? (
             <div className="space-y-2">
               <div className="flex items-start gap-3"><AiAvatar className="mt-0.5 size-8 shrink-0" /><Markdown className="min-w-0 flex-1 text-sm text-foreground/85">{summary}</Markdown></div>
-              {/* No `onMute` on a coach surface: the coach asked for this by
-                  pressing Generate, so there is nothing to mute — only to rate. */}
+              {/* No `onMute` on a coach surface: this is the tab's own content
+                  and there is nowhere for it to go — only a rating. */}
               <InsightFeedback insightType="client-summary" insightRef={clientId} />
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Generate a coach-facing read: current phase, adherence, trajectory, and the single most important thing to address next.</p>
+            <p className="text-sm text-muted-foreground">No read yet. Refresh to get the current phase, adherence, trajectory and the single most important thing to address next.</p>
           )}
           {summaryErr && <p role="status" aria-live="polite" className="text-sm text-warning">{summaryErr}</p>}
         </Card>

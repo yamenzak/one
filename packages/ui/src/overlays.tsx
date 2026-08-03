@@ -335,13 +335,31 @@ export function TabsTrigger({ value, children }: { value: string; children: Reac
 }
 export const TabsContent = TabsPrimitive.Content;
 
-/** Segmented control with a sliding indicator.
- *  The indicator is positioned from the *measured* geometry of the active
- *  segment (a single absolutely-positioned pill), not Framer's `layoutId`
- *  projection. Layout projection re-animates on ANY box change — including when
- *  an ancestor (a drawer, an expanding accordion) grows — which made the pill
- *  visibly fly across the container. Measuring keeps it inside the control, so
- *  it only ever springs between its own segments. */
+/**
+ * Segmented control with a sliding indicator.
+ *
+ * The indicator is positioned from the *measured* geometry of the active
+ * segment (a single absolutely-positioned pill), not Framer's `layoutId`
+ * projection. Layout projection re-animates on ANY box change — including when
+ * an ancestor (a drawer, an expanding accordion) grows — which made the pill
+ * visibly fly across the container. Measuring keeps it inside the control, so
+ * it only ever springs between its own segments.
+ *
+ * ── One physical standard for every segmented thing ─────────────────────────
+ *
+ * This and `IconTabs` are the same object at two label densities, and they had
+ * drifted into two different controls: the icon rail was 44px tall inside a
+ * real border with equal-share segments, and this one was 30px tall in a
+ * borderless fill with segments sized by their text. Two of them on one screen
+ * — which is exactly what a tabbed surface with a filter on it looks like —
+ * read as two unrelated widgets.
+ *
+ * So the geometry moved here: `min-h-11` (the §12 floor, and the same height as
+ * the icon rail), the same `border-border/50` hairline so a studio that set
+ * `--border-width: 0` gets none and one that set 2 gets two, and the same
+ * spring. Nothing at any call site had to change; every segmented control in
+ * every app grew to the floor at once.
+ */
 export function SegmentedControl<T extends string>({ options, value, onChange, className, fill }: { options: { value: T; label: ReactNode }[]; value: T; onChange: (v: T) => void; className?: string; fill?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const btnRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -359,7 +377,11 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
   }, [value, options.length]);
 
   return (
-    <div ref={containerRef} className={cn("relative items-center gap-1 rounded-full bg-secondary p-1", fill ? "flex w-full" : "inline-flex", className)}>
+    <div
+      ref={containerRef}
+      role="tablist"
+      className={cn("relative items-center gap-0.5 rounded-full border border-border/50 bg-secondary p-1", fill ? "flex w-full" : "inline-flex", className)}
+    >
       {pill && (
         <motion.span
           aria-hidden
@@ -372,9 +394,17 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
       {options.map((o) => (
         <button
           key={o.value}
+          type="button"
+          role="tab"
+          aria-selected={value === o.value}
           ref={(el) => { btnRefs.current[o.value] = el; }}
           onClick={() => onChange(o.value)}
-          className={cn("relative z-10 truncate rounded-full py-1.5 text-sm font-medium outline-none transition-colors", FOCUS, fill ? "flex-1 basis-0 px-2 text-center" : "px-4", value === o.value ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground")}
+          className={cn(
+            "relative z-10 flex min-h-11 items-center justify-center truncate rounded-full text-sm font-medium outline-none transition-colors",
+            FOCUS,
+            fill ? "flex-1 basis-0 px-2 text-center" : "px-4",
+            value === o.value ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+          )}
         >
           {o.label}
         </button>

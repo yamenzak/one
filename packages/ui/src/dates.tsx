@@ -34,9 +34,10 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "./lib/utils.js";
-import { Calendar, ChevronLeft, ChevronRight, RotateCcw } from "./lib/icons.js";
+import { Calendar, Check, ChevronLeft, ChevronRight, RotateCcw } from "./lib/icons.js";
 import { Button, Chip } from "./primitives.js";
-import { SegmentedControl, Sheet } from "./overlays.js";
+import { Group, Row } from "./layout.js";
+import { Sheet } from "./overlays.js";
 
 /** Solid for ordinary content; translucent where the control sits over the T0
  *  atmosphere and must let it through (§1: "T4 is translucent"). */
@@ -177,28 +178,31 @@ export function DayNav({
 // ── RangePicker ──────────────────────────────────────────────────────────────
 
 /**
- * THE RANGE, IN ONE ROW, ALWAYS.
+ * THE RANGE IS ONE CONTROL, AND IT SITS IN THE HEADER.
  *
- * Two screens in this product scoped themselves to a date range and did it
- * differently. One offered 7d/30d/90d and nothing else, so a coach who wanted
- * "since the phase started" could not ask. The other bolted a fourth cell onto
- * the same segmented control and, when you pressed it, GREW A SECOND ROW of
- * date pills — which pushed the entire screen down, appeared and vanished under
- * the reader, and still only ever offered a start and an end.
+ * Three versions of this shipped before this one, and each failed differently:
  *
- * The rules this settles:
+ *   7/30/90 AND NOTHING ELSE.  A coach who wanted "since the phase started"
+ *                              could not ask.
+ *   A FOURTH CELL THAT GREW A ROW.  Pressing "custom" revealed two date pills
+ *                              underneath, pushing the whole screen down and
+ *                              appearing under the reader.
+ *   A BAR THAT WRAPPED.        Presets + a calendar button is ~200px of chrome.
+ *                              Next to a lens rail on a 390px phone it wrapped
+ *                              to a second line, so the screen opened with two
+ *                              rows of controls stacked above any content.
  *
- *   THE PRESETS STAY ONE TAP.   Switching between the two or three windows
- *                               people actually use is the common case; putting
- *                               them behind a menu to buy tidiness is a bad
- *                               trade.
- *   THE CONTROL HAS ONE HEIGHT. Custom lives in a sheet, so nothing on the
- *                               screen moves when it opens, and the sheet has
- *                               room for the shortcuts a row never would.
- *   A CUSTOM RANGE IS VISIBLE.  It takes its own cell in the bar, labelled with
- *                               its length, so "45d" sits where "30d" was
- *                               rather than the bar showing no selection at
- *                               all.
+ * So there is no bar. The control is ONE chip in the section header — the slot
+ * `Eyebrow`/`Section` already reserves for a quiet affordance — showing the
+ * window currently in force, and everything else is in the sheet it opens:
+ * the presets as rows (each with the dates it covers), and a custom start→end
+ * under them with whole-calendar shortcuts.
+ *
+ * The cost is a tap to change range. It buys back a whole row of the viewport
+ * on every screen that scopes itself to a window, the presets get READABLE
+ * names instead of "90d", and adding a fourth preset is free. A range is
+ * something you set and then read from for a while; it is not a switch you flip
+ * every few seconds, which is the case the segmented control was right for.
  *
  * ── Dates in, dates out ─────────────────────────────────────────────────────
  *
@@ -211,7 +215,8 @@ export function DayNav({
  */
 export interface RangePresetDef {
   value: string;
-  /** What the bar shows — keep it to three or four characters. */
+  /** The readable name — "Last 30 days". This is what the chip and the menu
+   *  show, so write it as words rather than as an axis label. */
   label: string;
   /** Window length INCLUDING today, so 7 means today and the six before it. */
   days: number;
@@ -267,21 +272,26 @@ export function RangePicker({
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
 
+  const windowOf = (value: string) =>
+    presetWindow(presets.find((p) => p.value === value) ?? presets[0] ?? { value, label: value, days: 30 }, today);
+
   useEffect(() => {
     if (!open) return;
-    const fallback = presetWindow(presets.find((p) => p.value === preset) ?? presets[0] ?? { value: "", label: "", days: 30 }, today);
+    const fallback = windowOf(preset);
     setFrom(custom && start ? start : fallback.start);
     setTo(custom && end ? end : fallback.end);
+    // `windowOf` is derived from props already in this list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, custom, start, end, preset, presets, today]);
 
   const draftDays = from <= to ? rangeLength(from, to) : 0;
   const tooLong = draftDays > maxDays;
   const valid = draftDays > 0 && !tooLong;
 
-  const options = [
-    ...presets.map((p) => ({ value: p.value, label: p.label })),
-    ...(custom && start && end ? [{ value: "custom", label: `${rangeLength(start, end)}d` }] : []),
-  ];
+  /** What the chip says: the window in force, in the fewest words that are true. */
+  const chipLabel = custom && start && end
+    ? `${format(start)} – ${format(end)}`
+    : presets.find((p) => p.value === preset)?.label ?? "Range";
 
   /** Whole-calendar shortcuts. These are the windows people name out loud, and
    *  none of them is expressible as "N days back from today". */
@@ -296,21 +306,18 @@ export function RangePicker({
 
   return (
     <>
-      <div className={cn("flex items-center gap-2", className)}>
-        <SegmentedControl
-          value={custom ? "custom" : preset}
-          onChange={(v) => { if (v === "custom") setOpen(true); else onPreset(v); }}
-          options={options}
-        />
-        <Button
-          variant={custom ? "tonal" : "ghost"}
-          className="shrink-0"
-          aria-label="Pick a custom date range"
-          onClick={() => setOpen(true)}
-        >
-          <Calendar aria-hidden />
-        </Button>
-      </div>
+      <Button
+        variant="secondary"
+        size="sm"
+        className={cn("shrink-0", className)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+      >
+        <Calendar aria-hidden />
+        <span className="sr-only">Date range: </span>
+        {chipLabel}
+      </Button>
 
       <Sheet
         open={open}
@@ -323,38 +330,63 @@ export function RangePicker({
             disabled={!valid}
             onClick={() => { onCustom(from, to); setOpen(false); }}
           >
-            {valid ? `Show ${draftDays} ${draftDays === 1 ? "day" : "days"}` : "Pick a range"}
+            {valid ? `Show these ${draftDays} ${draftDays === 1 ? "day" : "days"}` : "Pick a range"}
           </Button>
         }
       >
         <div className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {jumps.map((j) => (
-              <Chip
-                key={j.label}
-                selected={from === j.from && to === j.to}
-                onClick={() => { setFrom(j.from); setTo(j.to > today ? today : j.to); }}
-              >
-                {j.label}
-              </Chip>
-            ))}
-          </div>
+          {/* The presets APPLY ON TAP and close. They are the common case, and
+              a preset that needed the footer button too would make the footer
+              mean two different things depending on what you touched last. */}
+          <Group>
+            {presets.map((p) => {
+              const w = presetWindow(p, today);
+              return (
+                <Row
+                  key={p.value}
+                  onClick={() => { onPreset(p.value); setOpen(false); }}
+                  sub={`${format(w.start)} – ${format(w.end)}`}
+                  chevron={false}
+                  trailing={!custom && p.value === preset
+                    ? <Check aria-label="Current range" className="size-4 text-primary" />
+                    : undefined}
+                >
+                  {p.label}
+                </Row>
+              );
+            })}
+          </Group>
 
-          <div className="flex items-center gap-2">
-            <DatePill value={from} max={to} label="Start date" display={format(from)}
-              onChange={(v) => { setFrom(v); if (v > to) setTo(v); }} />
-            <span aria-hidden className="shrink-0 text-sm text-muted-foreground">→</span>
-            <DatePill value={to} min={from} max={today} label="End date" display={format(to)}
-              onChange={(v) => { setTo(v); if (v < from) setFrom(v); }} />
-          </div>
+          <div className="space-y-3">
+            <p className="px-1 text-micro uppercase text-muted-foreground">Custom range</p>
+            <div className="flex flex-wrap gap-2">
+              {jumps.map((j) => (
+                <Chip
+                  key={j.label}
+                  selected={from === j.from && to === (j.to > today ? today : j.to)}
+                  onClick={() => { setFrom(j.from); setTo(j.to > today ? today : j.to); }}
+                >
+                  {j.label}
+                </Chip>
+              ))}
+            </div>
 
-          {/* The consequence of the two pills above, in words — a range is two
-              dates and a LENGTH, and the length is the thing being chosen. */}
-          <p className={cn("text-caption", tooLong ? "text-warning" : "text-muted-foreground")} role={tooLong ? "alert" : undefined}>
-            {tooLong
-              ? `That is ${draftDays} days. The longest range is ${maxDays} — move the start date forward.`
-              : `${format(from)} → ${format(to)} · ${draftDays} ${draftDays === 1 ? "day" : "days"}`}
-          </p>
+            <div className="flex items-center gap-2">
+              <DatePill value={from} max={to} label="Start date" display={format(from)}
+                onChange={(v) => { setFrom(v); if (v > to) setTo(v); }} />
+              <span aria-hidden className="shrink-0 text-sm text-muted-foreground">→</span>
+              <DatePill value={to} min={from} max={today} label="End date" display={format(to)}
+                onChange={(v) => { setTo(v); if (v < from) setFrom(v); }} />
+            </div>
+
+            {/* The consequence of the two pills above, in words — a range is two
+                dates and a LENGTH, and the length is the thing being chosen. */}
+            <p className={cn("px-1 text-caption", tooLong ? "text-warning" : "text-muted-foreground")} role={tooLong ? "alert" : undefined}>
+              {tooLong
+                ? `That is ${draftDays} days. The longest range is ${maxDays} — move the start date forward.`
+                : `${draftDays} ${draftDays === 1 ? "day" : "days"}`}
+            </p>
+          </div>
         </div>
       </Sheet>
     </>
@@ -370,7 +402,7 @@ export function RangePicker({
  * window at all. A query string built next to the fetch and a control rendered
  * two hundred lines above it is a pair that can silently disagree — which is
  * exactly what a hook removes: `props` and `query` are computed from the same
- * value, so a control showing "45d" cannot be fetching thirty.
+ * value, so a chip reading "45 days" cannot be fetching thirty.
  */
 export function useDateRange(presets: readonly RangePresetDef[], today: string, initial?: string) {
   const first = initial ?? presets[0]?.value ?? "30d";

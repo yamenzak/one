@@ -12,7 +12,7 @@
 import type { RangePresetDef } from "@4dl/ui";
 
 export const RANGE_PRESETS: readonly RangePresetDef[] = [
-  { value: "7d", label: "7d", days: 7 },
-  { value: "30d", label: "30d", days: 30 },
-  { value: "90d", label: "90d", days: 90 },
+  { value: "7d", label: "Last 7 days", days: 7 },
+  { value: "30d", label: "Last 30 days", days: 30 },
+  { value: "90d", label: "Last 90 days", days: 90 },
 ];

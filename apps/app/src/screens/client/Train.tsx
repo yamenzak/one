@@ -203,7 +203,7 @@ export function Train({ clientId }: { clientId: string }) {
         {plans && (
         <>
       {/* Everything plan-shaped follows `workoutPlan`. */}
-      {canPlan && <LaneSwitcher clientId={clientId} variants={variants} currentVariantId={currentVariantId} defaultLabel={defaultLabel} onSwitched={() => void load()} />}
+      {canPlan && <LaneSwitcher clientId={clientId} kind="workout" variants={variants} currentVariantId={currentVariantId} defaultLabel={defaultLabel} onSwitched={() => void load()} />}
       {canPlan && (published ? (
         <Stagger>
           <button onClick={() => start()} className="w-full text-left">

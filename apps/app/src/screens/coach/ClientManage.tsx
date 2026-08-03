@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@kova/domain";
-import { Button, Card, Badge, Field, Select, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, NoData, Anchor, ActionCluster, CountUp, Group, Row, GroupNote, RotateCcw, History, Users, ActionResult, useAction as useActionBase } from "@4dl/ui";
+import { Button, Card, Badge, Field, Select, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonLine, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, NoData, Anchor, ActionCluster, CountUp, Group, Row, GroupNote, RotateCcw, History, Users, ActionResult, useAction as useActionBase } from "@4dl/ui";
 import { personaLabel, personaTone } from "../../registry/index.js";
 import { api, errorText, todayLocal } from "../../api.js";
 import { FeatureLock, useCan } from "../../FeatureLock.js";
@@ -476,30 +476,58 @@ function CoachesSection({ clientId }: { clientId: string }) {
           {coaches.length === 0 ? (
             <Card><p className="text-sm text-warning" role="status">No coach is assigned — nobody but an owner can see this client.</p></Card>
           ) : (
+            /*
+              ONE LINE OF NAME, ONE LINE OF FACT, TWO ICON BUTTONS.
+              This row shipped with everything competing at once: the title held
+              the name plus TWO badges (role and Primary), which wrapped to
+              three lines on a phone; the sub-line repeated the email that was
+              already the title, because `coachName` falls back to it when a
+              staff member has no name; and the trailing slot held a labelled
+              "Make primary" button next to an X, so the name had ~130px left.
+              §7 caps a row at two trailing actions and both are icons.
+            */
             <Group>
-              {coaches.map((co) => (
-                <Row
-                  key={co.userId}
-                  leading={<Avatar name={coachName(co)} seed={co.email ?? co.userId} className="size-10" />}
-                  sub={co.email ?? undefined}
-                  trailing={
-                    <>
-                      {!co.isPrimary && (
-                        <Button size="sm" variant="secondary" className="shrink-0" disabled={busy !== null} onClick={() => void assign(co.userId, true)}>
-                          {busy === co.userId ? "…" : "Make primary"}
-                        </Button>
-                      )}
-                      <Button size="icon" variant="ghost" className="shrink-0 text-muted-foreground" aria-label={`Remove ${coachName(co)} from this client`} disabled={busy !== null} onClick={() => { setErr(null); setToRemove(co); }}><X /></Button>
-                    </>
-                  }
-                >
-                  <span className="flex flex-wrap items-center gap-1.5">
-                    <span className="truncate">{coachName(co)}</span>
-                    <Badge tone={personaTone(roleOf(co.userId), { self: co.userId === myUserId })}>{personaLabel(roleOf(co.userId), { self: co.userId === myUserId })}</Badge>
-                    {co.isPrimary && <Badge tone="primary"><Star /> Primary</Badge>}
-                  </span>
-                </Row>
-              ))}
+              {coaches.map((co) => {
+                const name = coachName(co);
+                const role = personaLabel(roleOf(co.userId), { self: co.userId === myUserId });
+                // The email only earns the sub-line when it is not already the
+                // title. Otherwise the role stands alone there.
+                const sub = [role, co.email && co.email !== name ? co.email : null].filter(Boolean).join(" · ");
+                return (
+                  <Row
+                    key={co.userId}
+                    leading={<Avatar name={name} seed={co.email ?? co.userId} className="size-10" />}
+                    sub={sub}
+                    trailing={
+                      <span className="flex shrink-0 items-center gap-0.5">
+                        {/* A star that is a BUTTON when it can be pressed and a
+                            plain mark when it cannot — the primary coach's row
+                            needs to say so without offering an action that
+                            would be a no-op. */}
+                        {co.isPrimary ? (
+                          <span className="grid size-11 place-items-center text-primary" title="Primary coach">
+                            <Star aria-label="Primary coach" className="size-[1.15rem] fill-current" />
+                          </span>
+                        ) : (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-muted-foreground"
+                            aria-label={`Make ${name} the primary coach`}
+                            disabled={busy !== null}
+                            onClick={() => void assign(co.userId, true)}
+                          >
+                            <Star />
+                          </Button>
+                        )}
+                        <Button size="icon" variant="ghost" className="text-muted-foreground" aria-label={`Remove ${name} from this client`} disabled={busy !== null} onClick={() => { setErr(null); setToRemove(co); }}><X /></Button>
+                      </span>
+                    }
+                  >
+                    {name}
+                  </Row>
+                );
+              })}
             </Group>
           )}
           <GroupNote>Only assigned coaches see this client on their roster. The primary coach receives their notifications.</GroupNote>
@@ -999,15 +1027,34 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
   const [sending, setSending] = useState<string | null>(null);
   const [sendErr, setSendErr] = useState<Record<string, string>>({});
   const units = useUnits();
-  const summarize = async () => {
-    setBusy(true); setErr(null); setSummary(null);
+  const firstId = checkIns[0]?.id ?? null;
+  const summarize = useCallback(async (fresh: boolean) => {
+    setBusy(true); setErr(null);
     try {
-      const r = await api.post<{ summary: string; suggestedReply: string }>("/api/ai/summarize-checkins", { clientId });
+      const r = await api.post<{ summary: string; suggestedReply: string }>("/api/ai/summarize-checkins", { clientId, fresh });
       setSummary(r.summary);
-      if (checkIns[0]) setDraft((d) => ({ ...d, [checkIns[0]!.id]: r.suggestedReply }));
-    } catch (e) { setErr(e); }
+      // Only seed the reply box on an EXPLICIT refresh. Overwriting a draft the
+      // coach is halfway through typing, because a cached summary arrived on
+      // mount, is the kind of help nobody asked for.
+      setDraft((d) => (fresh && firstId && !d[firstId]?.trim() ? { ...d, [firstId]: r.suggestedReply } : d));
+    // Quiet on the automatic pass, loud on Refresh — a studio with no AI
+    // provider must not get an error box every time a coach opens Manage.
+    } catch (e) { if (fresh) setErr(e); }
     finally { setBusy(false); }
-  };
+  }, [clientId, firstId]);
+
+  /*
+   * Written on arrival, like every other note this assistant writes.
+   *
+   * It used to wait behind a Summarize button on a screen the coach opened
+   * *because* they were about to read the check-ins. The route caches on the
+   * client's signal hash for an hour, so arriving is free and only a new
+   * check-in (or Refresh) pays again.
+   */
+  useEffect(() => {
+    if (!canAi || checkIns.length === 0) return;
+    void summarize(false);
+  }, [canAi, checkIns.length, summarize]);
   // Sending notifies the client, so a double-tap used to send the reply twice —
   // and a failed POST cleared nothing and said nothing, leaving the coach to
   // believe the client had been answered when they hadn't.
@@ -1025,10 +1072,13 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
   return (
     <section className="space-y-2">
       {/* `/api/ai/summarize-checkins` is gated on aiSuite. */}
-      <Eyebrow action={canAi ? <Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize()}><AiAvatar className="size-5" /> {busy ? "…" : "Summarize"}</Button> : undefined}>Check-ins</Eyebrow>
+      <Eyebrow action={canAi ? <Button size="sm" variant="tonal" disabled={busy || checkIns.length === 0} onClick={() => void summarize(true)}><AiAvatar className="size-5" /> {busy ? "…" : "Refresh"}</Button> : undefined}>Check-ins</Eyebrow>
       <Stagger>
       <Card className="space-y-3">
       {err ? <AiErrorBox error={err} /> : null}
+      {busy && !summary && (
+        <SubCard className="space-y-2"><SkeletonLine w="100%" /><SkeletonLine w="70%" /></SubCard>
+      )}
       {summary && (
         <SubCard className="space-y-2 text-sm">
           <div className="flex items-start gap-2.5"><AiAvatar className="size-7" /><Markdown className="min-w-0 flex-1">{summary}</Markdown></div>

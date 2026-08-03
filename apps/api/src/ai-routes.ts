@@ -606,13 +606,24 @@ export const aiRoutes = new Hono<AppEnv>()
     const role = c.get("role");
     if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
     { const gate = await gateFeature(c, "aiSuite"); if (gate) return gate; }
-    const parsed = z.object({ clientId: z.string() }).safeParse(await c.req.json().catch(() => null));
+    const parsed = z.object({ clientId: z.string(), fresh: z.boolean().optional() }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
     const rows = await c.env.DB.prepare("SELECT date_local, weight_kg, mood, energy, stress, sleep_hours, notes FROM check_ins WHERE client_id = ? ORDER BY date_local DESC LIMIT 14").bind(access.client.id).all();
     if ((rows.results ?? []).length === 0) return c.json({ error: "no check-ins yet" }, 404);
     const ctx = await buildClientContext(c.env, access.client, { today: new Date().toISOString().slice(0, 10), hour: 12, units: await unitsFor(c.env.DB, who.userId) });
+
+    // Cached on the client's signal hash — see the note on `client-summary`.
+    // Both are generated on arrival now, so both need the cache that makes
+    // arriving free.
+    const cacheKey = `ai:checkins:v1:${access.client.id}:${ctx.signalHash}`;
+    if (!parsed.data.fresh) {
+      const hit = await c.env.CACHE.get(cacheKey, "json").catch(() => null) as { summary?: string; suggestedReply?: string } | null;
+      if (hit && typeof hit.summary === "string" && typeof hit.suggestedReply === "string") {
+        return c.json({ summary: hit.summary, suggestedReply: hit.suggestedReply, cached: true });
+      }
+    }
 
     const result = await generate(c.env, {
       tenantId: who.tenantId,
@@ -629,6 +640,7 @@ export const aiRoutes = new Hono<AppEnv>()
     if (!result.ok) return aiFail(c, result);
     const out = extractJson<{ summary: string; suggestedReply: string }>(result.output);
     if (!out) return c.json({ error: "The AI response couldn't be parsed.", raw: result.output.slice(0, 1500), mocked: result.mocked }, 422);
+    await c.env.CACHE.put(cacheKey, JSON.stringify({ summary: out.summary, suggestedReply: out.suggestedReply }), { expirationTtl: 3600 }).catch(() => undefined);
     return c.json({ ...out, credits: result.credits, mocked: result.mocked });
   })
 
@@ -1031,12 +1043,28 @@ export const aiRoutes = new Hono<AppEnv>()
     const role = c.get("role");
     if (role !== "owner" && role !== "trainer") return c.json({ error: "forbidden" }, 403);
     { const gate = await gateFeature(c, "aiSuite"); if (gate) return gate; }
-    const parsed = z.object({ clientId: z.string(), today: z.string().optional(), hour: z.coerce.number().int().min(0).max(23).optional() }).safeParse(await c.req.json().catch(() => null));
+    const parsed = z.object({ clientId: z.string(), today: z.string().optional(), hour: z.coerce.number().int().min(0).max(23).optional(), fresh: z.boolean().optional() }).safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return c.json({ error: "invalid body" }, 400);
     const access = await requireClientAccess(c, parsed.data.clientId);
     if ("response" in access) return access.response;
     const units = await unitsFor(c.env.DB, who.userId);
     const ctx = await buildClientContext(c.env, access.client, { today: parsed.data.today ?? new Date().toISOString().slice(0, 10), hour: parsed.data.hour ?? 12, units });
+
+    /*
+     * The same content-hash cache `coach-note` uses, for the same reason: this
+     * is now GENERATED ON ARRIVAL rather than behind a button, so without it
+     * every visit to a client's Report would mint a fresh paid generation of an
+     * answer that had not changed. The key is the client's signal hash, so a
+     * material change invalidates it and nothing else does; `fresh` is the
+     * Refresh button, which is the coach explicitly asking to pay again.
+     */
+    const cacheKey = `ai:summary:v1:${access.client.id}:${ctx.signalHash}`;
+    if (!parsed.data.fresh) {
+      const hit = await c.env.CACHE.get(cacheKey, "json").catch(() => null);
+      if (hit && typeof (hit as { summary?: string }).summary === "string") {
+        return c.json({ summary: (hit as { summary: string }).summary, cached: true });
+      }
+    }
 
     const result = await generate(c.env, {
       tenantId: who.tenantId, actorUserId: who.userId, subjectId: access.client.id,
@@ -1045,7 +1073,9 @@ export const aiRoutes = new Hono<AppEnv>()
       mock: () => `${access.client.display_name} is training consistently and logging most days. Adherence is solid and the trend is positive; sleep is the main lever. Next: nudge check-in consistency and confirm protein targets are being hit.`,
     });
     if (!result.ok) return aiFail(c, result);
-    return c.json({ summary: result.output.trim(), credits: result.credits, mocked: result.mocked });
+    const summary = result.output.trim();
+    await c.env.CACHE.put(cacheKey, JSON.stringify({ summary }), { expirationTtl: 3600 }).catch(() => undefined);
+    return c.json({ summary, credits: result.credits, mocked: result.mocked });
   })
 
   /**

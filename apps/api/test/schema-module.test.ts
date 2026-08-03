@@ -78,13 +78,16 @@ describe("the Kova schema module", () => {
     // can't charge — "not onboarded yet" and "restricted for fraud" were the
     // same `charges_enabled = 0` before it) and `connect_created_at` (an account
     // abandoned mid-onboarding bills a Radar per-account fee forever, and
-    // nothing recorded when it started).
+    // nothing recorded when it started). +2 more for the plan-lane split:
+    // `plan_variants.kind` (a lane belongs to one surface; NULL is a pre-split
+    // lane and still applies to both) and `clients.current_meal_variant_id`
+    // (the lane a client is on, per surface, backfilled from the shared one).
     const ddl = schemaStatements(KOVA_SCHEMA);
     expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(34);
     expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(24);
     expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(6);
     expect(ddl.filter((s) => s.startsWith("DROP INDEX"))).toHaveLength(1);
-    expect(KOVA_SCHEMA.alters ?? []).toHaveLength(41);
+    expect(KOVA_SCHEMA.alters ?? []).toHaveLength(43);
   });
 
   it("names every backfill", () => {

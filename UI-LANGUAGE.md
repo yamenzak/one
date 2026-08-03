@@ -754,6 +754,37 @@ card.
   wizard.
 - **A card is not a way to add padding.** If something needs air, give it air.
 
+### Every tab of one subject opens the same way
+
+A tabbed surface is several screens sharing chrome (§1), and the fastest way to
+make it feel like several *products* is to let each tab invent its own opening.
+One client's tabs had, between them: an eyebrow with no control, a bare
+segmented control with no eyebrow, a scrolling chip row, and a `SectionHeader` —
+four devices in the space above the fold on four tabs of one person's record.
+
+**Every one of them opens with an `Eyebrow` naming the surface, and its ONE
+quiet control in the action slot.** A range picker, a lane picker, an add
+button — whatever that tab's single scoping decision is. If a tab has two such
+controls, one of them is not a scoping decision and belongs in the content.
+
+### The assistant speaks on arrival, not on request
+
+A generated note behind a **Generate** button is a feature nobody uses twice.
+Two surfaces shipped that way — the coach's read of a client, and the check-in
+summary — on screens the reader had opened *in order to* read exactly that.
+
+So it generates on mount, and the button becomes **Refresh**. The cost is real
+(a generation is metered), and the answer is a **content-hash cache**, not
+restraint: key the result on a hash of the inputs, serve it for an hour, and let
+the explicit Refresh bypass it. Arriving is then free, a material change
+regenerates on its own, and the reader never presses anything.
+
+Two rules go with it: while the first generation is in flight the surface shows
+a **skeleton in the shape of the text**, not a spinner or a sentence about
+waiting; and an auto-generated draft must never **overwrite something the user
+is typing** — seed a reply box only on an explicit Refresh, and only when it is
+empty.
+
 ### Creating a thing is an event. It does not live on the screen.
 
 A form the reader is not filling in must not be on screen. This sounds obvious
@@ -1204,6 +1235,15 @@ effect; the entrance ladder means nothing to something that never ends).
 
 ### Overlays — `overlays.tsx`
 
+**`SegmentedControl` and `IconTabs` are one control at two label densities, and
+they share a physical standard**: `min-h-11` (the §12 floor), the same
+`border-border/50` hairline, the same spring. They had drifted — the icon rail
+was 44px inside a real border with equal-share segments, the segmented control
+was 30px in a borderless fill sized by its text — so a tabbed surface with a
+filter on it read as two unrelated widgets. Pick between them on LABELS, never
+on looks: up to four that fit, `SegmentedControl`; more than four,
+`IconTabs`.
+
 | Component | Use it when | Do NOT use it for | State |
 |---|---|---|---|
 | `Sheet` | **Doing** — anything with inputs. The mobile default. Title is `title-2`: it sits in the content and names the surface. | A yes/no question. | ✅ |
@@ -1306,19 +1346,28 @@ toolbar says what would free the space instead.
 |---|---|---|---|
 | `DatePill` | One date the user can change — a range endpoint, a single field in a filter row. | A date you only *display*. That is text. | ✅ |
 | `DayNav` | The whole screen is scoped to one day and the user steps through days. | Two-way range selection — that is `RangePicker`. | ✅ |
-| `RangePicker` | A screen scoped to a **window**: presets one tap away, a custom start→end in a sheet. | A single date (`DatePill`) or a day-stepper (`DayNav`). | ✅ |
+| `RangePicker` | A screen scoped to a **window**. One chip in the section header; presets and a custom start→end live in the sheet it opens. | A single date (`DatePill`) or a day-stepper (`DayNav`). | ✅ |
 | `useDateRange` | The state behind it: the preset, the custom window, and the query string — computed from one value. | Holding `range` + `customStart` + `customEnd` yourself and rebuilding the query at the fetch site. | ✅ |
 
-`RangePicker` has **one height for its whole life**. The version it replaces put
-a calendar cell in the segmented control and, when pressed, grew a second row of
-date pills — which pushed the screen down, appeared and vanished under the
-reader, and still only offered a start and an end. Custom now lives in a sheet:
-nothing moves, and the sheet has room for the whole-calendar shortcuts a row
-never would ("This month", "Last month", "Year to date" — the windows people
-name out loud, none of which is expressible as "N days back").
+`RangePicker` is **one chip in the section header**, not a bar. Three versions
+came before it and each failed differently: 7/30/90 and nothing else (no way to
+ask for "since the phase started"); a fourth cell that GREW A ROW of date pills
+when pressed, pushing the screen down under the reader; and a bar that WRAPPED —
+presets plus a calendar button is ~200px of chrome, so next to a lens rail on a
+390px phone the screen opened with two rows of controls stacked above any
+content.
 
-A custom window takes **its own cell in the bar, labelled with its length**
-(`45d`), so the control never shows an empty selection.
+So the chip says what window is in force ("Last 30 days", "4 Jul – 3 Aug") and
+the sheet holds everything else: the presets as rows, each showing the dates it
+covers, and a custom start→end under them with the whole-calendar shortcuts a
+row never had space for ("This month", "Last month", "Year to date" — the
+windows people name out loud, none of which is expressible as "N days back").
+
+The cost is a tap to change range, and it is the right trade: a range is
+something you set and then read from for a while, not a switch you flip every
+few seconds. Presets apply on tap and close; the footer button applies the
+custom draft only — so the footer never means two different things depending on
+what you touched last.
 
 `useDateRange` exists because the two screens that had a range held it
 differently and one of them built its query string from a ternary at the fetch

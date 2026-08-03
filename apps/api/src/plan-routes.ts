@@ -17,7 +17,7 @@ import { notify } from "./notify.js";
 import { recordAudit } from "./audit.js";
 import { newId, nowIso } from "./ids.js";
 import { parseJson, j } from "./db.js";
-import { loadVariants, laneMatchSql } from "./plan-variants.js";
+import { currentLaneColumn, loadVariants, laneMatchSql, type LaneKind } from "./plan-variants.js";
 
 type Kind = "workout" | "meal";
 /** The FEATURES key gating a client's own view of this plan kind. */
@@ -106,7 +106,10 @@ function makePlanRoutes(kind: Kind): Hono<AppEnv> {
         .all<PlanRow>();
       // Lane context travels with the plan list so the client can pick the
       // published plan for the lane they're on and offer a lane switcher.
-      const lanes = await loadVariants(c.env.DB, access.client.id, access.client.current_variant_id ?? null, access.client.default_lane_label ?? null);
+      // Lanes are per surface now, so a workout list must never report the meal
+      // lanes (or the meal lane the client is on) — see plan-variants.ts.
+      const laneKind: LaneKind = kind === "meal" ? "meal" : "workout";
+      const lanes = await loadVariants(c.env.DB, access.client.id, laneKind, access.client[currentLaneColumn(laneKind)] ?? null, access.client.default_lane_label ?? null);
       return c.json({ plans: (rows.results ?? []).map(planView), variants: lanes.variants, currentVariantId: lanes.currentVariantId, defaultLabel: lanes.defaultLabel });
     })
 
