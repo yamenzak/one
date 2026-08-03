@@ -661,6 +661,42 @@ and then knows every list in the product.
 - **Sort and filter are additive, never the default experience.** If the list
   needs a filter to be useful, the wrong things are in it.
 
+### A detail screen's sections: a rail up to four, the header past that
+
+A screen about ONE thing, cut into parts. Which control switches them is decided
+by the COUNT, and there are only two answers:
+
+| Sections | Control | Why |
+|---|---|---|
+| 2–4 | `SegmentedControl`, or `IconTabs` when the labels are long | one tap, every option visible, labels fit |
+| 5+ | `SectionSwitcher` — the header IS the menu | a rail past four breaks in three ways at once |
+
+**The three ways a rail breaks past four**, all of which shipped on one screen:
+
+- **The targets go under the floor.** Six cells across 412px is 68px each, and
+  after padding it is a 34×30 hit area. §12 says 44.
+- **The labels go.** They stop fitting, so the rail becomes icons — six glyphs
+  with no words is a guessing game the first ten times and a memory test after
+  that.
+- **It costs a row.** The identity of the thing needs a line and the rail needs
+  another, both sticky. That is a fifth of a phone spent on chrome above any
+  content.
+
+`SectionSwitcher` puts them in the header: the bar carries the leading mark, the
+title, and the CURRENT SECTION as its second line; tapping it opens every
+section with a real label, a tone and a line saying what is inside.
+
+- **It costs a second tap, and that is the trade.** The tap buys a readable
+  label on every option, a 72px row instead of a 30px cell, a whole row of the
+  screen back, and an eighth section without a redesign. Under five sections it
+  is not worth it.
+- **The header's second line is the one thing on it that changes.** The screen
+  this came from wrote "COACH VIEW" there — true, permanent, and under a header
+  only a coach can reach. A caption that is always the same is furniture.
+- **In the menu, a check on the current one and nothing on the rest.** A chevron
+  says "there is more inside this", which is wrong when what is inside is the
+  screen you are already on; and shading the current row reads as disabled.
+
 ### Sectioning: how a long screen becomes a short one
 
 A screen is long because it holds a lot, and that is allowed. A screen is
@@ -1128,7 +1164,8 @@ effect; the entrance ladder means nothing to something that never ends).
 | `Dialog` / `ConfirmDialog` | **Deciding** — a confirmation, ≥`md`. | Forms. | ✅ |
 | `DropdownMenu` | A short list of actions on an element. | Navigation between sections. | ✅ |
 | `SegmentedControl` | 2–4 mutually exclusive views of the same data. | More than 4 — above the cap it truncates its own labels. Use `IconTabs`. | ✅ |
-| `IconTabs` | 5+ tabs on one surface. Every tab is its icon; only the active one keeps its label, and the label grows in beside it — the same grammar as the bottom nav, so it needs no explaining. | Two or three tabs, where labels fit and icons are just decoration. | ✅ |
+| `IconTabs` | **Exactly 4**, where the labels are too long to sit side by side. Every tab is its icon; only the active one keeps its label, and the label grows in beside it — the same grammar as the bottom nav. Each tab is an equal share of the bar and 44px tall. | Two or three, where labels fit and icons are decoration. **Five or more** — that is `SectionSwitcher`. | ✅ |
+| `SectionSwitcher` | **5+ sections** on a detail screen about one thing. The header carries the leading mark, the title and the CURRENT SECTION; tapping it lists them all with labels, tones and a line each. One row of chrome instead of two. | Fewer than five, where a rail still labels everything in one tap. Top-level navigation — that is the tab bar. | ✅ |
 | `Select` · `Tooltip` · `Tabs` · `Avatar` | As named. | — | ✅ |
 
 `IconTabs` generates its own `layoutId`: two instances sharing a projection id

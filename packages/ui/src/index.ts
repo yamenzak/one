@@ -18,6 +18,7 @@ export * from "./settings.js";
 export * from "./patterns.js";
 export * from "./toast.js";
 export * from "./collection.js";
+export * from "./section-switcher.js";
 export * from "./controls.js";
 export * from "./dates.js";
 export * from "./tiles.js";

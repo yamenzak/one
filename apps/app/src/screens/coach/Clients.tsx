@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Avatar, IconTabs, Page, Stagger, ConfirmDialog, Collection, useCollectionView, ActionResult, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle, Anchor, CountUp, Group, Row, Sun, ClipboardList, Target, TrendingUp, BarChart3, Settings as SettingsIcon } from "@4dl/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, Page, Stagger, ConfirmDialog, Collection, useCollectionView, ActionResult, SectionSwitcher, toneVar, Users, Mail, User, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle, Anchor, CountUp, Group, Row, Sun, ClipboardList, Target, TrendingUp, BarChart3, Settings as SettingsIcon } from "@4dl/ui";
 import type { AttentionSeverity } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -458,18 +458,30 @@ function InviteSheet({ invite, onClose }: { invite: Invite; onClose: () => void 
 }
 
 /**
- * Six tabs. A `fill` SegmentedControl truncated half of them at phone width —
- * "Prog…", "Repo…", "Man…" — which is what §7's 2-to-4 cap is warning about.
- * `IconTabs` is the answer above that cap: every tab is its icon, only the
- * active one keeps its label, exactly like the bottom nav.
+ * SIX SECTIONS, AND THEY DO NOT GO IN A RAIL.
+ *
+ * This was a `fill` SegmentedControl that truncated half of them at phone width
+ * ("Prog…", "Repo…", "Man…"), then `IconTabs`, which fixed the truncation by
+ * removing the words: six unlabelled glyphs, packed to the left of a bar that
+ * was mostly empty, at a 34×30 hit area under the 44px floor. And it cost a
+ * whole sticky row beneath a sticky identity chip — a fifth of a phone spent on
+ * chrome before any of the client's data.
+ *
+ * The sections are IN the header now (`SectionSwitcher`). The chip says who you
+ * are looking at and where you are in them; tapping it lists all six with real
+ * labels, tones and a line each saying what is inside.
+ *
+ * The second line of the chip used to read "COACH VIEW" — true, permanent, and
+ * under a header only a coach can reach. It carries the current section now,
+ * which is the one thing there that changes.
  */
 const TABS = [
-  { value: "today", label: "Today", icon: Sun },
-  { value: "plans", label: "Plans", icon: ClipboardList },
-  { value: "goals", label: "Goals", icon: Target },
-  { value: "progress", label: "Progress", icon: TrendingUp },
-  { value: "report", label: "Report", icon: BarChart3 },
-  { value: "manage", label: "Manage", icon: SettingsIcon },
+  { value: "today", label: "Today", icon: Sun, tone: "primary", hint: "Their day: food, training, wellness" },
+  { value: "plans", label: "Plans", icon: ClipboardList, tone: "activity", hint: "Workout and meal plans you've published" },
+  { value: "goals", label: "Goals", icon: Target, tone: "cardio", hint: "Targets, and how close they are" },
+  { value: "progress", label: "Progress", icon: TrendingUp, tone: "nutrition", hint: "Weight, measurements and trends" },
+  { value: "report", label: "Report", icon: BarChart3, tone: "sleep", hint: "A period summary you can share" },
+  { value: "manage", label: "Manage", icon: SettingsIcon, tone: "neutral", hint: "Access, coaches, archiving" },
 ] as const;
 type Tab = (typeof TABS)[number]["value"];
 
@@ -487,24 +499,21 @@ export function ClientDetail() {
   if (!clientId) return null;
   return (
     <div>
-      {/* Bare, floating sub-header — mirrors the AppBar's ambient language:
-          no solid slab, so the page wash + content bleed behind it and only the
-          identity chip + tab pill float over what's scrolling past. */}
-      <div className="sticky top-16 z-20 space-y-2.5 px-4 pb-2 pt-2">
-        <div className="column flex items-center">
-          <div className="flex min-w-0 items-center gap-1.5 rounded-full border border-border/40 bg-background/60 py-1 pl-1 pr-3.5 backdrop-blur-md">
-            <button onClick={() => nav("/clients")} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground" aria-label="All clients">
-              <ArrowLeft className="size-[1.1rem]" />
-            </button>
-            <Avatar name={client?.displayName ?? ""} src={client?.avatarUrl} seed={client?.avatarSeed ?? clientId} className="size-8 shrink-0" />
-            <div className="min-w-0 leading-tight">
-              <div className="truncate text-sm font-semibold">{client?.displayName ?? "…"}</div>
-              <div className="text-micro uppercase text-muted-foreground">Coach view</div>
-            </div>
-          </div>
-        </div>
+      {/* Bare, floating sub-header — mirrors the AppBar's ambient language: no
+          solid slab, so the page wash and the content bleed behind it and only
+          the chip floats over what is scrolling past. ONE row now, not two. */}
+      <div className="sticky top-16 z-20 px-4 pb-2 pt-2">
         <div className="column">
-          <IconTabs items={TABS} value={tab} onChange={(v) => nav(`/clients/${clientId}/${v}`)} />
+          <SectionSwitcher
+            sections={TABS}
+            value={tab}
+            onChange={(v) => nav(`/clients/${clientId}/${v}`)}
+            title={client?.displayName ?? "…"}
+            menuTitle="Go to"
+            onBack={() => nav("/clients")}
+            backLabel="All clients"
+            leading={<Avatar name={client?.displayName ?? ""} src={client?.avatarUrl} seed={client?.avatarSeed ?? clientId} className="size-9 shrink-0" />}
+          />
         </div>
       </div>
       {tab === "today" && <Today key={clientId} clientId={clientId} />}

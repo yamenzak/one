@@ -15,7 +15,7 @@
  */
 
 import { test } from "@playwright/test";
-import { buildDemoWorld, DEMO_STUDIO, prepare, type DemoWorld } from "../src/demo.js";
+import { buildDemoWorld, DEMO_CLIENT, DEMO_STUDIO, prepare, type DemoWorld } from "../src/demo.js";
 import { shoot, visit } from "../src/shoot.js";
 import { teardown } from "../src/provision.js";
 
@@ -69,6 +69,16 @@ test("the coach's studio", async () => {
   await test.step("a client", async () => {
     await visit(page, `${base}/clients/${world.client.id}/overview`, shell);
     await shoot(page, project, "coach-client", { settle: 600 });
+  });
+
+  // The section menu — the control that replaced the icon rail. Opened rather
+  // than described, because the whole claim is that six sections read better
+  // with words than as six glyphs, and only a picture settles that.
+  await test.step("the client's sections", async () => {
+    await visit(page, `${base}/clients/${world.client.id}/overview`, shell);
+    await page.getByRole("button", { name: new RegExp(DEMO_CLIENT, "i") }).first().click();
+    await shoot(page, project, "coach-client-sections", { ready: page.getByText("Go to") });
+    await page.keyboard.press("Escape");
   });
 
   await test.step("the plan", async () => {

@@ -413,7 +413,7 @@ export function IconTabs<T extends string>({
 }) {
   const pillId = useId();
   return (
-    <div className={cn("relative flex items-center gap-0.5 rounded-full bg-secondary p-1", className)} role="tablist">
+    <div className={cn("relative flex items-center gap-0.5 rounded-full border border-border/50 bg-secondary p-1", className)} role="tablist">
       {items.map((it) => {
         const on = value === it.value;
         const Icon = it.icon;
@@ -427,7 +427,11 @@ export function IconTabs<T extends string>({
             title={it.label}
             onClick={() => onChange(it.value)}
             className={cn(
-              "relative z-10 flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium outline-none transition-colors",
+              // `flex-1` and a 44px floor: the rail used to pack its items to
+              // the left at 34x30, leaving dead width on the right and a target
+              // under the accessibility floor (§12). Now every tab is an equal
+              // share of the bar and the whole share is tappable.
+              "relative z-10 flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full px-2 text-sm font-medium outline-none transition-colors",
               FOCUS,
               on ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
             )}
