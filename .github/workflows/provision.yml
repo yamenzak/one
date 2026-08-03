@@ -94,6 +94,7 @@ jobs:
             echo "r2=$(get .provision.r2)"
             echo "email=$(get .email.name)"
             echo "shared_title=$(node scripts/apps.mjs shared-config-title)"
+            echo "worker=$(node scripts/apps.mjs worker "$APP")"
           } >> "$GITHUB_OUTPUT"
 
       - uses: pnpm/action-setup@v4
@@ -109,6 +110,7 @@ jobs:
         env:
           D1_NAME: ${{ steps.app.outputs.d1 }}
           KV_TITLE: ${{ steps.app.outputs.kv }}
+          WORKER_NAME: ${{ steps.app.outputs.worker }}
           SHARED_TITLE: ${{ steps.app.outputs.shared_title }}
           R2_BUCKET: ${{ steps.app.outputs.r2 }}
         run: |
@@ -178,19 +180,37 @@ jobs:
           # ── KV ────────────────────────────────────────────────────────────
           # Wrangler titles the namespace "<worker>-<binding>", so match the
           # suffix. The config carries only an id, so there is no name to drift.
+          # ── EXACT title, and this is not a nicety ─────────────────────────
+          #
+          # `wrangler kv namespace create CACHE` inside apps/api makes
+          # `kova-CACHE`; inside apps/tessa, `tessa-CACHE`. This used to match
+          # `endswith("CACHE")` and take `head -1` — which was fine with one app
+          # and a coin flip with two. It landed: provisioning kova adopted
+          # TESSA's cache namespace and committed the id, so one product's
+          # worker was reading and writing the other's KV.
+          #
+          # A cache is "never a source of truth" (the bindings contract), so it
+          # was recoverable — but the same match is one registry entry away from
+          # doing it to a D1 database. So the expected title is CONSTRUCTED from
+          # the worker name and compared exactly; a namespace that does not
+          # exist under that exact name is created, which produces that exact
+          # name.
+          WANT_KV="${WORKER_NAME}-${KV_TITLE}"
+          echo "Looking for the KV namespace titled exactly: $WANT_KV"
+
           # Guarded on a non-empty title: `endswith("")` matches EVERY namespace,
           # so an app that declares no KV would otherwise adopt a stranger's.
           KV_ID=""
           if [ -z "$KV_TITLE" ]; then
             echo "No KV declared for $APP — skipping."
           elif kv=$(require_list "KV namespaces" pnpm exec wrangler kv namespace list); then
-            KV_ID=$(printf '%s' "$kv" | jq -r --arg t "$KV_TITLE" '.[]? | select(.title | endswith($t)) | .id' | head -1)
+            KV_ID=$(printf '%s' "$kv" | jq -r --arg t "$WANT_KV" '.[]? | select(.title == $t) | .id' | head -1)
             if [ -n "$KV_ID" ]; then
               echo "✓ KV namespace ending in '$KV_TITLE' exists ($KV_ID)."
             else
               echo "Creating KV namespace '$KV_TITLE'…"
               pnpm exec wrangler kv namespace create "$KV_TITLE" >/dev/null 2>&1 || fail=1
-              KV_ID=$(pnpm exec wrangler kv namespace list 2>/dev/null | json_only | jq -r --arg t "$KV_TITLE" '.[]? | select(.title | endswith($t)) | .id' | head -1)
+              KV_ID=$(pnpm exec wrangler kv namespace list 2>/dev/null | json_only | jq -r --arg t "$WANT_KV" '.[]? | select(.title == $t) | .id' | head -1)
               [ -n "$KV_ID" ] || { echo "::error::Created KV '$KV_TITLE' but could not read its id back."; fail=1; }
             fi
           else
@@ -210,6 +230,16 @@ jobs:
           if [ -z "$SHARED_TITLE" ]; then
             echo "No shared config namespace declared — skipping."
           elif kv=$(require_list "KV namespaces" pnpm exec wrangler kv namespace list); then
+            # Suffix match is CORRECT here and nowhere else: this namespace is
+            # deliberately shared, so whichever app created it, every app after
+            # must find that same one. More than one match means duplicates were
+            # created — binding either would split the platform's config in two,
+            # so it refuses rather than picking.
+            n=$(printf '%s' "$kv" | jq -r --arg t "$SHARED_TITLE" '[.[]? | select(.title | endswith($t))] | length')
+            if [ "$n" -gt 1 ]; then
+              echo "::error::$n KV namespaces end in '$SHARED_TITLE'. Delete the duplicates — binding either splits the platform config."
+              fail=1
+            fi
             SHARED_ID=$(printf '%s' "$kv" | jq -r --arg t "$SHARED_TITLE" '.[]? | select(.title | endswith($t)) | .id' | head -1)
             if [ -n "$SHARED_ID" ]; then
               echo "✓ Shared config namespace ending in '$SHARED_TITLE' exists ($SHARED_ID) — binding it."

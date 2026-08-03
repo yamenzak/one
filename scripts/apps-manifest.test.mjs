@@ -162,6 +162,42 @@ for (const wf of ["deploy.yml", "provision.yml"]) {
   }
 }
 
+/**
+ * NO TWO APPS MAY BIND THE SAME RESOURCE — except the one that is meant to be.
+ *
+ * This is not hypothetical. Provisioning matched its KV namespace by title
+ * SUFFIX and took the first hit: `kova-CACHE` and `tessa-CACHE` both end in
+ * "CACHE", so running it for Kova adopted TESSA's namespace and committed the
+ * id. One product's worker then read and wrote the other's KV, and nothing
+ * anywhere said so — the config looked perfectly well-formed, every id was
+ * real, and `ready` passed.
+ *
+ * A cache is recoverable ("never a source of truth" — the bindings contract).
+ * The same match was one registry entry away from doing it to a D1 database,
+ * which is not. So the invariant is asserted here, where it is cheap and loud,
+ * rather than trusted to whatever wrote the ids.
+ *
+ * `sharedConfig.binding` is the deliberate exception and the ONLY one: that
+ * namespace exists precisely to be the same id everywhere. It is read from the
+ * registry rather than hardcoded, so renaming it cannot silently disable this.
+ */
+const SHARED = registry.sharedConfig?.binding ?? "";
+const seen = new Map(); // id → "app.BINDING"
+for (const a of apps.filter((x) => x.provision)) {
+  const text = wranglerText(a.id);
+  const bindings = [
+    ...text.matchAll(/"binding"\s*:\s*"(\w+)"\s*,\s*"(?:id|database_id)"\s*:\s*"([^"]+)"/g),
+    ...text.matchAll(/"binding"\s*:\s*"(\w+)"\s*,\s*"bucket_name"\s*:\s*"([^"]+)"/g),
+  ];
+  for (const [, binding, id] of bindings) {
+    if (binding === SHARED) continue;
+    const where = `${a.id}.${binding}`;
+    const prev = seen.get(id);
+    if (prev) fail(`${where} and ${prev} both bind "${id}". Two apps sharing a resource is a mis-provisioned id, not a design — only ${SHARED || "the shared config namespace"} may be common.`);
+    else seen.set(id, where);
+  }
+}
+
 // ── Report ──────────────────────────────────────────────────────────────────
 if (problems.length) {
   for (const p of problems) console.error(`BAD  ${p}`);

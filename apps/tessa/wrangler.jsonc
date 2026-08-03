@@ -110,7 +110,15 @@
   // invalid bucket name means `pnpm test` cannot even boot, and a template whose
   // tests do not run is a template that rots. Local dev and the test suite
   // simulate all three and never look at the values.
-  "kv_namespaces": [{ "binding": "CACHE", "id": "d45cc2d0725d4d9aab13c247f2a27e1a" }],
+  "kv_namespaces": [
+    { "binding": "CACHE", "id": "d45cc2d0725d4d9aab13c247f2a27e1a" },
+    // The SHARED platform config store — the SAME namespace id in every 4DL
+    // app, holding the credentials the whole platform has in common (the
+    // Google key, the Stripe account, the Cloudflare token, the Turnstile
+    // widget). This app's own `app_config` rows still win. Written here by
+    // provisioning; see packages/core/src/config.ts.
+    { "binding": "PLATFORM_CONFIG", "id": "c851c1a484c444cd91c5be8766d9256d" }
+  ],
   "d1_databases": [{ "binding": "DB", "database_id": "160a72f4-fef9-476d-a069-66bd0234471f" }],
   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "tessa-media" }],
   "send_email": [{ "name": "EMAIL" }]

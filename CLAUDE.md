@@ -225,7 +225,13 @@ the coverage.
 
 **Three dependency-free guards, and all are in `pnpm test`:**
 `scripts/apps-manifest.test.mjs` fails on anything under `apps/` with a
-`wrangler.jsonc` and no registry entry (`_template` exempt),
+`wrangler.jsonc` and no registry entry (`_template` exempt) — and on two apps
+binding the SAME resource id, which is never a design and has happened once:
+provisioning matched its KV namespace by title SUFFIX (`kova-CACHE` and
+`tessa-CACHE` both end in `CACHE`), took the first hit, and pointed Kova's cache
+at Tessa's namespace. `PLATFORM_CONFIG` is the one exemption, read from the
+registry rather than hardcoded. Provisioning now matches the exact
+`<worker>-<binding>` title,
 `scripts/affected.test.mjs` on a deploy filter that would skip an app it should
 have shipped, and `.github/workflows/workflows-parse.test.mjs` on a workflow
 that would not parse —

@@ -21,6 +21,7 @@
  *   node scripts/apps.mjs origin <id>     # its canonical public origin, or ""
  *   node scripts/apps.mjs email-sql <id>  # the seeding SQL for its sender
  *   node scripts/apps.mjs shared-config-title   # the platform-wide KV title
+ *   node scripts/apps.mjs worker <id>     # its wrangler `name` (the script)
  */
 
 import { readFileSync, readdirSync, existsSync, realpathSync } from "node:fs";
@@ -317,6 +318,17 @@ switch (cmd) {
   // The ONE resource that is not per-app: a single KV namespace bound with the
   // same id into every worker. Printed rather than repeated in the workflow,
   // for the same reason nothing else here is repeated.
+  /**
+   * The worker's SCRIPT name, from its own `wrangler.jsonc`.
+   *
+   * `wrangler kv namespace create X` prefixes this onto the title, so it is what
+   * turns a binding name into the exact namespace an app owns. Provisioning used
+   * to match the title by SUFFIX and take the first hit — fine with one app, a
+   * coin flip with two, and it bound Kova's cache to Tessa's namespace.
+   */
+  case "worker":
+    console.log(/^\s*"name"\s*:\s*"([^"]+)"/m.exec(uncommented(wranglerText(arg)))?.[1] ?? "");
+    break;
   case "shared-config-title":
     console.log(registry.sharedConfig?.title ?? "");
     break;

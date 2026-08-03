@@ -105,7 +105,7 @@
 
   "kv_namespaces": [
     // External food/exercise API response cache + short-lived tokens.
-    { "binding": "CACHE", "id": "d45cc2d0725d4d9aab13c247f2a27e1a" },
+    { "binding": "CACHE", "id": "f3408df5412d473e9a43cacc0bb56b78" },
     // The SHARED platform config store — the SAME namespace id in every 4DL
     // app, holding the credentials the whole platform has in common (the
     // Google key, the Stripe account, the Cloudflare token, the Turnstile

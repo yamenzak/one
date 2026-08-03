@@ -216,8 +216,15 @@ jobs:
           # created it, every app after that finds the SAME namespace.
           id=$(printf '%s' "$out" | json_only | jq -r --arg t "$title" '.[]? | select(.title | endswith($t)) | .id' | head -1)
           if [ -z "$id" ]; then
-            echo "Creating the shared config namespace '$title'…"
-            pnpm exec wrangler kv namespace create "$title" >/dev/null 2>&1 || true
+            # From an APP's directory, not the repo root. `wrangler kv namespace
+            # create` reads the worker name out of the wrangler config to prefix
+            # the title, and at the root there is no config to read — the create
+            # fails, the list comes back empty, and the step reports "could not
+            # create" on a platform where nothing was wrong except the cwd.
+            # (That is exactly what run #490 did.)
+            dir=$(node --input-type=module -e "import {apps} from './scripts/apps.mjs'; process.stdout.write(apps.find((a) => a.provision)?.dir ?? '')")
+            echo "Creating the shared config namespace '$title' from $dir…"
+            (cd "$dir" && pnpm exec wrangler kv namespace create "$title") >/dev/null 2>&1 || true
             id=$(pnpm exec wrangler kv namespace list 2>/dev/null | json_only | jq -r --arg t "$title" '.[]? | select(.title | endswith($t)) | .id' | head -1)
           fi
           if [ -z "$id" ]; then
