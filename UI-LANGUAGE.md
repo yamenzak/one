@@ -754,6 +754,45 @@ card.
   wizard.
 - **A card is not a way to add padding.** If something needs air, give it air.
 
+### Creating a thing is an event. It does not live on the screen.
+
+A form the reader is not filling in must not be on screen. This sounds obvious
+and is broken constantly, because the form is the part someone built first and
+the readouts got added above it.
+
+The screen that made the rule: a client's goal. Reading the goal in force is
+something a coach does every visit; setting a new one happens every six or eight
+weeks. The screen was eleven inputs, three selects and a Save button occupying
+its middle **permanently**, with the live goal as a card above them and every
+past one as a paragraph of dense text at the bottom. The thing you came for was
+the smallest element on it.
+
+- **The current state is the page.** In full, first, as the anchor (§1).
+- **Creating or replacing it is a `Sheet`** behind one button, prefilled **at
+  open time** — not once at mount. A composer prefilled at mount shows numbers
+  from before whatever the user just went and did.
+- **The consequence goes on the sheet's footer button**, in words: `Replace
+  "Cut — 8 weeks"`, not `Save`.
+- **The outcome is a toast** and the sheet closes. Both, or neither — a sheet
+  that stays open after a success reads as a failure.
+
+The same shape applies to any screen whose subject has one live version and a
+history: a plan, a price list, a policy, a goal.
+
+### A history is a series. One picker drives the chart AND the list.
+
+When a screen holds several versions of the same thing over time, the question
+is never "what were they" — it is "how did they move". So:
+
+- **The list is chronological and every row carries the same value**, with its
+  change from the row before it (`Delta`, §13).
+- **A chart above it, from two entries.** One is not a comparison — the same
+  floor `GlanceStrip` has — and a one-bar chart is worse than the sentence
+  "there is only one so far".
+- **ONE control picks the metric, and it drives both.** Two controls let them
+  disagree, and a list whose right-hand column silently means something other
+  than the chart above it is worse than no column at all.
+
 ### The component you want already exists
 
 The registry (§13) is the answer to "how do I build this". Before writing a
@@ -1107,6 +1146,14 @@ deltas).
 | `Section` | A titled block with the standard rhythm. `action` is one quiet affordance. | Wrapping a single row — that is just a `Group`. | ✅ |
 | `Group` | The container rows live in. Rounded, inset hairlines, no padding of its own. | Free-form content. If it is not rows, it is a `Card`. | ✅ |
 | `Row` | Any scannable list line. Three heights by content. | Prose. A row truncates; a sentence in one is a bug (found the hard way on the doorway screens). | ✅ |
+
+`Row`'s `iconTone` tints the squircle when the **kind** of a row is meaningful
+and repeated — a feed of mixed event types, an index, a picker — so the list is
+scannable by colour as well as by word. Reach for it instead of
+`leading={<IconBadge …/>}`: `leading` is the avatar slot and forces the row to
+its 72px height, and two row heights in one list is exactly what §2's fixed
+heights exist to prevent.
+
 | `Tile` | A browsable 2-up/3-up grid item. | A list. Tiles are browsed, rows are scanned — a list of tiles has no left edge to scan. | ✅ |
 | `TileGrid` | The grid `Tile` sits in. | — | ✅ |
 | `GroupNote` | One quiet line under a group. | Two sentences. That is a `Callout`. | ✅ |
@@ -1198,10 +1245,20 @@ invisible cursor.
 | `GlanceStrip` | 3 bare numbers split by hairlines — a deliberate break from the card rhythm. | More than 4 items, or anything needing a chart. | ✅ |
 | `ProgressRing` / `TargetRing` | One value against a whole. | Restating the anchor. A ring under an anchor showing the same number is the §1 defect. | ✅ |
 | `ChartCard` | A chart with a headline number. Three `value` states — see §5. | A chart with no story. If the title is the whole point, it is a `Section`. | ✅ |
+| `Delta` | A change between two versions of a number: its size, its direction, and whether that direction is good. | A value. A delta is always secondary to the thing that changed. | ✅ |
 | `NoData` | Rendered *by* the components above when their `value` is `null`. Call it directly only in a hand-rolled value slot. | A dash. Ever. See §5. | ✅ |
 
 `isBlank(v)` is the shared predicate — `null`, `undefined` or `""`, and
 deliberately **not** `0`.
+
+`Delta` settles three things every hand-rolled version decided differently:
+the direction is an **icon** (a `+`/`−` at caption size is one pixel wide and
+vanishes beside a numeral); the tone comes from **`goodWhen`**, not from the
+sign, because a rise is good for protein and bad for body fat; and **zero says
+so in words** rather than rendering `+0`, which is a badge drawing attention to
+the news that nothing happened. `goodWhen` defaults to neutral — most changes a
+product shows are neither good nor bad, and a component that guessed would be
+confidently wrong half the time.
 
 ### Tiles — `tiles.tsx`
 
@@ -1248,7 +1305,30 @@ toolbar says what would free the space instead.
 | Component | Use it when | Do NOT use it for | State |
 |---|---|---|---|
 | `DatePill` | One date the user can change — a range endpoint, a single field in a filter row. | A date you only *display*. That is text. | ✅ |
-| `DayNav` | The whole screen is scoped to one day and the user steps through days. | Two-way range selection — that is two `DatePill`s. | ✅ |
+| `DayNav` | The whole screen is scoped to one day and the user steps through days. | Two-way range selection — that is `RangePicker`. | ✅ |
+| `RangePicker` | A screen scoped to a **window**: presets one tap away, a custom start→end in a sheet. | A single date (`DatePill`) or a day-stepper (`DayNav`). | ✅ |
+| `useDateRange` | The state behind it: the preset, the custom window, and the query string — computed from one value. | Holding `range` + `customStart` + `customEnd` yourself and rebuilding the query at the fetch site. | ✅ |
+
+`RangePicker` has **one height for its whole life**. The version it replaces put
+a calendar cell in the segmented control and, when pressed, grew a second row of
+date pills — which pushed the screen down, appeared and vanished under the
+reader, and still only offered a start and an end. Custom now lives in a sheet:
+nothing moves, and the sheet has room for the whole-calendar shortcuts a row
+never would ("This month", "Last month", "Year to date" — the windows people
+name out loud, none of which is expressible as "N days back").
+
+A custom window takes **its own cell in the bar, labelled with its length**
+(`45d`), so the control never shows an empty selection.
+
+`useDateRange` exists because the two screens that had a range held it
+differently and one of them built its query string from a ternary at the fetch
+site, two hundred lines from the control. `props` and `query` come from the same
+value, so a bar showing "45d" cannot be fetching thirty.
+
+`today` is a **required prop** on both, for the same reason `DayNav` does no
+date math: the app's day is the user's local day, and a component that read the
+clock would be a day out for anyone whose device is not on the server's
+timezone.
 
 `surface` is the one decision they share: `"solid"` on ordinary background,
 `"translucent"` where the control sits over the T0 atmosphere (§1: "T4 is

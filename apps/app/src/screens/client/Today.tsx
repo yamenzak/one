@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtVolume, fmtEnergy, fmtWeight, featureEnabled, type UnitPrefs } from "@kova/domain";
-import { Button, Card, Skeleton, IconBadge, Sheet, EmptyState, ProgressRing, Reveal, SkeletonHero, SkeletonList, SkeletonHeader, Page, Stagger, Anchor, DayNav, ChevronRight, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock, Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple, Store, Ticket, AlertTriangle, ShieldCheck, toneVar, Target, ScanLine, BookOpen, Group, Row, User, type Tone, type LucideIcon } from "@4dl/ui";
+import { Button, Card, Skeleton, Sheet, EmptyState, ProgressRing, Reveal, SkeletonHero, SkeletonList, SkeletonHeader, Page, Stagger, Anchor, DayNav, LoadError, ChevronRight, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock, Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple, Store, Ticket, AlertTriangle, ShieldCheck, toneVar, Target, ScanLine, BookOpen, Group, Row, User, type Tone, type LucideIcon } from "@4dl/ui";
 import { MacroBar } from "../../registry/index.js";
 import type { WidgetItem } from "@kova/protocol";
 import { useNavigate } from "react-router-dom";
@@ -477,17 +477,24 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
             <Reveal loading={!feed} skeleton={<SkeletonList card rows={3} />}>
               {feed && (feedError ? (
                 /* The feed alone failed — an empty timeline would read as "you
-                   logged nothing today", which is a different and wrong claim. */
-                <Card className="flex items-center justify-between gap-3 py-3 text-sm text-muted-foreground">
-                  <span className="min-w-0">Couldn't load this day's activity.</span>
-                  <Button size="sm" variant="secondary" className="shrink-0" onClick={() => setReloadKey((k) => k + 1)}>Retry</Button>
-                </Card>
+                   logged nothing today", which is a different and wrong claim.
+                   `LoadError` is the shared shape for exactly that: what broke,
+                   and a way to try again (§7). */
+                <LoadError what="this day's activity" error="Something went wrong reaching the server." onRetry={() => setReloadKey((k) => k + 1)} />
               ) : feed.length === 0 ? (
-                <Card className="text-center text-sm text-muted-foreground">{isToday ? "Your day fills in here as you log — meals, workouts, check-ins and more." : "Nothing was logged on this day."}</Card>
+                <EmptyState
+                  icon={History}
+                  title={isToday ? "Nothing logged yet" : "Nothing was logged"}
+                  description={isToday ? "Your day fills in here as you log — meals, workouts, check-ins and more." : undefined}
+                />
               ) : (
-                <Card className="divide-y divide-border/40 py-0.5">
+                /* The app's row, not a hand-rolled one. This was a `Card` of
+                   `py-2.5` buttons: below the 56px floor, with its own hairline
+                   inset, its own press feedback and no entrance stagger — four
+                   decisions §4 has already made. */
+                <Group>
                   {feed.map((ev) => <FeedRow key={ev.id} ev={ev} units={units} onOpen={onOpen} onDetail={(kind, ref) => setDetail({ kind, ref })} />)}
-                </Card>
+                </Group>
               ))}
             </Reveal>
           </Stagger>
@@ -612,21 +619,24 @@ function FeedRow({ ev, units, onOpen, onDetail }: { ev: FeedEvent; units: UnitPr
   const route = !detail && onOpen ? routeForEvent(ev) : null;
   const clickable = detail || !!route;
   const open = () => (detail ? onDetail!(ev.kind.replace(":", "."), ev.ref!) : onOpen!(route!));
-  const body = (
-    <>
-      <IconBadge icon={meta.icon} tone={meta.tone} size="sm" />
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">{ev.title}</div>
-        {sub && <div className="truncate text-xs text-muted-foreground">{sub}</div>}
-      </div>
-      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{time}</span>
-      {clickable && <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" />}
-    </>
-  );
-  return clickable ? (
-    <button onClick={open} className="flex w-full items-center gap-3 py-2.5 text-left transition-opacity active:opacity-60">{body}</button>
-  ) : (
-    <div className="flex items-center gap-3 py-2.5">{body}</div>
+  return (
+    <Row
+      // Tinted by KIND, so the day is scannable by colour before it is read —
+      // and through `iconTone` rather than a custom `leading`, which would push
+      // this row to the 72px avatar height and give the feed two row sizes.
+      icon={meta.icon}
+      iconTone={meta.tone}
+      sub={sub || undefined}
+      onClick={clickable ? open : undefined}
+      trailing={
+        <span className="flex shrink-0 items-center gap-1">
+          <span className="numeral text-caption text-muted-foreground">{time}</span>
+          {clickable && <ChevronRight aria-hidden className="size-4 text-muted-foreground" />}
+        </span>
+      }
+    >
+      {ev.title}
+    </Row>
   );
 }
 

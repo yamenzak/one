@@ -7,13 +7,14 @@
  */
 
 import { useEffect, useState } from "react";
-import { kgToDisplay, weightLabel, type RangePreset } from "@kova/domain";
+import { kgToDisplay, weightLabel } from "@kova/domain";
 import {
-  Button, Card, Badge, SegmentedControl, Page, Stagger, StatCard, ChartCard, AreaChart, SectionHeader, Eyebrow, GlanceStrip, Sparkline, toneVar,
+  Button, Card, Badge, RangePicker, useDateRange, Page, Stagger, StatCard, ChartCard, AreaChart, SectionHeader, Eyebrow, GlanceStrip, Sparkline, toneVar,
   Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList,
   Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, TrendingUp, Percent, cn,
 } from "@4dl/ui";
 import { api, errorText, todayLocal } from "../../api.js";
+import { RANGE_PRESETS } from "../../ranges.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
 import { AiAvatar, useAiIdentity } from "../../AiAvatar.js";
@@ -34,7 +35,10 @@ const shortDate = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateStrin
 
 export function ClientReport({ clientId }: { clientId: string }) {
   const ai = useAiIdentity();
-  const [range, setRange] = useState<RangePreset>("30d");
+  // The same control and the same wire contract as Progress. This tab used to
+  // offer 7/30/90 and nothing else, so one client screen answered "since the
+  // phase started" on one tab and refused on the next.
+  const range = useDateRange(RANGE_PRESETS, todayLocal(), "30d");
   const [report, setReport] = useState<Report | null>(null);
   const [exMap, setExMap] = useState<Map<string, ExerciseInfo>>(new Map());
   const [summary, setSummary] = useState<string | null>(null);
@@ -42,7 +46,7 @@ export function ClientReport({ clientId }: { clientId: string }) {
   const units = useUnits();
   const today = todayLocal();
 
-  useEffect(() => { setReport(null); void api.get<Report>(`/api/reports/client/${clientId}?range=${range}&today=${today}`).then(setReport).catch(() => setReport(null)); }, [clientId, range, today]);
+  useEffect(() => { setReport(null); void api.get<Report>(`/api/reports/client/${clientId}?${range.query}&today=${today}`).then(setReport).catch(() => setReport(null)); }, [clientId, range.query, today]);
   useEffect(() => { void api.get<{ exercises: ExerciseInfo[] }>("/api/exercises?scope=all").then((r) => setExMap(new Map(r.exercises.map((e) => [e.id, e])))).catch(() => undefined); }, []);
 
   // `/api/ai/client-summary` is gated on aiSuite. The card used to render on
@@ -69,7 +73,7 @@ export function ClientReport({ clientId }: { clientId: string }) {
 
   return (
     <Page className="column space-y-4 p-4 pb-28">
-      <SegmentedControl options={[{ value: "7d", label: "7 days" }, { value: "30d", label: "30 days" }, { value: "90d", label: "90 days" }]} value={range} onChange={(v) => setRange(v as RangePreset)} />
+      <RangePicker format={shortDate} {...range.props} />
 
       {canAi && (
       <Stagger>

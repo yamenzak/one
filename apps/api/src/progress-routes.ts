@@ -8,10 +8,8 @@
 
 import { Hono } from "hono";
 import {
-  presetRange,
+  resolveRange,
   daysInRange,
-  addDays,
-  daysBetween,
   currentStreak,
   longestStreak,
   consistencyPct,
@@ -44,26 +42,18 @@ function weekStart(date: string): string {
 export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", async (c) => {
   const access = await requireClientAccess(c, c.req.param("clientId"));
   if ("response" in access) return access.response;
-  const range = (c.req.query("range") as "7d" | "30d" | "90d") ?? "30d";
-  // `today` reaches throwing domain date helpers (presetRange/addDays/
+  // `today` reaches throwing domain date helpers (resolveRange/addDays/
   // currentStreak) — an unparseable value would 500 the whole endpoint, so
   // validate the LocalDate shape and fall back to the server date.
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   const qToday = c.req.query("today");
   const today = qToday && DATE_RE.test(qToday) ? qToday : new Date().toISOString().slice(0, 10);
-  // Range is either a preset (7d/30d/90d) or an explicit custom window via
-  // `start`/`end` (YYYY-MM-DD). A valid custom pair wins; anything malformed
-  // falls back to the preset. The window is clamped to today and capped at
-  // 366 days so a hand-crafted query can't scan an unbounded history.
-  const qStart = c.req.query("start"), qEnd = c.req.query("end");
-  let start: string, end: string;
-  if (qStart && qEnd && DATE_RE.test(qStart) && DATE_RE.test(qEnd) && qStart <= qEnd) {
-    end = qEnd > today ? today : qEnd;
-    start = qStart > end ? end : qStart;
-    if (daysBetween(start, end) > 366) start = addDays(end, -366);
-  } else {
-    ({ start, end } = presetRange(range, today));
-  }
+  // A preset (7d/30d/90d) or an explicit custom window via `start`/`end`.
+  // Validation, precedence and the clamps are the domain's — see `resolveRange`.
+  const { start, end } = resolveRange(
+    { range: c.req.query("range"), start: c.req.query("start"), end: c.req.query("end") },
+    today,
+  );
   const clientId = access.client.id;
   const db = c.env.DB;
   const days = daysInRange(start, end);

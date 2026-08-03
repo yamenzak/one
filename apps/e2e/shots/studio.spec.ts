@@ -81,6 +81,20 @@ test("the coach's studio", async () => {
     await page.keyboard.press("Escape");
   });
 
+  await test.step("the client's goal", async () => {
+    await visit(page, `${base}/clients/${world.client.id}/goals`, page.getByText("Body snapshot").first());
+    await shoot(page, project, "coach-client-goals", { settle: 1200 });
+  });
+
+  // The composer. It is a sheet now rather than a permanent form in the middle
+  // of the screen, which is the whole claim — so it gets its own picture.
+  await test.step("setting a new phase", async () => {
+    await visit(page, `${base}/clients/${world.client.id}/goals`, page.getByText("Body snapshot").first());
+    await page.getByRole("button", { name: /new phase|set a goal/i }).first().click();
+    await shoot(page, project, "coach-client-goal-new", { ready: page.getByLabel("Phase label"), settle: 400 });
+    await page.keyboard.press("Escape");
+  });
+
   await test.step("the plan", async () => {
     await visit(page, `${base}/clients/${world.client.id}/train`, shell);
     await shoot(page, project, "coach-client-plan");

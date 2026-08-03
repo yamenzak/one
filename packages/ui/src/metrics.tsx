@@ -6,8 +6,8 @@
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import { cn } from "./lib/utils.js";
-import { toneSoft, toneText, toneVar, type Tone } from "./primitives.js";
-import { Check, type LucideIcon } from "./lib/icons.js";
+import { Badge, toneSoft, toneText, toneVar, type Tone } from "./primitives.js";
+import { Check, Minus, TrendingDown, TrendingUp, type LucideIcon } from "./lib/icons.js";
 import { SPRING_SNAP , DUR} from "./lib/animation.js";
 
 interface MetricPillProps {
@@ -48,6 +48,49 @@ export function NoData({ children = "No data yet", className }: { children?: Rea
 
 /** True when a value slot should render `NoData` rather than a numeral. */
 export const isBlank = (v: ReactNode): boolean => v === null || v === undefined || v === "";
+
+/**
+ * A CHANGE — its size, its direction, and whether that direction is good.
+ *
+ * Every screen that shows two versions of a number ends up hand-rolling this,
+ * and the hand-rolled ones disagree on all three decisions at once: some print
+ * `+300` and some `↑ 300`; some colour every rise green even when the number is
+ * body-fat; and every one of them renders `+0` when nothing moved, which is a
+ * badge saying "look at this" attached to the news that there is nothing to
+ * look at.
+ *
+ * So the direction is an ICON (a sign glyph at caption size is one pixel wide
+ * and disappears next to a numeral), the tone comes from `goodWhen` rather than
+ * from the sign, and zero says so in words.
+ *
+ * `goodWhen` DEFAULTS to "any" — neutral. Most changes a product shows are not
+ * an improvement or a regression, they are just different, and a component that
+ * guessed would be confidently wrong half the time. Pass it only where the
+ * product genuinely knows.
+ */
+export function Delta({ value, format = (v) => String(Math.round(v)), unit, goodWhen = "any", zeroLabel = "No change", className }: {
+  value: number;
+  /** Receives the ABSOLUTE change — the sign is the component's to draw. */
+  format?: (abs: number) => string;
+  unit?: string;
+  goodWhen?: "up" | "down" | "any";
+  zeroLabel?: string;
+  className?: string;
+}) {
+  if (!Number.isFinite(value) || Math.round(value) === 0) {
+    return <Badge tone="neutral" className={className}><Minus aria-hidden className="size-3" />{zeroLabel}</Badge>;
+  }
+  const up = value > 0;
+  const tone: Tone = goodWhen === "any" ? "neutral" : up === (goodWhen === "up") ? "success" : "warning";
+  const Icon = up ? TrendingUp : TrendingDown;
+  return (
+    <Badge tone={tone} className={cn("numeral", className)}>
+      <Icon aria-hidden className="size-3" />
+      <span className="sr-only">{up ? "up by" : "down by"} </span>
+      {format(Math.abs(value))}{unit ? ` ${unit}` : ""}
+    </Badge>
+  );
+}
 
 /** A bare, uppercase section label (optional trailing action) — the flow device
  *  that keeps a page from reading as one long stack of cards. Pair with a

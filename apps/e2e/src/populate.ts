@@ -112,13 +112,35 @@ export async function populateClient(client: Client, days = 14): Promise<void> {
   }
 }
 
-/** A goal with real targets, set by the coach — most client screens key off it. */
+/**
+ * Two goal phases, in order — most client screens key off the live one, and the
+ * Goals screen keys off having MORE THAN ONE.
+ *
+ * A single goal is the state every seeded world had, and it is the state where
+ * the phase chart correctly refuses to draw: one bar is not a comparison. So the
+ * demo world carries a superseded phase as well, which is also the honest shape
+ * of a real client — nobody is on their first eight weeks forever.
+ */
 export async function setTargets(studio: Studio, client: Client): Promise<void> {
+  // GoalTargetsSchema is `.strict()` — an unknown key 400s the whole call.
+  await call(studio.page, studio.base, "/api/goals", {
+    clientId: client.id,
+    label: "Base build",
+    startDate: dayBefore(90),
+    notes: "Eat at maintenance, get the lifts moving, no deficit yet.",
+    targets: {
+      targetCalories: 2450,
+      targetProteinG: 150,
+      targetCarbsG: 275,
+      targetFatG: 78,
+      targetWaterMl: 2800,
+      weeklyTrainingLoad: 340,
+    },
+  });
   await call(studio.page, studio.base, "/api/goals", {
     clientId: client.id,
     label: "Lean out for summer",
     startDate: dayBefore(30),
-    // GoalTargetsSchema is `.strict()` — an unknown key 400s the whole call.
     targets: {
       targetCalories: 2100,
       targetProteinG: 165,

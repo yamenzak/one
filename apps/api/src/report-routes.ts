@@ -13,7 +13,7 @@ import {
   currentStreak,
   daysInRange,
   epley1Rm,
-  presetRange,
+  resolveRange,
   sessionTonnage,
   type LoggedSetLike,
 } from "@kova/domain";
@@ -43,11 +43,15 @@ export const reportRoutes = new Hono<AppEnv>()
     // staff (requireClientFlag exempts them); it only bounds a CLIENT reading
     // their own report on a package that didn't include it.
     { const g = await gateFeature(c, "bodyMetrics", access.client.id); if (g) return g; }
-    const range = (c.req.query("range") as "7d" | "30d" | "90d") ?? "30d";
     // "today" comes from the caller's tz; validate the LocalDate shape (it feeds
-    // presetRange → addDays, which throws on an unparseable date) and fall back.
+    // resolveRange → addDays, which throws on an unparseable date) and fall back.
     const today = safeDate(c.req.query("today"), todayLocal());
-    const { start, end } = presetRange(range, today);
+    // A preset OR a custom `start`/`end` window — the same resolver Progress
+    // uses, so the two tabs of one screen cannot offer different date ranges.
+    const { start, end } = resolveRange(
+      { range: c.req.query("range"), start: c.req.query("start"), end: c.req.query("end") },
+      today,
+    );
     const clientId = access.client.id;
     const db = c.env.DB;
 

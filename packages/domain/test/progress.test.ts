@@ -5,8 +5,10 @@ import {
   currentStreak,
   goalProgress,
   longestStreak,
+  MAX_RANGE_DAYS,
   presetRange,
   rangeStatus,
+  resolveRange,
   resolveGoalTimeline,
   seriesDelta,
   wellnessIndex,
@@ -76,6 +78,35 @@ describe("progress aggregates", () => {
     expect(goalProgress(76, 80, 70)!.pct).toBe(40);
     expect(goalProgress(76, 80, 70)!.direction).toBe("down");
     expect(goalProgress(80, 80, 80)).toBeNull();
+  });
+
+  it("resolveRange prefers a valid custom window and clamps it", () => {
+    const today = "2026-07-10";
+    // A well-formed pair wins over the preset.
+    expect(resolveRange({ range: "7d", start: "2026-05-01", end: "2026-05-31" }, today))
+      .toEqual({ start: "2026-05-01", end: "2026-05-31" });
+    // Never past today.
+    expect(resolveRange({ start: "2026-07-01", end: "2026-12-31" }, today))
+      .toEqual({ start: "2026-07-01", end: today });
+    // Never longer than the ceiling.
+    const wide = resolveRange({ start: "2020-01-01", end: today }, today);
+    expect(wide.end).toBe(today);
+    expect(wide.start).toBe("2025-07-09");
+    expect(Math.round((Date.parse(wide.end) - Date.parse(wide.start)) / 86_400_000)).toBe(MAX_RANGE_DAYS);
+  });
+
+  it("resolveRange falls back to the preset on anything malformed", () => {
+    const today = "2026-07-10";
+    const thirty = { start: "2026-06-11", end: today };
+    // Half a pair, an inverted pair, a junk date, an unknown preset — a bad
+    // query string is the caller's mistake, and a 500 would make it look like
+    // ours.
+    expect(resolveRange({ range: "30d", start: "2026-06-01" }, today)).toEqual(thirty);
+    expect(resolveRange({ start: "2026-06-30", end: "2026-06-01" }, today)).toEqual(thirty);
+    expect(resolveRange({ start: "yesterday", end: "today" }, today)).toEqual(thirty);
+    expect(resolveRange({ range: "all-time" }, today)).toEqual(thirty);
+    expect(resolveRange({}, today)).toEqual(thirty);
+    expect(resolveRange({ range: "7d" }, today)).toEqual({ start: "2026-07-04", end: today });
   });
 
   it("range presets and range status", () => {

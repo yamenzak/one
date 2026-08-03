@@ -28,6 +28,7 @@ import { motion, type HTMLMotionProps } from "motion/react";
 import { cn } from "./lib/utils.js";
 import { anchorIn, atmosphereIn, contentIn, contentStagger, pressProps, rowIn, rowStagger, stepPanelVariants } from "./lib/animation.js";
 import { ChevronRight, type LucideIcon } from "./lib/icons.js";
+import { toneVar, type Tone } from "./primitives.js";
 
 // ── T0 · Atmosphere ─────────────────────────────────────────────────────────
 
@@ -304,6 +305,18 @@ export function Group({ children, className }: { children: ReactNode; className?
 export interface RowProps {
   /** A squircle identity container — what this row is ABOUT (§6). */
   icon?: LucideIcon;
+  /**
+   * Tint the icon container. Use it when the KIND of the row is meaningful and
+   * repeated — a feed of mixed event types, a settings index, a picker — so the
+   * list is scannable by colour as well as by word.
+   *
+   * It exists because the alternative was being reached for: a screen that
+   * wanted a tinted glyph passed `leading={<IconBadge …/>}` instead, which is a
+   * different container at a different size and pushes the row to its 72px
+   * avatar height. Two row heights in one list is the thing §4 fixed heights
+   * are for preventing.
+   */
+  iconTone?: Tone;
   /** Anything custom in the leading slot: an avatar, a logo, a colour swatch. */
   leading?: ReactNode;
   /** The primary line. A noun the user recognises (§10). */
@@ -335,7 +348,7 @@ export interface RowProps {
  * matter how correct the spacing is. The whole row is the tap target.
  */
 export const Row = forwardRef<HTMLElement, RowProps>(function Row(
-  { icon: Icon, leading, children, sub, value, valueSub, trailing, onClick, href, chevron, divider = true, tone = "default", disabled, className },
+  { icon: Icon, iconTone, leading, children, sub, value, valueSub, trailing, onClick, href, chevron, divider = true, tone = "default", disabled, className },
   ref,
 ) {
   const navigates = Boolean(onClick || href);
@@ -347,8 +360,17 @@ export const Row = forwardRef<HTMLElement, RowProps>(function Row(
       {(Icon || leading) && (
         <span className="grid shrink-0 place-items-center">
           {leading ?? (
-            <span className="grid size-9 place-items-center rounded-sm bg-surface-2">
-              {Icon && <Icon aria-hidden className={cn("size-[18px]", tone === "danger" ? "text-danger" : "text-muted-foreground")} />}
+            <span
+              className={cn("grid size-9 place-items-center rounded-sm", !iconTone && "bg-surface-2")}
+              style={iconTone ? { backgroundColor: `color-mix(in oklch, ${toneVar[iconTone]} 15%, transparent)` } : undefined}
+            >
+              {Icon && (
+                <Icon
+                  aria-hidden
+                  className={cn("size-[18px]", !iconTone && (tone === "danger" ? "text-danger" : "text-muted-foreground"))}
+                  style={iconTone ? { color: toneVar[iconTone] } : undefined}
+                />
+              )}
             </span>
           )}
         </span>

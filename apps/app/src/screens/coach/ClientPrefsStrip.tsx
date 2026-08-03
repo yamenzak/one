@@ -14,12 +14,22 @@ import { Card, Target, Dumbbell, Utensils, MapPin, type LucideIcon } from "@4dl/
 import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 
-export function ClientPrefsStrip({ clientId, focus, className }: { clientId: string; focus?: "workout" | "meal"; className?: string }) {
-  const [prefs, setPrefs] = useState<ClientPreferences | null>(null);
+export function ClientPrefsStrip({ clientId, prefs: given, focus, className }: {
+  clientId: string;
+  /** Already loaded upstream? Pass them and the strip skips its own read — a
+   *  screen that has the client is not going to fetch it a second time to draw
+   *  four chips. */
+  prefs?: ClientPreferences | null;
+  focus?: "workout" | "meal";
+  className?: string;
+}) {
+  const [fetched, setFetched] = useState<ClientPreferences | null>(null);
   const units = useUnits();
   useEffect(() => {
-    void api.get<{ client: { preferences: ClientPreferences } }>(`/api/clients/${clientId}`).then((r) => setPrefs(r.client.preferences ?? {})).catch(() => undefined);
-  }, [clientId]);
+    if (given) return;
+    void api.get<{ client: { preferences: ClientPreferences } }>(`/api/clients/${clientId}`).then((r) => setFetched(r.client.preferences ?? {})).catch(() => undefined);
+  }, [clientId, given]);
+  const prefs = given ?? fetched;
   if (!prefs) return null;
 
   const chips: { icon?: LucideIcon; label: string }[] = [];

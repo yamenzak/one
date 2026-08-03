@@ -27,6 +27,44 @@ export function presetRange(preset: RangePreset, todayLocal: string): { start: s
   return { start: addDays(todayLocal, -back), end: todayLocal };
 }
 
+const LOCAL_DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** The ceiling on a custom window. A hand-crafted query must not be able to
+ *  scan an unbounded history. */
+export const MAX_RANGE_DAYS = 366;
+
+/**
+ * The window a range query asks for — a preset, or an explicit `start`/`end`.
+ *
+ * Every date that reaches the throwing helpers above (`addDays`, `presetRange`,
+ * `daysInRange`) has to be a well-formed LocalDate, so validation is part of
+ * resolving rather than something each route remembers. Anything malformed —
+ * an unparseable date, an inverted pair, one half of a pair — falls back to the
+ * preset rather than erroring: a bad query string is a caller's mistake, and a
+ * 500 makes it look like ours.
+ *
+ * A valid pair still gets CLAMPED: never past today, never longer than
+ * `MAX_RANGE_DAYS`.
+ *
+ * It is one function because it was two. Progress accepted a custom window and
+ * the report did not, so the same screen offered "any dates you like" on one
+ * tab and 7/30/90 on the next — with the clamping rules written out inline on
+ * the one route that had them.
+ */
+export function resolveRange(
+  q: { range?: string | null; start?: string | null; end?: string | null },
+  todayLocal: string,
+): { start: string; end: string } {
+  const { start: qs, end: qe } = q;
+  if (qs && qe && LOCAL_DATE.test(qs) && LOCAL_DATE.test(qe) && qs <= qe) {
+    const end = qe > todayLocal ? todayLocal : qe;
+    let start = qs > end ? end : qs;
+    if (daysBetween(start, end) > MAX_RANGE_DAYS) start = addDays(end, -MAX_RANGE_DAYS);
+    return { start, end };
+  }
+  const preset: RangePreset = q.range === "7d" || q.range === "90d" ? q.range : "30d";
+  return presetRange(preset, todayLocal);
+}
+
 /**
  * Current streak of consecutive logged days ending today — with a ONE-DAY
  * GRACE: if today has no log yet, the streak counts from yesterday instead of

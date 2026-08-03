@@ -10,12 +10,13 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "motion/react";
-import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, POSTURE_GUIDANCE, presetRange, type RangePreset, type SeriesDelta } from "@kova/domain";
+import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, POSTURE_GUIDANCE, type SeriesDelta } from "@kova/domain";
 
 const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-import { Card, Badge, Button, SegmentedControl, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState, SectionHeader, Sparkline, Eyebrow, GlanceStrip, Reveal, SkeletonHero, SkeletonChart, AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, cn, toneVar, Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, Calendar, DatePill, Scale, Anchor, CountUp, type Tone, type LucideIcon, NoData, IconTabs, DUR } from "@4dl/ui";
+import { Card, Badge, Button, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState, SectionHeader, Sparkline, Eyebrow, GlanceStrip, Reveal, SkeletonHero, SkeletonChart, AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, cn, toneVar, Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, RangePicker, useDateRange, Scale, Anchor, CountUp, type Tone, type LucideIcon, NoData, IconTabs, DUR } from "@4dl/ui";
 import { METRICS, POSTURE_SEVERITY_TONE } from "../../registry/index.js";
 import { api, todayLocal } from "../../api.js";
+import { RANGE_PRESETS } from "../../ranges.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
 import { CoachNote } from "./CoachNote.js";
@@ -68,13 +69,11 @@ export function Progress({ clientId }: { clientId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const today = todayLocal();
-  // Range is a preset (7d/30d/90d) or a "custom" window with explicit start/end
-  // dates. Every chart & summary keys off the fetched range, so the custom
-  // window flows through all four lenses automatically.
-  const [range, setRange] = useState<RangePreset | "custom">("30d");
-  const [customStart, setCustomStart] = useState(() => presetRange("30d", today).start);
-  const [customEnd, setCustomEnd] = useState(today);
-  const customValid = customStart <= customEnd;
+  // A preset (7d/30d/90d) or a custom start→end window. Every chart and summary
+  // keys off the fetched range, so a custom window flows through all four lenses
+  // automatically. The hook owns both the control's props and the query string,
+  // so the two cannot disagree.
+  const range = useDateRange(RANGE_PRESETS, today, "30d");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -84,17 +83,13 @@ export function Progress({ clientId }: { clientId: string }) {
   // while the next range loads, so switching doesn't flash the full skeleton.
   // An alive guard drops a stale response; a failure surfaces a retry.
   useEffect(() => {
-    if (range === "custom" && !customValid) return;
     let alive = true;
     setLoading(true); setError(false);
-    const qs = range === "custom"
-      ? `start=${customStart}&end=${customEnd}&today=${today}`
-      : `range=${range}&today=${today}`;
-    api.get<ProgressData>(`/api/progress/${clientId}?${qs}`)
+    api.get<ProgressData>(`/api/progress/${clientId}?${range.query}&today=${today}`)
       .then((d) => { if (alive) { setData(d); setLoading(false); } })
       .catch(() => { if (alive) { setError(true); setLoading(false); } });
     return () => { alive = false; };
-  }, [clientId, range, customStart, customEnd, customValid, today, reloadKey]);
+  }, [clientId, range.query, today, reloadKey]);
 
   const days = data?.range.days ?? [];
   const dateLabel = (i: number) => shortDate(days[i] ?? today);
@@ -107,25 +102,13 @@ export function Progress({ clientId }: { clientId: string }) {
           rather than the largest thing on a screen it does not describe. */}
       <p className="px-1 text-caption text-muted-foreground">Progress</p>
       {/* Lens tabs collapse to icons (active one keeps its label, navbar-style)
-          so the whole row — tabs + range — fits the Progress column. "Custom"
-          is a calendar icon; picking it reveals the start→end pickers below. */}
+          so the whole row — tabs + range — fits the Progress column. The range
+          control has ONE height for its whole life: a custom window takes its
+          own cell here and is edited in a sheet, so nothing below ever moves. */}
       <div className="flex flex-wrap items-center gap-2">
         <IconTabs items={lenses} value={tab} onChange={setTab} />
-        <SegmentedControl className="ml-auto" value={range} onChange={(v) => setRange(v as RangePreset | "custom")}
-          options={[
-            { value: "7d", label: "7d" }, { value: "30d", label: "30d" }, { value: "90d", label: "90d" },
-            { value: "custom", label: <span title="Custom range" className="flex items-center [&_svg]:size-4"><Calendar /><span className="sr-only">Custom range</span></span> },
-          ]} />
+        <RangePicker className="ml-auto" format={shortDate} {...range.props} />
       </div>
-      {range === "custom" && (
-        <div className="flex items-center gap-2">
-          <DatePill value={customStart} max={customEnd} label="Start date" display={shortDate(customStart)}
-            onChange={(v) => { setCustomStart(v); if (v > customEnd) setCustomEnd(v); }} />
-          <span className="shrink-0 text-sm text-muted-foreground">→</span>
-          <DatePill value={customEnd} min={customStart} max={today} label="End date" display={shortDate(customEnd)}
-            onChange={(v) => { setCustomEnd(v); if (v < customStart) setCustomStart(v); }} />
-        </div>
-      )}
 
       {error && !data ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load progress" description="Something went wrong loading your analytics. Check your connection and try again." action={<Button onClick={() => setReloadKey((k) => k + 1)}>Try again</Button>} />
