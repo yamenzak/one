@@ -180,7 +180,10 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
-        with: { ref: ${{ github.ref_name }} }
+        with:
+          # The BRANCH, not the triggering SHA: this job commits the binding, and
+          # a commit built on an older SHA is rejected the moment main has moved.
+          ref: ${{ github.ref_name }}
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

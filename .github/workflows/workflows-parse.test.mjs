@@ -33,6 +33,36 @@ for (const f of readdirSync(DIR).filter((n) => n.endsWith(".yml") || n.endsWith(
    * find expected ':'" pointing at whatever came next — so naming it here is
    * what turns a confusing message into an obvious one.
    */
+  /**
+   * An `${{ }}` EXPRESSION INSIDE A FLOW COLLECTION, unquoted.
+   *
+   *     with: { ref: ${{ github.ref_name }} }      ← invalid YAML
+   *     with: { ref: "${{ github.ref_name }}" }    ← fine
+   *     with:                                      ← fine
+   *       ref: ${{ github.ref_name }}
+   *
+   * In block style the value is a plain scalar and the braces are just
+   * characters. Inside `{ … }` they are STRUCTURE, so `{{` opens a nested
+   * mapping and the file stops parsing.
+   *
+   * This one shipped. `deploy.yml` carried it for two commits, and the symptom
+   * was exactly what the header of this file describes: the run appeared, took
+   * zero seconds, ran no jobs, reported "failure", and was listed under its
+   * FILENAME instead of its name. Nothing deployed and nothing said why. The
+   * check above did not see it, and neither did the `on:`/`name:` regexes below
+   * — both still matched a file GitHub could not read.
+   */
+  lines.forEach((line, i) => {
+    const flow = /:\s*[{[]/.exec(line);
+    if (!flow) return;
+    // Quoted spans are safe; strip them before looking for a bare expression.
+    const bare = line.slice(flow.index).replace(/"[^"]*"|'[^']*'/g, "");
+    if (bare.includes("${{")) {
+      console.error(`BAD  ${f}:${i + 1} — unquoted \${{ }} inside a YAML flow collection. Quote it, or use block style:\n     ${line.trim()}`);
+      bad++;
+    }
+  });
+
   let inBlock = false;
   let blockIndent = 0;
   lines.forEach((line, i) => {
@@ -56,9 +86,15 @@ for (const f of readdirSync(DIR).filter((n) => n.endsWith(".yml") || n.endsWith(
   });
 }
 
-// The parse itself, via GitHub's own reading of it: `on:` must survive as a key.
-// `js-yaml` is not a dependency here on purpose, so this is a structural check
-// rather than a full parse — the column-0 rule above is what actually bit.
+// `on:` and `name:` must survive as keys.
+//
+// `js-yaml` is deliberately not a dependency — this file has to run before
+// `pnpm install`, so it cannot be a real parse. That is a genuine limitation
+// and it has now cost something: these two regexes match happily on a file
+// GitHub refuses to read, so they can only prove a key EXISTS, never that the
+// document is well-formed. Every syntax trap has to be named explicitly above.
+// If a third one ever gets through, that is the signal to move this check
+// somewhere it can afford a YAML parser rather than to add a fourth regex.
 const names = new Map();
 for (const f of readdirSync(DIR).filter((n) => n.endsWith(".yml"))) {
   const text = readFileSync(join(DIR, f), "utf8");
