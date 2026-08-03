@@ -643,6 +643,37 @@ export const clientRoutes = new Hono<AppEnv>()
   })
 
   /**
+   * Put an archived client back on the roster. OWNER ONLY, like archiving.
+   *
+   * Archiving was a one-way door for no reason anybody chose: the route existed,
+   * the reverse did not, and the only way back was to create the person again —
+   * a second record, a second invitation, and their entire history stranded on
+   * the first one. A relationship ending and then resuming is ordinary (a client
+   * takes a season off, a wrong row gets archived by mistake), so the reverse is
+   * a route, not a support ticket.
+   *
+   * It cannot exceed the plan's ceiling, and that falls out of an earlier
+   * decision rather than needing a check here: archiving does NOT free an
+   * `activeClients` seat (`countClientSeats` counts archived records too,
+   * because their data still sits on the tenancy). The seat was never released,
+   * so taking it back cannot overrun anything.
+   *
+   * `archived_at` is cleared. It is the anchor the studio's own lapse ladder
+   * counts from, and leaving it set would leave a restored client permanently
+   * N days into a countdown they are no longer in.
+   */
+  .post("/clients/:id/unarchive", async (c) => {
+    const access = await requireClientAccess(c, c.req.param("id"));
+    if ("response" in access) return access.response;
+    if (c.get("role") !== "owner") return c.json({ error: "forbidden", message: "Only the studio owner can restore a client." }, 403);
+    await c.env.DB.prepare("UPDATE clients SET status = 'active', archived_at = NULL WHERE id = ?")
+      .bind(access.client.id)
+      .run();
+    await recordAudit(c.env, { tenantId: access.client.tenant_id, clientId: access.client.id, actorUserId: c.get("user")?.id, action: "client.unarchive", summary: access.client.display_name });
+    return c.json({ ok: true });
+  })
+
+  /**
    * PERMANENT erasure of one client (SPEC §8.1) — the hard-delete counterpart to
    * `/archive`. Both free an `activeClients` slot (the quota counts
    * `status != 'archived'`); only this one reclaims the database rows and the R2

@@ -492,10 +492,11 @@ export function ClientDetail() {
   const { clientId, subtab } = useParams<{ clientId: string; subtab?: string }>();
   const tab = (TABS.some((t) => t.value === subtab) ? subtab : "today") as Tab;
   const [client, setClient] = useState<ClientSummary | null>(null);
+  const [nonce, setNonce] = useState(0);
   useEffect(() => {
     if (!clientId) return;
     void api.get<{ client: ClientSummary }>(`/api/clients/${clientId}`).then((r) => setClient(r.client)).catch(() => setClient(null));
-  }, [clientId]);
+  }, [clientId, nonce]);
   if (!clientId) return null;
   return (
     <div>
@@ -523,7 +524,7 @@ export function ClientDetail() {
       {tab === "report" && <ClientReport key={clientId} clientId={clientId} />}
       {/* clientName is only for copy in the archive confirmation — Manage names the
           client it's about to take off the roster rather than saying "this client". */}
-      {tab === "manage" && <ClientManage key={clientId} clientId={clientId} clientName={client?.displayName} />}
+      {tab === "manage" && <ClientManage key={clientId} clientId={clientId} clientName={client?.displayName} archived={client?.status === "archived"} onClientChanged={() => setNonce((n) => n + 1)} />}
     </div>
   );
 }

@@ -242,7 +242,7 @@ describe("archive / offboard", () => {
     expect(allowed.status).toBe(201);
   });
 
-  it("archiving retains the record and stamps archived_at (no delete, no un-archive route)", async () => {
+  it("archiving retains the record and stamps archived_at", async () => {
     const clientId = await mkClient(ownerCookie, "Retained");
     expect((await SELF.fetch(`${ORIGIN}/api/clients/${clientId}/archive`, { method: "POST", headers: auth(ownerCookie) })).status).toBe(200);
 
@@ -255,7 +255,7 @@ describe("archive / offboard", () => {
 
     // The record is still addressable by id for staff (requireClientAccess uses
     // getClient, which does not filter status) — this is what "data is retained"
-    // means in the archive copy. There is no route back to 'active'.
+    // means in the archive copy.
     expect((await SELF.fetch(`${ORIGIN}/api/clients/${clientId}`, { headers: auth(ownerCookie) })).status).toBe(200);
     expect(await rosterIds(ownerCookie)).not.toContain(clientId);
 
@@ -263,5 +263,47 @@ describe("archive / offboard", () => {
     // which is why the UI copy says they lose access.
     const linked = await (env.DB as D1Database).prepare("SELECT COUNT(*) AS n FROM clients WHERE id = ? AND status != 'archived'").bind(clientId).first<{ n: number }>();
     expect(linked!.n).toBe(0);
+  });
+
+  /**
+   * ARCHIVING IS NOT A ONE-WAY DOOR ANY MORE.
+   *
+   * There was no route back, so the only way to resume with somebody was to
+   * create them again — a second record, a second invitation, and their whole
+   * history stranded on the first one. A relationship ending and resuming is
+   * ordinary; so is archiving the wrong row.
+   */
+  it("un-archiving puts the client back on the roster and clears the clock", async () => {
+    const clientId = await mkClient(ownerCookie, "Returning");
+    await SELF.fetch(`${ORIGIN}/api/clients/${clientId}/archive`, { method: "POST", headers: auth(ownerCookie) });
+    expect(await rosterIds(ownerCookie)).not.toContain(clientId);
+
+    const back = await SELF.fetch(`${ORIGIN}/api/clients/${clientId}/unarchive`, { method: "POST", headers: auth(ownerCookie) });
+    expect(back.status).toBe(200);
+    expect(await rosterIds(ownerCookie)).toContain(clientId);
+
+    // `archived_at` is the anchor the studio's own lapse ladder counts from.
+    // Left set, a restored client would sit permanently N days into a countdown
+    // they are no longer in.
+    const row = await (env.DB as D1Database)
+      .prepare("SELECT status, archived_at FROM clients WHERE id = ?")
+      .bind(clientId)
+      .first<{ status: string; archived_at: string | null }>();
+    expect(row).toMatchObject({ status: "active", archived_at: null });
+  });
+
+  /** Ending or resuming the studio's relationship with a client is the owner's
+   *  call, exactly like archiving — an employed coach may not do it silently. */
+  it("refuses un-archive from a trainer", async () => {
+    const coach = await staffIn(ownerTenant, "cm-restore-coach@test.dev", "CM Restore Org", "trainer");
+    const clientId = await mkClient(ownerCookie, "Not Yours To Restore");
+    await SELF.fetch(`${ORIGIN}/api/clients/${clientId}/archive`, { method: "POST", headers: auth(ownerCookie) });
+    await SELF.fetch(`${ORIGIN}/api/clients/${clientId}/trainers`, {
+      method: "POST",
+      headers: json(ownerCookie),
+      body: JSON.stringify({ trainerUserId: coach.userId }),
+    });
+    const res = await SELF.fetch(`${ORIGIN}/api/clients/${clientId}/unarchive`, { method: "POST", headers: auth(coach.cookie) });
+    expect(res.status).toBe(403);
   });
 });

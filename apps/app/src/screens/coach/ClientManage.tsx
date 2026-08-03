@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@kova/domain";
-import { Button, Card, Badge, Field, Select, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, NoData, Anchor, ActionCluster, CountUp, Group, Row, GroupNote } from "@4dl/ui";
+import { Button, Card, Badge, Field, Select, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, NoData, Anchor, ActionCluster, CountUp, Group, Row, GroupNote, RotateCcw, History, Users, ActionResult, useAction as useActionBase } from "@4dl/ui";
 import { personaLabel, personaTone } from "../../registry/index.js";
 import { api, errorText, todayLocal } from "../../api.js";
 import { FeatureLock, useCan } from "../../FeatureLock.js";
@@ -17,7 +17,12 @@ import { ExerciseRow, type ExerciseInfo } from "../exercise.js";
 import { PreferencesEditorCard } from "../PreferencesEditor.js";
 import { checkInPhotos } from "../client/WellnessDetails.js";
 import { AiAvatar } from "../../AiAvatar.js";
+import { SectionSplit } from "../SectionSplit.js";
 import { InsightFeedback } from "../client/InsightFeedback.js";
+
+/** `useAction`, bound to this app's error formatter — the same wrapper every
+ *  other screen uses, so a refused write reads the same wherever it happens. */
+const useAction = () => useActionBase(errorText);
 import { Markdown } from "../../Markdown.js";
 import { AiErrorBox } from "../../AiError.js";
 
@@ -40,7 +45,15 @@ function focusRow(id: string): boolean {
   return true;
 }
 
-export function ClientManage({ clientId, clientName }: { clientId: string; clientName?: string | null }) {
+export function ClientManage({ clientId, clientName, archived = false, onClientChanged }: {
+  clientId: string;
+  clientName?: string | null;
+  /** Archived clients get a RESTORE where the others get an archive. */
+  archived?: boolean;
+  /** Re-read the client after a state change, so the header and this screen
+   *  agree about whether they are on the roster. */
+  onClientChanged?: () => void;
+}) {
   const { ctx } = useSession();
   const canSuppLabs = useCan("supplementsLabs");
   // Every `/api/ai/*` call on this screen (supplement-reco, summarize-checkins,
@@ -283,19 +296,60 @@ export function ClientManage({ clientId, clientName }: { clientId: string; clien
       </Reveal>
       )}
 
-      {/* Coaches + Archive read their own endpoints and sit OUTSIDE the Reveal
-          above, so a failed `subscriptions` read can't hide the only screen in
-          the product that can hand a client to another coach. */}
-      {isOwner && <CoachesSection clientId={clientId} />}
+      {/*
+        AN OFFBOARDING REQUEST IS AN ALERT, NOT A SECTION.
 
-      <ActivityLog clientId={clientId} />
+        It stays on the surface, above everything, because a coach has ASKED for
+        a decision and the owner is the only one who can give it. Filing it
+        behind an index row would be filing a to-do behind a menu.
+      */}
+      {isOwner && <OffboardRequestQueue clientId={clientId} onDecided={load} />}
 
-      {/* Owners act; coaches ask. Both surfaces live here so offboarding is in
-          the same place whoever you are — a coach used to see nothing at all and
-          had to find the owner by other means, losing the reason and the trail. */}
-      {isOwner
-        ? <><OffboardRequestQueue clientId={clientId} onDecided={load} /><OffboardSection clientId={clientId} clientName={clientName} /></>
-        : <OffboardRequestSection clientId={clientId} clientName={clientName} />}
+      {/*
+        THE REST OF THE TAB IS AN INDEX.
+
+        Manage was one 1,200-line scroll: the access anchor, profile, swaps,
+        check-ins, supplements, labs, the coach roster, the whole audit trail,
+        and two full-width offboarding walls — in that order, all open, all the
+        time. Nothing in it could be found, and the sections nobody had scrolled
+        to may as well not have shipped (§7: past five groups, an INDEX and a
+        page each).
+
+        Everything above this line is what a coach acts on TODAY — access, the
+        things waiting for them. Everything below is administration you go to
+        deliberately, so it becomes three rows carrying their own current value.
+      */}
+      <SectionSplit
+        param="m"
+        subs={[
+          ...(isOwner ? [{
+            key: "coaches",
+            label: "Coaches",
+            icon: Users,
+            tone: "cardio" as const,
+            value: "Who can see this client",
+            render: () => <CoachesSection clientId={clientId} />,
+          }] : []),
+          {
+            key: "activity",
+            label: "Activity log",
+            icon: History,
+            tone: "neutral" as const,
+            value: "Every change, and who made it",
+            render: () => <ActivityLog clientId={clientId} />,
+          },
+          {
+            key: "offboard",
+            label: archived ? "Restore or delete" : "Offboard",
+            icon: Archive,
+            tone: "warning" as const,
+            value: archived ? "Archived — not on your roster" : "Archive or delete this client",
+            render: () => (isOwner
+              ? <OffboardSection clientId={clientId} clientName={clientName} archived={archived} onChanged={() => onClientChanged?.()} />
+              : <OffboardRequestSection clientId={clientId} clientName={clientName} />),
+          },
+        ]}
+      />
 
       <Sheet open={prefsOpen} onClose={() => setPrefsOpen(false)} title="Profile & preferences">
         <PreferencesEditorCard clientId={clientId} includeProfile onSaved={() => { setPrefsOpen(false); void load(); }} />
@@ -398,9 +452,12 @@ function CoachesSection({ clientId }: { clientId: string }) {
 
   return (
     <section className="space-y-2">
-      <Eyebrow action={
+      {/* No eyebrow: the sub-page's own header already says "Coaches", and a
+          section heading repeating the page title is the chrome §7 bans. The
+          ACTION still belongs here, so it stands alone. */}
+      <div className="flex justify-end">
         <Button size="sm" disabled={!coaches || staffErr} onClick={() => { setErr(null); setAddOpen(true); }}><Plus /> Assign</Button>
-      }>Coaches</Eyebrow>
+      </div>
       <Stagger>
       {loadErr && !coaches ? (
         <Card className="flex items-start gap-3">
@@ -552,8 +609,7 @@ function OffboardRequestSection({ clientId, clientName }: { clientId: string; cl
   };
 
   return (
-    <section className="space-y-2">
-      <Eyebrow>Offboard</Eyebrow>
+    <section className="space-y-3">
       <Stagger>
         <Card className="space-y-3">
           {pending ? (
@@ -651,55 +707,90 @@ function OffboardRequestQueue({ clientId, onDecided }: { clientId: string; onDec
   );
 }
 
-function OffboardSection({ clientId, clientName }: { clientId: string; clientName?: string | null }) {
+function OffboardSection({ clientId, clientName, archived, onChanged }: {
+  clientId: string;
+  clientName?: string | null;
+  archived: boolean;
+  onChanged: () => void;
+}) {
   const nav = useNavigate();
   const [confirmArchive, setConfirmArchive] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const act = useAction();
   const who = clientName?.trim() || "this client";
-  const archive = async () => {
-    if (busy) return;
-    setBusy(true); setErr(null);
-    try { await api.post(`/api/clients/${clientId}/archive`); nav("/clients"); }
-    catch (e) { setErr(errorText(e, "Couldn't archive this client. Please try again.")); setBusy(false); }
-  };
-  return (
-    <section className="space-y-2">
-      <Eyebrow>Offboard</Eyebrow>
-      <Stagger className="space-y-3">
-      <Card className="space-y-2.5">
-        <div className="flex items-center gap-2 font-medium"><Archive className="size-4 text-muted-foreground" /> Archive this client</div>
-        <p className="text-sm text-muted-foreground">
-          They come off your roster. Everything on the record — logs, plans, check-ins, labs, files — is kept, and {who} can still sign in to read their own history but can&rsquo;t add to it.
-        </p>
-        <p className="text-sm text-muted-foreground">
-          This does <span className="font-medium text-foreground">not</span> free a seat on your plan — you&rsquo;re still storing their data. Only deleting does. There&rsquo;s no un-archive in the app yet, so treat this as one-way.
-        </p>
-        <Button variant="outline" className="w-full" disabled={busy} onClick={() => { setErr(null); setConfirmArchive(true); }}><Archive /> {busy ? "Archiving…" : "Archive client…"}</Button>
-        {err && <p className="text-sm text-warning" role="alert">{err}</p>}
-      </Card>
 
-      <Card className="space-y-2.5 border border-danger/30">
-        <div className="flex items-center gap-2 font-medium text-danger"><Trash2 className="size-4" /> Delete this client permanently</div>
-        <p className="text-sm text-muted-foreground">
-          Erases the record and everything on it — logs, measurements, check-ins, progress photos, uploaded lab files and their whole history. This is the <span className="font-medium text-foreground">only</span> action that frees a seat on your plan, because it&rsquo;s the only one that stops storing their data — and it reclaims the storage those files were using.
-        </p>
-        <p className="text-sm text-danger">
-          There is no backup and no undo. Archive instead if there's any chance you'll want their history back.
-        </p>
-        <Button variant="outline" className="w-full border-danger/40 text-danger" onClick={() => setDeleteOpen(true)}><Trash2 /> Delete client…</Button>
-      </Card>
-      </Stagger>
+  const archive = () =>
+    void act.run("archive", async () => {
+      await api.post(`/api/clients/${clientId}/archive`);
+      nav("/clients");
+      return `${who} is archived.`;
+    }, "Couldn't archive this client.");
+
+  const restore = () =>
+    void act.run("restore", async () => {
+      await api.post(`/api/clients/${clientId}/unarchive`);
+      onChanged();
+      return `${who} is back on your roster.`;
+    }, "Couldn't restore this client.");
+
+  /*
+    TWO ROWS, NOT TWO WALLS.
+
+    This was two bordered cards carrying five paragraphs between them — what
+    archiving keeps, what it does not free, that there was no way back, what
+    deleting erases, that it frees a seat, that there is no undo. Every word of
+    it was true and none of it was READ, because it sat permanently open on an
+    admin tab under everything else, and prose you scroll past is prose you
+    have not seen (§10: nothing explains a control the reader can just try;
+    prose is for what is irreversible).
+
+    The consequence belongs on the CONFIRMATION, at the moment you are asked to
+    accept it — which is where both now say it, in one sentence each.
+  */
+  return (
+    <section className="space-y-3">
+      <Group>
+        {archived ? (
+          <Row
+            icon={RotateCcw}
+            sub="Put them back on your roster — everything is still here"
+            onClick={restore}
+            disabled={act.busy !== null}
+          >
+            {act.busy === "restore" ? "Restoring…" : "Restore client"}
+          </Row>
+        ) : (
+          <Row
+            icon={Archive}
+            sub="Off the roster, everything kept. Reversible."
+            onClick={() => setConfirmArchive(true)}
+            disabled={act.busy !== null}
+          >
+            {act.busy === "archive" ? "Archiving…" : "Archive client"}
+          </Row>
+        )}
+        <Row
+          icon={Trash2}
+          tone="danger"
+          sub="Erases their whole history. Frees a seat. No undo."
+          onClick={() => setDeleteOpen(true)}
+        >
+          Delete permanently
+        </Row>
+      </Group>
+      <ActionResult msg={act.msg} err={act.err} />
 
       <ConfirmDialog
         open={confirmArchive}
         onOpenChange={setConfirmArchive}
         title={`Archive ${who}?`}
-        description={`${who} comes off your roster and their data is kept — they can still sign in to read their own history, but not add to it. This does NOT free a seat on your plan (you're still storing their data); only deleting does. It can't be undone from the app.`}
+        /* One sentence naming the consequence (§10), and it can now end on the
+           truth rather than on "treat this as one-way": archiving is reversible
+           from this same screen. */
+        description={`${who} comes off your roster and keeps every log, plan and file — they can still sign in to read their history, but not add to it. It does not free a seat on your plan, and you can restore them from here.`}
         confirmLabel="Archive client"
         destructive
-        onConfirm={() => void archive()}
+        onConfirm={archive}
       />
 
       {deleteOpen && (
@@ -813,10 +904,14 @@ function ActivityLog({ clientId }: { clientId: string }) {
   useEffect(() => {
     void api.get<{ items: AuditItem[] }>(`/api/clients/${clientId}/audit`).then((r) => setItems(r.items)).catch(() => setItems([]));
   }, [clientId]);
-  if (items && items.length === 0) return null; // nothing to show yet — stay quiet
+  // It used to `return null` on an empty log, which was right while this was one
+  // section among ten on a scroll. It is a destination now: opening a row and
+  // landing on a blank page reads as broken.
+  if (items && items.length === 0) {
+    return <EmptyState icon={History} title="Nothing yet" description="Every change to this client — by you, a coach, or them — shows up here." />;
+  }
   return (
     <section className="space-y-2">
-      <Eyebrow>Activity log</Eyebrow>
       <Stagger>
       <Card className="space-y-3">
         {!items ? (

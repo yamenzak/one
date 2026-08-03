@@ -27,6 +27,7 @@ export type AuditAction =
   | "content.assign"
   | "package.assign"
   | "client.archive"
+  | "client.unarchive"
   // Offboarding hand-off: a coach asks, the owner decides. Three entries so the
   // log reads as a conversation rather than one unexplained archive.
   | "client.offboard_request"
@@ -57,6 +58,7 @@ export const AUDIT_ACTIONS: Record<AuditAction, AuditActionMeta> = {
   "content.assign": { label: "shared content", permission: "content", feature: "content" },
   "package.assign": { label: "assigned a package", permission: "package", feature: "commerce" },
   "client.archive": { label: "archived the client", permission: "client" },
+  "client.unarchive": { label: "put the client back on the roster", permission: "client" },
   "client.offboard_request": { label: "asked the owner to remove the client", permission: "client" },
   "client.offboard_approved": { label: "approved removing the client", permission: "client" },
   "client.offboard_declined": { label: "declined removing the client", permission: "client" },
