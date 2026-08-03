@@ -28,11 +28,11 @@
  * owns what one item looks like.
  */
 
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { LayoutGrid, List, Search, type LucideIcon } from "./lib/icons.js";
 import { contentIn, contentStagger } from "./lib/animation.js";
-import { Field } from "./primitives.js";
+import { Button, Field } from "./primitives.js";
 import { EmptyState } from "./shell.js";
 import { LoadError } from "./patterns.js";
 import { SkeletonLine, SkeletonList } from "./skeleton.js";
@@ -92,14 +92,6 @@ export interface CollectionProps<T> {
   /** Controlled search. Omit for a collection nobody would search. */
   query?: string;
   onQuery?: (q: string) => void;
-  /**
-   * How many items before the search box appears.
-   *
-   * A search box above four rows is a control asking to be used on a list you
-   * can already see (§7). Eight is where scrolling starts being the
-   * alternative on a phone.
-   */
-  searchFrom?: number;
 
   /** The one primary action, on the header row beside the controls. */
   action?: ReactNode;
@@ -122,7 +114,6 @@ export function Collection<T>({
   onView,
   query,
   onQuery,
-  searchFrom = 8,
   action,
   empty,
   renderList,
@@ -133,16 +124,19 @@ export function Collection<T>({
   const searching = Boolean(query?.trim());
   const grid = view === "grid" && Boolean(renderGrid);
   /*
-   * The search box stays once it has appeared.
+   * The search box is always there, if the collection has one at all.
    *
-   * Its trigger is the item count, and the query CHANGES the item count — so a
-   * search that narrows the list past the threshold would remove the control
-   * being typed into, mid-keystroke. A ref rather than state: this only ever
-   * latches on, so it never needs to cause a render of its own.
+   * It used to appear at eight items, on the reasoning that a search above four
+   * rows is a control asking to be used on a list you can already see. That is
+   * true of the control and false of the HEADER: a header that grows a field
+   * when the ninth item is added changes shape under someone who has learned
+   * it, and until then the screen looks like a screen you cannot search — which
+   * is the thing people ask about. Every app this borrows from keeps it pinned.
+   *
+   * It also removed the box mid-keystroke, since the query changes the count
+   * that decided whether to show the box.
    */
-  const wasSearchable = useRef(false);
-  if ((items?.length ?? 0) >= searchFrom) wasSearchable.current = true;
-  const showSearch = Boolean(onQuery) && (wasSearchable.current || searching);
+  const showSearch = Boolean(onQuery);
 
   const header = (showSearch || onView || action) && (
     <div className="flex items-center gap-2">
@@ -218,36 +212,36 @@ export function Collection<T>({
 }
 
 /**
- * List or grid. Two icon buttons rather than a labelled segmented control: it
- * sits on a row with a search field and a primary action, and words there cost
- * the search box the width it needs on a phone.
+ * List or grid — ONE button, showing where it takes you.
+ *
+ * This was a two-button segmented pill, which is the shape you reach for when
+ * the choice is a setting. It is not: there are exactly two views and you are
+ * always in one of them, so the second button is permanently a no-op taking up
+ * the width the search field wants. A single control carrying the icon of the
+ * OTHER view says the same thing in half the space and reads as an action
+ * rather than as configuration — which is what the Library had already got
+ * right, and this is now the one implementation both use.
+ *
+ * The label names the DESTINATION for the same reason ("Show as a grid"), and
+ * there is no `aria-pressed`: this is not a toggle button holding a state, it
+ * is a button that switches.
  */
 export function ViewToggle({ value, onChange, noun }: {
   value: CollectionView;
   onChange: (v: CollectionView) => void;
   noun?: string;
 }) {
-  const opts = [
-    { v: "list" as const, icon: List, label: `Show ${noun ?? "items"} as a list` },
-    { v: "grid" as const, icon: LayoutGrid, label: `Show ${noun ?? "items"} as a grid` },
-  ];
+  const next = value === "list" ? "grid" : "list";
+  const Icon = value === "list" ? LayoutGrid : List;
   return (
-    <div role="group" className="flex shrink-0 items-center gap-0.5 rounded-full bg-surface-2 p-1">
-      {opts.map((o) => (
-        <button
-          key={o.v}
-          onClick={() => onChange(o.v)}
-          aria-label={o.label}
-          aria-pressed={value === o.v}
-          className={cn(
-            "grid size-9 place-items-center rounded-full outline-none ring-ring transition-colors focus-visible:ring-2 [&_svg]:size-[1.05rem]",
-            value === o.v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <o.icon aria-hidden />
-        </button>
-      ))}
-    </div>
+    <Button
+      variant="ghost"
+      className="shrink-0"
+      aria-label={`Show ${noun ?? "items"} as a ${next}`}
+      onClick={() => onChange(next)}
+    >
+      <Icon aria-hidden />
+    </Button>
   );
 }
 

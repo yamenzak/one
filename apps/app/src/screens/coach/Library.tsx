@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Reveal, SkeletonRow, SkeletonLine, Avatar, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, List, PencilLine, ArrowLeftRight, Ellipsis, Send, History, Group, Row } from "@4dl/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Reveal, SkeletonRow, SkeletonLine, Avatar, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Ellipsis, Send, History, Group, Row, ViewToggle, useCollectionView } from "@4dl/ui";
 import { MacroInline } from "../../registry/index.js";
 import { api } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -41,7 +41,9 @@ type ExEdit = { exerciseId?: string; initial?: Partial<ExerciseInfo> };
 function Exercises() {
   const [q, setQ] = useState("");
   const [items, setItems] = useState<LibraryExercise[] | null>(null);
-  const [view, setView] = useState<"list" | "grid">("list");
+  // Remembered, like every other collection's view — this one used to reset to
+  // the list on every visit, which is why nobody switched it twice.
+  const [view, setView] = useCollectionView("exercises");
   // Browse facets, composed with search — lifted from the plan-builder's picker.
   const [muscle, setMuscle] = useState<string | null>(null);
   const [equip, setEquip] = useState<string | null>(null);
@@ -94,7 +96,9 @@ function Exercises() {
     <div className="space-y-3">
       <div className="flex items-end gap-2">
         <Field className="flex-1" label="Search exercises" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
-        <Button variant="ghost" aria-label={view === "list" ? "Grid view" : "List view"} onClick={() => setView((v) => (v === "list" ? "grid" : "list"))}>{view === "list" ? <LayoutGrid /> : <List />}</Button>
+        {/* The shared toggle — this screen is where the shape came from, and
+            keeping a second copy of it here is how the two drift. */}
+        <ViewToggle value={view} onChange={setView} noun="exercises" />
         <Button variant="tonal" aria-label="New exercise" onClick={() => setEditor({})}><Plus /></Button>
       </div>
       {/* A rail with a single option filters nothing — tapping it narrows the
@@ -244,7 +248,7 @@ function Foods() {
   const units = useUnits();
   const [q, setQ] = useState("");
   const [items, setItems] = useState<FoodRow[] | null>(null);
-  const [view, setView] = useState<"list" | "grid">("list");
+  const [view, setView] = useCollectionView("foods");
   // Browse facets, composed with search — mirrors the exercise library.
   const [kind, setKind] = useState<"whole" | "branded" | null>(null);
   const [owner, setOwner] = useState<"seed" | "shared" | "private" | null>(null);
@@ -287,7 +291,9 @@ function Foods() {
     <div className="space-y-3">
       <div className="flex items-end gap-2">
         <Field className="flex-1" label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
-        <Button variant="ghost" aria-label={view === "list" ? "Grid view" : "List view"} onClick={() => setView((v) => (v === "list" ? "grid" : "list"))}>{view === "list" ? <LayoutGrid /> : <List />}</Button>
+        {/* The shared toggle — this screen is where the shape came from, and
+            keeping a second copy of it here is how the two drift. */}
+        <ViewToggle value={view} onChange={setView} noun="foods" />
         <Button variant="tonal" aria-label="New food" onClick={() => setEditor({})}><Plus /></Button>
       </div>
       {items && (kinds.length > 1 || owners.length > 1) && (

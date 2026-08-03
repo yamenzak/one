@@ -627,12 +627,23 @@ templates — is a COLLECTION, and they all behave the same way. Consistency her
 is worth more than per-screen cleverness: the reader learns one set of controls
 and then knows every list in the product.
 
-- **Search appears when the list outgrows the screen, and not before.** A search
-  box above four rows is a control asking to be used on a list you can already
-  see. Above the fold once scrolling is the alternative.
+- **The search box is PINNED, not conditional.** It was previously revealed at
+  eight items, on the reasoning that a search above four rows is a control
+  asking to be used on a list you can already see. True of the control, false of
+  the HEADER: one that grows a field when the ninth item arrives changes shape
+  under someone who has already learned it, and until then the screen looks like
+  a screen you cannot search — which is the thing people ask about. It also
+  removed the box mid-keystroke, because the query changes the count that
+  decided whether to show the box.
 - **List and grid are both first-class**, and the choice is the reader's. A list
   favours identity and status; a grid favours images and scanning. Neither is
   correct for everyone, which is why it is a toggle and not a decision.
+- **The toggle is ONE button carrying the icon of the other view**, labelled
+  with the destination ("Show as a grid"). A two-button segmented pill is the
+  shape for a setting; this is not one — there are exactly two views and you are
+  always in one, so half the pill is permanently a no-op occupying the width the
+  search field wants. No `aria-pressed`: it is a button that switches, not a
+  toggle holding a state.
 - **The choice is REMEMBERED, per collection, per device.** A view that resets
   on every visit is a view nobody switches twice. It is a display preference —
   it survives sign-out, like the theme, and it is never account data.
