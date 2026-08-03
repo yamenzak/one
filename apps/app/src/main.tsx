@@ -5,7 +5,7 @@ import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { Atmosphere, anchorIn, brandMark, contentIn, contentStagger, DUR} from "@4dl/ui";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
-import { ThemeProvider, useTheme } from "./theme.js";
+import { bootBrand, ThemeProvider, useTheme } from "./theme.js";
 import { Login } from "./screens/Login.js";
 import { Start } from "./screens/Start.js";
 import { Shell } from "./Shell.js";
@@ -25,20 +25,32 @@ import { stripReloadParam } from "./hard-refresh.js";
  * shows; otherwise the default Kova mark. Branding is applied before this
  * paints, so it already sits in the tenant's palette and mode.
  *
- * Design note (UI-LANGUAGE §8): the mark **settles down from 1.06**, it does not
- * grow from 0.82. That inversion is the whole entrance language in one element,
- * and the boot screen is where a user meets it first — so getting it right here
- * sets the expectation every subsequent screen keeps. The old spinning ring is
- * gone: an indefinite rotation is decoration that also implies work is happening
- * at a rate it cannot know. The progress bar stays, because it is honest about
- * being indeterminate.
+ * ── Whose brand, before anyone has said ─────────────────────────────────────
+ *
+ * The session has nothing here: `/api/host` and `/api/context` are both still in
+ * flight, which is precisely why this screen exists. It used to fall back to
+ * Kova's mark — the letter "K" on the default primary — so every client of every
+ * white-labelled studio met the VENDOR for a beat before meeting their coach, on
+ * the screen that opens every session. Two fixes, in order:
+ *
+ *   the REMEMBERED brand   what this hostname resolved to last time (theme.tsx).
+ *                          Covers every visit after the first, and the offline
+ *                          cold start, which is the one boot with no network at
+ *                          all.
+ *   NEUTRAL, not Kova      when even that is absent — a first-ever visit — show
+ *                          a plain plate and the progress bar. Nothing in the
+ *                          browser can know the studio at that instant, and an
+ *                          unlabelled moment is honest where the wrong brand is
+ *                          not. The letter comes back the moment a NAME does,
+ *                          which on the platform's own doors is immediately.
  */
 function BootSplash() {
   const { host, ctx } = useSession();
   const { mode } = useTheme();
-  const branding = ctx?.branding ?? host?.tenant?.branding;
+  const branding = ctx?.branding ?? host?.tenant?.branding ?? bootBrand?.branding;
   const logo = brandMark(branding, mode, "icon");
-  const name = host?.tenant?.name ?? null;
+  const name = host?.tenant?.name ?? bootBrand?.name ?? null;
+  const initial = name?.trim()?.[0]?.toUpperCase() ?? null;
   return (
     <div className="relative grid min-h-dvh place-items-center overflow-hidden bg-background">
       <Atmosphere />
@@ -50,9 +62,9 @@ function BootSplash() {
       >
         <motion.div
           variants={anchorIn}
-          className="grid size-20 place-items-center overflow-hidden rounded-2xl bg-primary text-primary-foreground shadow-glow"
+          className={`grid size-20 place-items-center overflow-hidden rounded-2xl text-primary-foreground ${logo || initial ? "bg-primary shadow-glow" : "bg-surface-2"}`}
         >
-          {logo ? <img src={logo} alt="" className="size-full object-cover" /> : <span className="text-title-1 font-black">{(name?.[0] ?? "K").toUpperCase()}</span>}
+          {logo ? <img src={logo} alt="" className="size-full object-cover" /> : initial && <span className="text-title-1 font-black">{initial}</span>}
         </motion.div>
         {name && <motion.div variants={contentIn} className="text-body-lg">{name}</motion.div>}
         <motion.div variants={contentIn} className="h-1 w-32 overflow-hidden rounded-full bg-surface-2">

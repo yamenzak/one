@@ -137,6 +137,23 @@ export function brandMark(
 }
 
 /**
+ * Whether the mark `brandMark(b, mode, "logo")` returns is a WORDMARK — an image
+ * that already contains the studio's name.
+ *
+ * The distinction is not cosmetic. A surface that anchors on the studio (the
+ * sign-in screen) draws the mark and then writes the name under it, which is
+ * right for a square icon and duplicated for a wordmark — and the generator in
+ * `mark.ts` draws the studio's NAME into the wordmark it makes, so every studio
+ * that used it saw its name twice. The condition mirrors `brandMark`'s logo
+ * branch exactly: if that branch fell through to the icon, this is false and the
+ * written name is the only place the name appears.
+ */
+export function hasWordmark(b: BrandMarks | null | undefined, mode: ThemeMode): boolean {
+  if (!b) return false;
+  return Boolean((mode === "light" && b.logoUrlLight) || b.logoUrl);
+}
+
+/**
  * Elevation presets. Shadows are a brand decision — a clinical studio wants
  * hairlines and a boutique one wants depth — so they are configurable rather
  * than baked in, and they are PRESETS rather than free-form CSS: a mistyped

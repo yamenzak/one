@@ -72,3 +72,60 @@ export function appStorage(prefix: string, keep: readonly string[] = []): AppSto
  * restored payload cannot grant access to anything. A real 401 clears it.
  */
 export const CONTEXT_CACHE = "ctx-cache";
+
+/**
+ * The name of the cached BOOT BRAND — the studio's name and palette, remembered
+ * per hostname so the first frame is already theirs.
+ *
+ * The problem it solves is small and very visible: branding arrives over the
+ * network (`/api/host`, then `/api/context`), and the boot splash paints before
+ * either lands. So a client opening a white-labelled studio met the PLATFORM's
+ * mark and colour for a beat, and then the studio's — the one moment of the
+ * whole product where the vendor's identity is unavoidable, on the screen every
+ * single session starts with. No amount of care inside the splash fixes it: the
+ * data genuinely is not there yet.
+ *
+ * Remembering it is what makes it not there only ONCE, on the first-ever visit
+ * to a host. That limit is real and worth stating plainly: nothing here can
+ * brand a first visit, because the app is a static bundle and the only thing
+ * that knows the tenant at that instant is the server that served it. The fix
+ * for the first frame of the first visit would be server-rendered branding in
+ * the HTML; this is the fix for every visit after it, which is nearly all of
+ * them, and it is also what an offline cold start has.
+ *
+ * ⚠️ Keyed by HOSTNAME, and the key is checked on read. One device visits
+ * several studios (a coach with two, anyone who has seen the platform root), and
+ * a cache that ignored the host would paint the last studio's brand over this
+ * one — a worse bug than the flash, because it looks deliberate.
+ *
+ * ⚠️ Like the context cache: a UI convenience, never an authorization decision.
+ * It holds what an unauthenticated visitor to that hostname is already shown.
+ */
+export const BRAND_CACHE = "brand-boot";
+
+export interface BootBrand<B> {
+  /** The hostname this was captured on. A mismatch discards it. */
+  host: string;
+  /** The studio's display name, for the splash's caption. */
+  name: string | null;
+  branding: B | null;
+}
+
+/** The remembered brand for this hostname, or null. Never throws. */
+export function readBootBrand<B>(storage: AppStorage, host: string): BootBrand<B> | null {
+  const cached = storage.read<BootBrand<B>>(BRAND_CACHE);
+  return cached && cached.host === host ? cached : null;
+}
+
+/**
+ * Remember this hostname's brand for the next boot — or forget it, on `null`.
+ *
+ * Forgetting is not an afterthought. A door with no studio behind it (the
+ * platform root, `setup.`, a studio that was closed) must CLEAR the entry, not
+ * skip the write: skipping leaves the last studio's name and colours in place,
+ * and the next boot on that host paints them before the server can say there is
+ * no studio there.
+ */
+export function writeBootBrand<B>(storage: AppStorage, entry: BootBrand<B> | null): void {
+  storage.write(BRAND_CACHE, entry);
+}

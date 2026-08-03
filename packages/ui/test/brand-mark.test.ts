@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { brandMark } from "../src/lib/theme.js";
+import { brandMark, hasWordmark } from "../src/lib/theme.js";
 import { monogramFor } from "../src/lib/mark.js";
 
 const full = { logoUrl: "/logo.png", iconUrl: "/icon.png", logoUrlLight: "/logo-light.png", iconUrlLight: "/icon-light.png" };
@@ -58,6 +58,52 @@ describe("brandMark", () => {
     expect(brandMark({}, "dark", "icon")).toBeNull();
     expect(brandMark(null, "dark", "icon")).toBeNull();
     expect(brandMark(undefined, "light", "logo")).toBeNull();
+  });
+});
+
+/**
+ * A WORDMARK ALREADY SAYS THE NAME.
+ *
+ * The sign-in screen draws the mark and writes the studio's name under it. That
+ * is right for a square icon and duplicated for a wordmark — and the generator
+ * draws the NAME into the wordmark it makes, so every studio that used it saw
+ * its own name twice. This has to track `brandMark`'s logo branch exactly: when
+ * that branch falls through to the icon, the written name is the only place the
+ * name appears and must stay.
+ */
+describe("hasWordmark", () => {
+  it("is true exactly when brandMark returns a wide mark", () => {
+    // The wide URL each shape should resolve to per mode, or null for "the icon
+    // fallback was taken" — which is the case the written name must survive.
+    const cases: [Record<string, string>, string | null, string | null][] = [
+      [full, "/logo-light.png", "/logo.png"],
+      [{ logoUrl: "/logo.png" }, "/logo.png", "/logo.png"],
+      [{ logoUrlLight: "/l.png" }, "/l.png", null],
+      [{ iconUrl: "/i.png" }, null, null],
+      [{}, null, null],
+    ];
+    for (const [b, inLight, inDark] of cases) {
+      expect(hasWordmark(b, "light")).toBe(inLight !== null);
+      expect(hasWordmark(b, "dark")).toBe(inDark !== null);
+      if (inLight) expect(brandMark(b, "light", "logo")).toBe(inLight);
+      if (inDark) expect(brandMark(b, "dark", "logo")).toBe(inDark);
+    }
+  });
+
+  it("is false when only a square icon was uploaded", () => {
+    expect(hasWordmark({ iconUrl: "/icon.png" }, "dark")).toBe(false);
+    expect(hasWordmark({ iconUrl: "/icon.png", iconUrlLight: "/icon-light.png" }, "light")).toBe(false);
+  });
+
+  it("is false in dark mode when only a LIGHT wordmark exists", () => {
+    expect(hasWordmark({ logoUrlLight: "/logo-light.png" }, "dark")).toBe(false);
+    expect(hasWordmark({ logoUrlLight: "/logo-light.png" }, "light")).toBe(true);
+  });
+
+  it("is safe on no branding", () => {
+    expect(hasWordmark(null, "dark")).toBe(false);
+    expect(hasWordmark(undefined, "light")).toBe(false);
+    expect(hasWordmark({}, "dark")).toBe(false);
   });
 });
 

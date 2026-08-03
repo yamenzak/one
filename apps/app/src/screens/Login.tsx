@@ -39,6 +39,7 @@ import {
   TierContent,
   motion,
   brandMark,
+  hasWordmark,
 } from "@4dl/ui";
 import { RefreshNote, useTheme } from "@4dl/app-kit";
 import { api, ApiError } from "../api.js";
@@ -52,6 +53,13 @@ export function Login() {
   const brandName = tenant?.name ?? "Kova";
   const { mode } = useTheme();
   const logoUrl = brandMark(tenant?.branding, mode, "logo");
+  // A wordmark already contains the studio's name, so writing it underneath
+  // prints the name twice — which the mark generator made the common case, since
+  // the wordmark it draws IS the name. When there is one the heading goes
+  // visually hidden rather than away: it is this page's h1 and the only thing
+  // that gives the screen a name in the document outline. The image then carries
+  // an empty alt, so the name is announced once, by the heading.
+  const wordmark = Boolean(logoUrl) && hasWordmark(tenant?.branding, mode);
   const login = tenant?.branding?.login ?? null;
   const bgImageUrl = login?.bgImageUrl || null;
   const showPasskey = login?.showPasskey !== false;
@@ -158,13 +166,13 @@ export function Login() {
           right place", and the answer should be the biggest thing on screen. */}
       <TierAnchor className="flex flex-col items-center gap-3 pb-8 text-center">
         {logoUrl ? (
-          <img src={logoUrl} alt={brandName} className="h-14 w-auto max-w-[70%] object-contain" />
+          <img src={logoUrl} alt={wordmark ? "" : brandName} className="h-14 w-auto max-w-[70%] object-contain" />
         ) : (
           <span aria-hidden className="grid size-14 place-items-center rounded-xl bg-primary text-title-2 font-black text-primary-foreground shadow-glow">
             {brandName.charAt(0).toUpperCase()}
           </span>
         )}
-        <h1 className="text-title-1">{brandName}</h1>
+        <h1 className={wordmark ? "sr-only" : "text-title-1"}>{brandName}</h1>
         {(headline || tagline) && <p className="text-body text-muted-foreground">{headline ?? tagline}</p>}
         {subtext && <p className="text-caption text-muted-foreground/80">{subtext}</p>}
       </TierAnchor>

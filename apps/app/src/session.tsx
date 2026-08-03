@@ -37,7 +37,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
-import { adminUrl, appStorage, createSession, tenantUrl, type HostInfo as KitHostInfo, type HostRole } from "@4dl/app-kit";
+import { adminUrl, appStorage, BRAND_CACHE, createSession, tenantUrl, type HostInfo as KitHostInfo, type HostRole } from "@4dl/app-kit";
 import type { SessionContext, TenantBranding } from "@kova/protocol";
 
 export { adminUrl };
@@ -58,8 +58,14 @@ export const studioUrl = tenantUrl;
  *
  * The remembered door used to be here too. It no longer exists: the hostname is
  * the door, so there is nothing for the device to remember.
+ *
+ * The BOOT BRAND is kept for the same reason as the theme, one step further out:
+ * it is this hostname's public identity — the name and colours anyone who loads
+ * the address is shown before signing in — so it is not one account's data, and
+ * dropping it on sign-out would put the platform's mark back on the first frame
+ * of the next visit, which is the exact flash it exists to remove.
  */
-const store = appStorage("kova", ["kova-theme"]);
+export const store = appStorage("kova", ["kova-theme", `kova:${BRAND_CACHE}`]);
 
 const kit = createSession<SessionContext, TenantBranding>({
   storage: store,
