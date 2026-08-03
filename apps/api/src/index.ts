@@ -39,7 +39,7 @@ import { goalRoutes } from "./goal-routes.js";
 import { commerceRoutes } from "./commerce-routes.js";
 import { paymentsRoutes, paymentsWebhook } from "./payments-routes.js";
 import { aiRoutes, aiAdminRoutes } from "./ai-routes.js";
-import { aiCatalogAdminRoutes } from "@4dl/ai";
+import { aiCatalogAdminRoutes, applySharedSelection } from "@4dl/ai";
 import { healthRoutes } from "./health-routes.js";
 import { bodyScanRoutes } from "./body-scan-routes.js";
 import { contentHubRoutes, marketplaceRoutes } from "./content-routes.js";
@@ -361,6 +361,14 @@ async function dailySweep(env: Env): Promise<void> {
   await step("schema+seed", async () => {
     await ensureSchema(env.DB);
     await seedBilling(env.DB);
+  });
+
+  // Anything another app broadcast with "apply to every app". Applied here as
+  // well as on the AI console, so a product nobody opens still converges within
+  // a day instead of waiting for someone to look at it. Idempotent by cursor.
+  await step("ai-selection", async () => {
+    const r = await applySharedSelection(env);
+    if (r.applied) console.log(`[dailySweep] applied ${r.applied} shared AI model change(s)`);
   });
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();

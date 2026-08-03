@@ -47,7 +47,7 @@ import { DUNNING_DAYS } from "@4dl/billing";
 import { periodKey } from "@4dl/core";
 import { billingAdminRoutes, billingRoutes, stripeWebhookRoutes } from "./billing-routes.js";
 import { aiAdminRoutes, aiRoutes } from "./ai-routes.js";
-import { aiCatalogAdminRoutes } from "@4dl/ai";
+import { aiCatalogAdminRoutes, applySharedSelection } from "@4dl/ai";
 import { settingsRoutes } from "./settings-routes.js";
 import { insightRoutes } from "./insight-routes.js";
 import { staffRoutes } from "./staff-routes.js";
@@ -336,6 +336,14 @@ async function dailySweep(env: Env): Promise<void> {
   await step("schema+seed", async () => {
     await ensureSchema(env.DB);
     await seedBilling(env.DB);
+  });
+
+  // Anything another app broadcast with "apply to every app". Applied here as
+  // well as on the AI console, so a product nobody opens still converges within
+  // a day instead of waiting for someone to look at it. Idempotent by cursor.
+  await step("ai-selection", async () => {
+    const r = await applySharedSelection(env);
+    if (r.applied) console.log(`[dailySweep] applied ${r.applied} shared AI model change(s)`);
   });
 
   const nowMs = Date.now();

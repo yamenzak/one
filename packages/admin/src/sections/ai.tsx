@@ -206,11 +206,34 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
       return `${line}. ${plural(r.total, "model")} selectable.`;
     }, "Sync failed — check outbound access to the pricing docs.");
 
+  /**
+   * "Apply to every app" — off by default, and remembered for the session.
+   *
+   * Off by default because a switch that silently reaches products you are not
+   * looking at is the wrong default for a control that decides what a tenant
+   * can spend credits on. Remembered because the operator who wants it wants it
+   * for the whole sitting, not once per row.
+   *
+   * It is a BROADCAST, not a shared setting: each app applies it once and then
+   * owns its own row again. So this can be ticked for one model and left off
+   * for the next without anything to reconcile afterwards.
+   */
+  const [allApps, setAllApps] = useState(false);
+
   const patchModel = (m: ModelRow, body: { enabled?: boolean; isDefault?: boolean }, what: string) =>
     catalog.run(`model:${m.id}`, async () => {
-      await api.patch(`/api/admin/ai/models/${encodeURIComponent(m.id)}`, body);
+      const r = await api.patch<{ broadcast?: boolean }>(
+        `/api/admin/ai/models/${encodeURIComponent(m.id)}`,
+        { ...body, ...(allApps ? { allApps: true } : {}) },
+      );
       models.reload();
-      return `${m.label}: ${what}`;
+      // The server reports whether the broadcast actually landed. A deployment
+      // with no shared store cannot make one, and saying "every app" when only
+      // this one changed is the failure this whole feature exists to remove.
+      if (!allApps) return `${m.label}: ${what}`;
+      return r?.broadcast
+        ? `${m.label}: ${what} — on this app now, on the others next time each one syncs or its console is opened.`
+        : `${m.label}: ${what} on THIS app only — the shared store isn't wired, so nothing was sent to the others.`;
     }, `Couldn't update ${m.label}.`);
 
   /** Make `m` the default for its lane. `enabled: true` is belt and braces — the
@@ -218,7 +241,7 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
    *  model is switched off between the catalog loading and this click. */
   const setDefaultModel = (m: ModelRow) =>
     catalog.run(`lane:${m.task}`, async () => {
-      await api.patch(`/api/admin/ai/models/${encodeURIComponent(m.id)}`, { isDefault: true, enabled: true });
+      await api.patch(`/api/admin/ai/models/${encodeURIComponent(m.id)}`, { isDefault: true, enabled: true, ...(allApps ? { allApps: true } : {}) });
       models.reload();
       return `${laneLabel(m.task)} now defaults to ${m.label}.`;
     }, `Couldn't set the ${laneLabel(m.task)} default.`);
@@ -393,6 +416,21 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
                         <span className="numeral">~n cr</span> is a typical request of that model&apos;s lane, and the second
                         line is the exact credit rate card. Neurons and the markup that produced them follow, as the cost basis.
                       </p>
+                      {/* One decision for the whole list, rather than a
+                          checkbox on every row: "should this reach the other
+                          products" is a mode the operator is in, not a property
+                          of a model. */}
+                      <label className="flex items-center gap-2.5 rounded-xl bg-surface-2 p-3">
+                        <Switch checked={allApps} onCheckedChange={setAllApps} aria-label="Apply changes to every 4DL app" />
+                        <span className="min-w-0 flex-1 text-sm">
+                          <span className="font-medium">Apply to every 4DL app</span>
+                          <span className="block text-xs text-muted-foreground">
+                            Switching a model on or off, and setting a lane default, also reaches the other products. Each
+                            applies it once and keeps its own setting after that. Per-model prices are never sent.
+                          </span>
+                        </span>
+                      </label>
+
                       {Object.entries(grouped).map(([prov, rows]) => (
                         <Card key={prov} className="space-y-1">
                           <div className="flex items-center justify-between gap-2 pb-1">

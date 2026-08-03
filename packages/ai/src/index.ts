@@ -7,3 +7,4 @@ export * from "./pricing.js";
 export * from "./registry.js";
 export * from "./schema.js";
 export { readSharedCatalog, publishSharedCatalog, SHARED_CATALOG_KEY, type SharedCatalog } from "./shared-catalog.js";
+export { applySharedSelection, broadcastSelection, SHARED_SELECTION_KEY, type SelectionOp } from "./shared-selection.js";

@@ -323,7 +323,12 @@ remote bindings without editing the config (this is what the E2E suite does).
   (`@4dl/ai` shared-catalog.ts) — a new app then seeds its whole priced catalog
   when its AI panel is first opened, instead of living on `DEFAULT_MODELS`'
   twelve hardcoded rows until somebody presses Sync. `enabled`/`is_default`
-  never cross: which models a product turns on is a product decision. When both
+  stay the app's — which models a product turns on is a product decision — but
+  the AI panel's **"Apply to every 4DL app"** switch BROADCASTS a toggle or a
+  lane default to the others (`shared-selection.ts`). A broadcast, not a shared
+  default: each app applies it once from its console or its daily sweep and then
+  owns its row again, so there is no precedence layer under the column the
+  credit math reads. `markup` is never broadcast. When both
   pricing pages fail, the sync applies the last published catalog rather than
   applying nothing. `ai.markup` is the DEFAULT bound into new rows, not the
   authority — metering reads the per-row `ai_models.markup` column.

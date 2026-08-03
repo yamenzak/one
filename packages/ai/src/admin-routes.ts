@@ -36,6 +36,7 @@ import { listModels, modelPricing, modelTasks, seedAiModels, type AiModelRow } f
 import { mockModeSettable } from "./mock-lane.js";
 import { fetchPricingDoc, syncModelCatalog } from "./catalog-sync.js";
 import { publishSharedCatalog, readSharedCatalog } from "./shared-catalog.js";
+import { applySharedSelection, broadcastSelection } from "./shared-selection.js";
 
 /** The slice of an app's Hono env these routes actually read. */
 export type AiRouteEnv = {
@@ -137,6 +138,11 @@ export function aiCatalogAdminRoutes<E extends AiRouteEnv = AiRouteEnv>(deps: Ai
       // hardcoded rows that exist only as a floor. This is where a new product's
       // catalog now comes from — no Sync, no operator action.
       await seedAiModels(c.env.DB, c.env);
+      // Anything another app broadcast with "apply to every app" and this one
+      // has not seen yet. Applied HERE so an operator who goes looking sees the
+      // effect immediately; the daily sweep applies it too, so an app nobody
+      // opens still converges. Idempotent by cursor — whichever runs first wins.
+      await applySharedSelection(c.env).catch(() => undefined);
       const rows = await c.env.DB.prepare("SELECT * FROM ai_models ORDER BY provider, task, label").all<AiModelRow>();
       // Every row carries its price in CREDITS as well as its neuron rate card.
       // Neurons are the cost basis and stay useful, but they are not the currency
@@ -151,11 +157,25 @@ export function aiCatalogAdminRoutes<E extends AiRouteEnv = AiRouteEnv>(deps: Ai
       return c.json({ models });
     })
 
-    /** Toggle / default / per-model markup override. */
+    /**
+     * Toggle / default / per-model markup override.
+     *
+     * `allApps` broadcasts the on/off and default decision to every other 4DL
+     * app, which each applies once and then owns. It is a one-time event rather
+     * than a shared default on purpose — see shared-selection.ts. `markup` is
+     * deliberately NOT broadcast: it is this app's price for this model, and
+     * pushing one product's pricing onto another is a different decision from
+     * "we all want this model available".
+     */
     .patch("/admin/ai/models/:id", async (c) => {
       if (!deps.isPlatformAdmin(c)) return forbidden(c);
       const d = z
-        .object({ enabled: z.boolean().optional(), isDefault: z.boolean().optional(), markup: z.number().min(1).max(100).optional() })
+        .object({
+          enabled: z.boolean().optional(),
+          isDefault: z.boolean().optional(),
+          markup: z.number().min(1).max(100).optional(),
+          allApps: z.boolean().optional(),
+        })
         .safeParse(await c.req.json().catch(() => null));
       if (!d.success) return c.json({ error: "invalid body" }, 400);
       const id = c.req.param("id");
@@ -171,7 +191,22 @@ export function aiCatalogAdminRoutes<E extends AiRouteEnv = AiRouteEnv>(deps: Ai
       if (d.data.isDefault !== undefined) (sets.push("is_default = ?"), binds.push(d.data.isDefault ? 1 : 0));
       if (d.data.markup !== undefined) (sets.push("markup = ?"), binds.push(d.data.markup));
       if (sets.length) await c.env.DB.prepare(`UPDATE ai_models SET ${sets.join(", ")} WHERE id = ?`).bind(...binds, id).run();
-      return c.json({ ok: true });
+
+      // This app is already done above; the broadcast is for the others.
+      let broadcast = false;
+      if (d.data.allApps && (d.data.enabled !== undefined || d.data.isDefault !== undefined)) {
+        broadcast = await broadcastSelection(c.env, {
+          modelId: id,
+          enabled: d.data.enabled,
+          isDefault: d.data.isDefault,
+          by: deps.appName ?? "an app",
+          at: nowIso(),
+        });
+      }
+      // Reported rather than assumed. A deployment with no shared store cannot
+      // broadcast, and an operator who ticked the box deserves to know that
+      // rather than believe every app just changed.
+      return c.json({ ok: true, broadcast });
     })
 
     /**

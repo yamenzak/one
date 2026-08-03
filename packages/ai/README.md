@@ -41,8 +41,37 @@ platform store (`shared-catalog.ts`), and two things follow:
   format change, a bad day at a provider — the sync falls back to the last
   published catalog instead of reporting failure and applying nothing.
 
-`enabled` and `is_default` never cross. One product reads food photos, another
-reads sterilisation labels, and a third has no use for the speech lane at all.
+`enabled` and `is_default` never cross by default. One product reads food
+photos, another reads sterilisation labels, and a third has no use for the
+speech lane at all.
+
+### "Apply to every app" is a broadcast, not a shared default
+
+But there is one operator, and turning a new model on meant finding it on every
+console. So the AI panel has a switch, and `shared-selection.ts` is what stands
+behind it.
+
+A shared DEFAULT would be the wrong shape. It is a standing rule, so every later
+divergence becomes an override — and an operator who turns a model off on one
+app then wonders, months later, why it is off, with the answer living in a
+precedence rule rather than in anything they did. Worse: `ai_models` is what the
+credit math reads, and a second invisible layer under the column that decides
+what a tenant is charged is a bug class nobody wants.
+
+A BROADCAST is an event. "Turn this on everywhere" happens once, each app
+applies it once, and after that every app owns its row again — exactly what
+would have happened had somebody clicked through each console by hand.
+
+A worker cannot write another worker's D1, so this cannot push. Each app PULLS:
+a cursor in its own `app_config`, applied from two places — its AI console (so
+an operator who looks sees it at once) and its daily sweep (so an app nobody
+opens still converges within a day). Sequence numbers rather than timestamps,
+because a tie on a clock means an op silently never applied, which looks exactly
+like the feature not working.
+
+`markup` is never broadcast: it is this app's price for this model, and pushing
+one product's pricing onto another is a different decision from "we all want
+this model available".
 
 ### Why publish a blob, when config is read-through
 
