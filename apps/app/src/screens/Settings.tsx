@@ -6,7 +6,7 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, monogramFor, renderMarkPng, markRuns, MARK_WEIGHT, MARK_SOFT_ALPHA, MARK_TINT_ALPHA, RefreshCw, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type WordmarkStyle, type MarkPlate, type MarkRun, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
+import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, monogramFor, renderMarkPng, markRuns, brandMark, MARK_WEIGHT, MARK_SOFT_ALPHA, MARK_TINT_ALPHA, RefreshCw, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type WordmarkStyle, type MarkPlate, type MarkRun, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
 import { personaLabel, personaTone } from "../registry/index.js";
 import { KOVA_TOKEN_GROUPS, DEFAULT_ACCENT_TOKENS, MACRO_SPEC } from "../registry/tones.js";
 
@@ -685,6 +685,11 @@ function CloseStudioSection() {
 function SignInSettings({ canBrand, branding, slug, onSaved }: { canBrand: boolean; branding: TenantBranding | null; slug: string | null; onSaved: () => void }) {
   const login = branding?.login ?? null;
   const customised = [login?.headline, login?.subtext, login?.bgImageUrl].filter(Boolean).length;
+  // The preview shows the sign-in screen as it renders in the mode the owner is
+  // looking at — so a mark that only works on dark is caught here rather than by
+  // a client on a light phone.
+  const { mode } = useTheme();
+  const previewLogo = brandMark(branding, mode, "logo");
   return (
     <SectionSplit
       param="g"
@@ -698,7 +703,7 @@ function SignInSettings({ canBrand, branding, slug, onSaved }: { canBrand: boole
           key: "screen", label: "The sign-in screen", icon: Palette, tone: "cardio",
           value: !canBrand ? "In the branding add-on" : customised ? `${customised} of 3 customised` : "Kova's default copy",
           render: () => canBrand
-            ? <LoginCustomizeSection initial={login} logoUrl={branding?.logoUrl ?? null} onSaved={onSaved} />
+            ? <LoginCustomizeSection initial={login} logoUrl={previewLogo} onSaved={onSaved} />
             : <p className="px-1 text-sm text-muted-foreground">Your own copy, a hero image and a branded domain are part of the branding add-on.</p>,
         },
         {

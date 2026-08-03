@@ -10,7 +10,7 @@ import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } 
 import {
   ChevronDown,
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, toneVar, type TabDef, type Tone,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, brandMark, hasIcon, hasWordmark, toneVar, type TabDef, type Tone,
 } from "@4dl/ui";
 import { resolveStanding, tenantStandingOfGate } from "@4dl/tenancy/model";
 import { useSession, useActiveClientId, adminUrl } from "./session.js";
@@ -194,6 +194,9 @@ function TabLayout() {
   const loc = useLocation();
   const active = ctx!.active!;
   const isStaff = active.role !== "client";
+  const barMark = brandMark(ctx!.branding, themeMode, "logo");
+  const barWordmark = hasWordmark(ctx!.branding, themeMode);
+  const railMark = brandMark(ctx!.branding, themeMode, "icon");
   const { tour: activeTour, start: startTour, startIfNew } = useTour();
 
   // First-run interactive tour — once per device, for the client surface.
@@ -289,9 +292,22 @@ function TabLayout() {
           // logo, and a bare text span at its own line-height), so the two sides
           // of the bar were optically off by 4–12px.
           <div className="flex h-9 min-w-0 items-center gap-2">
-            {ctx!.branding?.logoUrl ? (
-              <img src={ctx!.branding.logoUrl} alt={active.tenantName} className="h-9 max-w-32 object-contain" />
-            ) : (
+            {/* The bar's mark follows the theme, like every other surface: a
+                studio's logo is usually one colour, and the one drawn for dark
+                is what a member sees all day after switching to light.
+                A WORDMARK replaces the name; a square icon sits BESIDE it,
+                because a two-letter mark alone does not say whose studio this
+                is — and `brandMark` falls back to the icon when there is no
+                wordmark, which is how the name silently vanished from the bar
+                when the fallback was wired without this distinction. */}
+            {barMark && (
+              <img
+                src={barMark}
+                alt={barWordmark ? active.tenantName : ""}
+                className={barWordmark ? "h-9 max-w-32 object-contain" : "size-9 shrink-0 rounded-lg object-cover"}
+              />
+            )}
+            {!barWordmark && (
               <span className="flex h-9 items-center truncate text-base font-semibold tracking-tight">{active.tenantName}</span>
             )}
             {isStaff && (
@@ -454,7 +470,7 @@ function TabLayout() {
       </div>
 
       <BottomTabs tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} />
-      <NavRail tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} brand={ctx!.branding?.iconUrl ? <img src={ctx!.branding.iconUrl} alt={active.tenantName} className="size-full object-cover" /> : active.tenantName.charAt(0).toUpperCase()} />
+      <NavRail tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} brand={railMark ? <img src={railMark} alt={active.tenantName} className={hasIcon(ctx!.branding, themeMode) ? "size-full object-cover" : "size-full object-contain p-1"} /> : active.tenantName.charAt(0).toUpperCase()} />
     </div>
   );
 }

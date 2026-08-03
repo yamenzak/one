@@ -32,7 +32,7 @@
 
 import { useState } from "react";
 import type { PersonaRef } from "@kova/protocol";
-import { Badge, Button, Card, Sheet, Check, ChevronsUpDown, Store, Spinner, brandMark, cn } from "@4dl/ui";
+import { Badge, Button, Card, Sheet, Check, ChevronsUpDown, Store, Spinner, brandMark, hasIcon, cn } from "@4dl/ui";
 import { personaLabel, personaTone } from "./registry/index.js";
 import { useSession } from "./session.js";
 import { useTheme } from "./theme.js";
@@ -41,6 +41,9 @@ import { useTheme } from "./theme.js";
 function StudioMark({ persona, className }: { persona: PersonaRef; className?: string }) {
   const { mode } = useTheme();
   const icon = brandMark(persona, mode, "icon");
+  // `object-cover` is right for a square mark and destroys a wordmark — it
+  // crops the middle third of the studio's name into a 44px box.
+  const square = hasIcon(persona, mode);
   // A studio that has set a brand colour wears it here even when the app is
   // currently themed by a DIFFERENT studio — that is the whole point of the
   // switcher: you are looking at other businesses, not at this one's palette.
@@ -53,7 +56,7 @@ function StudioMark({ persona, className }: { persona: PersonaRef; className?: s
       style={tint}
       aria-hidden
     >
-      {icon ? <img src={icon} alt="" className="size-full object-cover" /> : persona.tenantName.charAt(0).toUpperCase()}
+      {icon ? <img src={icon} alt="" className={square ? "size-full object-cover" : "size-full object-contain p-1"} /> : persona.tenantName.charAt(0).toUpperCase()}
     </span>
   );
 }

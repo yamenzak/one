@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { Atmosphere, anchorIn, brandMark, contentIn, contentStagger, DUR} from "@4dl/ui";
+import { Atmosphere, anchorIn, brandMark, contentIn, contentStagger, DUR, hasIcon } from "@4dl/ui";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
 import { bootBrand, ThemeProvider, useTheme } from "./theme.js";
@@ -49,6 +49,9 @@ function BootSplash() {
   const { mode } = useTheme();
   const branding = ctx?.branding ?? host?.tenant?.branding ?? bootBrand?.branding;
   const logo = brandMark(branding, mode, "icon");
+  // A wordmark handed to a square slot gets its middle third cropped, which
+  // is the first thing anyone sees of the studio. Fit it instead.
+  const square = hasIcon(branding, mode);
   const name = host?.tenant?.name ?? bootBrand?.name ?? null;
   const initial = name?.trim()?.[0]?.toUpperCase() ?? null;
   return (
@@ -64,7 +67,7 @@ function BootSplash() {
           variants={anchorIn}
           className={`grid size-20 place-items-center overflow-hidden rounded-2xl text-primary-foreground ${logo || initial ? "bg-primary shadow-glow" : "bg-surface-2"}`}
         >
-          {logo ? <img src={logo} alt="" className="size-full object-cover" /> : initial && <span className="text-title-1 font-black">{initial}</span>}
+          {logo ? <img src={logo} alt="" className={square ? "size-full object-cover" : "size-full object-contain p-2"} /> : initial && <span className="text-title-1 font-black">{initial}</span>}
         </motion.div>
         {name && <motion.div variants={contentIn} className="text-body-lg">{name}</motion.div>}
         <motion.div variants={contentIn} className="h-1 w-32 overflow-hidden rounded-full bg-surface-2">

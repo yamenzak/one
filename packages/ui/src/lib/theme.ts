@@ -166,6 +166,20 @@ export function hasWordmark(b: BrandMarks | null | undefined, mode: ThemeMode): 
 }
 
 /**
+ * The mirror: whether `brandMark(b, mode, "icon")` returned a SQUARE mark, or
+ * fell through to the wide one.
+ *
+ * A square slot crops what it is given (`object-cover`), which is right for an
+ * icon and destroys a wordmark — the middle third of the studio's name, at
+ * 40px, in the nav rail and on the boot screen. Callers use this to switch to
+ * `object-contain` when what they were handed is not the shape of the hole.
+ */
+export function hasIcon(b: BrandMarks | null | undefined, mode: ThemeMode): boolean {
+  if (!b) return false;
+  return Boolean((mode === "light" && b.iconUrlLight) || b.iconUrl);
+}
+
+/**
  * Elevation presets. Shadows are a brand decision — a clinical studio wants
  * hairlines and a boutique one wants depth — so they are configurable rather
  * than baked in, and they are PRESETS rather than free-form CSS: a mistyped

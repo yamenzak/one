@@ -17,9 +17,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { motion } from "motion/react";
-import { Button, Card, Field, Mail, KeyRound, ArrowRight, Check, Spinner, DUR} from "@4dl/ui";
+import { Button, Card, Field, Mail, KeyRound, ArrowRight, Check, Spinner, DUR, brandMark } from "@4dl/ui";
 import { api, ApiError } from "../api.js";
 import { useSession } from "../session.js";
+import { useTheme } from "../theme.js";
 import { Turnstile } from "../Turnstile.js";
 
 export function AcceptInvite() {
@@ -27,7 +28,8 @@ export function AcceptInvite() {
   const { ctx, loading, refresh, host } = useSession();
   const tenant = host?.tenant ?? null;
   const brandName = tenant?.name ?? "the studio";
-  const logoUrl = tenant?.branding?.logoUrl ?? null;
+  const { mode } = useTheme();
+  const logoUrl = brandMark(tenant?.branding, mode, "logo");
   const turnstile = host?.turnstile ?? null;
   const needsTurnstile = Boolean(turnstile?.enabled && turnstile.siteKey);
 

@@ -42,6 +42,7 @@ import {
   Store,
   TierContent,
   brandMark,
+  hasIcon,
 } from "@4dl/ui";
 import { useTheme } from "../theme.js";
 import { RefreshNote } from "@4dl/app-kit";
@@ -99,7 +100,7 @@ export function RootSignpost() {
                 leading={
                   <span aria-hidden className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-sm bg-primary/15 text-body-lg font-bold text-primary">
                     {brandMark(p, mode, "icon") ? (
-                      <img src={brandMark(p, mode, "icon") ?? ""} alt="" className="size-full object-cover" />
+                      <img src={brandMark(p, mode, "icon") ?? ""} alt="" className={hasIcon(p, mode) ? "size-full object-cover" : "size-full object-contain p-1"} />
                     ) : (
                       p.tenantName.charAt(0).toUpperCase()
                     )}
