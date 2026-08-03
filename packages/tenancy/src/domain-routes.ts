@@ -92,13 +92,47 @@ function present(row: DomainRow) {
   };
 }
 
+/**
+ * The DCV records to STORE, given what Cloudflare just said.
+ *
+ * Two rules, and the second one is the whole reason this is a function.
+ *
+ * On `txt` DCV, an empty answer is KEPT: Cloudflare omits the validation
+ * records from some polls, and blanking the row on one of those would erase the
+ * instructions from under an owner who is halfway through typing them.
+ *
+ * On `http` DCV there ARE no records, permanently and by design — the CA fetches
+ * a token over port 80 instead. So the same "keep what we had" rule becomes a
+ * lie that cannot expire: a hostname created under `txt` and later migrated to
+ * `http` keeps its old `_acme-challenge` values forever, and the screen goes on
+ * demanding a TXT record that no longer does anything, at a domain whose
+ * certificate is issuing perfectly well without it. That is exactly what
+ * happened to every domain added before the switch, and it looks from the
+ * outside like the migration did not work.
+ */
+export function verifyToStore(row: Pick<DomainRow, "verify_name" | "verify_value" | "verify_json">, ch: CustomHostname): { name: string | null; value: string | null; json: string | null } {
+  if (ch.sslMethod === "http") return { name: null, value: null, json: null };
+  return {
+    name: ch.verify.name ?? row.verify_name,
+    value: ch.verify.value ?? row.verify_value,
+    json: ch.verifyAll.length ? JSON.stringify(ch.verifyAll) : row.verify_json,
+  };
+}
+
 /** Fold a CF poll result into our row + return the derived status. */
 async function syncStatus(env: { DB: D1Database; CACHE?: KVNamespace }, row: DomainRow, ch: CustomHostname): Promise<string> {
   const status = ch.status === "active" && ch.sslStatus === "active" ? "active" : ch.errors.length ? "error" : "pending";
+  const v = verifyToStore(row, ch);
   await env.DB
     .prepare("UPDATE tenant_domains SET status = ?, ssl_status = ?, verify_name = ?, verify_value = ?, verify_json = ?, cf_errors = ?, updated_at = ? WHERE hostname = ?")
-    .bind(status, ch.sslStatus, ch.verify.name ?? row.verify_name, ch.verify.value ?? row.verify_value, ch.verifyAll.length ? JSON.stringify(ch.verifyAll) : row.verify_json, JSON.stringify(ch.errors), nowIso(), row.hostname)
+    .bind(status, ch.sslStatus, v.name, v.value, v.json, JSON.stringify(ch.errors), nowIso(), row.hostname)
     .run();
+  // The in-memory row is what `present()` serialises to the caller, so it has to
+  // carry the same answer the database just took — otherwise the response to the
+  // very refresh that migrated a hostname still shows the TXT it just dropped.
+  row.verify_name = v.name;
+  row.verify_value = v.value;
+  row.verify_json = v.json;
   // A status flip (esp. active→pending/error) must not linger in the host cache.
   await invalidateHostCache(env, row.hostname);
   return status;
@@ -191,8 +225,21 @@ export function domainRoutes(deps: RouteGuards, opts: DomainRouteConfig) {
     const out = [];
     for (const row of rows) {
       if (cfg && row.cf_hostname_id && row.status !== "active") {
-        const ch = await getCustomHostname(cfg, row.cf_hostname_id).catch(() => null);
-        if (ch) { row.status = await syncStatus(c.env, row, ch); row.ssl_status = ch.sslStatus; if (ch.verify.name) { row.verify_name = ch.verify.name; row.verify_value = ch.verify.value; } }
+        let ch = await getCustomHostname(cfg, row.cf_hostname_id).catch(() => null);
+        // Migrate here as well as on `Check now`, because this is the read that
+        // renders the instructions. A domain added before the switch to `http`
+        // DCV would otherwise show its old TXT to whoever opened the screen, and
+        // the honest reaction to that is to go and publish the TXT — not to
+        // press a button captioned "Check now" about a record you have not
+        // added yet. By the time anyone reads the page, it should already be
+        // telling them the truth.
+        if (ch && ch.sslMethod === "txt" && ch.sslStatus !== "active") {
+          ch = (await useHttpValidation(cfg, row.cf_hostname_id).catch(() => null)) ?? ch;
+        }
+        // `syncStatus` owns the verify columns now, in memory as well as in D1 —
+        // re-applying `ch.verify` here was what put the migrated hostname's old
+        // TXT back on the response after the database had correctly dropped it.
+        if (ch) { row.status = await syncStatus(c.env, row, ch); row.ssl_status = ch.sslStatus; }
       }
       out.push(present(row));
     }
@@ -308,7 +355,10 @@ export function domainRoutes(deps: RouteGuards, opts: DomainRouteConfig) {
       if (ch && ch.sslMethod === "txt" && ch.sslStatus !== "active") {
         ch = (await useHttpValidation(cfg, row.cf_hostname_id).catch(() => null)) ?? ch;
       }
-      if (ch) { row.status = await syncStatus(c.env, row, ch); row.ssl_status = ch.sslStatus; if (ch.verify.name) { row.verify_name = ch.verify.name; row.verify_value = ch.verify.value; } }
+      // `syncStatus` owns the verify columns now, in memory as well as in D1 —
+      // re-applying `ch.verify` here was what put the migrated hostname's old
+      // TXT back on the response after the database had correctly dropped it.
+      if (ch) { row.status = await syncStatus(c.env, row, ch); row.ssl_status = ch.sslStatus; }
     }
     const target = row.cname_target ?? cfg?.cnameTarget ?? null;
     const dns = row.status !== "active" && target ? await checkCname(row.hostname, target).catch(() => null) : null;
