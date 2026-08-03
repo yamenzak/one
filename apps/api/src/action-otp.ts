@@ -38,7 +38,7 @@ export async function sendActionOtp(
         { brand, preheader: `${code} — your confirmation code` },
       );
       await sendEmail(
-        env.DB,
+        env,
         { to: opts.email, subject: `${code} — confirm ${actionLabel}`, html, text: `Your confirmation code is ${code} (expires in 10 minutes).` },
         env.EMAIL,
         undefined,

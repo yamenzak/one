@@ -123,7 +123,7 @@ export const otpSendGuard: MiddlewareHandler<AppEnv> = buildOtpGuard<Env, Auth, 
   },
 
   deliverable: async (c) => {
-    const r = await emailDeliverable(c.env.DB, c.env.EMAIL, isDevLane(c.env, c.req.header("origin") ?? ""));
+    const r = await emailDeliverable(c.env, c.env.EMAIL, isDevLane(c.env, c.req.header("origin") ?? ""));
     return r.ok ? { ok: true } : { ok: false, reason: r.reason };
   },
 

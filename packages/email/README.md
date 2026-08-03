@@ -8,6 +8,28 @@ Transactional mail, and the HTML kit that makes it look like the product.
 | `provider.ts` | The PER-TENANT lane: platform sender vs the tenant's own Brevo key vs `off`. |
 | `schema.ts` | `email_templates` — a tenant's white-label overrides. |
 
+## `email.provider` is on the shared allow-list, so the send path must MERGE
+
+`getEmailConfig` used to read `app_config` with a raw
+`SELECT … WHERE key IN ('email.provider','email.from')`. That is this app's
+table and only this app's table — which was fine until `email.provider` became
+shareable, and then quietly wrong in the worst direction.
+
+An operator who set the provider once for the platform and cleared this app's
+own row — which the shared-config panel offers, as **Use shared** — would have
+had the send path fall through to the `"mock"` default and stop delivering
+mail, while every screen reported a configured provider. On a passwordless
+platform that is not "email is degraded", it is "nobody can sign in".
+
+So it reads through `getConfig`, and `sendEmail`/`emailDeliverable` take a
+`ConfigSource`: pass the ENV wherever one is to hand. A bare `D1Database` still
+works and sees app-local config only, which is the right answer for a caller
+that genuinely has nothing else.
+
+`email.from` is unaffected either way — it is app-local by design (it carries
+the product's display name) and a local row always wins.
+
+
 ## Two things the app supplies
 
 **Its identity** (`configureEmailBrand`). The name, accent and logo the platform's

@@ -8,7 +8,7 @@
  * is onboarded). Defaults to mock so passwordless auth never dead-ends in dev.
  */
 
-import type { HasDb, SendEmailBinding } from "@4dl/core";
+import type { ConfigSource, HasDb, SendEmailBinding } from "@4dl/core";
 import { getConfig } from "@4dl/core";
 
 export interface SendResult {
@@ -37,15 +37,26 @@ export interface SendResult {
  */
 export const PLATFORM_FROM_DEFAULT = "noreply@invalid.local";
 
-async function getEmailConfig(db: D1Database): Promise<{ provider: string; from: string }> {
+/**
+ * The two rows a send needs — through `getConfig`, NOT a raw query.
+ *
+ * This used to `SELECT … WHERE key IN (…)` straight off `app_config`, which
+ * reads only THIS app's table. `email.provider` is on the shared allow-list, so
+ * that combination was quietly broken in the worst direction: an operator who
+ * set the provider once for the platform and then cleared this app's own row —
+ * which the console offers, as "Use shared" — would have had the send path fall
+ * through to the `"mock"` default and stop delivering mail, while every screen
+ * reported a configured provider.
+ *
+ * `email.from` is app-local by design (it carries the product's display name),
+ * and merging changes nothing for it: a local row always wins.
+ */
+async function getEmailConfig(src: ConfigSource): Promise<{ provider: string; from: string }> {
   try {
-    const rows = await db
-      .prepare("SELECT key, value FROM app_config WHERE key IN ('email.provider','email.from')")
-      .all<{ key: string; value: string }>();
-    const cfg = Object.fromEntries((rows.results ?? []).map((r) => [r.key, r.value]));
+    const cfg = await getConfig(src);
     return {
-      provider: cfg["email.provider"] ?? "mock",
-      from: cfg["email.from"] ?? platformFromAddress(),
+      provider: cfg["email.provider"] || "mock",
+      from: cfg["email.from"] || platformFromAddress(),
     };
   } catch {
     return { provider: "mock", from: platformFromAddress() };
@@ -73,11 +84,11 @@ export { bareAddress };
  * BEFORE handing off to Better Auth is the only way to return a real error.
  */
 export async function emailDeliverable(
-  db: D1Database,
+  src: ConfigSource,
   binding?: SendEmailBinding,
   isDev = false,
 ): Promise<{ ok: true } | { ok: false; provider: string; reason: string }> {
-  const cfg = await getEmailConfig(db);
+  const cfg = await getEmailConfig(src);
   if (cfg.provider === "disabled") {
     return { ok: false, provider: cfg.provider, reason: "email delivery is switched off for this deployment" };
   }
@@ -97,13 +108,21 @@ export async function emailDeliverable(
 }
 
 export async function sendEmail(
-  db: D1Database,
+  /**
+   * The app's D1, or its whole env.
+   *
+   * Pass the ENV wherever one is to hand: `email.provider` may live in the
+   * shared platform store, and a bare `D1Database` cannot see it. A database
+   * still works and reads app-local config only — which is the correct answer
+   * for a caller that genuinely has nothing else.
+   */
+  src: ConfigSource,
   msg: { to: string; subject: string; html?: string; text?: string },
   binding?: SendEmailBinding,
   fromOverride?: string,
   isDev = false,
 ): Promise<SendResult> {
-  const cfg = await getEmailConfig(db);
+  const cfg = await getEmailConfig(src);
   const from = fromOverride || cfg.from;
   if (cfg.provider === "disabled") return { ok: false, error: "email disabled" };
   if (cfg.provider === "cloudflare" && binding) {

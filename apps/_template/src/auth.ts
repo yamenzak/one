@@ -62,7 +62,9 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape): Shared
 
     async sendOtp(e, { email, otp, devLane }) {
       const res = await sendEmail(
-        (e as Env).DB,
+        // The ENV, so a provider set once in the shared platform store reaches
+        // the sign-in code — the one email a deployment cannot do without.
+        e as Env,
         {
           to: email,
           subject: `${otp} is your sign-in code`,

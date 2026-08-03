@@ -72,7 +72,7 @@ async function sendNotifEmail(env: Env, n: ResolvedNotification<NotifyInput>): P
     manageUrl: base ? `${base}/settings/notifications` : undefined,
   });
   await sendEmail(
-    env.DB,
+    env,
     { to: user.email, subject: n.title, html, text: n.message ?? n.title },
     env.EMAIL,
     undefined,

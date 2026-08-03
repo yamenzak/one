@@ -181,7 +181,7 @@ async function sendNotifEmail(env: Env, n: ResolvedNotification<NotifyInput>): P
           html = notifEmailHtml(env, brand, input.tenantId, { title, message: input.message, link, footnote: signature, eyebrow });
         }
         if (isPlatformBilling) {
-          await sendEmail(env.DB, { to: user.email, subject, html, text: input.message ?? subject }, env.EMAIL, undefined, env.ENVIRONMENT === "development").catch(() => undefined);
+          await sendEmail(env, { to: user.email, subject, html, text: input.message ?? subject }, env.EMAIL, undefined, env.ENVIRONMENT === "development").catch(() => undefined);
         } else {
           await sendTenantEmail(env, input.tenantId, { to: user.email, subject, html, text: input.message ?? subject, brandName: brand.name }).catch(() => undefined);
         }

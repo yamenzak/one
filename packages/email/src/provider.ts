@@ -130,7 +130,9 @@ export async function sendTenantEmail(
   // authenticated), but the name is the studio's to choose.
   const displayName = cfg.senderName.trim() || msg.brandName;
   const from = displayName ? `${displayName} <${bareAddress(platformFrom)}>` : platformFrom;
-  const result = await sendEmail(env.DB, msg, env.EMAIL, from, isDevLane(env));
+  // `env`, not `env.DB`: `email.provider` may live in the shared platform
+  // store, and a bare database cannot see it.
+  const result = await sendEmail(env, msg, env.EMAIL, from, isDevLane(env));
   // Refund the metered credit if the send didn't actually go out — a charged-but-
   // failed email should never silently spend a tenant's credits.
   if (metered && !result.ok) {
