@@ -5,7 +5,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Avatar, IconTabs, Page, Stagger, EmptyState, Reveal, SkeletonList, ConfirmDialog, toneVar, Users, Mail, User, Search, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle, Anchor, CountUp, Group, Row, Sun, ClipboardList, Target, TrendingUp, BarChart3, Settings as SettingsIcon } from "@4dl/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, IconTabs, Page, Stagger, ConfirmDialog, Collection, useCollectionView, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle, Anchor, CountUp, Group, Row, Sun, ClipboardList, Target, TrendingUp, BarChart3, Settings as SettingsIcon } from "@4dl/ui";
 import type { AttentionSeverity } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -18,6 +18,29 @@ import { ClientManage } from "./ClientManage.js";
 import { ClientReport } from "./ClientReport.js";
 
 export interface ClientSummary { id: string; displayName: string; email: string | null; status: string; hasLogin: boolean; avatarUrl?: string | null; avatarSeed?: string | null }
+
+/**
+ * What a client's row (or tile) says about them, in one badge.
+ *
+ * Extracted because the list and the grid both need it, and a second copy would
+ * have drifted the first time a rule changed — which is the whole reason the two
+ * views are one component's two renderers rather than two screens.
+ */
+function ClientStatus({ client, att }: { client: ClientSummary; att: Map<string, { labels: string[]; severity: AttentionSeverity }> }) {
+  /*
+    An invited client is not a lapsed one.
+
+    Attention rules assume an ACTIVE client who stopped doing something, so they
+    fired "Gone quiet" and "No active plan" at someone invited five seconds ago
+    who has never signed in. Until they log in, the row is about the invitation.
+  */
+  if (!client.hasLogin) return <Badge tone="neutral">Invited</Badge>;
+  const hit = att.get(client.id);
+  // The badge is the COUNT — the sub-line carries the words — so a long name
+  // keeps its room.
+  if (hit) return <Badge tone={SEVERITY_TONE[hit.severity]}>{hit.labels.length}</Badge>;
+  return <Badge tone="success">Active</Badge>;
+}
 
 /** The invite payload POST /api/clients returns when an email is present — the
  *  branded deep-link (also emailed) the coach can show in the gym. */
@@ -83,6 +106,8 @@ export function Clients() {
     bottom: they are waiting on the client, not on the coach.
   */
   const [q, setQ] = useState("");
+  // Remembered per device, outside the sign-out sweep — see `useCollectionView`.
+  const [view, setView] = useCollectionView("clients");
   const ordered = useMemo(() => {
     if (!clients) return null;
     const rank = (c: ClientSummary) => (!c.hasLogin ? 2 : att.has(c.id) ? 0 : 1);
@@ -189,91 +214,87 @@ export function Clients() {
         </Card>
       )}
 
-      {loadError && !clients ? (
-        <EmptyState icon={AlertTriangle} title="Couldn't load your clients" description="Something went wrong reaching the server. Check your connection and try again." action={<Button onClick={() => void load()}>Try again</Button>} />
-      ) : (
-      <Reveal loading={!clients} skeleton={<SkeletonList card rows={6} thumb={44} />}>
-        {/* Search appears once scrolling is the alternative. Below that it is a
-            control asking to be used on a list you can already see. */}
-        {clients && clients.length > 7 && (
-          <Field
-            label="Search clients"
-            labelHidden
-            icon={Search}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Search by name or email…"
-            className="mb-2"
-          />
+      {/*
+        THE ROSTER, AS A COLLECTION.
+
+        Search, the list/grid choice, the four states and the empty copy are all
+        `@4dl/ui`'s now (UI-LANGUAGE §7 "Collections"). What stays here is the
+        only part that is genuinely about CLIENTS: what one row says, and what
+        one tile shows.
+
+        The list is the working view — a coach scans for what needs doing, and
+        the attention labels are words on a line. The grid is the roster view —
+        faces, for a studio that knows its people by sight. Neither is right for
+        everyone, which is why it is remembered rather than decided.
+      */}
+      <Collection
+        items={ordered}
+        itemKey={(c) => c.id}
+        noun="clients"
+        error={loadError && !clients ? "Something went wrong reaching the server." : null}
+        onRetry={() => void load()}
+        query={q}
+        onQuery={setQ}
+        view={view}
+        onView={setView}
+        thumb={44}
+        empty={{
+          icon: Users,
+          title: "No clients yet",
+          description: "Add your first client. With an email set, they sign in the moment you do — no codes, no passwords.",
+          action: <Button onClick={() => setCreateOpen(true)}><Plus /> Add your first client</Button>,
+        }}
+        renderList={(c) => (
+          <Row
+            onClick={() => nav(`/clients/${c.id}/today`)}
+            /*
+              What needs doing, not who they are.
+
+              Every row's sub-line was the client's email, truncated — an
+              identifier, not a fact a coach scans by (§7: the secondary line is
+              a fact, not a category). The attention labels are the fact. Email
+              survives as the fallback for a client who has not named themselves
+              yet, where it is the only identity there is.
+
+              Two labels and a count, not three and an ellipsis: "Check-in to
+              answer · No active plan · Profil…" spent its last characters on a
+              word nobody can finish reading.
+            */
+            sub={(() => {
+              const ls = c.hasLogin ? att.get(c.id)?.labels : undefined;
+              if (!ls?.length) return c.email ?? "No email yet";
+              return ls.length > 2 ? `${ls.slice(0, 2).join(" · ")} · +${ls.length - 2}` : ls.join(" · ");
+            })()}
+            leading={<Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-11" />}
+            trailing={freeing ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="shrink-0"
+                disabled={archiveBusy}
+                aria-label={`Archive ${c.displayName}`}
+                onClick={(e) => { e.stopPropagation(); setArchiveErr(null); setToArchive(c); }}
+              ><Archive /> Archive</Button>
+            ) : <ClientStatus client={c} att={att} />}
+          >
+            {c.displayName}
+          </Row>
         )}
-        {ordered && (clients!.length === 0 ? (
-          <EmptyState icon={Users} title="No clients yet" description="Add your first client. With an email set, they sign in the moment you do — no codes, no passwords." action={<Button onClick={() => setCreateOpen(true)}><Plus /> Add your first client</Button>} />
-        ) : (
-          ordered.length === 0 ? (
-            <EmptyState icon={Users} title="Nothing matches" description="Try part of a name or an email address." />
-          ) : (
-          <Group>
-            {ordered.map((c) => (
-              <Row
-                key={c.id}
-                onClick={() => nav(`/clients/${c.id}/today`)}
-                /*
-                  What needs doing, not who they are.
-
-                  Every row's sub-line was the client's email, truncated —
-                  "e2e-roster-0-aswcwg@kova.t…" — which is an identifier, not a
-                  fact a coach scans by (§7: the secondary line is a fact, not a
-                  category). The attention labels are the fact. Email survives
-                  as the fallback for a client who has not named themselves yet,
-                  where it is the only identity there is.
-                */
-                /* Two labels and a count, not three labels and an ellipsis:
-                   "Check-in to answer · No active plan · Profil…" spent its last
-                   characters on a word nobody can finish reading. */
-                sub={(() => {
-                  const ls = c.hasLogin ? att.get(c.id)?.labels : undefined;
-                  if (!ls?.length) return c.email ?? "No email yet";
-                  return ls.length > 2 ? `${ls.slice(0, 2).join(" · ")} · +${ls.length - 2}` : ls.join(" · ");
-                })()}
-                leading={<Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-10" />}
-                trailing={
-                  freeing ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="shrink-0"
-                      disabled={archiveBusy}
-                      aria-label={`Archive ${c.displayName}`}
-                      onClick={(e) => { e.stopPropagation(); setArchiveErr(null); setToArchive(c); }}
-                    ><Archive /> Archive</Button>
-                  ) : !c.hasLogin ? (
-                    /*
-                      An invited client is not a lapsed one.
-
-                      Attention rules assume an ACTIVE client who stopped doing
-                      something, so they fired "Gone quiet" and "No active plan"
-                      at someone invited five seconds ago who has never signed
-                      in — which the E2E caught by asserting the row still shows
-                      the address the invite went to. Until they log in, the row
-                      is about the invitation: the email is the thing a coach
-                      double-checks, and "Invited" is the whole status.
-                    */
-                    <Badge tone="neutral">Invited</Badge>
-                  ) : att.has(c.id) ? (
-                    // The badge is the COUNT — the sub-line carries the words —
-                    // so a long name keeps its room.
-                    <Badge tone={SEVERITY_TONE[att.get(c.id)!.severity]}>{att.get(c.id)!.labels.length}</Badge>
-                  ) : <Badge tone="success">Active</Badge>
-                }
-              >
-                {c.displayName}
-              </Row>
-            ))}
-          </Group>
-          )
-        ))}
-      </Reveal>
-      )}
+        renderGrid={(c) => (
+          <button
+            onClick={() => nav(`/clients/${c.id}/today`)}
+            className="flex size-full flex-col items-center gap-2 rounded-2xl bg-card p-3 text-center outline-none ring-ring transition-colors hover:bg-surface-2 focus-visible:ring-2"
+          >
+            <Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-16" />
+            {/* Two lines, always. Clamped so one long name cannot grow its row,
+                and RESERVED so a one-line name does not float its badge up to a
+                different height than its neighbour's — which is the thing that
+                makes a grid of people look untidy rather than the names. */}
+            <span className="line-clamp-2 min-h-[2.5em] min-w-0 text-sm font-medium leading-tight">{c.displayName}</span>
+            <ClientStatus client={c} att={att} />
+          </button>
+        )}
+      />
 
       <Sheet open={createOpen} onClose={() => { setCreateOpen(false); setCreateErr(null); }} title="New client" footer={<Button size="lg" className="w-full" disabled={!emailValid || busy} onClick={() => void create()}>{busy ? "Sending…" : "Send invite"}</Button>}>
         <div className="space-y-4">

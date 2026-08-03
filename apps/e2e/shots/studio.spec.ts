@@ -51,6 +51,16 @@ test("the coach's studio", async () => {
 
   // `?new=1` opens the create sheet — the same deep link the coach's Today uses,
   // so photographing it needs no clicking and cannot drift from the real one.
+  // The same collection in its other view. Set through the preference the app
+  // itself writes, not by clicking — the point of the shot is the GRID, and a
+  // click that silently missed would produce a second list shot nobody notices.
+  await test.step("roster as a grid", async () => {
+    await page.evaluate(() => localStorage.setItem("4dl.view.clients", "grid"));
+    await visit(page, `${base}/clients`, shell);
+    await shoot(page, project, "coach-roster-grid");
+    await page.evaluate(() => localStorage.setItem("4dl.view.clients", "list"));
+  });
+
   await test.step("adding a client", async () => {
     await visit(page, `${base}/clients?new=1`, page.getByRole("button", { name: "Send invite" }));
     await shoot(page, project, "coach-add-client");
