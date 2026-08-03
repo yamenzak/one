@@ -29,7 +29,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   ActionResult, AlertTriangle, Badge, Button, Callout, Card, CircleCheck, ConfigRow, EmptyState, Field,
   FieldGroup, KeyRound, LayoutGrid, LoadError, Percent, Play, Plug, Reveal, RefreshCw, SectionHeader,
-  SegmentedControl, Select, Skeleton, SkeletonLine, Spinner, Switch, cn, useAction, useLoad,
+  SegmentedControl, Select, Skeleton, SkeletonLine, Spinner, Stagger, Switch, cn, useAction, useLoad,
 } from "@4dl/ui";
 import { AdminDepsProvider, useAdminDeps, type AdminDeps } from "../deps.js";
 import { ConsoleSplit } from "../split.js";
@@ -253,258 +253,260 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
   }, {});
 
   return (
-    <ConsoleSplit
-      param="a"
-      subs={[
-        {
-          key: "provider", label: "Provider", icon: Plug, tone: "primary",
-          value: status ? (status.geminiKeySet ? `Gemini key set · mock ${status.mockMode}` : "No Gemini key — the vision suite is dead") : "…",
-          render: () => (
-            <div className="space-y-3">
-              {cfg.error && !status ? (
-                <LoadError what="the AI configuration" error={cfg.error} onRetry={cfg.reload} />
-              ) : (
-                <Reveal
-                  loading={cfg.loading}
-                  skeleton={
-                    <Card className="space-y-3">
-                      <div className="flex items-center gap-2.5"><Skeleton className="size-9 rounded-2xl" /><SkeletonLine w="8rem" h="title" /></div>
-                      <SkeletonLine w="95%" h="xs" /><SkeletonLine w="80%" h="xs" />
-                      <Skeleton className="h-12 w-full rounded-xl" />
-                    </Card>
-                  }
-                >
-                  {status && (
-                    <Card className="space-y-4">
-                      <SectionHeader
-                        icon={Plug}
-                        title="Providers"
-                        action={<Badge tone={status.geminiKeySet ? "success" : "warning"}>{status.geminiKeySet ? "Gemini + Workers AI" : "Workers AI only"}</Badge>}
-                      />
-                      <div className="space-y-2.5 rounded-2xl bg-surface-2 p-3.5">
-                        <ConfigRow
-                          label="Gemini API key"
-                          ok={status.geminiKeySet}
-                          detail={status.geminiKeySet ? "Text, vision and image generation are available." : "Without it, anything that reads an image is unreachable."}
-                          okLabel="Stored"
+    <Stagger>
+      <ConsoleSplit
+        param="a"
+        subs={[
+          {
+            key: "provider", label: "Provider", icon: Plug, tone: "primary",
+            value: status ? (status.geminiKeySet ? `Gemini key set · mock ${status.mockMode}` : "No Gemini key — the vision suite is dead") : "…",
+            render: () => (
+              <div className="space-y-3">
+                {cfg.error && !status ? (
+                  <LoadError what="the AI configuration" error={cfg.error} onRetry={cfg.reload} />
+                ) : (
+                  <Reveal
+                    loading={cfg.loading}
+                    skeleton={
+                      <Card className="space-y-3">
+                        <div className="flex items-center gap-2.5"><Skeleton className="size-9 rounded-2xl" /><SkeletonLine w="8rem" h="title" /></div>
+                        <SkeletonLine w="95%" h="xs" /><SkeletonLine w="80%" h="xs" />
+                        <Skeleton className="h-12 w-full rounded-xl" />
+                      </Card>
+                    }
+                  >
+                    {status && (
+                      <Card className="space-y-4">
+                        <SectionHeader
+                          icon={Plug}
+                          title="Providers"
+                          action={<Badge tone={status.geminiKeySet ? "success" : "warning"}>{status.geminiKeySet ? "Gemini + Workers AI" : "Workers AI only"}</Badge>}
                         />
-                        <ConfigRow label="Workers AI" ok detail="Always available on the worker binding, and cheaper." okLabel="Built in" />
-                        <ConfigRow
-                          label="Model catalog"
-                          ok={status.modelCount > 0}
-                          detail={status.modelCount > 0 ? `${plural(status.modelCount, "model")} priced and selectable.` : "Empty — run the catalog sync."}
-                          okLabel={`${status.modelCount}`}
-                          missingLabel="Empty"
-                        />
-                      </div>
+                        <div className="space-y-2.5 rounded-2xl bg-surface-2 p-3.5">
+                          <ConfigRow
+                            label="Gemini API key"
+                            ok={status.geminiKeySet}
+                            detail={status.geminiKeySet ? "Text, vision and image generation are available." : "Without it, anything that reads an image is unreachable."}
+                            okLabel="Stored"
+                          />
+                          <ConfigRow label="Workers AI" ok detail="Always available on the worker binding, and cheaper." okLabel="Built in" />
+                          <ConfigRow
+                            label="Model catalog"
+                            ok={status.modelCount > 0}
+                            detail={status.modelCount > 0 ? `${plural(status.modelCount, "model")} priced and selectable.` : "Empty — run the catalog sync."}
+                            okLabel={`${status.modelCount}`}
+                            missingLabel="Empty"
+                          />
+                        </div>
 
-                      {cfg.error && <Callout tone="warning" icon={AlertTriangle} live="alert">{cfg.error} Showing the last values that loaded.</Callout>}
+                        {cfg.error && <Callout tone="warning" icon={AlertTriangle} live="alert">{cfg.error} Showing the last values that loaded.</Callout>}
 
-                      {/* Google's console has a name that collides with one app's word
-                          for a tenant, so the boundary check refuses the natural phrasing
-                          — and is right to: a shared package cannot tell the two uses
-                          apart. Naming the product instead is unambiguous and shorter. */}
-                      <FieldGroup title="Gemini key" hint="A Gemini API key from Google. Stored write-only — leaving the box blank keeps whatever is saved.">
-                        <Field
-                          label={status.geminiKeySet ? "Gemini API key — stored (blank keeps it)" : "Gemini API key"}
-                          icon={KeyRound}
-                          type="password"
-                          value={geminiKey}
-                          onChange={(e) => setGeminiKey(e.target.value)}
-                        />
-                        <Button className="min-h-12 w-full" disabled={!geminiKey || provider.busy !== null} onClick={() => void saveKey()}>
-                          {provider.busy === "key" ? <><Spinner className="size-4" /> Saving…</> : "Save key"}
-                        </Button>
-                      </FieldGroup>
+                        {/* Google's console has a name that collides with one app's word
+                            for a tenant, so the boundary check refuses the natural phrasing
+                            — and is right to: a shared package cannot tell the two uses
+                            apart. Naming the product instead is unambiguous and shorter. */}
+                        <FieldGroup title="Gemini key" hint="A Gemini API key from Google. Stored write-only — leaving the box blank keeps whatever is saved.">
+                          <Field
+                            label={status.geminiKeySet ? "Gemini API key — stored (blank keeps it)" : "Gemini API key"}
+                            icon={KeyRound}
+                            type="password"
+                            value={geminiKey}
+                            onChange={(e) => setGeminiKey(e.target.value)}
+                          />
+                          <Button className="min-h-12 w-full" disabled={!geminiKey || provider.busy !== null} onClick={() => void saveKey()}>
+                            {provider.busy === "key" ? <><Spinner className="size-4" /> Saving…</> : "Save key"}
+                          </Button>
+                        </FieldGroup>
 
-                      <FieldGroup title="Mock mode" hint={MOCK_HINT[status.mockMode] ?? "Deterministic offline outputs for development and testing."}>
-                        <SegmentedControl
-                          fill
-                          options={[{ value: "auto", label: "Auto" }, { value: "on", label: "On" }, { value: "off", label: "Off" }]}
-                          value={status.mockMode}
-                          onChange={(v) => void setMock(v)}
-                        />
-                        {status.mockMode === "on" && (
-                          <Callout tone="danger" icon={AlertTriangle} live="alert">
-                            Mock mode is forced on: every AI answer is fabricated — and the tenant is still billed credits for it.
-                          </Callout>
-                        )}
-                      </FieldGroup>
+                        <FieldGroup title="Mock mode" hint={MOCK_HINT[status.mockMode] ?? "Deterministic offline outputs for development and testing."}>
+                          <SegmentedControl
+                            fill
+                            options={[{ value: "auto", label: "Auto" }, { value: "on", label: "On" }, { value: "off", label: "Off" }]}
+                            value={status.mockMode}
+                            onChange={(v) => void setMock(v)}
+                          />
+                          {status.mockMode === "on" && (
+                            <Callout tone="danger" icon={AlertTriangle} live="alert">
+                              Mock mode is forced on: every AI answer is fabricated — and the tenant is still billed credits for it.
+                            </Callout>
+                          )}
+                        </FieldGroup>
 
-                      <ActionResult msg={provider.msg} err={provider.err} />
-                    </Card>
-                  )}
-                </Reveal>
-              )}
-            </div>
-          ),
-        },
-        {
-          key: "pricing", label: "Credit pricing", icon: Percent, tone: "warning",
-          value: status ? `${plural(status.modelCount, "model")} · ${status.markup}× markup` : "…",
-          render: () => (
-            <div className="space-y-3">
-              <Card className="space-y-4">
-                <SectionHeader icon={Percent} title="Credit pricing" />
-                <p className="text-sm text-muted-foreground">
-                  Every model bills in credits at <span className="font-medium text-foreground">markup × the real provider cost</span>{" "}
-                  (Cloudflare neurons; Gemini USD converted to the same unit), so the platform is always profitable. Setting the
-                  markup rewrites it across the whole catalog.
-                </p>
-                <div className="flex items-end gap-2">
-                  <Field
-                    label="Credit markup (×)"
-                    className="flex-1"
-                    inputMode="decimal"
-                    value={markup}
-                    onChange={(e) => setMarkup(e.target.value.replace(/[^0-9.]/g, ""))}
-                    hint={status ? `Currently ${status.markup}×` : undefined}
-                  />
-                  <Button className="min-h-12" disabled={pricing.busy !== null || markup.trim() === ""} onClick={saveMarkup}>
-                    {pricing.busy === "markup" ? <><Spinner className="size-4" /> …</> : "Apply"}
-                  </Button>
-                </div>
-                <FieldGroup
-                  title="Catalog sync"
-                  hint="Re-reads the official Cloudflare and Gemini pricing pages: it DISCOVERS models new to the page, refreshes every rate, and switches off any model that has disappeared from its provider's page (never deletes one — a tenant may still reference it). Task routing, enable/default and markup choices survive. Each provider is handled on its own, so a failed fetch on one never touches the other's models."
-                >
-                  <Button variant="tonal" className="min-h-12 w-full" disabled={pricing.busy !== null} onClick={() => void sync()}>
-                    {pricing.busy === "sync" ? <><Spinner className="size-4" /> Syncing…</> : <><RefreshCw /> Sync from the pricing docs</>}
-                  </Button>
-                </FieldGroup>
-                <ActionResult msg={pricing.msg} err={pricing.err} />
-                {syncReport && <SyncReportCard report={syncReport} />}
-              </Card>
-
-              {models.error && !models.data ? (
-                <LoadError what="the model catalog" error={models.error} onRetry={models.reload} />
-              ) : (
-                <Reveal
-                  loading={models.loading}
-                  className="space-y-3"
-                  skeleton={
-                    <>
-                      {Array.from({ length: 2 }).map((_, g) => (
-                        <Card key={g} className="space-y-2">
-                          <div className="flex items-center justify-between"><SkeletonLine w="8rem" h="text" /><Skeleton className="h-5 w-16 rounded-full" /></div>
-                          <div className="divide-y divide-border/40">
-                            {Array.from({ length: 3 }).map((_, i) => (
-                              <div key={i} className="flex items-center gap-2 py-2.5">
-                                <div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="50%" h="text" /><SkeletonLine w="35%" h="xs" /></div>
-                                <Skeleton className="h-6 w-11 shrink-0 rounded-full" />
-                              </div>
-                            ))}
-                          </div>
-                        </Card>
-                      ))}
-                    </>
-                  }
-                >
-                  {models.data && (models.data.length === 0 ? (
-                    <EmptyState
-                      icon={LayoutGrid}
-                      title="No models in the catalog"
-                      description="Nothing can be generated until the catalog is populated. Run the sync above to pull rates from the pricing docs."
+                        <ActionResult msg={provider.msg} err={provider.err} />
+                      </Card>
+                    )}
+                  </Reveal>
+                )}
+              </div>
+            ),
+          },
+          {
+            key: "pricing", label: "Credit pricing", icon: Percent, tone: "warning",
+            value: status ? `${plural(status.modelCount, "model")} · ${status.markup}× markup` : "…",
+            render: () => (
+              <div className="space-y-3">
+                <Card className="space-y-4">
+                  <SectionHeader icon={Percent} title="Credit pricing" />
+                  <p className="text-sm text-muted-foreground">
+                    Every model bills in credits at <span className="font-medium text-foreground">markup × the real provider cost</span>{" "}
+                    (Cloudflare neurons; Gemini USD converted to the same unit), so the platform is always profitable. Setting the
+                    markup rewrites it across the whole catalog.
+                  </p>
+                  <div className="flex items-end gap-2">
+                    <Field
+                      label="Credit markup (×)"
+                      className="flex-1"
+                      inputMode="decimal"
+                      value={markup}
+                      onChange={(e) => setMarkup(e.target.value.replace(/[^0-9.]/g, ""))}
+                      hint={status ? `Currently ${status.markup}×` : undefined}
                     />
-                  ) : (
-                    <div className="space-y-3">
-                      <ActionResult msg={catalog.msg} err={catalog.err} />
-                      {models.error && <Callout tone="warning" icon={AlertTriangle} live="alert">{models.error} Showing the last catalog that loaded.</Callout>}
-                      <DefaultModelPicker lanes={TASK_LANES} models={models.data} busy={catalog.busy} onPick={setDefaultModel} />
-                      <p className="px-1 text-xs leading-relaxed text-muted-foreground">
-                        The switch decides whether a tenant can pick a model at all. Prices are what the TENANT pays:{" "}
-                        <span className="numeral">~n cr</span> is a typical request of that model&apos;s lane, and the second
-                        line is the exact credit rate card. Neurons and the markup that produced them follow, as the cost basis.
-                      </p>
-                      {/* One decision for the whole list, rather than a
-                          checkbox on every row: "should this reach the other
-                          products" is a mode the operator is in, not a property
-                          of a model. */}
-                      <label className="flex items-center gap-2.5 rounded-xl bg-surface-2 p-3">
-                        <Switch checked={allApps} onCheckedChange={setAllApps} aria-label="Apply changes to every 4DL app" />
-                        <span className="min-w-0 flex-1 text-sm">
-                          <span className="font-medium">Apply to every 4DL app</span>
-                          <span className="block text-xs text-muted-foreground">
-                            Switching a model on or off, and setting a lane default, also reaches the other products. Each
-                            applies it once and keeps its own setting after that. Per-model prices are never sent.
-                          </span>
-                        </span>
-                      </label>
+                    <Button className="min-h-12" disabled={pricing.busy !== null || markup.trim() === ""} onClick={saveMarkup}>
+                      {pricing.busy === "markup" ? <><Spinner className="size-4" /> …</> : "Apply"}
+                    </Button>
+                  </div>
+                  <FieldGroup
+                    title="Catalog sync"
+                    hint="Re-reads the official Cloudflare and Gemini pricing pages: it DISCOVERS models new to the page, refreshes every rate, and switches off any model that has disappeared from its provider's page (never deletes one — a tenant may still reference it). Task routing, enable/default and markup choices survive. Each provider is handled on its own, so a failed fetch on one never touches the other's models."
+                  >
+                    <Button variant="tonal" className="min-h-12 w-full" disabled={pricing.busy !== null} onClick={() => void sync()}>
+                      {pricing.busy === "sync" ? <><Spinner className="size-4" /> Syncing…</> : <><RefreshCw /> Sync from the pricing docs</>}
+                    </Button>
+                  </FieldGroup>
+                  <ActionResult msg={pricing.msg} err={pricing.err} />
+                  {syncReport && <SyncReportCard report={syncReport} />}
+                </Card>
 
-                      {Object.entries(grouped).map(([prov, rows]) => (
-                        <Card key={prov} className="space-y-1">
-                          <div className="flex items-center justify-between gap-2 pb-1">
-                            <h3 className="min-w-0 truncate text-sm font-semibold">{providerLabel(prov)}</h3>
-                            <Badge tone={rows.some((m) => m.enabled === 1) ? "success" : "neutral"}>
-                              {rows.filter((m) => m.enabled === 1).length} of {rows.length} on
-                            </Badge>
-                          </div>
-                          <div className="divide-y divide-border/40">
-                            {rows.map((m) => {
-                              const busy = catalog.busy === `model:${m.id}`;
-                              const cost = requestCost(m);
-                              const rateLine = creditRateLine(m);
-                              return (
-                                <div key={m.id} className="flex items-center gap-2.5 py-2">
-                                  {/* A switched-off row READS switched off. The only signal
-                                      used to be the toggle at the far right of a thirty-row
-                                      list, so a model missing from the default picker looked
-                                      like it had vanished rather than been turned off. */}
-                                  <div className={cn("min-w-0 flex-1", m.enabled !== 1 && "opacity-55")}>
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                      <span className="min-w-0 truncate text-sm font-medium">{m.label}</span>
-                                      {m.enabled !== 1 && <Badge tone="neutral">off</Badge>}
-                                      {/* A default that is switched off is a setting the
-                                          engine ignores — it selects on `enabled = 1`. Say
-                                          so rather than claiming it is in force. */}
-                                      {m.is_default === 1 && (
-                                        m.enabled === 1
-                                          ? <Badge tone="primary">default · {laneLabel(m.task)}</Badge>
-                                          : <Badge tone="warning">default, but off</Badge>
-                                      )}
-                                    </div>
-                                    <div className="numeral truncate text-xs text-foreground/80">
-                                      {m.task}
-                                      {cost !== null && <> · <span className="font-semibold">~{nf.format(cost)} cr</span> per request</>}
-                                      {rateLine && <> · {rateLine}</>}
-                                    </div>
-                                    <div className="numeral truncate text-xs text-muted-foreground">{rate(m)} · {m.markup ?? "?"}×</div>
-                                  </div>
-                                  {busy
-                                    ? <Spinner className="size-4 shrink-0" />
-                                    : <Switch
-                                        checked={m.enabled === 1}
-                                        disabled={catalog.busy !== null}
-                                        aria-label={`${m.label} enabled`}
-                                        onCheckedChange={(v) => void patchModel(m, { enabled: v }, v ? "enabled" : "disabled")}
-                                      />}
+                {models.error && !models.data ? (
+                  <LoadError what="the model catalog" error={models.error} onRetry={models.reload} />
+                ) : (
+                  <Reveal
+                    loading={models.loading}
+                    className="space-y-3"
+                    skeleton={
+                      <>
+                        {Array.from({ length: 2 }).map((_, g) => (
+                          <Card key={g} className="space-y-2">
+                            <div className="flex items-center justify-between"><SkeletonLine w="8rem" h="text" /><Skeleton className="h-5 w-16 rounded-full" /></div>
+                            <div className="divide-y divide-border/40">
+                              {Array.from({ length: 3 }).map((_, i) => (
+                                <div key={i} className="flex items-center gap-2 py-2.5">
+                                  <div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="50%" h="text" /><SkeletonLine w="35%" h="xs" /></div>
+                                  <Skeleton className="h-6 w-11 shrink-0 rounded-full" />
                                 </div>
-                              );
-                            })}
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  ))}
-                </Reveal>
-              )}
+                              ))}
+                            </div>
+                          </Card>
+                        ))}
+                      </>
+                    }
+                  >
+                    {models.data && (models.data.length === 0 ? (
+                      <EmptyState
+                        icon={LayoutGrid}
+                        title="No models in the catalog"
+                        description="Nothing can be generated until the catalog is populated. Run the sync above to pull rates from the pricing docs."
+                      />
+                    ) : (
+                      <div className="space-y-3">
+                        <ActionResult msg={catalog.msg} err={catalog.err} />
+                        {models.error && <Callout tone="warning" icon={AlertTriangle} live="alert">{models.error} Showing the last catalog that loaded.</Callout>}
+                        <DefaultModelPicker lanes={TASK_LANES} models={models.data} busy={catalog.busy} onPick={setDefaultModel} />
+                        <p className="px-1 text-xs leading-relaxed text-muted-foreground">
+                          The switch decides whether a tenant can pick a model at all. Prices are what the TENANT pays:{" "}
+                          <span className="numeral">~n cr</span> is a typical request of that model&apos;s lane, and the second
+                          line is the exact credit rate card. Neurons and the markup that produced them follow, as the cost basis.
+                        </p>
+                        {/* One decision for the whole list, rather than a
+                            checkbox on every row: "should this reach the other
+                            products" is a mode the operator is in, not a property
+                            of a model. */}
+                        <label className="flex items-center gap-2.5 rounded-xl bg-surface-2 p-3">
+                          <Switch checked={allApps} onCheckedChange={setAllApps} aria-label="Apply changes to every 4DL app" />
+                          <span className="min-w-0 flex-1 text-sm">
+                            <span className="font-medium">Apply to every 4DL app</span>
+                            <span className="block text-xs text-muted-foreground">
+                              Switching a model on or off, and setting a lane default, also reaches the other products. Each
+                              applies it once and keeps its own setting after that. Per-model prices are never sent.
+                            </span>
+                          </span>
+                        </label>
 
-              {extraBelowCatalog}
-            </div>
-          ),
-        },
-        ...(extraSub
-          ? [{
-              key: extraSub.key,
-              label: extraSub.label,
-              value: extraSub.value,
-              icon: Play,
-              tone: "success" as const,
-              render: () => extraSub.render(models.data ?? []),
-            }]
-          : []),
-      ]}
-    />
+                        {Object.entries(grouped).map(([prov, rows]) => (
+                          <Card key={prov} className="space-y-1">
+                            <div className="flex items-center justify-between gap-2 pb-1">
+                              <h3 className="min-w-0 truncate text-sm font-semibold">{providerLabel(prov)}</h3>
+                              <Badge tone={rows.some((m) => m.enabled === 1) ? "success" : "neutral"}>
+                                {rows.filter((m) => m.enabled === 1).length} of {rows.length} on
+                              </Badge>
+                            </div>
+                            <div className="divide-y divide-border/40">
+                              {rows.map((m) => {
+                                const busy = catalog.busy === `model:${m.id}`;
+                                const cost = requestCost(m);
+                                const rateLine = creditRateLine(m);
+                                return (
+                                  <div key={m.id} className="flex items-center gap-2.5 py-2">
+                                    {/* A switched-off row READS switched off. The only signal
+                                        used to be the toggle at the far right of a thirty-row
+                                        list, so a model missing from the default picker looked
+                                        like it had vanished rather than been turned off. */}
+                                    <div className={cn("min-w-0 flex-1", m.enabled !== 1 && "opacity-55")}>
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="min-w-0 truncate text-sm font-medium">{m.label}</span>
+                                        {m.enabled !== 1 && <Badge tone="neutral">off</Badge>}
+                                        {/* A default that is switched off is a setting the
+                                            engine ignores — it selects on `enabled = 1`. Say
+                                            so rather than claiming it is in force. */}
+                                        {m.is_default === 1 && (
+                                          m.enabled === 1
+                                            ? <Badge tone="primary">default · {laneLabel(m.task)}</Badge>
+                                            : <Badge tone="warning">default, but off</Badge>
+                                        )}
+                                      </div>
+                                      <div className="numeral truncate text-xs text-foreground/80">
+                                        {m.task}
+                                        {cost !== null && <> · <span className="font-semibold">~{nf.format(cost)} cr</span> per request</>}
+                                        {rateLine && <> · {rateLine}</>}
+                                      </div>
+                                      <div className="numeral truncate text-xs text-muted-foreground">{rate(m)} · {m.markup ?? "?"}×</div>
+                                    </div>
+                                    {busy
+                                      ? <Spinner className="size-4 shrink-0" />
+                                      : <Switch
+                                          checked={m.enabled === 1}
+                                          disabled={catalog.busy !== null}
+                                          aria-label={`${m.label} enabled`}
+                                          onCheckedChange={(v) => void patchModel(m, { enabled: v }, v ? "enabled" : "disabled")}
+                                        />}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    ))}
+                  </Reveal>
+                )}
+
+                {extraBelowCatalog}
+              </div>
+            ),
+          },
+          ...(extraSub
+            ? [{
+                key: extraSub.key,
+                label: extraSub.label,
+                value: extraSub.value,
+                icon: Play,
+                tone: "success" as const,
+                render: () => extraSub.render(models.data ?? []),
+              }]
+            : []),
+        ]}
+      />
+    </Stagger>
   );
 }
 
