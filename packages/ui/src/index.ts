@@ -1,6 +1,7 @@
 export * from "./lib/utils.js";
 export * from "./lib/contrast.js";
 export * from "./lib/theme.js";
+export * from "./lib/mark.js";
 export * from "./lib/icons.js";
 export * from "./lib/motion.js";
 export * from "./layout.js";

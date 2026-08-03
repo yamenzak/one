@@ -6,7 +6,7 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
+import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, monogramFor, renderMarkPng, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
 import { personaLabel, personaTone } from "../registry/index.js";
 import { KOVA_TOKEN_GROUPS, DEFAULT_ACCENT_TOKENS, MACRO_SPEC } from "../registry/tones.js";
 
@@ -2017,6 +2017,8 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const [params, setParams] = useSearchParams();
   const closeSection = useCloseSection();
   const { ctx } = useSession();
+  const studioName = ctx?.active?.tenantName?.trim() || "Your studio";
+  const marks = useAction();
   const [tokens, setTokens] = useState<BrandTokens>(() => (initial?.tokens && hasTokens(initial.tokens) ? initial.tokens : deriveTokens({ primary: seedFrom(initial), accents: MACRO_SPEC })));
   const [seed, setSeed] = useState<string>(seedFrom(initial));
   // Seeded from what was saved, not hardcoded. Two things broke when it was not:
@@ -2042,6 +2044,13 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   // above works on both", which is true of any full-colour logo.
   const [logoUrlLight, setLogoUrlLight] = useState<string | null>(initial?.logoUrlLight ?? null);
   const [iconUrlLight, setIconUrlLight] = useState<string | null>(initial?.iconUrlLight ?? null);
+  /**
+   * The letters for a generated icon — a RECOMMENDATION the owner can rewrite.
+   *
+   * Seeded from the studio name and never normalised: "byShujaa" is capitalised
+   * that way on purpose, so "bS" is their brand where "BS" is subtly not.
+   */
+  const [monogram, setMonogram] = useState(() => monogramFor(studioName));
   const [aiAvatarUrl, setAiAvatarUrl] = useState<string | null>(initial?.aiAvatarUrl ?? null);
   const [aiName, setAiName] = useState<string>(initial?.aiName ?? "");
   const [advanced, setAdvanced] = useState(false);
@@ -2058,6 +2067,37 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
 
   // Generate a full palette from one color (the smart path).
   const generate = (color: string, tint: NeutralTint = neutral) => { setSeed(color); setNeutral(tint); setTokens(deriveTokens({ primary: color, neutral: tint, accents: MACRO_SPEC })); };
+
+  /**
+   * Generate a mark from the studio's name and the accent it already picked.
+   *
+   * It goes through `uploadAsset`, so a generated mark is an ordinary uploaded
+   * image from that point on — same media store, same quota, same public URL,
+   * and no consumer anywhere needs to know it was drawn rather than designed.
+   *
+   * The ICON needs no light variant: it carries its own coloured plate, so it
+   * reads on any background. The WORDMARK is bare letterforms and does not, so
+   * both are drawn — the studio's foreground token per mode, which is exactly
+   * the pair of files the light-variant slots exist to hold.
+   */
+  const generateMarks = () =>
+    void marks.run("marks", async () => {
+      const letters = monogram.trim() || monogramFor(studioName);
+      const hex = (v: string | undefined, fallback: string) =>
+        v ? (v.startsWith("#") ? v : oklchStringToHex(v) || fallback) : fallback;
+      const bg = seedHex;
+      const onBrand = hex(tokens.dark?.["--primary-foreground"], "#0b1220");
+      const icon = await renderMarkPng({ text: letters, bg, fg: onBrand });
+      if (icon) await uploadAsset(icon, setIconUrl);
+
+      const darkFg = hex(tokens.dark?.["--foreground"], "#e8eaed");
+      const lightFg = hex(tokens.light?.["--foreground"], "#0b1220");
+      const wideDark = await renderMarkPng({ text: studioName, bg, fg: darkFg, wide: true });
+      if (wideDark) await uploadAsset(wideDark, setLogoUrl);
+      const wideLight = await renderMarkPng({ text: studioName, bg, fg: lightFg, wide: true });
+      if (wideLight) await uploadAsset(wideLight, setLogoUrlLight);
+      return "Marks generated from your name and accent. Save to keep them.";
+    }, "Couldn't generate the marks.");
 
   const uploadAsset = async (file: File, setter: (url: string) => void) => {
     setMsg(null);
@@ -2104,6 +2144,38 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const seedHex = oklchStringToHex(seed.startsWith("#") ? hexToOklchString(seed) : seed);
 
   const marksBlock = (<>
+        {/* No design file? Draw one. Most studios here are one person with a
+            business name, and the fallback initial-in-a-square works in the nav
+            and nowhere that matters — the browser tab, the installed icon, the
+            top of every email a client opens all want an image. */}
+        <div className="space-y-2.5 rounded-xl border border-dashed border-border/70 p-3">
+          <div className="text-sm font-medium">No logo yet? <span className="font-normal text-muted-foreground">Draw one from your name</span></div>
+          <div className="flex items-end gap-3">
+            <div className="grid size-14 shrink-0 place-items-center rounded-2xl" style={{ background: seedHex }}>
+              <span className="text-lg font-black" style={{ color: oklchStringToHex(tokens.dark?.["--primary-foreground"] ?? "") || "#0b1220" }}>
+                {monogram.trim() || monogramFor(studioName)}
+              </span>
+            </div>
+            <Field
+              label="Icon letters"
+              className="flex-1"
+              value={monogram}
+              maxLength={3}
+              onChange={(e) => setMonogram(e.target.value)}
+              placeholder={monogramFor(studioName)}
+              hint={`Suggested from “${studioName}”. Yours to change.`}
+            />
+          </div>
+          <Button size="sm" variant="secondary" disabled={marks.busy !== null} onClick={() => void generateMarks()}>
+            {marks.busy ? <><Spinner className="size-4" /> Drawing…</> : <><Wand2 /> Generate icon + wordmark</>}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Uses your accent and your studio name, and fills the slots below — including a light-mode wordmark. Replace
+            any of them with a real file whenever you have one.
+          </p>
+          <ActionResult msg={marks.msg} err={marks.err} />
+        </div>
+
         {/* Logo (wide wordmark, shown in the app bar) */}
         <div className="space-y-2">
           <div className="text-sm font-medium">Logo <span className="font-normal text-muted-foreground">— app bar</span></div>
