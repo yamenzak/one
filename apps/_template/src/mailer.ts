@@ -20,6 +20,6 @@ export * from "@4dl/email";
 export const APP_BRAND: BrandKit = { name: "Template", accent: "#a8c7fa", accentFg: "#0b1220", logoUrl: null };
 
 /** Shadows the package's `PLATFORM_FROM_DEFAULT` for importers of this module. */
-export const PLATFORM_FROM_DEFAULT = "Template <noreply@template.4dl.app>";
+export const PLATFORM_FROM_DEFAULT = "Template <noreply@4dl.app>";
 
 configureEmailBrand(APP_BRAND, PLATFORM_FROM_DEFAULT);

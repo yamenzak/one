@@ -35,11 +35,22 @@ export const KOVA_BRAND: BrandKit = { name: "Kova", accent: "#a8c7fa", accentFg:
  * must be onboarded + verified under Cloudflare → Email → Email Sending before
  * anything actually delivers.
  *
+ * ⚠️ The ADDRESS is the platform's shared one, and this used to read
+ * `noreply@kova.4dl.app` — a per-app address that looks right and is not
+ * onboarded, because onboarding is per DOMAIN and a subdomain is a different
+ * domain to Cloudflare. The failure that buys is uniquely quiet: sign-in codes
+ * use `email.from` (correctly seeded to the shared address) and deliver, so
+ * email looks configured, while every message on the TENANT lane — the client
+ * invite, above all — is refused at the provider. `apps.json` owns this
+ * address (`defaultEmailAddress`), provisioning seeds it, and
+ * `scripts/sender-default.test.mjs` fails if a hardcoded default drifts from it
+ * again.
+ *
  * ⚠️ This SHADOWS `@4dl/email`'s `PLATFORM_FROM_DEFAULT` (`noreply@invalid.local`)
  * for importers of this module — an explicit re-declaration after the star
  * export, which is what makes it win. The package's value stays the unbranded
  * fail-loud one for an app that never calls `configureEmailBrand`.
  */
-export const PLATFORM_FROM_DEFAULT = "Kova <noreply@kova.4dl.app>";
+export const PLATFORM_FROM_DEFAULT = "Kova <noreply@4dl.app>";
 
 configureEmailBrand(KOVA_BRAND, PLATFORM_FROM_DEFAULT);
