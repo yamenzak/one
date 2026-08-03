@@ -15,7 +15,7 @@
  */
 
 import { test } from "@playwright/test";
-import { buildDemoWorld, DEMO_STUDIO, type DemoWorld } from "../src/demo.js";
+import { buildDemoWorld, DEMO_STUDIO, prepare, type DemoWorld } from "../src/demo.js";
 import { shoot, visit } from "../src/shoot.js";
 import { teardown } from "../src/provision.js";
 
@@ -143,9 +143,7 @@ test("the client's app", async () => {
  */
 test("the sign-in screen", async ({ browser }) => {
   const context = await browser.newContext();
-  await context.addInitScript((mode) => {
-    try { localStorage.setItem("kova-theme", mode as string); } catch { /* default theme */ }
-  }, project.endsWith("light") ? "light" : "dark");
+  await prepare(context, project.endsWith("light") ? "light" : "dark");
   const page = await context.newPage();
   try {
     await visit(page, `${world.studio.base}/`, page.getByRole("button", { name: /email me a code/i }));

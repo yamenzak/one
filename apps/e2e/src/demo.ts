@@ -59,7 +59,7 @@ export interface DemoWorld {
  */
 export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"): Promise<DemoWorld> {
   const studio = await provisionStudio(browser, DEMO_STUDIO);
-  themed(studio.context, theme);
+  await prepare(studio.context, theme);
 
   /*
    * A PLAN FIRST, comped — not an entitlement override.
@@ -79,7 +79,7 @@ export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"):
   await compOntoPlan(studio, "pro");
 
   const client = await provisionClient(browser, studio, DEMO_CLIENT);
-  themed(client.context, theme);
+  await prepare(client.context, theme);
 
   // A roster with the photographed client at the top of it. The names carry
   // their own variety — lengths from "Ben Ho" to "Amara Okonkwo-Fitzgerald" —
@@ -103,6 +103,47 @@ export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"):
 }
 
 /**
+ * DRAW THE FACES, without asking the browser to reach the internet.
+ *
+ * A studio's people are drawn by DiceBear from a seed whenever nobody uploaded
+ * a photo — which is most of a real roster, and is exactly what the roster
+ * screens are supposed to show. Chromium here cannot reach `api.dicebear.com`
+ * (the sandbox's egress proxy refuses the CONNECT), so every avatar fell back
+ * to a two-letter monogram and the images were a grid of grey initials: a real
+ * state, but the least representative one and the flattest possible thing to
+ * put in front of a customer.
+ *
+ * Node CAN reach it, so the request is fulfilled from there. What lands in the
+ * page is the genuine asset from the genuine URL — only the transport differs,
+ * which is the one thing a screenshot does not document. Responses are cached
+ * per URL because a ten-person roster asks for the same handful repeatedly.
+ *
+ * If the fetch fails the route is left ALONE rather than stubbed: the app then
+ * shows its real initials fallback, which is the honest picture of a machine
+ * with no egress — better than a placeholder that looks like a product
+ * decision.
+ */
+const avatarCache = new Map<string, string>();
+
+async function serveAvatars(context: BrowserContext): Promise<void> {
+  await context.route("https://api.dicebear.com/**", async (route) => {
+    const url = route.request().url();
+    try {
+      let svg = avatarCache.get(url);
+      if (svg === undefined) {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`dicebear ${res.status}`);
+        svg = await res.text();
+        avatarCache.set(url, svg);
+      }
+      await route.fulfill({ status: 200, contentType: "image/svg+xml", body: svg });
+    } catch {
+      await route.fallback();
+    }
+  });
+}
+
+/**
  * Pin the theme before the app boots.
  *
  * The mode is read out of local storage in the theme provider's INITIAL state,
@@ -111,12 +152,13 @@ export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"):
  * choice, which then overrides the studio's default and quietly makes the
  * light/dark pair a different comparison than the one intended.
  */
-function themed(context: BrowserContext, theme: "light" | "dark"): void {
-  void context.addInitScript((mode) => {
+export async function prepare(context: BrowserContext, theme: "light" | "dark"): Promise<void> {
+  await context.addInitScript((mode) => {
     try {
       localStorage.setItem("kova-theme", mode as string);
     } catch {
       /* storage unavailable — the default theme is then photographed */
     }
   }, theme);
+  await serveAvatars(context);
 }

@@ -28,12 +28,19 @@ rest themselves the first time they sign in.
 ![The Clients screen, showing the roster and the Add client button.](images/coach-roster.png)
 
 *Clients — every person you coach, with anything that needs your attention
-called out on their row.*
+called out on their row. Someone who has not signed in yet shows as **Invited**.*
+
+The two buttons beside the search switch between this list and a grid of faces.
+Kova remembers which you prefer.
+
+![The same roster shown as a grid of client photos.](images/coach-roster-grid.png)
+
+*The grid view — the same roster, for a studio that knows its people by sight.*
 
 ![The New client sheet, with an Email field, an optional Name field and a Send invite button.](images/coach-add-client.png)
 
-*New client — the email is the invite. A name is optional; leave it blank and
-they add their own.*
+*New client — the cursor is already in the field, and Enter sends. A name is
+optional; leave it blank and they add their own.*
 
 ## What happens next
 

@@ -3,9 +3,9 @@
  * (same surfaces scoped to the client) wrapped in coach chrome + editing tabs.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Sheet, Avatar, IconTabs, Page, Stagger, ConfirmDialog, Collection, useCollectionView, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle, Anchor, CountUp, Group, Row, Sun, ClipboardList, Target, TrendingUp, BarChart3, Settings as SettingsIcon } from "@4dl/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, IconTabs, Page, Stagger, ConfirmDialog, Collection, useCollectionView, ActionResult, toneVar, Users, Mail, User, ArrowLeft, Plus, Copy, Check, ExternalLink, Archive, AlertTriangle, Anchor, CountUp, Group, Row, Sun, ClipboardList, Target, TrendingUp, BarChart3, Settings as SettingsIcon } from "@4dl/ui";
 import type { AttentionSeverity } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -70,6 +70,10 @@ export function Clients() {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
+  // Validation speaks on BLUR, not on every keystroke: "that is not an email"
+  // while somebody is three characters into typing one is noise.
+  const [emailTouched, setEmailTouched] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
   const [loadError, setLoadError] = useState(false);
   // After a client is created with an email, hold the invite so the coach can
   // show / copy the in-gym deep-link before continuing into the client.
@@ -152,6 +156,20 @@ export function Clients() {
     finally { setArchiveBusy(false); }
   };
   const stillNeeded = Math.max(0, freeTarget - freedCount);
+
+  /*
+   * Put the cursor in the one field the sheet has.
+   *
+   * A one-field form that opens with nothing focused spends the reader's first
+   * tap on the thing the sheet exists for. The delay is the drawer's own
+   * entrance: focusing an element that is still sliding scrolls the sheet back
+   * up under some browsers, which looks like the sheet fighting the keyboard.
+   */
+  useEffect(() => {
+    if (!createOpen) return;
+    const t = setTimeout(() => emailRef.current?.focus(), 260);
+    return () => clearTimeout(t);
+  }, [createOpen]);
 
   // Consume the deep link once, then strip it, so a back-navigation or a reload
   // does not re-open the sheet over whatever the coach moved on to.
@@ -296,11 +314,63 @@ export function Clients() {
         )}
       />
 
-      <Sheet open={createOpen} onClose={() => { setCreateOpen(false); setCreateErr(null); }} title="New client" footer={<Button size="lg" className="w-full" disabled={!emailValid || busy} onClick={() => void create()}>{busy ? "Sending…" : "Send invite"}</Button>}>
+      {/*
+        ADDING A CLIENT IS ONE FIELD, AND THE SHEET SHOULD ACT LIKE IT.
+
+        Four things were wrong with the old version and none of them was the
+        layout:
+
+          the KEYBOARD did not arrive.   The sheet opened with nothing focused,
+                                         so the first tap of a one-field form
+                                         was spent putting the cursor in it, and
+                                         Enter did nothing once you were there.
+          the DISABLED BUTTON was mute.  It was the only feedback on a malformed
+                                         address, and a disabled control never
+                                         says why. Now the field says so itself,
+                                         once — on blur, so it does not shout at
+                                         somebody halfway through typing.
+          the HINT was a paragraph.      Fifteen words explaining the mechanism
+                                         of a passwordless invite above a field
+                                         asking for an email (§10 budgets).
+          the FAILURE was a warning line at the bottom of the sheet, which is
+          exactly where the reader is not looking after pressing a button in the
+          footer. It is a toast now, like every other outcome (§7).
+      */}
+      <Sheet
+        open={createOpen}
+        onClose={() => { setCreateOpen(false); setCreateErr(null); setEmailTouched(false); }}
+        title="New client"
+        footer={<Button size="lg" className="w-full" disabled={!emailValid || busy} onClick={() => void create()}>{busy ? "Sending…" : "Send invite"}</Button>}
+      >
         <div className="space-y-4">
-          <Field label="Email" icon={Mail} type="email" value={email} onChange={(e) => setEmail(e.target.value)} hint="This is the invite — they sign in with a code and their space links automatically." />
-          <Field label="Name (optional)" icon={User} value={name} onChange={(e) => setName(e.target.value)} hint="Leave blank and they'll add it on their profile." />
-          {createErr && <p className="text-sm text-warning" role="alert">{createErr}</p>}
+          <Field
+            ref={emailRef}
+            label="Email"
+            icon={Mail}
+            type="email"
+            inputMode="email"
+            autoComplete="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            value={email}
+            placeholder="them@example.com"
+            onChange={(e) => { setEmail(e.target.value); if (emailTouched) setEmailTouched(false); }}
+            onBlur={() => setEmailTouched(true)}
+            onKeyDown={(e) => { if (e.key === "Enter" && emailValid && !busy) void create(); }}
+            error={emailTouched && email.trim() && !emailValid ? "That doesn't look like an email address." : undefined}
+            hint="We'll email them a sign-in link."
+          />
+          <Field
+            label="Name (optional)"
+            icon={User}
+            value={name}
+            autoComplete="off"
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && emailValid && !busy) void create(); }}
+            hint="They can add their own later."
+          />
+          {/* Renders nothing — it announces. */}
+          <ActionResult msg={null} err={createErr} />
         </div>
       </Sheet>
 
