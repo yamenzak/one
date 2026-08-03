@@ -47,7 +47,7 @@ import { DUNNING_DAYS } from "@4dl/billing";
 import { periodKey } from "@4dl/core";
 import { billingAdminRoutes, billingRoutes, stripeWebhookRoutes } from "./billing-routes.js";
 import { aiAdminRoutes, aiRoutes } from "./ai-routes.js";
-import { aiCatalogAdminRoutes, applySharedSelection } from "@4dl/ai";
+import { aiCatalogAdminRoutes, applySharedSelection, disableRetiredModels } from "@4dl/ai";
 import { settingsRoutes } from "./settings-routes.js";
 import { insightRoutes } from "./insight-routes.js";
 import { staffRoutes } from "./staff-routes.js";
@@ -344,6 +344,13 @@ async function dailySweep(env: Env): Promise<void> {
   await step("ai-selection", async () => {
     const r = await applySharedSelection(env);
     if (r.applied) console.log(`[dailySweep] applied ${r.applied} shared AI model change(s)`);
+  });
+
+  // A model whose announced shutdown date has arrived. See Kova's sweep for the
+  // reasoning; it applies identically here because the catalog is the platform's.
+  await step("ai-retirements", async () => {
+    const gone = await disableRetiredModels(env.DB);
+    if (gone.length) console.log(`[dailySweep] switched off ${gone.length} retired AI model(s): ${gone.join(", ")}`);
   });
 
   const nowMs = Date.now();

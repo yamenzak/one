@@ -34,7 +34,24 @@ import {
 import { AdminDepsProvider, useAdminDeps, type AdminDeps } from "../deps.js";
 import { ConsoleSplit } from "../split.js";
 
-interface AiStatus { geminiKeySet: boolean; mockMode: string; markup: number; modelCount: number }
+/** Where a value in force came from. Null means nothing has it set anywhere. */
+type ConfigFrom = "app" | "shared" | null;
+
+interface AiStatus {
+  /** EFFECTIVE — this app's own row if it has one, else the shared platform
+   *  store. The same answer `generate()` gets, which is the whole point. */
+  geminiKeySet: boolean;
+  geminiKeyFrom: ConfigFrom;
+  mockMode: string;
+  mockModeFrom: ConfigFrom;
+  markup: number;
+  markupFrom: ConfigFrom;
+  modelCount: number;
+}
+
+/** "· from the shared platform config", where that is worth saying. */
+const fromNote = (f: ConfigFrom): string =>
+  f === "shared" ? " Set once for every 4DL app, in Shared platform config." : "";
 interface ModelPricing {
   costPerRequest: Record<string, number>;
   perMillion: { input: number | null; output: number | null };
@@ -44,6 +61,9 @@ interface ModelRow {
   id: string; label: string; provider: string; task: string;
   input_rate: number | null; output_rate: number | null; unit_rate: number | null; unit_kind: string | null;
   markup: number | null; enabled: number; is_default: number;
+  /** `YYYY-MM-DD` the provider says this model stops answering. Absent on a
+   *  server too old to send it, and null for the great majority of models. */
+  retires_at?: string | null;
   pricing?: ModelPricing;
   /** Lanes the ENGINE can actually run this model on — the server's own answer,
    *  not a guess from `task`. Absent on a server too old to send it. */
@@ -52,7 +72,9 @@ interface ModelRow {
 interface ProviderSyncReport {
   provider: string; source: string; ok: boolean; parsed: number; added: number; addedIds: string[];
   updated: number; disabled: number; disabledIds: string[];
-  unpriceable: { id: string; reason: string }[]; error: string | null;
+  unpriceable: { id: string; reason: string }[];
+  retired: { id: string; reason: string }[]; retiredDisabled: number;
+  error: string | null;
 }
 interface SyncReport { ok: boolean; providers: ProviderSyncReport[]; total: number; errors: string[] }
 
@@ -259,7 +281,11 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
         subs={[
           {
             key: "provider", label: "Provider", icon: Plug, tone: "primary",
-            value: status ? (status.geminiKeySet ? `Gemini key set · mock ${status.mockMode}` : "No Gemini key — the vision suite is dead") : "…",
+            value: status
+              ? status.geminiKeySet
+                ? `Gemini key ${status.geminiKeyFrom === "shared" ? "from the shared config" : "set"} · mock ${status.mockMode}`
+                : "No Gemini key — the vision suite is dead"
+              : "…",
             render: () => (
               <div className="space-y-3">
                 {cfg.error && !status ? (
@@ -286,8 +312,12 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
                           <ConfigRow
                             label="Gemini API key"
                             ok={status.geminiKeySet}
-                            detail={status.geminiKeySet ? "Text, vision and image generation are available." : "Without it, anything that reads an image is unreachable."}
-                            okLabel="Stored"
+                            detail={
+                              status.geminiKeySet
+                                ? `Text, vision and image generation are available.${fromNote(status.geminiKeyFrom)}`
+                                : "Without it, anything that reads an image is unreachable."
+                            }
+                            okLabel={status.geminiKeyFrom === "shared" ? "Shared" : "Stored"}
                           />
                           <ConfigRow label="Workers AI" ok detail="Always available on the worker binding, and cheaper." okLabel="Built in" />
                           <ConfigRow
@@ -305,7 +335,20 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
                             for a tenant, so the boundary check refuses the natural phrasing
                             — and is right to: a shared package cannot tell the two uses
                             apart. Naming the product instead is unambiguous and shorter. */}
-                        <FieldGroup title="Gemini key" hint="A Gemini API key from Google. Stored write-only — leaving the box blank keeps whatever is saved.">
+                        {/* Saving here writes THIS app's row, which then wins over the
+                            shared one — for this app and no other. Worth saying plainly:
+                            the shared store exists so a rotated key is pasted once, and
+                            an operator who does not know that a key is already in force
+                            will paste it here and quietly create the per-app override
+                            the shared store was built to abolish. */}
+                        <FieldGroup
+                          title="Gemini key"
+                          hint={
+                            status.geminiKeyFrom === "shared"
+                              ? "In force from the shared platform config. Saving a key here overrides it for THIS app only — rotate it in Shared platform config instead unless this app genuinely needs its own."
+                              : "A Gemini API key from Google. Stored write-only — leaving the box blank keeps whatever is saved."
+                          }
+                        >
                           <Field
                             label={status.geminiKeySet ? "Gemini API key — stored (blank keeps it)" : "Gemini API key"}
                             icon={KeyRound}
@@ -318,7 +361,7 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
                           </Button>
                         </FieldGroup>
 
-                        <FieldGroup title="Mock mode" hint={MOCK_HINT[status.mockMode] ?? "Deterministic offline outputs for development and testing."}>
+                        <FieldGroup title="Mock mode" hint={`${MOCK_HINT[status.mockMode] ?? "Deterministic offline outputs for development and testing."}${fromNote(status.mockModeFrom)}`}>
                           <SegmentedControl
                             fill
                             options={[{ value: "auto", label: "Auto" }, { value: "on", label: "On" }, { value: "off", label: "Off" }]}
@@ -463,6 +506,14 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
                                             ? <Badge tone="primary">default · {laneLabel(m.task)}</Badge>
                                             : <Badge tone="warning">default, but off</Badge>
                                         )}
+                                        {/* An announced end date, while the model still
+                                            works. It is switched off automatically on the
+                                            day, so this is notice rather than an alarm —
+                                            but a lane defaulting to a model with a date on
+                                            it is worth seeing before that morning. */}
+                                        {m.retires_at && m.enabled === 1 && (
+                                          <Badge tone="warning">retires {m.retires_at}</Badge>
+                                        )}
                                       </div>
                                       <div className="numeral truncate text-xs text-foreground/80">
                                         {m.task}
@@ -530,10 +581,21 @@ function SyncReportCard({ report }: { report: SyncReport }) {
           {p.error ? (
             <p className="mt-1 text-danger">{p.error}</p>
           ) : (
-            <p className="mt-1 text-muted-foreground">
-              {p.added} new · {p.updated} refreshed · {p.disabled} switched off
-              {p.unpriceable.length > 0 && <> · {p.unpriceable.length} unpriceable</>}
-            </p>
+            <>
+              <p className="mt-1 text-muted-foreground">
+                {p.added} new · {p.updated} refreshed · {p.disabled} switched off
+                {p.unpriceable.length > 0 && <> · {p.unpriceable.length} unpriceable</>}
+              </p>
+              {/* Named, not counted. A retired model may well be one this
+                  deployment was defaulting a whole lane to, and "2 retired" is
+                  not something an operator can act on — the ids are. */}
+              {p.retired.length > 0 && (
+                <p className="mt-1 text-warning">
+                  {p.retired.map((r) => r.id).join(", ")} {p.retired.length === 1 ? "has" : "have"} been shut down by the
+                  provider and {p.retiredDisabled > 0 ? `${p.retiredDisabled === 1 ? "was" : "were"} switched off here` : "were already off here"}.
+                </p>
+              )}
+            </>
           )}
         </div>
       ))}

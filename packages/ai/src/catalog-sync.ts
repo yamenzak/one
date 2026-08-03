@@ -12,7 +12,7 @@
  * whatever it does with user feedback. Everything here is provider mechanics.
  */
 
-import type { ModelSeed, SkippedModel } from "./pricing.js";
+import type { ModelSeed, ParsedCatalog, SkippedModel } from "./pricing.js";
 import { isRunnableTask, parseGeminiCatalog, parseWorkersAiCatalog } from "./pricing.js";
 import { listModels, seedAiModels } from "./generate.js";
 
@@ -53,6 +53,18 @@ export interface ProviderSyncReport {
   disabledIds: string[];
   /** Rows the page lists but the catalog cannot price, and why. */
   unpriceable: SkippedModel[];
+  /**
+   * Rows the page still prices but the provider has already SHUT DOWN.
+   *
+   * Reported separately from `unpriceable` because the operator's response is
+   * different: an unpriceable model is a gap in coverage to live with, a retired
+   * one is a model that may already be a lane default and is now failing every
+   * call in it. `retiredDisabled` is how many were actually in the catalog and
+   * have just been switched off — "found 2, switched off 0" and "found 2,
+   * switched off 2" are very different sentences.
+   */
+  retired: SkippedModel[];
+  retiredDisabled: number;
   /** Where the models came from: the provider's own page, or a shared catalog
    *  another app already parsed. Reported because "synced" meaning two
    *  different things is exactly the ambiguity an operator screen must not
@@ -115,9 +127,42 @@ export interface SyncOptions {
    * shared-catalog.ts.
    */
   from?: ModelSeed[];
+  /** "Now", for deciding whether an announced shutdown has already happened.
+   *  A parameter so the retirement rules are testable without moving a clock. */
+  now?: number;
+}
+
+/**
+ * Switch off every model whose announced shutdown date has passed.
+ *
+ * Separate from the sync, and callable on its own, because the two facts arrive
+ * at different times: the DATE is learned whenever the page is read, and it
+ * comes true on a morning that may be months later. A deployment that syncs
+ * once and then leaves the console alone — which is the normal case — would
+ * otherwise keep a dead model enabled, and possibly a lane default, until
+ * somebody happened to press Sync.
+ *
+ * Returns the ids it switched off, so a caller with somewhere to say it can.
+ */
+export async function disableRetiredModels(db: D1Database, now: number = Date.now()): Promise<string[]> {
+  const today = new Date(now).toISOString().slice(0, 10);
+  const rows = await db
+    .prepare("SELECT id FROM ai_models WHERE retires_at IS NOT NULL AND retires_at < ? AND (enabled = 1 OR is_default = 1)")
+    .bind(today)
+    .all<{ id: string }>()
+    .catch(() => ({ results: [] as { id: string }[] }));
+  const ids = (rows.results ?? []).map((r) => r.id);
+  if (!ids.length) return [];
+  await db
+    .prepare(`UPDATE ai_models SET enabled = 0, is_default = 0 WHERE id IN (${ids.map(() => "?").join(",")})`)
+    .bind(...ids)
+    .run()
+    .catch(() => undefined);
+  return ids;
 }
 
 export async function syncModelCatalog(db: D1Database, opts: SyncOptions): Promise<SyncReport> {
+  const now = opts.now ?? Date.now();
   await seedAiModels(db);
   const existing = await db.prepare("SELECT id, provider, enabled FROM ai_models").all<{ id: string; provider: string; enabled: number }>();
   const known = new Map((existing.results ?? []).map((r) => [r.id, r]));
@@ -128,16 +173,20 @@ export async function syncModelCatalog(db: D1Database, opts: SyncOptions): Promi
 
   for (const provider of ["workers-ai", "google"] as const) {
     const source = PRICING_SOURCES[provider];
-    const report: ProviderSyncReport = { provider, source, from: "pricing page", ok: false, parsed: 0, added: 0, addedIds: [], updated: 0, disabled: 0, disabledIds: [], unpriceable: [], error: null };
+    const report: ProviderSyncReport = { provider, source, from: "pricing page", ok: false, parsed: 0, added: 0, addedIds: [], updated: 0, disabled: 0, disabledIds: [], unpriceable: [], retired: [], retiredDisabled: 0, error: null };
     providers.push(report);
 
-    let parsedDoc: { models: ModelSeed[]; skipped: SkippedModel[] };
+    let parsedDoc: ParsedCatalog;
     if (opts.from) {
       // Already parsed elsewhere. `skipped` is empty by construction: whatever
       // could not be priced was dropped by the app that did the parsing, and
       // re-reporting it here would attribute another app's parse warnings to a
       // run that never read a page.
-      parsedDoc = { models: opts.from.filter((m) => m.provider === provider), skipped: [] };
+      // `retired` is empty for the same reason `skipped` is — the app that read
+      // the page dropped them before publishing. The catalog-wide sweep below
+      // is what covers a shared catalog published BEFORE this was understood,
+      // and it does not depend on anyone parsing anything.
+      parsedDoc = { models: opts.from.filter((m) => m.provider === provider), skipped: [], retired: [] };
       report.from = "shared catalog";
     } else {
       const doc = await opts.fetchMd(source);
@@ -146,9 +195,10 @@ export async function syncModelCatalog(db: D1Database, opts: SyncOptions): Promi
         errors.push(`${provider}: ${report.error}`);
         continue;
       }
-      parsedDoc = provider === "workers-ai" ? parseWorkersAiCatalog(doc.md) : parseGeminiCatalog(doc.md);
+      parsedDoc = provider === "workers-ai" ? parseWorkersAiCatalog(doc.md) : parseGeminiCatalog(doc.md, now);
     }
     report.unpriceable = parsedDoc.skipped;
+    report.retired = parsedDoc.retired;
     report.parsed = parsedDoc.models.length;
     if (parsedDoc.models.length === 0) {
       report.error = opts.from
@@ -165,12 +215,25 @@ export async function syncModelCatalog(db: D1Database, opts: SyncOptions): Promi
 
     await db.batch(parsedDoc.models.map((m) =>
       db.prepare(
-        `INSERT INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+        `INSERT INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default, retires_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
          ON CONFLICT(id) DO UPDATE SET label = excluded.label, provider = excluded.provider,
-           input_rate = excluded.input_rate, output_rate = excluded.output_rate, unit_rate = excluded.unit_rate, unit_kind = excluded.unit_kind`,
-      ).bind(m.id, m.task, m.label, m.provider, m.inputRate, m.outputRate, m.unitRate, m.unitKind, opts.markup, isRunnableTask(m.task) ? 1 : 0),
+           input_rate = excluded.input_rate, output_rate = excluded.output_rate, unit_rate = excluded.unit_rate, unit_kind = excluded.unit_kind,
+           retires_at = excluded.retires_at`,
+      ).bind(m.id, m.task, m.label, m.provider, m.inputRate, m.outputRate, m.unitRate, m.unitKind, opts.markup, isRunnableTask(m.task) ? 1 : 0, m.retiresAt ?? null),
     ));
+
+    // A retired model is switched off HERE rather than left to the "gone from
+    // the page" rule below, which would never fire: it is still on the page,
+    // still priced, and would look perfectly live to that check forever.
+    if (parsedDoc.retired.length) {
+      const ph = parsedDoc.retired.map(() => "?").join(",");
+      const r = await db
+        .prepare(`UPDATE ai_models SET enabled = 0, is_default = 0 WHERE id IN (${ph}) AND (enabled = 1 OR is_default = 1)`)
+        .bind(...parsedDoc.retired.map((x) => x.id))
+        .run();
+      report.retiredDisabled = r.meta?.changes ?? 0;
+    }
 
     const live = new Set(parsedDoc.models.map((m) => m.id));
     const gone = (existing.results ?? []).filter((r) => r.provider === provider && r.enabled === 1 && !live.has(r.id)).map((r) => r.id);
@@ -182,6 +245,18 @@ export async function syncModelCatalog(db: D1Database, opts: SyncOptions): Promi
     }
     parsedModels.push(...parsedDoc.models);
     report.ok = true;
+  }
+
+  // Catch anything whose stored date came true since the last run, including
+  // rows this sync never looked at — a provider whose page failed to fetch, and
+  // a catalog seeded from a shared publication that predates the retirement
+  // rules. Runs BEFORE the election below so a lane whose default just died
+  // re-elects in the same pass rather than staying pointed at a dead model
+  // until the next one.
+  const sweptRetired = await disableRetiredModels(db, now);
+  if (sweptRetired.length) {
+    const google = providers.find((p) => p.provider === "google");
+    if (google) google.retiredDisabled += sweptRetired.length;
   }
 
   // Guarantee a default per generation task (cheapest output among enabled).

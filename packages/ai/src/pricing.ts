@@ -44,6 +44,16 @@ export interface ModelSeed {
   outputRate: number | null; // neurons per 1M output tokens
   unitRate: number | null; // neurons per unit (e.g. per generated image)
   unitKind: "image" | "chars_1k" | "audio_min" | null;
+  /**
+   * The day the provider says this model stops answering (`YYYY-MM-DD`), when
+   * the page announces one that has not arrived yet. Null for a model with no
+   * announced end — which is every Workers AI row, because Cloudflare's pricing
+   * page carries no deprecation notices at all.
+   *
+   * A date already in the past is not represented here: such a model is not a
+   * seed, it is `ParsedCatalog.retired`.
+   */
+  retiresAt?: string | null;
 }
 
 /** A row the parser saw on the page but refused to price, and why. */
@@ -55,6 +65,25 @@ export interface SkippedModel {
 export interface ParsedCatalog {
   models: ModelSeed[];
   skipped: SkippedModel[];
+  /**
+   * Ids the page still PRICES but the provider has already SHUT DOWN.
+   *
+   * A pricing page is a billing document, not an availability one. Google keeps
+   * a retired model's rate tables in place under a deprecation banner —
+   * `gemini-2.0-flash` and `gemini-2.0-flash-lite` are still fully priced months
+   * after their 1 June 2026 shutdown — so "present on the page" cannot mean
+   * "callable", which is exactly what the sync used to assume.
+   *
+   * The consequence was not cosmetic. Both arrive in runnable lanes, both are
+   * the CHEAPEST rows in theirs, and the sync elects the cheapest enabled model
+   * as a lane's default: a sync run today would have crowned two dead models the
+   * text and text-small defaults and broken every text feature in the product.
+   *
+   * These are reported separately from `skipped` because they need an ACTION —
+   * a row already in the catalog has to be switched off — where a skipped row
+   * only ever needed an explanation.
+   */
+  retired: SkippedModel[];
 }
 
 /** USD → neuron-equivalents (so Gemini meters identically to Workers AI). */
@@ -159,7 +188,10 @@ export function parseWorkersAiCatalog(md: string): ParsedCatalog {
     seen.add(id);
     skipped.push({ id, reason: workersSkipReason(n) });
   }
-  return { models, skipped };
+  // Empty, and not an oversight: Cloudflare's pricing page carries no
+  // deprecation notices at all — a model it drops simply vanishes, which the
+  // sync's existing "gone from the page" reconcile already handles correctly.
+  return { models, skipped, retired: [] };
 }
 
 function workersSkipReason(neuronCol: string): string {
@@ -188,6 +220,34 @@ export function parseWorkersAiPricing(md: string): ModelSeed[] {
 
 const firstUsd = (s: string): number | null => { const m = /\$([0-9]+(?:\.[0-9]+)?)/.exec(s); return m ? Number(m[1]) : null; };
 
+const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+
+/**
+ * The shutdown date a model's block announces, as `YYYY-MM-DD`, or null.
+ *
+ * Google puts it in a blockquote above the rate tables, in one of two tenses:
+ *
+ *   > **Warning:** Gemini 2.0 Flash is deprecated and has been shut down June 1, 2026.
+ *   > **Warning:** Imagen 4 models (…) are deprecated and will be shut down on August 17, 2026;
+ *
+ * Only the DATE is extracted, and the tense is deliberately ignored — "has been"
+ * versus "will be" is the page's wording at the moment it was written, while the
+ * date compared against today is a fact that stays true as the page goes stale.
+ * A block that announces a deprecation with no parseable date returns null and
+ * the model is left alone: refusing to price a model over a sentence we could
+ * not read would be a doc-format change silently emptying the catalog, which is
+ * the failure this file's other guards exist to prevent.
+ */
+function shutdownDate(block: string): string | null {
+  const warn = /^>[^\n]*\bshut down\b[^\n]*$/im.exec(block)?.[0];
+  if (!warn) return null;
+  const m = /\bshut down(?:\s+on)?\s+([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})/i.exec(warn);
+  if (!m) return null;
+  const month = MONTHS.indexOf(m[1]!.toLowerCase());
+  if (month < 0) return null;
+  return `${m[3]}-${String(month + 1).padStart(2, "0")}-${String(Number(m[2])).padStart(2, "0")}`;
+}
+
 /** Which Kova lane a Gemini id belongs to, or a refusal reason. */
 function geminiLane(id: string): { task: SeedTask } | { skip: string } {
   if (/^(imagen|veo|lyria)/i.test(id)) return { skip: "a different Google API surface (predict / long-running ops); the app's generateContent path cannot drive it" };
@@ -206,10 +266,17 @@ function geminiLane(id: string): { task: SeedTask } | { skip: string } {
  * models price output per image). The FIRST such table in a block is the
  * Standard tier — Batch / Flex / Priority tables that follow are ignored.
  */
-export function parseGeminiCatalog(md: string): ParsedCatalog {
+export function parseGeminiCatalog(md: string, now: number = Date.now()): ParsedCatalog {
   const models: ModelSeed[] = [];
   const skipped: SkippedModel[] = [];
+  const retired: SkippedModel[] = [];
   const seen = new Set<string>();
+  // Compared as a date STRING, not a Date: both sides are `YYYY-MM-DD`, which
+  // sorts lexicographically, and that sidesteps the timezone question entirely.
+  // A model retiring "today" is treated as still alive — the provider's own
+  // cutover happens at some hour we do not know, and switching a working model
+  // off a few hours early is the worse error of the two.
+  const today = new Date(now).toISOString().slice(0, 10);
   // A block header line is `*`id`*` or `*`id-a`, `id-b` and `id-c`*` — several
   // ids can share one pricing table (the Imagen and Veo families do).
   const lineRe = /^\*((?:`[a-z0-9.\-]+`(?:\s*(?:,|and)\s*)*)+)\*\s*$/gim;
@@ -228,29 +295,37 @@ export function parseGeminiCatalog(md: string): ParsedCatalog {
     const outputLine = /\|\s*Output price[^\n|]*\|[^\n]*/i.exec(block)?.[0] ?? "";
     const inUsd = firstUsd(inputLine);
     const outUsd = firstUsd(outputLine);
+    // One banner covers the whole block, so a family sharing a pricing table
+    // (Imagen, Veo) retires together — which is how the page announces it.
+    const ends = shutdownDate(block);
+    const dead = ends !== null && ends < today;
     for (const id of ids) {
       if (seen.has(id)) continue;
       seen.add(id);
       const lane = geminiLane(id);
       if ("skip" in lane) { skipped.push({ id, reason: lane.skip }); continue; }
+      // Checked before pricing, not after: a shut-down model must not reach the
+      // catalog whether or not its rates are still parseable, and they are —
+      // that is the entire trap.
+      if (dead) { retired.push({ id, reason: `Google shut this model down on ${ends}; it is still priced on the page but no longer answers` }); continue; }
       if (lane.task === "image") {
         // Output priced per whole image. A tiered "per 0.5K / 1K / 2K image"
         // block has no single per-image figure — refuse rather than guess.
         const perImage = /\$([0-9.]+)\s*per image/i.exec(outputLine)?.[1];
         if (!perImage) { skipped.push({ id, reason: "image output is priced per resolution tier (0.5K / 1K / 2K / 4K), not a single per-image rate" }); continue; }
-        models.push({ id, label: prettyId(id), provider: "google", task: "image", inputRate: inUsd != null ? usdPerMToNeurons(inUsd) : null, outputRate: null, unitRate: usdToNeurons(Number(perImage)), unitKind: "image" });
+        models.push({ id, label: prettyId(id), provider: "google", task: "image", inputRate: inUsd != null ? usdPerMToNeurons(inUsd) : null, outputRate: null, unitRate: usdToNeurons(Number(perImage)), unitKind: "image", retiresAt: ends });
         continue;
       }
       if (lane.task === "embedding") {
         if (inUsd == null) { skipped.push({ id, reason: "no paid-tier input price on the page" }); continue; }
-        models.push({ id, label: prettyId(id), provider: "google", task: "embedding", inputRate: usdPerMToNeurons(inUsd), outputRate: null, unitRate: null, unitKind: null });
+        models.push({ id, label: prettyId(id), provider: "google", task: "embedding", inputRate: usdPerMToNeurons(inUsd), outputRate: null, unitRate: null, unitKind: null, retiresAt: ends });
         continue;
       }
       if (inUsd == null || outUsd == null) { skipped.push({ id, reason: "no paid-tier input/output price on the page" }); continue; }
-      models.push({ id, label: prettyId(id), provider: "google", task: lane.task, inputRate: usdPerMToNeurons(inUsd), outputRate: usdPerMToNeurons(outUsd), unitRate: null, unitKind: null });
+      models.push({ id, label: prettyId(id), provider: "google", task: lane.task, inputRate: usdPerMToNeurons(inUsd), outputRate: usdPerMToNeurons(outUsd), unitRate: null, unitKind: null, retiresAt: ends });
     }
   }
-  return { models, skipped };
+  return { models, skipped, retired };
 }
 
 /**

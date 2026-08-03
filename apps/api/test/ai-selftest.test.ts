@@ -345,9 +345,9 @@ const GEM_MD = `
 | Input price | Free of charge | $0.30 |
 | Output price (including thinking tokens) | Free of charge | $2.50 |
 
-## Gemini 2.0 Flash
+## Gemini 3.1 Flash-Lite
 
-*\`gemini-2.0-flash\`*
+*\`gemini-3.1-flash-lite\`*
 
 |   | Free Tier | Paid Tier, per 1M tokens in USD |
 | Input price (text, image, video) | Free of charge | $0.10 |
@@ -365,6 +365,93 @@ const modelRow = (id: string) =>
     .first<{ id: string; enabled: number; is_default: number; task: string; input_rate: number }>();
 
 describe("model-catalog sync — discovery and per-provider reconciliation", () => {
+  /**
+   * A model the provider has SHUT DOWN, through the whole real path.
+   *
+   * The parser's own rules are unit-tested in `@4dl/ai`; what this asserts is
+   * the consequence nobody would have found there — that a shut-down model
+   * cannot end up ENABLED, and cannot end up a lane DEFAULT, after a sync
+   * against a page that still prices it in full.
+   *
+   * That is not a hypothetical. Google leaves a retired model's rate tables up
+   * under a deprecation banner indefinitely, `gemini-2.0-flash` was still fully
+   * priced two months after its 1 June 2026 shutdown, and the sync elects the
+   * CHEAPEST enabled model per lane — so the dead row, being the cheapest thing
+   * on the page, was the one the election would pick.
+   */
+  it("never enables or elects a model the provider has already shut down", async () => {
+    const db = env.DB as D1Database;
+    await seedAiModels(db);
+    const withDead = `${GEM_MD}
+## Gemini 2.0 Flash
+
+*\`gemini-2.0-flash\`*
+
+> [!WARNING]
+> **Warning:** Gemini 2.0 Flash is [deprecated](https://ai.google.dev/gemini-api/docs/deprecations) and has been shut down June 1, 2026. Migrate to a newer model to avoid service disruption.
+
+|   | Free Tier | Paid Tier, per 1M tokens in USD |
+| Input price | Free of charge | $0.01 |
+| Output price | Free of charge | $0.02 |
+`;
+    const report = await syncModelCatalog(db, {
+      markup: 3,
+      fetchMd: fetcher({ [PRICING_SOURCES["workers-ai"]]: CF_MD, [PRICING_SOURCES.google]: withDead }),
+    });
+
+    const goog = report.providers.find((p) => p.provider === "google")!;
+    expect(goog.ok).toBe(true);
+    // Named in the report, so an operator learns why a model they expected is
+    // absent rather than assuming the sync missed it.
+    expect(goog.retired.map((r) => r.id)).toContain("gemini-2.0-flash");
+    expect(goog.addedIds).not.toContain("gemini-2.0-flash");
+    expect(await modelRow("gemini-2.0-flash")).toBeNull();
+
+    // The lanes it would have won on price are held by live models.
+    const defaults = await db
+      .prepare("SELECT id, task FROM ai_models WHERE is_default = 1 AND enabled = 1")
+      .all<{ id: string; task: string }>();
+    expect((defaults.results ?? []).map((r) => r.id)).not.toContain("gemini-2.0-flash");
+    expect((defaults.results ?? []).length).toBeGreaterThan(0);
+  });
+
+  /** The same model already in the catalog, enabled and holding a lane. The
+   *  sync has to take it off both, or the lane keeps failing every call. */
+  it("switches off a shut-down model that is already the lane default", async () => {
+    const db = env.DB as D1Database;
+    await seedAiModels(db);
+    await db.prepare(
+      `INSERT INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default)
+       VALUES ('gemini-2.0-flash', 'vision', 'Gemini 2.0 Flash', 'google', 9000, 36000, NULL, NULL, 3, 1, 1)
+       ON CONFLICT(id) DO UPDATE SET enabled = 1, is_default = 1`,
+    ).run();
+
+    const withDead = `${GEM_MD}
+## Gemini 2.0 Flash
+
+*\`gemini-2.0-flash\`*
+
+> [!WARNING]
+> **Warning:** Gemini 2.0 Flash is [deprecated](https://ai.google.dev/gemini-api/docs/deprecations) and has been shut down June 1, 2026.
+
+|   | Free Tier | Paid Tier, per 1M tokens in USD |
+| Input price | Free of charge | $0.10 |
+| Output price | Free of charge | $0.40 |
+`;
+    const report = await syncModelCatalog(db, {
+      markup: 3,
+      fetchMd: fetcher({ [PRICING_SOURCES["workers-ai"]]: CF_MD, [PRICING_SOURCES.google]: withDead }),
+    });
+
+    const row = (await modelRow("gemini-2.0-flash"))!;
+    expect(row.enabled).toBe(0);
+    expect(row.is_default).toBe(0);
+    // Never deleted — a tenant's `ai_config_json` may still name it, and the
+    // generation history has to stay readable.
+    expect(row).toBeTruthy();
+    expect(report.providers.find((p) => p.provider === "google")!.retiredDisabled).toBeGreaterThan(0);
+  });
+
   it("disables a Cloudflare model that vanished from the page, and leaves Gemini untouched when its fetch fails", async () => {
     const db = env.DB as D1Database;
     await seedAiModels(db);
@@ -394,7 +481,7 @@ describe("model-catalog sync — discovery and per-provider reconciliation", () 
     expect(goog.ok).toBe(false);
     expect(goog.error).toMatch(/couldn't fetch/i);
     expect(goog.disabled).toBe(0);
-    for (const id of ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash-image", "gemini-2.5-flash-preview-tts"]) {
+    for (const id of ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash-image", "gemini-2.5-flash-preview-tts"]) {
       expect((await modelRow(id))!.enabled, `${id} must survive a Cloudflare-only sync`).toBe(1);
     }
     // The overall call still reports partial success plus the reason.
@@ -432,10 +519,22 @@ describe("model-catalog sync — discovery and per-provider reconciliation", () 
   it("discovers new models, re-prices existing ones, and never re-routes a lane behind the operator's back", async () => {
     const db = env.DB as D1Database;
     await seedAiModels(db);
-    // The seed tags gemini-2.0-flash as the VISION model. The pricing page has
-    // no lane column, and the id reads like a text model — sync used to
-    // overwrite `task`, which quietly moved every text feature onto 2.5-pro.
-    const beforeTask = (await modelRow("gemini-2.0-flash"))!.task;
+    // A row whose LANE disagrees with what the page would guess. The pricing
+    // page has no lane column, so the parser guesses from the id — and
+    // `gemini-3.1-flash-lite` reads "lite", i.e. text-small. Sync used to
+    // overwrite `task` from that guess, which quietly moved every text feature
+    // onto the ~8× pricier 2.5-pro.
+    //
+    // Hand-inserted rather than taken from the seed: this used to lean on
+    // `gemini-2.0-flash` being seeded as the vision lane, and that model is gone
+    // — Google shut it down on 1 June 2026, so the seed no longer names it and
+    // no test should depend on a dead model to have a lane at all.
+    await db.prepare(
+      `INSERT INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default)
+       VALUES ('gemini-3.1-flash-lite', 'vision', 'Gemini 3.1 Flash-Lite', 'google', 9000, 36000, NULL, NULL, 3, 1, 0)
+       ON CONFLICT(id) DO UPDATE SET task = 'vision'`,
+    ).run();
+    const beforeTask = (await modelRow("gemini-3.1-flash-lite"))!.task;
     expect(beforeTask).toBe("vision");
 
     const report = await syncModelCatalog(db, { markup: 3, fetchMd: fetcher({ [PRICING_SOURCES["workers-ai"]]: CF_MD, [PRICING_SOURCES.google]: GEM_MD }) });
@@ -452,8 +551,9 @@ describe("model-catalog sync — discovery and per-provider reconciliation", () 
 
     // Re-pricing: the seeded row's rate is refreshed from the page…
     expect((await modelRow("@cf/meta/llama-3.3-70b-instruct-fp8-fast"))!.input_rate).toBe(26668);
-    // …but its lane is NOT rewritten.
-    expect((await modelRow("gemini-2.0-flash"))!.task).toBe(beforeTask);
+    // …but its lane is NOT rewritten, even though the page's own guess for that
+    // id would be text-small.
+    expect((await modelRow("gemini-3.1-flash-lite"))!.task).toBe(beforeTask);
   });
 });
 

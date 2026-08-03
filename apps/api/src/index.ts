@@ -39,7 +39,7 @@ import { goalRoutes } from "./goal-routes.js";
 import { commerceRoutes } from "./commerce-routes.js";
 import { paymentsRoutes, paymentsWebhook } from "./payments-routes.js";
 import { aiRoutes, aiAdminRoutes } from "./ai-routes.js";
-import { aiCatalogAdminRoutes, applySharedSelection } from "@4dl/ai";
+import { aiCatalogAdminRoutes, applySharedSelection, disableRetiredModels } from "@4dl/ai";
 import { healthRoutes } from "./health-routes.js";
 import { bodyScanRoutes } from "./body-scan-routes.js";
 import { contentHubRoutes, marketplaceRoutes } from "./content-routes.js";
@@ -369,6 +369,18 @@ async function dailySweep(env: Env): Promise<void> {
   await step("ai-selection", async () => {
     const r = await applySharedSelection(env);
     if (r.applied) console.log(`[dailySweep] applied ${r.applied} shared AI model change(s)`);
+  });
+
+  // A model the provider announced an end date for, on the morning that date
+  // arrives. The date is learned whenever the pricing page is read and comes
+  // true months later, so nothing else in the system would notice: a deployment
+  // that synced once and never opened the console again would keep calling a
+  // model that has stopped answering — and possibly keep a whole lane defaulted
+  // to it. Google leaves a retired model fully priced on its own pricing page,
+  // so "still listed" is no help at all here.
+  await step("ai-retirements", async () => {
+    const gone = await disableRetiredModels(env.DB);
+    if (gone.length) console.log(`[dailySweep] switched off ${gone.length} retired AI model(s): ${gone.join(", ")}`);
   });
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();

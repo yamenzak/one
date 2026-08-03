@@ -85,6 +85,8 @@ export interface AiModelRow {
   markup: number | null;
   enabled: number;
   is_default: number;
+  /** `YYYY-MM-DD` the provider says this model stops answering, or null. */
+  retires_at?: string | null;
 }
 
 /**
@@ -181,23 +183,25 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
     markup: 3,
   },
   {
-    // Gemini Flash — vision lane (Snap-a-Meal, Label Reader, Menu Scout). Rates
-    // are Google list prices expressed as neuron-equivalents (~$0.011/1k) so
-    // both providers meter identically (SPEC §6). ~$0.10/$0.40 per 1M tok.
-    id: "gemini-2.0-flash",
-    task: "vision",
-    label: "Gemini Flash (vision)",
-    provider: "google",
-    input_rate: 9_000,
-    output_rate: 36_000,
-    unit_rate: null,
-    unit_kind: null,
-    markup: 3,
-  },
-  {
+    // NO vision-TAGGED ROW, deliberately.
+    //
+    // This slot held `gemini-2.0-flash`, and Google shut that model down on
+    // 1 June 2026 — so every deployment that seeded and never synced had its
+    // whole vision lane (Snap-a-Meal, Label Reader, the body scan) pointed at a
+    // model that had stopped answering, with nothing on any screen saying so.
+    //
+    // Naming a replacement would only reset the clock on the same failure: a
+    // hardcoded id in a floor nobody re-reads is a model that WILL be retired
+    // one day, by a provider that owes us no notice. Nothing needs one anyway —
+    // `modelSupportsTask` already treats every Google text row as vision-capable
+    // (they are all multimodal), `preferredModelForTask` prefers a vision tag
+    // rather than requiring one, and `visionFallbackModel` exists for precisely
+    // this case. So the lane resolves to `gemini-2.5-flash` below, and the sync
+    // supplies a properly-tagged vision row the moment it runs.
+    //
     // Gemini 2.5 Flash — a strong text model a tenant can pick for any text
     // feature (native JSON mode → clean structured output). Gemini models are
-    // multimodal, so this also serves as a vision fallback. ~$0.30/$2.50 /1M.
+    // multimodal, so this also serves as the vision lane until a sync. ~$0.30/$2.50 /1M.
     id: "gemini-2.5-flash",
     task: "text",
     label: "Gemini 2.5 Flash",

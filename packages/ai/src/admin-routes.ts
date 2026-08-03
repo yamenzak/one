@@ -34,7 +34,7 @@ import { getConfig, nowIso, setConfig, type HasDb, type HasEnvironment, type Has
 import type { Context } from "hono";
 import { listModels, modelPricing, modelTasks, seedAiModels, type AiModelRow } from "./generate.js";
 import { mockModeSettable } from "./mock-lane.js";
-import { fetchPricingDoc, syncModelCatalog } from "./catalog-sync.js";
+import { disableRetiredModels, fetchPricingDoc, syncModelCatalog } from "./catalog-sync.js";
 import { publishSharedCatalog, readSharedCatalog } from "./shared-catalog.js";
 import { applySharedSelection, broadcastSelection } from "./shared-selection.js";
 
@@ -80,15 +80,44 @@ export function aiCatalogAdminRoutes<E extends AiRouteEnv = AiRouteEnv>(deps: Ai
   const forbidden = (c: Context<E>) => c.json({ error: "forbidden" }, 403);
 
   return new Hono<E>()
+    /**
+     * The EFFECTIVE configuration, and where each part of it comes from.
+     *
+     * This read used to be `getConfig(c.env.DB)` — this app's own `app_config`
+     * row and nothing else — while `generate()` has always read the MERGED
+     * config. The moment the Gemini key moved to the shared platform store,
+     * those two disagreed: the vision suite worked perfectly and this screen
+     * said "No Gemini key — the vision suite is dead".
+     *
+     * A wrong status here is worse than a wrong status usually is, because of
+     * what it invites. An operator reading it goes and pastes the key in again,
+     * and THAT writes a local row — a permanent per-app override of the shared
+     * value, which is precisely the state the shared store exists to abolish.
+     * The screen would have manufactured the problem it was misreporting.
+     *
+     * So the claim is the effective one, and `from` says whose value it is. The
+     * per-app panels are local-only on purpose (a panel that saves every field
+     * it displays would copy a shared value into a local override on the next
+     * save) — but that rule is about what a form WRITES BACK, and this is a
+     * status, not a field. The three writes below are each sent on their own,
+     * so nothing here is ever echoed into a save the operator did not make.
+     */
     .get("/admin/ai/config", async (c) => {
       if (!deps.isPlatformAdmin(c)) return forbidden(c);
-      const cfg = await getConfig(c.env.DB);
+      const local = await getConfig(c.env.DB);
+      const effective = await getConfig(c.env);
       const models = await listModels(c.env.DB);
-      // Never echo the key — only whether it's set.
+      /** Whose value is in force: this app's own row, or the shared store. */
+      const from = (key: string): "app" | "shared" | null =>
+        local[key] ? "app" : effective[key] ? "shared" : null;
+      // Never echo the key — only whether it's set, and where it came from.
       return c.json({
-        geminiKeySet: !!cfg["google.gemini_key"],
-        mockMode: cfg["ai.mock"] ?? "auto",
-        markup: globalMarkup(cfg),
+        geminiKeySet: !!effective["google.gemini_key"],
+        geminiKeyFrom: from("google.gemini_key"),
+        mockMode: effective["ai.mock"] ?? "auto",
+        mockModeFrom: from("ai.mock"),
+        markup: globalMarkup(effective),
+        markupFrom: from("ai.markup"),
         modelCount: models.length,
       });
     })
@@ -143,6 +172,10 @@ export function aiCatalogAdminRoutes<E extends AiRouteEnv = AiRouteEnv>(deps: Ai
       // effect immediately; the daily sweep applies it too, so an app nobody
       // opens still converges. Idempotent by cursor — whichever runs first wins.
       await applySharedSelection(c.env).catch(() => undefined);
+      // And anything whose announced shutdown date came true since the last
+      // sync. Same reason as the line above: an operator looking at this screen
+      // must not be shown a model as available when it has stopped answering.
+      await disableRetiredModels(c.env.DB).catch(() => undefined);
       const rows = await c.env.DB.prepare("SELECT * FROM ai_models ORDER BY provider, task, label").all<AiModelRow>();
       // Every row carries its price in CREDITS as well as its neuron rate card.
       // Neurons are the cost basis and stay useful, but they are not the currency

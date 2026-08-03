@@ -16,7 +16,7 @@ import { gateFeature, resolveClientFlagsFor } from "./client-flags.js";
 import { tenantEntitlements, hasFeature, getConfig, setConfig } from "./billing-store.js";
 import {
   generate, generateImage, extractJson, listModels, checkActorDailyBudget,
-  estimateRunCredits, modelSupportsTask, modelTasks, preferredModelForTask, modelForTask, modelById, seedAiModels, modelPricing,
+  estimateRunCredits, modelSupportsTask, modelTasks, preferredModelForTask, modelForTask, visionFallbackModel, modelById, seedAiModels, modelPricing,
   type AiModelRow,
 } from "./ai.js";
 import { buildClientContext } from "./ai-context.js";
@@ -1639,8 +1639,15 @@ async function planSelfTest(env: Env, s: SelfTestScopeInput) {
       }
     } else {
       // "default" — whatever generate() would pick right now, for this task.
+      // The chain has to be generate()'s, all three links: `modelForTask` alone
+      // matches `task` EXACTLY, and there is no longer a vision-tagged model in
+      // the seed (the one there was, `gemini-2.0-flash`, has been shut down by
+      // Google). generate() has always fallen through to a Gemini text row for
+      // vision — they are all multimodal — so a planner missing that link
+      // reported "cannot test this lane" about a lane that runs perfectly well.
       let m: AiModelRow | null = geminiKeySet ? await preferredModelForTask(env.DB, check.task, "google") : null;
       if (!m) m = await modelForTask(env.DB, check.task);
+      if (!m && check.task === "vision") m = await visionFallbackModel(env.DB);
       if (m) models = [m];
     }
     for (const m of models) {
