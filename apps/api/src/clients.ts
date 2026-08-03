@@ -15,7 +15,7 @@ import type { Env } from "./env.js";
 import { withinQuota } from "./billing-store.js";
 import { purgeClient } from "./purge.js";
 import { notify, tenantBrandKit } from "./notify.js";
-import { sendTenantEmail } from "./email-provider.js";
+import { sendTenantEmail, explainSendError } from "./email-provider.js";
 import { emailShell, emailButton, escapeHtml } from "./mailer.js";
 import { newId, nowIso } from "./ids.js";
 import { recordAudit } from "./audit.js";
@@ -447,13 +447,20 @@ export interface InviteDelivery { sent: boolean; reason: string | null }
  */
 function describeDelivery(r: { ok: boolean; skipped?: string; error?: string }): InviteDelivery {
   if (r.ok) return { sent: true, reason: null };
-  const why: Record<string, string> = {
+  // The three reasons the send path DECLINED before trying. Each is a studio
+  // setting, so each is phrased as something the coach can go and change.
+  const skipped: Record<string, string> = {
     provider_off: "Email is switched off in your studio settings.",
     no_credits: "Your studio is out of credits, so the email wasn't sent.",
     brevo_unconfigured: "Brevo needs an API key and a verified sender before it can send.",
-    email_not_configured: "This deployment can't send email yet.",
   };
-  return { sent: false, reason: (r.skipped && why[r.skipped]) || why[r.error ?? ""] || "The invite email couldn't be delivered." };
+  if (r.skipped && skipped[r.skipped]) return { sent: false, reason: skipped[r.skipped]! };
+  // Everything else is the provider's own failure, explained by the package
+  // that owns those strings. This lookup used to be keyed on `error` too, with
+  // one entry (`email_not_configured`) that is an HTTP error code from the OTP
+  // route and is never returned by a send — so every real send failure landed
+  // on the generic fallback and told the coach nothing at all.
+  return { sent: false, reason: explainSendError(r.error) };
 }
 
 export const clientRoutes = new Hono<AppEnv>()

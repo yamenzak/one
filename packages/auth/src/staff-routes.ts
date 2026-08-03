@@ -322,6 +322,16 @@ export function staffRoutes<E extends StaffRouteEnv & HonoEnv>(deps: StaffRouteD
        * this. Deleting the row would take that away and leave nothing behind but
        * a toast.
        */
+      /**
+       * `error` is passed through as the APP wrote it.
+       *
+       * `sendInvite` is injected, so the app owns the mail provider and is the
+       * only side that can turn a provider mechanic into a sentence — this
+       * package importing `@4dl/email` to explain a string it never produced
+       * would be a dependency bought for a formatting job. Kova's binding runs
+       * `explainSendError`; the contract here is only that whatever arrives is
+       * fit to show someone.
+       */
       return c.json({ id, url: sent.url ?? null, emailed: sent.ok, emailError: sent.ok ? null : (sent.error ?? "unknown") }, 201);
     })
 

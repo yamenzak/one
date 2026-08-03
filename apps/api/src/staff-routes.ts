@@ -32,7 +32,7 @@ import { checkStaffSeat } from "./auth.js";
 import { tenantEntitlements } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
 import { canonicalHost } from "./host-context.js";
-import { sendTenantEmail } from "./email-provider.js";
+import { sendTenantEmail, explainSendError } from "./email-provider.js";
 import { emailButton, emailShell, escapeHtml, KOVA_BRAND } from "./mailer.js";
 import { tenantBrandKit } from "./notify.js";
 import type { Env } from "./env.js";
@@ -116,7 +116,15 @@ export const staffRoutes = sharedStaffRoutes<AppEnv>({
     })
       // The link comes back even when the mail did not — that is what makes an
       // invitation survive a misconfigured mailer.
-      .then((r) => ({ ok: r.ok, error: r.ok ? null : (r.skipped ?? r.error ?? "unknown"), url }))
-      .catch((e) => ({ ok: false, error: String(e), url }));
+      //
+      // The reason is EXPLAINED here rather than passed through raw. `@4dl/auth`
+      // shows whatever this returns, and what a send returns is a provider
+      // mechanic — an exception out of the Cloudflare binding, a `brevo 401`.
+      // A manager reading "the email didn't send (unknown)" has been told
+      // nothing; the commonest real cause is that Cloudflare only delivers to
+      // verified destination addresses until the sending domain is onboarded,
+      // and that is worth saying in words.
+      .then((r) => ({ ok: r.ok, error: r.ok ? null : (r.skipped ?? explainSendError(r.error)), url }))
+      .catch((e) => ({ ok: false, error: explainSendError(String(e)), url }));
   },
 });

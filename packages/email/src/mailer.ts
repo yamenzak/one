@@ -511,3 +511,47 @@ export function emailListRow(label: string, value: string, opts: { brand?: Brand
     <td align="right" valign="top" style="font-family:${EMAIL_FONT};font-size:14px;font-weight:600;color:${color};white-space:nowrap;padding-left:12px">${escapeHtml(value)}</td>
   </tr></table>`;
 }
+
+/**
+ * A send failure, in words the person who caused it can act on.
+ *
+ * The failure strings this module produces are provider mechanics — `"email
+ * disabled"`, a `"brevo 401"`, a raw exception out of the Cloudflare binding —
+ * and every caller that shows one to a human had the same problem: a lookup
+ * table keyed on codes the send path never actually returns. Kova's invite
+ * screen listed four reasons, three of which were `skipped` codes and the
+ * fourth (`email_not_configured`) an HTTP error code from a completely
+ * different route, so the commonest real failures all fell through to a
+ * generic "couldn't be delivered" with nothing to act on.
+ *
+ * The unrecognised case returns the RAW error rather than a friendly nothing.
+ * These strings carry no secrets — they are provider status lines — and an
+ * operator with the actual message can search for it, where "couldn't be
+ * delivered" leaves them asking someone to read the logs.
+ *
+ * ── The one worth naming ────────────────────────────────────────────────────
+ *
+ * Cloudflare's send binding will only deliver to VERIFIED DESTINATION ADDRESSES
+ * until the sending domain is onboarded in Cloudflare Email Service. A fresh
+ * deployment therefore emails its own operator perfectly — their address is a
+ * verified destination, so sign-in codes work and everything looks configured —
+ * and fails on the first message to a real customer. Nothing about that is
+ * guessable from "couldn't be delivered", and it is the failure a new
+ * deployment hits first.
+ */
+export function explainSendError(error: string | undefined): string {
+  const e = (error ?? "").trim();
+  if (!e) return "The email couldn't be delivered.";
+  if (/verif/i.test(e) && /destination|address|recipient/i.test(e)) {
+    return "Cloudflare only delivers to verified destination addresses until the sending domain is onboarded in Cloudflare Email Service — so mail to your own address works and mail to anyone else does not. Onboard the sender's domain to send to any recipient.";
+  }
+  if (/email disabled/i.test(e)) return "Email is switched off for this deployment.";
+  if (/mock email provider/i.test(e)) return "This deployment is still on the mock email provider, which never sends outside development.";
+  const brevo = /^brevo (\d+)/i.exec(e);
+  if (brevo) {
+    return brevo[1] === "401"
+      ? "Brevo rejected the API key."
+      : `Brevo refused the send (HTTP ${brevo[1]}).`;
+  }
+  return `The email couldn't be delivered: ${e}`;
+}
