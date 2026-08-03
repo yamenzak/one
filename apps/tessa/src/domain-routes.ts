@@ -25,7 +25,7 @@ import {
 import { turnstileAdminRoutes, turnstileConfig } from "@4dl/auth";
 import { type AppEnv, requireTenant, requirePermission, isPlatformAdmin } from "./auth-context.js";
 import { hasFeature } from "./billing-store.js";
-import { tenancyConfig } from "./host-context.js";
+import { tenancyConfig, shapeOf } from "./host-context.js";
 
 /** Must match `name` in wrangler.jsonc. */
 export const WORKER_NAME = "tessa";
@@ -43,7 +43,15 @@ const GUARDS: RouteGuards = {
       ? null
       : c.json({ error: "custom domains aren't included in this plan" }, 403);
   },
-  turnstile: (db) => turnstileConfig(db),
+  // The host is what decides whether a bot-check widget applies at all: a
+  // Turnstile widget is registered against hostnames, and a tenant's own domain
+  // is not one of them unless somebody added it. The fallback coverage is the
+  // root this host was CLASSIFIED against, not the configured one: loopback is
+  // always classified against `localhost` whatever `ROOT_DOMAIN` says, so using
+  // the configured value would leave every dev and E2E host uncovered and stand
+  // the check down across the whole suite — silently, which is the one outcome
+  // this scoping must never produce.
+  turnstile: (env, host) => turnstileConfig(env, { host, rootDomain: shapeOf(host, env as never).root }),
 };
 
 const CONFIG: DomainRouteConfig = { config: tenancyConfig, workerName: WORKER_NAME };

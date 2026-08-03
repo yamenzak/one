@@ -153,13 +153,16 @@ const GROUPS: Group[] = [
     key: "bot",
     label: "Bot check",
     icon: ShieldCheck,
-    hint: "One Turnstile widget, with every app's doors listed under its Hostnames.",
-    keys: ["turnstile.site_key", "turnstile.secret"],
+    hint: "One Turnstile widget, and the hostnames it is registered for.",
+    perApp:
+      "A widget only works on hostnames it lists — listing one covers its subdomains too. Anywhere else it refuses to render, so the check stands down there rather than demanding a token nobody can produce. Leave this blank and the platform's own root is assumed. Cloudflare's \u201cAny Hostname\u201d option removes the limit and is Enterprise-only.",
+    keys: ["turnstile.site_key", "turnstile.secret", "turnstile.hostnames"],
     state: (get) => {
       const site = get("turnstile.site_key")?.shared;
       const secret = get("turnstile.secret")?.shared;
+      const hosts = shown(get("turnstile.hostnames"));
       if (secret && !site) return { value: "Secret with no site key — nobody can sign in", tone: "danger" };
-      if (secret) return { value: "Enforcing on every sign-in", tone: "success" };
+      if (secret) return { value: hosts ? `Enforcing on ${hosts}` : "Enforcing on the platform's own doors", tone: "success" };
       if (site) return { value: "Widget only — nothing verified", tone: "warning" };
       return { value: "Off", tone: "neutral" };
     },
@@ -217,6 +220,7 @@ const LABELS: Record<string, string> = {
   "email.credits_per_email": "Credits per email",
   "turnstile.site_key": "Site key (public)",
   "turnstile.secret": "Secret key (server)",
+  "turnstile.hostnames": "Hostnames the widget covers",
   "stripe.mode": "Mode",
   "stripe.test.secret_key": "Test secret key",
   "stripe.test.publishable_key": "Test publishable key",
@@ -241,6 +245,7 @@ const PLACEHOLDERS: Record<string, string> = {
   "stripe.mode": "test",
   "stripe.platform_fee_bps": "0",
   "turnstile.site_key": "0x4AAAAAAA…",
+  "turnstile.hostnames": "4dl.app, byshujaa.com",
   "cf.saas.cname_target": "saas.4dl.app",
 };
 

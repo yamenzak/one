@@ -15,7 +15,7 @@ import type { MiddlewareHandler } from "hono";
 import { forwardJson, otpSendGuard as buildOtpGuard, verifyTurnstile, type EligibilityVerdict } from "@4dl/auth";
 import { withinQuota } from "./billing-store.js";
 import { countClientSeats, PENDING_SIGNUP } from "./clients.js";
-import { hostnameOf } from "./host-context.js";
+import { shapeOf, hostnameOf } from "./host-context.js";
 import { newId, nowIso } from "./ids.js";
 import { emailDeliverable } from "./mailer.js";
 import type { AppEnv } from "./auth-context.js";
@@ -87,7 +87,24 @@ async function createPendingClient(db: D1Database, tenantId: string, email: stri
 export const otpSendGuard: MiddlewareHandler<AppEnv> = buildOtpGuard<Env, Auth, Branding>({
   db: (env) => env.DB,
 
-  humanCheck: async (c, token, ip) => (await verifyTurnstile(c.env, token, ip, hostnameOf(c.req.url))).ok,
+  /**
+   * `rootDomain` is the widget's assumed coverage when nobody has listed it.
+   *
+   * Without it the server demands a token on a tenant's OWN domain, where the
+   * widget cannot render and no token can exist — which is not a bot check, it
+   * is a studio that can admit nobody at the address it advertises. See
+   * `@4dl/auth`'s turnstile.ts for why standing down there is sound.
+   *
+   * It is the root this host was CLASSIFIED against rather than the configured
+   * one, because loopback is always classified against `localhost` whatever
+   * `ROOT_DOMAIN` holds. Reading the config here would mark every `*.localhost`
+   * host uncovered and quietly stand the check down across dev and the whole
+   * integration suite.
+   */
+  humanCheck: async (c, token, ip) => {
+    const host = hostnameOf(c.req.url);
+    return (await verifyTurnstile(c.env, token, ip, host, { rootDomain: shapeOf(host, c.env).root })).ok;
+  },
 
   /**
    * The host decides which studio this sign-in is for.

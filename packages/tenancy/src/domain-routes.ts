@@ -204,7 +204,7 @@ export function domainRoutes(deps: RouteGuards, opts: DomainRouteConfig) {
        * tell "not in maintenance" from "this server is too old to say".
        */
       maintenance: c.get("maintenance") ?? MAINTENANCE_OFF,
-      turnstile: (await deps.turnstile?.(c.env)) ?? null,
+      turnstile: (await deps.turnstile?.(c.env, here.hostname)) ?? null,
     });
   })
 

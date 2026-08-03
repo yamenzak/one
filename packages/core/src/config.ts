@@ -136,6 +136,7 @@ export const SHARED_CONFIG_KEYS: readonly string[] = [
   "ai.markup",
   // One Turnstile widget, hostname-scoped across the whole apex.
   "turnstile.secret",
+  "turnstile.hostnames",
   "turnstile.site_key",
   // The mail LANE and the platform's own sender. `email.from` is per-app.
   "email.provider",
@@ -187,6 +188,7 @@ export const isSharedConfigKey = (key: string): boolean => SHARED.has(key);
 const SECRET = new Set([
   "google.gemini_key",
   "turnstile.secret",
+  "turnstile.hostnames",
   "cf.saas.api_token",
   "stripe.secret_key",
   "stripe.test.secret_key",

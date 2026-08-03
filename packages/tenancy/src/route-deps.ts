@@ -82,5 +82,11 @@ export interface RouteGuards {
    * Reported by the host probe because that is the one endpoint a client reads
    * before it has a session — not because tenancy has an opinion about bots.
    */
-  turnstile?: (src: ConfigSource) => Promise<{ siteKey: string | null; enabled: boolean } | null>;
+  /**
+   * `host` is the hostname being served, and it is not optional in practice: a
+   * bot-check widget is registered against specific hostnames, so whether one
+   * applies AT ALL is a question about where the request landed. Without it the
+   * probe reports a widget for a tenant's own domain that cannot render there.
+   */
+  turnstile?: (src: ConfigSource, host: string) => Promise<{ siteKey: string | null; enabled: boolean } | null>;
 }

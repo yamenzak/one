@@ -2194,6 +2194,51 @@ describe("OTP-send gate — sign-up eligibility + cooldown", () => {
       await db.prepare("DELETE FROM app_config WHERE key = 'turnstile.secret'").run();
     }
   });
+
+  /**
+   * A Turnstile widget only renders on hostnames it was registered for, and a
+   * tenant's OWN domain is never one of them (Cloudflare's "Any Hostname" option
+   * is Enterprise-only, and a widget otherwise holds ~10–15 hostnames). So on a
+   * custom domain there is no widget, therefore no token — and a server that
+   * demanded one turned the address a studio actually advertises into a door
+   * nobody could pass. This is the sign-in that has to keep working.
+   */
+  it("Turnstile stands down on a custom domain, where no widget can render", async () => {
+    const db = env.DB as D1Database;
+    const tenantId = ((await (await SELF.fetch(`${STUDIO}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } }).active.tenantId;
+    const now = new Date().toISOString();
+    await db
+      .prepare("INSERT INTO tenant_domains (hostname, tenant_id, status, created_at, updated_at) VALUES ('coaching.byshujaa.test', ?, 'active', ?, ?) ON CONFLICT(hostname) DO UPDATE SET status='active', tenant_id=excluded.tenant_id")
+      .bind(tenantId, now, now)
+      .run();
+    await db.prepare("INSERT INTO app_config (key, value) VALUES ('turnstile.secret', 'test-secret') ON CONFLICT(key) DO UPDATE SET value = 'test-secret'").run();
+    await setSelfRegister(true);
+    try {
+      const OWN = "http://coaching.byshujaa.test";
+      const res = await SELF.fetch(`${OWN}/api/auth/email-otp/send-verification-otp`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: OWN },
+        body: JSON.stringify({ email: "own-domain@test.dev", type: "sign-in" }),
+      });
+      // Anything but `human_check_failed`: the bot check did not fire here.
+      expect(await res.clone().text()).not.toContain("human_check_failed");
+
+      // …and the widget is not advertised there either, so the login screen does
+      // not render a box that can only say "Unable to connect to website".
+      const probe = (await (await SELF.fetch(`${OWN}/api/host`)).json()) as { turnstile: { enabled: boolean; siteKey: string | null } | null };
+      expect(probe.turnstile?.enabled).toBe(false);
+      expect(probe.turnstile?.siteKey).toBeNull();
+
+      // The platform's own doors are unaffected — this is a scoping change, not
+      // a switch-off, and a change that quietly disabled the check everywhere is
+      // the failure being guarded against.
+      const onPlatform = (await (await SELF.fetch(`${STUDIO}/api/host`)).json()) as { turnstile: { enabled: boolean } | null };
+      expect(onPlatform.turnstile?.enabled).toBe(true);
+    } finally {
+      await db.prepare("DELETE FROM app_config WHERE key = 'turnstile.secret'").run();
+      await db.prepare("DELETE FROM tenant_domains WHERE hostname = 'coaching.byshujaa.test'").run();
+    }
+  });
 });
 
 describe("passkey — Better Auth endpoint methods (regression)", () => {
