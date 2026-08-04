@@ -17,7 +17,7 @@ import { AiAvatar } from "./AiAvatar.js";
 
 type ImageFeature = "food-image" | "exercise-image";
 
-export function AiImageField({ value, onChange, feature, subject, hint, canAi, label, size = 88, stacked = false, referenceUrl, loading = false, contain = false }: {
+export function AiImageField({ value, onChange, feature, subject, hint, canAi, label, size = 88, stacked = false, referenceUrl, loading = false }: {
   value: string;
   onChange: (url: string) => void;
   feature: ImageFeature;
@@ -31,8 +31,6 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
   referenceUrl?: string;
   /** Externally-driven "creating" state (e.g. a parent generating both frames). */
   loading?: boolean;
-  /** Fit the whole image inside the box (object-contain) instead of filling it. */
-  contain?: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -75,7 +73,10 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
       ) : uploading ? (
         <span className="size-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
       ) : value ? (
-        <img src={value} alt="" className={cn("size-full", contain ? "object-contain p-1" : "object-cover")} />
+        // A photo fills its frame — and an EDITOR preview must show what the app
+        // will show, or the coach picks a crop they never see. See @4dl/ui
+        // media.tsx's header for the rule.
+        <img src={value} alt="" className="size-full object-cover" />
       ) : (
         <Camera className="size-6" />
       )}

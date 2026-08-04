@@ -502,9 +502,7 @@ function EditEntrySheet({ entry, clientId, units, onClose, onSaved }: { entry: E
     >
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <div className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl bg-surface-2">
-            {entry.image_url ? <img src={entry.image_url} alt="" className="size-full object-cover" /> : <Utensils className="size-5 text-muted-foreground" />}
-          </div>
+          <FoodThumb src={entry.image_url} size={48} radius="xl" />
           <div className="grid grid-cols-4 gap-2 flex-1">
             {([["calories", entry.calories], ["protein", entry.protein_g], ["carbs", entry.carbs_g], ["fat", entry.fat_g]] as const).map(([m, v]) => {
               const M = METRICS[m];

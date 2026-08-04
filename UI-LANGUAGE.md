@@ -839,6 +839,41 @@ Three rules go with it, and the component enforces the first two:
 - **The button says how many are on.** A control that hides state must say it
   has some, or the list looks broken.
 
+### A photo fills its frame. A mark is contained inside one.
+
+Image fit looks like a per-slot preference and is not — it is a question about
+what the image IS, and it has one answer per kind:
+
+- **A photo** — a demo, a plate of food, a face, an article cover — is an
+  **identifier** at thumbnail size. Nobody studies it; they recognise it. It
+  fills the frame, centred, and the edges crop.
+- **A mark** — a logo, a wordmark, a generated app icon — carries its own
+  padding and its own transparency. Cropping destroys the thing itself, so it is
+  contained and the space around it is deliberate.
+- **A document** — an image being examined rather than recognised, i.e. the
+  lightbox — is contained too. It is the one place cropping loses information
+  the reader came for.
+
+Left unnamed, this splits about two-to-one across a codebase and the most-seen
+thumbnails land on the wrong side. Ours did: a library of photos, some shot
+portrait and some landscape, rendered as letterboxed rectangles floating in a
+**tone-tinted** plate — every tile a different amount of coloured background, the
+grid reading as broken rather than as a grid.
+
+`Thumb` (§13) is the photo case, and it is the only one worth a component:
+
+- **`object-cover`, always.** There is no prop to turn it off. A slot that wants
+  containing is a mark, and marks are hand-placed because a mark's frame is
+  always bespoke — a bar, a splash, a settings preview.
+- **The tint belongs to the fallback, not the frame.** A tone under a photo is
+  invisible when the photo loads and brand-coloured when it does not fill —
+  which is precisely what made the bars green instead of merely present.
+- **A dead URL falls back to the glyph**, not to the browser's broken-image
+  chrome inside a rounded box.
+- **An editor preview obeys the same rule as the list.** Showing the uncropped
+  original where the app will show a crop is how someone picks a framing they
+  never see.
+
 ### A history is a series. One picker drives the chart AND the list.
 
 When a screen holds several versions of the same thing over time, the question
@@ -1328,6 +1363,20 @@ so in words** rather than rendering `+0`, which is a badge drawing attention to
 the news that nothing happened. `goodWhen` defaults to neutral — most changes a
 product shows are neither good nor bad, and a component that guessed would be
 confidently wrong half the time.
+
+### Media — `media.tsx`
+
+| Component | Use it when | Do NOT use it for | State |
+|---|---|---|---|
+| `Thumb` | **Every photo slot.** A row's leading image, a grid tile, an editor preview. Fills (§7), tints only the fallback, falls back to a glyph on a dead URL, lazy-loads. `size` for a fixed box; omit it and it fills its parent at `ratio`. | A logo or a wordmark. Those are marks — contained, hand-placed, bespoke frame. | ✅ |
+| `PhotoGrid` | A small set of photos on a surface, tapping through to the lightbox. | A browsable collection — that is `Collection` with `view="grid"`. | ✅ |
+| `Lightbox` | Examining one image full-screen. Contained, because this is the one place cropping loses what the reader came for. | A preview. | ✅ |
+
+`Thumb` takes **two** sources: pass `src2` and the frames cross-fade on a
+`frame` tick the caller supplies, so every thumb on a screen flips together
+instead of each running its own timer. The app owns the ticker because the app
+knows when the screen is visible; a component with its own `setInterval` keeps
+running behind a sheet.
 
 ### Tiles — `tiles.tsx`
 

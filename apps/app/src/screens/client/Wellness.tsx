@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fmtVolume, volumeLabel, volumeDisplayToMl, POSTURE_GUIDANCE } from "@kova/domain";
-import { Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, StatCard, WeekDots, Sparkline, MiniBars, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonList, Anchor, ActionCluster, CountUp, ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Flame, Plus, ChevronRight, Upload, HeartPulse, AlertTriangle, type Tone } from "@4dl/ui";
+import { Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, Thumb, StatCard, WeekDots, Sparkline, MiniBars, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonList, Anchor, ActionCluster, CountUp, ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Flame, Plus, ChevronRight, Upload, HeartPulse, AlertTriangle, type Tone } from "@4dl/ui";
 import { METRICS, POSTURE_SEVERITY_TONE, FASTING_ZONES, type FastingZone } from "../../registry/index.js";
 
 interface PostureScan {
@@ -643,9 +643,7 @@ function LabRow({ lab, clientId, onOpen, onUploaded }: { lab: LabFull; clientId:
   return (
     <div>
     <Card interactive className="flex items-center gap-3 py-3">
-      {thumb
-        ? <img src={thumb} alt="" className="size-10 shrink-0 rounded-xl object-cover" />
-        : <IconBadge icon={FlaskConical} tone="lab" size="sm" />}
+      <Thumb src={thumb} fallback={FlaskConical} tone="lab" size={40} radius="xl" />
       <button onClick={onOpen} className="min-w-0 flex-1 text-left">
         <div className="truncate font-medium">{lab.display_name}</div>
         <div className="truncate text-xs text-muted-foreground">{sub}</div>

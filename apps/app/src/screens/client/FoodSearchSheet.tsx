@@ -16,7 +16,7 @@ import { api, errorText, isQueued, todayLocal, uploadMedia } from "../../api.js"
 import { QueuedNotice } from "../../notices.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
-import { FoodRow, normFood } from "../food.js";
+import { FoodRow, FoodThumb, normFood } from "../food.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { Markdown } from "../../Markdown.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
@@ -317,7 +317,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
       >
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            {img && <img src={img} alt="" className="size-14 shrink-0 rounded-xl object-cover" />}
+            <FoodThumb src={img} size={56} radius="xl" />
             <div className="min-w-0">{selected.brand && <div className="truncate text-sm text-muted-foreground">{selected.brand}</div>}<div className="text-xs text-muted-foreground">per {n.servingSize} {n.servingUnit}</div></div>
           </div>
           <div className="flex flex-wrap gap-2">{MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{mealLabel(m)}</Chip>)}</div>

@@ -13,8 +13,9 @@ import { motion } from "motion/react";
 import { kgToDisplay, cmToLengthDisplay, weightLabel, lengthLabel, fmtEnergy, kcalToDisplay, POSTURE_GUIDANCE, type SeriesDelta } from "@kova/domain";
 
 const capp = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-import { Card, Badge, Button, Page, Stagger, StatCard, ProgressRing, IconBadge, stagger, EmptyState, SectionHeader, Sparkline, Eyebrow, GlanceStrip, Reveal, SkeletonHero, SkeletonChart, AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, cn, toneVar, Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, RangePicker, useDateRange, Scale, Anchor, CountUp, type Tone, type LucideIcon, NoData, IconTabs, DUR } from "@4dl/ui";
+import { Card, Badge, Button, Page, Stagger, StatCard, ProgressRing, stagger, EmptyState, SectionHeader, Sparkline, Eyebrow, GlanceStrip, Reveal, SkeletonHero, SkeletonChart, AreaChart, BarChart, RadarChart, CalendarHeatmap, ChartCard, cn, toneVar, Dumbbell, Trophy, Flame, Moon, Smile, Zap, Gauge, HeartPulse, TrendingUp, Activity, AlertTriangle, RangePicker, useDateRange, Scale, Anchor, CountUp, type Tone, type LucideIcon, NoData, IconTabs, DUR } from "@4dl/ui";
 import { METRICS, POSTURE_SEVERITY_TONE } from "../../registry/index.js";
+import { ExerciseThumb } from "../exercise.js";
 import { api, todayLocal } from "../../api.js";
 import { RANGE_PRESETS } from "../../ranges.js";
 import { useCan } from "../../FeatureLock.js";
@@ -381,7 +382,7 @@ function Training({ data, units }: { data: ProgressData; units: ReturnType<typeo
               {training.prs.map((p, i) => (
                 <div key={p.exerciseId} className="flex items-center gap-3">
                   <div className="numeral w-5 shrink-0 text-center text-xs font-bold text-muted-foreground">{i + 1}</div>
-                  {p.thumb ? <img src={p.thumb} alt="" className="size-9 shrink-0 rounded-lg object-cover" /> : <IconBadge icon={Dumbbell} tone="activity" size="sm" />}
+                  <ExerciseThumb thumb={p.thumb} size={36} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{p.name}</div>
                     <div className="relative mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full" style={{ width: `${Math.max(6, (p.e1rm / maxE1) * 100)}%`, backgroundColor: toneVar.activity }} /></div>

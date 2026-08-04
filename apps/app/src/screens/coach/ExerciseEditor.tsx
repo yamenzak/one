@@ -13,7 +13,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, toneSoft, cn, type Tone, SPRING_SNAP} from "@4dl/ui";
+import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, Thumb, toneSoft, cn, type Tone, SPRING_SNAP} from "@4dl/ui";
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@kova/protocol";
 import { api, ApiError, uploadMedia } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -256,7 +256,7 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
                   {webBusy && <p className="p-3 text-center text-sm text-muted-foreground">Searching…</p>}
                   {webResults?.map((e) => (
                     <button key={e.sourceId} disabled={!!importing} onClick={() => void pickWeb(e)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary disabled:opacity-60">
-                      <div className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg bg-surface-2">{e.imageUrl ? <img src={e.imageUrl} alt="" className="size-full object-contain" /> : <Dumbbell className="size-4 text-muted-foreground" />}</div>
+                      <Thumb src={e.imageUrl} fallback={Dumbbell} size={40} />
                       <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{e.name}</div><div className="truncate text-xs text-muted-foreground">{[e.muscleGroups.join(", "), e.source].filter(Boolean).join(" · ")}</div></div>
                       {importing === e.sourceId ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Plus className="size-4 shrink-0 text-primary" />}
                     </button>
@@ -277,8 +277,8 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
             <div className="space-y-3">
               <SectionLabel>Demo</SectionLabel>
               <div className="grid grid-cols-2 gap-3">
-                <AiImageField value={image} onChange={setImage} feature="exercise-image" subject={name} canAi={false} label="Start" stacked loading={pairBusy} contain />
-                <AiImageField value={image2} onChange={setImage2} feature="exercise-image" subject={name} canAi={false} label="End" stacked loading={pairBusy} contain />
+                <AiImageField value={image} onChange={setImage} feature="exercise-image" subject={name} canAi={false} label="Start" stacked loading={pairBusy} />
+                <AiImageField value={image2} onChange={setImage2} feature="exercise-image" subject={name} canAi={false} label="End" stacked loading={pairBusy} />
               </div>
               {canAi && (
                 <Button variant="tonal" size="sm" className="w-full" disabled={pairBusy || name.trim().length < 2} onClick={() => void runPair()}>

@@ -12,7 +12,7 @@
 
 import type { ReactNode } from "react";
 import { fmtEnergy } from "@kova/domain";
-import { cn, Utensils } from "@4dl/ui";
+import { cn, Thumb, Utensils, type ThumbProps } from "@4dl/ui";
 import { MacroInline } from "../registry/index.js";
 import { useUnits } from "../units.js";
 
@@ -54,12 +54,11 @@ export function normFood(f: FoodInput): FoodDisplay {
 
 /** Square food thumbnail — the food's photo, else a nutrition-tinted glyph.
  *  One look for every food image in the app. */
-export function FoodThumb({ src, size = 44, className = "" }: { src?: string | null; size?: number; className?: string }) {
-  return (
-    <div className={cn("grid shrink-0 place-items-center overflow-hidden rounded-lg bg-nutrition-soft text-nutrition", className)} style={{ width: size, height: size }}>
-      {src ? <img src={src} alt="" className="size-full object-contain" /> : <Utensils className="size-1/2" />}
-    </div>
-  );
+export function FoodThumb({ src, size = 44, radius, className = "" }: { src?: string | null; size?: number; radius?: ThumbProps["radius"]; className?: string }) {
+  // `Thumb` (@4dl/ui) owns the fill, the fallback and the failed-URL path. This
+  // was `object-contain` over a tinted plate, so a photo shot in portrait sat in
+  // a brand-coloured letterbox — see the rule in that file's header.
+  return <Thumb src={src} fallback={Utensils} tone="nutrition" size={size || undefined} radius={radius} className={className} />;
 }
 
 /** Thin proportional protein/carbs/fat bar — the macro split at a glance. */

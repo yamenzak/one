@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Dumbbell, Info, cn } from "@4dl/ui";
+import { Dumbbell, Info, Thumb, cn, type ThumbProps } from "@4dl/ui";
 
 // ── Shared frame ticker ──────────────────────────────────────────────────────
 // One global interval drives every animated thumbnail in sync, so a whole
@@ -55,9 +55,10 @@ if (typeof document !== "undefined") {
   });
 }
 
-function useFrameTick(): number {
+function useFrameTick(active = true): number {
   const [i, setI] = useState(frame);
   useEffect(() => {
+    if (!active) return;
     // Respect the OS setting: no animation, no timer, no re-renders.
     if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
     const bump = () => setI(frame);
@@ -67,7 +68,7 @@ function useFrameTick(): number {
       tickers.delete(bump);
       if (tickers.size === 0) stopTicker();
     };
-  }, []);
+  }, [active]);
   return i;
 }
 
@@ -98,28 +99,31 @@ export const splitList = (s?: string | null): string[] => (s ?? "").split(",").m
 export const pretty = (m: string): string => cap(m.replace(/_/g, " "));
 export const firstMuscle = (e: ExerciseInfo): string | undefined => splitList(e.muscle_groups)[0];
 
-/** Square exercise thumbnail. With two frames (start + end) it cross-fades
- *  between them to animate the movement; otherwise a still image, or a
- *  muscle-tinted glyph when there's no image at all. */
-export function ExerciseThumb({ thumb, thumb2, size = 40, className = "" }: { thumb?: string | null; thumb2?: string | null; size?: number; className?: string }) {
-  const frames = [thumb, thumb2].filter(Boolean) as string[];
+/**
+ * An exercise's photo — `Thumb` with this product's fallback glyph and tone.
+ *
+ * The frame logic, the cross-fade, the failed-URL fallback and the FILL are all
+ * `Thumb`'s now. This used to be `object-contain` over a tinted plate, which is
+ * what put brand-green letterbox bars around every portrait photo in the
+ * library grid: a photo is an identifier, and an identifier fills its frame
+ * (@4dl/ui media.tsx).
+ */
+export function ExerciseThumb({ thumb, thumb2, size = 40, radius, className = "" }: { thumb?: string | null; thumb2?: string | null; size?: number; radius?: ThumbProps["radius"]; className?: string }) {
+  // Subscribed only when there are two frames to flip between — the ticker
+  // re-renders every subscriber every 1.1s, and a still image has nothing to do
+  // with that.
+  const tick = useFrameTick(Boolean(thumb && thumb2));
   return (
-    <div className={`relative grid shrink-0 place-items-center overflow-hidden rounded-lg bg-activity-soft text-activity ${className}`} style={{ width: size, height: size }}>
-      {frames.length > 1 ? <AnimatedFrames frames={frames} /> : frames.length === 1 ? <img src={frames[0]} alt="" className="size-full object-contain" /> : <Dumbbell className="size-1/2" />}
-    </div>
-  );
-}
-
-/** Two stacked frames that cross-fade on the shared tick. */
-function AnimatedFrames({ frames }: { frames: string[] }) {
-  const tick = useFrameTick();
-  const active = tick % frames.length;
-  return (
-    <>
-      {frames.map((f, i) => (
-        <img key={i} src={f} alt="" className={cn("absolute inset-0 size-full object-contain transition-opacity duration-700", i === active ? "opacity-100" : "opacity-0")} />
-      ))}
-    </>
+    <Thumb
+      src={thumb}
+      src2={thumb2}
+      fallback={Dumbbell}
+      tone="activity"
+      size={size || undefined}
+      radius={radius}
+      frame={tick}
+      className={className}
+    />
   );
 }
 

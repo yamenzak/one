@@ -352,8 +352,10 @@ const libCategory = (e: ExerciseInfo): string => { const c = splitList(e.categor
 function LibCover({ ex, className = "" }: { ex: ExerciseInfo; className?: string }) {
   const img = ex.thumb_url || ex.thumb2_url;
   return (
+    // A photo fills its frame (@4dl/ui media.tsx) — `object-contain` here put
+    // tinted bars around every portrait shot.
     <div className={`relative grid place-items-center overflow-hidden rounded-xl bg-activity-soft text-activity ${className}`}>
-      {img ? <img src={img} alt="" className="size-full object-contain" /> : <Dumbbell className="size-8" />}
+      {img ? <img src={img} alt="" className="size-full object-cover" /> : <Dumbbell className="size-8" />}
     </div>
   );
 }

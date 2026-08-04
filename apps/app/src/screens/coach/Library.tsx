@@ -160,7 +160,7 @@ function Exercises() {
         renderGrid={(e) => (
           <Card className="relative overflow-hidden p-0">
             <button onClick={() => open(e)} className="block w-full text-left transition-opacity active:opacity-80">
-              <div className="aspect-square bg-surface-2"><ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={0} className="!size-full !rounded-none" /></div>
+              <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={0} radius="none" />
               <div className="px-3 pb-3 pt-2">
                 <div className="truncate text-sm font-semibold">{e.name}</div>
                 <div className="truncate text-xs text-muted-foreground">{metaText(e) || "—"}</div>
@@ -409,7 +409,7 @@ function Foods() {
         renderGrid={(f) => (
           <Card className="relative overflow-hidden p-0">
             <button onClick={() => setEditor({ id: f.id })} className="block w-full text-left transition-opacity active:opacity-80">
-              <div className="aspect-square bg-nutrition-soft"><FoodThumb src={f.image_url} size={0} className="!size-full !rounded-none" /></div>
+              <FoodThumb src={f.image_url} size={0} radius="none" />
               <div className="px-3 pb-3 pt-2">
                 <div className="truncate text-sm font-semibold">{f.name}</div>
                 {f.brand && <div className="truncate text-xs text-muted-foreground">{f.brand}</div>}

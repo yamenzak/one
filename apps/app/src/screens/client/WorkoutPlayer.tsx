@@ -567,7 +567,10 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
           <div className="flex gap-2">
             {([["Start", ex?.thumb_url], ["End", ex?.thumb2_url]] as const).filter(([, src]) => src).map(([label, src]) => (
               <div key={label} className="relative min-w-0 flex-1 overflow-hidden rounded-2xl bg-surface-2">
-                <img src={src!} alt="" className="h-40 w-full object-contain" />
+                {/* Cover, like every other photo — the two frames are a BEFORE
+                    and AFTER of the same shot, so letterboxing them made the
+                    pair a different size from each other. */}
+                <img src={src!} alt="" className="h-40 w-full object-cover" />
                 {ex?.thumb_url && ex?.thumb2_url && <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-xs font-semibold text-white">{label}</span>}
               </div>
             ))}
