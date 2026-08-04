@@ -147,11 +147,16 @@
 
   --primary: oklch(0.74 0.15 164);
   --primary-foreground: oklch(0.17 0.03 164);
-  /* On-tone foreground for SOLID domain-tone surfaces (section-ambience buttons,
-     tinted nav pill). Domain tones invert per mode — light in dark UI, dark in
-     light UI — so the on-tone text is dark here (dark mode) and near-white in
-     light mode. Clears AA (>=5:1) on every tone; a brand `--primary-foreground`
-     can't, since its polarity is fixed to the brand primary, not the tones. */
+  /* The FALLBACK on-colour for a solid tone fill. Each tone names its own
+     `--<tone>-foreground`, picked by measured WCAG contrast against that exact
+     colour (`bestForeground`, lib/theme.ts) — this single per-mode value is only
+     right while every accent in a mode sits at a similar lightness, which is
+     true of a hand-tuned default set and false the moment a brand derives one.
+     It survives for the runtime path (`BottomTabs` reads
+     `var(--<tone>-foreground, var(--tone-foreground))`), so an app that
+     registers a tone WITHOUT an on-colour degrades to this rather than to
+     `inherit`. A brand `--primary-foreground` cannot serve here: its polarity is
+     fixed to the brand primary, not to the tones. */
   --tone-foreground: oklch(0.2 0.02 285);
   --secondary: oklch(0.245 0.007 285);
   --secondary-foreground: oklch(0.975 0.003 285);
@@ -197,7 +202,7 @@
      resolving the oklch through a canvas rather than by eye. */
   --primary: oklch(0.52 0.14 164);
   --primary-foreground: oklch(0.99 0.01 164);
-  --tone-foreground: oklch(0.99 0.01 285); /* light UI → dark tones → near-white on-tone text */
+  --tone-foreground: oklch(0.99 0.01 285); /* the same fallback, light mode */
   --secondary: oklch(0.955 0.004 285);
   --secondary-foreground: oklch(0.24 0.01 285);
   --muted: oklch(0.955 0.004 285);
