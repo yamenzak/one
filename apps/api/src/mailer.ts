@@ -22,8 +22,28 @@ import { configureEmailBrand, type BrandKit } from "@4dl/email";
 
 export * from "@4dl/email";
 
-/** Kova's own identity — platform emails (sign-in codes, receipts). */
-export const KOVA_BRAND: BrandKit = { name: "Kova", accent: "#a8c7fa", accentFg: "#0b1220", logoUrl: null };
+/**
+ * Kova's own identity — platform emails (sign-in codes, receipts, dunning).
+ *
+ * ⚠️ `iconUrl`/`siteUrl` are ABSOLUTE and hardcoded, and both have to be: a mail
+ * client fetches an image over the open internet with no session and no notion
+ * of our origin, and this constant is bound at module load where there is no
+ * `env` to read `BETTER_AUTH_URL` from. `apps/api/test/email-brand.test.ts`
+ * asserts the origin still matches `wrangler.jsonc`, because the failure mode is
+ * a broken image in every platform email and nothing that says so.
+ *
+ * The icon is the PWA icon the SPA already ships — served by the assets binding
+ * before a request ever reaches the worker, so it is public by construction and
+ * there is no second asset to keep in step with the one on people's home screens.
+ */
+export const KOVA_BRAND: BrandKit = {
+  name: "Kova",
+  accent: "#a8c7fa",
+  accentFg: "#0b1220",
+  logoUrl: null,
+  iconUrl: "https://kova.4dl.app/icon-192.png",
+  siteUrl: "https://kova.4dl.app",
+};
 
 /**
  * The PLATFORM sender — the address Kova's own mail (and any tenant on the

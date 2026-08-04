@@ -68,7 +68,14 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
   webServer: [
     {
-      command: `pnpm --filter @4dl/tessa exec wrangler dev --local --log-level ${process.env.E2E_SERVER_LOGS ? "info" : "warn"} --port ${APP_PORT}`,
+      // `--inspector-port` pinned per app, and not by taste: `wrangler dev`
+      // opens a devtools inspector on 9229 by DEFAULT, so two suites booting at
+      // once — which is exactly what `pnpm e2e` does, one turbo task per app —
+      // race for it and whichever loses exits with "Address already in use"
+      // before serving a single request. Playwright then reports
+      // "Process from config.webServer exited early", which reads as a broken
+      // app rather than as a port collision between two unrelated products.
+      command: `pnpm --filter @4dl/tessa exec wrangler dev --local --log-level ${process.env.E2E_SERVER_LOGS ? "info" : "warn"} --port ${APP_PORT} --inspector-port 9230`,
       // `/health` is dependency-free and answers on every door, including the
       // root that exists before any centre does.
       url: `${ROOT_URL}/health`,

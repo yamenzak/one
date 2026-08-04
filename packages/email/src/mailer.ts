@@ -224,8 +224,27 @@ export interface BrandKit {
   accent: string;
   /** Readable text ON the accent (CTA label). A tenant's `branding.primaryForeground`. */
   accentFg: string;
-  /** A PUBLIC absolute logo URL, or null → fall back to the wordmark. */
+  /**
+   * A PUBLIC absolute WORDMARK url — an image that already contains the name.
+   * Drawn alone, because setting the name beside it prints it twice.
+   */
   logoUrl: string | null;
+  /**
+   * A PUBLIC absolute SQUARE icon url — the app mark, the thing on their home
+   * screen. Drawn as a rounded chip beside the name when there is no wordmark,
+   * which is the same lockup the app bar and the nav rail use.
+   *
+   * Separate from `logoUrl` because the two are different shapes and an email
+   * client will not letterbox for you: a wordmark in a 36px square is its own
+   * middle third, and an icon stretched to a wordmark's width is a blur.
+   */
+  iconUrl?: string | null;
+  /**
+   * The brand's own public origin (`https://studio.example.com`) — the footer
+   * identity line, and the only place in the message that says where this came
+   * from in the recipient's own words rather than ours.
+   */
+  siteUrl?: string | null;
 }
 
 /**
@@ -279,6 +298,50 @@ export function emailButton(label: string, href: string, brand: BrandKit = platf
   </td></tr></table>`;
 }
 
+/** Just the hostname of an origin, for the footer line. Never throws — a stored
+ *  value that is not a URL simply prints as itself. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url.replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+  }
+}
+
+/**
+ * The brand, at the top of the message — the same lockup rule the app itself
+ * uses, so a studio's email opens looking like their app rather than like a
+ * template with their name typed into it.
+ *
+ *   a WORDMARK   drawn alone. It already contains the name, and setting the name
+ *                beside it prints it twice — the exact duplication `hasWordmark`
+ *                exists to prevent on the sign-in screen.
+ *   an ICON      a rounded chip beside the name, which is what the app bar and
+ *                the nav rail draw. A square mark carries no name, so the name
+ *                has to be set next to it.
+ *   NEITHER      the name alone, clean in the foreground. Not a coloured chip
+ *                with an initial in it: a generated monogram is our guess at
+ *                their brand, and an email is the wrong place to guess.
+ *
+ * Both images are given explicit pixel `width`/`height` attributes as well as
+ * CSS. Outlook ignores the CSS and sizes from the attribute; without one it
+ * draws the asset at its intrinsic size, so a 512px app icon arrives as a
+ * 512px block above the message.
+ */
+function brandLockup(brand: BrandKit): string {
+  const name = `<span style="font-family:${EMAIL_FONT};font-size:17px;font-weight:600;letter-spacing:-0.01em;color:${T.fg}">${escapeHtml(brand.name)}</span>`;
+  if (brand.logoUrl) {
+    return `<img src="${encodeURI(brand.logoUrl)}" alt="${escapeHtml(brand.name)}" height="28" style="height:28px;max-height:28px;width:auto;border:0;display:block">`;
+  }
+  if (!brand.iconUrl) return name;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td width="34" style="width:34px;padding-right:11px">
+      <img src="${encodeURI(brand.iconUrl)}" alt="" width="34" height="34" style="width:34px;height:34px;border:0;border-radius:10px;display:block">
+    </td>
+    <td valign="middle">${name}</td>
+  </tr></table>`;
+}
+
 /** The tenant-branded wrapper. `heading`/`bodyHtml` are pre-escaped by the
  *  caller; `brand` skins it; `preheader` is the inbox preview line; `eyebrow` is
  *  an optional muted kicker above the heading; `footnote` overrides the small
@@ -291,11 +354,7 @@ export function emailShell(
 ): string {
   const brand = opts.brand ?? platformBrandKit();
   const font = EMAIL_FONT;
-  // Wordmark: the tenant's public logo, else the studio name set clean in the
-  // foreground — a quiet, confident mark, not a coloured chip.
-  const mark = brand.logoUrl
-    ? `<img src="${encodeURI(brand.logoUrl)}" alt="${escapeHtml(brand.name)}" height="26" style="height:26px;max-height:26px;width:auto;border:0;display:block">`
-    : `<span style="font-size:17px;font-weight:600;letter-spacing:-0.01em;color:${T.fg}">${escapeHtml(brand.name)}</span>`;
+  const mark = brandLockup(brand);
   const preheader = opts.preheader ?? heading;
   const isPlatform = brand.name === platformBrandKit().name;
   // The footer told people to "manage notifications in your account settings"
@@ -306,9 +365,27 @@ export function emailShell(
   const manage = opts.manageUrl
     ? `<a href="${encodeURI(opts.manageUrl)}" style="color:${T.muted};text-decoration:underline">Manage notifications</a>`
     : "";
+  // Their own address, in their own words. A white-labelled studio's mail should
+  // point at the studio, and this is the only line in the message that does.
+  const site = brand.siteUrl
+    ? `<a href="${encodeURI(brand.siteUrl)}" style="color:${T.muted};text-decoration:underline">${escapeHtml(hostOf(brand.siteUrl))}</a>`
+    : "";
+  // EXACTLY ONE accent mark above the heading, and which one depends on whether
+  // there is anything to say. The eyebrow is already set in the studio's accent,
+  // so a rule above it would be the same colour twice in 20px. Without one, the
+  // rule is what makes the card theirs: every other brand cue in this message is
+  // conditional — a logo they may not have uploaded, a CTA the message may not
+  // need — so a studio with nothing but a colour used to get a card identical to
+  // everyone else's.
+  //
+  // Inside the card's padding, not across its top edge. A full-bleed seam is the
+  // obvious way to do this and it is wrong here: a 3px strip cannot carry the
+  // card's 22px corner radius (browsers clamp a radius to the box), so it
+  // overhangs the curve at both ends and reads as a rendering fault rather than
+  // as a decision.
   const eyebrow = opts.eyebrow
     ? `<div style="font-size:12px;font-weight:600;letter-spacing:0.01em;color:${brand.accent};margin:0 0 10px">${escapeHtml(opts.eyebrow)}</div>`
-    : "";
+    : `<div style="width:34px;height:3px;background:${brand.accent};border-radius:99px;font-size:0;line-height:0;margin:0 0 16px">&nbsp;</div>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark light"><meta name="supported-color-schemes" content="dark light"></head>
 <body style="margin:0;padding:0;background:${T.bg};-webkit-font-smoothing:antialiased">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${T.bg};font-size:1px;line-height:1px">${escapeHtml(preheader)}</div>
@@ -329,7 +406,7 @@ export function emailShell(
         <div style="height:1px;line-height:1px;font-size:0;background:${T.hair}">&nbsp;</div>
       </td></tr>
       <tr><td style="padding:14px 8px 0;font-family:${font};font-size:12px;line-height:1.6;color:${T.muted}">
-        ${escapeHtml(footnote)}${manage ? ` ${manage}` : ""}
+        ${escapeHtml(footnote)}${site ? ` ${site}` : ""}${manage ? ` · ${manage}` : ""}
       </td></tr>
     </table>
   </td></tr>

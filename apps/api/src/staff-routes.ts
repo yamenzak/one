@@ -92,7 +92,7 @@ export const staffRoutes = sharedStaffRoutes<AppEnv>({
   },
   sendInvite: async (c, inv) => {
     const env = c.env as Env;
-    const brand = await tenantBrandKit(env.DB, inv.tenantId).catch(() => KOVA_BRAND);
+    const brand = await tenantBrandKit(env, inv.tenantId).catch(() => KOVA_BRAND);
     // The studio's OWN hostname, not whatever origin this request arrived on: an
     // owner standing on the operator door must not mint a link that lands
     // somewhere the invitee cannot sign in.

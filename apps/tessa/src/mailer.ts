@@ -23,7 +23,16 @@ export * from "@4dl/email";
  * CSS custom property — a mail client sees only what the MIME body contains —
  * so the value is duplicated here deliberately. Change one, change both.
  */
-export const APP_BRAND: BrandKit = { name: "Tessa", accent: "#25c891", accentFg: "#03130c", logoUrl: null };
+export const APP_BRAND: BrandKit = {
+  name: "Tessa",
+  accent: "#25c891",
+  accentFg: "#03130c",
+  logoUrl: null,
+  // No `iconUrl`: `apps/tessa-app` ships no PWA icon, and pointing at one that
+  // does not exist is a broken image at the top of every message — strictly
+  // worse than the clean wordmark the shell falls back to.
+  siteUrl: "https://tessa.4dl.app",
+};
 
 /**
  * Shadows the package's `PLATFORM_FROM_DEFAULT` for importers of this module.

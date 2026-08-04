@@ -409,7 +409,7 @@ async function buildClientInvite(env: Env, tenantId: string, clientId: string, e
   const loginUrl = await tenantLoginUrl(env, tenantId, from);
   const token = await signInviteToken(env, { c: clientId, t: tenantId, e: email });
   const url = `${loginUrl}${loginUrl.includes("?") ? "&" : "?"}invite=${encodeURIComponent(token)}`;
-  const brand = await tenantBrandKit(env.DB, tenantId).catch(() => null);
+  const brand = await tenantBrandKit(env, tenantId).catch(() => null);
   let delivery: InviteDelivery = { sent: false, reason: "This studio has no branding set up yet, so no invite email was sent." };
   if (brand) {
     const html = emailShell(

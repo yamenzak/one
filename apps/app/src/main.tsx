@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { Atmosphere, brandMark, DUR, EASE_OUT, SPRING_SOFT, exitOf, hasIcon, markPlateClass, Toaster, cn, type Variants } from "@4dl/ui";
+import { Atmosphere, brandMark, DUR, EASE_OUT, SPRING_SOFT, exitOf, hasIcon, hasWordmark, markPlateClass, Toaster, cn, type Variants } from "@4dl/ui";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
 import { bootBrand, ThemeProvider, useTheme } from "./theme.js";
@@ -120,6 +120,15 @@ function BootSplash() {
   // is the first thing anyone sees of the studio. Fit it instead.
   const square = hasIcon(branding, mode);
   const name = host?.tenant?.name ?? bootBrand?.name ?? null;
+  // The WORDMARK under the icon, in place of the typed name — a studio that drew
+  // its name once, properly, should not have the app set it again in Inter.
+  //
+  // Only when the square above is a real ICON. `brandMark(…, "logo")` falls
+  // through to the icon when there is no wordmark, and a studio with ONLY a
+  // wordmark is already showing it in the square — printing it a second time
+  // directly underneath is the same mistake `hasWordmark` exists to stop on the
+  // sign-in screen.
+  const wordmark = square && hasWordmark(branding, mode) ? brandMark(branding, mode, "logo") : null;
   const initial = name?.trim()?.[0]?.toUpperCase() ?? null;
   // The studio's own plate, and only where WE are drawing one. The letter
   // fallback is not their mark, so it keeps the accent plate whatever they set
@@ -162,7 +171,9 @@ function BootSplash() {
               : initial && <span className="text-title-1 font-black">{initial}</span>}
           </motion.div>
         </div>
-        {name && <motion.div variants={lineIn} className="text-body-lg">{name}</motion.div>}
+        {wordmark
+          ? <motion.img variants={lineIn} src={wordmark} alt={name ?? ""} className="h-7 w-auto max-w-60 object-contain" />
+          : name && <motion.div variants={lineIn} className="text-body-lg">{name}</motion.div>}
         <motion.div variants={lineIn} className="h-1 w-32 overflow-hidden rounded-full bg-surface-2">
           <motion.div className="h-full w-1/3 rounded-full bg-primary" animate={{ x: ["-120%", "320%"] }} transition={{ duration: 1.15, repeat: Infinity, ease: "easeInOut" }} />
         </motion.div>

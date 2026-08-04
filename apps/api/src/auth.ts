@@ -86,7 +86,7 @@ async function otpBrand(env: Env, origin?: string, shape?: HostShape): Promise<B
   try {
     const host = await resolveHost(env.DB, hostnameOf(origin), env);
     if (!host.tenant) return KOVA_BRAND;
-    const brand = await tenantBrandKit(env.DB, host.tenant.tenantId);
+    const brand = await tenantBrandKit(env, host.tenant.tenantId);
     return brand.name ? brand : KOVA_BRAND;
   } catch {
     return KOVA_BRAND;
@@ -191,7 +191,7 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape): Shared
      */
     async sendInvitation(e, data) {
       const env2 = e as Env;
-      const brand = await tenantBrandKit(env2.DB, data.organization.id).catch(() => KOVA_BRAND);
+      const brand = await tenantBrandKit(env2, data.organization.id).catch(() => KOVA_BRAND);
       const inviter = data.inviter.user.name || data.inviter.user.email || "Your studio";
       const roleLabel = data.role === "assistant" ? "an assistant" : "a coach";
       const html = emailShell(

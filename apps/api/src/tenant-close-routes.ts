@@ -37,5 +37,5 @@ export const tenantCloseRoutes = sharedCloseRoutes<AppEnv>({
   verifyOtp: (c, opts) => verifyActionOtp(c.env, opts),
   // The studio's own brand name, so the code says "confirm closing Hale Studio"
   // rather than naming a tenant id nobody recognises.
-  actionLabel: async (c, tenantId) => `closing ${(await tenantBrandKit(c.env.DB, tenantId)).name}`,
+  actionLabel: async (c, tenantId) => `closing ${(await tenantBrandKit(c.env, tenantId)).name}`,
 });

@@ -222,7 +222,7 @@ async function digestForTenant(env: Env, tenantId: string, _brand: string, weekA
   const policy = parseNotifPolicy(policyRow?.notif_policy_json ?? null);
   const digestTo = { staff: emailAllowedByPolicy(policy, "digest", "staff"), client: emailAllowedByPolicy(policy, "digest", "client") };
   if (!digestTo.staff && !digestTo.client) return;
-  const brand = await tenantBrandKit(db, tenantId);
+  const brand = await tenantBrandKit(env, tenantId);
   // Every CTA carries the tenant hint (?t=) so a multi-studio recipient lands in
   // THIS studio; the coach CTA deep-links to /today, where the attention queue
   // lives. The app reads + strips ?t= at boot before routing.

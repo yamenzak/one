@@ -94,7 +94,14 @@ export default defineConfig({
        * Off by default: the three golden paths must run against the same
        * authorization the product ships. Opt in per command, never in config.
        */
-      command: `pnpm --filter @kova/api exec wrangler dev --local --log-level ${process.env.E2E_SERVER_LOGS ? "info" : "warn"} --port ${APP_PORT}${process.env.E2E_DEV_ADMIN ? " --var ADMIN_EMAILS:" : ""}`,
+      // `--inspector-port` pinned per app, and not by taste: `wrangler dev`
+      // opens a devtools inspector on 9229 by DEFAULT, so two suites booting at
+      // once — which is exactly what `pnpm e2e` does, one turbo task per app —
+      // race for it and whichever loses exits with "Address already in use"
+      // before serving a single request. Playwright then reports
+      // "Process from config.webServer exited early", which reads as a broken
+      // app rather than as a port collision between two unrelated products.
+      command: `pnpm --filter @kova/api exec wrangler dev --local --log-level ${process.env.E2E_SERVER_LOGS ? "info" : "warn"} --port ${APP_PORT} --inspector-port 9229${process.env.E2E_DEV_ADMIN ? " --var ADMIN_EMAILS:" : ""}`,
       // Readiness is checked on the ROOT host: `/health` is dependency-free and
       // answers on every door, and the root is the one that exists before any
       // studio does.

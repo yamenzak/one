@@ -40,6 +40,24 @@ would be a small lie.
 
 **The meter, if it sells sending** (the `EmailMeter` parameter). See below.
 
+## Every brand asset must be ABSOLUTE and PUBLIC
+
+A mail client fetches an image over the open internet: no session, no cookies, no
+notion of the app's origin. So a `BrandKit`'s `logoUrl`/`iconUrl` are absolute
+urls to something a stranger can `GET`, and an app that stores its brand assets
+behind an authed media proxy has to resolve them to a public url before they get
+here. Kova's `tenantBrandKit` does exactly that — it absolutises the studio's
+`/api/media/t/<id>/brand/…` key against the studio's own hostname, and refuses
+any other media key, because a private one would 401 into a broken box.
+
+The two are different SHAPES and the shell treats them as such: a `logoUrl` is a
+wordmark and is drawn ALONE (it already contains the name), while an `iconUrl` is
+square and is drawn as a rounded chip beside the name. Passing a wordmark as the
+icon gets you its middle third; passing an icon as the logo gets you a blur.
+Neither is an error — with both absent the shell sets the name cleanly, which is
+a complete email, so an app with no assets should pass none rather than point at
+one that does not exist.
+
 ## The default sender cannot send, on purpose
 
 `PLATFORM_FROM_DEFAULT` is `noreply@invalid.local`. A plausible-looking default

@@ -947,6 +947,18 @@ what the image IS, and it has one answer per kind:
   lightbox — is contained too. It is the one place cropping loses information
   the reader came for.
 
+**A wordmark is drawn ALONE; an icon is drawn beside the name.** The two are
+different objects and the lockup follows from which one you were handed. A
+wordmark already contains the name, so setting the name under it prints it
+twice — which the boot screen did to every studio that uploaded one, and the
+sign-in screen did before `hasWordmark` existed. A square icon carries no name,
+so it needs one next to it, as a rounded chip: the app bar, the nav rail and
+every branded email use the same pair. With neither, the name alone, set clean —
+**not** a generated monogram on a coloured plate. A monogram is our guess at
+their brand, and the surfaces that draw it (the nav tile, the splash) are chrome
+the person is already inside; the first thing a stranger sees is not the place
+to guess.
+
 Left unnamed, this splits about two-to-one across a codebase and the most-seen
 thumbnails land on the wrong side. Ours did: a library of photos, some shot
 portrait and some landscape, rendered as letterboxed rectangles floating in a

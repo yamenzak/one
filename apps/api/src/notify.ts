@@ -46,25 +46,88 @@ async function userRole(db: D1Database, tenantId: string, userId: string): Promi
   return r === "owner" || r === "trainer" || r === "assistant" || r === "client" ? r : "member";
 }
 
-/** Resolve a tenant's full email brand kit — name + accent + foreground + a
- *  PUBLIC logo (authed /api/media keys can't load in email, so those fall back
- *  to the wordmark). Every branded email is skinned from this. */
-export async function tenantBrandKit(db: D1Database, tenantId: string): Promise<BrandKit> {
+/**
+ * The studio's own front door, as an absolute origin.
+ *
+ * Preferred in this order and for one reason each: an ACTIVE custom domain is
+ * the address their clients know them by; the `subdomain` row is the address
+ * every studio has from the moment it is created; `BETTER_AUTH_URL` is the root
+ * signpost and is the last resort, because a white-labelled studio's email
+ * should not be quietly serving its logo off `kova.4dl.app`.
+ *
+ * A custom domain only counts at `active` — `pending` means Cloudflare has not
+ * issued the certificate yet, and an `https://` image on a host with no cert is
+ * a broken image in every mail client.
+ */
+async function tenantOrigin(env: Env, tenantId: string): Promise<string | null> {
+  const rows = await env.DB
+    .prepare("SELECT hostname, kind, status FROM tenant_domains WHERE tenant_id = ?")
+    .bind(tenantId)
+    .all<{ hostname: string; kind: string; status: string }>()
+    .catch(() => null);
+  const all = rows?.results ?? [];
+  const host =
+    all.find((r) => r.kind === "custom" && r.status === "active")?.hostname ??
+    all.find((r) => r.kind === "subdomain")?.hostname ??
+    null;
+  return host ? `https://${host}` : (env.BETTER_AUTH_URL?.replace(/\/$/, "") || null);
+}
+
+/**
+ * A brand asset that will actually LOAD in a mail client — absolute, and
+ * reachable with no session, because an email has neither our origin nor our
+ * cookies.
+ *
+ * The branding editor stores what it uploads as `/api/media/t/<tenant>/brand/…`,
+ * and this used to reject anything containing `/api/media` outright. That guard
+ * was written for the private media proxy and is wrong for exactly one prefix:
+ * `brand/` is PUBLIC by construction — `route-guard.ts` lets it through
+ * unauthenticated and `media-routes.ts` serves it `cache-control: public`,
+ * because the login screen, the favicon and the PWA install icon all fetch it
+ * with no session. So the guard threw away every studio's logo and every studio
+ * email fell back to the typed name — silently, for all of them, forever.
+ *
+ * Anything else under `/api/media` is still refused: those keys are
+ * tenant-scoped and assignment-gated, so the image would 401 into a broken box
+ * anyway, and a relative URL to a private key in an email is a link we do not
+ * want to teach anyone to click.
+ */
+function publicBrandAsset(url: string | null | undefined, origin: string | null): string | null {
+  const u = (url ?? "").trim();
+  if (!u) return null;
+  if (/^https?:\/\//i.test(u)) return u;
+  if (!origin) return null;
+  return /^\/api\/media\/t\/[^/]+\/brand\//.test(u) ? `${origin}${u}` : null;
+}
+
+/**
+ * Resolve a tenant's full email brand kit — name, accent, on-accent ink, their
+ * wordmark, their app icon and their own address. Every branded email is skinned
+ * from this.
+ *
+ * The DARK variants deliberately: `emailShell` paints a near-black canvas at
+ * fixed hex values, so `logoUrlLight`/`iconUrlLight` — which exist for the app's
+ * light theme — would be the pale mark on the pale-mark-hostile surface.
+ */
+export async function tenantBrandKit(env: Env, tenantId: string): Promise<BrandKit> {
+  const db = env.DB;
   const row = await db.prepare("SELECT branding_json FROM tenant_settings WHERE tenant_id = ?").bind(tenantId).first<{ branding_json: string | null }>();
+  const origin = await tenantOrigin(env, tenantId);
   let name: string | null = null;
   let accent = KOVA_BRAND.accent;
   let accentFg = KOVA_BRAND.accentFg;
   let logoUrl: string | null = null;
+  let iconUrl: string | null = null;
   try {
-    const b = row?.branding_json ? (JSON.parse(row.branding_json) as { name?: string; primary?: string; primaryForeground?: string; logoUrl?: string }) : null;
+    const b = row?.branding_json ? (JSON.parse(row.branding_json) as { name?: string; primary?: string; primaryForeground?: string; logoUrl?: string; iconUrl?: string }) : null;
     if (b?.name) name = b.name;
     if (b?.primary) accent = safeColor(b.primary, KOVA_BRAND.accent);
     if (b?.primaryForeground) accentFg = safeColor(b.primaryForeground, KOVA_BRAND.accentFg);
-    // Only a public absolute URL renders in an email client (no session/cookies).
-    if (b?.logoUrl && /^https?:\/\//i.test(b.logoUrl) && !b.logoUrl.includes("/api/media")) logoUrl = b.logoUrl;
+    logoUrl = publicBrandAsset(b?.logoUrl, origin);
+    iconUrl = publicBrandAsset(b?.iconUrl, origin);
   } catch { /* fall through to org name + defaults */ }
   if (!name) name = (await db.prepare("SELECT name FROM organization WHERE id = ?").bind(tenantId).first<{ name: string }>())?.name ?? "Kova";
-  return { name, accent, accentFg, logoUrl };
+  return { name, accent, accentFg, logoUrl, iconUrl, siteUrl: origin };
 }
 
 /** The friendly category kicker shown as an eyebrow above every notif email —
@@ -125,7 +188,7 @@ async function sendNotifEmail(env: Env, n: ResolvedNotification<NotifyInput>): P
       // Kova, not the studio, and shouldn't cost the studio a credit. Everything
       // else is the tenant's own message: tenant rail + tenant brand.
       const isPlatformBilling = category === "billing";
-      const brand = isPlatformBilling ? KOVA_BRAND : await tenantBrandKit(env.DB, input.tenantId);
+      const brand = isPlatformBilling ? KOVA_BRAND : await tenantBrandKit(env, input.tenantId);
       // Tenant white-label (tenant rail only): a per-type subject/body override
       // and a global signature. An override with enabled=0 mutes this email
       // entirely (the inbox row above still delivers).
