@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { Atmosphere, anchorIn, brandMark, contentIn, contentStagger, DUR, hasIcon, Toaster } from "@4dl/ui";
+import { Atmosphere, brandMark, DUR, EASE_OUT, SPRING_SOFT, exitOf, hasIcon, Toaster, cn, type Variants } from "@4dl/ui";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
 import { bootBrand, ThemeProvider, useTheme } from "./theme.js";
@@ -44,7 +44,80 @@ import { ErrorBoundary } from "./ErrorBoundary.js";
  *                          unlabelled moment is honest where the wrong brand is
  *                          not. The letter comes back the moment a NAME does,
  *                          which on the platform's own doors is immediately.
+ *
+ * ── The studio's PLATE is theirs, and this screen used to overrule it ───────
+ *
+ * `branding.mark.plate` is a real choice in the brand editor — `accent` (a solid
+ * brand square with the letters knocked out), `tint` (the same at 16%), or
+ * `none` (a bare mark on nothing) — and it is baked INTO the generated PNG by
+ * `renderMarkPng`. This screen painted `bg-primary` behind whatever it was
+ * handed, which quietly overruled two of the three: a `tint` mark had its 16%
+ * plate backfilled to a solid block, and a studio that deliberately chose a bare
+ * mark got a coloured square anyway — on the very first frame of their product.
+ * The plate is read here now, and `PLATE` below is the only place that decision
+ * lives.
+ *
+ * (The nav rail and the studio switcher plate the same mark and still hardcode
+ * theirs. They should read this too; that is a change to `NavRail`'s own chrome
+ * and is left deliberate rather than folded into a splash fix.)
+ *
+ * ── The choreography, and why it is weighted the way it is ──────────────────
+ *
+ * ENTRY settles rather than arrives: the mark fades up from 0.92 on a soft
+ * spring while a glow blooms behind it, then the name, then the bar. Nothing
+ * overshoots — a boot screen that bounces reads as a toy, and this is the frame
+ * that sets the tone for everything after it.
+ *
+ * EXIT runs in REVERSE ORDER (`staggerDirection: -1`), which is the whole
+ * trick: the bar goes first, then the name, and the mark leaves LAST while
+ * growing slightly. So the screen does not blink away — it clears back to the
+ * mark, and the mark opens. The app is behind it the moment it is gone.
+ * `AnimatePresence mode="wait"` in `App` is what makes that readable: the shell
+ * waits, so the exit is a transition rather than a collision.
+ *
+ * Every duration comes from the registry (§8) and the exit is `exitOf` the
+ * entrance, so a leaving screen is decisive rather than reluctant. Under
+ * `prefers-reduced-motion` the transforms drop out and the opacity carries it,
+ * which is why the choreography never depends on movement alone.
  */
+
+/** The plate behind the mark, as the studio set it. `accent` is the default the
+ *  generator uses, so an unset value must land there and not on "none". */
+const PLATE: Record<string, string> = {
+  accent: "bg-primary shadow-glow",
+  tint: "bg-primary/15",
+  none: "",
+};
+
+const splashStagger: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: DUR.fast, delayChildren: 0.05 } },
+  // Reversed: the mark is the last thing to leave.
+  exit: { transition: { staggerChildren: exitOf(DUR.fast), staggerDirection: -1 } },
+};
+
+const markIn: Variants = {
+  hidden: { opacity: 0, scale: 0.92 },
+  show: { opacity: 1, scale: 1, transition: SPRING_SOFT },
+  // Grows on the way out — the mark opening into the app, not shrinking away.
+  exit: { opacity: 0, scale: 1.14, transition: { duration: DUR.base, ease: EASE_OUT } },
+};
+
+/** The bloom's strength lives in the VARIANT, not in an `opacity-70` class:
+ *  motion writes `opacity` as an inline style, which beats the class outright,
+ *  so a Tailwind opacity here would be silently ignored the moment it animated. */
+const glowIn: Variants = {
+  hidden: { opacity: 0, scale: 0.6 },
+  show: { opacity: 0.7, scale: 1, transition: { duration: DUR.slow, ease: EASE_OUT } },
+  exit: { opacity: 0, scale: 1.6, transition: { duration: DUR.base, ease: EASE_OUT } },
+};
+
+const lineIn: Variants = {
+  hidden: { opacity: 0, y: 6 },
+  show: { opacity: 1, y: 0, transition: { duration: DUR.base, ease: EASE_OUT } },
+  exit: { opacity: 0, y: 4, transition: { duration: exitOf(DUR.base), ease: EASE_OUT } },
+};
+
 function BootSplash() {
   const { host, ctx } = useSession();
   const { mode } = useTheme();
@@ -55,23 +128,45 @@ function BootSplash() {
   const square = hasIcon(branding, mode);
   const name = host?.tenant?.name ?? bootBrand?.name ?? null;
   const initial = name?.trim()?.[0]?.toUpperCase() ?? null;
+  // The studio's own plate, and only where WE are drawing one. The letter
+  // fallback is not their mark, so it keeps the accent plate whatever they set
+  // for an icon they have not uploaded.
+  const plate = logo ? (PLATE[branding?.mark?.plate ?? "accent"] ?? PLATE.accent!) : initial ? PLATE.accent! : "bg-surface-2";
+
   return (
+    // `Atmosphere` stays OUTSIDE the choreography on purpose: `atmosphereIn`
+    // declares `hidden`/`show` and no `exit`, so inside the stagger parent it
+    // would both consume a stagger slot and sit there un-animated while
+    // everything else left. The wash belongs to the screen, not to the sequence.
     <div className="relative grid min-h-dvh place-items-center overflow-hidden bg-background">
       <Atmosphere />
       <motion.div
         initial="hidden"
         animate="show"
-        variants={contentStagger}
+        exit="exit"
+        variants={splashStagger}
         className="relative flex flex-col items-center gap-6"
       >
-        <motion.div
-          variants={anchorIn}
-          className={`grid size-20 place-items-center overflow-hidden rounded-2xl text-primary-foreground ${logo || initial ? "bg-primary shadow-glow" : "bg-surface-2"}`}
-        >
-          {logo ? <img src={logo} alt="" className={square ? "size-full object-cover" : "size-full object-contain p-2"} /> : initial && <span className="text-title-1 font-black">{initial}</span>}
-        </motion.div>
-        {name && <motion.div variants={contentIn} className="text-body-lg">{name}</motion.div>}
-        <motion.div variants={contentIn} className="h-1 w-32 overflow-hidden rounded-full bg-surface-2">
+        <div className="relative grid place-items-center">
+          {/* The bloom. Behind the mark, `aria-hidden`, and pure light — it
+              carries the entrance when reduced motion has removed the scale. */}
+          <motion.div
+            aria-hidden
+            variants={glowIn}
+            className="pointer-events-none absolute size-44 rounded-full blur-3xl"
+            style={{ background: "radial-gradient(circle, var(--primary) 0%, transparent 70%)" }}
+          />
+          <motion.div
+            variants={markIn}
+            className={cn("relative grid size-20 place-items-center overflow-hidden rounded-2xl text-primary-foreground", plate)}
+          >
+            {logo
+              ? <img src={logo} alt="" className={square ? "size-full object-cover" : "size-full object-contain p-2"} />
+              : initial && <span className="text-title-1 font-black">{initial}</span>}
+          </motion.div>
+        </div>
+        {name && <motion.div variants={lineIn} className="text-body-lg">{name}</motion.div>}
+        <motion.div variants={lineIn} className="h-1 w-32 overflow-hidden rounded-full bg-surface-2">
           <motion.div className="h-full w-1/3 rounded-full bg-primary" animate={{ x: ["-120%", "320%"] }} transition={{ duration: 1.15, repeat: Infinity, ease: "easeInOut" }} />
         </motion.div>
       </motion.div>
