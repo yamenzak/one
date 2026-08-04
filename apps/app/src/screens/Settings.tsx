@@ -33,6 +33,7 @@ import { PasskeysCard } from "@4dl/app-kit";
 import { usePasskey } from "../PasskeyPrompt.js";
 import { AiConfigSection } from "./AiSettings.js";
 import { SectionSplit } from "./SectionSplit.js";
+import { clientAvatar, meAvatar } from "../registry/avatars.js";
 
 /**
  * Section header inside a settings PAGE.
@@ -284,7 +285,7 @@ function PersonalSettings({ clientId, initialTab, onBack, onSaved }: {
           does not pretend to navigate. */}
       <Stagger>
         <Card className="flex items-center gap-3.5">
-          <Avatar name={ctx?.user.name || ctx?.user.email || "?"} seed={ctx?.user.email ?? "me"} className="size-12" />
+          <Avatar {...meAvatar(ctx?.user ?? {}, ctx?.active)} className="size-12" />
           <div className="min-w-0 flex-1">
             <div className="truncate font-semibold">{ctx?.user.name || ctx?.user.email}</div>
             {ctx?.user.name && <div className="truncate text-sm text-muted-foreground">{ctx.user.email}</div>}
@@ -1484,7 +1485,7 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
         {p && (
       <Card className="space-y-4">
         <div className="flex items-center gap-3">
-          <Avatar name={p.displayName} src={p.avatarUrl} seed={p.avatarSeed} className="size-16" />
+          <Avatar {...clientAvatar({ ...p, id: clientId })} className="size-16" />
           <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Change photo
             <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAvatar(e.target.files[0])} />
           </label>

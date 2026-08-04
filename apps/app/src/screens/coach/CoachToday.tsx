@@ -14,10 +14,11 @@ import type { ClientSummary } from "./Clients.js";
 import { WidgetCarousel, WidgetBuilder } from "../widget-kit.js";
 import { COACH_WIDGETS, DEFAULT_COACH_WIDGETS, type CoachWidgetData } from "./CoachWidgets.js";
 import { featureEnabled } from "@kova/domain";
+import { clientAvatar } from "../../registry/avatars.js";
 
 interface Notification { id: string; type: string; title: string; message: string; created_at: string; read: number }
 interface AttentionItem { type: AttentionType; severity: "info" | "warn" | "urgent"; label: string; actionLabel: string; detail: string | null; link: string }
-interface AttentionRow { clientId: string; name: string; avatarUrl: string | null; items: AttentionItem[] }
+interface AttentionRow { clientId: string; name: string; avatarUrl: string | null; avatarSeed: string | null; items: AttentionItem[] }
 interface AttentionData { clients: AttentionRow[]; totals: Record<string, number>; total: number }
 interface RosterEvent { id: string; clientId: string; clientName: string; kind: string; date: string; at: string; title: string; subtitle: string | null; metric?: { unit: "weight"; value: number } }
 interface RosterAnalytics {
@@ -207,7 +208,7 @@ export function CoachToday() {
             {attention.clients.slice(0, 12).map((row) => (
               <div key={row.clientId} className="space-y-1.5 border-t border-border/40 pt-3 first:border-0 first:pt-0">
                 <button onClick={() => nav(row.items[0]!.link)} className="flex items-center gap-2 text-left hover:underline">
-                  <Avatar name={row.name} src={row.avatarUrl} seed={row.clientId} className="size-7" />
+                  <Avatar {...clientAvatar({ id: row.clientId, displayName: row.name, avatarUrl: row.avatarUrl, avatarSeed: row.avatarSeed })} className="size-7" />
                   <span className="truncate text-sm font-semibold">{row.name}</span>
                 </button>
                 <div className="flex flex-wrap gap-1.5">

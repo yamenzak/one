@@ -15,6 +15,7 @@ import {
 import { resolveStanding, tenantStandingOfGate } from "@4dl/tenancy/model";
 import { useSession, useActiveClientId, adminUrl } from "./session.js";
 import { useTheme } from "./theme.js";
+import { meAvatar } from "./registry/avatars.js";
 import { api } from "./api.js";
 import { hardRefresh } from "./hard-refresh.js";
 import { Today } from "./screens/client/Today.js";
@@ -327,20 +328,8 @@ function TabLayout() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="rounded-full outline-none ring-ring focus-visible:ring-2" aria-label="Account">
-                  {/* The same face the rest of the app draws for this person:
-                      the photo they uploaded in Profile, else their shuffled
-                      DiceBear seed — both off the CLIENT row, which is where
-                      `POST /clients/:id/avatar` writes them and where the coach's
-                      roster reads them. `user.image` is Better Auth's own field
-                      and is never set on this passwordless stack, so the bar used
-                      to ignore an uploaded photo and seed a different robot from
-                      the email. Staff with no client record keep initials. */}
-                  <Avatar
-                    name={ctx!.user.name || ctx!.user.email}
-                    src={active.avatarUrl ?? ctx!.user.image}
-                    seed={active.avatarSeed ?? active.clientId ?? ctx!.user.email}
-                    className="size-9"
-                  />
+                  {/* One face per person — `registry/avatars.ts` owns the rule. */}
+                  <Avatar {...meAvatar(ctx!.user, active)} className="size-9" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>

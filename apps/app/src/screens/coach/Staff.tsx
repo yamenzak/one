@@ -25,6 +25,7 @@ import { personaLabel, personaTone } from "../../registry/index.js";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { useCan } from "../../FeatureLock.js";
+import { staffAvatar } from "../../registry/avatars.js";
 
 interface Member { userId: string; role: string; name: string | null; email: string | null; customGrant?: Record<string, string[]> | null }
 interface Invitation { id: string; email: string; role: string; expiresAt: string }
@@ -147,7 +148,7 @@ export function Staff() {
             {members.filter((m) => m.role !== "client").map((m) => (
               <Row
                 key={m.userId}
-                leading={<Avatar name={m.name || m.email || "?"} seed={m.email ?? m.userId} className="size-10" />}
+                leading={<Avatar {...staffAvatar(m)} className="size-10" />}
                 sub={m.email}
                 trailing={
                   <>
@@ -185,7 +186,7 @@ export function Staff() {
                 {data.invitations.map((inv) => (
                   <Row
                     key={inv.id}
-                    leading={<Avatar name={inv.email} seed={inv.email} className="size-10" />}
+                    leading={<Avatar {...staffAvatar({ email: inv.email })} className="size-10" />}
                     sub={`Invited as ${personaLabel(inv.role)} · expires ${new Date(inv.expiresAt).toLocaleDateString()}`}
                     trailing={
                       <Button size="sm" variant="ghost" disabled={busy} onClick={() => void revokeInvite(inv.id)}>Revoke</Button>

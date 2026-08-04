@@ -25,6 +25,7 @@ import { InsightFeedback } from "../client/InsightFeedback.js";
 const useAction = () => useActionBase(errorText);
 import { Markdown } from "../../Markdown.js";
 import { AiErrorBox } from "../../AiError.js";
+import { staffAvatar } from "../../registry/avatars.js";
 
 interface Sub { id: string; status: string; daysRemaining: number; daysByFeature?: Record<string, number>; packageId: string | null }
 interface GrantRow { id: string; packageName: string | null; source: string; days: { feature: string; days: number }[]; at: string }
@@ -513,7 +514,7 @@ function CoachesSection({ clientId }: { clientId: string }) {
                 return (
                   <Row
                     key={co.userId}
-                    leading={<Avatar name={name} seed={co.email ?? co.userId} className="size-10" />}
+                    leading={<Avatar {...staffAvatar({ name, email: co.email, userId: co.userId })} className="size-10" />}
                     sub={sub}
                     trailing={
                       <span className="flex shrink-0 items-center gap-0.5">
@@ -567,7 +568,7 @@ function CoachesSection({ clientId }: { clientId: string }) {
               disabled={busy !== null}
               className="flex min-h-12 w-full items-center gap-3 rounded-xl bg-secondary px-4 py-3 text-left transition-colors hover:bg-surface-3 disabled:opacity-45"
             >
-              <Avatar name={coachName(m)} seed={m.email ?? m.userId} className="size-9 shrink-0" />
+              <Avatar {...staffAvatar({ name: coachName(m), email: m.email, userId: m.userId })} className="size-9 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{coachName(m)}</div>
                 <div className="truncate text-sm text-muted-foreground">{personaLabel(m.role)}{m.email ? ` · ${m.email}` : ""}</div>

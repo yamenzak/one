@@ -1436,6 +1436,18 @@ on looks: up to four that fit, `SegmentedControl`; more than four,
 | `SectionSwitcher` | **5+ sections** on a detail screen about one thing. The header carries the leading mark, the title and the CURRENT SECTION; tapping it lists them all with labels, tones and a line each. One row of chrome instead of two. | Fewer than five, where a rail still labels everything in one tap. Top-level navigation — that is the tab bar. | ✅ |
 | `Select` · `Tooltip` · `Tabs` · `Avatar` | As named. | — | ✅ |
 
+**`Avatar` takes three props and a face is all three of them.** `name`, `src`
+and `seed` together decide what gets drawn, so a caller that passes two of them
+still compiles, still renders, and looks completely right on the screen its
+author had open. It is wrong only when you put two screens side by side and
+notice the same person is a different robot on each. One sweep found four: the
+uploaded photo missing on bookings, the shuffled seed ignored on the coach's
+Today, no id fallback on the client's own profile, and the account header seeded
+from the email. **The app resolves the triple once and every call site spreads
+it** — `clientAvatar` / `staffAvatar` / `meAvatar`, in the app's registry beside
+the metrics and the tones, because who counts as a person is product vocabulary.
+No exemptions: even the screen that uploads the photo renders the resolved face.
+
 `IconTabs` generates its own `layoutId`: two instances sharing a projection id
 makes the pill fly between them. Every item needs a real `label` — it is the
 accessible name and the tooltip, and an icon alone is not a name.

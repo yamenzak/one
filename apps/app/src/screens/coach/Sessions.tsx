@@ -26,6 +26,7 @@ import { useSession } from "../../session.js";
 import { FeatureLock } from "../../FeatureLock.js";
 import { fmtPrice } from "../../money.js";
 import type { ClientSummary } from "./Clients.js";
+import { clientAvatar } from "../../registry/avatars.js";
 
 interface AddOnType { id: string; slug: string; label: string; kind: string; duration_minutes: number; standalone_price_cents: number | null }
 interface SessionRow { id: string; client_id: string; addon_type_id: string; scheduled_at: string; duration_minutes: number; status: string; notes: string | null }
@@ -58,6 +59,18 @@ export function Sessions() {
   useEffect(() => { void load(); }, [load]);
 
   const clientName = (id: string) => clients.find((c) => c.id === id)?.displayName ?? "Client";
+  /**
+   * The client's FACE, from the roster this screen already loaded.
+   *
+   * It was rendering `<Avatar name={clientName(id)} seed={id} />` — the name off
+   * the roster and nothing else — so a client with an uploaded photo appeared as
+   * a robot on every booking, and one who had reshuffled got a different robot
+   * here than everywhere else. The row was in memory the whole time.
+   */
+  const clientFace = (id: string) => {
+    const c = clients.find((x) => x.id === id);
+    return clientAvatar(c ? { ...c, displayName: c.displayName } : { id, displayName: "Client" });
+  };
   const typeLabel = (id: string) => types?.find((t) => t.id === id)?.label ?? "Session";
 
   // The API returns upcoming bookings AND a recent resolved tail in one list;
@@ -157,7 +170,7 @@ export function Sessions() {
                 {upcoming.map((s) => (
                   <Card key={s.id} className="space-y-3">
                     <div className="flex items-center gap-3">
-                      <Avatar name={clientName(s.client_id)} seed={s.client_id} className="size-10" />
+                      <Avatar {...clientFace(s.client_id)} className="size-10" />
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-semibold">{clientName(s.client_id)}</div>
                         <div className="truncate text-sm text-muted-foreground">{typeLabel(s.addon_type_id)}</div>
@@ -188,7 +201,7 @@ export function Sessions() {
                   {history.map((s) => (
                     <Card key={s.id} className="space-y-2.5">
                       <div className="flex items-center gap-3">
-                        <Avatar name={clientName(s.client_id)} seed={s.client_id} className="size-9 opacity-70" />
+                        <Avatar {...clientFace(s.client_id)} className="size-9 opacity-70" />
                         <div className="min-w-0 flex-1">
                           <div className="truncate font-medium">{clientName(s.client_id)}</div>
                           <div className="truncate text-xs text-muted-foreground">

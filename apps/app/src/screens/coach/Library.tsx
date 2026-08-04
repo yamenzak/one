@@ -37,6 +37,7 @@ import { FoodThumb } from "../food.js";
 import { fmtEnergy } from "@kova/domain";
 import { useUnits } from "../../units.js";
 import { ExerciseRow, ExerciseThumb, metaText, splitList, pretty, type ExerciseInfo } from "../exercise.js";
+import { clientAvatar } from "../../registry/avatars.js";
 
 type Tab = "exercises" | "foods" | "templates" | "content";
 const TABS: Tab[] = ["exercises", "foods", "templates", "content"];
@@ -537,7 +538,7 @@ function Templates() {
                 {clients.map((cl) => (
                   <Row
                     key={cl.id}
-                    leading={<Avatar name={cl.displayName} src={cl.avatarUrl} seed={cl.avatarSeed ?? cl.id} className="size-10" />}
+                    leading={<Avatar {...clientAvatar(cl)} className="size-10" />}
                     disabled={busy}
                     onClick={() => void applyTo(cl.id)}
                   >

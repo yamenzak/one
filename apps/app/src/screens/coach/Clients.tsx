@@ -16,6 +16,7 @@ import { CoachPlans } from "./CoachPlans.js";
 import { GoalManager } from "./GoalManager.js";
 import { ClientManage } from "./ClientManage.js";
 import { ClientReport } from "./ClientReport.js";
+import { clientAvatar } from "../../registry/avatars.js";
 
 export interface ClientSummary { id: string; displayName: string; email: string | null; status: string; hasLogin: boolean; avatarUrl?: string | null; avatarSeed?: string | null }
 
@@ -290,7 +291,7 @@ export function Clients() {
               if (!ls?.length) return c.email ?? "No email yet";
               return ls.length > 2 ? `${ls.slice(0, 2).join(" · ")} · +${ls.length - 2}` : ls.join(" · ");
             })()}
-            leading={<Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-11" />}
+            leading={<Avatar {...clientAvatar(c)} className="size-11" />}
             trailing={freeing ? (
               <Button
                 size="sm"
@@ -310,7 +311,7 @@ export function Clients() {
             onClick={() => nav(`/clients/${c.id}/today`)}
             className="flex size-full flex-col items-center gap-2 rounded-2xl bg-card p-3 text-center outline-none ring-ring transition-colors hover:bg-surface-2 focus-visible:ring-2"
           >
-            <Avatar name={c.displayName} src={c.avatarUrl} seed={c.avatarSeed ?? c.id} className="size-16" />
+            <Avatar {...clientAvatar(c)} className="size-16" />
             {/* Two lines, always. Clamped so one long name cannot grow its row,
                 and RESERVED so a one-line name does not float its badge up to a
                 different height than its neighbour's — which is the thing that
@@ -519,7 +520,7 @@ export function ClientDetail() {
             menuTitle="Go to"
             onBack={() => nav("/clients")}
             backLabel="All clients"
-            leading={<Avatar name={client?.displayName ?? ""} src={client?.avatarUrl} seed={client?.avatarSeed ?? clientId} className="size-9 shrink-0" />}
+            leading={<Avatar {...clientAvatar({ ...client, id: clientId })} className="size-9 shrink-0" />}
           />
         </div>
       </div>

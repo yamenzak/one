@@ -17,14 +17,14 @@ import { visibleClientIds } from "./clients.js";
 import { parseJson } from "./db.js";
 
 interface OutItem { type: AttentionType; severity: AttentionSeverity; label: string; actionLabel: string; detail: string | null; link: string }
-export interface AttentionClientRow { id: string; user_id: string | null; created_at?: string | null; display_name: string; email: string | null; avatar_url: string | null; gender: string | null; date_of_birth: string | null; height_cm: number | null; preferences_json: string | null }
+export interface AttentionClientRow { id: string; user_id: string | null; created_at?: string | null; display_name: string; email: string | null; avatar_url: string | null; avatar_seed: string | null; gender: string | null; date_of_birth: string | null; height_cm: number | null; preferences_json: string | null }
 export interface AttentionRollup {
-  clients: { clientId: string; name: string; email: string | null; avatarUrl: string | null; items: OutItem[] }[];
+  clients: { clientId: string; name: string; email: string | null; avatarUrl: string | null; avatarSeed: string | null; items: OutItem[] }[];
   totals: Record<string, number>;
   total: number;
 }
 
-const SELECT_CLIENT = "id, user_id, created_at, display_name, email, avatar_url, gender, date_of_birth, height_cm, preferences_json";
+const SELECT_CLIENT = "id, user_id, created_at, display_name, email, avatar_url, avatar_seed, gender, date_of_birth, height_cm, preferences_json";
 
 /** Compute the attention rollup for a specific set of client rows. */
 export async function rollupAttention(db: D1Database, clients: AttentionClientRow[]): Promise<AttentionRollup> {
@@ -134,7 +134,7 @@ export async function rollupAttention(db: D1Database, clients: AttentionClientRo
         : invitedDays === 1 ? "Invited yesterday"
         : `Invited ${invitedDays} days ago`;
       items.push(mk("invite_pending", "info", detail, cl.id));
-      rows.push({ clientId: cl.id, name: cl.display_name, email: cl.email, avatarUrl: cl.avatar_url, items });
+      rows.push({ clientId: cl.id, name: cl.display_name, email: cl.email, avatarUrl: cl.avatar_url, avatarSeed: cl.avatar_seed, items });
       continue;
     }
 
@@ -191,7 +191,7 @@ export async function rollupAttention(db: D1Database, clients: AttentionClientRo
 
     if (items.length) {
       items.sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity]); // worst first
-      rows.push({ clientId: cl.id, name: cl.display_name, email: cl.email, avatarUrl: cl.avatar_url, items });
+      rows.push({ clientId: cl.id, name: cl.display_name, email: cl.email, avatarUrl: cl.avatar_url, avatarSeed: cl.avatar_seed, items });
     }
   }
 
