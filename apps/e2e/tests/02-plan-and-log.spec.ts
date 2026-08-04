@@ -38,12 +38,14 @@ test("coach publishes a workout plan, the client logs a set, and the coach sees 
     // Deep-link: the plan builder and the client sub-tabs are real routes
     // (Shell.tsx), so this is the same destination the segmented control reaches.
     await coach.goto(`${studio.base}/clients/${client.id}/plans`);
-    await expect(coach.getByText("Coach view")).toBeVisible();
+    await expect(coach.locator("[data-coach-view]")).toBeVisible();
     await expect(coach.getByText("No workout plans")).toBeVisible();
   });
 
   await test.step("coach creates the plan and lands in the builder", async () => {
-    await coach.getByRole("button", { name: "New", exact: true }).click();
+    // The create affordance is an icon button named for what it makes — there is
+    // one per plan KIND on this screen, so "New" alone is ambiguous.
+    await coach.getByRole("button", { name: "New workout plan" }).click();
     const form = sheet(coach, "New workout plan");
     await form.getByLabel("Plan name").fill(planName);
     await form.getByRole("button", { name: "Create & build" }).click();
@@ -54,10 +56,10 @@ test("coach publishes a workout plan, the client logs a set, and the coach sees 
   });
 
   await test.step("coach builds one day with one exercise", async () => {
-    await coach.getByRole("button", { name: "Day", exact: true }).click();
+    await coach.getByRole("button", { name: "Add a day", exact: true }).click();
     await expect(coach.getByLabel("Day name")).toHaveValue("Day 1");
 
-    await coach.getByRole("button", { name: "Block", exact: true }).click();
+    await coach.getByRole("button", { name: "Add a block", exact: true }).click();
     await coach.getByRole("button", { name: "Add exercise" }).click();
 
     const picker = sheet(coach, "Add exercise");
@@ -66,7 +68,7 @@ test("coach publishes a workout plan, the client logs a set, and the coach sees 
 
     // A picked exercise arrives with three prescribed sets (`emptySlot`), which is
     // what the client's player will count down.
-    await expect(coach.getByRole("combobox", { name: "Measurement mode" })).toBeVisible();
+    await expect(coach.getByRole("combobox", { name: "Measured in" })).toBeVisible();
     await expect(coach.getByRole("spinbutton", { name: "Reps" })).toHaveCount(3);
   });
 
@@ -105,7 +107,7 @@ test("coach publishes a workout plan, the client logs a set, and the coach sees 
 
   await test.step("the coach sees the logged set on the client's day", async () => {
     await coach.goto(`${studio.base}/clients/${client.id}/today`);
-    await expect(coach.getByText("Coach view")).toBeVisible();
+    await expect(coach.locator("[data-coach-view]")).toBeVisible();
     // The day's activity timeline. Anchored to the start of the accessible name
     // ("Workout · 1 set · <time>") so it can't be satisfied by the agenda card
     // above it, which also says "workout" and "1 sets".

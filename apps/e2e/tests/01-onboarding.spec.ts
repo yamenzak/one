@@ -147,7 +147,7 @@ test("owner onboards, invites a client, and the client signs in and completes in
     await invited.getByRole("button", { name: "Go to client" }).click();
 
     // Coach view of the new client.
-    await expect(coach.getByText("Coach view")).toBeVisible();
+    await expect(coach.locator("[data-coach-view]")).toBeVisible();
     await expect(coach).toHaveURL(/\/clients\/[^/]+\/today$/);
   });
 
@@ -230,7 +230,7 @@ test("owner onboards, invites a client, and the client signs in and completes in
     await expect(tab(coach, "Clients")).toBeVisible({ timeout: 30_000 });
     await tab(coach, "Clients").click();
     await coach.getByRole("button").filter({ hasText: clientName }).click();
-    await expect(coach.getByText("Coach view")).toBeVisible();
+    await expect(coach.locator("[data-coach-view]")).toBeVisible();
 
     // The gap list is a coach-only affordance now — the client's own version of
     // this card is a single row, because they are one tap from the form and do

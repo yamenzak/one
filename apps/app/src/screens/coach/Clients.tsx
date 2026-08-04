@@ -503,7 +503,13 @@ export function ClientDetail() {
       {/* Bare, floating sub-header — mirrors the AppBar's ambient language: no
           solid slab, so the page wash and the content bleed behind it and only
           the chip floats over what is scrolling past. ONE row now, not two. */}
-      <div className="sticky top-16 z-20 px-4 pb-2 pt-2">
+      {/* `data-coach-view` is the E2E anchor for "a coach is looking at one
+          client". It used to be the words "COACH VIEW" in the chip's second
+          line, which were removed when the sections moved into the header —
+          three specs then failed on copy that was correctly deleted. An
+          attribute is the right handle: it survives every wording change and
+          says out loud that something depends on it. */}
+      <div data-coach-view className="sticky top-16 z-20 px-4 pb-2 pt-2">
         <div className="column">
           <SectionSwitcher
             sections={TABS}

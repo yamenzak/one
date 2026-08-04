@@ -1,10 +1,33 @@
-/** Meal plan builder — bank-of-options with live macro totals + free meals. */
+/**
+ * Meal plan builder — a BANK OF OPTIONS the client picks one of, per meal.
+ *
+ * ── What this screen is, and what it was ────────────────────────────────────
+ *
+ * The plan is six meal types deep and the coach works on one at a time. The
+ * screen rendered ALL of them, always, as full cards — so a fresh draft opened
+ * as six cards reading "No options yet", and a real one meant scrolling past
+ * breakfast and lunch to reach the dinner you came to fix. It is now a RAIL of
+ * meal types carrying their option counts, and the meal you picked is the page —
+ * the same shape the workout builder uses for days.
+ *
+ * Three more things were costing the coach room and telling them nothing:
+ *
+ *   TWO CARDS SAID THE SAME NUMBER.  A "Daily target" card sat above a "Daily
+ *     plan health" card whose ring already shows the sample day AGAINST that
+ *     target. The target alone is not information; the comparison is.
+ *   EVERY FOOD CARRIED A CHIP ROW AND A LABELLED FIELD.  Four foods in an option
+ *     was four preset rows and four floating-label fields — roughly 400px of
+ *     controls for four numbers. The portion is now one line.
+ *   EVERY FOOD SHOWED THE SAME GLYPH.  `FoodThumb` was rendered with no `src` at
+ *     all, so a library full of photographed foods looked like a library of
+ *     nothing. The image was simply never read out of the food row.
+ */
 
 import { useCallback, useEffect, useState } from "react";
 import type { MealBody, MealOption, MealFood } from "@kova/protocol";
 import { optionMacroTotals, type FoodLike } from "@kova/protocol";
 import { fmtEnergy, scaleFood, servingsToQuantity, SERVING_PRESETS } from "@kova/domain";
-import { Button, Card, Badge, Field, Sheet, Skeleton, SubCard, ProgressRing, Eyebrow, Chip, IconBadge, ConfirmDialog, EmptyState, Page, Stagger, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, AlertTriangle, ArrowLeft, Plus, PencilLine, Utensils, Flame, History, LayoutGrid, ChevronRight, Trash2, X } from "@4dl/ui";
+import { Button, Card, Badge, Field, Input, Sheet, Skeleton, SubCard, ProgressRing, Eyebrow, Chip, ConfirmDialog, Disclosure, EmptyState, Page, Stagger, Rail, RailItem, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, AlertTriangle, Plus, PencilLine, Utensils, Flame, Save, ChevronRight, Trash2, X } from "@4dl/ui";
 import { MacroInline, MacroBar } from "../../registry/index.js";
 import { api, ApiError, errorText } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -14,12 +37,14 @@ import { AiErrorBox } from "../../AiError.js";
 import { useUnits } from "../../units.js";
 import { FoodSearchSheet } from "../client/FoodSearchSheet.js";
 import { FoodThumb } from "../food.js";
+import { BuilderHeader, BuilderFooter, BuilderMenuItem, BuilderMenuSeparator, SeedMenuItems, TemplatePickerSheet, SaveTemplateSheet, usePlanLifecycle } from "./builder.js";
 
 /** Client daily targets (flat shape, as stored on the active goal). */
 interface Targets { targetCalories?: number; targetProteinG?: number; targetCarbsG?: number; targetFatG?: number }
 interface Plan { id: string; clientId: string; name: string; status: string; body: MealBody; targetGoal?: Record<string, unknown> | null; variantId?: string | null }
-interface FoodRow { id: string; name: string; serving_size: number; calories: number; protein_g: number; carbs_g: number; fat_g: number }
+interface FoodRow { id: string; name: string; serving_size: number; calories: number; protein_g: number; carbs_g: number; fat_g: number; image_url: string | null }
 const BUILTIN_TYPES = ["breakfast", "lunch", "dinner", "snack", "pre_workout", "post_workout"];
+const typeLabel = (t: string) => t.replace(/_/g, " ");
 
 /** Normalize a plan's snapshotted goal (flat or `{targets}`-nested) into flat targets. */
 function asTargets(src: unknown): Targets | null {
@@ -35,15 +60,9 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const [customTypes, setCustomTypes] = useState<{ label: string }[]>([]);
   const [hiddenTypes, setHiddenTypes] = useState<string[]>([]);
   const [foods, setFoods] = useState<Map<string, FoodLike>>(new Map());
-  const [names, setNames] = useState<Map<string, string>>(new Map());
+  const [rows, setRows] = useState<Map<string, { name: string; image: string | null }>>(new Map());
   const [targets, setTargets] = useState<Targets | null>(null);
-  const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  // One in-flight name for the footer's three lifecycle actions — they share the
-  // bar, and only one can sensibly run at a time.
-  const [action, setAction] = useState<"publish" | "activate" | "rollback" | null>(null);
-  const [actionErr, setActionErr] = useState<string | null>(null);
   const [foodPicker, setFoodPicker] = useState<{ optIdx: number } | null>(null);
   const units = useUnits();
   const [aiOpen, setAiOpen] = useState(false);
@@ -51,15 +70,18 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const canAi = useCan("aiSuite");
   const [typeOpen, setTypeOpen] = useState(false);
   const [newType, setNewType] = useState("");
+  const [exportOpen, setExportOpen] = useState(false);
+  /** Which meal type is on screen. `null` until the plan resolves its list. */
+  const [activeType, setActiveType] = useState<string | null>(null);
   // Seed-the-draft: the client's most recent OTHER plan + a template picker.
   const [latestOther, setLatestOther] = useState<{ id: string; name: string; body: MealBody } | null>(null);
-  const [plansLoaded, setPlansLoaded] = useState(false);
   const [seedTemplateOpen, setSeedTemplateOpen] = useState(false);
   // A pending destructive replace, held until the coach confirms.
   const [seedConfirm, setSeedConfirm] = useState<{ source: string; apply: () => void } | null>(null);
 
-  const foodsFromRows = (rows: FoodRow[]): Map<string, FoodLike> =>
-    new Map(rows.map((x) => [x.id, { id: x.id, servingSize: x.serving_size, caloriesPerServing: x.calories, proteinG: x.protein_g, carbsG: x.carbs_g, fatG: x.fat_g }]));
+  const foodsFromRows = (list: FoodRow[]): Map<string, FoodLike> =>
+    new Map(list.map((x) => [x.id, { id: x.id, servingSize: x.serving_size, caloriesPerServing: x.calories, proteinG: x.protein_g, carbsG: x.carbs_g, fatG: x.fat_g }]));
+  const rowsFrom = (list: FoodRow[]) => new Map(list.map((x) => [x.id, { name: x.name, image: x.image_url }] as const));
 
   // Two independent reads, so `allSettled`: the plan is required (nothing renders
   // without it) but the food library only powers the macro read-outs, and with
@@ -69,14 +91,16 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const load = useCallback(async () => {
     setLoadError(false);
     const [p, f] = await Promise.allSettled([api.get<{ plan: Plan }>(`/api/meal-plans/${planId}`), api.get<{ foods: FoodRow[] }>("/api/foods?scope=all")]);
-    if (f.status === "fulfilled") {
-      setFoods(foodsFromRows(f.value.foods));
-      setNames(new Map(f.value.foods.map((x) => [x.id, x.name])));
-    }
+    if (f.status === "fulfilled") { setFoods(foodsFromRows(f.value.foods)); setRows(rowsFrom(f.value.foods)); }
     if (p.status === "rejected") { setLoadError(true); return; }
     setPlan(p.value.plan); setOptions(p.value.plan.body.mealOptions ?? []); setCustomTypes(p.value.plan.body.customMealTypes ?? []); setHiddenTypes(p.value.plan.body.hiddenMealTypes ?? []);
   }, [planId]);
   useEffect(() => void load(), [load]);
+
+  const life = usePlanLifecycle({
+    kind: "meal", planId, reload: load,
+    body: () => ({ customMealTypes: customTypes, hiddenMealTypes: hiddenTypes, mealOptions: options }),
+  });
 
   // Live target feedback: the client's ACTIVE goal targets (canonical, guarded
   // by requireClientAccess). Drafts don't snapshot a goal — only published
@@ -92,7 +116,8 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
     return () => { alive = false; };
   }, [plan?.clientId, plan?.targetGoal]);
 
-  const nameOf = useCallback((id: string) => names.get(id) ?? "Food", [names]);
+  const nameOf = useCallback((id: string) => rows.get(id)?.name ?? "Food", [rows]);
+  const imageOf = useCallback((id: string) => rows.get(id)?.image ?? null, [rows]);
 
   // Pull the food reference map fresh WITHOUT touching plan/option edits — used
   // after a pick or AI draft so newly-imported foods get live macros + serving
@@ -101,7 +126,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
     try {
       const f = await api.get<{ foods: FoodRow[] }>("/api/foods?scope=all");
       setFoods(foodsFromRows(f.foods));
-      setNames((prev) => { const m = new Map(prev); for (const x of f.foods) m.set(x.id, x.name); return m; });
+      setRows((prev) => { const m = new Map(prev); for (const [k, v] of rowsFrom(f.foods)) m.set(k, v); return m; });
     } catch { /* keep optimistic names */ }
   }, []);
 
@@ -115,8 +140,8 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
     const lane = plan?.variantId ?? null;
     let alive = true;
     api.get<{ plans: { id: string; name: string; body: MealBody; variantId?: string | null }[] }>(`/api/meal-plans?clientId=${cid}`)
-      .then((r) => { if (!alive) return; setLatestOther(r.plans?.find((pl) => pl.id !== planId && (pl.variantId ?? null) === lane) ?? null); setPlansLoaded(true); })
-      .catch(() => { if (alive) setPlansLoaded(true); });
+      .then((r) => { if (alive) setLatestOther(r.plans?.find((pl) => pl.id !== planId && (pl.variantId ?? null) === lane) ?? null); })
+      .catch(() => undefined);
     return () => { alive = false; };
   }, [plan?.clientId, plan?.variantId, planId]);
 
@@ -126,7 +151,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
     setOptions(body.mealOptions ?? []);
     setCustomTypes(body.customMealTypes ?? []);
     setHiddenTypes(body.hiddenMealTypes ?? []);
-    setDirty(true);
+    life.markDirty();
     void refreshFoods();
   };
   // Guard: replacing is destructive, so confirm only when the draft has options.
@@ -136,45 +161,20 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
     else apply();
   };
 
-  const mutate = (fn: (d: MealOption[]) => void) => { const next = structuredClone(options); fn(next); setOptions(next); setDirty(true); };
-  // The raw body write — publish composes it, so it must throw rather than
-  // swallow (publishing an unsaved body would hand the client the wrong meals).
-  const saveBody = async () => { await api.patch(`/api/meal-plans/${planId}`, { body: { customMealTypes: customTypes, hiddenMealTypes: hiddenTypes, mealOptions: options } }); setDirty(false); };
-  const save = async () => {
-    if (saving || action) return;
-    setSaving(true); setActionErr(null);
-    try { await saveBody(); }
-    catch (e) { setActionErr(errorText(e, "Couldn't save the draft. Please try again.")); }
-    finally { setSaving(false); }
-  };
-  /** Run one footer action with an in-flight guard + a visible failure. Without
-   *  this a flaky POST changed nothing on screen: the coach walked away believing
-   *  the client had the plan, and a double-tap fired the write twice. */
-  const runAction = async (name: "publish" | "activate" | "rollback", fn: () => Promise<void>, fallback: string) => {
-    if (action || saving) return;
-    setAction(name); setActionErr(null);
-    try { await fn(); }
-    catch (e) { setActionErr(errorText(e, fallback)); }
-    finally { setAction(null); }
-  };
+  const mutate = (fn: (d: MealOption[]) => void) => { const next = structuredClone(options); fn(next); setOptions(next); life.markDirty(); };
   // Remove a meal type from THIS plan: built-ins are hidden (restorable via
   // "+ Meal type"); custom types are dropped outright. Either way its options go.
   const removeType = (type: string) => {
     setOptions((prev) => prev.filter((o) => o.mealType !== type));
     if (BUILTIN_TYPES.includes(type)) setHiddenTypes((p) => (p.includes(type) ? p : [...p, type]));
     else setCustomTypes((p) => p.filter((t) => t.label !== type));
-    setDirty(true);
+    life.markDirty();
   };
-  const publish = () => runAction("publish", async () => { await saveBody(); await api.post(`/api/meal-plans/${planId}/publish`); await load(); }, "Couldn't publish this plan — the client hasn't received it. Please try again.");
-  // Superseded/archived plans are read-only (PATCH 409s). "Make active" re-publishes
-  // WITHOUT a save first (which would 409); rollback returns it to an editable draft.
-  const makeActive = () => runAction("activate", async () => { await api.post(`/api/meal-plans/${planId}/publish`); await load(); }, "Couldn't make this plan active. Please try again.");
-  const rollback = () => runAction("rollback", async () => { await api.post(`/api/meal-plans/${planId}/status`, { status: "draft" }); await load(); }, "Couldn't roll this plan back to a draft. Please try again.");
-  const addCustomType = () => { const label = newType.trim(); if (label && !customTypes.some((t) => t.label === label)) { setCustomTypes((p) => [...p, { label }]); setDirty(true); } setNewType(""); setTypeOpen(false); };
+  const addCustomType = () => { const label = newType.trim(); if (label && !customTypes.some((t) => t.label === label)) { setCustomTypes((p) => [...p, { label }]); life.markDirty(); setActiveType(label); } setNewType(""); setTypeOpen(false); };
   const runAi = async (instructions: string): Promise<string[]> => {
     if (!plan) return [];
     const res = await api.post<{ draft: MealBody; dropped?: string[] }>("/api/ai/draft-meal", { clientId: plan.clientId, instructions });
-    setOptions((prev) => [...prev, ...(res.draft.mealOptions ?? [])]); setDirty(true);
+    setOptions((prev) => [...prev, ...(res.draft.mealOptions ?? [])]); life.markDirty();
     void refreshFoods();
     const dropped = res.dropped ?? [];
     if (!dropped.length) setAiOpen(false);
@@ -186,6 +186,14 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   options.forEach((opt, idx) => byType.set(opt.mealType, [...(byType.get(opt.mealType) ?? []), { opt, idx }]));
   const allTypes = [...BUILTIN_TYPES.filter((t) => !hiddenTypes.includes(t)), ...customTypes.map((t) => t.label)];
   const restorable = BUILTIN_TYPES.filter((t) => hiddenTypes.includes(t)); // hidden built-ins, offered for re-add
+  // Open on the first meal that HAS something, else the first meal — a draft
+  // seeded from a template should land on its content, not on an empty
+  // breakfast the coach then has to scroll past.
+  const type = (activeType && allTypes.includes(activeType) ? activeType : null)
+    ?? allTypes.find((t) => (byType.get(t)?.length ?? 0) > 0)
+    ?? allTypes[0]
+    ?? null;
+  const opts = type ? byType.get(type) ?? [] : [];
 
   return (
     <Page className="column space-y-4 p-4 pb-32">
@@ -198,163 +206,133 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
             <Skeleton className="size-9 rounded-xl" />
             <SkeletonLine w="40%" h="title" className="flex-1" />
             <Skeleton className="h-6 w-16 rounded-full" />
+            <Skeleton className="size-9 rounded-xl" />
           </div>
           <Skeleton className="h-12 rounded-2xl" />
-          <div className="flex gap-2"><Skeleton className="h-10 flex-1 rounded-xl" /><Skeleton className="h-10 w-32 rounded-xl" /></div>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="space-y-3 rounded-2xl bg-card p-4">
-              <SkeletonLine w="30%" h="title" />
-              <div className="rounded-xl bg-surface-2 p-3"><SkeletonRow thumb={34} /></div>
-            </div>
-          ))}
+          <Skeleton className="h-40 rounded-2xl" />
+          <div className="flex gap-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-9 w-24 shrink-0 rounded-full" />)}</div>
+          <div className="space-y-3 rounded-2xl bg-card p-4">
+            <SkeletonLine w="30%" h="title" />
+            <div className="rounded-xl bg-surface-2 p-3"><SkeletonRow thumb={34} /></div>
+          </div>
         </>
       }>
         {plan && (
         <>
-      <div className="flex items-center gap-3">
-        <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
-        <h1 className="flex-1 truncate text-title-3">{plan.name}</h1>
-        <Badge tone={plan.status === "published" ? "success" : "neutral"}>{plan.status}</Badge>
-      </div>
+      <BuilderHeader
+        title={plan.name}
+        status={plan.status}
+        onBack={onBack}
+        menu={
+          <>
+            {!readOnly && (
+              <>
+                {canAi && <BuilderMenuItem onSelect={() => setAiOpen(true)}><AiAvatar className="size-4" /> Draft meals with AI</BuilderMenuItem>}
+                <SeedMenuItems
+                  latestName={latestOther?.name ?? null}
+                  onLatest={() => latestOther && seedDraft(latestOther.name, latestOther.body)}
+                  onTemplate={() => setSeedTemplateOpen(true)}
+                />
+                <BuilderMenuItem onSelect={() => setTypeOpen(true)}><Plus /> Add a meal type</BuilderMenuItem>
+                <BuilderMenuSeparator />
+              </>
+            )}
+            <BuilderMenuItem onSelect={() => setExportOpen(true)}><Save /> Save as template</BuilderMenuItem>
+          </>
+        }
+      />
 
       <ClientPrefsStrip clientId={plan.clientId} focus="meal" />
 
-      {targets?.targetCalories ? (
-        <Card className="flex items-center justify-between py-3 text-sm">
-          <span className="text-muted-foreground">Daily target</span>
-          <span className="numeral flex items-center gap-2 font-medium"><span className="text-calories">{fmtEnergy(targets.targetCalories, units)}</span><MacroInline proteinG={targets.targetProteinG ?? 0} carbsG={targets.targetCarbsG ?? 0} fatG={targets.targetFatG ?? 0} /></span>
-        </Card>
-      ) : null}
-
       <PlanHealth allTypes={allTypes} byType={byType} foods={foods} targets={targets} />
 
-      <div className="flex gap-2">
-        {/* `/api/ai/draft-meal` is gated on aiSuite — don't offer a 403. */}
-        {canAi && <Button variant="tonal" className="flex-1" onClick={() => setAiOpen(true)}><AiAvatar className="size-5" /> AI meal draft</Button>}
-        <Button variant="secondary" className={canAi ? undefined : "flex-1"} onClick={() => setTypeOpen(true)}><Plus /> Meal type</Button>
-      </div>
-
-      {/* Seed the draft — load the client's most recent other plan, or a saved
-          template, into this draft (each REPLACES the current meals). */}
-      {!readOnly && (
-        <div className="space-y-1.5">
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" disabled={!latestOther} onClick={() => latestOther && seedDraft(latestOther.name, latestOther.body)}><History /> Latest plan</Button>
-            <Button variant="secondary" size="sm" onClick={() => setSeedTemplateOpen(true)}><LayoutGrid /> From template</Button>
-          </div>
-          {plansLoaded && !latestOther && <p className="px-1 text-[0.7rem] text-muted-foreground">No previous plan for this client — start from a template instead.</p>}
-        </div>
+      {/*
+        The meal picker. Each chip carries its option count, so "which meals have
+        I actually written" is answered without opening any of them — the
+        question the old six-cards-of-nothing layout answered by making you
+        scroll.
+      */}
+      {allTypes.length > 0 && (
+        <Rail>
+          {allTypes.map((t) => {
+            const n = byType.get(t)?.length ?? 0;
+            return (
+              <RailItem key={t}>
+                <Chip selected={t === type} onClick={() => setActiveType(t)} className="capitalize">
+                  {typeLabel(t)}
+                  <span className={cn("numeral ml-1.5 text-xs", t === type ? "opacity-70" : n > 0 ? "text-nutrition" : "text-muted-foreground/50")}>{n}</span>
+                </Chip>
+              </RailItem>
+            );
+          })}
+          {!readOnly && <RailItem><Chip onClick={() => setTypeOpen(true)} aria-label="Add a meal type"><Plus className="size-3.5" /></Chip></RailItem>}
+        </Rail>
       )}
 
       <Stagger className="space-y-4">
-      {allTypes.map((type) => {
-        const opts = byType.get(type) ?? [];
-        return (
-          <Card key={type} className="space-y-3 p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="font-semibold capitalize">{type.replace("_", " ")}</h2>
-              <div className="flex items-center gap-1">
-                <button onClick={() => mutate((d) => d.push({ mealType: type, mealName: `Option ${opts.length + 1}`, isFree: false, foods: [] }))} className="inline-flex items-center gap-1 text-sm font-medium text-nutrition [&_svg]:size-4"><Plus /> Option</button>
-                {!readOnly && <button onClick={() => removeType(type)} aria-label={`Remove ${type.replace("_", " ")}`} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button>}
-              </div>
+      {!type ? (
+        <EmptyState icon={Utensils} title="No meals in this plan" description="Add a meal type to start building the bank of options this client picks from." action={<Button onClick={() => setTypeOpen(true)}><Plus /> Add a meal type</Button>} />
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-2 px-1">
+            <h2 className="text-title-3 capitalize">{typeLabel(type)}</h2>
+            <div className="flex items-center gap-1">
+              <Button size="sm" variant="tonal" onClick={() => mutate((d) => d.push({ mealType: type, mealName: `Option ${opts.length + 1}`, isFree: false, foods: [] }))}><Plus /> Option</Button>
+              {!readOnly && <button onClick={() => removeType(type)} aria-label={`Remove ${typeLabel(type)}`} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button>}
             </div>
-            {opts.length === 0 && <p className="text-sm text-muted-foreground">No options yet.</p>}
-            {opts.map(({ opt, idx }) => {
-              const t = optionMacroTotals(opt, foods);
-              const over = !!(targets?.targetCalories && t.calories > targets.targetCalories);
-              return (
-                <SubCard key={idx} className="space-y-3">
-                  {/* Header: name + macro summary vs target + remove */}
-                  <div className="flex items-end gap-2">
-                    <Field label="Option name" value={opt.mealName} placeholder="e.g. Oats & berries" onChange={(e) => mutate((d) => (d[idx]!.mealName = e.target.value))} className="flex-1" />
-                    <Button size="icon-sm" variant="ghost" aria-label="Remove option" className="mb-0.5 text-muted-foreground hover:text-danger" onClick={() => mutate((d) => d.splice(idx, 1))}><X /></Button>
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <button onClick={() => mutate((d) => { d[idx]!.isFree = !d[idx]!.isFree; if (d[idx]!.isFree) d[idx]!.foods = []; })} className={cn("rounded-full px-3 py-1 text-xs font-medium transition-colors", opt.isFree ? "bg-nutrition-soft text-nutrition" : "bg-surface-3 text-muted-foreground hover:text-foreground")}>Free meal</button>
-                    <span className="numeral flex items-center gap-2 text-xs">
-                      {targets?.targetCalories ? (
-                        <span className="flex items-center gap-1">
-                          <span className={cn("font-semibold", over ? "text-warning" : "text-calories")}>{fmtEnergy(t.calories, units)}</span>
-                          <span className="text-muted-foreground">/ {fmtEnergy(targets.targetCalories, units)}</span>
-                        </span>
-                      ) : (
-                        <span className="font-semibold text-calories">{fmtEnergy(t.calories, units)}</span>
-                      )}
-                      <MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} />
-                    </span>
-                  </div>
+          </div>
 
-                  {opt.isFree ? (
-                    <Field label="Max calories" type="number" inputMode="numeric" placeholder="Optional cap" value={opt.freeMealMaxCalories ?? ""} onChange={(e) => mutate((d) => (d[idx]!.freeMealMaxCalories = e.target.value ? Number(e.target.value) : null))} className="max-w-[12rem]" />
-                  ) : (
-                    <div className="space-y-3">
-                      {opt.foods.map((mf, fi) => (
-                        <FoodPortionRow
-                          key={fi}
-                          mf={mf}
-                          name={nameOf(mf.foodId)}
-                          food={foods.get(mf.foodId)}
-                          onQty={(q) => mutate((d) => (d[idx]!.foods[fi]!.quantity = q))}
-                          onRemove={() => mutate((d) => d[idx]!.foods.splice(fi, 1))}
-                        />
-                      ))}
-                      <div className="space-y-1.5">
-                        <button onClick={() => setFoodPicker({ optIdx: idx })} className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-xs font-medium text-nutrition transition-colors hover:bg-surface-3 [&_svg]:size-4"><Plus /> Add food</button>
-                        {opt.foods.length === 0 && <p className="px-1 text-center text-[0.7rem] text-muted-foreground">Search the library — or create a new food from the search if it's not there yet.</p>}
-                      </div>
-                      {opt.foods.length > 0 && <MealImage mealName={opt.mealName} foodNames={opt.foods.map((mf) => nameOf(mf.foodId))} value={opt.imageUrl} onChange={(url) => mutate((d) => (d[idx]!.imageUrl = url))} />}
-                    </div>
-                  )}
-                </SubCard>
-              );
-            })}
-          </Card>
-        );
-      })}
+          {opts.length === 0 ? (
+            <EmptyState
+              icon={Utensils}
+              title={`No ${typeLabel(type)} options yet`}
+              description="An option is one thing the client may eat for this meal. Give them two or three and they pick whichever suits the day."
+              action={<Button onClick={() => mutate((d) => d.push({ mealType: type, mealName: "Option 1", isFree: false, foods: [] }))}><Plus /> Add the first option</Button>}
+            />
+          ) : opts.map(({ opt, idx }, n) => (
+            <OptionCard
+              key={idx}
+              opt={opt} ordinal={n + 1} targets={targets} foods={foods}
+              nameOf={nameOf} imageOf={imageOf}
+              onPatch={(fn) => mutate((d) => fn(d[idx]!))}
+              onRemove={() => mutate((d) => d.splice(idx, 1))}
+              onAddFood={() => setFoodPicker({ optIdx: idx })}
+            />
+          ))}
+        </>
+      )}
       </Stagger>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/40 bg-background/90 p-3 backdrop-blur-xl md:pl-24">
-        <div className="column space-y-2">
-          {readOnly && (
-            <div className="flex items-center gap-2 rounded-xl bg-warning-soft px-3 py-2 text-xs text-warning [&_svg]:size-3.5"><History /> This plan is {plan.status} — read-only. Roll it back to a draft to edit, or make it active again.</div>
-          )}
-          {actionErr && <p className="px-1 text-xs text-warning" role="alert">{actionErr}</p>}
-          <div className="flex gap-3">
-            {readOnly ? (
-              <>
-                <Button variant="outline" className="flex-1" disabled={action !== null} onClick={() => void rollback()}>{action === "rollback" ? "Rolling back…" : "Roll back to draft"}</Button>
-                <Button className="flex-1" disabled={action !== null} onClick={() => void makeActive()}>{action === "activate" ? "Activating…" : "Make active"}</Button>
-              </>
-            ) : (
-              <>
-                <Button variant="outline" className="flex-1" disabled={!dirty || saving || action !== null} onClick={() => void save()}>{saving ? "Saving…" : dirty ? "Save draft" : "Saved"}</Button>
-                <Button className="flex-1" disabled={saving || action !== null} onClick={() => void publish()}>{action === "publish" ? "Publishing…" : plan.status === "published" ? "Re-publish" : "Publish"}</Button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+      <BuilderFooter status={plan.status} readOnly={!!readOnly} life={life} />
         </>
         )}
       </Reveal>
       )}
 
-      {foodPicker && <FoodSearchSheet onClose={() => setFoodPicker(null)} onPick={(id, name) => { mutate((d) => d[foodPicker.optIdx]!.foods.push({ foodId: id, quantity: 100, unit: "g" })); setNames((p) => new Map(p).set(id, name)); setFoodPicker(null); void refreshFoods(); }} />}
+      {foodPicker && <FoodSearchSheet onClose={() => setFoodPicker(null)} onPick={(id, name) => { mutate((d) => d[foodPicker.optIdx]!.foods.push({ foodId: id, quantity: 100, unit: "g" })); setRows((p) => new Map(p).set(id, { name, image: p.get(id)?.image ?? null })); setFoodPicker(null); void refreshFoods(); }} />}
       {aiOpen && <AiMealSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
+      {exportOpen && plan && <SaveTemplateSheet kind="meal" body={{ customMealTypes: customTypes, hiddenMealTypes: hiddenTypes, mealOptions: options }} defaultName={plan.name} stripNote="The meals and their portions are kept as written." onClose={() => setExportOpen(false)} />}
       <Sheet open={typeOpen} onClose={() => setTypeOpen(false)} title="Add meal type" footer={<Button size="lg" className="w-full" disabled={newType.trim().length < 2} onClick={addCustomType}>Add meal type</Button>}>
         <div className="space-y-4">
           {restorable.length > 0 && (
-            <div className="space-y-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Bring back a removed meal</span>
+            <div className="space-y-2">
+              <Eyebrow>Bring back a removed meal</Eyebrow>
               <div className="flex flex-wrap gap-2">
-                {restorable.map((t) => <Chip key={t} onClick={() => { setHiddenTypes((p) => p.filter((x) => x !== t)); setDirty(true); setTypeOpen(false); }}>{t.replace("_", " ")}</Chip>)}
+                {restorable.map((t) => <Chip key={t} className="capitalize" onClick={() => { setHiddenTypes((p) => p.filter((x) => x !== t)); life.markDirty(); setActiveType(t); setTypeOpen(false); }}>{typeLabel(t)}</Chip>)}
               </div>
             </div>
           )}
           <Field label="Or add a custom meal" icon={Utensils} value={newType} onChange={(e) => setNewType(e.target.value)} placeholder="e.g. Second breakfast" autoFocus />
         </div>
       </Sheet>
-      {seedTemplateOpen && <SeedTemplateSheet onClose={() => setSeedTemplateOpen(false)} onPick={(body, name) => { setSeedTemplateOpen(false); seedDraft(name, body); }} />}
+      {seedTemplateOpen && (
+        <TemplatePickerSheet<MealBody>
+          kind="meal" tone="nutrition"
+          countOf={(b) => { const n = b.mealOptions?.length ?? 0; return `${n} option${n === 1 ? "" : "s"}`; }}
+          onClose={() => setSeedTemplateOpen(false)}
+          onPick={(body, name) => { setSeedTemplateOpen(false); seedDraft(name, body); }}
+        />
+      )}
       <ConfirmDialog
         open={!!seedConfirm}
         onOpenChange={(o) => { if (!o) setSeedConfirm(null); }}
@@ -365,6 +343,87 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         onConfirm={() => seedConfirm?.apply()}
       />
     </Page>
+  );
+}
+
+/**
+ * ONE OPTION — a thing the client may eat for this meal.
+ *
+ * The name was a floating-label `Field` inside a `SubCard` inside a `Card`:
+ * three levels of container and a label reading "Option name" above a value
+ * reading "Option 1". It is now the card's own title, edited in place, with the
+ * ordinal supplying the identity a placeholder was carrying.
+ */
+function OptionCard({ opt, ordinal, targets, foods, nameOf, imageOf, onPatch, onRemove, onAddFood }: {
+  opt: MealOption; ordinal: number; targets: Targets | null; foods: Map<string, FoodLike>;
+  nameOf: (id: string) => string; imageOf: (id: string) => string | null;
+  onPatch: (fn: (o: MealOption) => void) => void;
+  onRemove: () => void;
+  onAddFood: () => void;
+}) {
+  const units = useUnits();
+  const t = optionMacroTotals(opt, foods);
+  const over = !!(targets?.targetCalories && t.calories > targets.targetCalories);
+  return (
+    <Card className="space-y-3">
+      <div className="flex items-center gap-2">
+        {/* A bare input, sized as a title. The value IS the heading. */}
+        <Input
+          value={opt.mealName}
+          placeholder={`Option ${ordinal}`}
+          aria-label="Option name"
+          onChange={(e) => onPatch((o) => (o.mealName = e.target.value))}
+          className="h-9 min-w-0 flex-1 border-0 bg-transparent px-1 text-base font-semibold focus-visible:bg-surface-2"
+        />
+        {/*
+          A toggle that reads as a BADGE when it is off is a lie: "Free meal" on
+          a quiet pill beside an option full of foods says this option IS free.
+          So off is a verb ("Make free") on a dashed outline, and on is the state
+          on a filled tone. One control, and it never claims the wrong thing.
+        */}
+        <button
+          onClick={() => onPatch((o) => { o.isFree = !o.isFree; if (o.isFree) o.foods = []; })}
+          aria-pressed={opt.isFree}
+          className={cn(
+            "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+            opt.isFree ? "bg-nutrition-soft text-nutrition" : "border border-dashed border-border text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {opt.isFree ? "Free meal" : "Make free"}
+        </button>
+        <Button size="icon-sm" variant="ghost" aria-label="Remove option" className="shrink-0 text-muted-foreground hover:text-danger" onClick={onRemove}><X /></Button>
+      </div>
+
+      {/* What this option costs, against what the client is allowed. */}
+      <div className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2">
+        <span className="numeral flex items-baseline gap-1 text-sm">
+          <span className={cn("font-bold", over ? "text-warning" : "text-calories")}>{fmtEnergy(t.calories, units)}</span>
+          {targets?.targetCalories ? <span className="text-xs text-muted-foreground">of {fmtEnergy(targets.targetCalories, units)}</span> : null}
+        </span>
+        <MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} className="text-xs" />
+      </div>
+
+      {opt.isFree ? (
+        <Field label="Max calories" type="number" inputMode="numeric" placeholder="Optional cap" value={opt.freeMealMaxCalories ?? ""} onChange={(e) => onPatch((o) => (o.freeMealMaxCalories = e.target.value ? Number(e.target.value) : null))} className="max-w-[12rem]" />
+      ) : (
+        <div className="space-y-2">
+          {opt.foods.map((mf, fi) => (
+            <FoodPortionRow
+              key={fi}
+              mf={mf}
+              name={nameOf(mf.foodId)}
+              image={imageOf(mf.foodId)}
+              food={foods.get(mf.foodId)}
+              onQty={(q) => onPatch((o) => (o.foods[fi]!.quantity = q))}
+              onRemove={() => onPatch((o) => o.foods.splice(fi, 1))}
+            />
+          ))}
+          <button onClick={onAddFood} className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-xs font-medium text-nutrition transition-colors hover:bg-surface-2 [&_svg]:size-4"><Plus /> Add food</button>
+          {opt.foods.length === 0 && <p className="px-1 text-center text-[0.7rem] text-muted-foreground">Search your library — or create a new food from the search if it isn't there yet.</p>}
+          {opt.foods.length > 0 && <MealImage mealName={opt.mealName} foodNames={opt.foods.map((mf) => nameOf(mf.foodId))} value={opt.imageUrl} onChange={(url) => onPatch((o) => (o.imageUrl = url))} />}
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -443,33 +502,43 @@ function PlanHealth({ allTypes, byType, foods, targets }: {
         </div>
       </div>
 
-      <div className="space-y-1.5">
-        <Eyebrow>Per-meal range</Eyebrow>
+      {/* The per-meal spread folds: it is a check on the variety the client can
+          pick within, not the number the coach is steering. */}
+      <Disclosure label="Per-meal range">
+        <div className="space-y-1.5">
         {ranges.map((r) => (
           <div key={r.type} className="flex items-center justify-between gap-2 text-sm">
             <span className="flex items-center gap-1.5 capitalize text-muted-foreground [&_svg]:size-3.5">
-              <Flame style={{ color: toneVar.calories }} /> {r.type.replace("_", " ")}
+              <Flame style={{ color: toneVar.calories }} /> {typeLabel(r.type)}
             </span>
             <span className="numeral font-medium text-calories">
               {r.min === r.max ? fmtEnergy(r.min, units) : `${fmtEnergy(r.min, units, false)}–${fmtEnergy(r.max, units)}`}
             </span>
           </div>
         ))}
-      </div>
+        </div>
+      </Disclosure>
     </Card>
   );
 }
 
-/** One food in an option: identity + live scaled macros, one-tap serving presets,
- *  and an exact-amount field. Portion math is shared (`scaleFood`/`servingsToQuantity`). */
-function FoodPortionRow({ mf, name, food, onQty, onRemove }: { mf: MealFood; name: string; food?: FoodLike; onQty: (q: number) => void; onRemove: () => void }) {
+/**
+ * One food in an option: identity, live scaled macros, and the portion.
+ *
+ * The portion used to be a wrapped chip row plus a floating-label `Field` on its
+ * own line — roughly 100px per food. It is one line now: the multipliers scroll,
+ * the exact amount sits at the end, and the unit is the field's suffix rather
+ * than a label above it. Portion math stays shared (`scaleFood` /
+ * `servingsToQuantity`).
+ */
+function FoodPortionRow({ mf, name, image, food, onQty, onRemove }: { mf: MealFood; name: string; image: string | null; food?: FoodLike; onQty: (q: number) => void; onRemove: () => void }) {
   const units = useUnits();
   const scaled = food ? scaleFood({ servingSize: food.servingSize, calories: food.caloriesPerServing, proteinG: food.proteinG, carbsG: food.carbsG, fatG: food.fatG }, mf.quantity) : null;
   const serving = food?.servingSize ?? 0;
   return (
-    <div className="space-y-2.5 border-t border-border/50 pt-3 first:border-t-0 first:pt-0">
+    <SubCard className="space-y-2">
       <div className="flex items-center gap-3">
-        <FoodThumb size={34} />
+        <FoodThumb src={image} size={34} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium leading-tight">{name}</div>
           {scaled ? (
@@ -479,20 +548,27 @@ function FoodPortionRow({ mf, name, food, onQty, onRemove }: { mf: MealFood; nam
           )}
         </div>
         {scaled && <div className="numeral shrink-0 text-sm font-semibold text-calories">{fmtEnergy(scaled.calories, units)}</div>}
-        <button onClick={onRemove} aria-label="Remove food" className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3 hover:text-danger [&_svg]:size-3.5"><X /></button>
+        <button onClick={onRemove} aria-label={`Remove ${name}`} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3 hover:text-danger [&_svg]:size-3.5"><X /></button>
       </div>
-      <div className="space-y-2 pl-[calc(34px+0.75rem)]">
+      <div className="flex items-center gap-2">
+        <div className="relative shrink-0">
+          <Input
+            type="number" inputMode="decimal" aria-label={`Amount in ${mf.unit}`}
+            value={mf.quantity} onChange={(e) => onQty(Number(e.target.value))}
+            className="h-9 w-[5.5rem] pr-7 text-sm"
+          />
+          <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-muted-foreground">{mf.unit}</span>
+        </div>
         {serving > 0 && (
-          <div className="flex flex-wrap gap-1.5">
+          <Rail bleed="none" className="pb-0">
             {SERVING_PRESETS.map((mult) => {
               const q = servingsToQuantity(serving, mult);
-              return <Chip key={mult} selected={Math.abs(mf.quantity - q) < 0.05} onClick={() => onQty(q)} className="h-8 px-3 text-xs">{mult}×</Chip>;
+              return <RailItem key={mult}><Chip selected={Math.abs(mf.quantity - q) < 0.05} onClick={() => onQty(q)} className="h-9 px-3 text-xs">{mult}×</Chip></RailItem>;
             })}
-          </div>
+          </Rail>
         )}
-        <Field label={`Amount (${mf.unit})`} type="number" inputMode="decimal" value={mf.quantity} onChange={(e) => onQty(Number(e.target.value))} className="max-w-[10rem]" />
       </div>
-    </div>
+    </SubCard>
   );
 }
 
@@ -529,50 +605,11 @@ function MealImage({ mealName, foodNames, value, onChange }: { mealName: string;
   if (!canAi) return null;
   return (
     <>
-      <button onClick={() => void gen()} disabled={busy} className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface-3 text-xs text-muted-foreground transition-colors hover:bg-surface-2 disabled:opacity-50 [&_svg]:size-3.5">
-        {busy ? <><span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> Plating…</> : <><AiAvatar className="size-3.5" /> Generate plated-meal photo</>}
+      <button onClick={() => void gen()} disabled={busy} className="flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:bg-surface-2 disabled:opacity-50 [&_svg]:size-3.5">
+        {busy ? <><span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> Plating…</> : <><AiAvatar className="size-3.5" /> Generate a plated photo</>}
       </button>
       {err && <p className="text-xs text-warning">{err}</p>}
     </>
-  );
-}
-
-/** Pick a saved meal template to seed the draft with. Fetches on open; each row
- *  shows the template name + its option count. Picking hands the body up. */
-function SeedTemplateSheet({ onClose, onPick }: { onClose: () => void; onPick: (body: MealBody, name: string) => void }) {
-  const [templates, setTemplates] = useState<{ id: string; name: string; description?: string | null; body: MealBody }[] | null>(null);
-  useEffect(() => {
-    let alive = true;
-    api.get<{ templates: { id: string; name: string; description?: string | null; body: MealBody }[] }>("/api/meal-templates")
-      .then((r) => { if (alive) setTemplates(r.templates ?? []); })
-      .catch(() => { if (alive) setTemplates([]); });
-    return () => { alive = false; };
-  }, []);
-  return (
-    <Sheet open onClose={onClose} title="Start from a template" size="tall">
-      <p className="mb-3 text-sm text-muted-foreground">Loads a saved template into this draft, replacing the current meals.</p>
-      {templates === null ? (
-        <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>
-      ) : templates.length === 0 ? (
-        <p className="px-3 py-6 text-center text-sm text-muted-foreground">No templates yet — save one from a plan's builder.</p>
-      ) : (
-        <div className="max-h-96 space-y-1.5 overflow-y-auto">
-          {templates.map((t) => {
-            const n = t.body.mealOptions?.length ?? 0;
-            return (
-              <button key={t.id} onClick={() => onPick(t.body, t.name)} className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-card p-3 text-left transition-colors hover:bg-surface-2">
-                <IconBadge icon={LayoutGrid} tone="nutrition" size="sm" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold">{t.name}</div>
-                  <div className="truncate text-xs text-muted-foreground">{n} option{n === 1 ? "" : "s"}{t.description ? ` · ${t.description}` : ""}</div>
-                </div>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </Sheet>
   );
 }
 

@@ -14,7 +14,7 @@ import {
   Card, Badge, Button, Chip, Field, Skeleton, Page, Stagger, EmptyState, StatCard, WeekDots, Sparkline, MiniBars, IconBadge, Sheet,
   Reveal, SkeletonHero, SkeletonStatGrid, SkeletonList, SkeletonLine,
   Dumbbell, Play, Moon, ChevronRight, Plus, Footprints, Flame, TrendingUp, Trophy, Activity, AlertTriangle, Search,
-  Anchor, CountUp,
+  Anchor, CountUp, Rail,
 } from "@4dl/ui";
 import { api, todayLocal, shiftDay } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -290,7 +290,7 @@ export function Train({ clientId }: { clientId: string }) {
       {canPlan && published && (
         <section className="space-y-2">
           <h3 className="px-1 text-micro uppercase text-muted-foreground">Plan days</h3>
-          <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
+          <Rail snap gap="md">
             {published.body.days.map((day, i) => {
               const sets = day.isRestDay ? 0 : prescribedSetsForDay(day);
               const exercises = day.isRestDay ? 0 : day.blocks.reduce((n, b) => n + b.slots.length, 0);
@@ -309,7 +309,7 @@ export function Train({ clientId }: { clientId: string }) {
                 </button>
               );
             })}
-          </div>
+          </Rail>
         </section>
       )}
 

@@ -295,6 +295,65 @@ export async function publishWorkoutPlan(
   return planId;
 }
 
+/**
+ * A small, real food library — enough that the meal builder photographs as a
+ * plan rather than as a set of empty slots, and enough VARIETY that the macro
+ * bars differ from row to row.
+ */
+const DEMO_FOODS = [
+  { name: "Rolled oats", servingSize: 40, calories: 150, proteinG: 5, carbsG: 27, fatG: 3, fiberG: 4 },
+  { name: "Greek yoghurt, 2%", servingSize: 170, calories: 145, proteinG: 17, carbsG: 8, fatG: 4 },
+  { name: "Blueberries", servingSize: 80, calories: 46, proteinG: 1, carbsG: 11, fatG: 0, fiberG: 2 },
+  { name: "Chicken breast", servingSize: 150, calories: 248, proteinG: 46, carbsG: 0, fatG: 5 },
+  { name: "Basmati rice, cooked", servingSize: 180, calories: 234, proteinG: 5, carbsG: 51, fatG: 1 },
+  { name: "Broccoli", servingSize: 120, calories: 41, proteinG: 3, carbsG: 8, fatG: 0, fiberG: 3 },
+  { name: "Salmon fillet", servingSize: 140, calories: 291, proteinG: 32, carbsG: 0, fatG: 18 },
+  { name: "Sweet potato", servingSize: 200, calories: 172, proteinG: 3, carbsG: 40, fatG: 0, fiberG: 6 },
+  { name: "Whey isolate", servingSize: 30, calories: 113, proteinG: 25, carbsG: 2, fatG: 1 },
+  { name: "Almonds", servingSize: 30, calories: 174, proteinG: 6, carbsG: 6, fatG: 15, fiberG: 4 },
+] as const;
+
+/** Create the demo food library. Returns ids in the order above. */
+export async function seedFoods(studio: Studio): Promise<string[]> {
+  const ids: string[] = [];
+  for (const f of DEMO_FOODS) {
+    const r = await callJson<{ id: string }>(studio.page, studio.base, "/api/foods", {
+      ...f, servingUnit: "g", visibility: "tenant", source: "custom", sourceId: `demo-${f.name.toLowerCase().replace(/[^a-z]+/g, "-")}`,
+    });
+    ids.push(r.id);
+  }
+  return ids;
+}
+
+/**
+ * A published meal plan: a BANK OF OPTIONS, two or three per meal, which is the
+ * shape the builder is designed around and the shape a one-option seed cannot
+ * show. Free-meal and per-meal-range affordances both need more than one.
+ */
+export async function publishMealPlan(studio: Studio, client: Client, foodIds: string[], name = "Lean phase — options"): Promise<string> {
+  const f = (i: number) => foodIds[i % foodIds.length]!;
+  const food = (i: number, quantity: number) => ({ foodId: f(i), quantity, unit: "g" });
+  const created = await callJson<{ plan: { id: string } }>(studio.page, studio.base, "/api/meal-plans", { clientId: client.id, name });
+  const planId = created.plan.id;
+  await callPatch(studio.page, studio.base, `/api/meal-plans/${planId}`, {
+    body: {
+      customMealTypes: [],
+      hiddenMealTypes: ["pre_workout", "post_workout"],
+      mealOptions: [
+        { mealType: "breakfast", mealName: "Oats, yoghurt & berries", isFree: false, foods: [food(0, 60), food(1, 170), food(2, 80)] },
+        { mealType: "breakfast", mealName: "Protein shake & almonds", isFree: false, foods: [food(8, 30), food(9, 30), food(2, 60)] },
+        { mealType: "lunch", mealName: "Chicken, rice & broccoli", isFree: false, foods: [food(3, 150), food(4, 180), food(5, 120)] },
+        { mealType: "lunch", mealName: "Salmon & sweet potato", isFree: false, foods: [food(6, 140), food(7, 200), food(5, 120)] },
+        { mealType: "dinner", mealName: "Salmon, rice & greens", isFree: false, foods: [food(6, 120), food(4, 150), food(5, 150)] },
+        { mealType: "dinner", mealName: "Eat out", isFree: true, foods: [], freeMealMaxCalories: 800 },
+        { mealType: "snack", mealName: "Yoghurt & almonds", isFree: false, foods: [food(1, 170), food(9, 20)] },
+      ],
+    },
+  });
+  await callJson(studio.page, studio.base, `/api/meal-plans/${planId}/publish`, {});
+  return planId;
+}
+
 async function callPatch(page: Page, base: string, path: string, body: unknown): Promise<void> {
   await ready(page, base);
   const out = await page.evaluate(

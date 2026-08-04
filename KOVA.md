@@ -1186,7 +1186,7 @@ the tenancy".
 | `/shop` | C (+staff in Train mode) | `client/Shop.tsx:30` | Storefront: packages, plans, access |
 | `/explore` | C (+staff in Train mode) | `client/Explore.tsx:20` | Coach-published articles |
 | `/accept-invitation/:id` | T O | `screens/AcceptInvite.tsx:25` | Staff invite, in-session |
-| `/clients/:id/plans/:kind/:planId` | T O | `coach/WorkoutBuilder.tsx:266` · `coach/MealBuilder.tsx:32` | Plan builders |
+| `/clients/:id/plans/:kind/:planId` | T O | `coach/WorkoutBuilder.tsx:356` · `coach/MealBuilder.tsx:57` | Plan builders. Shared frame — header ⋯ menu, lifecycle, footer, template sheets — in `coach/builder.tsx` |
 
 Routes declared in `Shell.tsx:123-142`.
 
@@ -1275,11 +1275,11 @@ None of these are routes. They live inside their parent's file.
 | `coach/Library.tsx:618` | Write/publish an Explore article |
 | `coach/Library.tsx:723` | One article's lifecycle actions |
 | `coach/ExerciseEditor.tsx:95` | Create/edit exercise, AI media |
-| `coach/WorkoutBuilder.tsx:619` | Copy a week with progression |
-| `coach/WorkoutBuilder.tsx:692` | Pick an exercise into a slot |
-| `coach/WorkoutBuilder.tsx:745` · `coach/MealBuilder.tsx:579` | AI-draft a plan |
-| `coach/WorkoutBuilder.tsx:765` · `coach/MealBuilder.tsx:542` | Start from a template |
-| `coach/WorkoutBuilder.tsx:802` | Save plan as a template |
+| `coach/WorkoutBuilder.tsx:685` | Copy a week with progression |
+| `coach/WorkoutBuilder.tsx:777` | Pick an exercise into a slot |
+| `coach/WorkoutBuilder.tsx:839` · `coach/MealBuilder.tsx:616` | AI-draft a plan |
+| `coach/builder.tsx:188` | Start from a template (both kinds) |
+| `coach/builder.tsx:231` | Save plan as a template (both kinds) |
 | `coach/ClientPrefsStrip.tsx:17` | Client prefs summary — plan builders + the goal composer |
 | `coach/CoachPlans.tsx:226` | Pick / rename / archive a client's plan lanes |
 | `coach/CoachPlans.tsx:337` | One plan's lifecycle actions |

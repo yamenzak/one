@@ -79,7 +79,7 @@ test("client logs a meal and the coach sees it on the client's day", async ({ br
 
   await test.step("the coach sees the snack on the client's day", async () => {
     await coach.goto(`${studio.base}/clients/${client.id}/today`);
-    await expect(coach.getByText("Coach view")).toBeVisible();
+    await expect(coach.locator("[data-coach-view]")).toBeVisible();
     // Feed rows are "<meal> · <n items> · <kcal> · <time>". Anchored to the start
     // of the accessible name so nothing above the timeline can satisfy it.
     await expect(coach.getByRole("button", { name: /^Snack 1 item/ })).toBeVisible({ timeout: 30_000 });

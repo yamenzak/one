@@ -104,6 +104,20 @@ test("the coach's studio", async () => {
     await shoot(page, project, "coach-client-plans");
   });
 
+  // The two BUILDERS. They are where a coach spends the most time and they had
+  // no picture at all — so a redesign of either shipped unphotographed, which is
+  // the one thing §16 exists to prevent. Both are deep-linked: the routes are
+  // real (`Shell.tsx`), and the plan ids come from the demo world.
+  await test.step("the workout builder", async () => {
+    await visit(page, `${base}/clients/${world.client.id}/plans/workout/${world.planId}`, page.getByLabel("Day name"));
+    await shoot(page, project, "coach-workout-builder", { settle: 600 });
+  });
+
+  await test.step("the meal builder", async () => {
+    await visit(page, `${base}/clients/${world.client.id}/plans/meal/${world.mealPlanId}`, page.getByText("Daily plan health"));
+    await shoot(page, project, "coach-meal-builder", { settle: 600 });
+  });
+
   await test.step("the report", async () => {
     await visit(page, `${base}/clients/${world.client.id}/report`, shell);
     await shoot(page, project, "coach-client-report", { settle: 1200 });

@@ -1,20 +1,40 @@
 /**
- * Workout plan builder — days → blocks → slots → sets. Full set richness
- * (all weight modes, rpe/rir/tempo/rest, measurement modes), block config
- * (rounds/rests), exercise picker, draft/publish, ✦ AI draft, duplicate-day,
- * export-to-template.
+ * Workout plan builder — days → blocks → slots → sets.
+ *
+ * ── What this screen is, and what it was ────────────────────────────────────
+ *
+ * Writing a plan is ONE task repeated: pick a day, pick an exercise, say how it
+ * is performed. Everything else — seeding, templating, drafting with AI, copying
+ * a week — happens once, at the start. The screen had it the other way round:
+ * four permanent full-width blocks of once-only verbs above the content, a
+ * six-day picture grid that filled the viewport before you reached the day you
+ * were editing, and the day itself last.
+ *
+ * So the once-only verbs are one ⋯ menu (`BuilderHeader`), the day picker is a
+ * RAIL — the covers survive at rail size, and the day you are editing starts
+ * near the top of the screen — and the day is the page.
+ *
+ * ── The set editor ──────────────────────────────────────────────────────────
+ *
+ * A set row is a spreadsheet line: reps, load mode, load, and a fold for the
+ * fine print (RPE/RIR/rest/tempo/notes). It had no COLUMN HEADER, so four
+ * unlabelled boxes per row asked the coach to remember which was which from the
+ * placeholder of an empty one — and a filled row has no placeholder. The header
+ * is one line per slot and it names every column, including the one that only
+ * appears for some load modes.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@kova/protocol";
-import { Button, Card, Badge, Field, Input, Select, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Switch, Page, Stagger, Eyebrow, GlanceStrip, IconBadge, ConfirmDialog, toneVar, type Tone, cn, colorToHex, Reveal, SkeletonLine, Search, ArrowLeft, Plus, Copy, Trash2, PencilLine, Dumbbell, Moon, ChevronRight, CheckCheck, Save, History, LayoutGrid, X, BarChart3, AlertTriangle } from "@4dl/ui";
+import { Button, Card, Badge, Field, Input, Select, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Page, Stagger, Eyebrow, GlanceStrip, ConfirmDialog, Disclosure, Rail, RailItem, toneVar, type Tone, cn, colorToHex, Reveal, SkeletonLine, Search, Plus, Copy, Trash2, PencilLine, Dumbbell, Moon, ChevronRight, CheckCheck, Save, LayoutGrid, ImageIcon, X, BarChart3, AlertTriangle } from "@4dl/ui";
 import { api, ApiError, errorText } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { ClientPrefsStrip } from "./ClientPrefsStrip.js";
 import { AiErrorBox } from "../../AiError.js";
-import { ExerciseRow, splitList, pretty, type ExerciseInfo } from "../exercise.js";
+import { ExerciseRow, ExerciseThumb, splitList, pretty, type ExerciseInfo } from "../exercise.js";
 import { ExerciseEditor } from "./ExerciseEditor.js";
+import { BuilderHeader, BuilderFooter, BuilderMenuItem, BuilderMenuSeparator, SeedMenuItems, TemplatePickerSheet, SaveTemplateSheet, usePlanLifecycle } from "./builder.js";
 
 interface Plan { id: string; clientId: string; name: string; status: string; body: WorkoutBody; variantId?: string | null }
 type ExerciseLite = ExerciseInfo;
@@ -31,6 +51,10 @@ const WEIGHT_MODES: { value: WeightMode; label: string; unit?: string }[] = [
 const MEASURE_MODES: { value: MeasurementMode; label: string }[] = [
   { value: "reps", label: "Reps" }, { value: "time", label: "Time" }, { value: "distance", label: "Distance" }, { value: "reps_in_time", label: "Reps in time" },
 ];
+/** What the measure column is CALLED, per mode — the set table's header. */
+const MEASURE_COLUMNS: Record<MeasurementMode, string[]> = {
+  reps: ["Reps"], time: ["Time"], distance: ["Distance"], reps_in_time: ["Reps", "Time"],
+};
 const SET_TYPES = ["warmup", "working", "amrap"] as const;
 
 const emptySetFor = (mode: MeasurementMode): WorkoutSet => ({
@@ -93,8 +117,15 @@ const DAY_STYLES = [
   { key: "neon", label: "Neon", hint: "neon-lit dark gym, glowing rim light, moody and cinematic" },
 ] as const;
 
-/** Per-day branded cover: generate in the tenant's accent colour, pick a style. */
-function DayCover({ dayName, value, onChange }: { dayName: string; value?: string | null; onChange: (url: string | null) => void }) {
+/**
+ * The day's cover, as a ROW rather than a panel.
+ *
+ * It was a 96px dashed placeholder sitting permanently above the first block —
+ * the most prominent thing on a day that has no exercises in it yet, for a
+ * decorative image. The cover already shows in the day rail; here it is a 44px
+ * square, a label and its verbs.
+ */
+function DayCoverRow({ dayName, value, onChange }: { dayName: string; value?: string | null; onChange: (url: string | null) => void }) {
   // Covers come from `/api/ai/generate-image`, which is gated on aiSuite. Without
   // it the generate/restyle buttons only ever produced a 403 rendered as
   // "Couldn't generate", so hide them (an existing cover still shows + removes).
@@ -111,22 +142,24 @@ function DayCover({ dayName, value, onChange }: { dayName: string; value?: strin
       setErr(e instanceof ApiError && e.message.toLowerCase().includes("credit") ? "Out of AI credits." : "Couldn't generate — try again.");
     } finally { setBusy(false); }
   };
+  if (!canAi && !value) return null;
   return (
-    <div className="space-y-2">
-      {value ? (
-        <div className="relative overflow-hidden rounded-2xl">
-          <img src={value} alt="" className="h-32 w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-          <div className="absolute right-2 top-2 flex gap-1.5">
-            {canAi && <button onClick={() => setPickOpen(true)} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><AiAvatar className="size-3.5" /> {busy ? "…" : "Restyle"}</button>}
-            <button onClick={() => onChange(null)} aria-label="Remove cover" className="grid size-7 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><Trash2 /></button>
-          </div>
+    <>
+      <div className="flex items-center gap-3">
+        {value
+          ? <img src={value} alt="" className="size-11 shrink-0 rounded-xl object-cover" />
+          : <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-dashed border-border text-muted-foreground [&_svg]:size-4"><ImageIcon /></div>}
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium">Day cover</div>
+          <div className="truncate text-xs text-muted-foreground">{value ? "Shown to the client on this day" : "Optional — rendered in your accent colour"}</div>
         </div>
-      ) : canAi ? (
-        <button onClick={() => setPickOpen(true)} disabled={busy} className="flex h-24 w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-surface-2 text-sm text-muted-foreground transition-colors hover:bg-surface-3 disabled:opacity-60 [&_svg]:size-4">
-          {busy ? <><span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> Generating cover…</> : <><AiAvatar className="size-4" /> Generate a branded day cover</>}
-        </button>
-      ) : null}
+        {canAi && (
+          <Button size="sm" variant={value ? "ghost" : "tonal"} disabled={busy} onClick={() => setPickOpen(true)}>
+            {busy ? "…" : <><AiAvatar className="size-4" /> {value ? "Restyle" : "Generate"}</>}
+          </Button>
+        )}
+        {value && <button onClick={() => onChange(null)} aria-label="Remove cover" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button>}
+      </div>
       {err && <p className="text-xs text-warning">{err}</p>}
       {pickOpen && (
         <Sheet open onClose={() => setPickOpen(false)} title="Cover style">
@@ -143,7 +176,7 @@ function DayCover({ dayName, value, onChange }: { dayName: string; value?: strin
           </div>
         </Sheet>
       )}
-    </div>
+    </>
   );
 }
 
@@ -208,11 +241,12 @@ function computePlanHealth(days: WorkoutDay[], lib: ExLib): PlanHealth {
   return { trainingDays, restDays, totalSets, workingSets, warmupSets: totalSets - workingSets, byMuscle: ranked, missingMajors, hasExercises: exerciseCount > 0 };
 }
 
-/** Per-day working-set count + heaviest muscle, for the day-cover cards. */
-function daySummary(day: WorkoutDay, lib: ExLib): { sets: number; topMuscle?: string } {
-  let sets = 0;
+/** Per-day working-set count + heaviest muscle, for the rail and the day header. */
+function daySummary(day: WorkoutDay, lib: ExLib): { sets: number; exercises: number; topMuscle?: string } {
+  let sets = 0, exercises = 0;
   const bm = new Map<string, number>();
   for (const b of day.blocks) for (const s of b.slots) {
+    exercises++;
     const working = s.sets.filter(isWorking).length;
     sets += working;
     if (working === 0) continue;
@@ -220,7 +254,7 @@ function daySummary(day: WorkoutDay, lib: ExLib): { sets: number; topMuscle?: st
   }
   let topMuscle: string | undefined, top = 0;
   for (const [m, n] of bm) if (n > top) { top = n; topMuscle = m; }
-  return { sets, topMuscle };
+  return { sets, exercises, topMuscle };
 }
 
 /** A live "is this plan balanced?" read: top-line counts + weekly set-volume by
@@ -240,8 +274,11 @@ function PlanHealthCard({ days, lib }: { days: WorkoutDay[]; lib: ExLib }) {
           { icon: BarChart3, tone: "primary", value: h.workingSets, label: h.warmupSets > 0 ? `Working sets · +${h.warmupSets} wu` : "Working sets" },
         ]}
       />
-      <div className="space-y-2">
-        <div className="px-1 text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground/80">Weekly sets by muscle</div>
+      {/* The breakdown FOLDS; the alarm below it never does (@4dl/ui Disclosure).
+          This card was ~380px of chart standing between the coach and the day
+          they came to edit — a check they run occasionally, permanently
+          occupying the space they work in. */}
+      <Disclosure label="Weekly sets by muscle">
         <div className="space-y-1.5">
           {top.map((mv) => (
             <div key={mv.muscle} className="flex items-center gap-2.5">
@@ -253,7 +290,7 @@ function PlanHealthCard({ days, lib }: { days: WorkoutDay[]; lib: ExLib }) {
             </div>
           ))}
         </div>
-      </div>
+      </Disclosure>
       {h.missingMajors.length > 0 && (
         <div className="flex items-center gap-1.5 rounded-xl bg-warning-soft px-3 py-2 text-xs text-warning [&_svg]:size-3.5">
           <AlertTriangle /> No {h.missingMajors.slice(0, 3).join(" · no ")} volume
@@ -263,17 +300,64 @@ function PlanHealthCard({ days, lib }: { days: WorkoutDay[]; lib: ExLib }) {
   );
 }
 
+/**
+ * The day picker.
+ *
+ * It was a two-column grid of 16:10 cover cards: six days is three rows, which
+ * on a phone is the whole viewport spent choosing before any editing happens —
+ * and the choice is made once. As a rail the covers survive (they are how a
+ * coach recognises a day at a glance), the selection is one tap either way, and
+ * the day being edited starts near the top of the screen.
+ */
+function DayRail({ days, lib, active, onSelect, onAdd }: {
+  days: WorkoutDay[]; lib: ExLib; active: number; onSelect: (i: number) => void; onAdd?: () => void;
+}) {
+  return (
+    <Rail snap gap="md">
+      {days.map((d, i) => {
+        const { sets } = daySummary(d, lib);
+        const sub = d.isRestDay ? "Rest" : sets > 0 ? `${sets} set${sets === 1 ? "" : "s"}` : "Empty";
+        return (
+          <RailItem key={i}>
+            <button
+              onClick={() => onSelect(i)}
+              aria-current={i === active}
+              className={cn(
+                "relative h-[4.5rem] w-32 overflow-hidden rounded-2xl text-left transition-transform active:scale-[0.97]",
+                i === active && "ring-2 ring-primary ring-offset-2 ring-offset-background",
+              )}
+            >
+              {d.imageUrl
+                ? <img src={d.imageUrl} alt="" className="absolute inset-0 size-full object-cover" />
+                : <div className={cn("absolute inset-0", d.isRestDay ? "bg-gradient-to-br from-sleep/25 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2")} />}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 p-2">
+                <div className="truncate text-xs font-semibold text-white">{d.name || `Day ${i + 1}`}</div>
+                {/* White, not `--tone-foreground`: that token is the ink for a
+                    TONE-COLOURED surface and is dark on a light-primary theme,
+                    which made this invisible over the scrim. */}
+                <div className="truncate text-[0.65rem] text-white/75">{sub}</div>
+              </div>
+            </button>
+          </RailItem>
+        );
+      })}
+      {onAdd && (
+        <RailItem>
+          <button onClick={onAdd} className="grid h-[4.5rem] w-24 place-items-center rounded-2xl border border-dashed border-border text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-2">
+            <span className="flex flex-col items-center gap-1 [&_svg]:size-4"><Plus /> Day</span>
+          </button>
+        </RailItem>
+      )}
+    </Rail>
+  );
+}
+
 export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () => void }) {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [days, setDays] = useState<WorkoutDay[]>([]);
   const [dayIdx, setDayIdx] = useState(0);
-  const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  // One in-flight name for the footer's three lifecycle actions — they share the
-  // bar, and only one can sensibly run at a time.
-  const [action, setAction] = useState<"publish" | "activate" | "rollback" | null>(null);
-  const [actionErr, setActionErr] = useState<string | null>(null);
   const [library, setLibrary] = useState<ExerciseLite[]>([]);
   const [picker, setPicker] = useState<{ blockIdx: number } | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
@@ -283,7 +367,6 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const [copyWeekOpen, setCopyWeekOpen] = useState(false);
   // Seed-the-draft: the client's most recent OTHER plan + a template picker.
   const [latestOther, setLatestOther] = useState<{ id: string; name: string; body: WorkoutBody } | null>(null);
-  const [plansLoaded, setPlansLoaded] = useState(false);
   const [seedTemplateOpen, setSeedTemplateOpen] = useState(false);
   // A pending destructive replace, held until the coach confirms.
   const [seedConfirm, setSeedConfirm] = useState<{ source: string; apply: () => void } | null>(null);
@@ -301,6 +384,8 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
     setPlan(p.value.plan); setDays(p.value.plan.body.days ?? []);
   }, [planId]);
   useEffect(() => void load(), [load]);
+
+  const life = usePlanLifecycle({ kind: "workout", planId, body: () => ({ days }), reload: load });
 
   // Library-only refresh — used after an inline "create exercise" so the new
   // row resolves its name/thumb WITHOUT reloading the plan (which would reset
@@ -323,8 +408,8 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
     const lane = plan?.variantId ?? null;
     let alive = true;
     api.get<{ plans: { id: string; name: string; body: WorkoutBody; variantId?: string | null }[] }>(`/api/workout-plans?clientId=${cid}`)
-      .then((r) => { if (!alive) return; setLatestOther(r.plans?.find((pl) => pl.id !== planId && (pl.variantId ?? null) === lane) ?? null); setPlansLoaded(true); })
-      .catch(() => { if (alive) setPlansLoaded(true); });
+      .then((r) => { if (alive) setLatestOther(r.plans?.find((pl) => pl.id !== planId && (pl.variantId ?? null) === lane) ?? null); })
+      .catch(() => undefined);
     return () => { alive = false; };
   }, [plan?.clientId, plan?.variantId, planId]);
 
@@ -333,7 +418,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const applySeedBody = (body: WorkoutBody) => {
     setDays(body.days ?? []);
     setDayIdx(0);
-    setDirty(true);
+    life.markDirty();
     void reloadLibrary();
   };
   // Guard: replacing is destructive, so confirm only when the draft has days.
@@ -343,33 +428,8 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
     else apply();
   };
 
-  const mutate = (fn: (d: WorkoutDay[]) => void) => { const next = structuredClone(days); fn(next); setDays(next); setDirty(true); };
-  // The raw body write — publish composes it, so it must throw rather than
-  // swallow (publishing an unsaved body would hand the client the wrong days).
-  const saveBody = async () => { await api.patch(`/api/workout-plans/${planId}`, { body: { days } }); setDirty(false); };
-  const save = async () => {
-    if (saving || action) return;
-    setSaving(true); setActionErr(null);
-    try { await saveBody(); }
-    catch (e) { setActionErr(errorText(e, "Couldn't save the draft. Please try again.")); }
-    finally { setSaving(false); }
-  };
-  /** Run one footer action with an in-flight guard + a visible failure. Without
-   *  this a flaky POST changed nothing on screen: the coach walked away believing
-   *  the client had the plan, and a double-tap fired the write twice. */
-  const runAction = async (name: "publish" | "activate" | "rollback", fn: () => Promise<void>, fallback: string) => {
-    if (action || saving) return;
-    setAction(name); setActionErr(null);
-    try { await fn(); }
-    catch (e) { setActionErr(errorText(e, fallback)); }
-    finally { setAction(null); }
-  };
-  const publish = () => runAction("publish", async () => { await saveBody(); await api.post(`/api/workout-plans/${planId}/publish`); await load(); }, "Couldn't publish this plan — the client hasn't received it. Please try again.");
-  // Superseded/archived plans are read-only (PATCH 409s). "Make active" re-publishes
-  // WITHOUT a save first (which would 409); rollback returns it to an editable draft.
-  const makeActive = () => runAction("activate", async () => { await api.post(`/api/workout-plans/${planId}/publish`); await load(); }, "Couldn't make this plan active. Please try again.");
-  const rollback = () => runAction("rollback", async () => { await api.post(`/api/workout-plans/${planId}/status`, { status: "draft" }); await load(); }, "Couldn't roll this plan back to a draft. Please try again.");
-  const runAi = async (instructions: string): Promise<string[]> => { if (!plan) return []; const res = await api.post<{ draft: WorkoutBody; dropped?: string[] }>("/api/ai/draft-plan", { clientId: plan.clientId, instructions }); setDays(res.draft.days); setDirty(true); const dropped = res.dropped ?? []; if (!dropped.length) setAiOpen(false); return dropped; };
+  const mutate = (fn: (d: WorkoutDay[]) => void) => { const next = structuredClone(days); fn(next); setDays(next); life.markDirty(); };
+  const runAi = async (instructions: string): Promise<string[]> => { if (!plan) return []; const res = await api.post<{ draft: WorkoutBody; dropped?: string[] }>("/api/ai/draft-plan", { clientId: plan.clientId, instructions }); setDays(res.draft.days); life.markDirty(); const dropped = res.dropped ?? []; if (!dropped.length) setAiOpen(false); return dropped; };
 
   // Copy week: duplicate every current day as a new mesocycle week, with an
   // optional linear progression (reps / load / %1RM) applied to each set.
@@ -401,8 +461,9 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const readOnly = plan?.status === "superseded" || plan?.status === "archived";
   const day = days[dayIdx];
   const libMap = useMemo(() => new Map(library.map((e) => [e.id, e] as const)), [library]);
-  const exOf = (id: string) => library.find((e) => e.id === id);
+  const exOf = (id: string) => libMap.get(id);
   const nameOf = (id: string) => exOf(id)?.name ?? "Exercise";
+  const summary = day ? daySummary(day, libMap) : null;
 
   return (
     <Page className="column space-y-4 p-4 pb-32">
@@ -417,10 +478,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
             <Skeleton className="h-6 w-16 rounded-full" />
             <Skeleton className="size-9 rounded-xl" />
           </div>
-          <div className="grid grid-cols-2 gap-2.5">
-            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="aspect-[16/10] rounded-2xl" />)}
-          </div>
-          <div className="flex flex-wrap gap-2"><Skeleton className="h-9 w-20 rounded-full" /><Skeleton className="h-9 w-24 rounded-full" /></div>
+          <div className="flex gap-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-[4.5rem] w-32 shrink-0 rounded-2xl" />)}</div>
           <div className="space-y-3 rounded-2xl bg-card p-4">
             <SkeletonLine w="50%" h="title" />
             <Skeleton className="h-24 rounded-2xl" />
@@ -429,85 +487,101 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
       }>
         {plan && (
         <>
-      <div className="flex items-center gap-3">
-        <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
-        <h1 className="flex-1 truncate text-title-3">{plan.name}</h1>
-        <Badge tone={plan.status === "published" ? "success" : "neutral"}>{plan.status}</Badge>
-        <Button size="icon" variant="secondary" aria-label="Save as template" onClick={() => setExportOpen(true)}><Save /></Button>
-      </div>
+      <BuilderHeader
+        title={plan.name}
+        status={plan.status}
+        onBack={onBack}
+        menu={
+          <>
+            {!readOnly && (
+              <>
+                {canAi && <BuilderMenuItem onSelect={() => setAiOpen(true)}><AiAvatar className="size-4" /> Draft this plan with AI</BuilderMenuItem>}
+                <SeedMenuItems
+                  latestName={latestOther?.name ?? null}
+                  onLatest={() => latestOther && seedDraft(latestOther.name, latestOther.body)}
+                  onTemplate={() => setSeedTemplateOpen(true)}
+                />
+                {days.length > 0 && <BuilderMenuItem onSelect={() => setCopyWeekOpen(true)}><Copy /> Copy week with progression</BuilderMenuItem>}
+                <BuilderMenuSeparator />
+              </>
+            )}
+            <BuilderMenuItem onSelect={() => setExportOpen(true)}><Save /> Save as template</BuilderMenuItem>
+          </>
+        }
+      />
 
       <ClientPrefsStrip clientId={plan.clientId} focus="workout" />
-
-      {/* Seed the draft — load the client's most recent other plan, or a saved
-          template, into this draft (each REPLACES the current days). */}
-      {!readOnly && (
-        <div className="space-y-1.5">
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" disabled={!latestOther} onClick={() => latestOther && seedDraft(latestOther.name, latestOther.body)}><History /> Latest plan</Button>
-            <Button variant="secondary" size="sm" onClick={() => setSeedTemplateOpen(true)}><LayoutGrid /> From template</Button>
-          </div>
-          {plansLoaded && !latestOther && <p className="px-1 text-[0.7rem] text-muted-foreground">No previous plan for this client — start from a template instead.</p>}
-        </div>
-      )}
 
       {/* Live "is this plan balanced?" read — volume by muscle group. */}
       <PlanHealthCard days={days} lib={libMap} />
 
-      {/* Day cards — 2 per row, each showing its branded cover; tap to edit. */}
       {days.length > 0 && (
-        <div className="grid grid-cols-2 gap-2.5">
-          {days.map((d, i) => {
-            const { sets, topMuscle } = daySummary(d, libMap);
-            const sub = d.isRestDay ? "Rest day" : sets > 0 ? `${sets} set${sets === 1 ? "" : "s"}${topMuscle ? ` · ${pretty(topMuscle)}` : ""}` : "No sets yet";
-            return (
-              <button key={i} onClick={() => setDayIdx(i)} className={cn("relative aspect-[16/10] overflow-hidden rounded-2xl text-left transition-all active:scale-[0.98]", i === dayIdx && "ring-2 ring-primary ring-offset-2 ring-offset-background")}>
-                {d.imageUrl ? <img src={d.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2" />}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
-                {d.isRestDay && <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-[0.6rem] font-semibold text-sleep">Rest</span>}
-                <div className="absolute inset-x-0 bottom-0 p-2.5">
-                  <div className="truncate text-sm font-semibold text-white">{d.name || `Day ${i + 1}`}</div>
-                  {/* Over the black scrim this must be white, like its twins in
-                      Train and the player. `--tone-foreground` is the ink for a
-                      TONE-COLOURED surface (a `bg-activity` pill) — it is dark on
-                      a light-primary theme, so at 70% over `from-black/75` the
-                      set count was invisible. */}
-                  <div className="truncate text-xs text-white/75">{sub}</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        <DayRail days={days} lib={libMap} active={dayIdx} onSelect={setDayIdx} onAdd={readOnly ? undefined : () => { mutate((d) => d.push(emptyDay(`Day ${days.length + 1}`))); setDayIdx(days.length); }} />
       )}
-      <div className="flex flex-wrap gap-2">
-        <button onClick={() => { mutate((d) => d.push(emptyDay(`Day ${days.length + 1}`))); setDayIdx(days.length); }} className="inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-2 text-sm text-muted-foreground [&_svg]:size-4"><Plus /> Day</button>
-        {day && <button onClick={() => { mutate((d) => d.splice(dayIdx + 1, 0, { ...structuredClone(d[dayIdx]!), name: `${d[dayIdx]!.name || `Day ${dayIdx + 1}`} (copy)` })); setDayIdx(dayIdx + 1); }} className="inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-2 text-sm text-muted-foreground [&_svg]:size-4"><Copy /> Duplicate</button>}
-        {days.length > 0 && <button onClick={() => setCopyWeekOpen(true)} className="inline-flex items-center gap-1 rounded-full bg-secondary px-4 py-2 text-sm text-muted-foreground [&_svg]:size-4"><Copy /> Copy week</button>}
-      </div>
 
       <Stagger className="space-y-4">
       {days.length === 0 ? (
         <EmptyState
           icon={Dumbbell}
           title="Empty plan"
-          description={canAi ? "Add a day, or let AI draft one from the client's intake." : "Add a day to get started."}
-          action={canAi ? <Button onClick={() => setAiOpen(true)}><AiAvatar className="size-5" /> AI draft plan</Button> : <Button onClick={() => { mutate((d) => d.push(emptyDay("Day 1"))); setDayIdx(0); }}><Plus /> Add a day</Button>}
+          description={canAi ? "Write the first day yourself, or let AI draft the whole plan from the client's intake." : "Add a day to get started."}
+          /*
+            BOTH ways in, always. The AI-entitled branch used to offer ONLY the
+            AI draft — the plain "add a day" button existed nowhere on an empty
+            plan, so a coach who wanted to write their own had to accept a
+            generated one first and delete it.
+          */
+          action={
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button onClick={() => { mutate((d) => d.push(emptyDay("Day 1"))); setDayIdx(0); }}><Plus /> Add a day</Button>
+              {canAi && <Button variant="secondary" onClick={() => setAiOpen(true)}><AiAvatar className="size-5" /> Draft with AI</Button>}
+            </div>
+          }
         />
       ) : day ? (
         <>
+          {/*
+            THE DAY'S OWN HEADER — what you are editing, and how much of it there
+            is. The set counts were only ever visible in the rail's 12px sub-line
+            and in a whole-plan card; while writing a day the question is about
+            THIS day.
+          */}
           <Card className="space-y-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-end gap-2">
               <Field label="Day name" value={day.name} onChange={(e) => mutate((d) => (d[dayIdx]!.name = e.target.value))} className="flex-1" />
-              <button onClick={() => mutate((d) => (d[dayIdx]!.isRestDay = !d[dayIdx]!.isRestDay))} className={`mt-6 inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm [&_svg]:size-4 ${day.isRestDay ? "bg-sleep-soft text-sleep" : "bg-secondary text-muted-foreground"}`}><Moon /> Rest</button>
+              <Button
+                variant={day.isRestDay ? "tonal" : "secondary"}
+                className={cn("mb-px", day.isRestDay && "text-sleep")}
+                onClick={() => mutate((d) => (d[dayIdx]!.isRestDay = !d[dayIdx]!.isRestDay))}
+              >
+                <Moon /> Rest
+              </Button>
             </div>
-            {!day.isRestDay && <DayCover dayName={day.name} value={day.imageUrl} onChange={(url) => mutate((d) => (d[dayIdx]!.imageUrl = url))} />}
+            {!day.isRestDay && summary && (
+              <p className="px-1 text-xs text-muted-foreground">
+                {summary.exercises === 0
+                  ? "No exercises yet — add a block below."
+                  : `${summary.exercises} exercise${summary.exercises === 1 ? "" : "s"} · ${summary.sets} working set${summary.sets === 1 ? "" : "s"}${summary.topMuscle ? ` · mostly ${pretty(summary.topMuscle).toLowerCase()}` : ""}`}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="ghost" onClick={() => { mutate((d) => d.splice(dayIdx + 1, 0, { ...structuredClone(d[dayIdx]!), name: `${d[dayIdx]!.name || `Day ${dayIdx + 1}`} (copy)` })); setDayIdx(dayIdx + 1); }}><Copy /> Duplicate day</Button>
+              <Button size="sm" variant="ghost" className="text-muted-foreground hover:text-danger" onClick={() => { mutate((d) => d.splice(dayIdx, 1)); setDayIdx(Math.max(0, dayIdx - 1)); }}><Trash2 /> Delete day</Button>
+            </div>
+            {!day.isRestDay && <DayCoverRow dayName={day.name} value={day.imageUrl} onChange={(url) => mutate((d) => (d[dayIdx]!.imageUrl = url))} />}
           </Card>
 
           {!day.isRestDay && day.blocks.map((block, blockIdx) => (
             <Card key={blockIdx} className="space-y-4">
-              <div className="flex items-center gap-2">
-                <Select value={block.type} onChange={(v) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.type = v as WorkoutBlock["type"]))} options={BLOCK_TYPES} aria-label="Block type" className="h-10 w-36" />
-                <div className="flex-1" />
-                <button onClick={() => mutate((d) => d[dayIdx]!.blocks.splice(blockIdx, 1))} aria-label="Remove block" className="grid size-9 place-items-center rounded-xl text-danger hover:bg-danger-soft [&_svg]:size-4"><Trash2 /></button>
+              {/* A block's TYPE is the structural decision of the day — whether
+                  these exercises are done one at a time or as a superset — so it
+                  is labelled, not an unnamed dropdown beside a bin. */}
+              <div className="flex items-end gap-2">
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <Eyebrow>How it's performed</Eyebrow>
+                  <Select value={block.type} onChange={(v) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.type = v as WorkoutBlock["type"]))} options={BLOCK_TYPES} aria-label="How it's performed" className="h-10 w-full" />
+                </div>
+                <button onClick={() => mutate((d) => d[dayIdx]!.blocks.splice(blockIdx, 1))} aria-label="Remove block" className="grid size-10 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button>
               </div>
 
               {block.type !== "single" && (
@@ -534,23 +608,31 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                   <ExerciseRow ex={exOf(slot.exerciseId)} name={nameOf(slot.exerciseId)} meta={false} thumbSize={34} trailing={
                     <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots.splice(slotIdx, 1))} aria-label="Remove exercise" className="text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
                   } />
-                  <Select value={slot.measurementMode} onChange={(v) => { const nm = v as MeasurementMode; setSlot((sl) => { sl.measurementMode = nm; sl.sets.forEach((s) => normalizeSetForMode(s, nm)); }); }} options={MEASURE_MODES} aria-label="Measurement mode" className="h-9 w-40 text-xs" />
 
-                  {/* Bulk-set presets — replace the slot's sets in one tap. */}
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[0.7rem] font-medium uppercase tracking-wide text-muted-foreground">Quick sets</span>
-                    {SET_PRESETS.map((p) => (
-                      <Chip key={p.label} className="h-8 px-3 text-xs" onClick={() => setSlot((sl) => { sl.sets = setsFromPreset(p, sl.measurementMode); })}>{p.label}</Chip>
-                    ))}
+                  {/* Measured-in + the one-tap set templates, on one line: both
+                      answer "what shape are these sets", and both are set once
+                      per exercise before any row is touched. */}
+                  <div className="flex items-center gap-2">
+                    <Select value={slot.measurementMode} onChange={(v) => { const nm = v as MeasurementMode; setSlot((sl) => { sl.measurementMode = nm; sl.sets.forEach((s) => normalizeSetForMode(s, nm)); }); }} options={MEASURE_MODES} aria-label="Measured in" className="h-9 w-32 shrink-0 text-xs" />
+                    <Rail bleed="none" className="pb-0">
+                      {SET_PRESETS.map((p) => (
+                        <RailItem key={p.label}>
+                          <Chip className="h-9 px-3 text-xs" onClick={() => setSlot((sl) => { sl.sets = setsFromPreset(p, sl.measurementMode); })}>{p.label}</Chip>
+                        </RailItem>
+                      ))}
+                    </Rail>
                   </div>
 
-                  {slot.sets.map((set, setIdx) => (
-                    <SetRow key={setIdx} set={set} index={setIdx} mode={slot.measurementMode}
-                      onPatch={(p) => mutate((d) => Object.assign(d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets[setIdx]!, p))}
-                      onApplyToAll={slot.sets.length > 1 ? () => applyToAll(setIdx) : undefined}
-                      onRemove={() => setSlot((sl) => sl.sets.splice(setIdx, 1))} />
-                  ))}
-                  <button onClick={() => setSlot((sl) => sl.sets.push(emptySetFor(sl.measurementMode)))} className="text-xs font-medium text-activity">+ Set</button>
+                  <div className="space-y-1.5">
+                    <SetTableHeader mode={slot.measurementMode} />
+                    {slot.sets.map((set, setIdx) => (
+                      <SetRow key={setIdx} set={set} index={setIdx} mode={slot.measurementMode}
+                        onPatch={(p) => mutate((d) => Object.assign(d[dayIdx]!.blocks[blockIdx]!.slots[slotIdx]!.sets[setIdx]!, p))}
+                        onApplyToAll={slot.sets.length > 1 ? () => applyToAll(setIdx) : undefined}
+                        onRemove={() => setSlot((sl) => sl.sets.splice(setIdx, 1))} />
+                    ))}
+                    <button onClick={() => setSlot((sl) => sl.sets.push(emptySetFor(sl.measurementMode)))} className="inline-flex items-center gap-1 px-1 text-xs font-semibold text-activity [&_svg]:size-3.5"><Plus /> Set</button>
+                  </div>
                 </SubCard>
                 );
               })}
@@ -559,36 +641,13 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
           ))}
 
           {!day.isRestDay && (
-            <div className="flex gap-2">
-              <Button variant="ghost" className="flex-1" onClick={() => mutate((d) => d[dayIdx]!.blocks.push(emptyBlock()))}><Plus /> Block</Button>
-              {canAi && <Button variant="ghost" className="flex-1" onClick={() => setAiOpen(true)}><AiAvatar className="size-5" /> AI draft</Button>}
-            </div>
+            <Button variant="ghost" className="w-full" onClick={() => mutate((d) => d[dayIdx]!.blocks.push(emptyBlock()))}><Plus /> Add a block</Button>
           )}
         </>
       ) : null}
       </Stagger>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/40 bg-background/90 p-3 backdrop-blur-xl md:pl-24">
-        <div className="column space-y-2">
-          {readOnly && (
-            <div className="flex items-center gap-2 rounded-xl bg-warning-soft px-3 py-2 text-xs text-warning [&_svg]:size-3.5"><History /> This plan is {plan.status} — read-only. Roll it back to a draft to edit, or make it active again.</div>
-          )}
-          {actionErr && <p className="px-1 text-xs text-warning" role="alert">{actionErr}</p>}
-          <div className="flex gap-3">
-            {readOnly ? (
-              <>
-                <Button variant="outline" className="flex-1" disabled={action !== null} onClick={() => void rollback()}>{action === "rollback" ? "Rolling back…" : "Roll back to draft"}</Button>
-                <Button className="flex-1" disabled={action !== null} onClick={() => void makeActive()}>{action === "activate" ? "Activating…" : "Make active"}</Button>
-              </>
-            ) : (
-              <>
-                <Button variant="outline" className="flex-1" disabled={!dirty || saving || action !== null} onClick={() => void save()}>{saving ? "Saving…" : dirty ? "Save draft" : "Saved"}</Button>
-                <Button className="flex-1" disabled={saving || action !== null} onClick={() => void publish()}>{action === "publish" ? "Publishing…" : plan.status === "published" ? "Re-publish" : "Publish"}</Button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+      <BuilderFooter status={plan.status} readOnly={!!readOnly} life={life} />
         </>
         )}
       </Reveal>
@@ -596,9 +655,16 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
 
       {picker && <ExercisePicker library={library} reloadLibrary={reloadLibrary} onClose={() => setPicker(null)} onPick={(id) => { mutate((d) => d[dayIdx]!.blocks[picker.blockIdx]!.slots.push(emptySlot(id))); setPicker(null); }} />}
       {aiOpen && <AiDraftSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
-      {exportOpen && plan && <ExportTemplateSheet body={{ days }} defaultName={plan.name} onClose={() => setExportOpen(false)} />}
+      {exportOpen && plan && <SaveTemplateSheet kind="workout" body={{ days }} defaultName={plan.name} stripNote="Absolute and dropset weights are cleared, so it's reusable for any client." onClose={() => setExportOpen(false)} />}
       {copyWeekOpen && <CopyWeekSheet dayCount={days.length} onClose={() => setCopyWeekOpen(false)} onCopy={copyWeek} />}
-      {seedTemplateOpen && <SeedTemplateSheet onClose={() => setSeedTemplateOpen(false)} onPick={(body, name) => { setSeedTemplateOpen(false); seedDraft(name, body); }} />}
+      {seedTemplateOpen && (
+        <TemplatePickerSheet<WorkoutBody>
+          kind="workout" tone="activity"
+          countOf={(b) => { const n = b.days?.length ?? 0; return `${n} day${n === 1 ? "" : "s"}`; }}
+          onClose={() => setSeedTemplateOpen(false)}
+          onPick={(body, name) => { setSeedTemplateOpen(false); seedDraft(name, body); }}
+        />
+      )}
       <ConfirmDialog
         open={!!seedConfirm}
         onOpenChange={(o) => { if (!o) setSeedConfirm(null); }}
@@ -626,11 +692,11 @@ function CopyWeekSheet({ dayCount, onClose, onCopy }: { dayCount: number; onClos
         <p className="text-sm text-muted-foreground">Duplicates all {dayCount} {dayCount === 1 ? "day" : "days"} as a new week. A progression is added to every set that has that value — leave at 0 to copy as-is.</p>
         <Field label="Week label (added to each day name)" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Week 2" />
         <div className="space-y-1.5">
-          <div className="text-sm text-muted-foreground">Reps per set</div>
+          <Eyebrow>Reps per set</Eyebrow>
           <SegmentedControl options={[{ value: "0", label: "Same" }, { value: "1", label: "+1" }, { value: "2", label: "+2" }]} value={reps} onChange={setReps} />
         </div>
         <div className="space-y-1.5">
-          <div className="text-sm text-muted-foreground">Load (kg on set weights, % on %1RM)</div>
+          <Eyebrow>Load — kg on set weights, % on %1RM</Eyebrow>
           <SegmentedControl options={[{ value: "0", label: "Same" }, { value: "2.5", label: "+2.5" }, { value: "5", label: "+5" }]} value={load} onChange={setLoad} />
         </div>
       </div>
@@ -638,16 +704,35 @@ function CopyWeekSheet({ dayCount, onClose, onCopy }: { dayCount: number; onClos
   );
 }
 
+/** The set table's column names. Aligned to `SetRow`'s cells by sharing their
+ *  widths — the one thing that must not drift, so both read `CELL`. */
+const CELL = "w-16 shrink-0";
+function SetTableHeader({ mode }: { mode: MeasurementMode }) {
+  return (
+    <div aria-hidden className="flex items-center gap-1.5 px-2 text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground/70">
+      <span className="w-5 shrink-0" />
+      <span className="w-4 shrink-0 text-center">#</span>
+      {MEASURE_COLUMNS[mode].map((c) => <span key={c} className={cn(CELL, "text-center")}>{c}</span>)}
+      <span className="min-w-0 flex-1">Load</span>
+    </div>
+  );
+}
+
 function SetRow({ set, index, mode, onPatch, onApplyToAll, onRemove }: { set: WorkoutSet; index: number; mode: MeasurementMode; onPatch: (p: Partial<WorkoutSet>) => void; onApplyToAll?: () => void; onRemove: () => void }) {
   const [open, setOpen] = useState(false);
   const wm = WEIGHT_MODES.find((m) => m.value === set.weightMode);
   const num = (v: string) => (v ? Number(v) : null);
-  const cell = "h-10 w-16 shrink-0 px-2.5 text-center text-sm";
+  const cell = cn(CELL, "h-10 px-2.5 text-center text-sm");
   return (
-    <div className="rounded-xl bg-surface-3/40 p-2">
+    <div className={cn("rounded-xl p-2 transition-colors", set.setType === "warmup" ? "bg-surface-3/25" : "bg-surface-3/40")}>
       <div className="flex items-center gap-1.5">
         <button onClick={() => setOpen((o) => !o)} aria-label={open ? "Collapse set" : "Expand set"} className="w-5 shrink-0 text-muted-foreground"><ChevronRight className={`size-3.5 transition-transform ${open ? "rotate-90" : ""}`} /></button>
-        <span className="w-4 shrink-0 text-center text-xs font-medium text-muted-foreground">{index + 1}</span>
+        {/* The index doubles as the set's TYPE: a warm-up and a working set look
+            identical in a column of boxes, and which is which changes what every
+            other number means. */}
+        <span className={cn("w-4 shrink-0 text-center text-xs font-semibold", set.setType === "warmup" ? "text-muted-foreground/60" : set.setType === "amrap" ? "text-activity" : "text-muted-foreground")}>
+          {set.setType === "warmup" ? "w" : set.setType === "amrap" ? "∞" : index + 1}
+        </span>
         {(mode === "reps" || mode === "reps_in_time") && (
           <Input type="number" inputMode="numeric" aria-label="Reps" placeholder="reps" value={set.reps ?? ""} onChange={(e) => onPatch({ reps: num(e.target.value) })} className={cell} />
         )}
@@ -672,8 +757,8 @@ function SetRow({ set, index, mode, onPatch, onApplyToAll, onRemove }: { set: Wo
       </div>
       {open && (
         <div className="mt-2.5 space-y-2.5 pl-6">
-          <div>
-            <div className="mb-1.5 text-xs font-medium text-muted-foreground">Set type</div>
+          <div className="space-y-1.5">
+            <Eyebrow>Set type</Eyebrow>
             <SegmentedControl fill value={set.setType} onChange={(v) => onPatch({ setType: v as WorkoutSet["setType"] })} options={SET_TYPES.map((t) => ({ value: t, label: t }))} />
           </div>
           <div className="grid grid-cols-3 gap-2">
@@ -718,25 +803,34 @@ function ExercisePicker({ library, onClose, onPick, reloadLibrary }: { library: 
 
   return (
     <Sheet open onClose={onClose} title="Add exercise" size="tall">
-      <Field label="Search your library" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} className="mb-2" />
-      <Button size="sm" variant="secondary" className="mb-3 w-full" onClick={() => setCompose(true)}><Plus /> Create a new exercise</Button>
-      {muscles.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
-          {muscles.map((m) => <Chip key={m} selected={muscle === m} onClick={() => setMuscle(muscle === m ? null : m)}>{pretty(m)}</Chip>)}
+      <div className="space-y-2.5">
+        <div className="flex items-center gap-2">
+          <Field label="Search your library" labelHidden icon={Search} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your library…" className="flex-1" />
+          <Button size="icon" variant="secondary" aria-label="Create a new exercise" onClick={() => setCompose(true)}><Plus /></Button>
         </div>
-      )}
-      {equipment.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {equipment.map((eq) => <Chip key={eq} selected={equip === eq} onClick={() => setEquip(equip === eq ? null : eq)}>{pretty(eq)}</Chip>)}
+        {/* Both facet rows scroll rather than wrap: wrapping made the sheet's
+            header up to four lines tall before the first result. */}
+        {muscles.length > 0 && (
+          <Rail bleed="tight">{muscles.map((m) => <RailItem key={m}><Chip selected={muscle === m} onClick={() => setMuscle(muscle === m ? null : m)}>{pretty(m)}</Chip></RailItem>)}</Rail>
+        )}
+        {equipment.length > 0 && (
+          <Rail bleed="tight">{equipment.map((eq) => <RailItem key={eq}><Chip selected={equip === eq} onClick={() => setEquip(equip === eq ? null : eq)}>{pretty(eq)}</Chip></RailItem>)}</Rail>
+        )}
+        <div className="max-h-96 space-y-1 overflow-y-auto">
+          {filtered.map((e) => (
+            <button key={e.id} onClick={() => onPick(e.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
+              <ExerciseRow ex={e} thumbSize={40} trailing={e.difficulty ? <Badge tone="neutral">{e.difficulty}</Badge> : null} />
+            </button>
+          ))}
+          {filtered.length === 0 && (
+            <EmptyState
+              icon={Dumbbell}
+              title={q || muscle || equip ? "Nothing matches" : "Your library is empty"}
+              description={q || muscle || equip ? "Try a different term, or clear the filters." : "Add the movements you coach and they'll be here for every plan."}
+              action={<Button onClick={() => setCompose(true)}><Plus /> Create an exercise</Button>}
+            />
+          )}
         </div>
-      )}
-      <div className="max-h-96 space-y-1 overflow-y-auto">
-        {filtered.map((e) => (
-          <button key={e.id} onClick={() => onPick(e.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary">
-            <ExerciseRow ex={e} thumbSize={40} trailing={e.difficulty ? <Badge tone="neutral">{e.difficulty}</Badge> : null} />
-          </button>
-        ))}
-        {filtered.length === 0 && <p className="px-3 py-6 text-center text-sm text-muted-foreground">No matches — create a new one above.</p>}
       </div>
     </Sheet>
   );
@@ -756,77 +850,6 @@ function AiDraftSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: stri
         {dropped ? <div className="rounded-xl border border-border/60 bg-surface-2 p-3 text-xs text-muted-foreground">Draft applied. {dropped.length} suggested exercise{dropped.length === 1 ? "" : "s"} weren't in your library and {dropped.length === 1 ? "was" : "were"} skipped: {dropped.join(", ")}. Add {dropped.length === 1 ? "it" : "them"} to your library to include next time.</div> : null}
         {err ? <AiErrorBox error={err} /> : null}
       </div>
-    </Sheet>
-  );
-}
-
-/** Pick a saved workout template to seed the draft with. Fetches on open;
- *  each row shows the template name + its day count. Picking hands the body up. */
-function SeedTemplateSheet({ onClose, onPick }: { onClose: () => void; onPick: (body: WorkoutBody, name: string) => void }) {
-  const [templates, setTemplates] = useState<{ id: string; name: string; description?: string | null; body: WorkoutBody }[] | null>(null);
-  useEffect(() => {
-    let alive = true;
-    api.get<{ templates: { id: string; name: string; description?: string | null; body: WorkoutBody }[] }>("/api/workout-templates")
-      .then((r) => { if (alive) setTemplates(r.templates ?? []); })
-      .catch(() => { if (alive) setTemplates([]); });
-    return () => { alive = false; };
-  }, []);
-  return (
-    <Sheet open onClose={onClose} title="Start from a template" size="tall">
-      <p className="mb-3 text-sm text-muted-foreground">Loads a saved template into this draft, replacing the current days.</p>
-      {templates === null ? (
-        <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>
-      ) : templates.length === 0 ? (
-        <p className="px-3 py-6 text-center text-sm text-muted-foreground">No templates yet — save one from a plan's builder.</p>
-      ) : (
-        <div className="max-h-96 space-y-1.5 overflow-y-auto">
-          {templates.map((t) => {
-            const n = t.body.days?.length ?? 0;
-            return (
-              <button key={t.id} onClick={() => onPick(t.body, t.name)} className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-card p-3 text-left transition-colors hover:bg-surface-2">
-                <IconBadge icon={LayoutGrid} tone="activity" size="sm" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold">{t.name}</div>
-                  <div className="truncate text-xs text-muted-foreground">{n} day{n === 1 ? "" : "s"}{t.description ? ` · ${t.description}` : ""}</div>
-                </div>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </Sheet>
-  );
-}
-
-function ExportTemplateSheet({ body, defaultName, onClose }: { body: WorkoutBody; defaultName: string; onClose: () => void }) {
-  const [name, setName] = useState(defaultName);
-  const [shared, setShared] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
-  const run = async () => {
-    setBusy(true);
-    try { await api.post("/api/workout-templates", { name, visibility: shared ? "tenant" : "private", body, stripWeights: true }); setDone(true); }
-    finally { setBusy(false); }
-  };
-  return (
-    <Sheet
-      open
-      onClose={onClose}
-      title="Save as template"
-      /* Once it is saved there is nothing left to submit — the done branch is a
-         receipt with its own way out, so the footer goes with the form. */
-      footer={done ? undefined : <Button size="lg" className="w-full" disabled={busy || !name.trim()} onClick={() => void run()}>{busy ? "Saving…" : "Save template"}</Button>}
-    >
-      {done ? (
-        <EmptyState icon={Save} title="Saved to your library" description="Client-specific loads were stripped so it's reusable." action={<Button onClick={onClose}>Done</Button>} />
-      ) : (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">Copies this plan's structure into a reusable template. Absolute and dropset weights are cleared.</p>
-          <Field label="Template name" value={name} onChange={(e) => setName(e.target.value)} />
-          <label className="flex items-center justify-between rounded-xl bg-secondary px-4 py-3 text-sm"><span>Share with the whole team</span><Switch checked={shared} onCheckedChange={setShared} /></label>
-        </div>
-      )}
     </Sheet>
   );
 }

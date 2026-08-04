@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, CircleAlert, CircleCheck, RefreshCw } from "./lib/icons.js";
+import { AlertTriangle, ChevronDown, CircleAlert, CircleCheck, RefreshCw } from "./lib/icons.js";
 import { Button, Callout } from "./primitives.js";
 import { Eyebrow } from "./metrics.js";
 import { EmptyState } from "./shell.js";
@@ -258,5 +258,141 @@ export function FieldGroup({ title, hint, children, className }: {
       {hint && <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>}
       {children}
     </section>
+  );
+}
+
+/**
+ * THE COMMITTING BAR — a workspace's verbs, pinned where the thumb is.
+ *
+ * A screen that EDITS something (as opposed to one that navigates or reads) owes
+ * its user two things a scrolling page cannot give: the commit action always
+ * reachable, and the reason it is unavailable stated next to it rather than
+ * inferred from a greyed-out button. Both builders had hand-rolled this — the
+ * same fixed/blur/border/`md:pl-24` incantation, twice, with the read-only
+ * notice and the error line copy-pasted around it.
+ *
+ * `md:pl-24` is the part nobody remembers: on desktop the nav RAIL occupies the
+ * left edge, and a bar spanning the true viewport slides underneath it.
+ *
+ * `notice` is above the buttons on purpose. It carries the sentence that
+ * explains a disabled state, and a sentence UNDER the control it explains is a
+ * sentence read after the tap that failed.
+ */
+export function ActionBar({ notice, error, children, className }: {
+  notice?: ReactNode;
+  /** The last failure, announced in place. Bars sit over content; a toast here
+   *  scrolls away from the button that caused it. */
+  error?: string | null;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("fixed inset-x-0 bottom-0 z-30 border-t border-border/40 bg-background/90 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl md:pl-24", className)}>
+      <div className="column space-y-2">
+        {notice}
+        {error && <p className="px-1 text-xs text-warning" role="alert">{error}</p>}
+        <div className="flex gap-3">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A ROW THAT RUNS OFF THE EDGE — the horizontal scroller, with the four details
+ * that were being retyped twelve times and getting one of them wrong.
+ *
+ *   BLEED.      The row scrolls edge-to-edge and its content starts at the
+ *               column's inset. Without the negative margin the first item is
+ *               inset and the last one stops short, so the row reads as clipped
+ *               rather than as continuing.
+ *   NO BAR.     A visible scrollbar under a chip row is desktop chrome on a
+ *               surface designed for a thumb.
+ *   SNAP.       Card-sized items snap; chip-sized items must not — snapping a
+ *               28px chip fights every flick.
+ *   SHRINK-0.   Flex children default to shrinking, so a long chip label
+ *               silently compresses its neighbours instead of scrolling. Each
+ *               item is wrapped rather than relying on every call site.
+ *
+ * It does NOT own selection, spacing semantics or item shape: a rail of chips,
+ * a rail of cover cards and a rail of avatars are the same scroller.
+ */
+export function Rail({ children, snap = false, bleed = "column", gap = "sm", className }: {
+  children: ReactNode;
+  /** Snap items to the leading edge. For CARD-sized items only. */
+  snap?: boolean;
+  /** How far the row bleeds past its container: the page column's `px-4`
+   *  (`column`), a card's `px-1` (`tight`), or not at all (`none`). */
+  bleed?: "column" | "tight" | "none";
+  gap?: "sm" | "md";
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "no-scrollbar flex overflow-x-auto overscroll-x-contain",
+        gap === "md" ? "gap-3" : "gap-1.5",
+        bleed === "column" ? "-mx-4 px-4" : bleed === "tight" ? "-mx-1 px-1" : "",
+        // SCROLL padding, not just padding. `snap-mandatory` aligns a
+        // `snap-start` item to the SNAPPORT, which defaults to the padding box —
+        // so at rest the container scrolls by exactly the inset above and the
+        // first item sits flush against the screen edge with its corner clipped.
+        // `scroll-p*` moves the snapport in to match.
+        snap && (bleed === "column" ? "scroll-pl-4" : bleed === "tight" ? "scroll-pl-1" : ""),
+        // The padding keeps a focus ring and a selected item's shadow from being
+        // clipped by the scroll box — an outline drawn outside the content box is
+        // still inside the OVERFLOW box, and `overflow-x-auto` cuts it.
+        "pb-1",
+        snap && "snap-x snap-mandatory",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** One item in a `Rail` — never shrinks, snaps when the rail does. */
+export function RailItem({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn("shrink-0 snap-start", className)}>{children}</div>;
+}
+
+/**
+ * MORE, ON REQUEST — the detail under a summary.
+ *
+ * A workspace screen keeps acquiring read-outs: a plan's muscle balance, a
+ * day's calorie spread, a report's per-item breakdown. Each is genuinely useful
+ * and none of them is the WORK, so they accumulate above the work and push it
+ * off the screen. The plan builder's health card was ~380px of chart before the
+ * day picker — a check the coach runs occasionally, permanently occupying the
+ * space they edit in.
+ *
+ * The summary stays; the breakdown folds. Two rules make it honest:
+ *
+ *   AN ALARM NEVER FOLDS.       Whatever is wrong stays visible next to the
+ *                               summary. A warning behind a chevron is a warning
+ *                               nobody reads.
+ *   THE TRIGGER SAYS WHAT IS IN IT. "Weekly sets by muscle", not "Details" —
+ *                               a chevron labelled "more" is a coin toss.
+ */
+export function Disclosure({ label, children, defaultOpen = false, className }: {
+  label: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className={cn("space-y-2", className)}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-1.5 px-1 text-micro uppercase text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <span className="min-w-0 flex-1 text-left">{label}</span>
+        <ChevronDown className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && children}
+    </div>
   );
 }

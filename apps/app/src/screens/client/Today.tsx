@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtVolume, fmtEnergy, fmtWeight, featureEnabled, type UnitPrefs } from "@kova/domain";
-import { Button, Card, Skeleton, Sheet, EmptyState, ProgressRing, Reveal, SkeletonHero, SkeletonList, SkeletonHeader, Page, Stagger, Anchor, DayNav, LoadError, ChevronRight, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock, Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple, Store, Ticket, AlertTriangle, ShieldCheck, toneVar, Target, ScanLine, BookOpen, Group, Row, User, type Tone, type LucideIcon } from "@4dl/ui";
+import { Button, Card, Skeleton, Sheet, EmptyState, ProgressRing, Reveal, SkeletonHero, SkeletonList, SkeletonHeader, Page, Stagger, Rail, Anchor, DayNav, LoadError, ChevronRight, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock, Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple, Store, Ticket, AlertTriangle, ShieldCheck, toneVar, Target, ScanLine, BookOpen, Group, Row, User, type Tone, type LucideIcon } from "@4dl/ui";
 import { MacroBar } from "../../registry/index.js";
 import type { WidgetItem } from "@kova/protocol";
 import { useNavigate } from "react-router-dom";
@@ -588,7 +588,7 @@ function ExploreRail({ clientId, onOpen }: { clientId: string; onOpen: () => voi
         <h3 className="text-micro uppercase text-muted-foreground">Explore</h3>
         <span className="inline-flex items-center gap-0.5 text-sm font-medium text-primary [&_svg]:size-4">See all <ChevronRight /></span>
       </button>
-      <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1">
+      <Rail snap gap="md">
         {items.map((r) => {
           const Icon = railIcon(r.type);
           return (
@@ -604,7 +604,7 @@ function ExploreRail({ clientId, onOpen }: { clientId: string; onOpen: () => voi
             </button>
           );
         })}
-      </div>
+      </Rail>
     </Stagger>
   );
 }

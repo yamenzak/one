@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MealBody, MealOption } from "@kova/protocol";
 import { optionMacroTotals, type FoodLike } from "@kova/protocol";
 import { fmtEnergy, featureEnabled } from "@kova/domain";
-import { Button, Card, Badge, Eyebrow, Media, Sheet, Skeleton, EmptyState, SegmentedControl, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw, Anchor, CountUp, Atmosphere, DUR, EASE_OUT } from "@4dl/ui";
+import { Button, Card, Badge, Eyebrow, Media, Sheet, Skeleton, EmptyState, SegmentedControl, Rail, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw, Anchor, CountUp, Atmosphere, DUR, EASE_OUT } from "@4dl/ui";
 import { MacroInline, MacroTiles, MicroGrid } from "../../registry/index.js";
 import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -283,14 +283,14 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                           <span className="font-semibold">{meta.label}</span>
                           <span className="text-xs text-muted-foreground">{opts.length} option{opts.length === 1 ? "" : "s"}</span>
                         </div>
-                        <div className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 py-2">
+                        <Rail snap gap="md" className="py-2">
                           {opts.map(({ opt, index }, oi) => (
                             <OptionPhotoCard
                               key={index} opt={opt} index={index} units={units} image={optionImage(opt)} totals={optionMacroTotals(opt, foodMap)} readOnly={isPast || !canLogFood} anchor={gi === 0 && oi === 0}
                               logged={!isPast && canLogFood && loggedIdx.has(index)} logging={logging === index} onLog={() => void logOption(opt, index)} onOpen={() => setDetail({ opt, index })}
                             />
                           ))}
-                        </div>
+                        </Rail>
                       </section>
                     );
                   })}

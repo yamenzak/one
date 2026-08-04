@@ -839,6 +839,36 @@ Three rules go with it, and the component enforces the first two:
 - **The button says how many are on.** A control that hides state must say it
   has some, or the list looks broken.
 
+### A workspace shows one subject, and the once-only verbs live in a menu
+
+A screen that BUILDS something — a plan, a schedule, a document — is one task
+repeated: pick a subject, edit it, move on. Everything else (seed from last
+time, start from a template, draft it with AI, save it as a template, duplicate
+the lot) happens **once, at the start**, and it accretes into permanent
+full-width controls stacked above the content. Both plan builders had four such
+blocks, so every scroll to the exercise being edited crossed four controls the
+coach had already finished with.
+
+Three rules, and they compose:
+
+- **Once-only verbs go in the header's ⋯ menu.** One glyph, always in the same
+  place, and the screen below it is the thing you are making. A verb that acts
+  on the WHOLE artefact belongs there; a verb that acts on what is on screen
+  (add a day, add a block, add a food) stays inline where it applies.
+- **The subject picker is a rail, not a grid.** Six days as a 2-up grid of
+  cover cards is three rows — the whole viewport spent choosing, before any
+  editing, on a choice made once. The same covers at rail height cost one row
+  and read identically.
+- **One subject at a time, and the picker says which ones have content.** The
+  meal builder rendered all six meal types as cards, always, so a fresh draft
+  opened as six cards saying "No options yet". A count on each chip answers
+  "what have I actually written" without opening anything.
+
+And the screen that edits owes a **committing bar** (`ActionBar`, §13): the
+commit always reachable, and the reason it is unavailable stated next to it —
+above the buttons, because a sentence under the control it explains is a
+sentence read after the tap that failed.
+
 ### A photo fills its frame. A mark is contained inside one.
 
 Image fit looks like a per-slot preference and is not — it is a question about
@@ -1534,6 +1564,21 @@ shared component would be off by one for everyone outside UTC.
 | `SettingsPage` | The frame around one section: back, title, and **one** line of description. | A section that needs a paragraph — if it does, its rows are named wrong. | ✅ |
 | `SectionDetail` | A section that is itself several settings: an index of sub-pages, one open at a time, each row stating its **current value**. | Two or three controls that fit on one page. Splitting those buys a tap and costs a screen. | ✅ |
 | `SaveBar` | The bottom of an editable section: result, then a full-width button. Pass `dirty` and it disables itself when nothing changed. | A section with no explicit save. An instant control belongs on `useConfirmedState`, whose failure surface is `ActionResult`. | ✅ |
+| `ActionBar` | The pinned bottom bar of a screen that **edits** something. Owns the blur, the safe area, the column, `md:pl-24` (the desktop nav rail), the `notice` slot and the error line. | A screen that reads or navigates. A bar over content the user is only scrolling is chrome in the way. | ✅ |
+| `Rail` + `RailItem` | Any row that scrolls sideways: chips, cover cards, avatars. Owns the bleed, the hidden scrollbar, `shrink-0`, and the **scroll padding** snapping needs. | A row that fits. A scroller that never scrolls hides its own affordance. | ✅ |
+| `Disclosure` | A read-out that is useful but is not the work: a breakdown, a spread, a per-item table. The summary stays; the detail folds. | An alarm, or anything a decision depends on. | ✅ |
+
+`Rail`'s fourth detail is the one that is always wrong when hand-rolled.
+`snap-mandatory` aligns a `snap-start` item to the **snapport**, which defaults
+to the padding box — so a bleeding row (`-mx-4 px-4`) scrolls by exactly its own
+inset at rest and the first card sits flush against the screen edge with its
+corner and its focus ring clipped. `scroll-p*` moves the snapport in to match.
+Three client screens shipped with that clipping before the component existed.
+
+`Disclosure` carries two rules the component cannot enforce: **an alarm never
+folds** (a warning behind a chevron is a warning nobody reads — keep it beside
+the summary), and **the trigger says what is inside it** ("Weekly sets by
+muscle", never "Details").
 
 `SectionDetail` is **controlled and router-free**: `openKey` + `onOpen` are
 props, because this package has no router dependency and must not gain one — a

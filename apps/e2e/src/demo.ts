@@ -31,7 +31,7 @@
 
 import type { Browser, BrowserContext } from "@playwright/test";
 import { provisionClient, provisionStudio, seedExercise, type Client, type Studio } from "./provision.js";
-import { compOntoPlan, populateClient, populateRoster, publishWorkoutPlan, seedFrontDesk, setTargets } from "./populate.js";
+import { compOntoPlan, populateClient, populateRoster, publishMealPlan, publishWorkoutPlan, seedFoods, seedFrontDesk, setTargets } from "./populate.js";
 
 /** The studio every image is taken in. A real-sounding name, not "Test Studio". */
 export const DEMO_STUDIO = "Northlight Strength";
@@ -51,6 +51,10 @@ export interface DemoWorld {
   /** Roster ids, in creation order. The first is the photographed client. */
   roster: string[];
   planId: string;
+  /** The published meal plan. The meal builder is a bank of OPTIONS, and a
+   *  screen designed around picking between them cannot be photographed with a
+   *  single one. */
+  mealPlanId: string;
 }
 
 /**
@@ -114,10 +118,11 @@ export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"):
     exercises.push(await seedExercise(studio, name, [...muscles], [...kit]));
   }
   const planId = await publishWorkoutPlan(studio, client, exercises, "Upper / Lower Split");
+  const mealPlanId = await publishMealPlan(studio, client, await seedFoods(studio));
 
   await seedFrontDesk(studio, client.id);
 
-  return { studio, client, roster, planId };
+  return { studio, client, roster, planId, mealPlanId };
 }
 
 /**
