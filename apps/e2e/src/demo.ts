@@ -55,6 +55,9 @@ export interface DemoWorld {
    *  screen designed around picking between them cannot be photographed with a
    *  single one. */
   mealPlanId: string;
+  /** A second plan in the FIXED kind — one meal per slot, no choosing. Both
+   *  kinds exist in the demo because they are different screens. */
+  fixedMealPlanId: string;
 }
 
 /**
@@ -118,11 +121,13 @@ export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"):
     exercises.push(await seedExercise(studio, name, [...muscles], [...kit]));
   }
   const planId = await publishWorkoutPlan(studio, client, exercises, "Upper / Lower Split");
-  const mealPlanId = await publishMealPlan(studio, client, await seedFoods(studio));
+  const foodIds = await seedFoods(studio);
+  const mealPlanId = await publishMealPlan(studio, client, foodIds);
+  const fixedMealPlanId = await publishMealPlan(studio, client, foodIds, "Prep week — fixed", "fixed", false);
 
   await seedFrontDesk(studio, client.id);
 
-  return { studio, client, roster, planId, mealPlanId };
+  return { studio, client, roster, planId, mealPlanId, fixedMealPlanId };
 }
 
 /**

@@ -113,9 +113,26 @@ test("the coach's studio", async () => {
     await shoot(page, project, "coach-workout-builder", { settle: 600 });
   });
 
+  // The block list, which is the whole point of the day and sits below the
+  // header at phone height. Scrolled to rather than cropped from a full-page
+  // shot: what matters is how the collapsed blocks read as a list.
+  await test.step("the workout builder's blocks", async () => {
+    await visit(page, `${base}/clients/${world.client.id}/plans/workout/${world.planId}`, page.getByLabel("Day name"));
+    await page.mouse.wheel(0, 620);
+    await shoot(page, project, "coach-workout-blocks", { settle: 600 });
+  });
+
   await test.step("the meal builder", async () => {
     await visit(page, `${base}/clients/${world.client.id}/plans/meal/${world.mealPlanId}`, page.getByText("Daily plan health"));
     await shoot(page, project, "coach-meal-builder", { settle: 600 });
+  });
+
+  // The other KIND of meal plan. It is a different screen — one meal per slot,
+  // no options rail — so photographing only the bank would document half the
+  // feature.
+  await test.step("the meal builder · a fixed day", async () => {
+    await visit(page, `${base}/clients/${world.client.id}/plans/meal/${world.fixedMealPlanId}`, page.getByText("one meal per slot"));
+    await shoot(page, project, "coach-meal-builder-fixed", { settle: 600 });
   });
 
   await test.step("the report", async () => {

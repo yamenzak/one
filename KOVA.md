@@ -519,9 +519,18 @@ snapshot the active goal.
   fan-out normalized to per-100 g, provider precedence, sourceId dedup, KV-cached.
 - **Barcode**: local-first → OFF fallback → auto-import. html5-qrcode with native
   BarcodeDetector when available.
-- **Meal plans = bank of options** (kept): options per meal type (built-ins gated by
-  client meals/day preference + tenant custom types), foods with live macro totals,
-  **free meals with calorie caps**, publish/supersede lifecycle, templates.
+- **Meal plans come in two KINDS** (`MealBody.mode`, `@kova/protocol` meal.ts) —
+  the same body, the same macro math, the same templates and shopping list; the
+  difference is whether the client chooses:
+  - `options` (the default, and what every plan written before the field existed
+    is): a **bank of options** per meal type (built-ins gated by the client's
+    meals/day preference + tenant custom types), foods with live macro totals,
+    **free meals with calorie caps**.
+  - `fixed`: a **prescription** — one meal per slot, no choosing. The builder
+    keeps the invariant (at most one option per meal type) and readers take the
+    first; switching to it drops the extras behind a confirmation. The client's
+    drawer renders one full-width card per meal instead of a rail.
+  Both share the publish/supersede lifecycle and the template store.
 - **Client arrangements**: private weekly (weekday × meal type → option) mapping,
   optimistic drawer UI, **grocery list** aggregated per week.
 - **Diary**: calorie donut segmented by macros with net = consumed − burned; one-tap
@@ -1186,7 +1195,7 @@ the tenancy".
 | `/shop` | C (+staff in Train mode) | `client/Shop.tsx:30` | Storefront: packages, plans, access |
 | `/explore` | C (+staff in Train mode) | `client/Explore.tsx:20` | Coach-published articles |
 | `/accept-invitation/:id` | T O | `screens/AcceptInvite.tsx:25` | Staff invite, in-session |
-| `/clients/:id/plans/:kind/:planId` | T O | `coach/WorkoutBuilder.tsx:356` · `coach/MealBuilder.tsx:57` | Plan builders. Shared frame — header ⋯ menu, lifecycle, footer, template sheets — in `coach/builder.tsx` |
+| `/clients/:id/plans/:kind/:planId` | T O | `coach/WorkoutBuilder.tsx` · `coach/MealBuilder.tsx` | Plan builders. Shared frame — header ⋯ menu, lifecycle, footer, template sheets — in `coach/builder.tsx`. Blocks and meal options are one-open-at-a-time `Collapsible`s |
 
 Routes declared in `Shell.tsx:123-142`.
 

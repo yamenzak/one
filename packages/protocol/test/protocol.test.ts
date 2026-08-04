@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
+  fixedOptionFor,
   MealBody,
+  mealTypesIn,
+  multiExerciseSingleBlocks,
   normalizeEquipment,
   normalizeMuscle,
   optionMacroTotals,
   prescribedSetsForDay,
+  splitSingleBlocks,
   stripBodyForTemplate,
   WorkoutBody,
+  type ExerciseSlot,
   type FoodLike,
+  type WorkoutBlock,
 } from "../src/index.js";
 
 describe("taxonomy normalization (AI auto-fill tolerance)", () => {
@@ -131,5 +137,77 @@ describe("meal body schema", () => {
       carbsG: 0,
       fatG: 0,
     });
+  });
+});
+
+describe("a `single` block holds one exercise", () => {
+  const slot = (id: string): ExerciseSlot => ({ exerciseId: id, measurementMode: "reps", sets: [{ setType: "working", weightMode: "unspecified", reps: 10 }] });
+  const body = (blocks: WorkoutBlock[]): WorkoutBody => ({ days: [{ name: "A", isRestDay: false, blocks }] });
+
+  it("splits a multi-exercise single block into one block each, in order", () => {
+    const { body: out, changed } = splitSingleBlocks(body([{ type: "single", slots: [slot("a"), slot("b"), slot("c")] }]));
+    expect(changed).toBe(1);
+    expect(out.days[0]!.blocks).toHaveLength(3);
+    expect(out.days[0]!.blocks.map((b) => b.slots[0]!.exerciseId)).toEqual(["a", "b", "c"]);
+    expect(out.days[0]!.blocks.every((b) => b.type === "single" && b.slots.length === 1)).toBe(true);
+  });
+
+  it("leaves supersets, circuits and HIIT alone — several slots is the point", () => {
+    for (const type of ["superset", "circuit", "hiit"] as const) {
+      const { body: out, changed } = splitSingleBlocks(body([{ type, rounds: 3, slots: [slot("a"), slot("b")] }]));
+      expect(changed).toBe(0);
+      expect(out.days[0]!.blocks).toHaveLength(1);
+      expect(out.days[0]!.blocks[0]!.slots).toHaveLength(2);
+    }
+  });
+
+  it("is a no-op on a body that already conforms, and says so", () => {
+    const input = body([{ type: "single", slots: [slot("a")] }, { type: "superset", slots: [slot("b"), slot("c")] }]);
+    const { body: out, changed } = splitSingleBlocks(input);
+    expect(changed).toBe(0);
+    expect(out).toEqual(input);
+  });
+
+  it("carries the block's own settings onto every piece", () => {
+    const { body: out } = splitSingleBlocks(body([{ type: "single", restAfterBlockSec: 120, blockNotes: "slow", slots: [slot("a"), slot("b")] }]));
+    expect(out.days[0]!.blocks.map((b) => b.restAfterBlockSec)).toEqual([120, 120]);
+    expect(out.days[0]!.blocks.map((b) => b.blockNotes)).toEqual(["slow", "slow"]);
+  });
+
+  it("does not change what the day PRESCRIBES — the split is presentational", () => {
+    const input = body([{ type: "single", slots: [slot("a"), slot("b"), slot("c")] }]);
+    expect(prescribedSetsForDay(splitSingleBlocks(input).body.days[0]!)).toBe(prescribedSetsForDay(input.days[0]!));
+  });
+
+  it("counts what needs splitting without splitting it", () => {
+    expect(multiExerciseSingleBlocks(body([{ type: "single", slots: [slot("a"), slot("b")] }, { type: "single", slots: [slot("c")] }]))).toBe(1);
+  });
+});
+
+describe("a meal plan is a bank of options or a prescription", () => {
+  it("defaults to options, so every plan written before the mode existed keeps its meaning", () => {
+    const parsed = MealBody.parse({ mealOptions: [] });
+    expect(parsed.mode).toBe("options");
+  });
+
+  it("round-trips a fixed plan", () => {
+    expect(MealBody.parse({ mode: "fixed", mealOptions: [] }).mode).toBe("fixed");
+  });
+
+  it("reads the ONE option a fixed meal prescribes, and ignores a stray second", () => {
+    const b = MealBody.parse({
+      mode: "fixed",
+      mealOptions: [
+        { mealType: "lunch", mealName: "Chicken & rice", foods: [] },
+        { mealType: "lunch", mealName: "left over from options mode", foods: [] },
+      ],
+    });
+    expect(fixedOptionFor(b, "lunch")?.mealName).toBe("Chicken & rice");
+    expect(fixedOptionFor(b, "dinner")).toBeUndefined();
+  });
+
+  it("lists the meals a body prescribes, in the caller's order", () => {
+    const b = MealBody.parse({ mealOptions: [{ mealType: "dinner", foods: [] }, { mealType: "breakfast", foods: [] }] });
+    expect(mealTypesIn(b, ["breakfast", "lunch", "dinner"])).toEqual(["breakfast", "dinner"]);
   });
 });

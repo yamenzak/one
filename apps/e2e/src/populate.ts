@@ -330,16 +330,12 @@ export async function seedFoods(studio: Studio): Promise<string[]> {
  * shape the builder is designed around and the shape a one-option seed cannot
  * show. Free-meal and per-meal-range affordances both need more than one.
  */
-export async function publishMealPlan(studio: Studio, client: Client, foodIds: string[], name = "Lean phase — options"): Promise<string> {
+export async function publishMealPlan(studio: Studio, client: Client, foodIds: string[], name = "Lean phase — options", mode: "options" | "fixed" = "options", publish = true): Promise<string> {
   const f = (i: number) => foodIds[i % foodIds.length]!;
   const food = (i: number, quantity: number) => ({ foodId: f(i), quantity, unit: "g" });
   const created = await callJson<{ plan: { id: string } }>(studio.page, studio.base, "/api/meal-plans", { clientId: client.id, name });
   const planId = created.plan.id;
-  await callPatch(studio.page, studio.base, `/api/meal-plans/${planId}`, {
-    body: {
-      customMealTypes: [],
-      hiddenMealTypes: ["pre_workout", "post_workout"],
-      mealOptions: [
+  const options = [
         { mealType: "breakfast", mealName: "Oats, yoghurt & berries", isFree: false, foods: [food(0, 60), food(1, 170), food(2, 80)] },
         { mealType: "breakfast", mealName: "Protein shake & almonds", isFree: false, foods: [food(8, 30), food(9, 30), food(2, 60)] },
         { mealType: "lunch", mealName: "Chicken, rice & broccoli", isFree: false, foods: [food(3, 150), food(4, 180), food(5, 120)] },
@@ -347,10 +343,21 @@ export async function publishMealPlan(studio: Studio, client: Client, foodIds: s
         { mealType: "dinner", mealName: "Salmon, rice & greens", isFree: false, foods: [food(6, 120), food(4, 150), food(5, 150)] },
         { mealType: "dinner", mealName: "Eat out", isFree: true, foods: [], freeMealMaxCalories: 800 },
         { mealType: "snack", mealName: "Yoghurt & almonds", isFree: false, foods: [food(1, 170), food(9, 20)] },
-      ],
+  ];
+  // A fixed plan prescribes ONE meal per slot — the same foods, minus the choice.
+  const seen = new Set<string>();
+  const mealOptions = mode === "fixed" ? options.filter((o) => (seen.has(o.mealType) ? false : (seen.add(o.mealType), true))) : options;
+  await callPatch(studio.page, studio.base, `/api/meal-plans/${planId}`, {
+    body: {
+      mode,
+      customMealTypes: [],
+      hiddenMealTypes: ["pre_workout", "post_workout"],
+      mealOptions,
     },
   });
-  await callJson(studio.page, studio.base, `/api/meal-plans/${planId}/publish`, {});
+  // Publishing a second plan SUPERSEDES the first. A demo that publishes both
+  // kinds leaves one read-only, which photographs the wrong footer.
+  if (publish) await callJson(studio.page, studio.base, `/api/meal-plans/${planId}/publish`, {});
   return planId;
 }
 

@@ -869,6 +869,29 @@ commit always reachable, and the reason it is unavailable stated next to it —
 above the buttons, because a sentence under the control it explains is a
 sentence read after the tap that failed.
 
+### One container, one meaning
+
+When two containers can hold the same thing, the coach has to decide which — and
+there is no right answer, so they decide differently every time and the screen
+stops being readable.
+
+A workout **block** answers "how are these performed *together*": as a superset,
+as a circuit, as HIIT. `single` is the answer "they are not". So a `single` block
+holding four exercises was a grouping that meant nothing — and the player had
+always agreed, flattening exactly that case into one step per exercise. The
+ambiguity lived only in the builder, where "add exercise" put a second movement
+inside a container whose type says they are unrelated. A `single` block holds
+**one** exercise; several is what the other three types are for.
+
+The test for this: **if two arrangements render identically downstream, they are
+the same arrangement, and the editor should only be able to express one of them.**
+
+⚠️ Normalising an existing document is not free. Logged sets here are stored
+against `(blockIndex, slotIndex)`, so splitting re-numbers them. The split is
+applied on open and left DIRTY rather than written — the footer says "Save
+draft", a `Callout` says what happened, and nothing reaches the server until the
+coach commits it.
+
 ### A photo fills its frame. A mark is contained inside one.
 
 Image fit looks like a per-slot preference and is not — it is a question about
@@ -1567,6 +1590,7 @@ shared component would be off by one for everyone outside UTC.
 | `ActionBar` | The pinned bottom bar of a screen that **edits** something. Owns the blur, the safe area, the column, `md:pl-24` (the desktop nav rail), the `notice` slot and the error line. | A screen that reads or navigates. A bar over content the user is only scrolling is chrome in the way. | ✅ |
 | `Rail` + `RailItem` | Any row that scrolls sideways: chips, cover cards, avatars. Owns the bleed, the hidden scrollbar, `shrink-0`, and the **scroll padding** snapping needs. | A row that fits. A scroller that never scrolls hides its own affordance. | ✅ |
 | `Disclosure` | A read-out that is useful but is not the work: a breakdown, a spread, a per-item table. The summary stays; the detail folds. | An alarm, or anything a decision depends on. | ✅ |
+| `Collapsible` + `useOneOpen` | A LIST of editable things where only one is being worked on: plan blocks, meal options, form sections. Controlled — the parent holds which one. | Two items. An accordion of two is a toggle wearing a costume. | ✅ |
 
 `Rail`'s fourth detail is the one that is always wrong when hand-rolled.
 `snap-mandatory` aligns a `snap-start` item to the **snapport**, which defaults
@@ -1579,6 +1603,15 @@ Three client screens shipped with that clipping before the component existed.
 folds** (a warning behind a chevron is a warning nobody reads — keep it beside
 the summary), and **the trigger says what is inside it** ("Weekly sets by
 muscle", never "Details").
+
+`Collapsible` is the different job: it folds CONTENT, so **the summary row has
+to be worth reading on its own** — in a list of ten collapsed sections the
+summaries ARE the screen. A meal option collapses to its name, its calories,
+its macros and what it is made of; a workout block to its exercise, its
+prescription and how it is performed. If choosing between three of them requires
+opening all three, the summary is wrong. `useOneOpen` adds the two behaviours
+every hand-rolled accordion gets wrong: **toggling the open one closes it**, and
+**a newly added item opens itself** (`focus(key)` from the Add handler).
 
 `SectionDetail` is **controlled and router-free**: `openKey` + `onOpen` are
 props, because this package has no router dependency and must not gain one — a

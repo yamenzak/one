@@ -396,3 +396,64 @@ export function Disclosure({ label, children, defaultOpen = false, className }: 
     </div>
   );
 }
+
+/**
+ * ONE THING AT A TIME — the section you are working on, open; the rest, listed.
+ *
+ * `Disclosure` folds a read-out under a quiet label. This folds CONTENT, and it
+ * is a different job: the summary row has to be worth reading on its own,
+ * because in a list of ten collapsed sections the summaries ARE the screen.
+ * A meal option collapses to its name, its calories and its macros; a workout
+ * block to its exercise, its set count and how it is performed. Nothing is
+ * hidden that you needed in order to choose.
+ *
+ * It is CONTROLLED. An accordion where every section owns its own open state
+ * ends up with six open at once, which is the layout it was meant to replace —
+ * so the parent holds "which one" and passes it down. That also makes "open the
+ * one I just added" a one-line consequence rather than a ref and an effect.
+ */
+export function Collapsible({ open, onToggle, summary, children, tone = "card", className }: {
+  open: boolean;
+  onToggle: () => void;
+  /** The collapsed row. Must stand alone — see above. */
+  summary: ReactNode;
+  children: ReactNode;
+  /** `card` sits on the page; `inset` sits inside one. */
+  tone?: "card" | "inset";
+  className?: string;
+}) {
+  return (
+    <div className={cn("overflow-hidden rounded-2xl", tone === "card" ? "bg-card" : "bg-surface-2", className)}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2 px-3.5 py-3 text-left transition-colors hover:bg-surface-2/60"
+      >
+        <span className="min-w-0 flex-1">{summary}</span>
+        <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
+      </button>
+      {open && <div className="border-t border-border/50 px-3.5 pb-3.5 pt-3">{children}</div>}
+    </div>
+  );
+}
+
+/**
+ * "Which one is open" for a list of `Collapsible`s, including the two rules
+ * every hand-rolled version gets wrong:
+ *
+ *   TOGGLING THE OPEN ONE CLOSES IT.  Not "does nothing" — a section you have
+ *                                     finished with should collapse.
+ *   A NEW ITEM OPENS ITSELF.          `focus(key)` is what an "Add" handler
+ *                                     calls, so the thing just created is the
+ *                                     thing on screen.
+ */
+export function useOneOpen<K>(initial: K | null = null) {
+  const [openKey, setOpenKey] = useState<K | null>(initial);
+  return {
+    openKey,
+    isOpen: (k: K) => openKey === k,
+    toggle: (k: K) => setOpenKey((cur) => (cur === k ? null : k)),
+    focus: (k: K | null) => setOpenKey(k),
+  };
+}

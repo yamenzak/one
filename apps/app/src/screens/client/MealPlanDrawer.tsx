@@ -1,9 +1,18 @@
 /**
- * Meal plan — the client's full-screen plan experience. A published plan is a
- * BANK OF OPTIONS grouped by meal: for each meal you pick one option, see its
- * macros, get an AI recipe, and log it in a tap. A second tab turns the same
- * options into a day-weighted shopping list. Full-screen (not a cramped sheet)
- * with a hero, clear "pick one per meal" framing, and premium motion.
+ * Meal plan — the client's full-screen plan experience.
+ *
+ * A published plan comes in one of two KINDS (`MealBody.mode`), and the screen
+ * has to say which without the client having to work it out:
+ *
+ *   options  a BANK grouped by meal — pick one lunch from three. A rail per
+ *            meal, the peek promising the others.
+ *   fixed    a PRESCRIPTION — this is breakfast, this is lunch. One full-width
+ *            card per meal and no rail, because a carousel of one says "swipe
+ *            for the rest" about a meal that has none.
+ *
+ * Everything downstream is shared: the macro maths, the detail sheet, the AI
+ * recipe, the logging, and the shopping list (which, in a fixed plan, is simply
+ * the day × how many days you are buying for).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -74,6 +83,8 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   // switching to one) can never overwrite the current plan's saved list.
   const active = (viewId ? allPlans.find((p) => p.id === viewId) : plan) ?? plan ?? null;
   const isPast = !!active && !!plan && active.id !== plan.id;
+  /** A prescription, not a bank — the coach chose, so the client does not. */
+  const fixed = active?.body.mode === "fixed";
   const shopKey = active ? `kova.shop.${active.id}` : null;
   const shopReady = useRef<string | null>(null);
 
@@ -255,7 +266,9 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
             <Anchor
              
               eyebrow={<span className={isPast ? undefined : "text-nutrition"}>{isPast ? "Past plan" : active?.name}</span>}
-              sub={`${groups.length === 1 ? "meal a day" : "meals a day"} · ${active?.body.mealOptions?.length ?? 0} option${(active?.body.mealOptions?.length ?? 0) === 1 ? "" : "s"}`}
+              sub={fixed
+                ? (groups.length === 1 ? "meal a day · set by your coach" : "meals a day · set by your coach")
+                : `${groups.length === 1 ? "meal a day" : "meals a day"} · ${active?.body.mealOptions?.length ?? 0} option${(active?.body.mealOptions?.length ?? 0) === 1 ? "" : "s"}`}
               below={isPast ? (
                 <button onClick={() => pickPlan(null)} className="inline-flex items-center gap-1 rounded-full bg-nutrition-soft px-3 py-1 text-xs font-semibold text-nutrition [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
               ) : (targets?.targetCalories || targets?.targetProteinG) ? (
@@ -273,7 +286,11 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
             {view === "plan" ? (
               groups.length === 0 ? <EmptyState icon={Utensils} title="No options yet" /> : (
                 <div className="space-y-6">
-                  <p className="-mt-1 px-1 text-sm text-muted-foreground">{isPast || !canLogFood ? "Browse the meals and recipes in your plan." : <>Pick one option per meal each day, then tap <span className="font-medium text-foreground">Log</span> when you eat it.</>}</p>
+                  <p className="-mt-1 px-1 text-sm text-muted-foreground">{
+                    isPast || !canLogFood ? "Browse the meals and recipes in your plan."
+                    : fixed ? <>This is your day as your coach wrote it. Tap <span className="font-medium text-foreground">Log</span> on each meal when you eat it.</>
+                    : <>Pick one option per meal each day, then tap <span className="font-medium text-foreground">Log</span> when you eat it.</>
+                  }</p>
                   {groups.map(([type, opts], gi) => {
                     const meta = metaFor(type);
                     return (
@@ -281,8 +298,22 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                         <div className="flex items-center gap-2 px-1">
                           <span className="grid size-7 place-items-center rounded-xl bg-nutrition-soft text-nutrition [&_svg]:size-4"><meta.icon /></span>
                           <span className="font-semibold">{meta.label}</span>
-                          <span className="text-xs text-muted-foreground">{opts.length} option{opts.length === 1 ? "" : "s"}</span>
+                          {!fixed && <span className="text-xs text-muted-foreground">{opts.length} option{opts.length === 1 ? "" : "s"}</span>}
                         </div>
+                        {/*
+                          A FIXED plan is not a carousel. A horizontal rail of
+                          one card says "swipe for the others" about a meal that
+                          has no others, and it wastes a third of the width on
+                          the peek that promises them. One card, full width.
+                        */}
+                        {fixed ? (
+                          opts.slice(0, 1).map(({ opt, index }) => (
+                            <OptionPhotoCard
+                              key={index} opt={opt} index={index} units={units} image={optionImage(opt)} totals={optionMacroTotals(opt, foodMap)} readOnly={isPast || !canLogFood} anchor={gi === 0} full
+                              logged={!isPast && canLogFood && loggedIdx.has(index)} logging={logging === index} onLog={() => void logOption(opt, index)} onOpen={() => setDetail({ opt, index })}
+                            />
+                          ))
+                        ) : (
                         <Rail snap gap="md" className="py-2">
                           {opts.map(({ opt, index }, oi) => (
                             <OptionPhotoCard
@@ -291,6 +322,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                             />
                           ))}
                         </Rail>
+                        )}
                       </section>
                     );
                   })}
@@ -427,12 +459,14 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
 /** A meal option as a photo-hero carousel card — cover, name, calories, macro
  *  split, Log button. Tapping the cover opens the full detail sheet. */
-function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, onLog, onOpen, readOnly, anchor }: {
+function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, onLog, onOpen, readOnly, anchor, full }: {
   opt: MealOption; index: number; units: ReturnType<typeof useUnits>; image: string | null;
   totals: { calories: number; proteinG: number; carbsG: number; fatG: number }; logged: boolean; logging: boolean; onLog: () => void; onOpen: () => void; readOnly?: boolean; anchor?: boolean;
+  /** The only meal for this slot — no rail, no peek, full width. */
+  full?: boolean;
 }) {
   return (
-    <div className="w-[74%] shrink-0 snap-start sm:w-[52%]">
+    <div className={full ? "w-full" : "w-[74%] shrink-0 snap-start sm:w-[52%]"}>
       <div className={cn("overflow-hidden rounded-2xl bg-card", logged && "ring-1 ring-nutrition/50")}>
         <button onClick={onOpen} className="relative block h-36 w-full text-left transition-opacity active:opacity-90">
           {image ? <img src={image} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-nutrition/20 to-surface-2 text-nutrition/50 [&_svg]:size-9"><Utensils /></div>}

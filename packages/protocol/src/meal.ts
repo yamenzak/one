@@ -36,7 +36,33 @@ export const MealOption = z.object({
 });
 export type MealOption = z.infer<typeof MealOption>;
 
+/**
+ * WHAT KIND OF MEAL PLAN THIS IS.
+ *
+ *   options  a BANK the client picks from — two or three lunches, choose one.
+ *            The original model, and the default: every plan written before
+ *            this field existed is one, and an absent value must keep meaning
+ *            exactly what it meant.
+ *   fixed    a PRESCRIPTION — breakfast IS this, lunch IS this. One option per
+ *            meal, no choosing.
+ *
+ * Deliberately a mode on the SAME body rather than a second schema. A plan is
+ * the same thing either way — meals, each with foods and portions — and the
+ * difference is whether the client gets to choose. Two schemas would have
+ * duplicated the macro math, the shopping list, the history sheet and the
+ * template store, and would have made switching a plan from one to the other a
+ * migration instead of a toggle.
+ *
+ * `fixed` is a CONSTRAINT, not a different shape: at most one option per meal
+ * type. Nothing enforces that in the schema, because a plan that briefly holds
+ * two while a coach is switching modes must still load rather than 400 — the
+ * builder holds the invariant, and readers take the first.
+ */
+export const MealPlanMode = z.enum(["options", "fixed"]);
+export type MealPlanMode = z.infer<typeof MealPlanMode>;
+
 export const MealBody = z.object({
+  mode: MealPlanMode.default("options"),
   customMealTypes: z.array(z.object({ label: z.string().min(1).max(40) })).default([]),
   /** Built-in meal types the coach removed from THIS plan (e.g. "pre_workout").
    *  Built-ins render by default; listing one here hides it. Custom types are
@@ -107,4 +133,17 @@ export function optionMacroTotals(option: MealOption, foods: Map<string, FoodLik
     carbsG: Math.round(t.carbsG * 10) / 10,
     fatG: Math.round(t.fatG * 10) / 10,
   };
+}
+
+/** The one option the client eats for this meal in a `fixed` plan — the first,
+ *  because that is the invariant the builder keeps and the only sane reading of
+ *  a plan that momentarily holds two. */
+export function fixedOptionFor(body: MealBody, mealType: string): MealOption | undefined {
+  return body.mealOptions.find((o) => o.mealType === mealType);
+}
+
+/** Meal types this body actually prescribes, in the caller's preferred order. */
+export function mealTypesIn(body: MealBody, order: readonly string[]): string[] {
+  const present = new Set(body.mealOptions.map((o) => o.mealType));
+  return order.filter((t) => present.has(t));
 }

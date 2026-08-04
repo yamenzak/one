@@ -26,7 +26,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet, WeightMode, MeasurementMode } from "@kova/protocol";
-import { Button, Card, Badge, Field, Input, Select, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Page, Stagger, Eyebrow, GlanceStrip, ConfirmDialog, Disclosure, Rail, RailItem, toneVar, type Tone, cn, colorToHex, Reveal, SkeletonLine, Search, Plus, Copy, Trash2, PencilLine, Dumbbell, Moon, ChevronRight, CheckCheck, Save, LayoutGrid, ImageIcon, X, BarChart3, AlertTriangle } from "@4dl/ui";
+import { splitSingleBlocks } from "@kova/protocol";
+import { Button, Card, Badge, Field, Input, Select, Sheet, Skeleton, SubCard, EmptyState, SegmentedControl, Chip, Page, Stagger, Eyebrow, GlanceStrip, IconBadge, Callout, Collapsible, useOneOpen, ConfirmDialog, Disclosure, Rail, RailItem, toneVar, type Tone, cn, colorToHex, Reveal, SkeletonLine, Search, Plus, Copy, Trash2, PencilLine, Dumbbell, Moon, Layers, ChevronRight, CheckCheck, Save, LayoutGrid, ImageIcon, X, BarChart3, AlertTriangle } from "@4dl/ui";
 import { api, ApiError, errorText } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { AiAvatar } from "../../AiAvatar.js";
@@ -70,6 +71,22 @@ function normalizeSetForMode(set: WorkoutSet, mode: MeasurementMode): void {
   if (mode !== "time" && mode !== "reps_in_time") set.timeSec = null;
   if (mode !== "distance") set.distanceM = null;
 }
+/** "3 × 10 · 90s" — what a slot prescribes, in one line, for a collapsed block.
+ *  Sets that differ collapse to their count alone rather than lying about a
+ *  uniform prescription that is not there. */
+function setPrescription(slot: ExerciseSlot): string {
+  const n = slot.sets.length;
+  if (n === 0) return "No sets yet";
+  const measure = (s: WorkoutSet): string | null =>
+    slot.measurementMode === "distance" ? (s.distanceM != null ? `${s.distanceM} m` : null)
+    : slot.measurementMode === "time" ? (s.timeSec != null ? `${s.timeSec}s` : null)
+    : s.reps != null ? String(s.reps) : s.setType === "amrap" ? "AMRAP" : null;
+  const all = slot.sets.map(measure);
+  const uniform = all.every((v) => v === all[0]) ? all[0] : null;
+  const rest = slot.sets[0]?.restAfterSec;
+  return [uniform ? `${n} × ${uniform}` : `${n} set${n === 1 ? "" : "s"}`, rest ? `${rest}s rest` : null].filter(Boolean).join(" · ");
+}
+
 const emptyBlock = (): WorkoutBlock => ({ type: "single", slots: [] });
 const emptyDay = (name: string): WorkoutDay => ({ name, isRestDay: false, blocks: [] });
 
@@ -358,8 +375,21 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
   const [days, setDays] = useState<WorkoutDay[]>([]);
   const [dayIdx, setDayIdx] = useState(0);
   const [loadError, setLoadError] = useState(false);
+  /*
+    NORMALISE ON OPEN — one exercise per `single` block.
+
+    `splitSingleBlocks` is presentational: the player already flattened a
+    multi-slot `single` block into one step per slot, so nothing about what the
+    client is asked to DO changes. What does change is the block numbering, and
+    logged sets are stored against `(blockIndex, slotIndex)` — so on a plan a
+    client has already trained against, sets logged before the split map to the
+    wrong slot after it. So the split is applied on open and left DIRTY rather
+    than written: the footer says "Save draft" / "Re-publish", the notice says
+    what happened, and nothing reaches the server until the coach commits it.
+  */
+  const [splitCount, setSplitCount] = useState(0);
   const [library, setLibrary] = useState<ExerciseLite[]>([]);
-  const [picker, setPicker] = useState<{ blockIdx: number } | null>(null);
+  const [picker, setPicker] = useState<{ blockIdx: number; mode: "slot" | "new-block" } | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   // Every AI affordance in the builder posts to a route gated on aiSuite.
   const canAi = useCan("aiSuite");
@@ -381,11 +411,17 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
     const [p, ex] = await Promise.allSettled([api.get<{ plan: Plan }>(`/api/workout-plans/${planId}`), api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all")]);
     if (ex.status === "fulfilled") setLibrary(ex.value.exercises);
     if (p.status === "rejected") { setLoadError(true); return; }
-    setPlan(p.value.plan); setDays(p.value.plan.body.days ?? []);
+    const raw = p.value.plan.body;
+    const { body: normalised, changed } = splitSingleBlocks({ days: raw.days ?? [] });
+    setPlan(p.value.plan); setDays(normalised.days); setSplitCount(changed);
   }, [planId]);
   useEffect(() => void load(), [load]);
 
   const life = usePlanLifecycle({ kind: "workout", planId, body: () => ({ days }), reload: load });
+  // Which block is open. One at a time — see the block list below.
+  const blocks = useOneOpen<number>(0);
+  // The split is a change to the plan, so the footer must say so.
+  useEffect(() => { if (splitCount > 0) life.markDirty(); }, [splitCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Library-only refresh — used after an inline "create exercise" so the new
   // row resolves its name/thumb WITHOUT reloading the plan (which would reset
@@ -512,6 +548,13 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
 
       <ClientPrefsStrip clientId={plan.clientId} focus="workout" />
 
+      {splitCount > 0 && (
+        <Callout tone="primary" icon={Layers}>
+          {splitCount} block{splitCount === 1 ? "" : "s"} held more than one exercise and {splitCount === 1 ? "has" : "have"} been split — a block now says how ONE exercise is performed.
+          Nothing the client does changes; the numbering does, so save when you're happy.
+        </Callout>
+      )}
+
       {/* Live "is this plan balanced?" read — volume by muscle group. */}
       <PlanHealthCard days={days} lib={libMap} />
 
@@ -571,8 +614,44 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
             {!day.isRestDay && <DayCoverRow dayName={day.name} value={day.imageUrl} onChange={(url) => mutate((d) => (d[dayIdx]!.imageUrl = url))} />}
           </Card>
 
-          {!day.isRestDay && day.blocks.map((block, blockIdx) => (
-            <Card key={blockIdx} className="space-y-4">
+          {/*
+            ONE BLOCK OPEN AT A TIME.
+
+            A real day is five to eight exercises, each with a mode picker, four
+            preset chips, a column header and three to five set rows — about
+            300px apiece, so the eighth was ~2,400px below the first and the
+            coach lost the day they were writing. Collapsed, a block is its
+            exercise, its prescription and how it is performed, which is what you
+            need to decide whether to open it.
+          */}
+          {!day.isRestDay && day.blocks.map((block, blockIdx) => {
+            const first = block.slots[0];
+            const solo = block.type === "single";
+            const setCount = block.slots.reduce((n, sl) => n + sl.sets.length, 0);
+            const title = solo
+              ? (first ? nameOf(first.exerciseId) : "Empty block")
+              : `${BLOCK_TYPES.find((b) => b.value === block.type)?.label ?? block.type} · ${block.slots.length} exercise${block.slots.length === 1 ? "" : "s"}`;
+            const sub = solo
+              ? (first ? setPrescription(first) : "Pick an exercise")
+              : `${block.rounds ?? 1} round${(block.rounds ?? 1) === 1 ? "" : "s"} · ${setCount} set${setCount === 1 ? "" : "s"}`;
+            return (
+            <Collapsible
+              key={blockIdx}
+              open={blocks.isOpen(blockIdx)}
+              onToggle={() => blocks.toggle(blockIdx)}
+              summary={
+                <span className="flex items-center gap-3">
+                  {solo
+                    ? <ExerciseThumb thumb={first && exOf(first.exerciseId)?.thumb_url} thumb2={first && exOf(first.exerciseId)?.thumb2_url} size={34} />
+                    : <IconBadge icon={Layers} tone="activity" size="sm" />}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">{title}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{sub}</span>
+                  </span>
+                </span>
+              }
+            >
+            <div className="space-y-4">
               {/* A block's TYPE is the structural decision of the day — whether
                   these exercises are done one at a time or as a superset — so it
                   is labelled, not an unnamed dropdown beside a bin. */}
@@ -581,7 +660,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                   <Eyebrow>How it's performed</Eyebrow>
                   <Select value={block.type} onChange={(v) => mutate((d) => (d[dayIdx]!.blocks[blockIdx]!.type = v as WorkoutBlock["type"]))} options={BLOCK_TYPES} aria-label="How it's performed" className="h-10 w-full" />
                 </div>
-                <button onClick={() => mutate((d) => d[dayIdx]!.blocks.splice(blockIdx, 1))} aria-label="Remove block" className="grid size-10 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button>
+                <button onClick={() => { mutate((d) => d[dayIdx]!.blocks.splice(blockIdx, 1)); blocks.focus(null); }} aria-label="Remove block" className="grid size-10 shrink-0 place-items-center rounded-xl text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button>
               </div>
 
               {block.type !== "single" && (
@@ -598,16 +677,24 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                 return (
                 <SubCard key={slotIdx} className="space-y-3">
                   {/*
-                    The exercise name gets the row; the mode picker gets its own line.
+                    On a SOLO block the collapsed summary above already names the
+                    exercise and shows its thumbnail — a second copy here read as
+                    a duplicate, and its × (remove the exercise) sat next to the
+                    bin (remove the block) meaning the same thing for a block
+                    that holds one. In a superset the row is what tells the three
+                    slots apart, so it stays.
 
-                    A 128px `Select` plus a remove button pinned to the right of a
-                    ~330px row left "Barbell Bac…", "Romanian …", "Incline Du…" —
-                    every exercise in a real plan truncated, in the one screen
-                    whose entire job is knowing which exercise you are editing.
+                    The name gets a whole row and the mode picker gets its own
+                    line: a 128px `Select` plus a remove button pinned to the
+                    right of a ~330px row left "Barbell Bac…", "Romanian …",
+                    "Incline Du…" — every exercise in a real plan truncated, in
+                    the one screen whose job is knowing which one you are editing.
                   */}
-                  <ExerciseRow ex={exOf(slot.exerciseId)} name={nameOf(slot.exerciseId)} meta={false} thumbSize={34} trailing={
-                    <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots.splice(slotIdx, 1))} aria-label="Remove exercise" className="text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
-                  } />
+                  {!solo && (
+                    <ExerciseRow ex={exOf(slot.exerciseId)} name={nameOf(slot.exerciseId)} meta={false} thumbSize={34} trailing={
+                      <button onClick={() => mutate((d) => d[dayIdx]!.blocks[blockIdx]!.slots.splice(slotIdx, 1))} aria-label={`Remove ${nameOf(slot.exerciseId)}`} className="text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
+                    } />
+                  )}
 
                   {/* Measured-in + the one-tap set templates, on one line: both
                       answer "what shape are these sets", and both are set once
@@ -636,12 +723,23 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                 </SubCard>
                 );
               })}
-              <button onClick={() => setPicker({ blockIdx })} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-secondary py-2.5 text-sm text-muted-foreground [&_svg]:size-4"><Plus /> Add exercise</button>
-            </Card>
-          ))}
+              {/*
+                A `single` block holds ONE exercise (@kova/protocol
+                splitSingleBlocks): the type says these movements are unrelated,
+                so a second one inside it is a container that means nothing. The
+                button therefore ADDS A BLOCK here and ADDS A SLOT on a superset,
+                circuit or HIIT — where several is the entire point.
+              */}
+              <button onClick={() => setPicker({ blockIdx, mode: solo && block.slots.length > 0 ? "new-block" : "slot" })} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-secondary py-2.5 text-sm text-muted-foreground [&_svg]:size-4">
+                <Plus /> {solo && block.slots.length > 0 ? "Add another exercise" : "Add exercise"}
+              </button>
+            </div>
+            </Collapsible>
+            );
+          })}
 
           {!day.isRestDay && (
-            <Button variant="ghost" className="w-full" onClick={() => mutate((d) => d[dayIdx]!.blocks.push(emptyBlock()))}><Plus /> Add a block</Button>
+            <Button variant="ghost" className="w-full" onClick={() => { mutate((d) => d[dayIdx]!.blocks.push(emptyBlock())); blocks.focus(day.blocks.length); }}><Plus /> Add a block</Button>
           )}
         </>
       ) : null}
@@ -653,7 +751,21 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
       </Reveal>
       )}
 
-      {picker && <ExercisePicker library={library} reloadLibrary={reloadLibrary} onClose={() => setPicker(null)} onPick={(id) => { mutate((d) => d[dayIdx]!.blocks[picker.blockIdx]!.slots.push(emptySlot(id))); setPicker(null); }} />}
+      {picker && (
+        <ExercisePicker
+          library={library} reloadLibrary={reloadLibrary} onClose={() => setPicker(null)}
+          onPick={(id) => {
+            if (picker.mode === "new-block") {
+              const at = picker.blockIdx + 1;
+              mutate((d) => d[dayIdx]!.blocks.splice(at, 0, { type: "single", slots: [emptySlot(id)] }));
+              blocks.focus(at);
+            } else {
+              mutate((d) => d[dayIdx]!.blocks[picker.blockIdx]!.slots.push(emptySlot(id)));
+            }
+            setPicker(null);
+          }}
+        />
+      )}
       {aiOpen && <AiDraftSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
       {exportOpen && plan && <SaveTemplateSheet kind="workout" body={{ days }} defaultName={plan.name} stripNote="Absolute and dropset weights are cleared, so it's reusable for any client." onClose={() => setExportOpen(false)} />}
       {copyWeekOpen && <CopyWeekSheet dayCount={days.length} onClose={() => setCopyWeekOpen(false)} onCopy={copyWeek} />}

@@ -24,10 +24,10 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import type { MealBody, MealOption, MealFood } from "@kova/protocol";
+import type { MealBody, MealOption, MealFood, MealPlanMode } from "@kova/protocol";
 import { optionMacroTotals, type FoodLike } from "@kova/protocol";
 import { fmtEnergy, scaleFood, servingsToQuantity, SERVING_PRESETS } from "@kova/domain";
-import { Button, Card, Badge, Field, Input, Sheet, Skeleton, SubCard, ProgressRing, Eyebrow, Chip, ConfirmDialog, Disclosure, EmptyState, Page, Stagger, Rail, RailItem, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, AlertTriangle, Plus, PencilLine, Utensils, Flame, Save, ChevronRight, Trash2, X } from "@4dl/ui";
+import { Button, Card, Badge, Field, Input, Sheet, Skeleton, SubCard, ProgressRing, Eyebrow, Chip, Callout, Collapsible, useOneOpen, ConfirmDialog, Disclosure, EmptyState, Page, Stagger, Rail, RailItem, Reveal, SkeletonLine, SkeletonRow, colorToHex, toneVar, cn, AlertTriangle, Plus, PencilLine, Utensils, Flame, Save, ListChecks, Layers, Trash2, X } from "@4dl/ui";
 import { MacroInline, MacroBar } from "../../registry/index.js";
 import { api, ApiError, errorText } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
@@ -45,6 +45,7 @@ interface Plan { id: string; clientId: string; name: string; status: string; bod
 interface FoodRow { id: string; name: string; serving_size: number; calories: number; protein_g: number; carbs_g: number; fat_g: number; image_url: string | null }
 const BUILTIN_TYPES = ["breakfast", "lunch", "dinner", "snack", "pre_workout", "post_workout"];
 const typeLabel = (t: string) => t.replace(/_/g, " ");
+const newOption = (mealType: string, ordinal: number): MealOption => ({ mealType, mealName: `Option ${ordinal}`, isFree: false, foods: [] });
 
 /** Normalize a plan's snapshotted goal (flat or `{targets}`-nested) into flat targets. */
 function asTargets(src: unknown): Targets | null {
@@ -59,6 +60,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   const [options, setOptions] = useState<MealOption[]>([]);
   const [customTypes, setCustomTypes] = useState<{ label: string }[]>([]);
   const [hiddenTypes, setHiddenTypes] = useState<string[]>([]);
+  const [mode, setMode] = useState<MealPlanMode>("options");
   const [foods, setFoods] = useState<Map<string, FoodLike>>(new Map());
   const [rows, setRows] = useState<Map<string, { name: string; image: string | null }>>(new Map());
   const [targets, setTargets] = useState<Targets | null>(null);
@@ -93,14 +95,23 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
     const [p, f] = await Promise.allSettled([api.get<{ plan: Plan }>(`/api/meal-plans/${planId}`), api.get<{ foods: FoodRow[] }>("/api/foods?scope=all")]);
     if (f.status === "fulfilled") { setFoods(foodsFromRows(f.value.foods)); setRows(rowsFrom(f.value.foods)); }
     if (p.status === "rejected") { setLoadError(true); return; }
-    setPlan(p.value.plan); setOptions(p.value.plan.body.mealOptions ?? []); setCustomTypes(p.value.plan.body.customMealTypes ?? []); setHiddenTypes(p.value.plan.body.hiddenMealTypes ?? []);
+    setPlan(p.value.plan); setOptions(p.value.plan.body.mealOptions ?? []); setCustomTypes(p.value.plan.body.customMealTypes ?? []); setHiddenTypes(p.value.plan.body.hiddenMealTypes ?? []); setMode(p.value.plan.body.mode ?? "options");
   }, [planId]);
   useEffect(() => void load(), [load]);
 
   const life = usePlanLifecycle({
     kind: "meal", planId, reload: load,
-    body: () => ({ customMealTypes: customTypes, hiddenMealTypes: hiddenTypes, mealOptions: options }),
+    body: () => ({ mode, customMealTypes: customTypes, hiddenMealTypes: hiddenTypes, mealOptions: options }),
   });
+
+  /*
+    ONE OPTION OPEN AT A TIME. An option is a name, a macro line, three or four
+    food rows each with a portion control, and a photo affordance — 250px or so.
+    Three of them for one meal filled the screen before the coach could compare
+    them, which is the entire reason a bank of options exists.
+  */
+  const opened = useOneOpen<number>(0);
+  const [modeConfirm, setModeConfirm] = useState(false);
 
   // Live target feedback: the client's ACTIVE goal targets (canonical, guarded
   // by requireClientAccess). Drafts don't snapshot a goal — only published
@@ -151,6 +162,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
     setOptions(body.mealOptions ?? []);
     setCustomTypes(body.customMealTypes ?? []);
     setHiddenTypes(body.hiddenMealTypes ?? []);
+    setMode(body.mode ?? "options");
     life.markDirty();
     void refreshFoods();
   };
@@ -162,6 +174,25 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
   };
 
   const mutate = (fn: (d: MealOption[]) => void) => { const next = structuredClone(options); fn(next); setOptions(next); life.markDirty(); };
+  /*
+    SWITCHING KIND.
+
+    `fixed` means one option per meal, so the switch DROPS the extras rather
+    than leaving a plan whose stored shape contradicts its mode — a reader
+    taking "the first" would silently ignore work the coach could still see in
+    the builder. Going back to `options` keeps what is there and simply starts
+    offering the choice again, so the round trip is only lossy in the direction
+    that was confirmed.
+  */
+  const applyMode = (next: MealPlanMode) => {
+    setMode(next);
+    if (next === "fixed") {
+      const seen = new Set<string>();
+      setOptions((prev) => prev.filter((o) => (seen.has(o.mealType) ? false : (seen.add(o.mealType), true))));
+    }
+    life.markDirty();
+    setModeConfirm(false);
+  };
   // Remove a meal type from THIS plan: built-ins are hidden (restorable via
   // "+ Meal type"); custom types are dropped outright. Either way its options go.
   const removeType = (type: string) => {
@@ -235,6 +266,12 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
                 />
                 <BuilderMenuItem onSelect={() => setTypeOpen(true)}><Plus /> Add a meal type</BuilderMenuItem>
                 <BuilderMenuSeparator />
+                {/* The plan's KIND. Switching to fixed is lossy (the options
+                    beyond the first stop being offered), so it asks first. */}
+                <BuilderMenuItem onSelect={() => (mode === "fixed" ? applyMode("options") : setModeConfirm(true))}>
+                  {mode === "fixed" ? <><ListChecks /> Let the client choose between options</> : <><Layers /> Make this a fixed daily plan</>}
+                </BuilderMenuItem>
+                <BuilderMenuSeparator />
               </>
             )}
             <BuilderMenuItem onSelect={() => setExportOpen(true)}><Save /> Save as template</BuilderMenuItem>
@@ -244,7 +281,13 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
 
       <ClientPrefsStrip clientId={plan.clientId} focus="meal" />
 
-      <PlanHealth allTypes={allTypes} byType={byType} foods={foods} targets={targets} />
+      {mode === "fixed" && (
+        <Callout tone="nutrition" icon={Layers}>
+          A <strong>fixed</strong> plan — one meal per slot, no choosing. Switch it back to options from the ⋯ menu.
+        </Callout>
+      )}
+
+      <PlanHealth allTypes={allTypes} byType={byType} foods={foods} targets={targets} mode={mode} />
 
       {/*
         The meal picker. Each chip carries its option count, so "which meals have
@@ -277,7 +320,14 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
           <div className="flex items-center justify-between gap-2 px-1">
             <h2 className="text-title-3 capitalize">{typeLabel(type)}</h2>
             <div className="flex items-center gap-1">
-              <Button size="sm" variant="tonal" onClick={() => mutate((d) => d.push({ mealType: type, mealName: `Option ${opts.length + 1}`, isFree: false, foods: [] }))}><Plus /> Option</Button>
+              {/* In a fixed plan a meal HAS one option, so once it exists there
+                  is nothing to add — the button would create a second meal the
+                  client is never offered. */}
+              {(mode === "options" || opts.length === 0) && (
+                <Button size="sm" variant="tonal" onClick={() => { mutate((d) => d.push(newOption(type, opts.length + 1))); opened.focus(options.length); }}>
+                  <Plus /> {mode === "fixed" ? "Set the meal" : "Option"}
+                </Button>
+              )}
               {!readOnly && <button onClick={() => removeType(type)} aria-label={`Remove ${typeLabel(type)}`} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button>}
             </div>
           </div>
@@ -285,17 +335,20 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
           {opts.length === 0 ? (
             <EmptyState
               icon={Utensils}
-              title={`No ${typeLabel(type)} options yet`}
-              description="An option is one thing the client may eat for this meal. Give them two or three and they pick whichever suits the day."
-              action={<Button onClick={() => mutate((d) => d.push({ mealType: type, mealName: "Option 1", isFree: false, foods: [] }))}><Plus /> Add the first option</Button>}
+              title={mode === "fixed" ? `No ${typeLabel(type)} yet` : `No ${typeLabel(type)} options yet`}
+              description={mode === "fixed"
+                ? "A fixed plan prescribes exactly one thing per meal — this is what the client eats."
+                : "An option is one thing the client may eat for this meal. Give them two or three and they pick whichever suits the day."}
+              action={<Button onClick={() => { mutate((d) => d.push(newOption(type, 1))); opened.focus(options.length); }}><Plus /> {mode === "fixed" ? "Set this meal" : "Add the first option"}</Button>}
             />
           ) : opts.map(({ opt, idx }, n) => (
             <OptionCard
               key={idx}
-              opt={opt} ordinal={n + 1} targets={targets} foods={foods}
+              opt={opt} ordinal={n + 1} targets={targets} foods={foods} mode={mode}
               nameOf={nameOf} imageOf={imageOf}
+              open={opened.isOpen(idx)} onToggle={() => opened.toggle(idx)}
               onPatch={(fn) => mutate((d) => fn(d[idx]!))}
-              onRemove={() => mutate((d) => d.splice(idx, 1))}
+              onRemove={() => { mutate((d) => d.splice(idx, 1)); opened.focus(null); }}
               onAddFood={() => setFoodPicker({ optIdx: idx })}
             />
           ))}
@@ -311,7 +364,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
 
       {foodPicker && <FoodSearchSheet onClose={() => setFoodPicker(null)} onPick={(id, name) => { mutate((d) => d[foodPicker.optIdx]!.foods.push({ foodId: id, quantity: 100, unit: "g" })); setRows((p) => new Map(p).set(id, { name, image: p.get(id)?.image ?? null })); setFoodPicker(null); void refreshFoods(); }} />}
       {aiOpen && <AiMealSheet onClose={() => setAiOpen(false)} onRun={runAi} />}
-      {exportOpen && plan && <SaveTemplateSheet kind="meal" body={{ customMealTypes: customTypes, hiddenMealTypes: hiddenTypes, mealOptions: options }} defaultName={plan.name} stripNote="The meals and their portions are kept as written." onClose={() => setExportOpen(false)} />}
+      {exportOpen && plan && <SaveTemplateSheet kind="meal" body={{ mode, customMealTypes: customTypes, hiddenMealTypes: hiddenTypes, mealOptions: options }} defaultName={plan.name} stripNote="The meals and their portions are kept as written." onClose={() => setExportOpen(false)} />}
       <Sheet open={typeOpen} onClose={() => setTypeOpen(false)} title="Add meal type" footer={<Button size="lg" className="w-full" disabled={newType.trim().length < 2} onClick={addCustomType}>Add meal type</Button>}>
         <div className="space-y-4">
           {restorable.length > 0 && (
@@ -334,6 +387,15 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
         />
       )}
       <ConfirmDialog
+        open={modeConfirm}
+        onOpenChange={setModeConfirm}
+        title="Make this a fixed daily plan?"
+        description="Each meal keeps its FIRST option and the rest are removed. The client stops choosing and simply eats what's written."
+        confirmLabel="Make it fixed"
+        destructive
+        onConfirm={() => applyMode("fixed")}
+      />
+      <ConfirmDialog
         open={!!seedConfirm}
         onOpenChange={(o) => { if (!o) setSeedConfirm(null); }}
         title="Replace this draft?"
@@ -354,9 +416,10 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
  * reading "Option 1". It is now the card's own title, edited in place, with the
  * ordinal supplying the identity a placeholder was carrying.
  */
-function OptionCard({ opt, ordinal, targets, foods, nameOf, imageOf, onPatch, onRemove, onAddFood }: {
-  opt: MealOption; ordinal: number; targets: Targets | null; foods: Map<string, FoodLike>;
+function OptionCard({ opt, ordinal, targets, foods, mode, nameOf, imageOf, open, onToggle, onPatch, onRemove, onAddFood }: {
+  opt: MealOption; ordinal: number; targets: Targets | null; foods: Map<string, FoodLike>; mode: MealPlanMode;
   nameOf: (id: string) => string; imageOf: (id: string) => string | null;
+  open: boolean; onToggle: () => void;
   onPatch: (fn: (o: MealOption) => void) => void;
   onRemove: () => void;
   onAddFood: () => void;
@@ -364,16 +427,42 @@ function OptionCard({ opt, ordinal, targets, foods, nameOf, imageOf, onPatch, on
   const units = useUnits();
   const t = optionMacroTotals(opt, foods);
   const over = !!(targets?.targetCalories && t.calories > targets.targetCalories);
+  const label = opt.mealName || (opt.isFree ? "Free meal" : `Option ${ordinal}`);
   return (
-    <Card className="space-y-3">
-      <div className="flex items-center gap-2">
-        {/* A bare input, sized as a title. The value IS the heading. */}
-        <Input
+    <Collapsible
+      open={open}
+      onToggle={onToggle}
+      summary={
+        /* The collapsed row is the comparison: what it is, what it costs, and
+           what it is made of. Choosing between three lunches must not require
+           opening all three. */
+        <span className="flex items-center gap-3">
+          <FoodThumb src={opt.imageUrl ?? opt.foods.map((mf) => imageOf(mf.foodId)).find(Boolean) ?? null} size={34} />
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-1.5">
+              <span className="min-w-0 truncate text-sm font-semibold">{label}</span>
+              {opt.isFree && <Badge tone="nutrition">Free</Badge>}
+            </span>
+            <span className="mt-0.5 flex min-w-0 items-center gap-2">
+              <span className={cn("numeral shrink-0 text-xs font-semibold", over ? "text-warning" : "text-calories")}>{fmtEnergy(t.calories, units)}</span>
+              {!opt.isFree && <MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} className="shrink-0 text-xs" />}
+              {!opt.isFree && <span className="truncate text-xs text-muted-foreground">{opt.foods.length === 0 ? "no foods yet" : opt.foods.map((mf) => nameOf(mf.foodId)).join(", ")}</span>}
+            </span>
+          </span>
+        </span>
+      }
+    >
+    <div className="space-y-3">
+      <div className="flex items-end gap-2">
+        {/* LABELLED, not a bare title. The summary row directly above already
+            shows the name; an unlabelled second copy of it reads as a duplicate
+            rather than as the field that edits it. */}
+        <Field
+          label={mode === "fixed" ? "What this meal is" : "Option name"}
           value={opt.mealName}
-          placeholder={`Option ${ordinal}`}
-          aria-label="Option name"
+          placeholder={mode === "fixed" ? "e.g. Oats & berries" : `Option ${ordinal}`}
           onChange={(e) => onPatch((o) => (o.mealName = e.target.value))}
-          className="h-9 min-w-0 flex-1 border-0 bg-transparent px-1 text-base font-semibold focus-visible:bg-surface-2"
+          className="min-w-0 flex-1"
         />
         {/*
           A toggle that reads as a BADGE when it is off is a lie: "Free meal" on
@@ -385,22 +474,13 @@ function OptionCard({ opt, ordinal, targets, foods, nameOf, imageOf, onPatch, on
           onClick={() => onPatch((o) => { o.isFree = !o.isFree; if (o.isFree) o.foods = []; })}
           aria-pressed={opt.isFree}
           className={cn(
-            "shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+            "mb-1.5 shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
             opt.isFree ? "bg-nutrition-soft text-nutrition" : "border border-dashed border-border text-muted-foreground hover:text-foreground",
           )}
         >
           {opt.isFree ? "Free meal" : "Make free"}
         </button>
-        <Button size="icon-sm" variant="ghost" aria-label="Remove option" className="shrink-0 text-muted-foreground hover:text-danger" onClick={onRemove}><X /></Button>
-      </div>
-
-      {/* What this option costs, against what the client is allowed. */}
-      <div className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2">
-        <span className="numeral flex items-baseline gap-1 text-sm">
-          <span className={cn("font-bold", over ? "text-warning" : "text-calories")}>{fmtEnergy(t.calories, units)}</span>
-          {targets?.targetCalories ? <span className="text-xs text-muted-foreground">of {fmtEnergy(targets.targetCalories, units)}</span> : null}
-        </span>
-        <MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} className="text-xs" />
+        <Button size="icon-sm" variant="ghost" aria-label={`Remove ${label}`} className="mb-1 shrink-0 text-muted-foreground hover:text-danger" onClick={onRemove}><X /></Button>
       </div>
 
       {opt.isFree ? (
@@ -423,7 +503,8 @@ function OptionCard({ opt, ordinal, targets, foods, nameOf, imageOf, onPatch, on
           {opt.foods.length > 0 && <MealImage mealName={opt.mealName} foodNames={opt.foods.map((mf) => nameOf(mf.foodId))} value={opt.imageUrl} onChange={(url) => onPatch((o) => (o.imageUrl = url))} />}
         </div>
       )}
-    </Card>
+    </div>
+    </Collapsible>
   );
 }
 
@@ -432,11 +513,12 @@ function OptionCard({ opt, ordinal, targets, foods, nameOf, imageOf, onPatch, on
  *  representative SAMPLE DAY = the first option of each meal type (meals with no
  *  options are skipped; free meals contribute their max-calories cap via
  *  optionMacroTotals). Pure derivation — no fetches, no plan mutation. */
-function PlanHealth({ allTypes, byType, foods, targets }: {
+function PlanHealth({ allTypes, byType, foods, targets, mode }: {
   allTypes: string[];
   byType: Map<string, { opt: MealOption; idx: number }[]>;
   foods: Map<string, FoodLike>;
   targets: Targets | null;
+  mode: MealPlanMode;
 }) {
   const units = useUnits();
   const meals = allTypes
@@ -479,14 +561,14 @@ function PlanHealth({ allTypes, byType, foods, targets }: {
             tone={over && !onTarget ? "warning" : "calories"}
             softTrack
             value={fmtEnergy(total.calories, units, false)}
-            label="Sample day"
+            label={mode === "fixed" ? "The day" : "Sample day"}
             sublabel={`of ${fmtEnergy(target, units)}`}
           />
         ) : (
           <div className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-2xl bg-surface-2 px-5 py-4 text-center">
             <Flame className="size-5" style={{ color: toneVar.calories }} />
             <span className="numeral text-2xl font-bold leading-none">{fmtEnergy(total.calories, units, false)}</span>
-            <span className="text-xs font-medium text-muted-foreground">Sample day</span>
+            <span className="text-xs font-medium text-muted-foreground">{mode === "fixed" ? "The day" : "Sample day"}</span>
           </div>
         )}
         <div className="min-w-0 flex-1 space-y-2">
@@ -503,8 +585,9 @@ function PlanHealth({ allTypes, byType, foods, targets }: {
       </div>
 
       {/* The per-meal spread folds: it is a check on the variety the client can
-          pick within, not the number the coach is steering. */}
-      <Disclosure label="Per-meal range">
+          pick within, not the number the coach is steering. A fixed plan has no
+          spread — every meal is one number — so it says so. */}
+      <Disclosure label={mode === "fixed" ? "Per meal" : "Per-meal range"}>
         <div className="space-y-1.5">
         {ranges.map((r) => (
           <div key={r.type} className="flex items-center justify-between gap-2 text-sm">

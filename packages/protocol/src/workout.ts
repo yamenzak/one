@@ -88,6 +88,55 @@ export function prescribedSetsForDay(day: WorkoutDay): number {
 }
 
 /**
+ * ONE EXERCISE PER `single` BLOCK.
+ *
+ * A block answers "how are these performed TOGETHER" — as a superset, as a
+ * circuit, as HIIT. `single` is the answer "they are not": each exercise is
+ * done straight through on its own. So a `single` block holding four exercises
+ * is a grouping that means nothing, and the player has always agreed — it
+ * flattens exactly that case into one step per slot, so N slots in one `single`
+ * block and N `single` blocks of one slot already RENDER and LOG identically.
+ *
+ * The ambiguity was only ever in the builder, where "add exercise" put a second
+ * movement inside a block whose type says they are unrelated, and the coach
+ * then had two containers meaning the same thing.
+ *
+ * ⚠️ **This re-indexes blocks, and logged sets are stored against
+ * `(blockIndex, slotIndex)`.** Splitting `[a,b,c]` at block 0 moves `b` from
+ * `0:1` to `1:0`. On a plan a client has already trained against, sets logged
+ * before the split map to the wrong slot afterwards. Callers decide when that
+ * is acceptable; this function only reports whether it changed anything
+ * (`changed`) so a caller can say so.
+ *
+ * Supersets, circuits and HIIT are left exactly alone — several slots is the
+ * whole point of those, and rounds/rests belong to the group.
+ */
+export function splitSingleBlocks(body: WorkoutBody): { body: WorkoutBody; changed: number } {
+  let changed = 0;
+  const days = body.days.map((day) => ({
+    ...day,
+    blocks: day.blocks.flatMap((block) => {
+      if (block.type !== "single" || block.slots.length <= 1) return [block];
+      changed++;
+      // Each slot becomes its own block, keeping the block's own settings —
+      // `restAfterBlockSec` and the note travel with every piece, because a
+      // rest written "after this block" applied after each of these exercises
+      // in the flattened timeline the player was already showing.
+      return block.slots.map((slot) => ({ ...block, slots: [slot] }));
+    }),
+  }));
+  return { body: { ...body, days }, changed };
+}
+
+/** How many `single` blocks in this body hold more than one exercise. */
+export function multiExerciseSingleBlocks(body: WorkoutBody): number {
+  return body.days.reduce(
+    (n, d) => n + d.blocks.filter((b) => b.type === "single" && b.slots.length > 1).length,
+    0,
+  );
+}
+
+/**
  * Strip client-specific loading for template export (ByShujaa rule): absolute
  * and dropset weights cleared -> "unspecified"; portable progression modes
  * (percent_1rm, previous_plus, previous_times, bodyweight) kept.
