@@ -534,18 +534,39 @@ export function StepHeader({
  * button you have to scroll to find is the most common reason people abandon
  * one. The blur is what keeps it legible over content passing beneath it.
  */
-export function StepActions({ back, children, className }: { back?: ReactNode; children: ReactNode; className?: string }) {
+export function StepActions({ back, children, escape, className }: {
+  back?: ReactNode;
+  children: ReactNode;
+  /**
+   * The quiet way PAST this step — "Skip for now", "I'll do this later".
+   *
+   * Its own line under the primary, never beside it, and that placement is the
+   * whole point of the slot existing. Putting it in `children` alongside the
+   * button turns the row into a stack and the back arrow ends up floating
+   * against the primary's left edge; putting it IN the row makes a dismissal
+   * look like an equal alternative to finishing.
+   *
+   * A flow that gates something a person needs should have one. It is not a
+   * convenience — if the step cannot be completed for any reason, the person is
+   * not inconvenienced, they are stuck outside the product.
+   */
+  escape?: ReactNode;
+  className?: string;
+}) {
   return (
     <motion.div
       variants={contentIn}
       className={cn(
-        "sticky bottom-0 z-10 -mx-4 mt-6 flex items-center gap-3 border-t border-border/60 bg-background/85 px-4 pt-3 backdrop-blur-xl md:-mx-6 md:px-6",
+        "sticky bottom-0 z-10 -mx-4 mt-6 border-t border-border/60 bg-background/85 px-4 pt-3 backdrop-blur-xl md:-mx-6 md:px-6",
         className,
       )}
       style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
     >
-      {back}
-      <div className="flex-1">{children}</div>
+      <div className="flex items-center gap-3">
+        {back}
+        <div className="flex-1">{children}</div>
+      </div>
+      {escape && <div className="mt-2 flex justify-center">{escape}</div>}
     </motion.div>
   );
 }

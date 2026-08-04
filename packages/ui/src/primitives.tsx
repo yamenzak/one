@@ -238,11 +238,37 @@ export function Chip({ selected, icon: Icon, className, children, ...props }: Ch
 }
 
 // ── Inputs ─────────────────────────────────────────────────────────────────
+/**
+ * ⚠️ THE DATE/TIME CLASSES ARE NOT DECORATION — they stop the input escaping
+ * its card.
+ *
+ * `w-full` is not enough for `type="date"` / `time` / `datetime-local`. Those
+ * are replaced elements: the browser gives them an INTRINSIC width from the
+ * widest value they could hold plus the picker button, and an intrinsic
+ * `min-width: auto` that `w-full` cannot shrink past. Inside a `Card` — or any
+ * flex or grid child — the field renders WIDER than its container and hangs off
+ * the right edge, which is exactly what a client photographed on the profile
+ * form. It is worst on iOS Safari, where the value is laid out right-aligned in
+ * a `-webkit-date-and-time-value` box that adds its own padding.
+ *
+ * The three fixes, each necessary:
+ *   `min-w-0`                        overrides the intrinsic minimum so `w-full` wins.
+ *   `appearance-none`                drops the platform chrome that carries the extra width.
+ *   `::-webkit-date-and-time-value`  left-aligns the value and gives it a normal
+ *                                    line box, so iOS stops reserving space for
+ *                                    its own alignment.
+ *
+ * All four are inert on every other input type, which is why they live in the
+ * base class rather than in each caller — a date field is added by writing
+ * `type="date"`, and nobody remembers a rule attached to a type.
+ */
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(({ className, ...props }, ref) => (
   <input
     ref={ref}
     className={cn(
-      "h-11 w-full rounded-xl border border-input bg-secondary/50 px-3.5 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary/70 focus:bg-secondary disabled:opacity-50",
+      "h-11 w-full min-w-0 appearance-none rounded-xl border border-input bg-secondary/50 px-3.5 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary/70 focus:bg-secondary disabled:opacity-50",
+      "[&::-webkit-date-and-time-value]:min-h-[1.5em] [&::-webkit-date-and-time-value]:text-left",
+      "[&::-webkit-calendar-picker-indicator]:opacity-60 [&::-webkit-calendar-picker-indicator]:hover:opacity-100",
       className,
     )}
     {...props}
@@ -290,7 +316,11 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(({ label, labelHid
   const generatedId = useId();
   const fieldId = id ?? generatedId;
   return (
-    <div className={className}>
+    // `min-w-0` on the WRAPPER as well as the input: a grid or flex child gets
+    // `min-width: auto`, so the two-column height row (`grid-cols-2`) would let
+    // a wide intrinsic input push its own track past the container even after
+    // the input itself agreed to shrink.
+    <div className={cn("min-w-0", className)}>
       <Label htmlFor={fieldId} className={labelHidden ? "sr-only" : "mb-1.5 block"}>
         {label}
       </Label>

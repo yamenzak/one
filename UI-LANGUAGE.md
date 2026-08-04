@@ -1629,6 +1629,7 @@ shared component would be off by one for everyone outside UTC.
 | `SaveBar` | The bottom of an editable section: result, then a full-width button. Pass `dirty` and it disables itself when nothing changed. | A section with no explicit save. An instant control belongs on `useConfirmedState`, whose failure surface is `ActionResult`. | ✅ |
 | `ActionBar` | The pinned bottom bar of a screen that **edits** something. Owns the blur, the safe area, the column, `md:pl-24` (the desktop nav rail), the `notice` slot and the error line. | A screen that reads or navigates. A bar over content the user is only scrolling is chrome in the way. | ✅ |
 | `Rail` + `RailItem` | Any row that scrolls sideways: chips, cover cards, avatars. Owns the bleed, the hidden scrollbar, `shrink-0`, and the **scroll padding** snapping needs. | A row that fits. A scroller that never scrolls hides its own affordance. | ✅ |
+| `StepActions` `escape` slot | The quiet way PAST a step — "Skip for now". Its own line under the primary. | A destructive or lossy exit. `escape` **saves**; a discard is a confirm, not a footnote. | ✅ |
 | `Disclosure` | A read-out that is useful but is not the work: a breakdown, a spread, a per-item table. The summary stays; the detail folds. | An alarm, or anything a decision depends on. | ✅ |
 | `Collapsible` + `useOneOpen` | A LIST of editable things where only one is being worked on: plan blocks, meal options, form sections. Controlled — the parent holds which one. | Two items. An accordion of two is a toggle wearing a costume. | ✅ |
 
@@ -1643,6 +1644,51 @@ Three client screens shipped with that clipping before the component existed.
 folds** (a warning behind a chevron is a warning nobody reads — keep it beside
 the summary), and **the trigger says what is inside it** ("Weekly sets by
 muscle", never "Details").
+
+### A gate needs a way past it, and the way past SAVES
+
+A flow that stands between a person and the product — an intake, a required
+profile, a setup wizard — must carry an `escape` on every step but the last.
+This is not a convenience. If the step cannot be completed, for any reason at
+all (a field they can't answer, a control their phone won't render, a bug), the
+person is not inconvenienced: **they are locked out of a product they are paying
+for**, and no amount of good copy on the blocking screen helps them.
+
+Three rules, and the middle one is the one that gets forgotten:
+
+1. **Its own line, under the primary.** Beside it, a dismissal reads as an equal
+   alternative to finishing. In `children` alongside the button, the row becomes
+   a stack and the back affordance ends up floating against the primary's edge.
+   That is what the `escape` slot is for.
+2. **It SAVES what was answered.** "Skip" is the same write as "Finish" with
+   fewer answers — not a second, weaker path, and never a discard. Two write
+   paths drift; one cannot.
+3. **Something downstream must notice.** Skipping is only safe because the gap
+   is visible to someone who can close it later — for Kova, the coach's
+   finish-this-profile card. An escape with no downstream reader is a way to
+   lose data quietly.
+
+### Ask the question in the units the person answers in
+
+A form that asks for centimetres from someone who thinks in feet has made a
+guess on their behalf and charged them a trip to Settings for it. Where a
+product supports both, **the unit choice comes first, on the same step, above
+the field it governs** — and switching it must RE-EXPRESS what is already typed
+rather than clearing it, or the control punishes anyone who answered before
+noticing it.
+
+### The answer, read back
+
+The cheapest interactivity in the language, and the one that turns a form into a
+conversation: a derived value under a field, appearing as it is typed. A birth
+date becomes an age; two weights become a distance to travel; four tapped chips
+become "4× a week". Each is proof the app *understood* the answer rather than
+merely stored it.
+
+Two constraints. It **springs in and out** (`SPRING`, keyed on the value) —
+un-animated text appearing under a field reads as a validation error. And it is
+a *derivation*, never a restatement: "180 cm" under a field containing 180 is
+noise.
 
 `Collapsible` is the different job: it folds CONTENT, so **the summary row has
 to be worth reading on its own** — in a list of ten collapsed sections the

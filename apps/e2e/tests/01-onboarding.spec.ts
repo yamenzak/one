@@ -189,26 +189,37 @@ test("owner onboards, invites a client, and the client signs in and completes in
     const next = client.getByRole("button", { name: "Continue" });
     // Step 1 — basics. Continue stays disabled until sex + DOB + a sane height.
     await expect(next).toBeDisabled();
+    // Units come first because they decide what the height question ASKS. The
+    // client never chose them, so asking for centimetres without offering the
+    // alternative is a guess we make on their behalf.
+    await expect(client.getByRole("tab", { name: "Metric" })).toBeVisible();
     await client.getByRole("radio", { name: "Female" }).click();
     await client.getByLabel("Date of birth").fill("1994-06-15");
     await client.getByLabel("Height (cm)").fill("168");
+    // The app understood the date rather than merely storing it.
+    await expect(client.getByText(/\d+ years old/)).toBeVisible();
     await expect(next).toBeEnabled();
     await next.click();
 
-    // Step 2 — goal.
+    // Step 2 — goal, and the two weights that close the `targetWeight` gap.
     await expect(client.getByRole("heading", { name: "Your goal" })).toBeVisible();
     await client.getByRole("radio", { name: /^Build muscle/ }).click();
+    await client.getByLabel("Today (kg)").fill("62");
+    await client.getByLabel("Target (kg)").fill("66");
+    await expect(client.getByText("4 kg to gain")).toBeVisible();
     await next.click();
 
-    // Step 3 — how you train.
+    // Step 3 — how you train. The days ARE `workoutsPerWeek`.
     await expect(client.getByRole("heading", { name: "How you train" })).toBeVisible();
     await client.getByRole("radio", { name: /^At home/ }).click();
     await next.click();
 
     // Step 4 — how you eat, and the write. This is the PATCH that used to 403.
     // There is no "you're all set" step any more: the confirmation belongs after
-    // the write, so the last question is the last step.
+    // the write, so the last question is the last step — and the skip hatch is
+    // gone with it, because there is nothing left to skip.
     await expect(client.getByRole("heading", { name: "How you eat" })).toBeVisible();
+    await expect(client.getByRole("button", { name: "Skip for now" })).toHaveCount(0);
     await client.getByRole("radio", { name: /^High protein/ }).click();
     await client.getByRole("button", { name: "Finish" }).click();
   });
@@ -235,26 +246,22 @@ test("owner onboards, invites a client, and the client signs in and completes in
     await coach.getByRole("button").filter({ hasText: clientName }).click();
     await expect(coach.locator("[data-coach-view]")).toBeVisible();
 
-    // The gap list is a coach-only affordance now — the client's own version of
-    // this card is a single row, because they are one tap from the form and do
-    // not need it previewed. The coach cannot open that form, so they still get
-    // the field names: "ask them to finish their profile" is useless next to
-    // "ask them for their target weight". `data-profile-gaps` marks the list.
-    const profileGaps = coach.locator("[data-profile-gaps]");
-    await expect(profileGaps).toBeVisible({ timeout: 30_000 });
-    await expect(profileGaps).toContainText("Target weight");
-    await expect(profileGaps).not.toContainText("Date of birth");
-    await expect(profileGaps).not.toContainText("Height");
-    await expect(profileGaps).not.toContainText("Gender");
-
-    // The wizard's other three answers must count too. These were sent only as
-    // `intake` — free-form AI context — while profileGaps reads the typed
-    // `preferences` store, so a client answered their goal, their activity level
-    // and where they train, and their coach was still told all three were
-    // missing. Onboarding now writes both.
-    await expect(profileGaps).not.toContainText("Primary goal");
-    await expect(profileGaps).not.toContainText("Activity level");
-    await expect(profileGaps).not.toContainText("Where you train");
+    // THE GAP LIST IS GONE, and that is the assertion.
+    //
+    // `profileGaps` (@kova/domain body.ts) names nine fields and is what the
+    // coach's finish-this-profile card reads. The wizard used to fill six: a
+    // client answered every question they were shown and their coach was still
+    // told the profile was incomplete, naming things the client had never been
+    // asked. Two separate causes, both fixed — three fields were not asked at
+    // all (target weight, workouts per week, meals per day), and the ones about
+    // training were written to `intake` (free-form AI context) rather than to
+    // the typed `preferences` store the gap list actually reads.
+    //
+    // So a completed intake now completes the profile, and the card that used
+    // to nag about it does not render. Asserting its ABSENCE is the strongest
+    // form of this test: any field that falls out of the wizard, or lands in
+    // the wrong store again, brings the card straight back.
+    await expect(coach.locator("[data-profile-gaps]")).toHaveCount(0, { timeout: 30_000 });
   });
 
   await closeAll(coach, client);
