@@ -1,10 +1,33 @@
-/** Coach Library — exercises (create + web import), foods, templates, content. */
+/**
+ * Coach Library — exercises, foods, templates, content.
+ *
+ * ── What this pass changed ──────────────────────────────────────────────────
+ *
+ * Four tabs, four hand-rolled collections. Each had its own loading skeleton,
+ * its own empty state, its own idea of what a row looks like (a floating `Card`
+ * per item on two of them, a real `Group` on one, a `Card` with a button inside
+ * it on the fourth), and none of them told "nothing here yet" apart from
+ * "nothing matches what you typed" — which are opposite problems with opposite
+ * fixes. `Collection` (§7) owns all five states and one row rhythm, so all four
+ * tabs are the same object now.
+ *
+ * The browse facets were two horizontally-scrolling chip rows stacked under the
+ * search box, on two of the tabs: a third of a phone viewport spent on controls
+ * before the first result, with half of each facet's options off the edge. They
+ * are one `Filters` button (§13) opening a sheet where the options wrap.
+ *
+ * And the actions came off the rows. Every exercise carried two unlabelled
+ * glyphs — eight on a four-row screen — for jobs done a few times a month,
+ * squeezing the name they sat next to. They are behind the same `···` the plan
+ * list and the content tab already use, so three of the four tabs no longer
+ * disagree about where a row's actions live.
+ */
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Stagger, EmptyState, cn, Reveal, SkeletonRow, SkeletonLine, Avatar, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Ellipsis, Send, History, Group, Row, ViewToggle, useCollectionView } from "@4dl/ui";
+import { Button, Card, Badge, Field, Textarea, Sheet, Skeleton, SegmentedControl, Chip, Page, Eyebrow, EmptyState, cn, Reveal, SkeletonList, Avatar, Search, Plus, Trash2, Archive, AlertTriangle, Dumbbell, Utensils, LayoutGrid, PencilLine, ArrowLeftRight, Ellipsis, Send, History, Users, Group, Row, ConfirmDialog, Collection, Filters, useCollectionView, activeFacetCount, type FacetSelection } from "@4dl/ui";
 import { MacroInline } from "../../registry/index.js";
-import { api } from "../../api.js";
+import { api, errorText } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { AiErrorBox } from "../../AiError.js";
@@ -26,8 +49,20 @@ export function Library() {
   const tab = (TABS.includes(tabParam as Tab) ? tabParam : "exercises") as Tab;
   return (
     <Page className="column space-y-4 p-4 pb-28">
-      <p className="px-1 text-caption text-muted-foreground">Library</p>
-      <SegmentedControl options={[{ value: "exercises", label: "Exercises" }, { value: "foods", label: "Foods" }, { value: "templates", label: "Templates" }, { value: "content", label: "Content" }]} value={tab} onChange={(v) => nav(`/library/${v}`)} />
+      {/* Same opening as every other tabbed surface: the eyebrow names it, the
+          rail switches it. Nothing else above the fold. */}
+      <Eyebrow>Library</Eyebrow>
+      <SegmentedControl
+        fill
+        options={[
+          { value: "exercises", label: "Exercises" },
+          { value: "foods", label: "Foods" },
+          { value: "templates", label: "Templates" },
+          { value: "content", label: "Content" },
+        ]}
+        value={tab}
+        onChange={(v) => nav(`/library/${v}`)}
+      />
       {tab === "exercises" && <Exercises />}
       {tab === "foods" && <Foods />}
       {tab === "templates" && <Templates />}
@@ -38,123 +73,128 @@ export function Library() {
 
 type LibraryExercise = ExerciseInfo & { source?: string; tenant_id?: string | null };
 type ExEdit = { exerciseId?: string; initial?: Partial<ExerciseInfo> };
+
 function Exercises() {
   const [q, setQ] = useState("");
   const [items, setItems] = useState<LibraryExercise[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   // Remembered, like every other collection's view — this one used to reset to
   // the list on every visit, which is why nobody switched it twice.
   const [view, setView] = useCollectionView("exercises");
-  // Browse facets, composed with search — lifted from the plan-builder's picker.
-  const [muscle, setMuscle] = useState<string | null>(null);
-  const [equip, setEquip] = useState<string | null>(null);
+  const [facets, setFacets] = useState<FacetSelection>({ muscle: null, equipment: null });
   const [editor, setEditor] = useState<ExEdit | null>(null);
+  const [menuFor, setMenuFor] = useState<LibraryExercise | null>(null);
   const [altFor, setAltFor] = useState<LibraryExercise | null>(null);
   const [archiveFor, setArchiveFor] = useState<LibraryExercise | null>(null);
-  const load = useCallback(async () => setItems((await api.get<{ exercises: LibraryExercise[] }>(`/api/exercises?q=${encodeURIComponent(q)}`)).exercises), [q]);
+
+  const load = useCallback(async () => {
+    setError(null);
+    try { setItems((await api.get<{ exercises: LibraryExercise[] }>(`/api/exercises?q=${encodeURIComponent(q)}`)).exercises); }
+    catch (e) { setError(errorText(e, "We couldn't reach your library.")); }
+  }, [q]);
   useEffect(() => { const t = setTimeout(() => void load(), 200); return () => clearTimeout(t); }, [load]);
   // Tenant-owned rows edit in place; platform seeds fork into a tenant copy.
   const open = (e: LibraryExercise) => setEditor(e.tenant_id ? { exerciseId: e.id, initial: e } : { initial: { ...e, id: undefined } });
 
-  // Filter chips derived from the loaded library, most-common-first (same
-  // derivation as the picker). Facets read from the full loaded set so toggling
-  // one doesn't make the others vanish; the grid/rows then apply both.
+  // Facet options derived from the loaded library, most-common-first (the same
+  // derivation the plan-builder's picker uses). They read the FULL loaded set,
+  // so choosing one doesn't make the others vanish; the list applies both.
   const opts = (get: (e: LibraryExercise) => string[]) => {
     const count = new Map<string, number>();
     for (const e of items ?? []) for (const v of get(e)) count.set(v, (count.get(v) ?? 0) + 1);
-    return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([v]) => v).slice(0, 8);
+    return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([v]) => ({ value: v, label: pretty(v) }));
   };
-  const muscles = opts((e) => splitList(e.muscle_groups));
-  const equipment = opts((e) => splitList(e.equipment));
-  const filtered = (items ?? []).filter((e) =>
-    (!muscle || splitList(e.muscle_groups).concat(splitList(e.secondary_muscle_groups)).includes(muscle)) &&
-    (!equip || splitList(e.equipment).includes(equip)),
+  const groups = [
+    { key: "muscle", label: "Muscle group", options: opts((e) => splitList(e.muscle_groups)) },
+    { key: "equipment", label: "Equipment", options: opts((e) => splitList(e.equipment)) },
+  ];
+  const filtered = items === null ? null : items.filter((e) =>
+    (!facets.muscle || splitList(e.muscle_groups).concat(splitList(e.secondary_muscle_groups)).includes(facets.muscle)) &&
+    (!facets.equipment || splitList(e.equipment).includes(facets.equipment)),
   );
 
   /*
-    TWO ACTIONS, NOT THREE — AND NEVER THE ROW'S OWN.
+    THE ROW'S ACTIONS ARE BEHIND ONE `···`.
 
-    Every row carried Edit / Alternatives / Archive as three 32px icon buttons,
-    96px of trailing controls squeezing the exercise name, twelve unlabelled
-    glyphs on a screen of four rows. The pencil was the worst of them: the row
-    and the grid card ALREADY call `open(e)` on tap, so it was a second button
-    for the thing the whole row does. (The food list keeps its pencil — those
-    cards are not tappable, so there it is the only way in.)
-
-    Two stay inline rather than moving behind a `···` menu, which is the rule the
-    plan list follows at five actions: below three, a menu costs a tap and hides
-    an affordance to save nothing.
+    Every row carried Alternatives and Archive as inline glyphs — eight
+    unlabelled icons on a screen of four rows, squeezing the exercise name they
+    sat beside, for two jobs a coach does a few times a month. §7 allows two
+    inline icons; it does not require them, and the plan list and the content
+    tab had already settled on a menu. Three of the four Library tabs agreeing
+    is worth more here than saving one tap on a rare action — and the menu can
+    label what the glyphs could not.
   */
-  const actions = (e: LibraryExercise) => (
-    <>
-      <button onClick={() => setAltFor(e)} aria-label="Alternatives" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><ArrowLeftRight /></button>
-      {/* Only tenant-owned rows can be archived; platform seeds have no delete affordance. */}
-      {e.tenant_id ? <button onClick={() => setArchiveFor(e)} aria-label="Archive" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Archive /></button> : null}
-    </>
+  const menu = (e: LibraryExercise) => (
+    <Button size="icon" variant="ghost" className="shrink-0 text-muted-foreground" aria-label={`Actions for ${e.name}`}
+      onClick={(ev) => { ev.stopPropagation(); setMenuFor(e); }}><Ellipsis /></Button>
   );
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-end gap-2">
-        <Field className="flex-1" label="Search exercises" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
-        {/* The shared toggle — this screen is where the shape came from, and
-            keeping a second copy of it here is how the two drift. */}
-        <ViewToggle value={view} onChange={setView} noun="exercises" />
-        <Button variant="tonal" aria-label="New exercise" onClick={() => setEditor({})}><Plus /></Button>
-      </div>
-      {/* A rail with a single option filters nothing — tapping it narrows the
-            list to everything already on screen. Same rule as the food picker's
-            All/Whole/Branded: a control that cannot change what you see is not
-            a control. */}
-      {items && (muscles.length > 1 || equipment.length > 1) && (
-        <div className="space-y-1.5">
-          {muscles.length > 1 && (
-            <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
-              {muscles.map((m) => <span key={m} className="shrink-0"><Chip className="h-8 px-3 text-[0.8rem]" selected={muscle === m} onClick={() => setMuscle(muscle === m ? null : m)}>{pretty(m)}</Chip></span>)}
-            </div>
-          )}
-          {equipment.length > 1 && (
-            <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
-              {equipment.map((eq) => <span key={eq} className="shrink-0"><Chip className="h-8 px-3 text-[0.8rem]" selected={equip === eq} onClick={() => setEquip(equip === eq ? null : eq)}>{pretty(eq)}</Chip></span>)}
-            </div>
-          )}
-        </div>
-      )}
-      <Reveal loading={!items} skeleton={
-        <div className="space-y-1">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="rounded-2xl bg-card px-3 py-2.5"><SkeletonRow thumb={44} /></div>)}</div>
-      }>
-        {items && (filtered.length === 0 ? (
-          items.length === 0
-            ? <EmptyState icon={Dumbbell} title="No exercises yet" description="Build your library as you go, or install the starter set from the platform." action={<Button onClick={() => setEditor({})}><Plus /> New exercise</Button>} />
-            : <EmptyState icon={Dumbbell} title="Nothing matches" description="Try a different word, or clear the muscle and equipment filters." />
-        ) : view === "grid" ? (
-        <Stagger className="grid grid-cols-2 gap-3">{filtered.map((e) => (
-          <Card key={e.id} className="overflow-hidden p-0">
+    <>
+      <Collection
+        items={filtered}
+        itemKey={(e) => e.id}
+        error={error}
+        onRetry={() => void load()}
+        noun="exercises"
+        view={view}
+        onView={setView}
+        query={q}
+        onQuery={setQ}
+        filter={<Filters groups={groups} value={facets} onChange={setFacets} />}
+        narrowed={activeFacetCount(facets) > 0}
+        onClearFilters={() => setFacets({ muscle: null, equipment: null })}
+        action={<Button variant="tonal" aria-label="New exercise" onClick={() => setEditor({})}><Plus /></Button>}
+        thumb={52}
+        empty={{
+          icon: Dumbbell,
+          title: "No exercises yet",
+          description: "Build your library as you go, or install the starter set from the platform.",
+          action: <Button onClick={() => setEditor({})}><Plus /> New exercise</Button>,
+        }}
+        renderList={(e) => (
+          <div className="px-4 py-2">
+            <ExerciseRow ex={e} thumbSize={44} onClick={() => open(e)} trailing={menu(e)} />
+          </div>
+        )}
+        renderGrid={(e) => (
+          <Card className="relative overflow-hidden p-0">
             <button onClick={() => open(e)} className="block w-full text-left transition-opacity active:opacity-80">
               <div className="aspect-square bg-surface-2"><ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={0} className="!size-full !rounded-none" /></div>
-              <div className="px-3 pt-2">
+              <div className="px-3 pb-3 pt-2">
                 <div className="truncate text-sm font-semibold">{e.name}</div>
                 <div className="truncate text-xs text-muted-foreground">{metaText(e) || "—"}</div>
               </div>
             </button>
-            <div className="flex items-center justify-between gap-1 px-1.5 pb-1 pt-0.5">
-              {e.difficulty ? <Badge tone="neutral" className="ml-1.5">{e.difficulty}</Badge> : <span />}
-              <div className="flex items-center">{actions(e)}</div>
-            </div>
+            {/* Over the image, where a tile's actions go — not a strip under it
+                competing with the name for the tile's last row. */}
+            <div className="absolute right-1 top-1 rounded-full bg-background/70 backdrop-blur-sm">{menu(e)}</div>
           </Card>
-        ))}</Stagger>
-        ) : (
-        <Stagger className="space-y-1">{filtered.map((e) => (
-          <div key={e.id} className="rounded-2xl bg-card px-3 py-2.5">
-            <ExerciseRow ex={e} thumbSize={52} onClick={() => open(e)} trailing={<div className="flex items-center gap-0">{actions(e)}</div>} />
-          </div>
-        ))}</Stagger>
-        ))}
-      </Reveal>
+        )}
+      />
+
       {/* After a NEW add, clear any active search so the new row is actually visible (not filtered out by a stale query). */}
       {editor && <ExerciseEditor exerciseId={editor.exerciseId} initial={editor.initial} onClose={() => setEditor(null)} onSaved={() => { const wasNew = !editor.exerciseId; setEditor(null); if (wasNew && q) setQ(""); else void load(); }} />}
+      {menuFor && (
+        <Sheet open onClose={() => setMenuFor(null)} title={menuFor.name}>
+          <Group>
+            <Row icon={PencilLine} iconTone="primary" chevron={false} onClick={() => { const e = menuFor; setMenuFor(null); open(e); }}>
+              {menuFor.tenant_id ? "Edit" : "Make a copy to edit"}
+            </Row>
+            <Row icon={ArrowLeftRight} iconTone="activity" chevron={false} sub="Bound swaps a client can make instantly"
+              onClick={() => { const e = menuFor; setMenuFor(null); setAltFor(e); }}>Alternatives</Row>
+            {/* Only tenant-owned rows can be archived; platform seeds have no
+                delete affordance at all. */}
+            {menuFor.tenant_id && (
+              <Row icon={Archive} tone="danger" chevron={false}
+                onClick={() => { const e = menuFor; setMenuFor(null); setArchiveFor(e); }}>Archive</Row>
+            )}
+          </Group>
+        </Sheet>
+      )}
       {altFor && <AlternativesSheet exercise={altFor} onClose={() => setAltFor(null)} />}
       {archiveFor && <ArchiveConfirm kind="exercise" id={archiveFor.id} name={archiveFor.name} onClose={() => setArchiveFor(null)} onDone={() => { setArchiveFor(null); void load(); }} />}
-    </div>
+    </>
   );
 }
 
@@ -174,31 +214,39 @@ function AlternativesSheet({ exercise, onClose }: { exercise: ExerciseInfo; onCl
   const remove = async (id: string) => { await api.del(`/api/exercises/${exercise.id}/alternatives/${id}`); await load(); };
   const altIds = new Set((alts ?? []).map((a) => a.id));
   return (
-    <Sheet open onClose={onClose} title={`Alternatives · ${exercise.name}`}>
+    <Sheet open onClose={onClose} title={`Alternatives · ${exercise.name}`} size="tall">
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">Bound alternatives let clients swap instantly — no approval. Binding is two-way.</p>
-        <Reveal loading={!alts} skeleton={
-          <div className="space-y-1">{Array.from({ length: 3 }).map((_, i) => <div key={i} className="rounded-xl bg-surface-2 px-2.5 py-2"><SkeletonRow thumb={36} trailing={false} /></div>)}</div>
-        }>
-          {alts && (alts.length === 0 ? <p className="text-sm text-muted-foreground">No alternatives yet.</p> : (
-            <div className="space-y-1">{alts.map((a) => (
-              <div key={a.id} className="rounded-xl bg-surface-2 px-2.5 py-2">
-                <ExerciseRow ex={a} thumbSize={36} trailing={
-                  <button onClick={() => void remove(a.id)} aria-label="Remove" className="text-muted-foreground hover:text-danger [&_svg]:size-4"><Trash2 /></button>
-                } />
-              </div>
-            ))}</div>
+        <p className="text-sm text-muted-foreground">A bound alternative is one the client can swap to on their own, mid-session, with no approval. Binding works both ways.</p>
+        <Reveal loading={!alts} skeleton={<SkeletonList card rows={3} thumb={36} />}>
+          {alts && (alts.length === 0 ? (
+            <EmptyState icon={ArrowLeftRight} title="Nothing bound yet" description="Add a movement that trains the same thing with what else the gym has." />
+          ) : (
+            <Group>
+              {alts.map((a) => (
+                <div key={a.id} className="px-4 py-2">
+                  <ExerciseRow ex={a} thumbSize={36} trailing={
+                    <Button size="icon" variant="ghost" className="shrink-0 text-muted-foreground" aria-label={`Unbind ${a.name}`} onClick={() => void remove(a.id)}><Trash2 /></Button>
+                  } />
+                </div>
+              ))}
+            </Group>
           ))}
         </Reveal>
-        <div className="border-t border-border/50 pt-3">
-          <Field label="Add an alternative" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
-          <div className="mt-1 max-h-56 space-y-1 overflow-y-auto">
-            {results.filter((e) => !altIds.has(e.id)).map((e) => (
-              <button key={e.id} onClick={() => void add(e.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-secondary">
-                <ExerciseRow ex={e} thumbSize={34} meta={false} trailing={<Plus className="size-4 shrink-0 text-primary" />} />
-              </button>
-            ))}
-          </div>
+        <div className="space-y-2 border-t border-border/50 pt-4">
+          <Field label="Add an alternative" labelHidden icon={Search} placeholder="Search exercises…" type="search" value={q} onChange={(e) => setQ(e.target.value)} />
+          {q.trim().length >= 2 && (
+            results.filter((e) => !altIds.has(e.id)).length === 0
+              ? <p className="px-1 text-caption text-muted-foreground">Nothing else matches “{q.trim()}”.</p>
+              : (
+                <Group className="max-h-64 overflow-y-auto">
+                  {results.filter((e) => !altIds.has(e.id)).map((e) => (
+                    <div key={e.id} className="px-4 py-2">
+                      <ExerciseRow ex={e} thumbSize={34} meta={false} onClick={() => void add(e.id)} trailing={<Plus className="size-4 shrink-0 text-primary" />} />
+                    </div>
+                  ))}
+                </Group>
+              )
+          )}
         </div>
       </div>
     </Sheet>
@@ -224,53 +272,87 @@ function ArchiveConfirm({ kind, id, name, onClose, onDone }: { kind: "exercise" 
   };
   const used = usage ? usage.plans + usage.templates : 0;
   const parts = usage ? [usage.plans && `${usage.plans} plan${usage.plans === 1 ? "" : "s"}`, usage.templates && `${usage.templates} template${usage.templates === 1 ? "" : "s"}`].filter(Boolean).join(" and ") : "";
+  /*
+    A DECISION, SO A DIALOG (§7 Overlay).
+
+    This was a `Sheet` with two buttons in it — the shape for DOING something
+    with inputs, used to ask a yes/no question. It also rolled its own button
+    pair, so the destructive one sat on the left on this screen and on the right
+    everywhere else `ConfirmDialog` is used.
+
+    The usage warning stays: "archive" is reversible, but archiving something 12
+    plans still reference is a different decision from archiving something
+    nothing uses, and only the count can tell you which one you are making.
+  */
   return (
-    <Sheet open onClose={onClose} title={`Archive ${name}?`}>
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">It's removed from your library and pickers. Plans and logs that already use it keep working — the name still shows, and you can restore it by re-adding it.</p>
-        {kind === "exercise" && used > 0 && (
-          <div className="flex items-start gap-2.5 rounded-2xl bg-warning-soft p-3 text-sm text-warning">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            <span>Still used in {parts}. Those keep showing it, but it won't be offered for new plans.</span>
-          </div>
-        )}
-        <div className="flex gap-3">
-          <Button variant="ghost" className="flex-1" onClick={onClose}>Cancel</Button>
-          <Button variant="destructive" className="flex-1" disabled={busy} onClick={() => void archive()}><Archive /> {busy ? "Archiving…" : "Archive"}</Button>
-        </div>
-      </div>
-    </Sheet>
+    <ConfirmDialog
+      open
+      onOpenChange={(o) => { if (!o) onClose(); }}
+      title={`Archive ${name}?`}
+      description={
+        <>
+          It leaves your library and the pickers. Plans and logs that already use it keep working — the name still shows.
+          {kind === "exercise" && used > 0 && (
+            <span className="mt-2 flex items-start gap-2 rounded-xl bg-warning-soft p-2.5 text-caption text-warning">
+              <AlertTriangle aria-hidden className="mt-0.5 size-4 shrink-0" />
+              <span>Still used in {parts}. Those keep showing it; it just won't be offered for new plans.</span>
+            </span>
+          )}
+        </>
+      }
+      confirmLabel={busy ? "Archiving…" : "Archive"}
+      destructive
+      onConfirm={() => void archive()}
+    />
   );
 }
 
 interface FoodRow { id: string; name: string; calories: number; brand: string | null; tenant_id: string | null; visibility?: string | null; protein_g?: number; carbs_g?: number; fat_g?: number; image_url?: string | null }
+
+const FOOD_TAG_LABEL = { seed: "Library", shared: "Shared", private: "Mine" } as const;
+type FoodTag = keyof typeof FOOD_TAG_LABEL;
+const foodTag = (f: FoodRow): FoodTag => (f.tenant_id === null ? "seed" : f.visibility === "private" ? "private" : "shared");
+const foodTagTone = (t: FoodTag) => (t === "seed" ? "cardio" : t === "private" ? "neutral" : "activity");
+
 function Foods() {
   const units = useUnits();
   const [q, setQ] = useState("");
   const [items, setItems] = useState<FoodRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [view, setView] = useCollectionView("foods");
-  // Browse facets, composed with search — mirrors the exercise library.
-  const [kind, setKind] = useState<"whole" | "branded" | null>(null);
-  const [owner, setOwner] = useState<"seed" | "shared" | "private" | null>(null);
+  const [facets, setFacets] = useState<FacetSelection>({ kind: null, owner: null });
   // `null` = closed; `{}` = new; `{ id }` = edit that food.
   const [editor, setEditor] = useState<{ id?: string } | null>(null);
+  const [menuFor, setMenuFor] = useState<FoodRow | null>(null);
   const [archiveFor, setArchiveFor] = useState<FoodRow | null>(null);
-  const load = useCallback(async () => setItems((await api.get<{ foods: FoodRow[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods), [q]);
-  useEffect(() => { const t = setTimeout(() => void load(), 200); return () => clearTimeout(t); }, [load]);
-  const tag = (f: FoodRow): "seed" | "private" | "shared" => (f.tenant_id === null ? "seed" : f.visibility === "private" ? "private" : "shared");
-  const tagLabel = { seed: "Library", shared: "Shared", private: "Mine" } as const;
-  const tagTone = (t: "seed" | "private" | "shared") => (t === "seed" ? "cardio" : t === "private" ? "neutral" : "activity");
 
-  // Type (whole vs branded) + ownership facets — only shown when they'd split
-  // the loaded set. Facets read from the full set so toggling one keeps the
-  // others; the list/grid then applies both alongside search.
-  const kinds = [
-    ...((items ?? []).some((f) => !f.brand) ? [{ v: "whole" as const, label: "Whole" }] : []),
-    ...((items ?? []).some((f) => f.brand) ? [{ v: "branded" as const, label: "Branded" }] : []),
+  const load = useCallback(async () => {
+    setError(null);
+    try { setItems((await api.get<{ foods: FoodRow[] }>(`/api/foods?q=${encodeURIComponent(q)}`)).foods); }
+    catch (e) { setError(errorText(e, "We couldn't reach your library.")); }
+  }, [q]);
+  useEffect(() => { const t = setTimeout(() => void load(), 200); return () => clearTimeout(t); }, [load]);
+
+  // Type (whole vs branded) + ownership. `Filters` drops a facet that cannot
+  // split the loaded set, so these are passed unconditionally.
+  const groups = [
+    {
+      key: "kind", label: "Type",
+      options: [
+        ...((items ?? []).some((f) => !f.brand) ? [{ value: "whole", label: "Whole" }] : []),
+        ...((items ?? []).some((f) => f.brand) ? [{ value: "branded", label: "Branded" }] : []),
+      ],
+    },
+    {
+      key: "owner", label: "Where it came from",
+      options: (["private", "shared", "seed"] as const)
+        .filter((o) => (items ?? []).some((f) => foodTag(f) === o))
+        .map((o) => ({ value: o, label: FOOD_TAG_LABEL[o] })),
+    },
   ];
-  const owners = (["private", "shared", "seed"] as const).filter((o) => (items ?? []).some((f) => tag(f) === o));
-  const filtered = (items ?? []).filter((f) =>
-    (!kind || (kind === "branded" ? !!f.brand : !f.brand)) && (!owner || tag(f) === owner),
+  const filtered = items === null ? null : items.filter((f) =>
+    (!facets.kind || (facets.kind === "branded" ? !!f.brand : !f.brand)) &&
+    (!facets.owner || foodTag(f) === facets.owner),
   );
 
   const macros = (f: FoodRow) => (
@@ -279,81 +361,66 @@ function Foods() {
       {f.protein_g != null && <MacroInline proteinG={f.protein_g} carbsG={f.carbs_g ?? 0} fatG={f.fat_g ?? 0} className="text-xs" />}
     </>
   );
-  const actions = (f: FoodRow) => (
-    <>
-      <button onClick={() => setEditor({ id: f.id })} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground [&_svg]:size-4" aria-label="Edit food"><PencilLine /></button>
-      {/* Seeds (tenant_id null) can't be archived — only a tenant's own rows. */}
-      {f.tenant_id !== null ? <button onClick={() => setArchiveFor(f)} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4" aria-label="Archive food"><Archive /></button> : null}
-    </>
+  const menu = (f: FoodRow) => (
+    <Button size="icon" variant="ghost" className="shrink-0 text-muted-foreground" aria-label={`Actions for ${f.name}`}
+      onClick={(ev) => { ev.stopPropagation(); setMenuFor(f); }}><Ellipsis /></Button>
   );
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-end gap-2">
-        <Field className="flex-1" label="Search foods" icon={Search} value={q} onChange={(e) => setQ(e.target.value)} />
-        {/* The shared toggle — this screen is where the shape came from, and
-            keeping a second copy of it here is how the two drift. */}
-        <ViewToggle value={view} onChange={setView} noun="foods" />
-        <Button variant="tonal" aria-label="New food" onClick={() => setEditor({})}><Plus /></Button>
-      </div>
-      {items && (kinds.length > 1 || owners.length > 1) && (
-        <div className="space-y-1.5">
-          {kinds.length > 1 && (
-            <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
-              {kinds.map((k) => <span key={k.v} className="shrink-0"><Chip className="h-8 px-3 text-[0.8rem]" selected={kind === k.v} onClick={() => setKind(kind === k.v ? null : k.v)}>{k.label}</Chip></span>)}
-            </div>
-          )}
-          {owners.length > 1 && (
-            <div className="no-scrollbar -mx-1 flex gap-1.5 overflow-x-auto px-1">
-              {owners.map((o) => <span key={o} className="shrink-0"><Chip className="h-8 px-3 text-[0.8rem]" selected={owner === o} onClick={() => setOwner(owner === o ? null : o)}>{tagLabel[o]}</Chip></span>)}
-            </div>
-          )}
-        </div>
-      )}
-      <Reveal loading={!items} skeleton={
-        <div className="space-y-1">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="rounded-2xl bg-card p-4"><SkeletonRow thumb={40} /></div>)}</div>
-      }>
-        {items && (filtered.length === 0 ? (
-          items.length === 0
-            ? <EmptyState icon={Utensils} title="No foods yet" description="Add one, or build your library from the Eat tab." action={<Button onClick={() => setEditor({})}><Plus /> New food</Button>} />
-            : <EmptyState icon={Utensils} title="Nothing matches" description="Try a different word." />
-        ) : view === "grid" ? (
-        <Stagger className="grid grid-cols-2 gap-3">{filtered.map((f) => (
-          <Card key={f.id} className="overflow-hidden p-0">
+    <>
+      <Collection
+        items={filtered}
+        itemKey={(f) => f.id}
+        error={error}
+        onRetry={() => void load()}
+        noun="foods"
+        view={view}
+        onView={setView}
+        query={q}
+        onQuery={setQ}
+        filter={<Filters groups={groups} value={facets} onChange={setFacets} />}
+        narrowed={activeFacetCount(facets) > 0}
+        onClearFilters={() => setFacets({ kind: null, owner: null })}
+        action={<Button variant="tonal" aria-label="New food" onClick={() => setEditor({})}><Plus /></Button>}
+        thumb={44}
+        empty={{
+          icon: Utensils,
+          title: "No foods yet",
+          description: "Add one, or build your library from the Eat tab.",
+          action: <Button onClick={() => setEditor({})}><Plus /> New food</Button>,
+        }}
+        renderList={(f) => (
+          // Two lines, so the NAME gets the full width — it shares its line with
+          // one menu button; energy, macros and where it came from sit beneath.
+          <Row
+            leading={<FoodThumb src={f.image_url} size={44} />}
+            onClick={() => setEditor({ id: f.id })}
+            trailing={menu(f)}
+            sub={
+              <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                {macros(f)}
+                <Badge tone={foodTagTone(foodTag(f))}>{FOOD_TAG_LABEL[foodTag(f)]}</Badge>
+              </span>
+            }
+          >
+            {f.name}{f.brand && <span className="ml-1.5 text-caption font-normal text-muted-foreground">{f.brand}</span>}
+          </Row>
+        )}
+        renderGrid={(f) => (
+          <Card className="relative overflow-hidden p-0">
             <button onClick={() => setEditor({ id: f.id })} className="block w-full text-left transition-opacity active:opacity-80">
               <div className="aspect-square bg-nutrition-soft"><FoodThumb src={f.image_url} size={0} className="!size-full !rounded-none" /></div>
-              <div className="px-3 pt-2">
+              <div className="px-3 pb-3 pt-2">
                 <div className="truncate text-sm font-semibold">{f.name}</div>
                 {f.brand && <div className="truncate text-xs text-muted-foreground">{f.brand}</div>}
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">{macros(f)}</div>
               </div>
             </button>
-            <div className="flex items-center justify-between gap-1 px-1.5 pb-1 pt-0.5">
-              <Badge tone={tagTone(tag(f))} className="ml-1.5">{tagLabel[tag(f)]}</Badge>
-              <div className="flex items-center">{actions(f)}</div>
-            </div>
+            <div className="absolute right-1 top-1 rounded-full bg-background/70 backdrop-blur-sm">{menu(f)}</div>
           </Card>
-        ))}</Stagger>
-        ) : (
-        // Two-line row so the food NAME gets the full width — it only shares its
-        // line with the actions; kcal, macros and the visibility tag sit beneath.
-        <Stagger className="space-y-1">{filtered.map((f) => (
-          <Card key={f.id} className="p-3">
-            <div className="flex items-center gap-3">
-              <FoodThumb src={f.image_url} size={44} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-medium">{f.name}{f.brand && <span className="ml-1.5 text-xs font-normal text-muted-foreground">{f.brand}</span>}</div>
-                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-                  {macros(f)}
-                  <Badge tone={tagTone(tag(f))}>{tagLabel[tag(f)]}</Badge>
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">{actions(f)}</div>
-            </div>
-          </Card>
-        ))}</Stagger>
-        ))}
-      </Reveal>
+        )}
+      />
+
       {editor && (
         <FoodEditor
           foodId={editor.id}
@@ -362,23 +429,42 @@ function Foods() {
           onSaved={() => { const wasNew = !editor.id; setEditor(null); if (wasNew && q) setQ(""); else void load(); }}
         />
       )}
+      {menuFor && (
+        <Sheet open onClose={() => setMenuFor(null)} title={menuFor.name}>
+          <Group>
+            <Row icon={PencilLine} iconTone="primary" chevron={false} onClick={() => { const f = menuFor; setMenuFor(null); setEditor({ id: f.id }); }}>Edit</Row>
+            {/* Seeds (tenant_id null) can't be archived — only a tenant's own rows. */}
+            {menuFor.tenant_id !== null && (
+              <Row icon={Archive} tone="danger" chevron={false} onClick={() => { const f = menuFor; setMenuFor(null); setArchiveFor(f); }}>Archive</Row>
+            )}
+          </Group>
+        </Sheet>
+      )}
       {archiveFor && <ArchiveConfirm kind="food" id={archiveFor.id} name={archiveFor.name} onClose={() => setArchiveFor(null)} onDone={() => { setArchiveFor(null); void load(); }} />}
-    </div>
+    </>
   );
 }
 
 interface Template { id: string; name: string; visibility: string; createdBy: string }
+
 function Templates() {
   const nav = useNavigate();
   const [kind, setKind] = useState<"workout" | "meal">("workout");
+  const [q, setQ] = useState("");
   const [items, setItems] = useState<Template[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [clients, setClients] = useState<ClientOpt[]>([]);
   const [useFor, setUseFor] = useState<Template | null>(null); // template being applied to a client
+  const [toDelete, setToDelete] = useState<Template | null>(null);
   const [busy, setBusy] = useState(false);
-  const load = useCallback(async () => setItems((await api.get<{ templates: Template[] }>(`/api/${kind}-templates`)).templates), [kind]);
-  useEffect(() => void load(), [load]);
+  const load = useCallback(async () => {
+    setError(null);
+    try { setItems((await api.get<{ templates: Template[] }>(`/api/${kind}-templates`)).templates); }
+    catch (e) { setError(errorText(e, "We couldn't reach your templates.")); }
+  }, [kind]);
+  useEffect(() => { setItems(null); void load(); }, [load]);
   useEffect(() => { void api.get<{ clients: ClientOpt[] }>("/api/clients").then((r) => setClients(r.clients)).catch(() => undefined); }, []);
-  const remove = async (id: string) => { await api.del(`/api/${kind}-templates/${id}`); await load(); };
+  const remove = async (t: Template) => { await api.del(`/api/${kind}-templates/${t.id}`); await load(); };
   const applyTo = async (clientId: string) => {
     if (!useFor) return;
     setBusy(true);
@@ -388,47 +474,78 @@ function Templates() {
       nav(`/clients/${clientId}/plans/${kind}/${plan.id}`); // straight into the builder to publish
     } finally { setBusy(false); }
   };
+
+  const needle = q.trim().toLowerCase();
+  const filtered = items === null ? null : items.filter((t) => !needle || t.name.toLowerCase().includes(needle));
+
   return (
     <div className="space-y-3">
-      <SegmentedControl options={[{ value: "workout", label: "Workout" }, { value: "meal", label: "Meal" }]} value={kind} onChange={setKind} />
-      <Reveal loading={!items} skeleton={
-        <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="flex items-center justify-between rounded-2xl bg-card p-4">
-            <div className="space-y-1.5"><SkeletonLine w="9rem" h="text" /><SkeletonLine w="5rem" h="xs" /></div>
-            <Skeleton className="size-8 rounded-full" />
-          </div>
-        ))}</div>
-      }>
-        {items && (items.length === 0 ? <EmptyState icon={LayoutGrid} title="No templates yet" description="Save any plan as a template from its builder to reuse it across clients." /> : (
-        <Group>{items.map((t) => (
+      <SegmentedControl fill options={[{ value: "workout", label: "Workout" }, { value: "meal", label: "Meal" }]} value={kind} onChange={setKind} />
+      <Collection
+        items={filtered}
+        itemKey={(t) => t.id}
+        error={error}
+        onRetry={() => void load()}
+        noun="templates"
+        query={q}
+        onQuery={setQ}
+        thumb={0}
+        empty={{
+          icon: LayoutGrid,
+          title: `No ${kind} templates yet`,
+          description: "Save any plan as a template from its builder to reuse it across clients.",
+        }}
+        renderList={(t) => (
           <Row
-            key={t.id}
-            sub={t.visibility === "tenant" ? "Shared with team" : "Private"}
+            icon={kind === "workout" ? Dumbbell : Utensils}
+            iconTone={kind === "workout" ? "activity" : "nutrition"}
+            sub={t.visibility === "tenant" ? "Shared with the team" : "Only you"}
+            chevron={false}
             trailing={
-              <>
-                <Button size="sm" variant="tonal" onClick={() => setUseFor(t)}><Send className="size-4" /> Use</Button>
-                <button onClick={() => void remove(t.id)} aria-label={`Delete template ${t.name}`} className="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button>
-              </>
+              <span className="flex shrink-0 items-center gap-1">
+                <Button size="sm" variant="tonal" onClick={() => setUseFor(t)}><Send /> Use</Button>
+                <Button size="icon" variant="ghost" className="text-muted-foreground" aria-label={`Delete template ${t.name}`} onClick={() => setToDelete(t)}><Trash2 /></Button>
+              </span>
             }
           >
             {t.name}
           </Row>
-        ))}</Group>
-        ))}
-      </Reveal>
+        )}
+      />
+
+      {/* Deleting used to happen on the FIRST tap of an unlabelled bin, with no
+          confirmation of any kind — the only irreversible control in the
+          Library that asked nothing. */}
+      <ConfirmDialog
+        open={toDelete != null}
+        onOpenChange={(o) => { if (!o) setToDelete(null); }}
+        title={`Delete ${toDelete?.name ?? "this template"}?`}
+        description="Plans already created from it are unaffected. The template itself cannot be recovered."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={() => { const t = toDelete; setToDelete(null); if (t) void remove(t); }}
+      />
+
       {useFor && (
-        <Sheet open onClose={() => !busy && setUseFor(null)} title={`Use "${useFor.name}"`}>
-          <p className="mb-3 text-sm text-muted-foreground">Create a {kind} plan for a client from this template — you'll land in the builder to review and publish it.</p>
-          <div className="max-h-[60vh] space-y-1 overflow-y-auto">
+        <Sheet open onClose={() => !busy && setUseFor(null)} title={`Use “${useFor.name}”`}>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Creates a {kind} plan for the client and opens the builder, so you can review it before publishing.</p>
             {clients.length === 0 ? (
-              <p className="p-4 text-center text-sm text-muted-foreground">No clients yet.</p>
-            ) : clients.map((cl) => (
-              <button key={cl.id} disabled={busy} onClick={() => void applyTo(cl.id)} className="flex w-full items-center gap-3 rounded-xl p-2.5 text-left transition-colors hover:bg-secondary disabled:opacity-60">
-                <Avatar name={cl.displayName} src={cl.avatarUrl} seed={cl.avatarSeed ?? cl.id} className="size-9 shrink-0" />
-                <span className="min-w-0 flex-1 truncate font-medium">{cl.displayName}</span>
-                <Send className="size-4 shrink-0 text-primary" />
-              </button>
-            ))}
+              <EmptyState icon={Users} title="No clients yet" description="Add someone to your roster first." />
+            ) : (
+              <Group>
+                {clients.map((cl) => (
+                  <Row
+                    key={cl.id}
+                    leading={<Avatar name={cl.displayName} src={cl.avatarUrl} seed={cl.avatarSeed ?? cl.id} className="size-10" />}
+                    disabled={busy}
+                    onClick={() => void applyTo(cl.id)}
+                  >
+                    {cl.displayName}
+                  </Row>
+                ))}
+              </Group>
+            )}
           </div>
         </Sheet>
       )}
@@ -440,49 +557,68 @@ interface Resource { id: string; type: string; title: string; status: string; au
 interface ClientOpt { id: string; displayName: string; avatarUrl?: string | null; avatarSeed?: string | null }
 
 const AUDIENCE_LABEL: Record<string, string> = { clients: "All clients", public: "Public", assigned: "Specific clients" };
+/** The DB's words are not the coach's (§10). `status` was printed verbatim, so
+ *  a badge read "published" in lower case beside sentence-cased ones. */
+const ARTICLE_STATUS: Record<string, string> = { published: "Live", draft: "Draft", archived: "Archived" };
 
 function Content() {
+  const [q, setQ] = useState("");
   const [items, setItems] = useState<Resource[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   // `null` = closed; `{}` = new; `{ id }` = edit that article.
   const [sheet, setSheet] = useState<{ id?: string } | null>(null);
   const [menuFor, setMenuFor] = useState<Resource | null>(null);
   const [clients, setClients] = useState<ClientOpt[]>([]);
-  const load = useCallback(async () => setItems((await api.get<{ resources: Resource[] }>("/api/resources")).resources), []);
+  const load = useCallback(async () => {
+    setError(null);
+    try { setItems((await api.get<{ resources: Resource[] }>("/api/resources")).resources); }
+    catch (e) { setError(errorText(e, "We couldn't reach your content.")); }
+  }, []);
   useEffect(() => void load(), [load]);
   useEffect(() => { void api.get<{ clients: ClientOpt[] }>("/api/clients").then((r) => setClients(r.clients)).catch(() => undefined); }, []);
   const tone = (s: string) => (s === "published" ? "success" : s === "archived" ? "warning" : "neutral");
+
+  const needle = q.trim().toLowerCase();
+  const filtered = items === null ? null : items.filter((r) => !needle || r.title.toLowerCase().includes(needle));
+
   return (
-    <div className="space-y-3">
-      <div className="flex justify-end"><Button size="sm" onClick={() => setSheet({})}><PencilLine /> Write article</Button></div>
-      <Reveal loading={!items} skeleton={
-        <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="flex items-center justify-between gap-2 rounded-2xl bg-card p-4">
-            <div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="70%" h="text" /><SkeletonLine w="45%" h="xs" /></div>
-            <Skeleton className="h-6 w-16 rounded-full" />
-            <Skeleton className="size-8 rounded-full" />
-          </div>
-        ))}</div>
-      }>
-        {items && (items.length === 0 ? <EmptyState icon={PencilLine} title="Content hub is empty" description="Publish articles, recipes, and routines — public ones become your marketplace blog." /> : (
-        <Stagger className="space-y-2">{items.map((r) => (
-          <Card key={r.id} className="flex items-center justify-between gap-2 py-3">
-            <button onClick={() => setSheet({ id: r.id })} className="min-w-0 flex-1 text-left">
-              <div className="truncate font-medium">{r.title}</div>
-              <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-                <span>{r.category || r.type}</span>
-                <span>· {AUDIENCE_LABEL[r.audience] ?? r.audience}</span>
-                {(r.topics ?? []).slice(0, 3).map((t) => <span key={t} className="rounded-full bg-surface-2 px-1.5 py-0.5">{t}</span>)}
-              </div>
-            </button>
-            <Badge tone={tone(r.status)}>{r.status}</Badge>
-            <button onClick={() => setMenuFor(r)} aria-label="Article actions" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground [&_svg]:size-4"><Ellipsis /></button>
-          </Card>
-        ))}</Stagger>
-        ))}
-      </Reveal>
+    <>
+      <Collection
+        items={filtered}
+        itemKey={(r) => r.id}
+        error={error}
+        onRetry={() => void load()}
+        noun="articles"
+        query={q}
+        onQuery={setQ}
+        thumb={0}
+        action={<Button variant="tonal" aria-label="Write article" onClick={() => setSheet({})}><Plus /></Button>}
+        empty={{
+          icon: PencilLine,
+          title: "Nothing published yet",
+          description: "Articles, recipes and routines — public ones become your marketplace blog.",
+          action: <Button onClick={() => setSheet({})}><PencilLine /> Write article</Button>,
+        }}
+        renderList={(r) => (
+          <Row
+            icon={PencilLine}
+            iconTone={r.status === "published" ? "primary" : undefined}
+            onClick={() => setSheet({ id: r.id })}
+            sub={[r.category || r.type, AUDIENCE_LABEL[r.audience] ?? r.audience].join(" · ")}
+            trailing={
+              <span className="flex shrink-0 items-center gap-1">
+                <Badge tone={tone(r.status)}>{ARTICLE_STATUS[r.status] ?? r.status}</Badge>
+                <Button size="icon" variant="ghost" className="text-muted-foreground" aria-label={`Actions for ${r.title}`} onClick={(e) => { e.stopPropagation(); setMenuFor(r); }}><Ellipsis /></Button>
+              </span>
+            }
+          >
+            {r.title}
+          </Row>
+        )}
+      />
       {sheet && <ArticleEditor id={sheet.id} clients={clients} onClose={() => setSheet(null)} onSaved={() => { setSheet(null); void load(); }} />}
       {menuFor && <ArticleActions article={menuFor} onClose={() => setMenuFor(null)} onEdit={() => { const id = menuFor.id; setMenuFor(null); setSheet({ id }); }} onChanged={() => { setMenuFor(null); void load(); }} />}
-    </div>
+    </>
   );
 }
 
@@ -597,30 +733,31 @@ function ArticleActions({ article, onClose, onEdit, onChanged }: { article: Reso
   const [busy, setBusy] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const act = (fn: () => Promise<unknown>) => async () => { setBusy(true); try { await fn(); onChanged(); } catch { setBusy(false); } };
-  const status = (s: string) => api.post(`/api/resources/${article.id}/publish`, { status: s });
+  const status = (sv: string) => api.post(`/api/resources/${article.id}/publish`, { status: sv });
   return (
     <Sheet open onClose={onClose} title={article.title}>
-      <div className="space-y-1">
-        <ActionRow icon={PencilLine} label="Edit" onClick={onEdit} />
-        {article.status !== "published" && <ActionRow icon={Send} label="Publish" disabled={busy} onClick={act(() => status("published"))} />}
-        {article.status === "published" && <ActionRow icon={History} label="Unpublish (back to draft)" disabled={busy} onClick={act(() => status("draft"))} />}
-        {article.status !== "archived" && <ActionRow icon={Archive} label="Archive" hint="Hide it without deleting" disabled={busy} onClick={act(() => status("archived"))} />}
-        {article.status === "archived" && <ActionRow icon={History} label="Restore to draft" disabled={busy} onClick={act(() => status("draft"))} />}
-        {confirmDel
-          ? <ActionRow icon={Trash2} label={busy ? "Deleting…" : "Tap again to delete"} danger disabled={busy} onClick={act(() => api.del(`/api/resources/${article.id}`))} />
-          : <ActionRow icon={Trash2} label="Delete permanently" danger onClick={() => setConfirmDel(true)} />}
-      </div>
+      {/* The app's rows. This file had its own `ActionRow` — a private copy of
+          `Row` with different heights, no press animation and no stagger — and
+          so did the plan list, which is how two menus in one product end up
+          feeling like two products. */}
+      <Group>
+        <Row icon={PencilLine} iconTone="primary" chevron={false} onClick={onEdit}>Edit</Row>
+        {article.status !== "published" && <Row icon={Send} iconTone="success" chevron={false} disabled={busy} onClick={act(() => status("published"))}>Publish</Row>}
+        {article.status === "published" && <Row icon={History} chevron={false} sub="Back to a draft only you can see" disabled={busy} onClick={act(() => status("draft"))}>Unpublish</Row>}
+        {article.status !== "archived" && <Row icon={Archive} chevron={false} sub="Hide it without deleting" disabled={busy} onClick={act(() => status("archived"))}>Archive</Row>}
+        {article.status === "archived" && <Row icon={History} chevron={false} disabled={busy} onClick={act(() => status("draft"))}>Restore to draft</Row>}
+        <Row icon={Trash2} tone="danger" chevron={false} disabled={busy} onClick={() => setConfirmDel(true)}>Delete permanently</Row>
+      </Group>
+
+      <ConfirmDialog
+        open={confirmDel}
+        onOpenChange={(o) => { if (!o) setConfirmDel(false); }}
+        title={`Delete ${article.title}?`}
+        description="Anyone who has read it keeps nothing, and it cannot be recovered. Archive instead if you only want it out of the way."
+        confirmLabel={busy ? "Deleting…" : "Delete"}
+        destructive
+        onConfirm={act(() => api.del(`/api/resources/${article.id}`))}
+      />
     </Sheet>
   );
 }
-
-function ActionRow({ icon: Icon, label, hint, danger, disabled, onClick }: { icon: (p: { className?: string }) => ReactNode; label: string; hint?: string; danger?: boolean; disabled?: boolean; onClick: () => void }) {
-  return (
-    <button disabled={disabled} onClick={onClick} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors disabled:opacity-50 [&_svg]:size-[1.15rem]", danger ? "text-danger hover:bg-danger-soft" : "hover:bg-surface-2")}>
-      <Icon className="shrink-0" />
-      <div className="min-w-0 flex-1"><div className="text-sm font-medium">{label}</div>{hint && <div className="text-xs text-muted-foreground">{hint}</div>}</div>
-    </button>
-  );
-}
-
-function split(s: string): string[] { return s.split(",").map((x) => x.trim()).filter(Boolean); }

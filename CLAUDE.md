@@ -270,7 +270,7 @@ loud, which is the only kind this repo has actually had.
   each spec creates its own studio + users, so runs never collide. Stop any
   `wrangler dev` you started with `pnpm dev` first — it shares `.wrangler` state.
   `E2E_SERVER_LOGS=1 pnpm e2e` un-mutes the worker's request log.
-- `pnpm --filter @kova/e2e shots` — the SCREENSHOT suite (`apps/e2e/shots`,
+- `pnpm shots` — the SCREENSHOT suite (`apps/e2e/shots`,
   `shots.config.ts`). Seeds one demo studio through the real API — a comped
   `pro` plan, a ten-person roster, six weeks of a client's history, a published
   plan — and photographs every surface at phone/desktop × light/dark. The images
@@ -278,6 +278,11 @@ loud, which is the only kind this repo has actually had.
   all the same images, which is what keeps them honest (UI-LANGUAGE §16).
   Output: `apps/e2e/shots-out/<project>/<shot-id>.png`, gitignored; the ones
   that ship are copied out by id (`docs/help/README.md`).
+  ⚠️ Run it through **turbo** (`pnpm shots`), never `pnpm --filter @kova/e2e
+  shots`. The worker serves `apps/app/dist`, and unlike the test suites a stale
+  build here does not fail — it produces convincing photographs of the PREVIOUS
+  design filed under the current shot ids. `turbo.json` declares the
+  `@kova/app#build` edge; the raw filter bypasses it.
   ⚠️ Separate from `pnpm e2e` on purpose: that is the launch gate and runs on
   every push; this takes minutes and is run when images are wanted. It is also
   the ONE suite that sets `ADMIN_EMAILS:` empty, because comping the demo studio

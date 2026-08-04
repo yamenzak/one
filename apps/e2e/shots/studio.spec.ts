@@ -109,9 +109,20 @@ test("the coach's studio", async () => {
     await shoot(page, project, "coach-client-report", { settle: 1200 });
   });
 
-  await test.step("the library", async () => {
-    await visit(page, `${base}/library`, shell);
-    await shoot(page, project, "coach-library");
+  // All four tabs — they are four collections of the same shape now, and the
+  // only way that claim survives is if all four are photographed.
+  for (const [tab, id] of [["exercises", "coach-library"], ["foods", "coach-library-foods"], ["templates", "coach-library-templates"], ["content", "coach-library-content"]] as const) {
+    await test.step(`the library · ${tab}`, async () => {
+      await visit(page, `${base}/library/${tab}`, shell);
+      await shoot(page, project, id);
+    });
+  }
+
+  await test.step("the library's filters", async () => {
+    await visit(page, `${base}/library/exercises`, shell);
+    await page.getByRole("button", { name: /^Filters/ }).first().click();
+    await shoot(page, project, "coach-library-filter", { ready: page.getByText("Muscle group") });
+    await page.keyboard.press("Escape");
   });
 
   await test.step("the business", async () => {

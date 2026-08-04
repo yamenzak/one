@@ -91,9 +91,27 @@ export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"):
   // looking like themselves once there is more history than fits on screen.
   await populateClient(client, 42);
 
+  /*
+   * A library with VARIETY, not four rows of "Quadriceps · Barbell".
+   *
+   * Every seeded exercise used to carry the same muscle group and the same
+   * equipment, which made the library screenshots read as one row repeated four
+   * times — and hid the browse facets entirely, because a facet with one option
+   * cannot narrow anything and correctly renders nothing. The demo world has to
+   * be varied enough for the controls it is meant to demonstrate to exist.
+   */
   const exercises: string[] = [];
-  for (const name of ["Back squat", "Romanian deadlift", "Incline dumbbell press", "Chest-supported row"]) {
-    exercises.push(await seedExercise(studio, name));
+  for (const [name, muscles, kit] of [
+    ["Back squat", ["quadriceps", "glutes"], ["barbell"]],
+    ["Romanian deadlift", ["hamstrings", "glutes"], ["barbell"]],
+    ["Incline dumbbell press", ["chest", "shoulders"], ["dumbbell"]],
+    ["Chest-supported row", ["back", "biceps"], ["machine"]],
+    ["Walking lunge", ["quadriceps", "glutes"], ["dumbbell"]],
+    ["Lat pulldown", ["back"], ["cable"]],
+    ["Standing calf raise", ["calves"], ["machine"]],
+    ["Hanging leg raise", ["core"], ["bodyweight"]],
+  ] as const) {
+    exercises.push(await seedExercise(studio, name, [...muscles], [...kit]));
   }
   const planId = await publishWorkoutPlan(studio, client, exercises, "Upper / Lower Split");
 

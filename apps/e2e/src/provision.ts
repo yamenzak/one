@@ -181,12 +181,17 @@ export async function provisionClient(browser: Browser, studio: Studio, name: st
  * cause is absent seed content. A studio's own exercise is also the more honest
  * fixture: it is what a real coach has.
  */
-export async function seedExercise(studio: Studio, name: string): Promise<string> {
+export async function seedExercise(
+  studio: Studio,
+  name: string,
+  muscleGroups: string[] = ["quadriceps"],
+  equipment: string[] = ["barbell"],
+): Promise<string> {
   const created = await post<{ id: string }>(studio.page, studio.base, "/api/exercises", {
     name,
     category: "strength",
-    muscleGroups: ["quadriceps"],
-    equipment: ["barbell"],
+    muscleGroups,
+    equipment,
     visibility: "tenant",
   });
   return created.id;

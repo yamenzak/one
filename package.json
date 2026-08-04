@@ -14,6 +14,7 @@
     "gate": "node .github/workflows/workflows-parse.test.mjs && node scripts/apps-manifest.test.mjs && node scripts/affected.test.mjs && node scripts/shared-config.test.mjs && node scripts/sender-default.test.mjs",
     "typecheck": "turbo run typecheck",
     "e2e": "turbo run e2e",
+    "shots": "turbo run shots",
     "lint": "turbo run lint",
     "clean": "turbo run clean && rm -rf node_modules"
   },

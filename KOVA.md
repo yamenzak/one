@@ -1204,7 +1204,7 @@ Routes declared in `Shell.tsx:123-142`.
 | `/wellness` | C | `client/Wellness.tsx:75` | Score, check-ins, labs, supplements |
 | `/clients` | T O | `coach/Clients.tsx:26` | Roster + invite |
 | `/clients/:id`, `/clients/:id/:subtab` | T O | `coach/Clients.tsx:380` | Client detail → §D |
-| `/library`, `/library/:tab` | T O | `coach/Library.tsx:21` | Exercises, foods, templates, content |
+| `/library`, `/library/:tab` | T O | `coach/Library.tsx:44` | Exercises, foods, templates, content |
 | `/sessions` | T O (feature `frontDesk`) | `coach/Sessions.tsx:38` | Scheduling + add-on types |
 | `/business` | O (tab); T by deep link | `coach/Business.tsx:80` | Revenue, packages, getting paid, staff |
 | `/business` → Getting paid | O (write), T (read) | `coach/PaymentSetup.tsx:96` | Choose provider; guided setup for the studio's OWN checkout |
@@ -1228,7 +1228,8 @@ scope and powers, never screens.
 **Business** (in-component state, not routes): Overview `coach/Business.tsx:96` ·
 Packages `coach/Packages.tsx:44` (feature `commerce`) · Staff `coach/Staff.tsx:22`.
 
-**Library**: four tabs at `coach/Library.tsx:31-34`.
+**Library**: four tabs at `coach/Library.tsx:57-60` — four `Collection`s of the
+same shape (`Exercises:68` · `Foods:308` · `Templates:441` · `Content:555`).
 **Progress lenses**: `?tab=overview|body|training|wellness`, `client/Progress.tsx:484`.
 
 ### E. Sheets, drawers, editors — where most of the work happens
@@ -1269,8 +1270,10 @@ None of these are routes. They live inside their parent's file.
 | File:line | What it is |
 | --- | --- |
 | `coach/Clients.tsx:310` | Invite a client, share link |
-| `coach/Library.tsx:158` · `coach/ExerciseEditor.tsx:338` | AI exercise alternatives |
-| `coach/Library.tsx:485` | Write/publish an Explore article |
+| `coach/Library.tsx:193` · `coach/ExerciseEditor.tsx:338` | Bind exercise alternatives |
+| `coach/Library.tsx:252` | Archive an exercise or food (with its usage count) |
+| `coach/Library.tsx:618` | Write/publish an Explore article |
+| `coach/Library.tsx:723` | One article's lifecycle actions |
 | `coach/ExerciseEditor.tsx:95` | Create/edit exercise, AI media |
 | `coach/WorkoutBuilder.tsx:619` | Copy a week with progression |
 | `coach/WorkoutBuilder.tsx:692` | Pick an exercise into a slot |

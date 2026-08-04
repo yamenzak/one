@@ -93,6 +93,23 @@ export interface CollectionProps<T> {
   query?: string;
   onQuery?: (q: string) => void;
 
+  /**
+   * True when something OTHER than the search is excluding items — an active
+   * facet. It drives the NO-RESULTS state, which is a different claim from
+   * EMPTY and has a different fix.
+   *
+   * Without it, a facet that happens to exclude everything renders "no
+   * exercises yet" to a studio with two hundred of them, and the only action
+   * offered is "create one".
+   */
+  narrowed?: boolean;
+  /** Clears the facets. Offered alongside clearing the search on no-results. */
+  onClearFilters?: () => void;
+
+  /** Facet narrowing, on the header row. `Filters` renders itself as one
+   *  button, so a collection with facets costs no extra rows. */
+  filter?: ReactNode;
+
   /** The one primary action, on the header row beside the controls. */
   action?: ReactNode;
 
@@ -114,6 +131,9 @@ export function Collection<T>({
   onView,
   query,
   onQuery,
+  narrowed = false,
+  onClearFilters,
+  filter,
   action,
   empty,
   renderList,
@@ -122,6 +142,8 @@ export function Collection<T>({
   className,
 }: CollectionProps<T>) {
   const searching = Boolean(query?.trim());
+  // Either kind of narrowing means the reader excluded these rows themselves.
+  const excluded = searching || narrowed;
   const grid = view === "grid" && Boolean(renderGrid);
   /*
    * The search box is always there, if the collection has one at all.
@@ -138,7 +160,7 @@ export function Collection<T>({
    */
   const showSearch = Boolean(onQuery);
 
-  const header = (showSearch || onView || action) && (
+  const header = (showSearch || onView || filter || action) && (
     <div className="flex items-center gap-2">
       {showSearch && (
         <Field
@@ -152,6 +174,7 @@ export function Collection<T>({
           onChange={(e) => onQuery?.(e.target.value)}
         />
       )}
+      {filter}
       {onView && renderGrid && <ViewToggle value={view} onChange={onView} noun={noun} />}
       {action}
     </div>
@@ -168,17 +191,17 @@ export function Collection<T>({
         // which is the reflow a skeleton exists to prevent.
         grid ? <GridSkeleton /> : <SkeletonList rows={6} thumb={thumb} card />
       ) : items.length === 0 ? (
-        searching ? (
+        excluded ? (
           <EmptyState
             icon={Search}
-            title={`No ${noun} match “${query!.trim()}”`}
-            description="Try a shorter search, or clear it to see everything."
+            title={searching ? `No ${noun} match “${query!.trim()}”` : `No ${noun} match those filters`}
+            description={searching ? "Try a shorter search, or clear it to see everything." : "Loosen a filter to see more."}
             action={
               <button
-                onClick={() => onQuery?.("")}
+                onClick={() => { onQuery?.(""); onClearFilters?.(); }}
                 className="min-h-12 text-sm font-medium text-primary"
               >
-                Clear search
+                {searching && narrowed ? "Clear search and filters" : searching ? "Clear search" : "Clear filters"}
               </button>
             }
           />

@@ -659,7 +659,15 @@ and then knows every list in the product.
   (different from empty — the reader typed something, so offer to clear it), and
   failed (what broke, and a retry).
 - **Sort and filter are additive, never the default experience.** If the list
-  needs a filter to be useful, the wrong things are in it.
+  needs a filter to be useful, the wrong things are in it. When it does have
+  facets, they collapse to one `Filters` button on the same header row — see
+  "Facets collapse to one button" below.
+- **A row's actions go behind `···` once they are not the row's own job.** The
+  row already opens the thing; anything else is rarer, and two unlabelled glyphs
+  per row is eight on a screen of four, squeezing the name they sit beside. Two
+  inline icons are *allowed* (§7 "How many actions a row may show") — they are
+  not the default, and consistency across a product's lists beats saving a tap
+  on an action taken twice a month.
 
 ### A detail screen's sections: a rail up to four, the header past that
 
@@ -809,6 +817,27 @@ the smallest element on it.
 
 The same shape applies to any screen whose subject has one live version and a
 history: a plan, a price list, a policy, a goal.
+
+### Facets collapse to one button
+
+A browsable collection grows facets, and the obvious rendering — one
+horizontally-scrolling chip row per facet, under the search box — is what
+everyone reaches for and it costs the screen twice: two facets is two extra
+rows above the first result, and each row is a scroller, so half of every
+facet's options are off the edge with nothing saying so.
+
+`Filters` (§13) is one button carrying the active count, opening a sheet where
+the options WRAP and all of them are visible at once. Same trade as
+`RangePicker`: a facet is set and then read from for a while.
+
+Three rules go with it, and the component enforces the first two:
+
+- **One option per facet.** Multi-select reads as "narrower" and behaves as
+  "wider", which nobody predicts.
+- **A facet that cannot split the set is dropped.** One option filters nothing —
+  tapping it narrows the list to everything already on screen.
+- **The button says how many are on.** A control that hides state must say it
+  has some, or the list looks broken.
 
 ### A history is a series. One picker drives the chart AND the list.
 
@@ -1339,6 +1368,24 @@ was already a legal token, so the check is provenance, not validity.
 answers whether a form still has room; a disabled chip with no explanation is a
 dead end (switch a ring to a card and the way back becomes invisible), so the
 toolbar says what would free the space instead.
+
+### Collections — `collection.tsx`, `filters.tsx`
+
+| Component | Use it when | Do NOT use it for | State |
+|---|---|---|---|
+| `Collection` | ANY list of things a person accumulates. Owns the header row and all five states; `renderList`/`renderGrid` stay yours. | A fixed set of options — that is a `Group` of `Row`s. | ✅ |
+| `useCollectionView` | The list/grid preference. Keyed on the COLLECTION, prefixed `4dl.view.`, deliberately outside any app's sign-out sweep. | Anything that is account data. | ✅ |
+| `ViewToggle` | Rendered *by* `Collection`. Call it directly only in a header you own. | A two-button pill — see §7. | ✅ |
+| `Filters` | Browse facets. One button + a sheet; drops facets that cannot narrow, counts the ones that are on. | A single either/or — that is a `SegmentedControl`. | ✅ |
+
+The header row is fixed in this order: **search · filters · view · action**.
+Every collection in the product then puts the same control in the same place,
+which is the entire point of the component — four screens that each invented
+their own arrangement is what it replaced.
+
+`Collection` takes `items: T[] | null`, and `null` is what makes the loading
+state work. Passing `[]` while a request is in flight renders the EMPTY state
+for a moment — "no clients yet" flashing on a studio with forty of them.
 
 ### Dates — `dates.tsx`
 

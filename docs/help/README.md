@@ -80,8 +80,8 @@ written for both. Beyond them:
 Images come from the screenshot suite, never from someone's browser:
 
 ```
-pnpm --filter @kova/e2e shots            # every screen, both themes, phone + desktop
-pnpm --filter @kova/e2e shots --project=phone-light
+pnpm shots                              # every screen, both themes, phone + desktop
+pnpm shots -- --project=phone-light
 ```
 
 Output lands in `apps/e2e/shots-out/<project>/<id>.png`, which is gitignored —
