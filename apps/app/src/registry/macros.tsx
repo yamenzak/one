@@ -9,7 +9,9 @@
 
 import { METRICS, MACRO_KEYS, type MetricKey } from "./metrics.js";
 import type { ReactNode } from "react";
+import { kcalToDisplay } from "@kova/domain";
 import { cn, toneVar, toneText, toneSoft } from "@4dl/ui";
+import { useUnits } from "../units.js";
 
 export function MetricChip({ metric, value, className }: { metric: MetricKey; value: ReactNode; className?: string }) {
   const m = METRICS[metric];
@@ -63,6 +65,61 @@ export function MacroBar({ proteinG, carbsG, fatG, targets, className }: { prote
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * The four-up energy + macro readout of a PORTION: what this food, this meal,
+ * this entry actually delivers.
+ *
+ * `MacroBar` is a different question — it grades three macros against targets —
+ * and this is the flat answer, calories first. It was hand-written identically
+ * in the food detail sheet, the meal-option sheet and the diary entry sheet,
+ * with the tile padding and the label drifting between them.
+ *
+ * The tiles carry no label because the ICON is the label: every metric's glyph
+ * and tone come from one registry, so the flame is calories everywhere in the
+ * app. `label` turns the words on where the surface has room and the reader may
+ * be seeing the group for the first time.
+ */
+export function MacroTiles({ calories, proteinG, carbsG, fatG, label = false, className }: {
+  calories: number; proteinG: number; carbsG: number; fatG: number;
+  label?: boolean; className?: string;
+}) {
+  const units = useUnits();
+  const grams: Record<string, number> = { protein: proteinG, carbs: carbsG, fat: fatG };
+  return (
+    <div className={cn("grid grid-cols-4 gap-2", className)}>
+      {(["calories", ...MACRO_KEYS] as const).map((k) => {
+        const m = METRICS[k];
+        const v = k === "calories" ? kcalToDisplay(calories, units) : grams[k]!;
+        return (
+          <div key={k} className={cn("flex flex-col items-center gap-1 rounded-xl p-2.5", toneSoft[m.tone])}>
+            <m.icon className="size-4" />
+            <span className="numeral text-lg font-semibold leading-none">{Math.round(v).toLocaleString()}</span>
+            {label && <span className="text-micro uppercase opacity-70">{m.label}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** The micronutrients a food or meal happens to carry — two columns, and only
+ *  the rows with a value. A zero here means "not recorded" far more often than
+ *  it means zero, and printing forty dashes is not a nutrition panel. */
+export function MicroGrid({ rows, className }: { rows: readonly (readonly [string, number, string])[]; className?: string }) {
+  const present = rows.filter(([, v]) => v > 0);
+  if (present.length === 0) return null;
+  return (
+    <div className={cn("grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-xl bg-surface-2 p-3 text-sm", className)}>
+      {present.map(([l, v, u]) => (
+        <div key={l} className="flex items-center justify-between gap-2">
+          <span className="min-w-0 truncate text-muted-foreground">{l}</span>
+          <span className="numeral shrink-0">{Math.round(v * 10) / 10} {u}</span>
+        </div>
+      ))}
     </div>
   );
 }

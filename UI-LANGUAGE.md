@@ -874,6 +874,30 @@ grid reading as broken rather than as a grid.
   original where the app will show a crop is how someone picks a framing they
   never see.
 
+### A detail sheet is a sequence of answers, and every one is labelled
+
+A sheet that opens on one subject — a food, a meal, a movement — is not a form
+and not a page. It is a short list of questions someone came with, answered in
+the order they will ask them, and each answer gets an `Eyebrow`.
+
+Three of ours had grown into unlabelled stacks: a photo, four tinted squares, a
+row of chips, a field, a list, a paragraph, a table. Every block legible on its
+own and none of them announced, so the reader identifies each one from its
+contents before reading it. The controls did not change when this was fixed —
+only the headings appeared — and that is the point: it is the cheapest legibility
+there is.
+
+Three things the labels have to get right:
+
+- **The heading states scope when scope can change.** "Per 150 g", not
+  "Nutrition", above figures that live-scale with a field two blocks up. A panel
+  of numbers that silently changes meaning is how a diary gets logged wrong.
+- **The same subject gets the same sections in the same order**, wherever it is
+  opened. An exercise in the workout player and the same exercise in the library
+  had drifted into two different screens answering the same question.
+- **A section with nothing in it is not rendered** — no empty hero, no table of
+  dashes. A micronutrient recorded as `0` almost always means "not recorded".
+
 ### A history is a series. One picker drives the chart AND the list.
 
 When a screen holds several versions of the same thing over time, the question
@@ -1369,6 +1393,7 @@ confidently wrong half the time.
 | Component | Use it when | Do NOT use it for | State |
 |---|---|---|---|
 | `Thumb` | **Every photo slot.** A row's leading image, a grid tile, an editor preview. Fills (§7), tints only the fallback, falls back to a glyph on a dead URL, lazy-loads. `size` for a fixed box; omit it and it fills its parent at `ratio`. | A logo or a wordmark. Those are marks — contained, hand-placed, bespoke frame. | ✅ |
+| `Media` | **The hero of a detail surface** — the photo someone opened the sheet to look at. Contained over a blurred, dimmed copy of itself, so nothing crops and nothing is a coloured bar whatever the orientation. Takes a `video` (renders a player), a second frame (cross-fades), and a `badge`. | A thumbnail. A hero is looked at; a thumbnail is recognised, and cropping is right there. | ✅ |
 | `PhotoGrid` | A small set of photos on a surface, tapping through to the lightbox. | A browsable collection — that is `Collection` with `view="grid"`. | ✅ |
 | `Lightbox` | Examining one image full-screen. Contained, because this is the one place cropping loses what the reader came for. | A preview. | ✅ |
 

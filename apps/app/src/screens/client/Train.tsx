@@ -21,10 +21,9 @@ import { useCan } from "../../FeatureLock.js";
 import { activityIcon } from "./activityIcons.js";
 import { useUnits } from "../../units.js";
 import { LogSheet } from "./LogSheet.js";
-import { pretty, splitList, metaText, type ExerciseInfo } from "../exercise.js";
+import { ExerciseDetail, ExerciseThumb, pretty, splitList, metaText, type ExerciseInfo } from "../exercise.js";
 import { CoachNote } from "./CoachNote.js";
 import { LaneSwitcher, type Lane } from "./LaneSwitcher.js";
-import { Markdown } from "../../Markdown.js";
 
 interface Plan { id: string; name: string; status: string; variantId: string | null; body: WorkoutBody }
 interface Goal { status: string; targets: Record<string, number> | null; weeklyLoadTarget?: number | null }
@@ -347,18 +346,6 @@ export function Train({ clientId }: { clientId: string }) {
 /** The first muscle group of an exercise, humanised — the browse category. */
 const libCategory = (e: ExerciseInfo): string => { const c = splitList(e.category)[0] ?? splitList(e.muscle_groups)[0]; return c ? pretty(c) : "Other"; };
 
-/** A full-width illustrated cover for a library exercise (static first frame,
- *  muscle-tinted glyph fallback). ExerciseThumb is fixed-size; this fills. */
-function LibCover({ ex, className = "" }: { ex: ExerciseInfo; className?: string }) {
-  const img = ex.thumb_url || ex.thumb2_url;
-  return (
-    // A photo fills its frame (@4dl/ui media.tsx) — `object-contain` here put
-    // tinted bars around every portrait shot.
-    <div className={`relative grid place-items-center overflow-hidden rounded-xl bg-activity-soft text-activity ${className}`}>
-      {img ? <img src={img} alt="" className="size-full object-cover" /> : <Dumbbell className="size-8" />}
-    </div>
-  );
-}
 
 /** A browsable grid of the platform + tenant exercise library: search + muscle
  *  category chips over illustrated thumbnails; tap a card for the how-to. */
@@ -401,7 +388,10 @@ function LibraryGrid() {
                 {filtered.map((e) => (
                   <button key={e.id} onClick={() => setOpen(e)} className="text-left">
                     <Card interactive className="flex flex-col gap-2 p-2.5">
-                      <LibCover ex={e} className="aspect-square w-full" />
+                      {/* A tile is recognised, not studied — so it fills and
+                          crops, and it animates like every other exercise
+                          thumbnail in the app. */}
+                      <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={0} radius="xl" />
                       <div className="min-w-0">
                         <div className="truncate text-sm font-medium">{e.name}</div>
                         <div className="truncate text-xs text-muted-foreground">{metaText(e) || "Exercise"}</div>
@@ -422,16 +412,7 @@ function LibraryGrid() {
 /** The illustrated how-to for a library exercise: animated frames + meta +
  *  instructions. Read-only browse; freestyle logging still lives in LogSheet. */
 function ExerciseLibrarySheet({ ex, onClose }: { ex: ExerciseInfo; onClose: () => void }) {
-  const chips = [splitList(ex.muscle_groups)[0], splitList(ex.equipment)[0], ex.difficulty, ex.mechanic].filter(Boolean) as string[];
-  return (
-    <Sheet open onClose={onClose} title={ex.name}>
-      <div className="space-y-4">
-        <LibCover ex={ex} className="aspect-video w-full" />
-        {chips.length > 0 && <div className="flex flex-wrap gap-1.5">{chips.map((ch, i) => <Badge key={i} tone="activity">{pretty(ch)}</Badge>)}</div>}
-        {ex.instructions_md
-          ? <Markdown className="text-sm text-foreground/90">{ex.instructions_md}</Markdown>
-          : <p className="text-sm text-muted-foreground">No written instructions for this exercise yet.</p>}
-      </div>
-    </Sheet>
-  );
+  // The whole body is `ExerciseDetail` — the same one the workout player shows,
+  // which is what this sheet used to be a thinner, worse copy of.
+  return <Sheet open onClose={onClose} title={ex.name}><ExerciseDetail ex={ex} /></Sheet>;
 }

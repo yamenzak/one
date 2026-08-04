@@ -8,7 +8,7 @@ import { AnimatePresence, motion } from "motion/react";
 import type { WorkoutBody, WorkoutDay, WorkoutBlock, ExerciseSlot, WorkoutSet } from "@kova/protocol";
 import { detectPrs, recommendNextDay, displayToKg, kgToDisplay, weightLabel, fmtWeight, computePlates, type ExerciseBests, type PlateBreakdown, type UnitPrefs } from "@kova/domain";
 import {
-  Button, Card, Badge, Field, Input, Label, Sheet, SubCard, ProgressRing, EmptyState,
+  Button, Card, Badge, Eyebrow, Field, Input, Label, Sheet, SubCard, ProgressRing, EmptyState,
   Reveal, Skeleton, SkeletonLine, SkeletonList, useModalOverlay,
   Anchor, CountUp, Atmosphere, stagger, rowStagger, rowIn, DUR, EASE_OUT,
   AlertTriangle, ArrowLeft, ArrowLeftRight, Trophy, Timer, Dumbbell, Moon, Check, Info, History, Plus, Minus, RotateCcw, cn,
@@ -16,8 +16,7 @@ import {
 import { api, todayLocal, errorText } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
-import { Markdown } from "../../Markdown.js";
-import { ExerciseRow, ExerciseThumb, metaText, splitList, pretty, type ExerciseInfo } from "../exercise.js";
+import { ExerciseDetail, ExerciseRow, ExerciseThumb, metaText, type ExerciseInfo } from "../exercise.js";
 
 interface PublishedPlan { id: string; name: string; body: WorkoutBody }
 type PlanRow = PublishedPlan & { status: string; publishedAt?: string | null };
@@ -530,11 +529,6 @@ function DayPreviewSheet({ day, index, exercises, onClose }: { day: WorkoutDay; 
  *  full prescription for this slot (SPEC §8.3 — client sees what's configured). */
 function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: ExerciseSlot; onClose: () => void }) {
   const units = useUnits();
-  const primary = splitList(ex?.muscle_groups).map(pretty);
-  const secondary = splitList(ex?.secondary_muscle_groups).map(pretty);
-  const equipment = splitList(ex?.equipment).map(pretty);
-  // Library attributes the trainer/library set: difficulty, movement type…
-  const attrs = [ex?.difficulty, ex?.mechanic, ex?.force, ex?.category].filter(Boolean).map((a) => pretty(a!));
   const setLine = (s: WorkoutSet, i: number): string => {
     const parts: string[] = [];
     if (s.setType === "warmup") parts.push("Warm-up");
@@ -554,63 +548,30 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
     if (s.restAfterSec) parts.push(`rest ${fmtClock(s.restAfterSec)}`);
     return `Set ${i + 1} · ${parts.join(" · ")}`;
   };
-  const Attr = ({ label, chips, tone }: { label: string; chips: string[]; tone: "primary" | "activity" | "neutral" }) => chips.length ? (
-    <div className="flex items-start gap-2">
-      <span className="mt-1 w-20 shrink-0 text-micro uppercase text-muted-foreground">{label}</span>
-      <div className="flex flex-wrap gap-1.5">{chips.map((c) => <Badge key={c} tone={tone}>{c}</Badge>)}</div>
+  /*
+    The media, the facts and the how-to are `ExerciseDetail` — the same body the
+    client's library sheet renders, because they answer the same question about
+    the same thing. What is player-only is the PRESCRIPTION, and it sits between
+    the two so the coach's numbers come before the generic instructions: mid-set,
+    "3 x 10 at RPE 8" is what you opened this for.
+  */
+  const prescription = (
+    <div className="space-y-2.5">
+      <Eyebrow>Prescribed</Eyebrow>
+      <SubCard className="space-y-1.5">
+        {slot.sets.map((s, i) => (
+          <div key={i}>
+            <div className="text-sm">{setLine(s, i)}</div>
+            {s.notes && <div className="text-xs italic text-muted-foreground">{s.notes}</div>}
+          </div>
+        ))}
+        {slot.slotNotes && <p className="border-t border-border/50 pt-1.5 text-xs italic text-muted-foreground">Coach: {slot.slotNotes}</p>}
+      </SubCard>
     </div>
-  ) : null;
+  );
   return (
     <Sheet open onClose={onClose} title={ex?.name ?? "Exercise"}>
-      <div className="space-y-4">
-        {(ex?.thumb2_url || ex?.thumb_url) && (
-          <div className="flex gap-2">
-            {([["Start", ex?.thumb_url], ["End", ex?.thumb2_url]] as const).filter(([, src]) => src).map(([label, src]) => (
-              <div key={label} className="relative min-w-0 flex-1 overflow-hidden rounded-2xl bg-surface-2">
-                {/* Cover, like every other photo — the two frames are a BEFORE
-                    and AFTER of the same shot, so letterboxing them made the
-                    pair a different size from each other. */}
-                <img src={src!} alt="" className="h-40 w-full object-cover" />
-                {ex?.thumb_url && ex?.thumb2_url && <span className="absolute left-2 top-2 rounded-full bg-black/55 px-2 py-0.5 text-xs font-semibold text-white">{label}</span>}
-              </div>
-            ))}
-          </div>
-        )}
-        {ex?.video_url && (
-          <div>
-            <div className="mb-1.5 text-micro uppercase text-muted-foreground">Demo video</div>
-            <video src={ex.video_url} controls playsInline preload="metadata" className="w-full rounded-2xl bg-black" />
-          </div>
-        )}
-        {(primary.length > 0 || secondary.length > 0 || equipment.length > 0 || attrs.length > 0) && (
-          <div className="space-y-2">
-            <Attr label="Muscles" chips={primary} tone="activity" />
-            <Attr label="Also works" chips={secondary} tone="neutral" />
-            <Attr label="Equipment" chips={equipment} tone="neutral" />
-            <Attr label="Type" chips={attrs} tone="neutral" />
-          </div>
-        )}
-        <div>
-          <div className="mb-1.5 text-micro uppercase text-muted-foreground">Prescribed</div>
-          <SubCard className="space-y-1.5">
-            {slot.sets.map((s, i) => (
-              <div key={i}>
-                <div className="text-sm">{setLine(s, i)}</div>
-                {s.notes && <div className="text-xs italic text-muted-foreground">{s.notes}</div>}
-              </div>
-            ))}
-            {slot.slotNotes && <p className="border-t border-border/50 pt-1.5 text-xs italic text-muted-foreground">Coach: {slot.slotNotes}</p>}
-          </SubCard>
-        </div>
-        {ex?.instructions_md ? (
-          <div>
-            <div className="mb-1.5 text-micro uppercase text-muted-foreground">How to</div>
-            <Markdown className="text-[0.95rem] text-foreground/90">{ex.instructions_md}</Markdown>
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">No instructions yet — ask your coach for cues.</p>
-        )}
-      </div>
+      {ex ? <ExerciseDetail ex={ex}>{prescription}</ExerciseDetail> : prescription}
     </Sheet>
   );
 }

@@ -9,14 +9,14 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { kcalToDisplay, scaleFood, servingsToQuantity, SERVING_PRESETS, type UnitPrefs } from "@kova/domain";
-import { Button, Field, Sheet, Chip, SegmentedControl, IconBadge, cn, toneSoft, Search, Barcode, Camera, PencilLine, ChevronRight, Plus, X } from "@4dl/ui";
-import { METRICS } from "../../registry/index.js";
+import { scaleFood, servingsToQuantity, SERVING_PRESETS, type UnitPrefs } from "@kova/domain";
+import { Button, Field, Sheet, Chip, SegmentedControl, IconBadge, Eyebrow, Media, Search, Barcode, Camera, PencilLine, ChevronRight, Plus, Utensils, X } from "@4dl/ui";
+import { MacroTiles, MicroGrid } from "../../registry/index.js";
 import { api, errorText, isQueued, todayLocal, uploadMedia } from "../../api.js";
 import { QueuedNotice } from "../../notices.js";
 import { useSession } from "../../session.js";
 import { useUnits } from "../../units.js";
-import { FoodRow, FoodThumb, normFood } from "../food.js";
+import { FoodRow, normFood } from "../food.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { Markdown } from "../../Markdown.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
@@ -315,14 +315,29 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
         title={selected.name}
         footer={<div className="flex gap-3"><Button variant="ghost" onClick={() => setSelected(null)}>Back</Button><Button size="lg" className="flex-1" disabled={logging} onClick={() => void log()}>{logging ? "Logging…" : "Log it"}</Button></div>}
       >
-        <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <FoodThumb src={img} size={56} radius="xl" />
-            <div className="min-w-0">{selected.brand && <div className="truncate text-sm text-muted-foreground">{selected.brand}</div>}<div className="text-xs text-muted-foreground">per {n.servingSize} {n.servingUnit}</div></div>
+        {/*
+          A detail sheet is a sequence of answers, and each one gets a heading.
+          Without them this was six unlabelled blocks: a thumbnail, some chips,
+          some more chips, a field, four tinted squares and a table — every one
+          of which you had to work out from its contents. The controls did not
+          change; the reader now knows what they are looking at.
+        */}
+        <div className="space-y-5">
+          {/* Only when there IS a photo. An empty hero on a food nobody
+              photographed is 200px of plate above the controls you came for. */}
+          {img && <Media src={img} fallback={Utensils} tone="nutrition" ratio="wide" alt={selected.name} />}
+          <p className="px-1 text-sm text-muted-foreground">
+            {selected.brand ? `${selected.brand} · ` : ""}per {n.servingSize} {n.servingUnit}
+          </p>
+
+          <div className="space-y-2.5">
+            <Eyebrow>Meal</Eyebrow>
+            <div className="flex flex-wrap gap-2">{MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{mealLabel(m)}</Chip>)}</div>
           </div>
-          <div className="flex flex-wrap gap-2">{MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{mealLabel(m)}</Chip>)}</div>
+
           {/* Portion — quick serving multipliers + an exact amount, live-scaled. */}
           <div className="space-y-2.5">
+            <Eyebrow>Portion</Eyebrow>
             <div className="flex flex-wrap gap-2">
               {SERVING_PRESETS.map((s) => {
                 const qv = servingsToQuantity(n.servingSize, s);
@@ -331,23 +346,19 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
             </div>
             <Field label={`Amount (${n.servingUnit})`} inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1"))} />
           </div>
-          <div className="grid grid-cols-4 gap-2">
-            {(["calories", "protein", "carbs", "fat"] as const).map((metric) => {
-              const M = METRICS[metric];
-              const v = scaledFor[metric];
-              return (
-                <div key={metric} className={cn("flex flex-col items-center gap-1 rounded-xl p-2.5", toneSoft[M.tone])}>
-                  <M.icon className="size-4" />
-                  <div className="numeral text-lg font-semibold leading-none">{metric === "calories" ? kcalToDisplay(v, units).toLocaleString() : Math.round(v)}</div>
-                </div>
-              );
-            })}
+
+          <div className="space-y-2.5">
+            {/* The heading states the AMOUNT the numbers below are for. They
+                live-scale with the field above, and a panel of four figures that
+                silently changes meaning is how a diary gets logged wrong. */}
+            <Eyebrow>{qtyNum > 0 ? `Per ${Math.round(qtyNum * 10) / 10} ${n.servingUnit}` : "Per portion"}</Eyebrow>
+            <MacroTiles calories={scaledFor.calories} proteinG={scaledFor.protein} carbsG={scaledFor.carbs} fatG={scaledFor.fat} label />
           </div>
+
           {hasMicros && (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-xl bg-surface-2 p-3 text-sm">
-              {microRows.filter(([, v]) => v > 0).map(([l, v, u]) => (
-                <div key={l} className="flex items-center justify-between"><span className="text-muted-foreground">{l}</span><span className="numeral">{Math.round(v * factor * 10) / 10} {u}</span></div>
-              ))}
+            <div className="space-y-2.5">
+              <Eyebrow>Also in this</Eyebrow>
+              <MicroGrid rows={microRows.map(([l, v, u]) => [l, v * factor, u] as const)} />
             </div>
           )}
         </div>
@@ -572,16 +583,9 @@ function SnapReview({ entries, note, mocked, defaultMeal, units, onCancel, onRet
         </div>
 
         {items.length > 0 && (
-          <div className="grid grid-cols-4 gap-2">
-            {([["calories", totals.calories], ["protein", totals.proteinG], ["carbs", totals.carbsG], ["fat", totals.fatG]] as const).map(([metric, v]) => {
-              const M = METRICS[metric];
-              return (
-                <div key={metric} className={cn("flex flex-col items-center gap-1 rounded-xl p-2.5", toneSoft[M.tone])}>
-                  <M.icon className="size-4" />
-                  <div className="numeral text-lg font-semibold leading-none">{metric === "calories" ? kcalToDisplay(v, units).toLocaleString() : Math.round(v)}</div>
-                </div>
-              );
-            })}
+          <div className="space-y-2.5">
+            <Eyebrow>What you're about to log</Eyebrow>
+            <MacroTiles calories={totals.calories} proteinG={totals.proteinG} carbsG={totals.carbsG} fatG={totals.fatG} label />
           </div>
         )}
 

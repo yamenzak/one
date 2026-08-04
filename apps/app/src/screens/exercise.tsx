@@ -7,7 +7,8 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Dumbbell, Info, Thumb, cn, type ThumbProps } from "@4dl/ui";
+import { Badge, Dumbbell, Eyebrow, Info, Media, SegmentedControl, Thumb, cn, type MediaProps, type ThumbProps } from "@4dl/ui";
+import { Markdown } from "../Markdown.js";
 
 // ── Shared frame ticker ──────────────────────────────────────────────────────
 // One global interval drives every animated thumbnail in sync, so a whole
@@ -124,6 +125,147 @@ export function ExerciseThumb({ thumb, thumb2, size = 40, radius, className = ""
       frame={tick}
       className={className}
     />
+  );
+}
+
+/**
+ * THE EXERCISE'S MEDIA, at detail size.
+ *
+ * Three things were wrong with the hand-rolled versions, and all three came
+ * from each surface deciding for itself:
+ *
+ *  1. The library sheet cropped a single frame into a 16:9 box, so a portrait
+ *     photo showed the gym ceiling and the top of the model's head — the
+ *     dumbbells, i.e. the exercise, cropped away. `Media` contains the photo
+ *     over a blurred copy of itself (@4dl/ui media.tsx), so nothing is lost and
+ *     nothing is a coloured bar.
+ *  2. The library sheet showed ONE frame. An exercise with a start and an end
+ *     position is a movement, and the pair animating is the whole point of
+ *     storing two — it was already happening in every 40px row and not in the
+ *     screen you open to study the movement.
+ *  3. The library sheet dropped the demo VIDEO entirely. A coach who uploads
+ *     one has said what they want the client to watch.
+ *
+ * Photos and video are a two-way switch rather than a stack, because they are
+ * the same content at two fidelities — showing both means scrolling past the
+ * one you did not want.
+ */
+export function ExerciseHero({ ex, ratio = "photo" }: { ex: ExerciseInfo; ratio?: MediaProps["ratio"] }) {
+  const animated = Boolean(ex.thumb_url && ex.thumb2_url);
+  const tick = useFrameTick(animated);
+  const hasPhoto = Boolean(ex.thumb_url || ex.thumb2_url);
+  const [tab, setTab] = useState<"photo" | "video">(hasPhoto ? "photo" : "video");
+  if (!hasPhoto && !ex.video_url) return null;
+  const both = hasPhoto && Boolean(ex.video_url);
+  const showVideo = Boolean(ex.video_url) && (tab === "video" || !hasPhoto);
+  return (
+    <div className="space-y-2">
+      <Media
+        src={showVideo ? undefined : ex.thumb_url}
+        src2={showVideo ? undefined : ex.thumb2_url}
+        video={showVideo ? ex.video_url : undefined}
+        fallback={Dumbbell}
+        tone="activity"
+        ratio={ratio}
+        frame={tick}
+        alt={ex.name}
+        // Which position is on screen, on the frame itself — a cross-fade with
+        // no label is just a photo that will not sit still.
+        badge={animated && !showVideo ? (tick % 2 === 0 ? "Start" : "End") : undefined}
+      />
+      {both && (
+        <SegmentedControl
+          value={tab}
+          onChange={setTab}
+          options={[{ value: "photo" as const, label: "Demo" }, { value: "video" as const, label: "Video" }]}
+        />
+      )}
+    </div>
+  );
+}
+
+/** One attribute line: a fixed-width label and its chips. */
+function Attr({ label, chips, tone }: { label: string; chips: string[]; tone: "activity" | "neutral" }) {
+  if (chips.length === 0) return null;
+  return (
+    <div className="flex items-start gap-3 px-1">
+      <span className="mt-1 w-24 shrink-0 text-micro uppercase text-muted-foreground">{label}</span>
+      <div className="flex flex-wrap gap-1.5">{chips.map((c) => <Badge key={c} tone={tone}>{c}</Badge>)}</div>
+    </div>
+  );
+}
+
+/** What the movement trains and what it needs — the same four lines wherever an
+ *  exercise is opened, so the answer is always in the same place. */
+export function ExerciseFacts({ ex }: { ex: ExerciseInfo }) {
+  const primary = splitList(ex.muscle_groups).map(pretty);
+  const secondary = splitList(ex.secondary_muscle_groups).map(pretty);
+  const equipment = splitList(ex.equipment).map(pretty);
+  const type = [ex.difficulty, ex.mechanic, ex.force].filter(Boolean).map((a) => pretty(a!));
+  if (!primary.length && !secondary.length && !equipment.length && !type.length) return null;
+  return (
+    <div className="space-y-2">
+      <Attr label="Muscles" chips={primary} tone="activity" />
+      <Attr label="Also works" chips={secondary} tone="neutral" />
+      <Attr label="Equipment" chips={equipment} tone="neutral" />
+      <Attr label="Type" chips={type} tone="neutral" />
+    </div>
+  );
+}
+
+/**
+ * Instructions, as STEPS.
+ *
+ * The library's written instructions arrive as three or four dense paragraphs,
+ * and rendering them as prose is what the screen looked like before: a wall of
+ * text you are supposed to read WHILE holding a dumbbell. They are already a
+ * sequence — the source just does not say so — and numbering them costs
+ * nothing and makes the thing findable mid-set ("I'm on 3").
+ *
+ * Text that is ALREADY structured (a markdown list, headings) is left to
+ * `Markdown`: someone wrote that structure deliberately and re-numbering it
+ * would fight them.
+ */
+const STRUCTURED = /^\s*(#{1,6}\s|[-*+]\s|\d+[.)]\s)/m;
+
+export function ExerciseSteps({ md }: { md?: string | null }) {
+  const text = (md ?? "").trim();
+  if (!text) return <p className="px-1 text-sm text-muted-foreground">No written instructions yet — ask your coach for cues.</p>;
+  if (STRUCTURED.test(text)) return <Markdown className="text-[0.95rem] leading-relaxed text-foreground/90">{text}</Markdown>;
+  const steps = text.split(/\n\s*\n/).map((s) => s.trim().replace(/\s*\n\s*/g, " ")).filter(Boolean);
+  if (steps.length < 2) return <p className="px-1 text-[0.95rem] leading-relaxed text-foreground/90">{steps[0] ?? text}</p>;
+  return (
+    <ol className="space-y-3">
+      {steps.map((s, i) => (
+        <li key={i} className="flex gap-3">
+          <span className="numeral mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-activity-soft text-xs font-bold text-activity">{i + 1}</span>
+          <span className="min-w-0 flex-1 text-[0.95rem] leading-relaxed text-foreground/90">{s}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/**
+ * THE exercise detail body — media, facts, whatever the surface wants in the
+ * middle (the player puts the coach's prescription there), then the how-to.
+ *
+ * The two surfaces that show an exercise in full had drifted apart: the player
+ * had side-by-side start/end stills, a video and an attribute list; the client's
+ * library sheet had one cropped photo and three badges. Same subject, same
+ * question being asked of it, two answers. This is the one answer.
+ */
+export function ExerciseDetail({ ex, children }: { ex: ExerciseInfo; children?: ReactNode }) {
+  return (
+    <div className="space-y-5">
+      <ExerciseHero ex={ex} />
+      <ExerciseFacts ex={ex} />
+      {children}
+      <div className="space-y-2.5">
+        <Eyebrow>How to</Eyebrow>
+        <ExerciseSteps md={ex.instructions_md} />
+      </div>
+    </div>
   );
 }
 

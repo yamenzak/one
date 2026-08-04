@@ -24,18 +24,19 @@
  *   and its own transparency, and cropping it destroys the thing itself. It is
  *   contained, and the space around it is deliberate.
  *
- *   A DOCUMENT — an image being examined rather than recognised, i.e. the
- *   lightbox — is contained too. That is the one place cropping loses
- *   information the reader came for.
+ *   A DOCUMENT — an image being examined rather than recognised: the lightbox,
+ *   and the HERO of a detail surface, which someone opened in order to look at
+ *   it — is contained. That is where cropping loses the information the reader
+ *   came for.
  *
- * `Thumb` is the first case. Marks stay hand-placed, because a mark's frame is
- * always bespoke (a bar, a splash, a settings preview) and there is no second
- * decision to share.
+ * `Thumb` is the first case, `Media` the third. Marks stay hand-placed, because
+ * a mark's frame is always bespoke (a bar, a splash, a settings preview) and
+ * there is no second decision to share.
  */
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { motion } from "motion/react";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "./lib/utils.js";
 import { toneSoft, type Tone } from "./primitives.js";
 import { ChevronLeft, ChevronRight, X, ImageIcon, type LucideIcon } from "./lib/icons.js";
@@ -147,6 +148,106 @@ export function Thumb({
         <Fallback aria-hidden className="size-1/2 max-h-8 max-w-8" />
       )}
     </div>
+  );
+}
+
+/**
+ * THE HERO OF A DETAIL SURFACE — a photo you opened something to LOOK at.
+ *
+ * `Thumb`'s rule (fill, crop) is right for recognition and wrong here. Someone
+ * who taps a row to read the how-to wants the whole image, so a hero belongs
+ * with the lightbox: it is CONTAINED. Which lands straight back on the problem
+ * `Thumb` exists to avoid — a portrait photo in a wide hero is a narrow strip
+ * between two slabs of flat colour.
+ *
+ * Cropping instead is worse, and this is not hypothetical: an exercise hero
+ * showed the gym's ceiling lights and the top of the model's head, with the
+ * dumbbells — the entire subject, the reason the photo exists — cropped away.
+ *
+ * So the surround is THE IMAGE ITSELF: the same source, scaled up, blurred and
+ * dimmed behind the contained foreground. Nothing is cropped, nothing is a
+ * coloured bar, and the frame takes its colour from the photograph rather than
+ * from the brand. Every orientation lands in the same rectangle, so a column of
+ * them keeps one rhythm.
+ *
+ * A video needs none of it — it letterboxes itself against black, which is what
+ * a video player is supposed to look like — so `video` renders a player and the
+ * backdrop stays out of the way.
+ */
+export interface MediaProps {
+  src?: string | null;
+  /** A second frame. The two cross-fade on `frame` — start/end, before/after. */
+  src2?: string | null;
+  /** An attached video. Takes the frame over; `src` then only seeds the poster. */
+  video?: string | null;
+  fallback?: LucideIcon;
+  tone?: Tone;
+  ratio?: ThumbRatio;
+  radius?: keyof typeof THUMB_RADIUS;
+  alt?: string;
+  className?: string;
+  frame?: number;
+  /** A corner label — "Start"/"End", a duration, a count. */
+  badge?: ReactNode;
+}
+
+export function Media({
+  src, src2, video, fallback: Fallback = ImageIcon, tone, ratio = "photo",
+  radius = "2xl", alt = "", className, frame = 0, badge,
+}: MediaProps) {
+  const [failed, setFailed] = useState<Record<string, boolean>>({});
+  const frames = [src, src2].filter((f): f is string => Boolean(f) && !failed[f!]);
+  const active = frames.length > 1 ? frame % frames.length : 0;
+  const shape = cn("relative w-full overflow-hidden", THUMB_RADIUS[radius], RATIO[ratio], className);
+
+  if (video) {
+    return (
+      <div className={cn(shape, "bg-black")}>
+        <video src={video} poster={frames[0]} controls playsInline preload="metadata" className="absolute inset-0 size-full" />
+        {badge != null && <MediaBadge>{badge}</MediaBadge>}
+      </div>
+    );
+  }
+
+  if (frames.length === 0) {
+    return (
+      <div className={cn(shape, "grid place-items-center", tone ? toneSoft[tone] : "bg-surface-2 text-muted-foreground")}>
+        <Fallback aria-hidden className="size-10" />
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn(shape, "bg-surface-2")}>
+      {frames.map((f, i) => (
+        <div key={f} className={cn("absolute inset-0 transition-opacity duration-700", i === active ? "opacity-100" : "opacity-0")}>
+          {/* The backdrop. `scale-110` pushes the blur's soft edge out of frame,
+              and the saturation lift stops a dim photo's surround reading as
+              grey mud. */}
+          <img src={f} alt="" aria-hidden loading="lazy" decoding="async" className="absolute inset-0 size-full scale-110 object-cover blur-2xl saturate-150" />
+          <div className="absolute inset-0 bg-black/25" />
+          <img
+            src={f}
+            alt={i === 0 ? alt : ""}
+            loading="lazy"
+            decoding="async"
+            onError={() => setFailed((m) => ({ ...m, [f]: true }))}
+            className="absolute inset-0 size-full object-contain"
+          />
+        </div>
+      ))}
+      {badge != null && <MediaBadge>{badge}</MediaBadge>}
+    </div>
+  );
+}
+
+/** The corner label on a `Media` frame — a dark scrim rather than a tone,
+ *  because it has to stay legible over an arbitrary photograph. */
+function MediaBadge({ children }: { children: ReactNode }) {
+  return (
+    <span className="absolute left-2.5 top-2.5 z-10 rounded-full bg-black/55 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+      {children}
+    </span>
   );
 }
 

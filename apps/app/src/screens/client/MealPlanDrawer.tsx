@@ -9,9 +9,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MealBody, MealOption } from "@kova/protocol";
 import { optionMacroTotals, type FoodLike } from "@kova/protocol";
-import { fmtEnergy, kcalToDisplay, featureEnabled } from "@kova/domain";
-import { Button, Card, Badge, Sheet, Skeleton, EmptyState, SegmentedControl, toneSoft, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw, Anchor, CountUp, Atmosphere, DUR, EASE_OUT } from "@4dl/ui";
-import { MacroInline, METRICS } from "../../registry/index.js";
+import { fmtEnergy, featureEnabled } from "@kova/domain";
+import { Button, Card, Badge, Eyebrow, Media, Sheet, Skeleton, EmptyState, SegmentedControl, cn, motion, type LucideIcon, Reveal, SkeletonHero, SkeletonLine, ConfirmDialog, useModalOverlay, Utensils, ShoppingCart, Plus, Minus, Check, ArrowLeft, History, LifeBuoy, Croissant, Soup, Apple, Dumbbell, RotateCcw, Anchor, CountUp, Atmosphere, DUR, EASE_OUT } from "@4dl/ui";
+import { MacroInline, MacroTiles, MicroGrid } from "../../registry/index.js";
 import { api, todayLocal } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
@@ -36,7 +36,6 @@ const MEAL_META: Record<string, { label: string; icon: LucideIcon }> = {
 };
 const MEAL_ORDER = ["breakfast", "lunch", "dinner", "snack", "pre_workout", "post_workout", "free"];
 const metaFor = (m: string) => MEAL_META[m] ?? { label: m.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase()), icon: Utensils };
-const MACRO_TILES = [["calories", "calories"], ["protein", "proteinG"], ["carbs", "carbsG"], ["fat", "fatG"]] as const;
 
 export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: string; onClose: () => void; onLogged: () => void }) {
   const [plan, setPlan] = useState<Plan | null | undefined>(undefined);
@@ -483,25 +482,24 @@ function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, l
       title={opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}
       footer={readOnly ? undefined : <Button size="lg" className="w-full" variant={logged ? "secondary" : "default"} disabled={logging} onClick={() => { onLog(); onClose(); }}>{logging ? "Logging…" : logged ? "Log again" : "Log this meal"}</Button>}
     >
-      <div className="space-y-3">
-        {image && <img src={image} alt="" className="h-44 w-full rounded-2xl object-cover" />}
+      {/* Same shape as the food detail sheet, for the same reason: an unlabelled
+          stack of a photo, four tiles, a list, a paragraph and a table asks the
+          reader to identify each block before reading it. */}
+      <div className="space-y-5">
+        {/* Contained over a blur, not cropped — a meal photographed in portrait
+            was losing the plate to a 16:9 crop (@4dl/ui media.tsx). */}
+        {image && <Media src={image} fallback={Utensils} tone="nutrition" ratio="wide" alt={opt.mealName ?? "Meal"} />}
         {opt.isFree ? (
           <p className="text-sm text-muted-foreground">A free meal up to {opt.freeMealMaxCalories != null ? fmtEnergy(opt.freeMealMaxCalories, units) : "your cap"} — eat what you like within it.</p>
         ) : (
           <>
-            <div className="grid grid-cols-4 gap-2">
-              {MACRO_TILES.map(([metric, key]) => {
-                const M = METRICS[metric];
-                return (
-                  <div key={metric} className={cn("flex flex-col items-center gap-1 rounded-xl p-2.5", toneSoft[M.tone])}>
-                    <M.icon className="size-4" />
-                    <div className="numeral text-lg font-semibold leading-none">{metric === "calories" ? kcalToDisplay(t[key], units).toLocaleString() : Math.round(t[key])}</div>
-                  </div>
-                );
-              })}
+            <div className="space-y-2.5">
+              <Eyebrow>The whole meal</Eyebrow>
+              <MacroTiles calories={t.calories} proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} label />
             </div>
             {opt.foods.length > 0 && (
-              <div className="space-y-1">
+              <div className="space-y-2.5">
+                <Eyebrow>What's in it</Eyebrow>
                 {opt.foods.map((mf, k) => {
                   const { f, factor } = contrib(mf);
                   return (
@@ -521,17 +519,21 @@ function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, l
                 })}
               </div>
             )}
-            {opt.notes && <p className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted-foreground">{opt.notes}</p>}
+            {opt.notes && (
+              <div className="space-y-2.5">
+                <Eyebrow>From your coach</Eyebrow>
+                <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-sm text-muted-foreground">{opt.notes}</p>
+              </div>
+            )}
             {aiMealTools && opt.foods.length > 0 && (
               <Button size="sm" variant="tonal" className="w-full" disabled={recipeBusy} onClick={onRecipe}>
                 <AiAvatar className="size-5" /> {recipeBusy ? "Cooking up a recipe…" : "Recommend a recipe"}
               </Button>
             )}
             {hasMicros && (
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-xl bg-surface-2 p-3 text-xs">
-                {microRows.filter(([, v]) => v > 0).map(([l, v, u]) => (
-                  <div key={l} className="flex items-center justify-between"><span className="text-muted-foreground">{l}</span><span className="numeral">{Math.round(v * 10) / 10} {u}</span></div>
-                ))}
+              <div className="space-y-2.5">
+                <Eyebrow>Also in this</Eyebrow>
+                <MicroGrid rows={microRows} />
               </div>
             )}
           </>
