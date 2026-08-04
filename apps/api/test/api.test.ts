@@ -1091,6 +1091,18 @@ describe("commerce + redemption", () => {
         body: JSON.stringify({ displayName: "RedeemTest2" }),
       })
     ).json()) as { client: { id: string } };
+    // The client has to HOLD a package: a code is a top-up on something bought,
+    // never access from nothing (access-integrity.test.ts). This one carries no
+    // days of its own, so the 10 the code adds is still the whole answer.
+    const db2 = env.DB as D1Database;
+    const ctx2 = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await db2.prepare("INSERT INTO packages (id, tenant_id, name, budgets_json, visibility, active, created_at) VALUES ('pkg_welcome', ?, 'Backing', '[]', 'private', 1, ?)")
+      .bind(ctx2.active.tenantId, new Date().toISOString()).run();
+    await SELF.fetch(`${ORIGIN}/api/subscriptions/grant`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth(ownerCookie) },
+      body: JSON.stringify({ clientId: client.id, packageId: "pkg_welcome" }),
+    });
     await SELF.fetch(`${ORIGIN}/api/redemption-codes`, {
       method: "POST",
       headers: { "content-type": "application/json", ...auth(ownerCookie) },
@@ -3230,6 +3242,10 @@ describe("package lifecycle + redemption scoping", () => {
     expect((await SELF.fetch(`${ORIGIN}/api/purchases`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, packageId: "pkg_cs" }) })).status).not.toBe(404);
 
     // Redemption code locked to client A: B is rejected, A succeeds.
+    // A code TOPS UP a package the client holds, so A is granted one first —
+    // otherwise this asserts the per-client lock through a 409 that is really
+    // about something else (see access-integrity.test.ts).
+    await SELF.fetch(`${ORIGIN}/api/subscriptions/grant`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, packageId: "pkg_priv" }) });
     await SELF.fetch(`${ORIGIN}/api/redemption-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "LOCKEDA", daysToAdd: 10, restrictedClientId: a }) });
     expect((await SELF.fetch(`${ORIGIN}/api/redeem`, { method: "POST", headers: H, body: JSON.stringify({ clientId: b, code: "LOCKEDA" }) })).status).toBe(404);
     expect((await SELF.fetch(`${ORIGIN}/api/redeem`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, code: "LOCKEDA" }) })).status).toBe(200);
@@ -3247,6 +3263,16 @@ describe("redemption codes — atomic over-redemption guard", () => {
       ((await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: name }) })).json()) as { client: { id: string } }).client.id;
     const a = await mk("RedeemA");
     const b = await mk("RedeemB");
+    // Both hold a package: a code tops access up rather than creating it, so
+    // without this the second 409 would be the wrong 409 and the guard this
+    // test exists for would go unexercised.
+    const db = env.DB as D1Database;
+    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
+    await db.prepare("INSERT INTO packages (id, tenant_id, name, budgets_json, visibility, active, created_at) VALUES ('pkg_oneshot', ?, 'Backing', ?, 'private', 1, ?)")
+      .bind(ctx.active.tenantId, JSON.stringify([{ feature: "workout", days: 5 }]), new Date().toISOString()).run();
+    for (const id of [a, b]) {
+      await SELF.fetch(`${ORIGIN}/api/subscriptions/grant`, { method: "POST", headers: H, body: JSON.stringify({ clientId: id, packageId: "pkg_oneshot" }) });
+    }
     await SELF.fetch(`${ORIGIN}/api/redemption-codes`, { method: "POST", headers: H, body: JSON.stringify({ code: "ONESHOT1", daysToAdd: 10, maxUses: 1 }) });
     // First client redeems it.
     expect((await SELF.fetch(`${ORIGIN}/api/redeem`, { method: "POST", headers: H, body: JSON.stringify({ clientId: a, code: "ONESHOT1" }) })).status).toBe(200);

@@ -295,7 +295,7 @@ export const paymentsRoutes = new Hono<AppEnv>()
     if (outcome.kind === "unmatched") return c.json({ error: "purchase not found" }, 404);
     if (outcome.kind === "already") return c.json({ error: "purchase is already settled" }, 409);
     if (outcome.kind === "granted") {
-      await grantClientPackage(c.env.DB, who.tenantId, outcome.intent.subject_id, outcome.intent.package_id, outcome.intent.id, null);
+      await grantClientPackage(c.env.DB, who.tenantId, outcome.intent.subject_id, outcome.intent.package_id, outcome.intent.id, null, null, "manual");
       await recordAudit(c.env, {
         tenantId: who.tenantId,
         clientId: outcome.intent.subject_id,
@@ -355,7 +355,7 @@ export const paymentsWebhook = new Hono<AppEnv>().post("/pay/webhook/:tenantId",
       } else {
         // The reference doubles as the recurring key, so a later renewal for the
         // same subscription resolves this row. See grantClientPackage's header.
-        await grantClientPackage(c.env.DB, tenantId, intent.subject_id, intent.package_id, intent.id, intent.id);
+        await grantClientPackage(c.env.DB, tenantId, intent.subject_id, intent.package_id, intent.id, intent.id, null, "provider");
       }
       if (outcome.mismatch) {
         // The studio's link and their package disagree on price. Only they can

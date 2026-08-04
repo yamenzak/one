@@ -10,12 +10,16 @@ import { Hono } from "hono";
 import { z } from "zod";
 import {
   buildBudgetsForPurchase,
+  daysByFeature,
   isFullyExpired,
   mergeAddOnBalances,
   overallDaysRemaining,
+  setRemainingDays,
   BUDGET_FEATURES,
+  BUDGET_SCOPES,
   type Budget,
 } from "@kova/domain";
+import { hasPriorPurchase, recordPackageGrant } from "@4dl/commerce";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { gateFeature } from "./client-flags.js";
 import { requireClientAccess } from "./clients.js";
@@ -93,7 +97,12 @@ const PackageBody = z.object({
 interface SubRow {
   id: string;
   tenant_id: string;
-  client_id: string;
+  /* The COLUMN is `subject_id` — `@4dl/commerce` renamed it when the package was
+     extracted, and this interface kept the old name. `SELECT *` then produced
+     rows whose `client_id` was `undefined`, so `/api/subscriptions` has been
+     answering `clientId: undefined` for every subscription. Nothing read it
+     until this file needed to scope a write by it. */
+  subject_id: string;
   package_id: string | null;
   status: string;
   payment_status: string;
@@ -109,12 +118,20 @@ function subView(row: SubRow, nowIsoStr: string) {
   const budgets = parseJson<Budget[]>(row.budgets_json, []);
   return {
     id: row.id,
-    clientId: row.client_id,
+    clientId: row.subject_id,
     packageId: row.package_id,
     status: row.status,
     paymentStatus: row.payment_status,
     budgets,
     daysRemaining: overallDaysRemaining(budgets, nowIsoStr),
+    /*
+      The headline is a MAX across scopes, which is right for "is this still a
+      customer" and misleading as a number on a screen: 70 workout days and 0
+      meal days reads as "70 days left" while half of what they bought has
+      lapsed. The breakdown ships alongside it so no surface has to choose
+      between the two.
+    */
+    daysByFeature: daysByFeature(budgets, BUDGET_SCOPES, nowIsoStr),
     addOns: parseJson(row.addons_json, []),
     source: row.source,
     startedAt: row.started_at,
@@ -304,13 +321,17 @@ export const commerceRoutes = new Hono<AppEnv>()
     }
 
     const now = nowIso();
-    if (pkg.once_per_customer) {
-      const prior = await c.env.DB.prepare(
-        "SELECT 1 AS x FROM subject_subscriptions WHERE subject_id = ? AND package_id = ?",
-      )
-        .bind(access.client.id, pkg.id)
-        .first();
-      if (prior) return c.json({ error: "package is once per customer" }, 409);
+    /*
+      The LEDGER answers this, not the subscription row's `package_id`.
+
+      A repeat grant FOLDS into the client's live row, which keeps whichever
+      package opened it — so "SELECT ... WHERE package_id = ?" said `no` forever
+      for every package after the first, and a once-only package could be
+      granted without limit, stacking days each time. `hasPriorPurchase` reads
+      `subject_package_grants` ∪ that column, so existing data still counts.
+    */
+    if (pkg.once_per_customer && (await hasPriorPurchase(c.env.DB, access.client.id, pkg.id))) {
+      return c.json({ error: "package is once per customer" }, 409);
     }
 
     // Queue-not-sum: extend the client's current NON-recurring subscription if
@@ -329,11 +350,22 @@ export const commerceRoutes = new Hono<AppEnv>()
     if (current) {
       // CAS append so a concurrent redeem / renewal on the same row can't lose
       // this grant's budget days (last-writer-wins on the JSON columns).
-      await updateSubscriptionRunway(c.env.DB, current.id, (existing, addOnsPrev) => ({
+      const ok = await updateSubscriptionRunway(c.env.DB, current.id, (existing, addOnsPrev) => ({
         budgets: [...existing, ...buildBudgetsForPurchase(existing, specs, now)],
         addOns: mergeAddOnBalances(addOnsPrev, purchasedAddOns),
         extra: { sql: "updated_at = ?", binds: [now] },
       }));
+      /*
+        A RACED-OUT CAS IS A FAILED GRANT, AND IT USED TO REPORT SUCCESS.
+
+        The return value was discarded: the write landed nowhere, the route
+        answered 200 `{ok: true, extended: true}`, an audit row said the package
+        was assigned, and the client was notified that their access had been
+        extended. The coach had no way to know it had not. It is a 409 now, with
+        nothing else written.
+      */
+      if (!ok) return c.json({ error: "couldn't extend this client's access just now — someone else was changing it. Try again." }, 409);
+      await recordPackageGrant(c.env.DB, { id: newId("pgr"), tenantId: who.tenantId, subjectId: access.client.id, packageId: pkg.id, subscriptionId: current.id, source: "admin", days: specs, actorUserId: who.userId, at: now });
       await recordAudit(c.env, { tenantId: who.tenantId, clientId: access.client.id, actorUserId: who.userId, action: "package.assign", summary: `${pkg.name} (extended)`, ref: pkg.id });
       if (access.client.user_id && access.client.user_id !== who.userId) {
         await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "access_granted", title: "Your access was extended", message: `${pkg.name} — more time added`, vars: { coachName: c.get("user")?.name || "Your coach", packageName: pkg.name } });
@@ -352,11 +384,117 @@ export const commerceRoutes = new Hono<AppEnv>()
         j(mergeAddOnBalances([], purchasedAddOns)), pkg.flags_json, now, now,
       )
       .run();
+    await recordPackageGrant(c.env.DB, { id: newId("pgr"), tenantId: who.tenantId, subjectId: access.client.id, packageId: pkg.id, subscriptionId: id, source: "admin", days: specs, actorUserId: who.userId, at: now });
     await recordAudit(c.env, { tenantId: who.tenantId, clientId: access.client.id, actorUserId: who.userId, action: "package.assign", summary: pkg.name, ref: pkg.id });
     if (access.client.user_id && access.client.user_id !== who.userId) {
       await notify(c.env, { tenantId: who.tenantId, userId: access.client.user_id, type: "access_granted", message: pkg.name, vars: { coachName: c.get("user")?.name || "Your coach", packageName: pkg.name } });
     }
     return c.json({ ok: true, id, extended: false }, 201);
+  })
+
+  /**
+   * SET a client's remaining days — the correction an owner needs when the
+   * numbers are wrong.
+   *
+   * ── Why this exists, and why only an owner may use it ───────────────────────
+   *
+   * Every other write in this file ADDS runway, which is correct for selling and
+   * useless for repair. When a defect (or a coach's mistake, or a duplicated
+   * webhook) has left a client holding days nobody sold them, there was no way to
+   * say what the number should be — the only lever was to wait it out.
+   *
+   * It is OWNER-only, and that is not the usual role check being copied. A
+   * trainer granting a package is bounded by the catalogue: the days come from a
+   * package someone priced. This writes an arbitrary number directly onto a
+   * customer's access, in both directions, and is the one control in the access
+   * economy with no price attached. It is also the one an angry customer would
+   * most like a junior member of staff to press.
+   *
+   * `reason` is REQUIRED and lands in the audit trail. A correction with no
+   * stated cause is indistinguishable from a mistake six months later, and this
+   * route exists precisely because nobody could reconstruct what happened.
+   *
+   * The client is NOT notified. A silent correction is right here: the common
+   * case is taking back days that were never bought, and a push saying "your
+   * access changed" invites a conversation the studio may not have started yet.
+   * The audit row and the visible number are the record.
+   */
+  .post("/subscriptions/:id/days", async (c) => {
+    const who = requireTenant(c)!;
+    if (c.get("role") !== "owner") return c.json({ error: "only the studio owner can correct access days" }, 403);
+    const parsed = z
+      .object({
+        feature: z.enum(BUDGET_FEATURES),
+        days: z.number().int().min(0).max(3650),
+        reason: z.string().min(3).max(300),
+      })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body", issues: parsed.error.issues }, 400);
+    const { feature, days, reason } = parsed.data;
+
+    const row = await c.env.DB.prepare("SELECT * FROM subject_subscriptions WHERE id = ? AND tenant_id = ?")
+      .bind(c.req.param("id"), who.tenantId)
+      .first<SubRow>();
+    if (!row) return c.json({ error: "not found" }, 404);
+    // Tenant scope is not enough: the row names a client, and every client-scoped
+    // write in this codebase goes through the same chokepoint.
+    const access = await requireClientAccess(c, row.subject_id);
+    if ("response" in access) return access.response;
+
+    const now = nowIso();
+    // The wildcard sets EVERY scope, one at a time, so "give them 30 days of
+    // everything" is one action rather than two that queue against each other.
+    const targets = feature === "all" ? BUDGET_SCOPES : [feature];
+    const before = overallDaysRemaining(parseJson<Budget[]>(row.budgets_json, []), now);
+    const ok = await updateSubscriptionRunway(c.env.DB, row.id, (budgets, addOns) => ({
+      budgets: targets.reduce((acc, f) => setRemainingDays(acc, f, days, now, BUDGET_SCOPES), budgets),
+      addOns,
+      // A correction to a positive number RE-OPENS an expired subscription —
+      // otherwise the owner sets 30 days on a lapsed client and the row stays
+      // `expired`, which every gate reads as no access.
+      extra: { sql: `status = ?, updated_at = ?`, binds: [days > 0 ? "active" : row.status, now] },
+    }));
+    if (!ok) return c.json({ error: "couldn't change the days just now — someone else was changing them. Try again." }, 409);
+
+    const after = await c.env.DB.prepare("SELECT budgets_json FROM subject_subscriptions WHERE id = ?").bind(row.id).first<{ budgets_json: string | null }>();
+    const nowDays = overallDaysRemaining(parseJson<Budget[]>(after?.budgets_json ?? null, []), now);
+    await recordAudit(c.env, {
+      tenantId: who.tenantId,
+      clientId: access.client.id,
+      actorUserId: who.userId,
+      action: "access.days_set",
+      summary: `${feature} set to ${days} day${days === 1 ? "" : "s"} (was ${before}, now ${nowDays}) — ${reason}`,
+      ref: row.id,
+    });
+    return c.json({ ok: true, daysRemaining: nowDays });
+  })
+
+  /**
+   * The grant HISTORY for one client — what was applied, when, by which lane.
+   *
+   * The subscription row cannot answer this: repeat purchases fold into it and
+   * it keeps one `package_id`. Working out why a client has the days they have
+   * was, until the ledger existed, impossible from inside the product.
+   */
+  .get("/subscriptions/history", async (c) => {
+    const clientId = c.req.query("clientId");
+    if (!clientId) return c.json({ error: "clientId required" }, 400);
+    const access = await requireClientAccess(c, clientId);
+    if ("response" in access) return access.response;
+    if (c.get("role") === "client") return c.json({ error: "forbidden" }, 403);
+    const rows = await c.env.DB.prepare(
+      `SELECT g.id, g.package_id, g.source, g.days_json, g.at, p.name AS package_name
+       FROM subject_package_grants g LEFT JOIN packages p ON p.id = g.package_id
+       WHERE g.subject_id = ? ORDER BY g.at DESC LIMIT 100`,
+    )
+      .bind(access.client.id)
+      .all();
+    return c.json({
+      grants: (rows.results ?? []).map((r) => ({
+        id: r.id, packageId: r.package_id, packageName: r.package_name, source: r.source,
+        days: parseJson(r.days_json as string | null, []), at: r.at,
+      })),
+    });
   })
 
   // ── Redemption codes ───────────────────────────────────────────────────────
@@ -424,8 +562,37 @@ export const commerceRoutes = new Hono<AppEnv>()
     if (code.restricted_subject_id && code.restricted_subject_id !== access.client.id) return c.json({ error: "code not found" }, 404);
     // Per-package lock: only a client who holds that package may redeem.
     if (code.restricted_package_id) {
-      const owns = await c.env.DB.prepare("SELECT 1 AS x FROM subject_subscriptions WHERE subject_id = ? AND package_id = ? LIMIT 1").bind(access.client.id, code.restricted_package_id).first();
+      const owns = await hasPriorPurchase(c.env.DB, access.client.id, code.restricted_package_id);
       if (!owns) return c.json({ error: "code not found" }, 404);
+    }
+
+    /*
+      A CODE TOPS ACCESS UP. IT DOES NOT CREATE IT.
+
+      This route used to INSERT a fresh subscription when the client had none —
+      `package_id` NULL, `source: 'redemption'` — which made any valid code a
+      standalone access generator. A client calls this endpoint for themselves
+      (`requireClientAccess` passes on their own record), so a code that leaked,
+      was shared, or was simply guessed off a printed card granted a stranger the
+      full product with no package behind it, no price, and nothing for the
+      studio to reconcile against.
+
+      A code is a bonus on something bought. So it requires the client to HOLD a
+      package — the ledger ∪ the legacy column, the same question
+      once-per-customer asks. Refused BEFORE the use slot is claimed, so a
+      refused attempt costs the code nothing.
+
+      This is deliberately not "has an ACTIVE runway": topping a lapsed client
+      back up is exactly what these codes are for.
+    */
+    const holdsPackage = await c.env.DB.prepare(
+      "SELECT 1 AS x FROM subject_subscriptions WHERE subject_id = ? AND package_id IS NOT NULL LIMIT 1",
+    ).bind(access.client.id).first()
+      ?? await c.env.DB.prepare(
+        "SELECT 1 AS x FROM subject_package_grants WHERE subject_id = ? LIMIT 1",
+      ).bind(access.client.id).first();
+    if (!holdsPackage) {
+      return c.json({ error: "This code adds time to a package you already have. Ask your coach to set you up first." }, 409);
     }
 
     // Per-client claim (atomic): the UNIQUE(code_id, client_id) child row dedupes
@@ -481,12 +648,22 @@ export const commerceRoutes = new Hono<AppEnv>()
         }));
         if (!ok) throw new Error("redeem_cas_failed");
       } else {
+        /*
+          The client holds a package (checked above) but has no NON-recurring row
+          to fold into — every row they have is owned by its own recurring
+          subscription, which renews off its own package and must not be topped
+          up by hand. Open the code's runway as its own row, carrying the package
+          that entitled them to redeem so the row is never package-less.
+        */
+        const backing = await c.env.DB.prepare(
+          "SELECT package_id FROM subject_subscriptions WHERE subject_id = ? AND package_id IS NOT NULL ORDER BY started_at DESC LIMIT 1",
+        ).bind(access.client.id).first<{ package_id: string }>();
         await c.env.DB.prepare(
-          `INSERT INTO subject_subscriptions (id, tenant_id, subject_id, status, payment_status, budgets_json, addons_json, source, started_at, updated_at)
-           VALUES (?, ?, ?, 'active', 'none', ?, '[]', 'redemption', ?, ?)`,
+          `INSERT INTO subject_subscriptions (id, tenant_id, subject_id, package_id, status, payment_status, budgets_json, addons_json, source, started_at, updated_at)
+           VALUES (?, ?, ?, ?, 'active', 'none', ?, '[]', 'redemption', ?, ?)`,
         )
           .bind(
-            newId("csub"), who.tenantId, access.client.id,
+            newId("csub"), who.tenantId, access.client.id, backing?.package_id ?? null,
             j(buildBudgetsForPurchase([], codeSpec, now)), now, now,
           )
           .run();

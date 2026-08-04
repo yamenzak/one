@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@kova/domain";
-import { Button, Card, Badge, Field, Select, Textarea, Sheet, SubCard, Chip, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonLine, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, NoData, Anchor, ActionCluster, CountUp, Group, Row, GroupNote, RotateCcw, History, Users, ActionResult, useAction as useActionBase } from "@4dl/ui";
+import { Button, Card, Badge, Field, Select, Textarea, Sheet, SubCard, Chip, Collapsible, useOneOpen, Callout, Wrench, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonLine, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, NoData, Anchor, ActionCluster, CountUp, Group, Row, GroupNote, RotateCcw, History, Users, ActionResult, useAction as useActionBase } from "@4dl/ui";
 import { personaLabel, personaTone } from "../../registry/index.js";
 import { api, errorText, todayLocal } from "../../api.js";
 import { FeatureLock, useCan } from "../../FeatureLock.js";
@@ -26,7 +26,8 @@ const useAction = () => useActionBase(errorText);
 import { Markdown } from "../../Markdown.js";
 import { AiErrorBox } from "../../AiError.js";
 
-interface Sub { id: string; status: string; daysRemaining: number; packageId: string | null }
+interface Sub { id: string; status: string; daysRemaining: number; daysByFeature?: Record<string, number>; packageId: string | null }
+interface GrantRow { id: string; packageName: string | null; source: string; days: { feature: string; days: number }[]; at: string }
 interface Pkg { id: string; name: string }
 interface Swap { id: string; reason: string | null; status: string; day_index: number | null; current_exercise_id: string | null; suggested_exercise_id: string | null }
 interface Lab { id: string; display_name: string; status: string; client_notes?: string | null; file_key?: string | null; values?: { marker: string; value: string; unit?: string; flag?: string }[] | null; trainer_feedback?: string | null }
@@ -74,6 +75,7 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
   const [supps, setSupps] = useState<Supp[]>([]);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [grantOpen, setGrantOpen] = useState(false);
+  const [fixOpen, setFixOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [suppOpen, setSuppOpen] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
@@ -209,12 +211,25 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
 
       {active && (
         <section className="space-y-2">
-          <Eyebrow>Subscription</Eyebrow>
+          <Eyebrow action={isOwner ? <button onClick={() => setFixOpen(true)} className="inline-flex items-center gap-1 text-xs font-semibold text-primary [&_svg]:size-3.5"><Wrench /> Correct days</button> : undefined}>Subscription</Eyebrow>
           <Stagger>
             <GlanceStrip items={[
               { icon: Check, tone: "activity", value: "Active", label: "Status" },
               { icon: ClipboardList, tone: "neutral", value: activePkg?.name ?? null, label: "Plan" },
             ]} />
+            {/*
+              PER SCOPE, next to the headline. The anchor above shows a MAX
+              across scopes, so a client with 70 workout days and 0 meal days
+              reads as "70 days left" — half of what they bought already lapsed
+              and nothing on the screen said so.
+            */}
+            {active.daysByFeature && Object.values(active.daysByFeature).some((n, _i, all) => n !== all[0]) && (
+              <div className="flex flex-wrap gap-2 px-1 pt-1">
+                {Object.entries(active.daysByFeature).map(([f, n]) => (
+                  <Badge key={f} tone={n > 0 ? "neutral" : "warning"}>{f}: {n} {n === 1 ? "day" : "days"}</Badge>
+                ))}
+              </div>
+            )}
           </Stagger>
         </section>
       )}
@@ -366,6 +381,8 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
         </div>
         </FeatureLock>
       </Sheet>
+
+      {fixOpen && active && <CorrectDaysSheet clientId={clientId} sub={active} onClose={() => setFixOpen(false)} onDone={() => { setFixOpen(false); void load(); }} />}
 
       {suppOpen && <PrescribeSheet clientId={clientId} onClose={() => setSuppOpen(false)} onDone={() => { setSuppOpen(false); void load(); }} />}
       {suggestOpen && <SuggestSuppSheet clientId={clientId} onClose={() => setSuggestOpen(false)} onPrescribed={load} />}
@@ -1357,5 +1374,152 @@ function Metric({ label, value }: { label: string; value: string | number | null
       {value == null ? <NoData className="block text-xs">Not yet</NoData> : <div className="numeral text-lg font-semibold">{value}</div>}
       <div className="text-xs text-muted-foreground">{label}</div>
     </div>
+  );
+}
+
+/**
+ * CORRECTING A CLIENT'S DAYS — the owner's damage control.
+ *
+ * Every other control in the access economy adds runway from a priced package.
+ * This one writes a number directly, in both directions, and it exists because
+ * a defect stacked days nobody sold. So the sheet is built to make the owner
+ * certain before they commit:
+ *
+ *   THE HISTORY IS ON THE SAME SCREEN.  Loaded from the grant ledger and shown
+ *     above the field. "Why does this client have 210 days" is answerable here
+ *     and was answerable nowhere before — the subscription row folds repeat
+ *     purchases into itself and keeps one package name.
+ *   THE FIELD IS AN ABSOLUTE, NOT A DELTA. "+30" invites arithmetic against a
+ *     number the owner already believes is wrong. They type what it SHOULD be.
+ *   THE REASON IS REQUIRED, and lands in the audit trail — this is the one
+ *     write in the product with no price attached to explain it.
+ *   ZERO IS SPELLED OUT. Taking access away is a different sentence from
+ *     shortening it, so the button says which one is about to happen.
+ */
+function CorrectDaysSheet({ clientId, sub, onClose, onDone }: {
+  clientId: string;
+  sub: Sub;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [history, setHistory] = useState<GrantRow[] | null>(null);
+  const [feature, setFeature] = useState("all");
+  const [days, setDays] = useState("");
+  const [reason, setReason] = useState("");
+  const act = useAction();
+  const open = useOneOpen<string>(null);
+
+  useEffect(() => {
+    let alive = true;
+    api.get<{ grants: GrantRow[] }>(`/api/subscriptions/history?clientId=${clientId}`)
+      .then((r) => { if (alive) setHistory(r.grants); })
+      .catch(() => { if (alive) setHistory([]); });
+    return () => { alive = false; };
+  }, [clientId]);
+
+  const n = Number(days);
+  const valid = days.trim() !== "" && Number.isInteger(n) && n >= 0 && n <= 3650 && reason.trim().length >= 3;
+  const save = () =>
+    act.run("set", async () => {
+      await api.post(`/api/subscriptions/${sub.id}/days`, { feature, days: n, reason: reason.trim() });
+      onDone();
+      return n === 0 ? "Access removed." : `Set to ${n} ${n === 1 ? "day" : "days"}.`;
+    }, "Couldn't change the days. Nothing was altered.");
+
+  return (
+    <Sheet
+      open
+      onClose={onClose}
+      title="Correct access days"
+      size="tall"
+      footer={
+        <Button size="lg" className="w-full" variant={n === 0 && days.trim() !== "" ? "destructive" : "default"} disabled={!valid || act.busy !== null} onClick={save}>
+          {act.busy ? "Saving…" : days.trim() === "" ? "Enter a number" : n === 0 ? "Remove their access" : `Set to ${n} ${n === 1 ? "day" : "days"}`}
+        </Button>
+      }
+    >
+      <div className="space-y-5">
+        <Callout tone="warning" icon={AlertTriangle}>
+          This writes the number directly — it is not a purchase and nothing is charged.
+          The client is not notified; the change is recorded against your name.
+        </Callout>
+
+        <div className="space-y-2.5">
+          <Eyebrow>Right now</Eyebrow>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(sub.daysByFeature ?? {}).map(([f, d]) => (
+              <Badge key={f} tone={d > 0 ? "neutral" : "warning"}>{f}: {d} {d === 1 ? "day" : "days"}</Badge>
+            ))}
+            {!sub.daysByFeature && <Badge tone="neutral">{sub.daysRemaining} days</Badge>}
+          </div>
+        </div>
+
+        <div className="space-y-2.5">
+          <Eyebrow>Where the days came from</Eyebrow>
+          {history === null ? (
+            <SkeletonList rows={2} />
+          ) : history.length === 0 ? (
+            <p className="px-1 text-sm text-muted-foreground">Nothing recorded. Grants made before this ledger existed aren't listed — which is part of why the numbers may be wrong.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {history.map((g) => (
+                <Collapsible
+                  key={g.id}
+                  tone="inset"
+                  open={open.isOpen(g.id)}
+                  onToggle={() => open.toggle(g.id)}
+                  summary={
+                    <span className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{g.packageName ?? "A removed package"}</span>
+                      <Badge tone="neutral">{g.source}</Badge>
+                    </span>
+                  }
+                >
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <div>{new Date(g.at).toLocaleString()}</div>
+                    <div>{g.days.length === 0 ? "No days" : g.days.map((d) => `${d.days} × ${d.feature}`).join(" · ")}</div>
+                  </div>
+                </Collapsible>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2.5">
+          <Eyebrow>Set it to</Eyebrow>
+          <div className="flex items-end gap-2">
+            <Select
+              value={feature}
+              onChange={setFeature}
+              aria-label="Which access"
+              options={[{ value: "all", label: "Everything" }, { value: "workout", label: "Workout only" }, { value: "meal", label: "Meal only" }]}
+              className="h-11 w-40 shrink-0"
+            />
+            <Field
+              label="Days"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={3650}
+              value={days}
+              placeholder="e.g. 30"
+              onChange={(e) => setDays(e.target.value.replace(/[^\d]/g, ""))}
+              className="flex-1"
+            />
+          </div>
+          <p className="px-1 text-xs text-muted-foreground">
+            Whatever is there now is replaced — days already used stay in the record. Their next purchase queues on top of this.
+          </p>
+        </div>
+
+        <Field
+          label="Why (recorded in the audit trail)"
+          value={reason}
+          placeholder="e.g. granted three times by mistake"
+          onChange={(e) => setReason(e.target.value)}
+        />
+        <ActionResult msg={act.msg} err={act.err} />
+      </div>
+    </Sheet>
   );
 }

@@ -34,6 +34,11 @@ export const COMMERCE_SCHEMA: SchemaModule = {
   /**
    * ⚠️ BUMP THIS WHENEVER A STATEMENT BELOW CHANGES. Nothing detects intent.
    *
+   * `3 → 4` adds `subject_package_grants` — see its comment. Without it
+   * `once_per_customer` was unenforceable on every repeat sale, because the
+   * only record of "this customer got this package" was a single `package_id`
+   * column that the EXTEND path never rewrote.
+   *
    * `2 → 3` because the tenant payment rail added `purchase_intents` and
    * `tenant_payment_settings` (plus the `pay_link` ALTER) while leaving the
    * version at "2" — a version already applied in production. The marker row
@@ -44,7 +49,7 @@ export const COMMERCE_SCHEMA: SchemaModule = {
    * the module in full, so every test and every Miniflare run had the tables and
    * was green. Only databases with history were broken — i.e. only production.
    */
-  version: "3",
+  version: "4",
   ddl: [
     "CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, tenant_id TEXT, name TEXT, description TEXT, one_time_price_cents INTEGER, monthly_price_cents INTEGER, installment_months INTEGER, currency TEXT DEFAULT 'usd', budgets_json TEXT, addons_json TEXT, flags_json TEXT, visibility TEXT DEFAULT 'private', restricted_subject_id TEXT, once_per_customer INTEGER DEFAULT 0, stripe_product_id TEXT, stripe_price_id TEXT, stripe_monthly_price_id TEXT, active INTEGER DEFAULT 1, created_at TEXT);",
     "CREATE INDEX IF NOT EXISTS idx_packages_tenant ON packages(tenant_id, active);",
@@ -95,6 +100,36 @@ export const COMMERCE_SCHEMA: SchemaModule = {
      * vault of live payment keys. See providers.ts.
      */
     "CREATE TABLE IF NOT EXISTS tenant_payment_settings (tenant_id TEXT PRIMARY KEY, provider TEXT DEFAULT 'manual', config_json TEXT, updated_at TEXT);",
+
+    /**
+     * EVERY package a customer was ever given, whatever absorbed its days.
+     *
+     * ── The bug this table exists to make impossible ────────────────────────
+     *
+     * Access QUEUES: a second purchase folds its budgets into the customer's
+     * live subscription row rather than opening another. That is the right
+     * behaviour for runway and it destroyed the only record of what was bought,
+     * because the row keeps the FIRST package's `package_id` and nothing wrote
+     * the second one anywhere.
+     *
+     * So `once_per_customer` — a real selling rule, an intro offer — asked
+     * "is there a row with package_id = X" and got `no` forever. A customer with
+     * any live access could be granted, or could buy, the same once-only package
+     * without limit, each time stacking more days. That is where impossible day
+     * counts came from: not the budget arithmetic, which is correct, but the
+     * same package being applied over and over.
+     *
+     * An append-only ledger answers the question the rule actually asks. It is
+     * also the history an owner needs to work out what happened to a customer,
+     * which the subscription row could never show.
+     *
+     * `source` is how it arrived: admin | stripe | provider | manual | code.
+     * `days_json` snapshots the specs applied, because a package's budgets can
+     * be edited afterwards and the ledger must say what was granted THEN.
+     */
+    "CREATE TABLE IF NOT EXISTS subject_package_grants (id TEXT PRIMARY KEY, tenant_id TEXT, subject_id TEXT, package_id TEXT, subscription_id TEXT, source TEXT, days_json TEXT, actor_user_id TEXT, at TEXT);",
+    "CREATE INDEX IF NOT EXISTS idx_pkg_grants_subject ON subject_package_grants(subject_id, package_id);",
+    "CREATE INDEX IF NOT EXISTS idx_pkg_grants_tenant ON subject_package_grants(tenant_id, at);",
   ],
   alters: [
     "ALTER TABLE promo_codes ADD COLUMN restricted_subject_id TEXT",
@@ -108,11 +143,11 @@ export const COMMERCE_SCHEMA: SchemaModule = {
   ],
   scoped: {
     tenantColumn: "tenant_id",
-    tenantTables: ["packages", "subject_subscriptions", "redemption_codes", "promo_codes", "addon_types", "purchase_intents", "tenant_payment_settings"],
+    tenantTables: ["packages", "subject_subscriptions", "redemption_codes", "promo_codes", "addon_types", "purchase_intents", "tenant_payment_settings", "subject_package_grants"],
     // `redemption_uses` has no tenant column — it is keyed on (code_id,
     // subject_id) — so a tenant purge clears it through its codes, and a
     // subject purge through this one.
     subjectColumn: "subject_id",
-    subjectTables: ["subject_subscriptions", "redemption_uses", "purchase_intents"],
+    subjectTables: ["subject_subscriptions", "redemption_uses", "purchase_intents", "subject_package_grants"],
   },
 };

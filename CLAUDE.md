@@ -390,6 +390,28 @@ remote bindings without editing the config (this is what the E2E suite does).
   Both are correct: one is a shared package's vocabulary, the other is Kova's. —
   budgets carry `expiresAt`, days derive at read time, purchases QUEUE not sum,
   status reconciles lazily on read. No domain cron.
+  - ⚠️ **A REPEAT PURCHASE FOLDS INTO THE LIVE ROW, so the row's `package_id` is
+    only ever the package that OPENED it.** `subject_package_grants` is the
+    append-only ledger of what was actually applied, and it is what
+    `hasPriorPurchase` reads — without it `once_per_customer` asked "is there a
+    row with package_id = X", got `no` forever for every package after the first,
+    and the same once-only package stacked without limit. Every path that applies
+    a package's budgets MUST call `recordPackageGrant`: the staff grant (new row
+    AND extend), both webhook lanes, the manual confirmation.
+  - **A redemption code TOPS UP; it never creates access.** `/redeem` is
+    client-callable, so a code that leaked used to mint a package-less
+    subscription for anyone holding the string. It now requires the client to
+    hold a package, refused before the use slot is claimed.
+  - **`updateSubscriptionRunway` returns whether the write landed, and a `false`
+    is a FAILED GRANT.** Ignoring it answers 200 with an audit row, a
+    notification, and zero days added.
+  - **The headline day count is a MAX across scopes** (`overallDaysRemaining`).
+    Ship `daysByFeature` beside it or a client with a lapsed scope reads as fully
+    covered.
+  - **Repair is `setRemainingDays`** (pure, `@4dl/commerce`) behind
+    `POST /api/subscriptions/:id/days` — owner-only, reason required, audited as
+    `access.days_set`. It is the only write in the economy with no price behind
+    it.
 - **The tenant is paid on their OWN provider — Kova is not in the money path.**
   `payments-routes.ts` + `@4dl/commerce` providers.ts. Stripe Connect was removed
   in full, for three reasons that are not going to change: a Connect platform

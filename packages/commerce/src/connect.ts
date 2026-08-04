@@ -72,10 +72,67 @@ export function purchaseBlocked(
  * mistaken for a second purchase.
  */
 export async function hasPriorPurchase(db: D1Database, subjectId: string, packageId: string, excludeSubId: string | null = null): Promise<boolean> {
+  /*
+    TWO SOURCES, AND BOTH ARE LOAD-BEARING.
+
+    The LEDGER (`subject_package_grants`) is the real answer: one row per package
+    ever given to this customer, whatever absorbed its days. It exists because
+    access QUEUES — a repeat purchase folds into the live subscription row, which
+    keeps the FIRST package's `package_id` — so the column below records only the
+    package that happened to open the row. Every later one was invisible, and a
+    once-per-customer package could therefore be sold to the same person without
+    limit, stacking days each time.
+
+    The COLUMN is still consulted because the ledger starts empty on an existing
+    deployment. Dropping the column check would re-open every once-only package
+    for every customer who already bought one. Ledger ∪ column: nothing that was
+    true yesterday becomes false today.
+
+    `excludeSubId` skips rows belonging to ONE recurring subscription, so a
+    redelivered checkout for that same subscription tops its own runway up
+    instead of reading as a repeat purchase.
+  */
+  const ledger = excludeSubId
+    ? await db.prepare("SELECT 1 AS x FROM subject_package_grants WHERE subject_id = ? AND package_id = ? AND (subscription_id IS NULL OR subscription_id NOT IN (SELECT id FROM subject_subscriptions WHERE stripe_sub_id = ?)) LIMIT 1").bind(subjectId, packageId, excludeSubId).first()
+    : await db.prepare("SELECT 1 AS x FROM subject_package_grants WHERE subject_id = ? AND package_id = ? LIMIT 1").bind(subjectId, packageId).first();
+  if (ledger) return true;
   const row = excludeSubId
     ? await db.prepare("SELECT 1 AS x FROM subject_subscriptions WHERE subject_id = ? AND package_id = ? AND (stripe_sub_id IS NULL OR stripe_sub_id <> ?) LIMIT 1").bind(subjectId, packageId, excludeSubId).first()
     : await db.prepare("SELECT 1 AS x FROM subject_subscriptions WHERE subject_id = ? AND package_id = ? LIMIT 1").bind(subjectId, packageId).first();
   return !!row;
+}
+
+/** How a package reached a customer. `code` is a redemption top-up, which is
+ *  recorded for history but is never a "purchase" of the package. */
+export type GrantSource = "admin" | "stripe" | "provider" | "manual" | "renewal" | "code";
+
+/**
+ * Append to the grant ledger. Called by EVERY path that applies a package's
+ * budgets to a customer — the staff grant (new row and extend alike), both
+ * webhook lanes, and the manual confirmation.
+ *
+ * Deliberately fire-and-forget-safe but NOT silent: the caller awaits it, and a
+ * failure propagates. A grant whose ledger row is missing is a grant that
+ * `once_per_customer` cannot see, which is the whole defect this replaces.
+ */
+export async function recordPackageGrant(
+  db: D1Database,
+  row: {
+    id: string;
+    tenantId: string;
+    subjectId: string;
+    packageId: string;
+    subscriptionId: string | null;
+    source: GrantSource;
+    days: unknown;
+    actorUserId?: string | null;
+    at: string;
+  },
+): Promise<void> {
+  await db
+    .prepare("INSERT OR IGNORE INTO subject_package_grants (id, tenant_id, subject_id, package_id, subscription_id, source, days_json, actor_user_id, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .bind(row.id, row.tenantId, row.subjectId, row.packageId, row.subscriptionId, row.source, JSON.stringify(row.days ?? []), row.actorUserId ?? null, row.at)
+    .run();
 }
 
 /** Per-cycle share of a package's runway for an N-installment plan: each

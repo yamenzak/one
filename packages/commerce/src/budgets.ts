@@ -232,3 +232,81 @@ export function buildRedemptionBudget(
     expiresAt: new Date(t(startedAt) + d * DAY_MS).toISOString(),
   };
 }
+
+/**
+ * Days remaining PER SCOPE — the honest breakdown behind the headline.
+ *
+ * `overallDaysRemaining` is a MAX, which is right for "is this customer still a
+ * customer" and misleading as a number on a screen: a client with 70 days of one
+ * scope and none of another reads as "70 days left" while half of what they
+ * bought has already lapsed. Every surface that shows the headline should be
+ * able to show this next to it.
+ */
+export function daysByFeature(budgets: Budget[], scopes: readonly BudgetFeature[], nowIso: string): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const f of scopes) out[f] = daysRemainingForFeature(budgets, f, nowIso);
+  return out;
+}
+
+/**
+ * SET a scope's remaining days to exactly `days` — the correction primitive.
+ *
+ * Everything else in this file only ever ADDS runway, which is correct for
+ * selling and useless for repair: when a defect has granted a client 210 days
+ * they never bought, no amount of queueing fixes it. The operator needs to say
+ * what the number IS.
+ *
+ * The rules, and why each one:
+ *
+ *   LAPSED BUDGETS ARE HISTORY.   Anything already expired at `now` is left
+ *                                 untouched. It is the record of what was sold,
+ *                                 it affects nothing, and rewriting it would
+ *                                 destroy the only evidence of what went wrong.
+ *   LIVE AND QUEUED ARE REPLACED. Every not-yet-lapsed budget covering the scope
+ *                                 — including ones queued to start later — is
+ *                                 removed and replaced by ONE budget running
+ *                                 from now. Trimming the last one instead would
+ *                                 leave a client at "30 days" whose runway is
+ *                                 three stacked fragments, and the next purchase
+ *                                 would queue behind the wrong end.
+ *   ZERO IS ALLOWED, AND MEANS ZERO. Setting 0 removes the scope's live runway
+ *                                 outright rather than minting an already-
+ *                                 expired budget.
+ *   A WILDCARD BUDGET IS SPLIT.   A legacy `all` budget covers this scope AND
+ *                                 the others; it cannot simply be deleted. It is
+ *                                 re-issued for the scopes NOT being set, so
+ *                                 correcting one scope never silently revokes
+ *                                 another.
+ *
+ * Pure, and `days` is floored to a non-negative whole number.
+ */
+export function setRemainingDays(
+  budgets: Budget[],
+  feature: BudgetFeature,
+  days: number,
+  nowIso: string,
+  scopes: readonly BudgetFeature[] = [],
+  wildcard = ALL_FEATURES,
+): Budget[] {
+  const d = Math.max(0, Math.floor(days));
+  const now = t(nowIso);
+  const out: Budget[] = [];
+
+  for (const b of budgets) {
+    const lapsed = t(b.expiresAt) <= now;
+    // History, or a scope this call is not about: keep verbatim.
+    if (lapsed || (b.feature !== feature && b.feature !== wildcard)) { out.push(b); continue; }
+    if (b.feature === feature) continue; // replaced below
+    // A live wildcard budget: it also covers the OTHER scopes, and setting this
+    // one must not take those away. Re-issue it for each of them, unchanged.
+    for (const other of scopes) {
+      if (other === feature) continue;
+      out.push({ ...b, feature: other });
+    }
+  }
+
+  if (d > 0) {
+    out.push({ feature, daysTotal: d, startedAt: nowIso, expiresAt: new Date(now + d * DAY_MS).toISOString() });
+  }
+  return out;
+}

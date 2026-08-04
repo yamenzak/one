@@ -61,7 +61,7 @@ import {
   tenantByCustomer,
   unmarkSeen,
 } from "@4dl/billing";
-import { cancelInstallmentSub as cancelInstallmentSubBase, hasPriorPurchase, scaleSpecs, type CancelOnConnectedAccount } from "@4dl/commerce";
+import { cancelInstallmentSub as cancelInstallmentSubBase, hasPriorPurchase, recordPackageGrant, scaleSpecs, type CancelOnConnectedAccount, type GrantSource } from "@4dl/commerce";
 
 /**
  * Ending a recurring charge is now the STUDIO'S to do, not ours.
@@ -818,7 +818,7 @@ async function planForTenant(db: D1Database, tenantId: string | null): Promise<s
  *  with no second implementation of the runway maths. The column is still named
  *  `stripe_sub_id`; renaming a live D1 column is a migration we deliberately do
  *  not take for cosmetics. Read it as "the recurring key, whoever issued it". */
-export async function grantClientPackage(db: D1Database, tenantId: string, clientId: string, packageId: string, checkoutId: string | null = null, subId: string | null = null, installmentsTotal: number | null = null): Promise<void> {
+export async function grantClientPackage(db: D1Database, tenantId: string, clientId: string, packageId: string, checkoutId: string | null = null, subId: string | null = null, installmentsTotal: number | null = null, source: GrantSource = "stripe"): Promise<void> {
   // Scope the package to the granting tenant: an unscoped lookup would let a
   // (verified) event carrying another tenant's package id grant that package's
   // budgets/add-ons/flags into this tenant's row. Paired with the webhook's
@@ -844,6 +844,7 @@ export async function grantClientPackage(db: D1Database, tenantId: string, clien
   // pre-existing active row would drop the new sub id (COALESCE) and renew off
   // the wrong package — the client would be charged monthly with no top-up.
   if (subId) {
+    const rowId = newId("csub");
     const bySub = await db.prepare("SELECT id FROM subject_subscriptions WHERE stripe_sub_id = ? LIMIT 1").bind(subId).first<{ id: string }>();
     if (bySub) {
       // A redelivered checkout for this same sub (before firstSeen dedup) — top
@@ -858,18 +859,21 @@ export async function grantClientPackage(db: D1Database, tenantId: string, clien
       // Throw so the webhook releases the event-id claim and 500s → Stripe
       // redelivers and the grant lands (same contract as /redeem's compensation).
       if (!ok) throw new Error(`grantClientPackage: runway CAS failed for ${bySub.id}`);
+      await recordPackageGrant(db, { id: newId("pgr"), tenantId, subjectId: clientId, packageId, subscriptionId: bySub.id, source, days: specs, at: now });
     } else {
       await db.prepare(
         "INSERT INTO subject_subscriptions (id, tenant_id, subject_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, installments_total, installments_paid, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?, 'stripe', ?, ?, ?, ?, ?, ?)",
       )
-        .bind(newId("csub"), tenantId, clientId, packageId, n > 1 ? "installments" : "paid", j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, subId, n > 1 ? n : null, n > 1 ? 1 : null, now, now)
+        .bind(rowId, tenantId, clientId, packageId, n > 1 ? "installments" : "paid", j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, subId, n > 1 ? n : null, n > 1 ? 1 : null, now, now)
         .run();
+      await recordPackageGrant(db, { id: newId("pgr"), tenantId, subjectId: clientId, packageId, subscriptionId: rowId, source, days: specs, at: now });
     }
     return;
   }
 
   // One-time purchase: fold into the client's active NON-recurring runway (never
   // a recurring row — that row belongs to its own Stripe subscription).
+  const freshId = newId("csub");
   const current = await db.prepare("SELECT id FROM subject_subscriptions WHERE subject_id = ? AND status = 'active' AND stripe_sub_id IS NULL ORDER BY started_at DESC LIMIT 1").bind(clientId).first<{ id: string }>();
   if (current) {
     // CAS so a concurrent staff grant / redeem on the same row can't clobber
@@ -880,12 +884,17 @@ export async function grantClientPackage(db: D1Database, tenantId: string, clien
       extra: { sql: "payment_status = 'paid', stripe_checkout_id = COALESCE(?, stripe_checkout_id), updated_at = ?", binds: [checkoutId, now] },
     }));
     if (!ok) throw new Error(`grantClientPackage: runway CAS failed for ${current.id}`);
+    // The LEDGER, not the row's `package_id`. A folded-in purchase leaves that
+    // column pointing at whatever opened the row, which is exactly why
+    // once-per-customer could never see a repeat sale.
+    await recordPackageGrant(db, { id: newId("pgr"), tenantId, subjectId: clientId, packageId, subscriptionId: current.id, source, days: specs, at: now });
   } else {
     await db.prepare(
       "INSERT INTO subject_subscriptions (id, tenant_id, subject_id, package_id, status, payment_status, budgets_json, addons_json, flags_json, source, stripe_checkout_id, stripe_sub_id, started_at, updated_at) VALUES (?, ?, ?, ?, 'active', 'paid', ?, ?, ?, 'stripe', ?, ?, ?, ?)",
     )
-      .bind(newId("csub"), tenantId, clientId, packageId, j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, null, now, now)
+      .bind(freshId, tenantId, clientId, packageId, j(buildBudgetsForPurchase([], specs, now)), j(mergeAddOnBalances([], addOns)), pkg.flags_json, checkoutId, null, now, now)
       .run();
+    await recordPackageGrant(db, { id: newId("pgr"), tenantId, subjectId: clientId, packageId, subscriptionId: freshId, source, days: specs, at: now });
   }
 }
 

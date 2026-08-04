@@ -26,6 +26,7 @@ export type AuditAction =
   | "swap.decide"
   | "content.assign"
   | "package.assign"
+  | "access.days_set"
   | "client.archive"
   | "client.unarchive"
   // Offboarding hand-off: a coach asks, the owner decides. Three entries so the
@@ -57,6 +58,8 @@ export const AUDIT_ACTIONS: Record<AuditAction, AuditActionMeta> = {
   "swap.decide": { label: "decided an exercise swap", permission: "tracking", feature: "exerciseSwap" },
   "content.assign": { label: "shared content", permission: "content", feature: "content" },
   "package.assign": { label: "assigned a package", permission: "package", feature: "commerce" },
+  // A correction, not a sale — owner-only, and the reason is in the summary.
+  "access.days_set": { label: "corrected access days", permission: "package", feature: "commerce" },
   "client.archive": { label: "archived the client", permission: "client" },
   "client.unarchive": { label: "put the client back on the roster", permission: "client" },
   "client.offboard_request": { label: "asked the owner to remove the client", permission: "client" },

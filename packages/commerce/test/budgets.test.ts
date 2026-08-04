@@ -10,6 +10,8 @@ import {
   mergeAddOnBalances,
   overallDaysRemaining,
   remainingAddOnQuantity,
+  daysByFeature,
+  setRemainingDays,
   type Budget,
 } from "../src/budgets.js";
 
@@ -92,5 +94,72 @@ describe("access economy budgets", () => {
     );
     expect(remainingAddOnQuantity(merged, "consult")).toBe(5);
     expect(remainingAddOnQuantity(merged, "unknown")).toBe(0);
+  });
+});
+
+
+const SCOPES = ["workout", "meal"] as const;
+
+describe("the correction primitive — setRemainingDays", () => {
+  it("sets a scope to exactly the days asked for", () => {
+    const out = setRemainingDays([budget("workout", -10, 200)], "workout", 30, NOW, SCOPES);
+    expect(daysRemainingForFeature(out, "workout", NOW)).toBe(30);
+  });
+
+  it("collapses a stack of queued budgets into one runway", () => {
+    // The shape the once-per-customer defect produced: the same package applied
+    // four times, each queued behind the last.
+    const stacked = [budget("workout", -5, 30), budget("workout", 30, 60), budget("workout", 60, 90), budget("workout", 90, 120)];
+    expect(daysRemainingForFeature(stacked, "workout", NOW)).toBe(120);
+    const out = setRemainingDays(stacked, "workout", 30, NOW, SCOPES);
+    expect(daysRemainingForFeature(out, "workout", NOW)).toBe(30);
+    expect(out.filter((b) => b.feature === "workout" && Date.parse(b.expiresAt) > Date.parse(NOW))).toHaveLength(1);
+  });
+
+  it("leaves LAPSED budgets alone — they are the record of what was sold", () => {
+    const history = budget("workout", -60, -30);
+    const out = setRemainingDays([history, budget("workout", -5, 200)], "workout", 10, NOW, SCOPES);
+    expect(out).toContainEqual(history);
+  });
+
+  it("does not touch another scope", () => {
+    const meal = budget("meal", -5, 45);
+    const out = setRemainingDays([meal, budget("workout", -5, 200)], "workout", 10, NOW, SCOPES);
+    expect(daysRemainingForFeature(out, "meal", NOW)).toBe(45);
+    expect(out).toContainEqual(meal);
+  });
+
+  it("zero removes the live runway rather than minting an expired budget", () => {
+    const out = setRemainingDays([budget("workout", -5, 200)], "workout", 0, NOW, SCOPES);
+    expect(daysRemainingForFeature(out, "workout", NOW)).toBe(0);
+    expect(out.some((b) => b.feature === "workout" && Date.parse(b.expiresAt) > Date.parse(NOW))).toBe(false);
+  });
+
+  it("splits a legacy wildcard budget so correcting one scope never revokes the other", () => {
+    // A single `all` budget predates per-scope expansion. Setting `workout` to 5
+    // must not silently take `meal`'s 100 days away with it.
+    const out = setRemainingDays([budget("all", -5, 100)], "workout", 5, NOW, SCOPES);
+    expect(daysRemainingForFeature(out, "workout", NOW)).toBe(5);
+    expect(daysRemainingForFeature(out, "meal", NOW)).toBe(100);
+  });
+
+  it("a correction is the START of the next purchase's queue, not behind the old runway", () => {
+    const corrected = setRemainingDays([budget("workout", -5, 200)], "workout", 10, NOW, SCOPES);
+    const next = buildBudgetsForPurchase(corrected, [{ feature: "workout", days: 30 }], NOW, SCOPES);
+    // 10 corrected days, then 30 purchased = 40. Not 230.
+    expect(daysRemainingForFeature([...corrected, ...next], "workout", NOW)).toBe(40);
+  });
+
+  it("floors a fractional or negative request instead of minting a broken budget", () => {
+    expect(daysRemainingForFeature(setRemainingDays([], "workout", -5, NOW, SCOPES), "workout", NOW)).toBe(0);
+    expect(daysRemainingForFeature(setRemainingDays([], "workout", 7.9, NOW, SCOPES), "workout", NOW)).toBe(7);
+  });
+});
+
+describe("the headline hides a lapsed scope, so the breakdown ships with it", () => {
+  it("reports each scope on its own", () => {
+    const b = [budget("workout", -5, 70), budget("meal", -30, -1)];
+    expect(overallDaysRemaining(b, NOW)).toBe(70);
+    expect(daysByFeature(b, SCOPES, NOW)).toEqual({ workout: 70, meal: 0 });
   });
 });
