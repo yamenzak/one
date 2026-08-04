@@ -180,6 +180,44 @@ export function hasIcon(b: BrandMarks | null | undefined, mode: ThemeMode): bool
 }
 
 /**
+ * The plate to draw BEHIND a studio's mark, as the studio set it.
+ *
+ * `mark.plate` is a real choice in the brand editor and `renderMarkPng` bakes it
+ * into the generated PNG: `accent` knocks the letters out of a solid brand
+ * square, `tint` does the same at 16%, `none` leaves a bare mark. A surface that
+ * then paints its own background behind that PNG REVERSES two of the three — a
+ * `tint` mark gets its 16% backfilled to a solid block, and a studio that chose a
+ * bare mark gets a coloured square anyway.
+ *
+ * Which is what every surface did, each with its own hardcoded plate: the boot
+ * splash, the nav rail. One home for the decision, so a fourth surface cannot
+ * quietly disagree with the other three.
+ *
+ * `glow` is the caller's, not the studio's — a 96px hero mark on a boot screen
+ * earns the brand shadow and a 44px chrome tile does not. Emphasis is the
+ * surface's business; the PLATE is the studio's.
+ *
+ * ⚠️ Only for a surface showing the CURRENT studio. A list of several — the
+ * switcher, the doors — is handed `PersonaRef`s, which carry an icon and a
+ * colour and deliberately not `mark` (see `@kova/protocol` context.ts: shipping
+ * every token for every persona would put a studio's whole theme in a payload
+ * that wants a swatch). Those keep their own uniform list treatment, which is
+ * also why a solid per-row plate would be wrong there anyway.
+ */
+export function markPlateClass(
+  b: { mark?: { plate?: "accent" | "tint" | "none" | null } | null } | null | undefined,
+  opts?: { glow?: boolean },
+): string {
+  // `accent` is what the generator defaults to, so an unset value lands there
+  // and never on "none" — an absent setting is not a choice to go bare.
+  switch (b?.mark?.plate ?? "accent") {
+    case "none": return "text-primary";
+    case "tint": return "bg-primary/15 text-primary";
+    default: return opts?.glow ? "bg-primary text-primary-foreground shadow-glow" : "bg-primary text-primary-foreground";
+  }
+}
+
+/**
  * Elevation presets. Shadows are a brand decision — a clinical studio wants
  * hairlines and a boutique one wants depth — so they are configurable rather
  * than baked in, and they are PRESETS rather than free-form CSS: a mistyped

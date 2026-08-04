@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, MotionConfig, motion } from "motion/react";
-import { Atmosphere, brandMark, DUR, EASE_OUT, SPRING_SOFT, exitOf, hasIcon, Toaster, cn, type Variants } from "@4dl/ui";
+import { Atmosphere, brandMark, DUR, EASE_OUT, SPRING_SOFT, exitOf, hasIcon, markPlateClass, Toaster, cn, type Variants } from "@4dl/ui";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
 import { bootBrand, ThemeProvider, useTheme } from "./theme.js";
@@ -54,12 +54,13 @@ import { ErrorBoundary } from "./ErrorBoundary.js";
  * handed, which quietly overruled two of the three: a `tint` mark had its 16%
  * plate backfilled to a solid block, and a studio that deliberately chose a bare
  * mark got a coloured square anyway — on the very first frame of their product.
- * The plate is read here now, and `PLATE` below is the only place that decision
- * lives.
  *
- * (The nav rail and the studio switcher plate the same mark and still hardcode
- * theirs. They should read this too; that is a change to `NavRail`'s own chrome
- * and is left deliberate rather than folded into a splash fix.)
+ * `markPlateClass` (`@4dl/ui` theme.ts) is the one home for that decision, and
+ * the nav rail reads it through `NavRail`'s `brandPlate`. The switcher and the
+ * doors do NOT, and cannot: they list several studios from `PersonaRef`s, which
+ * carry an icon and a colour and deliberately not `mark` — see the type's own
+ * comment on why a persona is not a whole branding. They keep their uniform
+ * tint, which is the right treatment for a list anyway.
  *
  * ── The choreography, and why it is weighted the way it is ──────────────────
  *
@@ -80,14 +81,6 @@ import { ErrorBoundary } from "./ErrorBoundary.js";
  * `prefers-reduced-motion` the transforms drop out and the opacity carries it,
  * which is why the choreography never depends on movement alone.
  */
-
-/** The plate behind the mark, as the studio set it. `accent` is the default the
- *  generator uses, so an unset value must land there and not on "none". */
-const PLATE: Record<string, string> = {
-  accent: "bg-primary shadow-glow",
-  tint: "bg-primary/15",
-  none: "",
-};
 
 const splashStagger: Variants = {
   hidden: {},
@@ -130,8 +123,12 @@ function BootSplash() {
   const initial = name?.trim()?.[0]?.toUpperCase() ?? null;
   // The studio's own plate, and only where WE are drawing one. The letter
   // fallback is not their mark, so it keeps the accent plate whatever they set
-  // for an icon they have not uploaded.
-  const plate = logo ? (PLATE[branding?.mark?.plate ?? "accent"] ?? PLATE.accent!) : initial ? PLATE.accent! : "bg-surface-2";
+  // for an icon they have not uploaded. `glow` is this surface's call, not
+  // theirs: a 96px hero mark earns the brand shadow; the nav rail's 44px tile
+  // asks for the same plate without it.
+  const plate = logo
+    ? markPlateClass(branding, { glow: true })
+    : initial ? markPlateClass(null, { glow: true }) : "bg-surface-2";
 
   return (
     // `Atmosphere` stays OUTSIDE the choreography on purpose: `atmosphereIn`

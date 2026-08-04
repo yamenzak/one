@@ -103,7 +103,24 @@ export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[];
   );
 }
 
-export function NavRail({ tabs, active, onSelect, footer, brand, tinted }: { tabs: TabDef[]; active: string; onSelect: (k: string) => void; footer?: ReactNode; brand?: ReactNode; tinted?: boolean }) {
+export function NavRail({ tabs, active, onSelect, footer, brand, brandPlate, tinted }: {
+  tabs: TabDef[];
+  active: string;
+  onSelect: (k: string) => void;
+  footer?: ReactNode;
+  brand?: ReactNode;
+  /**
+   * The plate behind `brand`, from `markPlateClass(branding)`.
+   *
+   * The rail cannot work this out for itself — it is handed a `ReactNode`, not a
+   * branding — and it must not assume: a studio whose generated mark already
+   * carries its own plate gets a second one painted behind it here, which is
+   * exactly what the boot splash used to do. Omitted falls back to the solid
+   * accent, which is the generator's own default.
+   */
+  brandPlate?: string;
+  tinted?: boolean;
+}) {
   const color = activeColor(tabs, active, tinted);
   const soft = `color-mix(in oklch, ${color} 14%, transparent)`;
   return (
@@ -113,7 +130,7 @@ export function NavRail({ tabs, active, onSelect, footer, brand, tinted }: { tab
           would render a stranger's initial. An absent brand renders an empty
           mark, which is honest. */}
       {brand !== undefined && (
-        <div className="mb-6 grid size-11 place-items-center overflow-hidden rounded-2xl bg-primary text-title-3 font-black text-primary-foreground">{brand}</div>
+        <div className={cn("mb-6 grid size-11 place-items-center overflow-hidden rounded-2xl text-title-3 font-black", brandPlate ?? "bg-primary text-primary-foreground")}>{brand}</div>
       )}
       <div className="flex w-full flex-1 flex-col items-center gap-1.5 px-3">
         {tabs.map((t) => {

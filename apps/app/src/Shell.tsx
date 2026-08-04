@@ -10,7 +10,7 @@ import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } 
 import {
   ChevronDown,
   AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
-  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, brandMark, hasIcon, hasWordmark, toneVar, type TabDef, type Tone,
+  Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, brandMark, hasIcon, hasWordmark, markPlateClass, toneVar, type TabDef, type Tone,
 } from "@4dl/ui";
 import { resolveStanding, tenantStandingOfGate } from "@4dl/tenancy/model";
 import { useSession, useActiveClientId, adminUrl } from "./session.js";
@@ -435,7 +435,18 @@ function TabLayout() {
       </div>
 
       <BottomTabs tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} />
-      <NavRail tabs={tabs} active={current} onSelect={(k) => nav(`/${k}`)} tinted={tintedNav} brand={railMark ? <img src={railMark} alt={active.tenantName} className={hasIcon(ctx!.branding, themeMode) ? "size-full object-cover" : "size-full object-contain p-1"} /> : active.tenantName.charAt(0).toUpperCase()} />
+      <NavRail
+        tabs={tabs}
+        active={current}
+        onSelect={(k) => nav(`/${k}`)}
+        tinted={tintedNav}
+        brand={railMark ? <img src={railMark} alt={active.tenantName} className={hasIcon(ctx!.branding, themeMode) ? "size-full object-cover" : "size-full object-contain p-1"} /> : active.tenantName.charAt(0).toUpperCase()}
+        /* Only when there IS a mark. The letter is OUR fallback, not the
+           studio's — a `none` plate is a decision about the icon they uploaded,
+           and applying it to a bare initial leaves an unreadable letter on the
+           rail. Same rule as the boot splash. */
+        brandPlate={railMark ? markPlateClass(ctx!.branding) : undefined}
+      />
     </div>
   );
 }

@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { deriveTokens, brandingCss, SHADOW_PRESETS, BORDER_WIDTHS, type NeutralTint } from "../src/lib/theme.js";
+import { deriveTokens, brandingCss, markPlateClass, SHADOW_PRESETS, BORDER_WIDTHS, type NeutralTint } from "../src/lib/theme.js";
 import { contrastRatio, AA } from "../src/lib/contrast.js";
 
 /** Every NEUTRAL surface. Status colours and domain accents are deliberately
@@ -112,6 +112,43 @@ describe("deriveTokens — one colour re-skins everything", () => {
     }
     // And it really did choose differently for the two, in the same mode.
     expect(t.dark!["--bright-foreground"]).not.toBe(t.dark!["--dim-foreground"]);
+  });
+});
+
+describe("markPlateClass — the studio's plate, not the surface's", () => {
+  // `mark.plate` is baked into the generated PNG. A surface that paints its own
+  // background behind that PNG reverses the studio's choice, which is what the
+  // boot splash and the nav rail each did with their own hardcoded plate.
+  it("paints nothing when the studio chose a bare mark", () => {
+    expect(markPlateClass({ mark: { plate: "none" } })).not.toContain("bg-");
+  });
+
+  it("keeps the tint a tint rather than backfilling it solid", () => {
+    expect(markPlateClass({ mark: { plate: "tint" } })).toContain("bg-primary/15");
+  });
+
+  it("treats an UNSET plate as the accent, never as bare", () => {
+    // The generator defaults to `accent`, so an absent setting is "they never
+    // opened the editor" — not "they chose no plate". Falling through to bare
+    // would strip the plate off every studio that never touched it.
+    for (const b of [null, undefined, {}, { mark: null }, { mark: {} }]) {
+      expect(markPlateClass(b), JSON.stringify(b)).toContain("bg-primary");
+    }
+  });
+
+  it("leaves the glow to the CALLER, because emphasis is the surface's", () => {
+    // A 96px hero mark on the boot screen earns the brand shadow; the nav rail's
+    // 44px chrome tile asks for the same plate without it.
+    expect(markPlateClass(null, { glow: true })).toContain("shadow-glow");
+    expect(markPlateClass(null)).not.toContain("shadow-glow");
+    // …and never on a plate there is nothing to glow behind.
+    expect(markPlateClass({ mark: { plate: "none" } }, { glow: true })).not.toContain("shadow-glow");
+  });
+
+  it("always names an ink colour, so a letter fallback stays readable", () => {
+    for (const plate of ["accent", "tint", "none"] as const) {
+      expect(markPlateClass({ mark: { plate } }), plate).toMatch(/text-/);
+    }
   });
 });
 
