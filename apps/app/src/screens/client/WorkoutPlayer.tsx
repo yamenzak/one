@@ -228,7 +228,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                   {day.imageUrl ? <img src={day.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className={`absolute inset-0 ${day.isRestDay ? "bg-gradient-to-br from-sleep/20 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2"}`} />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
                   {!day.imageUrl && <div className="absolute inset-0 grid place-items-center text-white/35 [&_svg]:size-9">{day.isRestDay ? <Moon /> : <Dumbbell />}</div>}
-                  {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-xs font-semibold text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-activity px-2 py-0.5 text-xs font-semibold text-[var(--tone-foreground)]">Recommended</span> : null}
+                  {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-xs font-semibold text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-activity px-2 py-0.5 text-xs font-semibold text-activity-foreground">Recommended</span> : null}
                   <div className="absolute inset-x-0 bottom-0 p-3">
                     {/* Two lines, not an ellipsis. A day name is short and the
                         tile is 4:5 — "Upper A — push fo…" was losing the half
@@ -363,7 +363,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
             <li key={i} className="flex gap-3">
               {/* Timeline rail — numbered node + connector down to the next step. */}
               <div className="flex flex-col items-center">
-                <div className={cn("z-10 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ring-4 ring-background transition-colors [&_svg]:size-4", done ? "bg-activity text-[var(--tone-foreground)]" : "bg-surface-3 text-muted-foreground")}>
+                <div className={cn("z-10 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ring-4 ring-background transition-colors [&_svg]:size-4", done ? "bg-activity text-activity-foreground" : "bg-surface-3 text-muted-foreground")}>
                   {done ? <Check strokeWidth={3} /> : i + 1}
                 </div>
                 {!last && <div className="w-px flex-1 bg-border/60" />}
@@ -1084,7 +1084,7 @@ function RestTimer({ seconds, label, className, autoStart }: { seconds: number; 
         // collapses again a beat after "Go!", so the timeline layout is unchanged
         // except for the one row that's actively resting.
         counting ? "gap-2 rounded-2xl px-3.5 py-2 [&_svg]:size-5" : "gap-1 rounded-full px-2 py-0.5 text-xs [&_svg]:size-3",
-        done ? "bg-activity text-[var(--tone-foreground)]" : running ? "bg-cardio text-[var(--tone-foreground)]" : "bg-surface-3 text-muted-foreground hover:bg-surface-2", className)}>
+        done ? "bg-activity text-activity-foreground" : running ? "bg-cardio text-cardio-foreground" : "bg-surface-3 text-muted-foreground hover:bg-surface-2", className)}>
       <Timer />
       {counting
         ? <span className="numeral text-4xl font-bold leading-none tracking-tight">{done ? "Go!" : fmtClock(left!)}</span>

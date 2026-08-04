@@ -44,12 +44,13 @@ function screens(dir = SRC, out: string[] = []): string[] {
 }
 
 describe("completeness", () => {
-  it("defines both variables for every registered tone, in both modes", () => {
+  it("defines all three variables for every registered tone, in both modes", () => {
     for (const mode of [":root", ':root[data-theme="light"]']) {
       const tokens = cssTokens(css, mode);
       for (const tone of TONES) {
         expect(tokens[`--${tone}`], `${tone} in ${mode}`).toBeTruthy();
         expect(tokens[`--${tone}-soft`], `${tone}-soft in ${mode}`).toBeTruthy();
+        expect(tokens[`--${tone}-foreground`], `${tone}-foreground in ${mode}`).toBeTruthy();
       }
     }
   });
@@ -58,6 +59,7 @@ describe("completeness", () => {
     for (const tone of TONES) {
       expect(css).toContain(`--color-${tone}: var(--${tone});`);
       expect(css).toContain(`--color-${tone}-soft: var(--${tone}-soft);`);
+      expect(css).toContain(`--color-${tone}-foreground: var(--${tone}-foreground);`);
     }
   });
 });
@@ -68,10 +70,12 @@ describe("the class literals", () => {
       const c = ACCENT_CLASSES[tone];
       expect(c.text).toBe(`text-${tone}`);
       expect(c.soft).toBe(`bg-${tone}-soft text-${tone}`);
+      expect(c.fill).toBe(`bg-${tone} text-${tone}-foreground`);
       // Spelled out IN THE SOURCE, not merely equal to a template result — the
       // whole point is that a concatenated name is invisible to Tailwind.
       expect(registryText, `${tone} literals`).toContain(`"text-${tone}"`);
       expect(registryText, `${tone} literals`).toContain(`"bg-${tone}-soft text-${tone}"`);
+      expect(registryText, `${tone} literals`).toContain(`"bg-${tone} text-${tone}-foreground"`);
     }
   });
 });
@@ -83,6 +87,21 @@ describe("contrast", () => {
       for (const tone of TONES) {
         const ratio = contrastRatio(tokens[`--${tone}`]!, tokens[`--${tone}-soft`]!);
         expect(ratio, `${tone} on ${tone}-soft in ${mode} — ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA);
+      }
+    }
+  });
+
+  it("clears AA for ink on a SOLID tone fill, in both modes", () => {
+    // The other direction, and a different token: `bg-<tone>
+    // text-<tone>-foreground`. Whether that ink should be near-white or
+    // near-dark is not a per-mode constant — it is whichever measures higher
+    // against this specific colour, which is what `bestForeground` picks and
+    // what this keeps true of the shipped values.
+    for (const mode of [":root", ':root[data-theme="light"]']) {
+      const tokens = cssTokens(css, mode);
+      for (const tone of TONES) {
+        const ratio = contrastRatio(tokens[`--${tone}`]!, tokens[`--${tone}-foreground`]!);
+        expect(ratio, `${tone}-foreground on ${tone} in ${mode} — ${ratio.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA);
       }
     }
   });

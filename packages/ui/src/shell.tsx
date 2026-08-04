@@ -56,11 +56,16 @@ const navSpring = SPRING_SNAP;
 
 export function BottomTabs({ tabs, active, onSelect, tinted }: { tabs: TabDef[]; active: string; onSelect: (k: string) => void; tinted?: boolean }) {
   const color = activeColor(tabs, active, tinted);
-  // When the pill is tinted to a domain tone, its text needs the on-tone
-  // foreground (tones invert per mode); otherwise the pill is the brand primary
-  // and takes the brand foreground.
+  // When the pill is tinted to a domain tone, its text needs THAT TONE's on-tone
+  // foreground; otherwise the pill is the brand primary and takes the brand
+  // foreground. Per tone rather than the one shared `--tone-foreground`, which
+  // is only right while every accent in a mode sits at a similar lightness —
+  // false as soon as a studio's brand derives them. The shared token stays as
+  // the var fallback, for a tone an app registered without one.
   const activeTone = tabs.find((t) => t.key === active)?.tone;
-  const onFg = tinted && activeTone && activeTone !== "primary" ? "var(--tone-foreground)" : "var(--primary-foreground)";
+  const onFg = tinted && activeTone && activeTone !== "primary"
+    ? `var(--${activeTone}-foreground, var(--tone-foreground))`
+    : "var(--primary-foreground)";
   return (
     <motion.nav aria-label="Sections" initial="hidden" animate="show" variants={chromeIn} className="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom)+0.7rem)] md:hidden">
       <div className="pointer-events-auto flex max-w-full items-center gap-0.5 rounded-full border border-border/60 bg-card/75 p-1.5 shadow-lg backdrop-blur-2xl">

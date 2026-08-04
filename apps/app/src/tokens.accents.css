@@ -8,66 +8,112 @@
  *
  * `@4dl/ui` resolves any tone it does not recognise by convention — `foo` →
  * `text-foo` / `bg-foo-soft text-foo` / `var(--foo)` — so registering an accent
- * is exactly: define the two variables for both modes, map them in `@theme`,
+ * is exactly: define the THREE variables for both modes, map them in `@theme`,
  * and let the class literals in `registry/tones.ts` reach the Tailwind scan.
  *
  * Every value here is a studio-overridable default: `lib/theme.ts` regenerates
  * them from a tenant's brand colour (`MACRO_SPEC` in `registry/tones.ts`), and
  * the advanced editor can set any of them outright.
+ *
+ * ── Why each tone carries its own `-foreground` ─────────────────────────────
+ *
+ * Ink laid ON a filled tone (a `bg-activity` pill, the tinted primary in
+ * `Shell`) used to read ONE shared `--tone-foreground` per mode — near-dark in
+ * the dark theme, near-white in the light one. That is true of the defaults
+ * below and of nothing else: it holds only while every accent in a mode sits at
+ * a similar lightness, and the moment a studio's brand re-tints them (or the
+ * advanced editor sets one outright) a single token has to be wrong for at
+ * least one accent. Legibility is then decided by whichever tone happens to be
+ * furthest from the average.
+ *
+ * So each tone names its own on-colour, and the value is MEASURED rather than
+ * guessed: `bestForeground` (lib/theme.ts) computes the WCAG contrast ratio of
+ * near-white and near-dark against the tone and takes the winner — a lightness
+ * threshold mis-calls mid-lightness saturated colours, where both are
+ * borderline. The generator emits the same token for a derived palette, so a
+ * studio's accents get the same treatment as these defaults. The eleven pairs
+ * below clear AA at 5.1:1 or better; `tokens.accents.test.ts` asserts it.
+ *
+ * `--tone-foreground` still exists in `@4dl/ui` as the fallback for a tone that
+ * registered no token of its own.
  */
 
 @theme inline {
   /* Metric coding (macros) */
   --color-calories: var(--calories);
   --color-calories-soft: var(--calories-soft);
+  --color-calories-foreground: var(--calories-foreground);
   --color-protein: var(--protein);
   --color-protein-soft: var(--protein-soft);
+  --color-protein-foreground: var(--protein-foreground);
   --color-carbs: var(--carbs);
   --color-carbs-soft: var(--carbs-soft);
+  --color-carbs-foreground: var(--carbs-foreground);
   --color-fat: var(--fat);
   --color-fat-soft: var(--fat-soft);
+  --color-fat-foreground: var(--fat-foreground);
 
   /* Domain accents (fitness viz) */
   --color-activity: var(--activity);
   --color-activity-soft: var(--activity-soft);
+  --color-activity-foreground: var(--activity-foreground);
   --color-nutrition: var(--nutrition);
   --color-nutrition-soft: var(--nutrition-soft);
+  --color-nutrition-foreground: var(--nutrition-foreground);
   --color-sleep: var(--sleep);
   --color-sleep-soft: var(--sleep-soft);
+  --color-sleep-foreground: var(--sleep-foreground);
   --color-cardio: var(--cardio);
   --color-cardio-soft: var(--cardio-soft);
+  --color-cardio-foreground: var(--cardio-foreground);
   --color-hydration: var(--hydration);
   --color-hydration-soft: var(--hydration-soft);
+  --color-hydration-foreground: var(--hydration-foreground);
   --color-supplement: var(--supplement);
   --color-supplement-soft: var(--supplement-soft);
+  --color-supplement-foreground: var(--supplement-foreground);
   --color-lab: var(--lab);
   --color-lab-soft: var(--lab-soft);
+  --color-lab-foreground: var(--lab-foreground);
 }
 
 :root {
+  /* Dark theme: the accents are bright, so every on-tone ink is near-dark. That
+     is a RESULT of measuring each one, not the rule — see the header. */
   --calories: oklch(0.78 0.16 45);
   --calories-soft: oklch(0.35 0.07 45);
+  --calories-foreground: oklch(0.2 0.02 45);
   --protein: oklch(0.72 0.16 350);
   --protein-soft: oklch(0.34 0.07 350);
+  --protein-foreground: oklch(0.2 0.02 350);
   --carbs: oklch(0.82 0.15 90);
   --carbs-soft: oklch(0.36 0.06 90);
+  --carbs-foreground: oklch(0.2 0.02 90);
   --fat: oklch(0.715 0.14 275);
   --fat-soft: oklch(0.34 0.06 275);
+  --fat-foreground: oklch(0.2 0.02 275);
 
   --activity: oklch(0.78 0.13 164);
   --activity-soft: oklch(0.34 0.06 164);
+  --activity-foreground: oklch(0.2 0.02 164);
   --nutrition: oklch(0.8 0.13 68);
   --nutrition-soft: oklch(0.36 0.06 68);
+  --nutrition-foreground: oklch(0.2 0.02 68);
   --sleep: oklch(0.74 0.12 300);
   --sleep-soft: oklch(0.34 0.06 300);
+  --sleep-foreground: oklch(0.2 0.02 300);
   --cardio: oklch(0.74 0.13 250);
   --cardio-soft: oklch(0.34 0.06 250);
+  --cardio-foreground: oklch(0.2 0.02 250);
   --hydration: oklch(0.78 0.1 214);
   --hydration-soft: oklch(0.34 0.05 214);
+  --hydration-foreground: oklch(0.2 0.02 214);
   --supplement: oklch(0.77 0.11 190);
   --supplement-soft: oklch(0.34 0.05 190);
+  --supplement-foreground: oklch(0.2 0.02 190);
   --lab: oklch(0.74 0.14 322);
   --lab-soft: oklch(0.34 0.06 322);
+  --lab-foreground: oklch(0.2 0.02 322);
 }
 
 :root[data-theme="light"] {
@@ -76,25 +122,36 @@
      values washed out on white. `-soft` backgrounds stay pale (unchanged). */
   --calories: oklch(0.525 0.16 45);
   --calories-soft: oklch(0.94 0.06 45);
+  --calories-foreground: oklch(0.99 0.01 45);
   --protein: oklch(0.535 0.17 350);
   --protein-soft: oklch(0.94 0.05 350);
+  --protein-foreground: oklch(0.99 0.01 350);
   --carbs: oklch(0.53 0.15 90);
   --carbs-soft: oklch(0.95 0.07 90);
+  --carbs-foreground: oklch(0.99 0.01 90);
   --fat: oklch(0.53 0.17 275);
   --fat-soft: oklch(0.94 0.05 275);
+  --fat-foreground: oklch(0.99 0.01 275);
 
   --activity: oklch(0.49 0.14 164);
   --activity-soft: oklch(0.93 0.05 164);
+  --activity-foreground: oklch(0.99 0.01 164);
   --nutrition: oklch(0.525 0.15 62);
   --nutrition-soft: oklch(0.94 0.06 68);
+  --nutrition-foreground: oklch(0.99 0.01 62);
   --sleep: oklch(0.535 0.16 300);
   --sleep-soft: oklch(0.94 0.05 300);
+  --sleep-foreground: oklch(0.99 0.01 300);
   --cardio: oklch(0.52 0.17 250);
   --cardio-soft: oklch(0.94 0.05 250);
+  --cardio-foreground: oklch(0.99 0.01 250);
   --hydration: oklch(0.5 0.13 214);
   --hydration-soft: oklch(0.94 0.05 214);
+  --hydration-foreground: oklch(0.99 0.01 214);
   --supplement: oklch(0.5 0.11 190);
   --supplement-soft: oklch(0.93 0.05 190);
+  --supplement-foreground: oklch(0.99 0.01 190);
   --lab: oklch(0.535 0.16 322);
   --lab-soft: oklch(0.94 0.05 322);
+  --lab-foreground: oklch(0.99 0.01 322);
 }

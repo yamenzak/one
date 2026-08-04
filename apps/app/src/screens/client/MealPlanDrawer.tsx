@@ -373,7 +373,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                       const done = checked.has(g.id);
                       return (
                         <button key={g.id} onClick={() => setChecked((s) => { const n = new Set(s); n.has(g.id) ? n.delete(g.id) : n.add(g.id); return n; })} className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-surface-2">
-                          <span className={cn("grid size-5 shrink-0 place-items-center rounded-full border transition-colors [&_svg]:size-3", done ? "border-nutrition bg-nutrition text-[var(--tone-foreground)]" : "border-border")}>{done && <Check strokeWidth={3} />}</span>
+                          <span className={cn("grid size-5 shrink-0 place-items-center rounded-full border transition-colors [&_svg]:size-3", done ? "border-nutrition bg-nutrition text-nutrition-foreground" : "border-border")}>{done && <Check strokeWidth={3} />}</span>
                           <FoodThumb src={g.img} size={32} />
                           <span className={cn("min-w-0 flex-1 truncate text-sm transition-colors", done && "text-muted-foreground line-through")}>{g.name}</span>
                           <Badge tone="neutral">{Math.round(g.qty)} {g.unit}</Badge>
@@ -471,7 +471,7 @@ function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, on
         <button onClick={onOpen} className="relative block h-36 w-full text-left transition-opacity active:opacity-90">
           {image ? <img src={image} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-nutrition/20 to-surface-2 text-nutrition/50 [&_svg]:size-9"><Utensils /></div>}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-          {logged ? <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-nutrition px-2 py-0.5 text-xs font-semibold text-[var(--tone-foreground)] [&_svg]:size-2.5"><Check strokeWidth={3} /> Logged</span> : opt.isFree ? <span className="absolute right-2 top-2 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-md">Free</span> : null}
+          {logged ? <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-nutrition px-2 py-0.5 text-xs font-semibold text-nutrition-foreground [&_svg]:size-2.5"><Check strokeWidth={3} /> Logged</span> : opt.isFree ? <span className="absolute right-2 top-2 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-md">Free</span> : null}
           <div className="absolute inset-x-0 bottom-0 p-3">
             <div className="truncate font-semibold text-white">{opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}</div>
             {opt.isFree ? (

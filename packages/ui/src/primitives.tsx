@@ -89,9 +89,46 @@ const toneMap = (status: Record<StatusTone, string>, accent: (t: string) => stri
     has: () => true,
   });
 
+const STATUS_FILL: Record<StatusTone, string> = {
+  success: "bg-success text-success-foreground",
+  warning: "bg-warning text-warning-foreground",
+  danger: "bg-danger text-danger-foreground",
+  primary: "bg-primary text-primary-foreground",
+  neutral: "bg-surface-3 text-foreground",
+};
+
 export const toneText: Record<Tone, string> = toneMap(STATUS_TEXT, (t) => `text-${t}`);
 export const toneSoft: Record<Tone, string> = toneMap(STATUS_SOFT, (t) => `bg-${t}-soft text-${t}`);
 export const toneVar: Record<Tone, string> = toneMap(STATUS_VAR, (t) => `var(--${t})`);
+
+/**
+ * A tone as a SOLID fill, with ink that is readable on it.
+ *
+ * `toneSoft` is the pale tint with the tone as text; this is the inverse — the
+ * tone at full strength with a foreground chosen for it. The distinction
+ * matters because the ink cannot be one shared value:
+ *
+ * There used to be a single `--tone-foreground` per theme mode (near-dark in
+ * dark mode, near-white in light), which works only while every accent in a
+ * mode happens to sit at a similar lightness. Kova's hand-tuned defaults do —
+ * and the moment a studio generates its palette from its own brand colour, or
+ * an app registers an accent at a different lightness, that assumption breaks
+ * and a pill renders dark-on-dark. Each tone now carries `--<tone>-foreground`,
+ * picked by MEASURED WCAG contrast (`bestForeground`, lib/theme.ts): whichever
+ * of near-white or near-black actually wins against that specific colour.
+ *
+ * ⚠️ Like `toneText` and `toneSoft`, this builds its class names by
+ * CONCATENATION, which a Tailwind scanner cannot follow. An app's accent
+ * registry must spell `bg-<tone> text-<tone>-foreground` out as a literal (Kova:
+ * `ACCENT_CLASSES` in `registry/tones.ts`, asserted by `tokens.accents.test.ts`)
+ * or the utility is never emitted and the fill renders unstyled.
+ *
+ * `--tone-foreground` survives for the RUNTIME path — `BottomTabs` and Kova's
+ * `Shell` build `var(--${tone}-foreground, var(--tone-foreground))`, where a
+ * tone registered without its own on-colour falls back to the old shared value
+ * instead of to `inherit`.
+ */
+export const toneFill: Record<Tone, string> = toneMap(STATUS_FILL, (t) => `bg-${t} text-${t}-foreground`);
 
 // ── Button ─────────────────────────────────────────────────────────────────
 const buttonVariants = cva(

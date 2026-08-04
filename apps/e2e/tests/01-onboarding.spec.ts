@@ -9,7 +9,7 @@
  *     → the client opens the studio's own branded door (`<slug>.<root>`, straight
  *       out of the invite link the server built) and signs in with their code
  *     → auto-links to the invited record
- *     → completes the 5-step intake wizard
+ *     → completes the 4-step intake wizard
  *     → lands in the client app
  *     → the coach's roster flips the client from "Invited" to "Active"
  *
@@ -175,16 +175,21 @@ test("owner onboards, invites a client, and the client signs in and completes in
 
   await test.step("the client is auto-linked and gets the intake wizard, not 'create a studio'", async () => {
     // The regression that mattered: an unlinked invitee saw the business wizard.
-    await expect(client.getByRole("heading", { name: /^Hi / })).toBeVisible({ timeout: 30_000 });
-    await expect(client.getByRole("heading", { name: "Name your studio" })).toHaveCount(0);
+    // Anchored on the intake's first step heading and the ABSENCE of the studio
+    // wizard's, because both are `StepHeader` h1s and only the words differ.
+    await expect(client.getByRole("heading", { name: "About you" })).toBeVisible({ timeout: 30_000 });
     await expect(client.getByRole("heading", { name: "Your studio", exact: true })).toHaveCount(0);
+    await expect(client.getByRole("heading", { name: "Choose a plan" })).toHaveCount(0);
   });
 
-  await test.step("the client completes all five intake steps", async () => {
-    // Step 1 — basics. Continue stays disabled until gender + DOB + a sane height.
+  await test.step("the client completes all four intake steps", async () => {
+    // Every pick-one question is a `ChoiceGroup` — a real radiogroup — so these
+    // are radios, not buttons. That is the point of the component: a chip row
+    // announces as N unrelated buttons and looks like a multi-select.
     const next = client.getByRole("button", { name: "Continue" });
+    // Step 1 — basics. Continue stays disabled until sex + DOB + a sane height.
     await expect(next).toBeDisabled();
-    await client.getByRole("button", { name: "female" }).click();
+    await client.getByRole("radio", { name: "Female" }).click();
     await client.getByLabel("Date of birth").fill("1994-06-15");
     await client.getByLabel("Height (cm)").fill("168");
     await expect(next).toBeEnabled();
@@ -192,21 +197,19 @@ test("owner onboards, invites a client, and the client signs in and completes in
 
     // Step 2 — goal.
     await expect(client.getByRole("heading", { name: "Your goal" })).toBeVisible();
-    await client.getByRole("button", { name: "Build muscle" }).click();
+    await client.getByRole("radio", { name: /^Build muscle/ }).click();
     await next.click();
 
-    // Step 3 — training context.
-    await expect(client.getByRole("heading", { name: "Training context" })).toBeVisible();
-    await client.getByRole("button", { name: "home", exact: true }).click();
+    // Step 3 — how you train.
+    await expect(client.getByRole("heading", { name: "How you train" })).toBeVisible();
+    await client.getByRole("radio", { name: /^At home/ }).click();
     await next.click();
 
-    // Step 4 — nutrition.
-    await expect(client.getByRole("heading", { name: "Nutrition" })).toBeVisible();
-    await client.getByRole("button", { name: "high protein" }).click();
-    await next.click();
-
-    // Step 5 — the write. This is the PATCH that used to 403.
-    await expect(client.getByRole("heading", { name: "You're all set" })).toBeVisible();
+    // Step 4 — how you eat, and the write. This is the PATCH that used to 403.
+    // There is no "you're all set" step any more: the confirmation belongs after
+    // the write, so the last question is the last step.
+    await expect(client.getByRole("heading", { name: "How you eat" })).toBeVisible();
+    await client.getByRole("radio", { name: /^High protein/ }).click();
     await client.getByRole("button", { name: "Finish" }).click();
   });
 

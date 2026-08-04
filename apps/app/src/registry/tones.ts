@@ -3,8 +3,9 @@
  *
  * `@4dl/ui` owns the five status tones (success / warning / danger / primary /
  * neutral) and resolves anything else by convention: tone `foo` becomes
- * `text-foo`, `bg-foo-soft text-foo`, `var(--foo)`. A warehouse app has no
- * `nutrition` tone and no `protein`, so these are ours.
+ * `text-foo`, `bg-foo-soft text-foo`, `bg-foo text-foo-foreground`,
+ * `var(--foo)`. A warehouse app has no `nutrition` tone and no `protein`, so
+ * these are ours.
  *
  * ⚠️ **The class literals below are load-bearing and must stay literal.**
  * Tailwind generates a utility only if it SEES the class name in scanned
@@ -36,18 +37,18 @@ export type KovaTone = MacroTone | DomainTone;
  * the lists above without its classes appearing here — the exact mistake that
  * would otherwise ship as "the new chip is grey".
  */
-export const ACCENT_CLASSES: Record<KovaTone, { text: string; soft: string }> = {
-  calories: { text: "text-calories", soft: "bg-calories-soft text-calories" },
-  protein: { text: "text-protein", soft: "bg-protein-soft text-protein" },
-  carbs: { text: "text-carbs", soft: "bg-carbs-soft text-carbs" },
-  fat: { text: "text-fat", soft: "bg-fat-soft text-fat" },
-  activity: { text: "text-activity", soft: "bg-activity-soft text-activity" },
-  nutrition: { text: "text-nutrition", soft: "bg-nutrition-soft text-nutrition" },
-  sleep: { text: "text-sleep", soft: "bg-sleep-soft text-sleep" },
-  cardio: { text: "text-cardio", soft: "bg-cardio-soft text-cardio" },
-  hydration: { text: "text-hydration", soft: "bg-hydration-soft text-hydration" },
-  supplement: { text: "text-supplement", soft: "bg-supplement-soft text-supplement" },
-  lab: { text: "text-lab", soft: "bg-lab-soft text-lab" },
+export const ACCENT_CLASSES: Record<KovaTone, { text: string; soft: string; fill: string }> = {
+  calories: { text: "text-calories", soft: "bg-calories-soft text-calories", fill: "bg-calories text-calories-foreground" },
+  protein: { text: "text-protein", soft: "bg-protein-soft text-protein", fill: "bg-protein text-protein-foreground" },
+  carbs: { text: "text-carbs", soft: "bg-carbs-soft text-carbs", fill: "bg-carbs text-carbs-foreground" },
+  fat: { text: "text-fat", soft: "bg-fat-soft text-fat", fill: "bg-fat text-fat-foreground" },
+  activity: { text: "text-activity", soft: "bg-activity-soft text-activity", fill: "bg-activity text-activity-foreground" },
+  nutrition: { text: "text-nutrition", soft: "bg-nutrition-soft text-nutrition", fill: "bg-nutrition text-nutrition-foreground" },
+  sleep: { text: "text-sleep", soft: "bg-sleep-soft text-sleep", fill: "bg-sleep text-sleep-foreground" },
+  cardio: { text: "text-cardio", soft: "bg-cardio-soft text-cardio", fill: "bg-cardio text-cardio-foreground" },
+  hydration: { text: "text-hydration", soft: "bg-hydration-soft text-hydration", fill: "bg-hydration text-hydration-foreground" },
+  supplement: { text: "text-supplement", soft: "bg-supplement-soft text-supplement", fill: "bg-supplement text-supplement-foreground" },
+  lab: { text: "text-lab", soft: "bg-lab-soft text-lab", fill: "bg-lab text-lab-foreground" },
 };
 
 /** The accent groups the advanced theme editor shows, appended to the base
@@ -56,6 +57,10 @@ export const KOVA_TOKEN_GROUPS: { label: string; tokens: string[] }[] = [
   { label: "Macros", tokens: MACRO_TONES.flatMap((t) => [t, `${t}-soft`]) },
   { label: "Domain accents", tokens: DOMAIN_TONES.flatMap((t) => [t, `${t}-soft`]) },
 ];
+// `-foreground` is deliberately NOT offered here. It is the ink laid on the
+// fill, and `brandingCss` recomputes it by measured contrast whenever the fill
+// is overridden — an editable field would let a studio pair a colour with ink
+// that fails AA on it, which is the one thing this token exists to prevent.
 
 /**
  * Canonical macro hues, nudged toward the studio's brand so they read as one
@@ -91,30 +96,30 @@ export const MACRO_SPEC: { name: string; hue: number; c: number; dL: number; lL:
  */
 export const DEFAULT_ACCENT_TOKENS: { dark: Record<string, string>; light: Record<string, string> } = {
   dark: {
-    "--calories": "oklch(0.78 0.16 45)", "--calories-soft": "oklch(0.35 0.07 45)",
-    "--protein": "oklch(0.72 0.16 350)", "--protein-soft": "oklch(0.34 0.07 350)",
-    "--carbs": "oklch(0.82 0.15 90)", "--carbs-soft": "oklch(0.36 0.06 90)",
-    "--fat": "oklch(0.715 0.14 275)", "--fat-soft": "oklch(0.34 0.06 275)",
-    "--activity": "oklch(0.78 0.13 164)", "--activity-soft": "oklch(0.34 0.06 164)",
-    "--nutrition": "oklch(0.8 0.13 68)", "--nutrition-soft": "oklch(0.36 0.06 68)",
-    "--sleep": "oklch(0.74 0.12 300)", "--sleep-soft": "oklch(0.34 0.06 300)",
-    "--cardio": "oklch(0.74 0.13 250)", "--cardio-soft": "oklch(0.34 0.06 250)",
-    "--hydration": "oklch(0.78 0.1 214)", "--hydration-soft": "oklch(0.34 0.05 214)",
-    "--supplement": "oklch(0.77 0.11 190)", "--supplement-soft": "oklch(0.34 0.05 190)",
-    "--lab": "oklch(0.74 0.14 322)", "--lab-soft": "oklch(0.34 0.06 322)",
+    "--calories": "oklch(0.78 0.16 45)", "--calories-soft": "oklch(0.35 0.07 45)", "--calories-foreground": "oklch(0.2 0.02 45)",
+    "--protein": "oklch(0.72 0.16 350)", "--protein-soft": "oklch(0.34 0.07 350)", "--protein-foreground": "oklch(0.2 0.02 350)",
+    "--carbs": "oklch(0.82 0.15 90)", "--carbs-soft": "oklch(0.36 0.06 90)", "--carbs-foreground": "oklch(0.2 0.02 90)",
+    "--fat": "oklch(0.715 0.14 275)", "--fat-soft": "oklch(0.34 0.06 275)", "--fat-foreground": "oklch(0.2 0.02 275)",
+    "--activity": "oklch(0.78 0.13 164)", "--activity-soft": "oklch(0.34 0.06 164)", "--activity-foreground": "oklch(0.2 0.02 164)",
+    "--nutrition": "oklch(0.8 0.13 68)", "--nutrition-soft": "oklch(0.36 0.06 68)", "--nutrition-foreground": "oklch(0.2 0.02 68)",
+    "--sleep": "oklch(0.74 0.12 300)", "--sleep-soft": "oklch(0.34 0.06 300)", "--sleep-foreground": "oklch(0.2 0.02 300)",
+    "--cardio": "oklch(0.74 0.13 250)", "--cardio-soft": "oklch(0.34 0.06 250)", "--cardio-foreground": "oklch(0.2 0.02 250)",
+    "--hydration": "oklch(0.78 0.1 214)", "--hydration-soft": "oklch(0.34 0.05 214)", "--hydration-foreground": "oklch(0.2 0.02 214)",
+    "--supplement": "oklch(0.77 0.11 190)", "--supplement-soft": "oklch(0.34 0.05 190)", "--supplement-foreground": "oklch(0.2 0.02 190)",
+    "--lab": "oklch(0.74 0.14 322)", "--lab-soft": "oklch(0.34 0.06 322)", "--lab-foreground": "oklch(0.2 0.02 322)",
   },
   light: {
-    "--calories": "oklch(0.525 0.16 45)", "--calories-soft": "oklch(0.94 0.06 45)",
-    "--protein": "oklch(0.535 0.17 350)", "--protein-soft": "oklch(0.94 0.05 350)",
-    "--carbs": "oklch(0.53 0.15 90)", "--carbs-soft": "oklch(0.95 0.07 90)",
-    "--fat": "oklch(0.53 0.17 275)", "--fat-soft": "oklch(0.94 0.05 275)",
-    "--activity": "oklch(0.49 0.14 164)", "--activity-soft": "oklch(0.93 0.05 164)",
-    "--nutrition": "oklch(0.525 0.15 62)", "--nutrition-soft": "oklch(0.94 0.06 68)",
-    "--sleep": "oklch(0.535 0.16 300)", "--sleep-soft": "oklch(0.94 0.05 300)",
-    "--cardio": "oklch(0.52 0.17 250)", "--cardio-soft": "oklch(0.94 0.05 250)",
-    "--hydration": "oklch(0.5 0.13 214)", "--hydration-soft": "oklch(0.94 0.05 214)",
-    "--supplement": "oklch(0.5 0.11 190)", "--supplement-soft": "oklch(0.93 0.05 190)",
-    "--lab": "oklch(0.535 0.16 322)", "--lab-soft": "oklch(0.94 0.05 322)",
+    "--calories": "oklch(0.525 0.16 45)", "--calories-soft": "oklch(0.94 0.06 45)", "--calories-foreground": "oklch(0.99 0.01 45)",
+    "--protein": "oklch(0.535 0.17 350)", "--protein-soft": "oklch(0.94 0.05 350)", "--protein-foreground": "oklch(0.99 0.01 350)",
+    "--carbs": "oklch(0.53 0.15 90)", "--carbs-soft": "oklch(0.95 0.07 90)", "--carbs-foreground": "oklch(0.99 0.01 90)",
+    "--fat": "oklch(0.53 0.17 275)", "--fat-soft": "oklch(0.94 0.05 275)", "--fat-foreground": "oklch(0.99 0.01 275)",
+    "--activity": "oklch(0.49 0.14 164)", "--activity-soft": "oklch(0.93 0.05 164)", "--activity-foreground": "oklch(0.99 0.01 164)",
+    "--nutrition": "oklch(0.525 0.15 62)", "--nutrition-soft": "oklch(0.94 0.06 68)", "--nutrition-foreground": "oklch(0.99 0.01 62)",
+    "--sleep": "oklch(0.535 0.16 300)", "--sleep-soft": "oklch(0.94 0.05 300)", "--sleep-foreground": "oklch(0.99 0.01 300)",
+    "--cardio": "oklch(0.52 0.17 250)", "--cardio-soft": "oklch(0.94 0.05 250)", "--cardio-foreground": "oklch(0.99 0.01 250)",
+    "--hydration": "oklch(0.5 0.13 214)", "--hydration-soft": "oklch(0.94 0.05 214)", "--hydration-foreground": "oklch(0.99 0.01 214)",
+    "--supplement": "oklch(0.5 0.11 190)", "--supplement-soft": "oklch(0.93 0.05 190)", "--supplement-foreground": "oklch(0.99 0.01 190)",
+    "--lab": "oklch(0.535 0.16 322)", "--lab-soft": "oklch(0.94 0.05 322)", "--lab-foreground": "oklch(0.99 0.01 322)",
   },
 };
 

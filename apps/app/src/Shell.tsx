@@ -230,12 +230,20 @@ function TabLayout() {
   // ALSO rebind --primary-foreground to the on-tone foreground: the brand
   // foreground is fixed to the brand primary's polarity, but domain tones invert
   // per mode, so leaving it produces low-contrast text on a solid tone button
-  // (e.g. a purple "Check in" with dark-on-dark text). --tone-foreground clears
-  // AA on every tone in both modes. Scoped to the content — the nav tints itself.
-  // Only rebind for the non-primary section tokens — `--primary: var(--primary)`
-  // would be a circular self-reference and blank out every primary-tinted element.
+  // (e.g. a purple "Check in" with dark-on-dark text). That ink is the tone's
+  // OWN `--<tone>-foreground`, measured against it by contrast ratio — a single
+  // shared `--tone-foreground` is only right while every accent in a mode sits
+  // at a similar lightness, which stops being true the moment a studio's brand
+  // derives them. It stays as the var fallback. Scoped to the content — the nav
+  // tints itself. Only rebind for the non-primary section tokens —
+  // `--primary: var(--primary)` would be a circular self-reference and blank out
+  // every primary-tinted element.
   const pageVars = ambient && activeTone && activeTone !== "primary"
-    ? ({ "--primary": `var(--${activeTone})`, "--ring": `var(--${activeTone})`, "--primary-foreground": "var(--tone-foreground)" } as CSSProperties)
+    ? ({
+        "--primary": `var(--${activeTone})`,
+        "--ring": `var(--${activeTone})`,
+        "--primary-foreground": `var(--${activeTone}-foreground, var(--tone-foreground))`,
+      } as CSSProperties)
     : undefined;
 
   return (

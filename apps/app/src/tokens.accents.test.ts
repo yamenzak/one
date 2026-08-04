@@ -12,6 +12,11 @@
  *   CONTRAST     a tone rendered on its own `-soft` tint that does not clear AA.
  *                Unreadable, and invisible to review — oklch lightness is
  *                perceptual, so a pair can look generous and measure 3:1.
+ *   ON-TONE      the other direction: ink laid on the tone at FULL strength.
+ *                These pairs were once a single `--tone-foreground` per mode,
+ *                which is only right while every accent in a mode sits at a
+ *                similar lightness. Measured per tone now, so an accent moved
+ *                out of the pack fails here instead of shipping dark-on-dark.
  *   COMPLETENESS a tone in the registry with no CSS variable behind it, which
  *                renders as an unstyled `var(--foo)` — i.e. nothing.
  *   THE LITERALS a tone whose class names are not spelled out, which Tailwind
@@ -38,14 +43,25 @@ describe.each([
     const r = contrastRatio(tokens[`--${tone}`]!, tokens[`--${tone}-soft`]!);
     expect(r, `--${tone} on --${tone}-soft = ${r.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA);
   });
+
+  it.each(ALL)("ink on a solid %s fill clears AA", (tone) => {
+    // The `toneFill` / `bg-<tone> text-<tone>-foreground` pair: a logged pill, a
+    // completed set marker, the tinted primary in Shell. Whether that ink is
+    // near-white or near-dark is not a per-mode constant — it is whichever wins
+    // the measurement against THIS colour, which is what `bestForeground`
+    // computes and what this asserts is still true of the shipped values.
+    const r = contrastRatio(tokens[`--${tone}`]!, tokens[`--${tone}-foreground`]!);
+    expect(r, `--${tone}-foreground on --${tone} = ${r.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA);
+  });
 });
 
 describe("the accent registry and the stylesheet agree", () => {
-  it("every registered tone has both variables, in both modes", () => {
+  it("every registered tone has all three variables, in both modes", () => {
     for (const tone of ALL) {
       for (const [mode, tokens] of [["dark", DARK], ["light", LIGHT]] as const) {
         expect(tokens[`--${tone}`], `--${tone} (${mode})`).toBeTruthy();
         expect(tokens[`--${tone}-soft`], `--${tone}-soft (${mode})`).toBeTruthy();
+        expect(tokens[`--${tone}-foreground`], `--${tone}-foreground (${mode})`).toBeTruthy();
       }
     }
   });
@@ -65,8 +81,10 @@ describe("the accent registry and the stylesheet agree", () => {
     for (const tone of ALL) {
       expect(ACCENT_CLASSES[tone].text, tone).toBe(`text-${tone}`);
       expect(ACCENT_CLASSES[tone].soft, tone).toBe(`bg-${tone}-soft text-${tone}`);
+      expect(ACCENT_CLASSES[tone].fill, tone).toBe(`bg-${tone} text-${tone}-foreground`);
       expect(SRC, `text-${tone} must appear as a literal`).toContain(`"text-${tone}"`);
       expect(SRC, `bg-${tone}-soft must appear as a literal`).toContain(`"bg-${tone}-soft text-${tone}"`);
+      expect(SRC, `bg-${tone} must appear as a literal`).toContain(`"bg-${tone} text-${tone}-foreground"`);
     }
   });
 

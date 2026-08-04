@@ -203,7 +203,7 @@ function CompletionBanner({ count, expanded, onToggle }: { count: number; expand
             />
           ))}
           <motion.span
-            className="relative grid size-11 place-items-center rounded-full bg-success text-[var(--tone-foreground)] [&_svg]:size-5"
+            className="relative grid size-11 place-items-center rounded-full bg-success text-success-foreground [&_svg]:size-5"
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={SPRING_SNAP}

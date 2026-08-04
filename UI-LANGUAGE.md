@@ -262,11 +262,51 @@ Elevation shadows exist **only in light mode** and only on floating things
 | `primary` | the brand. The one accent. Themed per tenant. |
 | `foreground` / `muted-foreground` | text; muted for anything secondary |
 | `success` / `warning` / `danger` | states, each with a `-soft` container |
-| `<tone>` / `<tone>-soft` | product-defined categorical accents |
+| `<tone>` / `<tone>-soft` / `<tone>-foreground` | product-defined categorical accents |
 
-Every tone ships as a **pair**: a foreground tone and a `-soft` container. The
-pair is theme-aware — the foreground darkens in light mode so that tone-on-soft
-always clears **AA (4.5:1)**. This is already how the tokens work; keep it.
+### Every tone is a TRIPLE, and the third one is measured
+
+A tone ships as three tokens, because there are two directions to lay ink:
+
+| Token | Used as | Reached by |
+|---|---|---|
+| `<tone>` | the colour itself — icons, text, a chart series | `toneText` |
+| `<tone>-soft` | the pale container, with `<tone>` as the ink on it | `toneSoft` |
+| `<tone>-foreground` | the ink ON a solid `<tone>` fill | `toneFill` |
+
+The first pair is theme-aware in the obvious way: the tone darkens in light mode
+so tone-on-soft always clears **AA (4.5:1)**.
+
+The third is the one that is easy to get wrong, and it was. Ink on a *filled*
+tone used to read one shared `--tone-foreground` per theme mode — near-dark in
+dark mode, near-white in light — which is true of a hand-tuned default set and
+of nothing else. It holds only while every accent in a mode sits at a similar
+lightness. The moment a studio's brand derives the palette (`deriveAccents`) or
+someone edits one token, a single shared value has to be wrong for at least one
+accent, and the pill renders dark-on-dark.
+
+**So the on-colour is never chosen by rule; it is chosen by measurement.**
+`bestForeground` computes the WCAG contrast ratio of near-white AND near-dark
+against that exact colour and keeps the winner — a lightness threshold mis-calls
+mid-lightness saturated colours, where both are borderline. Three consequences,
+and all three are load-bearing:
+
+- **A derived palette gets the token for free.** `deriveAccents` emits
+  `--<tone>-foreground` beside `--<tone>` and `--<tone>-soft`.
+- **A hand-edited fill gets it recomputed.** `brandingCss` fills the on-colour
+  for every overridden fill token that did not bring its own, so the advanced
+  token editor cannot leave a fill and its ink drifted apart. Fills are
+  everything except the closed structural set (`--background`, `--card`,
+  `--border`, the surfaces…).
+- **`-foreground` is not an editable field.** It is derived, and offering it
+  would let a studio pair a colour with ink that fails AA on it — the one thing
+  the token exists to prevent.
+
+An app registers the triple the same way it registers the pair: the two values
+in `tokens.accents.css` for both modes, the `--color-*` mappings in
+`@theme inline`, and the class names spelled out as **literals**
+(`bg-<tone> text-<tone>-foreground`) so Tailwind emits them. Both apps' accent
+tests assert the ratio in both directions, in both modes.
 
 ### Tenant theming
 
@@ -1649,6 +1689,13 @@ on screen.
 `FieldGroup` (form fields under a heading — **not** `Group`) · `ConfigRow`
 (status + detail + state, for setup screens) · `Sparkline` · `MiniBars` ·
 `WeekDots` · `MacroBar`.
+
+**The tone helpers** — `toneText` (the colour as ink), `toneSoft` (the pale
+container with the tone on it), `toneFill` (a solid fill with the ink measured
+for it), `toneVar` (the raw `var()`, for a `style` prop or a chart). All four
+resolve the five status tones from a table and everything else by convention, so
+an app's accents work without the package knowing their names. §4 has the rule
+that governs `toneFill`, and the reason it is not a per-mode constant.
 
 ### When you need something that is not here
 

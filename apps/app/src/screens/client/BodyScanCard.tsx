@@ -88,7 +88,7 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
               </div>
             </div>
             {profileReady && !blocked && (
-              <Button size="sm" style={{ backgroundColor: toneVar.sleep, color: "var(--tone-foreground)" }} onClick={open}><Camera /> {latest ? "New scan" : "Scan"}</Button>
+              <Button size="sm" style={{ backgroundColor: toneVar.sleep, color: "var(--sleep-foreground)" }} onClick={open}><Camera /> {latest ? "New scan" : "Scan"}</Button>
             )}
           </div>
 

@@ -46,10 +46,10 @@ export type DomainTone = keyof typeof DOMAIN_TONES;
  * that each name appears literally in this file — so adding a tone without its
  * classes is a test failure rather than a grey chip.
  */
-export const ACCENT_CLASSES: Record<DomainTone, { text: string; soft: string }> = {
-  cycle: { text: "text-cycle", soft: "bg-cycle-soft text-cycle" },
-  case: { text: "text-case", soft: "bg-case-soft text-case" },
-  soiled: { text: "text-soiled", soft: "bg-soiled-soft text-soiled" },
+export const ACCENT_CLASSES: Record<DomainTone, { text: string; soft: string; fill: string }> = {
+  cycle: { text: "text-cycle", soft: "bg-cycle-soft text-cycle", fill: "bg-cycle text-cycle-foreground" },
+  case: { text: "text-case", soft: "bg-case-soft text-case", fill: "bg-case text-case-foreground" },
+  soiled: { text: "text-soiled", soft: "bg-soiled-soft text-soiled", fill: "bg-soiled text-soiled-foreground" },
 };
 
 /**

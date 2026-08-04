@@ -311,6 +311,45 @@ function fillDerived(map: Record<string, string>): Record<string, string> {
   return map;
 }
 
+/**
+ * The structural tokens that are NOT fills, so nothing may be laid on top of
+ * them by tone. Everything else a theme can override — `--primary`,
+ * `--destructive`, the status tones, and every accent an app registers — IS a
+ * fill, and therefore owes a readable on-colour.
+ *
+ * Spelled as a deny-list rather than an allow-list because the allow side is
+ * open: `@4dl/ui` cannot enumerate an app's accents (that is the whole reason
+ * they live in the app), while its own structural set is closed and known here.
+ */
+const NON_FILL_TOKENS = new Set([
+  "--background", "--foreground", "--card", "--popover", "--secondary", "--muted",
+  "--accent", "--border", "--input", "--ring", "--scrim", "--surface-2", "--surface-3",
+]);
+
+/**
+ * Give every overridden FILL a measured on-colour, unless the theme set one.
+ *
+ * The advanced token editor writes raw variables, and it writes them one at a
+ * time: a studio that darkens `--calories` by hand changes the colour a filled
+ * chip is painted and NOT the ink on it, so the pair drifts apart silently and
+ * the chip ends up dark-on-dark. `--primary` had the same hole from the other
+ * direction — `primaryForeground` is derived from the `primary` FIELD, so a
+ * primary set through the token editor kept the old foreground.
+ *
+ * An explicit `--x-foreground` in the same override always wins: this fills a
+ * gap, it does not overrule a choice.
+ */
+function fillOnColors(map: Record<string, string>): Record<string, string> {
+  for (const key of Object.keys(map)) {
+    if (NON_FILL_TOKENS.has(key) || key.endsWith("-foreground") || key.endsWith("-soft")) continue;
+    const fg = `${key}-foreground`;
+    if (map[fg]) continue;
+    const p = parseColor(map[key]);
+    if (p) map[fg] = bestForeground(p.l, p.c, p.h);
+  }
+  return map;
+}
+
 export function presetById(id: string | null | undefined): BrandPreset | undefined {
   return BRAND_PRESETS.find((p) => p.id === id);
 }
@@ -361,6 +400,10 @@ export function brandingCss(branding: Branding | null | undefined): string {
   }
   Object.assign(dark, branding?.tokens?.dark ?? {});
   Object.assign(light, branding?.tokens?.light ?? {});
+  // After the overrides, not before: a hand-set fill needs its ink recomputed,
+  // and the editor only ever writes the fill.
+  fillOnColors(dark);
+  fillOnColors(light);
 
   let rootExtra = branding?.radius != null ? `--radius:${branding.radius}rem;` : "";
   // Elevation: one preset drives all three steps, so `shadow-sm/md/lg` anywhere
@@ -599,6 +642,22 @@ export function deriveAccents(
     dark[`--${m.name}-soft`] = ok(0.35, c * 0.42, h);
     light[`--${m.name}`] = ok(m.lL, c, h);
     light[`--${m.name}-soft`] = ok(0.94, c * 0.4, h);
+    /*
+      THE INK FOR A SOLID FILL OF THIS TONE, per tone and per mode.
+
+      A single shared `--tone-foreground` only works while every accent in a
+      mode sits at a similar lightness — true of a hand-tuned default set, and
+      false the moment these are DERIVED: `lL`/`dL` come from the app's spec and
+      the chroma is scaled by the brand's, so one studio's `carbs` can be light
+      enough to need dark ink while another's is not.
+
+      `bestForeground` measures the actual WCAG ratio of near-white and
+      near-black against this exact colour and returns the winner, which is
+      robust across the whole gamut — a lightness threshold mis-calls
+      mid-lightness saturated colours, where both are borderline.
+    */
+    dark[`--${m.name}-foreground`] = bestForeground(m.dL, c, h);
+    light[`--${m.name}-foreground`] = bestForeground(m.lL, c, h);
   }
   return { light, dark };
 }

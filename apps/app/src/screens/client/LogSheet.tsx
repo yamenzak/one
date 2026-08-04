@@ -426,7 +426,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
                         {items.map((a) => {
                           const on = activityKey === a.key;
                           return (
-                            <button key={a.key} aria-pressed={on} onClick={() => setActivityKey(a.key)} style={on ? { background: toneVar.cardio, color: "var(--tone-foreground)" } : undefined} className={cn("rounded-full px-3 py-1.5 text-sm transition-colors", !on && "bg-background hover:bg-surface-3")}>
+                            <button key={a.key} aria-pressed={on} onClick={() => setActivityKey(a.key)} style={on ? { background: toneVar.cardio, color: "var(--cardio-foreground)" } : undefined} className={cn("rounded-full px-3 py-1.5 text-sm transition-colors", !on && "bg-background hover:bg-surface-3")}>
                               {a.label}
                             </button>
                           );

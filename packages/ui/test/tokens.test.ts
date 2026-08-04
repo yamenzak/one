@@ -10,6 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import { deriveTokens, brandingCss, SHADOW_PRESETS, BORDER_WIDTHS, type NeutralTint } from "../src/lib/theme.js";
+import { contrastRatio, AA } from "../src/lib/contrast.js";
 
 /** Every NEUTRAL surface. Status colours and domain accents are deliberately
  *  absent — see the tint test below for why. */
@@ -81,13 +82,64 @@ describe("deriveTokens — one colour re-skins everything", () => {
   it("derives the accents it IS given, in both modes, tinted toward the brand", () => {
     const spec = [{ name: "alpha", hue: 45, c: 0.16, dL: 0.78, lL: 0.53 }];
     const t = deriveTokens({ primary: BLUE, accents: spec });
-    for (const key of ["--alpha", "--alpha-soft"]) {
+    for (const key of ["--alpha", "--alpha-soft", "--alpha-foreground"]) {
       expect(t.dark?.[key], key).toBeTruthy();
       expect(t.light?.[key], key).toBeTruthy();
     }
     // Pulled 12% toward the brand hue rather than left at its canonical one.
     const hue = Number(/oklch\([\d.]+ [\d.]+ ([\d.]+)\)/.exec(t.dark!["--alpha"]!)![1]);
     expect(hue).not.toBe(45);
+  });
+
+  it("gives every derived accent ink that clears AA on a solid fill of it", () => {
+    // The reason `--<tone>-foreground` exists per tone rather than once per
+    // mode. These two sit at opposite ends of the lightness range in the SAME
+    // mode, so no single shared value can be right for both — `dim` needs
+    // near-white, `bright` needs near-dark, and a shared token picks one and
+    // renders the other unreadable.
+    const t = deriveTokens({
+      primary: BLUE,
+      accents: [
+        { name: "bright", hue: 90, c: 0.15, dL: 0.88, lL: 0.86 },
+        { name: "dim", hue: 270, c: 0.16, dL: 0.42, lL: 0.4 },
+      ],
+    });
+    for (const mode of ["dark", "light"] as const) {
+      for (const tone of ["bright", "dim"]) {
+        const r = contrastRatio(t[mode]![`--${tone}`]!, t[mode]![`--${tone}-foreground`]!);
+        expect(r, `--${tone}-foreground on --${tone} (${mode}) = ${r.toFixed(2)}:1`).toBeGreaterThanOrEqual(AA);
+      }
+    }
+    // And it really did choose differently for the two, in the same mode.
+    expect(t.dark!["--bright-foreground"]).not.toBe(t.dark!["--dim-foreground"]);
+  });
+});
+
+describe("brandingCss — a hand-edited fill keeps readable ink", () => {
+  // The advanced token editor writes one variable at a time, so a studio that
+  // darkens an accent by hand changes the FILL and not the ink on it. Before
+  // this, the pair drifted apart silently: a `bg-calories` pill kept whatever
+  // on-colour the default palette shipped.
+  it("derives an on-colour for an overridden fill that brought none", () => {
+    const css = brandingCss({ tokens: { dark: { "--calories": "oklch(0.95 0.14 90)" }, light: {} } });
+    const fg = /--calories-foreground:(oklch\([^)]*\))/.exec(css)?.[1];
+    expect(fg, "an overridden fill must get an on-colour").toBeTruthy();
+    expect(contrastRatio("oklch(0.95 0.14 90)", fg!)).toBeGreaterThanOrEqual(AA);
+  });
+
+  it("never overrules an on-colour the theme set itself", () => {
+    const css = brandingCss({
+      tokens: { dark: { "--calories": "oklch(0.95 0.14 90)", "--calories-foreground": "oklch(0.1 0 0)" }, light: {} },
+    });
+    expect(css).toContain("--calories-foreground:oklch(0.1 0 0)");
+  });
+
+  it("leaves the structural tokens alone — they are not fills", () => {
+    // `--background-foreground` is not a token anything reads, and writing one
+    // for every surface would be noise in every tenant's stylesheet.
+    const css = brandingCss({ tokens: { dark: { "--background": "oklch(0.2 0.01 285)", "--border": "#333" }, light: {} } });
+    expect(css).not.toContain("--background-foreground");
+    expect(css).not.toContain("--border-foreground");
   });
 });
 
