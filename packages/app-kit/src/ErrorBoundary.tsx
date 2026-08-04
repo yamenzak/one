@@ -4,6 +4,26 @@
  * whole app. Pass `resetKey` (e.g. the current pathname): when it changes the
  * boundary clears its error WITHOUT remounting children, so navigating away from
  * a broken route recovers on its own.
+ *
+ * ── Put one at the ROOT, above the providers, or this is all theatre ────────
+ *
+ * A boundary only catches what is BELOW it. An app that wraps its `<Routes>` and
+ * nothing else leaves its session provider, its theme provider and every early
+ * `return` above the router unguarded — and a throw there does not white-screen,
+ * it BLACK-screens: React unmounts the root, `#root` empties, and all that is
+ * left is the `body` background. No message, no button, no console for a phone
+ * user to open. Kova shipped exactly that and a client hit it after finishing
+ * their intake; the only evidence anyone could produce was a photograph of a
+ * dark rectangle, which is precisely as diagnostic as it sounds.
+ *
+ * ── The message is shown ON PURPOSE ────────────────────────────────────────
+ *
+ * Normally an end user should not read `Cannot read properties of undefined`.
+ * But the alternative here is worse: without it the only thing a stuck person
+ * can report is "it's blank", and a defect nobody can name is a defect nobody
+ * can fix. A render error carries no credentials and no personal data — it is a
+ * type name and a property — so the cost is a moment of ugliness and the benefit
+ * is that the next screenshot IS the bug report.
  */
 
 import { Component, type ErrorInfo, type ReactNode } from "react";
@@ -47,6 +67,11 @@ export class ErrorBoundary extends Component<Props, State> {
           <div className="max-w-sm text-center">
             <div className="text-body-lg">Something went wrong</div>
             <p className="mt-1 text-sm text-muted-foreground">This screen hit an unexpected error. You can try again or head back home.</p>
+            {/* The reason, verbatim. See the header: a screenshot of this line is
+                a usable bug report, and a screenshot of a blank screen is not. */}
+            <p className="mt-3 select-all break-words rounded-lg bg-surface-2 px-3 py-2 text-left font-mono text-[0.7rem] leading-relaxed text-muted-foreground">
+              {this.state.error.message || String(this.state.error)}
+            </p>
             <div className="mt-4 flex items-center justify-center gap-2">
               <Button variant="secondary" onClick={() => this.setState({ error: null })}>Try again</Button>
               <Button onClick={() => { window.location.href = this.props.homePath ?? "/" }}>Go home</Button>

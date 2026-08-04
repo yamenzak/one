@@ -48,9 +48,22 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
 
   const load = useCallback(async () => {
     if (!canCommerce) { setPackages([]); setSub(null); return; }
-    const [p, s] = await Promise.all([api.get<{ packages: Pkg[] }>("/api/packages"), api.get<{ subscriptions: Sub[] }>(`/api/subscriptions?clientId=${clientId}`)]);
-    setPackages(p.packages.filter((x) => x.visibility === "marketplace"));
-    setSub(s.subscriptions.find((x) => x.status === "active") ?? null);
+    try {
+      const [p, s] = await Promise.all([api.get<{ packages: Pkg[] }>("/api/packages"), api.get<{ subscriptions: Sub[] }>(`/api/subscriptions?clientId=${clientId}`)]);
+      setPackages(p.packages.filter((x) => x.visibility === "marketplace"));
+      setSub(s.subscriptions.find((x) => x.status === "active") ?? null);
+    } catch {
+      // A REFUSED READ MUST STILL SETTLE THE SCREEN. Without this the rejection
+      // escaped into the app-wide unhandled-error toast, `packages` stayed null,
+      // and the storefront sat on its skeleton for good — which in `locked` mode
+      // is the ENTIRE app for that client, with no way forward and nothing said.
+      // The `commerce` entitlement was handled above precisely because this bit
+      // once, and every other failure (a 500, a dropped connection, a tenant
+      // whose catalogue read errors) lands here for the same reason.
+      setPackages([]);
+      setSub(null);
+      setMsg("Couldn't load this studio's packages. Pull to refresh, or ask your coach to set you up.");
+    }
   }, [clientId, canCommerce]);
   useEffect(() => void load(), [load]);
 

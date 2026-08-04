@@ -17,6 +17,7 @@ import { ONBOARDING_PATH } from "./screens/onboarding/paths.js";
 import { PasskeyProvider } from "./PasskeyPrompt.js";
 import { PwaUpdatePrompt, UnhandledErrorToast } from "./notices.js";
 import { stripReloadParam } from "./hard-refresh.js";
+import { ErrorBoundary } from "./ErrorBoundary.js";
 
 /**
  * Branded boot screen — the very first frame of the product.
@@ -203,16 +204,42 @@ function App() {
 // never gets bookmarked or shared.
 stripReloadParam();
 
+/**
+ * THE ROOT BOUNDARY — the one that stops a crash being a BLACK SCREEN.
+ *
+ * `Shell` has had a boundary around its `<Routes>` since the plan builder went
+ * full-screen, and that covers every routed screen. It covers nothing else: not
+ * `SessionProvider`, not `ThemeProvider`, not `App`/`pickScreen`, and not the
+ * early `return`s at the top of `Shell` — the boot spinner, `StudioBlocked`, and
+ * the locked `Shop`. A throw in any of those is not caught by anything, so React
+ * unmounts the whole root, `#root` empties, and the page is left showing the
+ * `body` background and nothing else.
+ *
+ * That is not a hypothetical: a client reported a dark, empty screen after
+ * finishing their intake, and the blank area sampled to `oklch(0.165 …)` — the
+ * `--background` token exactly. The stylesheet had loaded; React had rendered
+ * nothing. There was no message, no button, and no console to open on a phone,
+ * so the fault could not even be named, let alone fixed.
+ *
+ * Tessa has had this since it was written. Kova never got it — which is the
+ * whole reason its failure mode was a photograph of a black rectangle.
+ *
+ * It is deliberately the OUTERMOST thing inside `StrictMode`: a boundary can
+ * only catch what is below it, so anything it does not enclose is a screen this
+ * app still cannot apologise for.
+ */
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <MotionConfig reducedMotion="user">
-      <BrowserRouter>
-        <SessionProvider>
-          <ThemeProvider>
-            <App />
-          </ThemeProvider>
-        </SessionProvider>
-      </BrowserRouter>
-    </MotionConfig>
+    <ErrorBoundary>
+      <MotionConfig reducedMotion="user">
+        <BrowserRouter>
+          <SessionProvider>
+            <ThemeProvider>
+              <App />
+            </ThemeProvider>
+          </SessionProvider>
+        </BrowserRouter>
+      </MotionConfig>
+    </ErrorBoundary>
   </StrictMode>,
 );

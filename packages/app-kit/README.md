@@ -10,10 +10,49 @@ The browser-side runtime every 4DL app would otherwise rewrite.
 | `passkey.ts` | The WebAuthn ceremony against Better Auth: enroll, sign in, conditional UI, and error messages that say *why*. |
 | `stripe.ts` + `PaymentSheet.tsx` | Stripe.js loaded at runtime (no CDN build dependency) and the inline Payment Element sheet, for both rails. |
 | `Turnstile.tsx` | The Cloudflare human check. |
-| `ErrorBoundary.tsx` | A real error boundary that clears itself on route change. |
+| `ErrorBoundary.tsx` | A real error boundary that clears itself on route change. **Put one at the ROOT too** — see below. |
 | `hard-refresh.ts` | The escape hatch from a stale precached build. |
 | `notices.tsx` | The four runtime notices no screen owns: offline, queued write, **a new build waiting**, an uncaught rejection. |
 | `RefreshNote.tsx` | `hardRefresh()` as an affordance, for the screens a signed-out visitor can be stranded on. |
+
+## An error boundary belongs at the ROOT, above every provider
+
+A boundary only catches what is **below** it. Wrapping `<Routes>` and stopping
+there — which is what Kova did — leaves `SessionProvider`, `ThemeProvider`, the
+screen picker, and every early `return` above the router unguarded. A throw in
+any of those does not white-screen: React unmounts the root, `#root` empties,
+and all that is left on screen is the `body` background.
+
+On a phone that is a black rectangle with no message, no button and no console.
+A client hit exactly that after finishing their intake, and the only evidence
+anyone could produce was a photograph of a dark screen — the blank area sampled
+to `--background`, which is how we knew React had rendered nothing at all rather
+than rendered something broken.
+
+So the outermost thing inside `StrictMode` is the boundary:
+
+```tsx
+createRoot(el).render(
+  <StrictMode>
+    <ErrorBoundary>
+      <MotionConfig …><BrowserRouter><SessionProvider><ThemeProvider>
+        <App />
+      </ThemeProvider></SessionProvider></BrowserRouter></MotionConfig>
+    </ErrorBoundary>
+  </StrictMode>,
+);
+```
+
+Kova asserts the shape in `root-boundary.conformance.test.ts` — the check reads
+the render tree and fails if any provider ends up *outside* the boundary,
+because the ordering is the whole invariant and a render test would have to
+mount the entire app to notice.
+
+**The fallback prints `error.message` deliberately.** An end user should not
+normally read `Cannot read properties of undefined`, but the alternative is that
+the only thing a stuck person can report is "it's blank" — and a defect nobody
+can name is a defect nobody can fix. A render error is a type name and a
+property; it carries no credentials and no personal data.
 
 ## Passkeys ship with a screen now
 
