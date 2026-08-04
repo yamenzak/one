@@ -11,7 +11,8 @@ import { useCallback, useEffect, useState } from "react";
 import { kgToDisplay, weightLabel } from "@kova/domain";
 import {
   Button, Card, Badge, RangePicker, useDateRange, Page, Stagger, StatCard, ChartCard, AreaChart, SectionHeader, Eyebrow, GlanceStrip, Sparkline, toneVar,
-  Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, SkeletonLine,
+  Anchor, CountUp, Unit,
+  Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, SkeletonLine, SkeletonHero,
   Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, TrendingUp, Percent, cn,
 } from "@4dl/ui";
 import { api, errorText, todayLocal } from "../../api.js";
@@ -46,6 +47,12 @@ export function ClientReport({ clientId }: { clientId: string }) {
   const [summaryBusy, setSummaryBusy] = useState(false);
   const units = useUnits();
   const today = todayLocal();
+  /** Inclusive day count of the window on screen — the denominator the anchor's
+   *  sub-line reads against. Derived from the resolved window rather than from
+   *  the preset id, so a custom start→end is counted the same way a preset is. */
+  const windowDays = Math.round(
+    (Date.parse(`${range.window.end}T00:00:00`) - Date.parse(`${range.window.start}T00:00:00`)) / 86_400_000,
+  ) + 1;
 
   useEffect(() => { setReport(null); void api.get<Report>(`/api/reports/client/${clientId}?${range.query}&today=${today}`).then(setReport).catch(() => setReport(null)); }, [clientId, range.query, today]);
   useEffect(() => { void api.get<{ exercises: ExerciseInfo[] }>("/api/exercises?scope=all").then((r) => setExMap(new Map(r.exercises.map((e) => [e.id, e])))).catch(() => undefined); }, []);
@@ -98,6 +105,52 @@ export function ClientReport({ clientId }: { clientId: string }) {
           did. */}
       <Eyebrow action={<RangePicker format={shortDate} {...range.props} />}>Report</Eyebrow>
 
+      {/*
+        T1 — CONSISTENCY (§1).
+
+        This tab had no anchor, on the reasoning that a period summary is a set
+        of numbers rather than one. `coach/Sessions` was filed the same way and
+        reversed on review, and the same test settles this one: what is the ONE
+        question on arrival, and does it have a numeric answer? A coach opens a
+        client's report to find out whether they have been showing up — every
+        other figure here (trajectory, averages, lifts) is read THROUGH that
+        answer, because a weight trend over a fortnight they barely logged is
+        not a trend.
+
+        It comes OUT of the compliance strip in the same move. §1: the anchor's
+        value appears once, and a display numeral with the same figure in a
+        strip 40px below it reads as a second thought about the first one.
+
+        Zero is the case that matters. A client with no check-ins in the window
+        scores 0%, and 0 at 56px over "of 30 days" is a verdict on the person
+        rather than a gap in the record (§5) — so the absence says so in words,
+        keyed on the COUNT rather than on the percentage, since 0% computed from
+        real days is a real measurement and keeps its numeral.
+      */}
+      {/* Its own `Reveal`, so the anchor's height is reserved while the report
+          loads — it sits above everything else on the tab, and a hero that
+          appears late pushes the whole screen down under the reader's thumb
+          (§9). The AI card below already loads independently. */}
+      <Reveal loading={!report} skeleton={<SkeletonHero height={150} />}>
+        {report && (
+          <Anchor
+            eyebrow="Consistency"
+            className="pt-1"
+            word={report.compliance.checkInDays === 0 ? "No check-ins" : undefined}
+            sub={report.compliance.checkInDays === 0
+              ? `Nothing logged in these ${windowDays} days`
+              : `${report.compliance.checkInDays} of ${windowDays} days checked in`}
+          >
+            {report.compliance.checkInDays > 0 && (
+              <>
+                <CountUp value={report.compliance.checkInConsistencyPct} />
+                <Unit>%</Unit>
+              </>
+            )}
+          </Anchor>
+        )}
+      </Reveal>
+
       {canAi && (
       <Stagger>
         <Card className="space-y-3">
@@ -137,8 +190,9 @@ export function ClientReport({ clientId }: { clientId: string }) {
       }>
         {report && (
         <>
-          {/* Compliance — card-less glance strips (two rows of three) so the
-              headline adherence numbers read as a summary, not a card grid. */}
+          {/* Compliance — card-less glance strips so the adherence numbers read
+              as a summary, not a card grid. Consistency is NOT here: it is the
+              anchor, and §1 spends the anchor's value once. */}
           <section className="space-y-2">
             <Eyebrow>Compliance</Eyebrow>
             <Stagger className="space-y-3">
@@ -147,12 +201,11 @@ export function ClientReport({ clientId }: { clientId: string }) {
                 // this report were calling the same number "Check-in streak", "Day streak"
                 // and "Day streak" respectively.
                 { icon: Flame, tone: "calories", value: report.compliance.currentStreak, label: "Check-in streak" },
-                { icon: Gauge, tone: "activity", value: `${report.compliance.checkInConsistencyPct}%`, label: "Consistency" },
                 { icon: Dumbbell, tone: "activity", value: report.compliance.workoutDays, label: "Workout days" },
+                { icon: Utensils, tone: "nutrition", value: report.compliance.foodDays, label: "Days logged" },
               ]} />
               <GlanceStrip items={[
-                { icon: Utensils, tone: "nutrition", value: report.compliance.foodDays, label: "Days logged" },
-                { icon: Flame, tone: "calories", value: report.compliance.calorieAdherencePct != null ? `${report.compliance.calorieAdherencePct}%` : null, label: "Cal adherence" },
+                { icon: Gauge, tone: "calories", value: report.compliance.calorieAdherencePct != null ? `${report.compliance.calorieAdherencePct}%` : null, label: "Cal adherence" },
                 // "0k" was shipping — the k-suffix was unconditional, so a client with no
                 // logged sets got a unit with nothing in front of it. Under 10,000 the
                 // real figure fits and is more useful; the unit rides the value, not the

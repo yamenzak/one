@@ -140,6 +140,26 @@ test("the coach's studio", async () => {
     await shoot(page, project, "coach-client-report", { settle: 1200 });
   });
 
+  // MANAGE had no picture, and it is the tab that holds access, supplements,
+  // labs and the offboarding index — i.e. everything a coach does TO a client
+  // rather than for one. Its supplements and labs lists were rebuilt from
+  // hand-rolled boxes into `Group`/`Row`, which is exactly the class of change
+  // §16 says must not ship unphotographed.
+  await test.step("managing a client", async () => {
+    await visit(page, `${base}/clients/${world.client.id}/manage`, shell);
+    await shoot(page, project, "coach-client-manage", { settle: 900 });
+  });
+
+  // The clinical lists, which sit below the check-in review and therefore below
+  // the fold at phone height. Scrolled to rather than cropped from the shot
+  // above: the claim is that supplements and labs now read as one scannable
+  // list each, and that is only visible where they are.
+  await test.step("a client's supplements and labs", async () => {
+    await visit(page, `${base}/clients/${world.client.id}/manage`, shell);
+    await page.getByText("Supplements").first().scrollIntoViewIfNeeded();
+    await shoot(page, project, "coach-client-clinical", { settle: 600 });
+  });
+
   // All four tabs — they are four collections of the same shape now, and the
   // only way that claim survives is if all four are photographed.
   for (const [tab, id] of [["exercises", "coach-library"], ["foods", "coach-library-foods"], ["templates", "coach-library-templates"], ["content", "coach-library-content"]] as const) {

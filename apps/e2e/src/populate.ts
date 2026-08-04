@@ -488,3 +488,48 @@ export async function seedFrontDesk(studio: Studio, clientId: string): Promise<v
     console.warn(`[seedFrontDesk] booking skipped: ${String(e).slice(0, 200)}`);
   }
 }
+
+/**
+ * SUPPLEMENTS AND LAB TESTS ON ONE CLIENT — the Manage tab's two clinical lists.
+ *
+ * Both sections render "nothing here" until a coach prescribes or requests
+ * something, so an unseeded studio photographs the Manage tab as two empty
+ * cards — which documents neither the lists nor the rebuild that turned them
+ * from hand-rolled boxes into `Group`/`Row`.
+ *
+ * The lab is left at `requested`, which is what a coach sees most of the time:
+ * asked for, waiting on the client. Flipping one to `uploaded` needs a real
+ * file through `/labs/:id/upload` as the CLIENT, and a fabricated attachment is
+ * exactly the placeholder §16 says must never reach an image.
+ *
+ * Gated on `supplementsLabs`, so it is best-effort like the front desk above: a
+ * studio without the entitlement hides both sections entirely, and that is a
+ * legitimate shot rather than a failed capture.
+ */
+export async function seedClinical(studio: Studio, clientId: string): Promise<void> {
+  const supplements = [
+    { name: "Creatine monohydrate", kind: "performance", dose: "5 g", schedule: [{ slot: "morning" }] },
+    { name: "Vitamin D3", kind: "vitamin", dose: "4000 IU", schedule: [{ slot: "with_breakfast" }] },
+    // One paused, so the badge and the Resume affordance are both in the picture.
+    { name: "Magnesium glycinate", kind: "mineral", dose: "300 mg", schedule: [{ slot: "before_bed" }] },
+  ];
+  try {
+    // The create route answers with the new id, so the pause is one PATCH and
+    // needs no list read — `callJson` only speaks POST.
+    let magnesiumId: string | null = null;
+    for (const s of supplements) {
+      const r = await callJson<{ id: string }>(studio.page, studio.base, "/api/supplements", { clientId, ...s });
+      if (s.name.startsWith("Magnesium")) magnesiumId = r.id;
+    }
+    if (magnesiumId) await callPatch(studio.page, studio.base, `/api/supplements/${magnesiumId}`, { status: "paused" });
+
+    await callJson(studio.page, studio.base, "/api/labs", {
+      clientId,
+      type: "blood_panel",
+      displayName: "Full blood panel",
+      instructions: "Fasted, first thing in the morning.",
+    });
+  } catch (e) {
+    console.warn(`[seedClinical] skipped: ${String(e).slice(0, 200)}`);
+  }
+}

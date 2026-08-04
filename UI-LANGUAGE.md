@@ -815,6 +815,22 @@ quiet control in the action slot.** A range picker, a lane picker, an add
 button — whatever that tab's single scoping decision is. If a tab has two such
 controls, one of them is not a scoping decision and belongs in the content.
 
+Two clarifications the sweep produced, both from tabs that looked conformant and
+were not:
+
+- **Naming the surface means naming the TAB, not the first thing under it.** One
+  tab's opener read "Active goal", which describes the card directly below —
+  and that card already said so twice, in its own title and in an "Active"
+  badge on the same line. A caption that describes its own next element is a
+  label on a labelled thing; the eyebrow's job is to say which of the N screens
+  you are on.
+- **A tab that opens on its `Anchor` has already done this**, because an
+  anchor's eyebrow names its subject at the same size in the same place. Adding
+  a surface eyebrow above it stacks two micro-captions, and the lower one is
+  more useful. The rule is that a tab never opens on a BARE CONTROL — which is
+  what a full-width day stepper with nothing above it is, and it is the shape
+  that made this rule necessary in the first place.
+
 ### The assistant speaks on arrival, not on request
 
 A generated note behind a **Generate** button is a feature nobody uses twice.

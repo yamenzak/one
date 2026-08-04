@@ -347,8 +347,17 @@ export function GoalManager({ clientId }: { clientId: string }) {
 
       {/* ── The anchor: what the client is being held to right now ───────────── */}
       <section className="space-y-2">
+        {/*
+          THE OPENER NAMES THE TAB, NOT THE CARD UNDER IT (§7).
+
+          This read "Active goal" / "Goal", which names the thing immediately
+          below — and that thing already says so twice, in its own `title-2` and
+          in an "Active" badge on the same line. So the tab was the only one of
+          the six whose first line described its first element instead of the
+          surface, and it spent a caption restating a badge.
+        */}
         <Eyebrow action={goals.length > 0 ? <Button size="sm" variant="secondary" onClick={compose}><Plus /> New phase</Button> : undefined}>
-          {active ? "Active goal" : "Goal"}
+          Goals
         </Eyebrow>
         <Stagger>
           {active ? (

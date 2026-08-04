@@ -31,7 +31,7 @@
 
 import type { Browser, BrowserContext } from "@playwright/test";
 import { provisionClient, provisionStudio, seedExercise, type Client, type Studio } from "./provision.js";
-import { compOntoPlan, populateClient, populateRoster, publishMealPlan, publishWorkoutPlan, seedFoods, seedFrontDesk, setTargets } from "./populate.js";
+import { compOntoPlan, populateClient, populateRoster, publishMealPlan, publishWorkoutPlan, seedClinical, seedFoods, seedFrontDesk, setTargets } from "./populate.js";
 
 /** The studio every image is taken in. A real-sounding name, not "Test Studio". */
 export const DEMO_STUDIO = "Northlight Strength";
@@ -126,6 +126,7 @@ export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"):
   const fixedMealPlanId = await publishMealPlan(studio, client, foodIds, "Prep week — fixed", "fixed", false);
 
   await seedFrontDesk(studio, client.id);
+  await seedClinical(studio, client.id);
 
   return { studio, client, roster, planId, mealPlanId, fixedMealPlanId };
 }

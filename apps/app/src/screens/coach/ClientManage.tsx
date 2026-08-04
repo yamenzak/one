@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { fmtWeight, kgToDisplay, weightLabel } from "@kova/domain";
-import { Button, Card, Badge, Field, Select, Textarea, Sheet, SubCard, Chip, Collapsible, useOneOpen, Callout, Wrench, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonLine, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, NoData, Anchor, ActionCluster, CountUp, Group, Row, GroupNote, RotateCcw, History, Users, ActionResult, useAction as useActionBase } from "@4dl/ui";
+import { Button, Card, Badge, Field, Select, Textarea, Sheet, SubCard, Chip, Collapsible, useOneOpen, Callout, Wrench, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonLine, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, NoData, Anchor, ActionCluster, CountUp, Group, Row, GroupNote, RotateCcw, History, Users, Play, Pause, ChevronRight, ActionResult, useAction as useActionBase, type Tone } from "@4dl/ui";
 import { personaLabel, personaTone } from "../../registry/index.js";
 import { api, errorText, todayLocal } from "../../api.js";
 import { FeatureLock, useCan } from "../../FeatureLock.js";
@@ -34,6 +34,22 @@ interface Swap { id: string; reason: string | null; status: string; day_index: n
 interface Lab { id: string; display_name: string; status: string; client_notes?: string | null; file_key?: string | null; values?: { marker: string; value: string; unit?: string; flag?: string }[] | null; trainer_feedback?: string | null }
 interface Supp { id: string; name: string; dose: string | null; kind: string; status: string; schedule?: { slot: string }[] }
 interface CheckIn { id: string; date_local: string; mood: number | null; energy: number | null; stress: number | null; sleep_hours: number | null; weight_kg: number | null; steps_count: number | null; notes: string | null; photos_json: string | null; trainer_feedback: string | null }
+
+/**
+ * The DB's words are not the coach's (§10), and `open` is what makes the row a
+ * door: a lab is only reachable once there is something in it to read.
+ *
+ * `lab_tests.status` is `requested` by default, `uploaded` when the client sends
+ * results in, `reviewed` once the coach has written back. The screen printed
+ * those verbatim in a `warning` badge, so a perfectly normal outstanding request
+ * rendered as an amber "requested".
+ */
+const LAB_STATUS: Record<string, { label: string; tone: Tone; open: boolean }> = {
+  requested: { label: "Waiting on them", tone: "neutral", open: false },
+  scheduled: { label: "Booked", tone: "neutral", open: false },
+  uploaded: { label: "Ready to review", tone: "cardio", open: true },
+  reviewed: { label: "Reviewed", tone: "success", open: true },
+};
 
 /** Scroll a deep-linked row into view and pulse a highlight ring so the coach's
  *  eye lands on the exact item a notification pointed them at. */
@@ -271,24 +287,81 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
             <Button size="sm" variant="secondary" onClick={() => setSuppOpen(true)}><Plus /> Prescribe</Button>
           </div>
         }>Supplements</Eyebrow>
+        {/*
+          A GROUP OF ROWS, NOT A CARD OF SUBCARDS.
+
+          This was `Card > SubCard > (flex row + chip row)` — three levels of
+          nesting for a prescription list (§1 caps it at two), with the dose on
+          its own line and the schedule as a wrapping row of pills below it. A
+          client on five supplements was five stacked boxes, each ~76px, each
+          needing to be read rather than scanned.
+          It is a list, so it is `Group`/`Row`: name on the left, dose and slots
+          as the ONE sub-line, and the two verbs as icon buttons on the right —
+          which is what §7 caps a row at, and what the coach roster two sections
+          down already looked like.
+        */}
         <Stagger>
-        <Card className="space-y-3">
-          {supps.length === 0 ? <p className="text-sm text-muted-foreground">No supplements prescribed.</p> : supps.map((s) => (
-            <SubCard key={s.id} className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2"><span className="truncate font-medium">{s.name}</span>{s.status === "paused" && <Badge tone="warning">Paused</Badge>}</div>
-                  {s.dose && <span className="text-xs text-muted-foreground">{s.dose}</span>}
-                </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => void setSuppStatus(s.id, s.status === "paused" ? "active" : "paused")} className="rounded-full px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-3 hover:text-foreground">{s.status === "paused" ? "Resume" : "Pause"}</button>
-                  <button onClick={() => setSuppToDiscontinue(s)} aria-label="Discontinue supplement" className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:text-danger [&_svg]:size-4"><X /></button>
-                </div>
-              </div>
-              {s.schedule && s.schedule.length > 0 && <div className="flex flex-wrap gap-1.5">{s.schedule.map((sc, i) => <span key={i} className="rounded-full bg-surface-3 px-2 py-0.5 text-xs font-medium capitalize text-muted-foreground">{sc.slot.replace(/_/g, " ")}</span>)}</div>}
-            </SubCard>
-          ))}
-        </Card>
+        {supps.length === 0 ? (
+          <Card><p className="text-sm text-muted-foreground">No supplements prescribed.</p></Card>
+        ) : (
+          <Group>
+            {supps.map((s) => {
+              // Dose and schedule are one fact about how it is taken, so they are
+              // one sub-line rather than a line plus a row of chips.
+              const slots = (s.schedule ?? []).map((sc) => sc.slot.replace(/_/g, " ")).join(", ");
+              const facts = [s.dose, slots].filter(Boolean).join(" · ");
+              const paused = s.status === "paused";
+              return (
+                <Row
+                  key={s.id}
+                  /*
+                    NO GLYPH. Every row in this list would carry the same pill —
+                    §7's "if every visible sibling would show the same glyph,
+                    delete it". It was also costing 48px of the width the NAME
+                    needs: photographed, "Magnesium glycinate" truncated to
+                    "Magnesium glyc…" between an icon it shared with its two
+                    neighbours and a badge saying something the sub-line can say.
+                  */
+                  /*
+                    PAUSED IS A FACT ABOUT THE PRESCRIPTION, so it rides in the
+                    sub-line with the other two rather than as a third trailing
+                    element beside two icon buttons (§7 caps a row at two). It
+                    keeps its tone, so it is still a colour AND a word (§4).
+                  */
+                  sub={
+                    paused
+                      ? <><span className="font-medium text-warning">Paused</span>{facts ? ` · ${facts}` : ""}</>
+                      : facts || undefined
+                  }
+                  trailing={
+                    <span className="flex shrink-0 items-center gap-0.5">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-muted-foreground"
+                        aria-label={paused ? `Resume ${s.name}` : `Pause ${s.name}`}
+                        onClick={() => void setSuppStatus(s.id, paused ? "active" : "paused")}
+                      >
+                        {paused ? <Play /> : <Pause />}
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-muted-foreground"
+                        aria-label={`Discontinue ${s.name}`}
+                        onClick={() => setSuppToDiscontinue(s)}
+                      >
+                        <X />
+                      </Button>
+                    </span>
+                  }
+                >
+                  {s.name}
+                </Row>
+              );
+            })}
+          </Group>
+        )}
         </Stagger>
       </section>
       )}
@@ -296,15 +369,48 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
       {canSuppLabs && (
       <section className="space-y-2">
         <Eyebrow action={<Button size="sm" variant="secondary" onClick={() => setLabOpen(true)}><Plus /> Request</Button>}>Lab tests</Eyebrow>
+        {/*
+          THE ROW IS THE WAY IN, SO IT DOES NOT ALSO CARRY A BUTTON.
+
+          These were bare `flex justify-between` divs inside a `Card` — under the
+          56px row floor, with no hairline, no press feedback and no entrance
+          stagger, and each one ended in a "Review" button that opened exactly
+          what tapping the line would have (§7: never render a control for the
+          thing the row already does).
+          The status is a WORD either way (§4). A result that is waiting on the
+          client is not tappable and says so; one that is in says so too, and the
+          chevron is the affordance.
+        */}
         <Stagger>
-        <Card className="space-y-3">
-          {labs.length === 0 ? <p className="text-sm text-muted-foreground">No lab tests.</p> : labs.map((l) => (
-            <div key={l.id} className="flex items-center justify-between gap-2">
-              <span className="min-w-0 truncate">{l.display_name}</span>
-              {l.status === "uploaded" || l.status === "reviewed" ? <Button size="sm" variant={l.status === "reviewed" ? "ghost" : "default"} onClick={() => setReviewLab(l)}>{l.status === "reviewed" ? "View" : "Review"}</Button> : <Badge tone="warning">{l.status}</Badge>}
-            </div>
-          ))}
-        </Card>
+        {labs.length === 0 ? (
+          <Card><p className="text-sm text-muted-foreground">No lab tests.</p></Card>
+        ) : (
+          <Group>
+            {labs.map((l) => {
+              const st = LAB_STATUS[l.status] ?? { label: l.status, tone: "neutral" as const, open: false };
+              return (
+                <Row
+                  key={l.id}
+                  /* Same rule as the supplements above: one flask on every row
+                     of a section already headed LAB TESTS distinguishes nothing
+                     and eats the width the test's name needs. */
+                  onClick={st.open ? () => setReviewLab(l) : undefined}
+                  /* `Row` renders `trailing ?? (value + chevron)`, so a trailing
+                     slot replaces the chevron rather than sitting beside it —
+                     the badge and the affordance have to be composed here. */
+                  trailing={
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <Badge tone={st.tone}>{st.label}</Badge>
+                      {st.open && <ChevronRight aria-hidden className="size-4 text-muted-foreground" />}
+                    </span>
+                  }
+                >
+                  {l.display_name}
+                </Row>
+              );
+            })}
+          </Group>
+        )}
         </Stagger>
       </section>
       )}

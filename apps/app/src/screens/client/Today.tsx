@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtVolume, fmtEnergy, fmtWeight, featureEnabled, type UnitPrefs } from "@kova/domain";
-import { Button, Card, Skeleton, Sheet, EmptyState, ProgressRing, Reveal, SkeletonHero, SkeletonList, SkeletonHeader, Page, Stagger, Rail, Anchor, DayNav, LoadError, ChevronRight, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock, Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple, Store, Ticket, AlertTriangle, ShieldCheck, toneVar, Target, ScanLine, BookOpen, Group, Row, User, type Tone, type LucideIcon } from "@4dl/ui";
+import { Button, Card, Skeleton, Sheet, EmptyState, ProgressRing, Reveal, SkeletonHero, SkeletonList, SkeletonHeader, Page, Stagger, Rail, Anchor, DayNav, Eyebrow, LoadError, ChevronRight, ActionCluster, CountUp, Unit, Plus, Play, PencilLine, ClipboardList, FlaskConical, History, Clock, Droplet, Dumbbell, Footprints, Weight, Moon, Smile, Timer, Pill, ArrowLeftRight, ArrowRight, Send, Info, Utensils, Croissant, Soup, Apple, Store, Ticket, AlertTriangle, ShieldCheck, toneVar, Target, ScanLine, BookOpen, Group, Row, User, type Tone, type LucideIcon } from "@4dl/ui";
 import { MacroBar } from "../../registry/index.js";
 import type { WidgetItem } from "@kova/protocol";
 import { useNavigate } from "react-router-dom";
@@ -298,16 +298,40 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
       }>
         {data && agenda && widgetData && (
         <>
-          {/* Date navigator — the whole day (macros + agenda + feed) rewinds. */}
+          {/*
+            THE TAB NAMES ITSELF, AND ITS ONE SCOPING CONTROL RIDES BESIDE IT (§7).
+
+            This opened on a bare full-width `DayNav` with nothing saying what
+            the screen was — the only surface in the client-detail set that did,
+            and the exact shape §7's "every tab of one subject opens the same
+            way" was written against. Plans, Progress and Report all open with an
+            eyebrow carrying one quiet control; this one now does too.
+
+            The day is that control. `DayNav` sizes to its content in the action
+            slot (the date pill's `flex-1` has no spare width to claim), so the
+            two rows this replaces cost one — and the "Back to today" line stays
+            inside the component, where it already reserves its own height so
+            stepping off today does not shove the screen down a line.
+
+            "Today" names the SURFACE, not the day on screen: the tab is called
+            Today whichever day you have rewound to, and the pill beside it says
+            which one that is. They read as the same word exactly once — on the
+            current day, in two different registers (11px muted micro against a
+            14px pill) — and diverge the moment you step back one. Naming the
+            surface after its commonest state is the cost of calling the tab
+            "Today" at all, and that is the tab bar's decision, not this row's.
+          */}
           <Stagger>
-            <DayNav
-              value={date}
-              max={today}
-              display={dayLabel(date, today)}
-              onChange={setDate}
-              onShift={(d) => setDate((cur) => shiftDay(cur, d))}
-              resetTo={today}
-            />
+            <Eyebrow action={
+              <DayNav
+                value={date}
+                max={today}
+                display={dayLabel(date, today)}
+                onChange={setDate}
+                onShift={(d) => setDate((cur) => shiftDay(cur, d))}
+                resetTo={today}
+              />
+            }>Today</Eyebrow>
           </Stagger>
 
           {/*
