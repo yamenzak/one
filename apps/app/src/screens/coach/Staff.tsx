@@ -20,7 +20,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { PERMISSION_CATALOG } from "@kova/domain";
-import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, SectionHeader, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, UserMinus, Plus, Group, Row, Anchor, CountUp } from "@4dl/ui";
+import { Button, Card, Badge, Field, Sheet, Avatar, Select, Chip, Page, Stagger, Eyebrow, ConfirmDialog, Reveal, SkeletonRow, Users, Mail, ShieldCheck, UserMinus, Plus, Group, Row, Anchor, CountUp } from "@4dl/ui";
 import { personaLabel, personaTone } from "../../registry/index.js";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -133,7 +133,10 @@ export function Staff() {
           <CountUp value={seatsUsed} />
         </Anchor>
       )}
-      <SectionHeader icon={Users} tone="cardio" title="Team" action={<Button size="sm" onClick={() => setInviteOpen(true)}><Plus /> Invite</Button>} />
+      {/* `Eyebrow`, like every other section on the Business tabs. `SectionHeader`
+          is the in-CARD device; using both across four tabs of one screen gave the
+          same idea two spellings. */}
+      <Eyebrow action={<Button size="sm" onClick={() => setInviteOpen(true)}><Plus /> Invite</Button>}>Team</Eyebrow>
       {msg && <p role="status" aria-live="polite" className="text-sm text-muted-foreground">{msg}</p>}
       <Reveal loading={!members} className="space-y-3" skeleton={
         <div className="space-y-2">
@@ -149,25 +152,35 @@ export function Staff() {
               <Row
                 key={m.userId}
                 leading={<Avatar {...staffAvatar(m)} className="size-10" />}
-                sub={m.email}
+                /*
+                  TWO TRAILING CONTROLS, NOT THREE AND A DROPDOWN (§7).
+
+                  This row carried a permissions button, a remove button AND a
+                  112px `Select` — beside a title that was the name plus up to
+                  two badges. At 375px the name had barely 80px, so every staff
+                  member on the team read as a truncation with three controls
+                  after it.
+
+                  The ROLE moves into the sub-line, where it is a fact rather
+                  than a control, and changing it becomes the row's own job:
+                  tapping opens the permissions sheet, which is where a role and
+                  its grants belong together anyway. That leaves one trailing
+                  verb — remove — which is the only one that is not "edit this
+                  person".
+                */
+                sub={[
+                  personaLabel(m.role, { self: m.userId === myUserId }),
+                  m.customGrant ? "custom permissions" : null,
+                  m.email && m.email !== (m.name || m.email) ? m.email : null,
+                ].filter(Boolean).join(" · ")}
+                onClick={m.role === "owner" ? undefined : () => setPermMember(m)}
                 trailing={
-                  <>
-                    {m.role !== "owner" && <Button size="icon" variant="secondary" aria-label={`Permissions for ${m.name || m.email}`} onClick={() => setPermMember(m)}><ShieldCheck /></Button>}
-                    {m.userId !== myUserId && (
-                      <Button size="icon" variant="ghost" aria-label={`Remove ${m.name || m.email}`} disabled={busy} onClick={() => setPendingRemove(m)}><UserMinus /></Button>
-                    )}
-                    {/* `Select` has no disabled prop, so gate the mutation itself on
-                        `busy` — a second role change mid-flight would race the roster
-                        reload and show a stale role. */}
-                    <div className="w-28"><Select aria-label={`Role for ${m.name || m.email}`} value={m.role} onChange={(v) => v !== m.role && !busy && setPendingRole({ member: m, role: v })} options={rolesFor(m.role)} /></div>
-                  </>
+                  m.userId !== myUserId ? (
+                    <Button size="icon" variant="ghost" className="text-muted-foreground" aria-label={`Remove ${m.name || m.email}`} disabled={busy} onClick={(e) => { e.stopPropagation(); setPendingRemove(m); }}><UserMinus /></Button>
+                  ) : undefined
                 }
               >
-                <span className="flex items-center gap-2">
-                  <span className="truncate">{m.name || m.email}</span>
-                  <Badge tone={personaTone(m.role, { self: m.userId === myUserId })}>{personaLabel(m.role, { self: m.userId === myUserId })}</Badge>
-                  {m.customGrant && <Badge tone="warning">Custom</Badge>}
-                </span>
+                {m.name || m.email}
               </Row>
             ))}
           </Group>
@@ -181,7 +194,7 @@ export function Staff() {
             */}
           {data && data.invitations.length > 0 && (
             <>
-              <SectionHeader icon={Mail} tone="nutrition" title="Invited" />
+              <Eyebrow className="pt-2">Invited</Eyebrow>
               <Group>
                 {data.invitations.map((inv) => (
                   <Row
@@ -192,10 +205,11 @@ export function Staff() {
                       <Button size="sm" variant="ghost" disabled={busy} onClick={() => void revokeInvite(inv.id)}>Revoke</Button>
                     }
                   >
-                    <span className="flex items-center gap-2">
-                      <span className="truncate">{inv.email}</span>
-                      <Badge tone="warning">Pending</Badge>
-                    </span>
+                    {/* No "Pending" badge: the section is called INVITED, so
+                        every row here would carry it — the status repeated down
+                        a list is texture, and it was squeezing the address
+                        between itself and Revoke until it truncated. */}
+                    {inv.email}
                   </Row>
                 ))}
               </Group>
@@ -226,7 +240,16 @@ export function Staff() {
         </div>
       </Sheet>
 
-      {permMember && <PermissionSheet member={permMember} onClose={() => setPermMember(null)} onSaved={() => { setPermMember(null); void load(); }} />}
+      {permMember && (
+        <PermissionSheet
+          member={permMember}
+          roles={rolesFor(permMember.role)}
+          rolePending={busy}
+          onRole={(role) => setPendingRole({ member: permMember, role })}
+          onClose={() => setPermMember(null)}
+          onSaved={() => { setPermMember(null); void load(); }}
+        />
+      )}
 
       <ConfirmDialog
         open={!!pendingRole}
@@ -254,7 +277,28 @@ export function Staff() {
   );
 }
 
-function PermissionSheet({ member, onClose, onSaved }: { member: Member; onClose: () => void; onSaved: () => void }) {
+/**
+ * ROLE AND ACCESS, IN ONE PLACE.
+ *
+ * The role used to be a 112px `Select` in the roster row's trailing slot, beside
+ * two icon buttons and after a title that was a name plus up to two badges — so
+ * at 375px the person's name had about 80px and the row read as a truncation
+ * with a dropdown after it. And it sat one control away from this sheet, whose
+ * own copy already said "clear everything to fall back to the {role} role"
+ * without being able to change that role.
+ *
+ * They are one question — what may this person do — so they are one surface.
+ * The row shows the role as a FACT in its sub-line and opens this to change it.
+ */
+function PermissionSheet({ member, roles, rolePending, onRole, onClose, onSaved }: {
+  member: Member;
+  roles: { value: string; label: string }[];
+  /** A role change is in flight on the roster — gate a second one. */
+  rolePending: boolean;
+  onRole: (role: string) => void;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [grant, setGrant] = useState<Record<string, string[]>>(() => structuredClone(member.customGrant ?? {}));
   const [busy, setBusy] = useState(false);
   const toggle = (res: string, action: string) => setGrant((g) => {
@@ -272,8 +316,21 @@ function PermissionSheet({ member, onClose, onSaved }: { member: Member; onClose
   return (
     <Sheet open onClose={onClose} title={`Access — ${member.name || member.email}`} footer={<Button size="lg" className="w-full" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save access"}</Button>}>
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">Override the role's defaults with a custom grant. Clear everything to fall back to the {personaLabel(member.role)} role.</p>
-        <div className="max-h-[55vh] space-y-3 overflow-y-auto">
+        {/* The role first: it is the decision, and the grants below only ever
+            override it. Changing it goes through the same confirmation the
+            roster's dropdown did — a demotion can be refused (the last owner)
+            and a promotion can hit the seat ceiling. */}
+        <div className="space-y-1.5">
+        <div className="text-sm font-medium text-muted-foreground">Role</div>
+        <Select
+          aria-label={`Role for ${member.name || member.email}`}
+          value={member.role}
+          onChange={(v) => { if (v !== member.role && !rolePending) onRole(v); }}
+          options={roles}
+        />
+        </div>
+        <p className="text-sm text-muted-foreground">Override the role&rsquo;s defaults with a custom grant. Clear everything to fall back to the {personaLabel(member.role)} role.</p>
+        <div className="max-h-[45vh] space-y-3 overflow-y-auto">
           {Object.entries(PERMISSION_CATALOG).map(([res, actions]) => (
             <div key={res}>
               <div className="mb-1.5 text-sm font-medium capitalize">{res}</div>

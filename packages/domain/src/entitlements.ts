@@ -49,7 +49,7 @@ export interface Quotas {
 }
 
 export interface Features {
-  /** Stripe Connect packages / marketplace (tenant rail). */
+  /** Selling packages to the studio's own customers (the tenant rail). */
   commerce: boolean;
   /** The AI suite as a whole (per-feature toggles live in tenant settings). */
   aiSuite: boolean;
@@ -120,13 +120,13 @@ export const FEATURE_KEYS = Object.keys(FREE_ENTITLEMENTS.features) as (keyof Fe
  *  (roadmap) — the admin builder hides it and a conformance test permits it to
  *  have no gate. Every non-reserved feature must be gated somewhere. */
 export const FEATURE_META: Record<string, { label: string; hint: string; reserved?: boolean }> = {
-  commerce: { label: "Commerce", hint: "Sell packages via Stripe Connect" },
+  commerce: { label: "Commerce", hint: "Sell packages and take payment your own way" },
   aiSuite: { label: "AI suite", hint: "AI drafting, coach notes, vision & image" },
   bfCamera: { label: "Body-fat camera", hint: "Camera body-fat estimator" },
   externalSearch: { label: "External food search", hint: "USDA / Nutritionix / FatSecret providers" },
   supplementsLabs: { label: "Supplements & labs", hint: "Supplement tracking + lab tests" },
   frontDesk: { label: "Front desk", hint: "Assistant role + sessions / booking" },
-  branding: { label: "White-label branding", hint: "Login skin, accent, public blog" },
+  branding: { label: "White-label branding", hint: "Your name, colours and logo throughout" },
   integrations: { label: "Integrations", hint: "API / webhooks + data exports", reserved: true },
   chat: { label: "Chat", hint: "Trainer ↔ client messaging", reserved: true },
 };
@@ -213,7 +213,7 @@ export interface TenantUsage {
   activeClients: number;
   templates: number;
   storageMb: number;
-  /** Active client subscriptions sold via Stripe Connect. */
+  /** Active client subscriptions sold on the studio's own payment rail. */
   activeCommerceSubs: number;
 }
 

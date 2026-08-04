@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { fmtVolume, volumeLabel, volumeDisplayToMl, POSTURE_GUIDANCE } from "@kova/domain";
-import { Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, Thumb, StatCard, WeekDots, Sparkline, MiniBars, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonList, Anchor, ActionCluster, CountUp, ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Flame, Plus, ChevronRight, Upload, HeartPulse, AlertTriangle, type Tone } from "@4dl/ui";
+import { Button, Card, Badge, Chip, Skeleton, Page, Stagger, IconBadge, Thumb, StatCard, WeekDots, Sparkline, MiniBars, EmptyState, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonList, Anchor, ActionCluster, CountUp, ArrowLeft, Droplet, Timer, Pill, FlaskConical, Calendar, Check, ClipboardList, Flame, Plus, ChevronRight, Upload, HeartPulse, AlertTriangle, type Tone, Meter } from "@4dl/ui";
 import { METRICS, POSTURE_SEVERITY_TONE, FASTING_ZONES, type FastingZone } from "../../registry/index.js";
 
 interface PostureScan {
@@ -62,7 +62,7 @@ function ZoneTrack({ elapsedHours }: { elapsedHours: number }) {
         const current = elapsedHours >= z.start && elapsedHours < z.max;
         return (
           <div key={z.label} style={{ flexGrow: z.vis }} className="min-w-0">
-            <div className="h-2 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full transition-all duration-700" style={{ width: `${frac * 100}%`, backgroundColor: toneVar[z.tone] }} /></div>
+            <Meter size="md" tone={z.tone} value={frac} />
             <div className={cn("mt-1.5 truncate text-center text-xs font-semibold leading-tight", current ? "text-foreground" : "text-muted-foreground/60")}>{z.label}</div>
             <div className="numeral text-center text-xs leading-tight text-muted-foreground/50" aria-hidden="true">{z.start}h</div>
           </div>

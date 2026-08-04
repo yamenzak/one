@@ -37,7 +37,7 @@ import {
   Eyebrow,
   SectionHeader,
   EmptyState,
-  Spinner,
+  Skeleton, SkeletonHeader, SkeletonList, ChoiceGroup, Choice,
   SaveBar,
   useAction,
   cn,
@@ -115,13 +115,14 @@ export function PaymentSetup({ isOwner }: { isOwner: boolean }) {
   useEffect(() => { void load(); }, []);
 
   if (err) return <EmptyState icon={AlertTriangle} title="Couldn't load your payment setup" description={err} action={<Button onClick={() => { setErr(null); void load(); }}>Try again</Button>} />;
-  if (!s) return <div className="grid place-items-center py-16"><Spinner /></div>;
+  /* Skeleton in the real geometry, not a spinner (§7). */
+  if (!s) return <div className="space-y-3"><Skeleton className="h-24 rounded-2xl" /><SkeletonHeader /><SkeletonList card rows={3} thumb={0} /></div>;
 
   const selected = s.providers.find((p) => p.id === choice);
   const isStripeLink = choice === "stripe_link";
 
   return (
-    <Page className="column space-y-5 pb-28">
+    <div className="space-y-5">
       {/* The trade, before anything is asked of them. */}
       <Stagger>
         <Card className="space-y-2">
@@ -137,50 +138,47 @@ export function PaymentSetup({ isOwner }: { isOwner: boolean }) {
               <p className="text-sm text-muted-foreground">Straight into your own account, in your own name.</p>
             </div>
           </div>
+          {/* ONE SENTENCE (§10). This was a 55-word paragraph making the full
+              argument — no cut taken, no keys held, works in any country, which
+              is why the setup below is yours. All true, and all of it read as a
+              wall above the only control on the screen. The promise is the two
+              lines above; the reasoning is a Help Center article. */}
           <p className="text-sm leading-relaxed text-muted-foreground">
-            We never hold your money, never take a cut of what you charge, and never ask for keys to your
-            payment account. That&rsquo;s why you can use whichever provider you already bank with, wherever
-            you are — and it&rsquo;s why the few setup steps below are yours to do rather than ours.
+            We never hold your money and never take a cut — which is why the setup below is yours to do.
           </p>
         </Card>
       </Stagger>
 
+      {/*
+        `ChoiceGroup`, not a stack of hand-rolled buttons.
+
+        This was one `<button>` per provider carrying its own border, its own
+        selected tint and a 20px div drawn to look like a radio — which is what
+        it is: pick exactly one from a small set. The real component brings what
+        the imitation did not: actual radio semantics, ONE tab stop for the whole
+        group with arrow keys between the options, and a name announced for the
+        group rather than five unexplained buttons in a row.
+      */}
       <section className="space-y-2">
         <Eyebrow>How you take payment</Eyebrow>
-        {s.providers.map((p) => {
-          const on = choice === p.id;
-          return (
-            <Stagger key={p.id}>
-              <button
-                type="button"
+        <Stagger>
+          <ChoiceGroup label="How you take payment" value={choice} onChange={(v) => isOwner && setChoice(v)}>
+            {s.providers.map((p) => (
+              <Choice
+                key={p.id}
+                value={p.id}
+                title={p.label}
+                badge={p.id === s.provider ? <Badge tone="success">In use</Badge> : undefined}
                 disabled={!isOwner}
-                onClick={() => setChoice(p.id)}
-                className={cn(
-                  "w-full rounded-2xl border p-3.5 text-left transition-colors",
-                  on ? "border-primary/60 bg-primary/8" : "border-border/60 hover:bg-muted/40",
-                  !isOwner && "opacity-60",
-                )}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={cn("grid size-5 shrink-0 place-items-center rounded-full border", on ? "border-primary bg-primary text-primary-foreground" : "border-border")}>
-                    {on && <CircleCheck className="size-3.5" />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold">{p.label}</div>
-                    <p className="text-xs text-muted-foreground">
-                      {p.id === "manual"
-                        ? "No setup. You take the money your way and tap to confirm."
-                        : p.capabilities.recurring
-                          ? "Clients pay online. Monthly plans renew on their own."
-                          : "Clients pay online."}
-                    </p>
-                  </div>
-                  {p.id === s.provider && <Badge tone="success">In use</Badge>}
-                </div>
-              </button>
-            </Stagger>
-          );
-        })}
+                sub={p.id === "manual"
+                  ? "No setup. You take the money your way and tap to confirm."
+                  : p.capabilities.recurring
+                    ? "Clients pay online. Monthly plans renew on their own."
+                    : "Clients pay online."}
+              />
+            ))}
+          </ChoiceGroup>
+        </Stagger>
       </section>
 
       {/* `manual` needs nothing, so it gets reassurance rather than a form. The
@@ -281,6 +279,6 @@ export function PaymentSetup({ isOwner }: { isOwner: boolean }) {
           }
         />
       )}
-    </Page>
+    </div>
   );
 }

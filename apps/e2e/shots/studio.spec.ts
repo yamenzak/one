@@ -176,6 +176,18 @@ test("the coach's studio", async () => {
     await page.keyboard.press("Escape");
   });
 
+  // ALL FOUR BUSINESS TABS. They are in-component state rather than routes, so
+  // each one needs a click — and until now only the first had a picture, which
+  // is how three of them came to hold every hand-rolled list left in the app.
+  for (const tab of ["Packages", "Getting paid", "Staff"] as const) {
+    await test.step(`the business · ${tab.toLowerCase()}`, async () => {
+      await visit(page, `${base}/business`, shell);
+      // `SegmentedControl`'s options are `role="tab"`, not buttons.
+      await page.getByRole("tab", { name: tab, exact: true }).first().click();
+      await shoot(page, project, `coach-business-${tab.toLowerCase().replace(/ /g, "-")}`, { settle: 900 });
+    });
+  }
+
   await test.step("the business", async () => {
     await visit(page, `${base}/business`, shell);
     await shoot(page, project, "coach-business", { settle: 600 });

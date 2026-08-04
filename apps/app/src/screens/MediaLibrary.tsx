@@ -9,7 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Button, Card, Page, Reveal, EmptyState, Badge, Chip, IconBadge, ConfirmDialog, SkeletonList,
   ArrowLeft, Trash2, ImageIcon, Wand2, Archive, Building2, Dumbbell, FlaskConical, HeartPulse, Utensils,
-  type LucideIcon,
+  Meter, type LucideIcon,
 } from "@4dl/ui";
 import { api } from "../api.js";
 
@@ -130,10 +130,11 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
               {usage.unlimited ? `${usage.usedMb} MB used` : `${usage.usedMb} / ${usage.limitMb} MB`}
             </span>
           </div>
+          {/* The one meter in the app that changes TONE with its own value — a
+              storage bar going amber at 70% and red at 90% IS the warning, and
+              the line under it is the words that go with it (§4). */}
           {!usage.unlimited && (
-            <div className="h-2 overflow-hidden rounded-full bg-surface-2">
-              <div className={`h-full rounded-full ${usage.pct >= 90 ? "bg-danger" : usage.pct >= 70 ? "bg-warning" : "bg-sleep"}`} style={{ width: `${usage.pct}%` }} />
-            </div>
+            <Meter size="md" value={usage.pct} max={100} tone={usage.pct >= 90 ? "danger" : usage.pct >= 70 ? "warning" : "sleep"} />
           )}
           {!usage.unlimited && usage.pct >= 90 && <p className="text-xs text-danger">Almost full — delete media you no longer need, or upgrade your plan.</p>}
         </Card>

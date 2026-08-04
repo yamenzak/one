@@ -1,7 +1,7 @@
 /** Package editor + redemption codes + promo codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Textarea, Switch, Sheet, Chip, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X, PencilLine, Archive, RotateCcw, AlertTriangle , Group, Row } from "@4dl/ui";
+import { Button, Card, Badge, Field, Textarea, Switch, Sheet, Chip, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X, PencilLine, Archive, RotateCcw, AlertTriangle, Group, Row, Eyebrow, ActionResult } from "@4dl/ui";
 import { CLIENT_FLAG_META, CLIENT_FLAG_CATEGORIES, SELLABLE_CLIENT_FLAG_KEYS, DEFAULT_CLIENT_FLAGS, type ClientFlags } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -122,41 +122,74 @@ export function Packages() {
       }>
         {packages && (
         <>
-      {actionErr && <p role="status" aria-live="polite" className="rounded-xl bg-danger-soft px-3 py-2 text-sm text-danger">{actionErr}</p>}
+      {/* Renders nothing — it announces (§7: every outcome is a toast). This
+          was a red block wedged above the first section, which on a tab you
+          scroll is frequently off-screen at the moment it appears. */}
+      <ActionResult msg={null} err={actionErr} />
 
-      <SectionHeader icon={CreditCard} tone="primary" title="Packages" action={<Button size="sm" onClick={() => setPkgOpen(true)}><Plus /> New</Button>} />
+      <Eyebrow action={<Button size="sm" onClick={() => setPkgOpen(true)}><Plus /> New</Button>}>Packages</Eyebrow>
       {packages.length === 0 ? (
-        <EmptyState icon={CreditCard} title="No packages yet" description="Build a package — feature budgets (workout/meal/all) sold once or monthly. $0 packages are comps you grant directly." />
+        <EmptyState icon={CreditCard} title="No packages yet" description="A package is what a client buys: how many days of training, food or both, sold once or monthly. Price one at $0 to hand it out as a comp." />
       ) : (
-        <Stagger className="space-y-2">
-          {packages.map((p) => (
-            <Card key={p.id} className="space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-semibold">{p.name}</div>
-                  {p.description && <p className="mt-0.5 text-sm text-muted-foreground">{p.description}</p>}
-                  <div className="mt-1.5 flex flex-wrap gap-1">
-                    {p.budgets.map((b, i) => <Badge key={i} tone="activity">{b.days}d {b.feature}</Badge>)}
-                    {p.once_per_customer ? <Badge tone="neutral">once per customer</Badge> : null}
-                  </div>
-                </div>
-                <div className="shrink-0 text-right">
-                  <div className="numeral font-semibold">{priceLabel(p)}</div>
-                  <Badge tone="neutral">{VISIBILITY_LABEL[p.visibility] ?? p.visibility}</Badge>
-                </div>
-              </div>
-              <div className="flex items-center justify-end gap-1 border-t border-border/50 pt-1">
-                <button type="button" onClick={() => setEditing(p)} disabled={rowBusy === p.id} aria-label={`Edit ${p.name}`} className="grid size-12 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50 [&_svg]:size-[1.15rem]"><PencilLine /></button>
-                <button type="button" onClick={() => setToArchive(p)} disabled={rowBusy === p.id} aria-label={`Archive ${p.name}`} className="grid size-12 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-50 [&_svg]:size-[1.15rem]"><Archive /></button>
-              </div>
-            </Card>
-          ))}
+        /*
+          THE SAME OBJECT, DRAWN THE SAME WAY.
+
+          A live package was a `Card`: name, description, a wrapping row of budget
+          badges, a right-hand price + visibility stack, and then a bordered
+          footer strip holding two 48px icon buttons. The ARCHIVED list 40px below
+          it — the identical object, just off sale — was already a `Group` of
+          `Row`s. So one screen drew a package two completely different ways, and
+          archiving one changed what kind of thing it looked like.
+
+          As a row: the name, the terms as ONE sub-line (they are one fact — what
+          you get and for how long), the price in the value slot where every
+          number in the app sits, and the two verbs as the trailing icon pair §7
+          allows. Tapping the row edits it, so the pencil goes: never render a
+          control for the thing the row already does.
+        */
+        <Stagger>
+          <Group>
+            {packages.map((p) => {
+              const terms = [
+                ...p.budgets.map((b) => `${b.days}d ${b.feature}`),
+                p.once_per_customer ? "once per customer" : null,
+                VISIBILITY_LABEL[p.visibility] ?? p.visibility,
+              ].filter(Boolean).join(" · ");
+              return (
+                <Row
+                  key={p.id}
+                  /* No glyph: every package row would carry the same card, which
+                     distinguishes nothing (§7) and was eating the 48px the NAME
+                     needed — "12-week transformation" truncated its terms to
+                     "…once per customer · In c…" with an icon it shared with
+                     all three of its neighbours. */
+                  onClick={() => setEditing(p)}
+                  /* The TERMS, not the description: the description is the
+                     studio's sales copy and belongs where the client reads it
+                     (the Shop) and where it is written (the editor). What a
+                     coach scans this list for is what each package grants. */
+                  sub={terms}
+                  /* `Row` renders `trailing ?? (value + chevron)`, so the price
+                     has to be composed in here beside the button rather than
+                     passed as `value`. */
+                  trailing={
+                    <span className="flex shrink-0 items-center gap-0.5">
+                      <span className="numeral pr-1 text-body-lg">{priceLabel(p)}</span>
+                      <Button size="icon" variant="ghost" className="text-muted-foreground" disabled={rowBusy === p.id} aria-label={`Archive ${p.name}`} onClick={(e) => { e.stopPropagation(); setToArchive(p); }}><Archive /></Button>
+                    </span>
+                  }
+                >
+                  {p.name}
+                </Row>
+              );
+            })}
+          </Group>
         </Stagger>
       )}
 
       {archived.length > 0 && (
         <>
-          <SectionHeader className="pt-2" icon={Archive} tone="neutral" title="Archived" count={archived.length} />
+          <Eyebrow className="pt-2" action={<Badge tone="neutral">{archived.length}</Badge>}>Archived</Eyebrow>
           <p className="px-1 text-xs text-muted-foreground">Off sale and hidden from every client&rsquo;s Shop. Clients who already bought one keep the days they paid for.</p>
           <Group>
             {archived.map((p) => (
@@ -176,13 +209,12 @@ export function Packages() {
         </>
       )}
 
-      <SectionHeader className="pt-2" icon={Ticket} tone="primary" title="Redemption codes" action={<Button size="sm" onClick={() => setCodeOpen(true)}><Plus /> Code</Button>} />
-      {codes.length === 0 ? <p className="text-sm text-muted-foreground">One-off access codes you can hand to a client to redeem.</p> : (
+      <Eyebrow className="pt-2" action={<Button size="sm" onClick={() => setCodeOpen(true)}><Plus /> Code</Button>}>Redemption codes</Eyebrow>
+      {codes.length === 0 ? <p className="px-1 text-xs text-muted-foreground">One-off access codes you can hand to a client to redeem.</p> : (
         <Group>
           {codes.map((c) => (
             <Row
               key={c.id}
-              icon={Ticket}
               sub={`${c.days_to_add}d ${c.target_feature} · used ${c.used_count}/${c.max_uses}`}
             >
               <span className="font-mono">{c.code}</span>
@@ -191,18 +223,17 @@ export function Packages() {
         </Group>
       )}
 
-      <SectionHeader className="pt-2" icon={Tag} tone="nutrition" title="Promo codes" action={<Button size="sm" onClick={() => setPromoOpen(true)}><Plus /> Promo</Button>} />
-      {promos.length === 0 ? <p className="text-sm text-muted-foreground">Discount codes applied at checkout.</p> : (
+      <Eyebrow className="pt-2" action={<Button size="sm" onClick={() => setPromoOpen(true)}><Plus /> Promo</Button>}>Promo codes</Eyebrow>
+      {promos.length === 0 ? <p className="px-1 text-xs text-muted-foreground">Discount codes applied at checkout.</p> : (
         <Group>
           {promos.map((p) => (
             <Row
               key={p.id}
-              icon={Tag}
               className={p.active ? "" : "opacity-50"}
               sub={`${p.discount_type === "percent" ? `${p.percent_off}% off` : `${fmtPrice(p.amount_off_cents ?? 0)} off`} · used ${p.redemption_count}${p.max_redemptions ? `/${p.max_redemptions}` : ""}`}
               trailing={
                 p.active ? (
-                  <button type="button" onClick={() => setPromoToDelete(p)} disabled={rowBusy === p.id} aria-label={`Delete promo code ${p.code}`} className="grid size-12 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-50 [&_svg]:size-4"><Trash2 /></button>
+                  <Button size="icon" variant="ghost" className="text-muted-foreground" disabled={rowBusy === p.id} aria-label={`Deactivate promo code ${p.code}`} onClick={() => setPromoToDelete(p)}><Trash2 /></Button>
                 ) : <Badge tone="neutral">inactive</Badge>
               }
             >

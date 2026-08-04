@@ -46,7 +46,15 @@ export async function carrySessionTo(context: BrowserContext, fromUrl: string, t
  *  (`otpSendGuard` also enforces a 30s per-address cooldown — reusing an address
  *  across runs would 429 rather than fail loudly.) */
 export function uniqueEmail(role: string): string {
-  return `e2e-${role}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}@kova.test`;
+  // The ENTROPY GOES IN THE DOMAIN, and that is a screenshot rule rather than a
+  // test one (§16: no placeholder ever reaches an image). Staff rows, the invite
+  // sheet and the account menu all print this address, and
+  // `e2e-owner-msf65q8g-bishe@kova.test` truncated mid-hash in every one of them
+  // — a photograph of the product that says "this is a test fixture".
+  // `<role>@<tag>.kova.test` reads as an address, and `.test` is the reserved
+  // TLD, so it is still obviously not a real inbox.
+  const tag = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  return `${role}@${tag}.kova.test`;
 }
 
 /**

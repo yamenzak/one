@@ -533,3 +533,55 @@ export async function seedClinical(studio: Studio, clientId: string): Promise<vo
     console.warn(`[seedClinical] skipped: ${String(e).slice(0, 200)}`);
   }
 }
+
+/**
+ * WHAT THE STUDIO SELLS — packages, a redemption code, a promo code.
+ *
+ * The Business tab's Packages section is three lists and, on an unseeded studio,
+ * three empty states — so photographing it documented the empty case three times
+ * and the rebuilt list not at all. The names and prices are deliberately uneven
+ * (§16: plausible, never uniform) — a long one, a short one, a monthly and a
+ * one-off, one comp at $0 — because that is where the truncation and the
+ * wrapping live.
+ *
+ * Gated on `commerce`, so it is best-effort like the others: a studio without it
+ * hides the whole tab, which is itself a legitimate shot.
+ */
+export async function seedCommerce(studio: Studio): Promise<void> {
+  const packages = [
+    { name: "12-week transformation", description: "Training, food and weekly check-ins.", oneTimePriceCents: 89_000, budgets: [{ feature: "all", days: 84 }], visibility: "marketplace", oncePerCustomer: true },
+    { name: "Online coaching", description: "Rolling month, cancel any time.", monthlyPriceCents: 14_900, budgets: [{ feature: "all", days: 31 }], visibility: "marketplace" },
+    { name: "Nutrition only", description: "Meal plans and food coaching.", monthlyPriceCents: 6_900, budgets: [{ feature: "meal", days: 31 }], visibility: "marketplace" },
+    { name: "Trial week", oneTimePriceCents: 0, budgets: [{ feature: "all", days: 7 }], visibility: "private" },
+  ];
+  try {
+    for (const p of packages) await callJson(studio.page, studio.base, "/api/packages", p);
+    await callJson(studio.page, studio.base, "/api/redemption-codes", { code: "WELCOME14", daysToAdd: 14, targetFeature: "all", maxUses: 25 });
+    await callJson(studio.page, studio.base, "/api/promo-codes", { code: "SUMMER20", discountType: "percent", percentOff: 20, maxRedemptions: 50 });
+  } catch (e) {
+    console.warn(`[seedCommerce] skipped: ${String(e).slice(0, 200)}`);
+  }
+}
+
+/**
+ * A SECOND PERSON ON THE TEAM, and one invitation outstanding.
+ *
+ * The Staff tab photographed as a seat anchor over a single row — the owner,
+ * alone — so neither the roster's real shape (a role in the sub-line, a remove
+ * button, a face that is not yours) nor the Invited section had a picture at
+ * all. An invitation is the cheapest way to get both: it is a real pending row
+ * AND it moves the seat count off "1 of 5", which is the number the anchor
+ * exists to make readable.
+ *
+ * The invite EMAIL will not send on a seeded studio (no provider configured),
+ * and that is fine and deliberate: `/api/staff/invite` answers `emailed: false`
+ * and keeps the invitation, which is the exact case the screen was built to
+ * report honestly.
+ */
+export async function seedStaff(studio: Studio): Promise<void> {
+  try {
+    await callJson(studio.page, studio.base, "/api/staff/invite", { email: "priya@northlight.test", role: "trainer" });
+  } catch (e) {
+    console.warn(`[seedStaff] skipped: ${String(e).slice(0, 200)}`);
+  }
+}

@@ -18,17 +18,8 @@
 
 import { useEffect, useState } from "react";
 import {
-  Button,
-  Card,
-  Page,
-  Stagger,
-  EmptyState,
-  Spinner,
-  SectionHeader,
-  ConfirmDialog,
-  CircleCheck,
-  AlertTriangle,
-  Wallet,
+  Button, Badge, Stagger, EmptyState, ConfirmDialog, Eyebrow, Group, Row, GroupNote,
+  SkeletonHeader, SkeletonList, CircleCheck, AlertTriangle, Wallet,
 } from "@4dl/ui";
 import { api, errorText } from "../../api.js";
 import { fmtPrice } from "../../money.js";
@@ -75,7 +66,10 @@ export function PendingPayments({ canConfirm }: { canConfirm: boolean }) {
   };
 
   if (err) return <EmptyState icon={AlertTriangle} title="Couldn't load pending payments" description={err} action={<Button onClick={() => { setErr(null); void load(); }}>Try again</Button>} />;
-  if (!rows) return <div className="grid place-items-center py-16"><Spinner /></div>;
+  /* A skeleton in the real geometry, never a spinner (§7): a spinner throws the
+     page away and rebuilds it, and this list sits above the payment setup, so
+     the whole tab jumped when it resolved. */
+  if (!rows) return <div className="space-y-2"><SkeletonHeader /><SkeletonList card rows={2} thumb={0} /></div>;
 
   if (rows.length === 0) {
     return (
@@ -87,29 +81,45 @@ export function PendingPayments({ canConfirm }: { canConfirm: boolean }) {
     );
   }
 
+  /*
+    A LIST, NOT A STACK OF CARDS.
+
+    Each purchase was a `Card` holding a three-part flex line and a full-width
+    "Mark as paid" button under it — so five people waiting was five 120px boxes,
+    each with its own primary-looking button, on a tab that is embedded inside
+    another screen's column. As rows: who and what on the left, the amount in the
+    value slot, and one verb on the right.
+
+    It also no longer renders its own `Page`. It is a SECTION of the Getting-paid
+    tab, which already supplies the column and the padding — the nested `Page`
+    was adding a second `pb-28` in the middle of a scroll.
+  */
   return (
-    <Page className="column space-y-4 pb-28">
-      <SectionHeader title="Waiting on payment" />
-      <p className="-mt-2 text-sm text-muted-foreground">Confirm once the money has reached you — their access starts immediately.</p>
-      {rows.map((r) => (
-        <Stagger key={r.id}>
-          <Card className="space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-warning/12 text-warning [&_svg]:size-5"><Wallet /></div>
-              <div className="min-w-0 flex-1">
-                <div className="font-semibold tracking-tight">{r.client_name ?? "A client"}</div>
-                <p className="truncate text-sm text-muted-foreground">{r.package_name ?? "Package"}</p>
-              </div>
-              <div className="shrink-0 text-right font-semibold tabular-nums">{fmtPrice(r.amount_cents)}</div>
-            </div>
-            {canConfirm && (
-              <Button size="sm" variant="tonal" className="w-full" onClick={() => setConfirming(r)}>
-                Mark as paid
-              </Button>
-            )}
-          </Card>
-        </Stagger>
-      ))}
+    <section className="space-y-2">
+      <Eyebrow action={<Badge tone="warning">{rows.length}</Badge>}>Waiting on payment</Eyebrow>
+      <Stagger className="space-y-2">
+        <Group>
+          {rows.map((r) => (
+            <Row
+              key={r.id}
+              icon={Wallet}
+              iconTone="warning"
+              sub={r.package_name ?? "Package"}
+              trailing={
+                <span className="flex shrink-0 items-center gap-1.5">
+                  <span className="numeral text-body-lg">{fmtPrice(r.amount_cents)}</span>
+                  {canConfirm && (
+                    <Button size="sm" variant="tonal" onClick={() => setConfirming(r)}>Mark paid</Button>
+                  )}
+                </span>
+              }
+            >
+              {r.client_name ?? "A client"}
+            </Row>
+          ))}
+        </Group>
+        <GroupNote>Confirm once the money has reached you — their access starts immediately.</GroupNote>
+      </Stagger>
 
       <ConfirmDialog
         open={!!confirming}
@@ -126,6 +136,6 @@ export function PendingPayments({ canConfirm }: { canConfirm: boolean }) {
         cancelLabel="Not yet"
         onConfirm={() => void confirm()}
       />
-    </Page>
+    </section>
   );
 }

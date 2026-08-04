@@ -13,8 +13,7 @@ import {
   Button, Card, Badge, RangePicker, useDateRange, Page, Stagger, StatCard, ChartCard, AreaChart, SectionHeader, Eyebrow, GlanceStrip, Sparkline, toneVar,
   Anchor, CountUp, Unit,
   Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, SkeletonLine, SkeletonHero,
-  Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, TrendingUp, Percent, cn,
-} from "@4dl/ui";
+  Flame, Gauge, Dumbbell, Utensils, Scale, Moon, Smile, TrendingUp, Percent, cn, Meter,} from "@4dl/ui";
 import { api, errorText, todayLocal } from "../../api.js";
 import { RANGE_PRESETS } from "../../ranges.js";
 import { useCan } from "../../FeatureLock.js";
@@ -265,7 +264,9 @@ export function ClientReport({ clientId }: { clientId: string }) {
                         sub={<>{Math.round(kgToDisplay(p.weight, units))} {weightLabel(units)} × {p.reps}</>}
                         trailing={<span className="numeral shrink-0 font-semibold">{Math.round(kgToDisplay(p.e1rm, units))} <span className="text-xs font-medium text-muted-foreground">{weightLabel(units)}</span></span>}
                       />
-                      <div className="ml-[52px] h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(6, (p.e1rm / maxE1) * 100)}%`, backgroundColor: toneVar.activity }} /></div>
+                      {/* Bare — the `ExerciseRow` above already labels it, and
+                          the indent clears its 40px thumbnail. */}
+                      <Meter className="ml-[52px]" tone="activity" value={p.e1rm} max={maxE1} />
                     </div>
                   ))}
                 </div>

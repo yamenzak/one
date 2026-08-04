@@ -14,8 +14,8 @@
  */
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { AlertTriangle, ChevronDown, CircleAlert, CircleCheck, RefreshCw } from "./lib/icons.js";
-import { Button, Callout } from "./primitives.js";
+import { AlertTriangle, ArrowRight, ChevronDown, ChevronRight, CircleAlert, CircleCheck, RefreshCw, type LucideIcon } from "./lib/icons.js";
+import { Button, Callout, toneVar, type Tone } from "./primitives.js";
 import { Eyebrow } from "./metrics.js";
 import { EmptyState } from "./shell.js";
 import { cn } from "./lib/utils.js";
@@ -241,6 +241,98 @@ export function ConfigRow({ label, ok, detail, okLabel = "Set", missingLabel = "
       <span className={cn("shrink-0 text-xs font-semibold", ok ? "text-success" : "text-muted-foreground")}>{ok ? okLabel : missingLabel}</span>
     </div>
   );
+}
+
+/**
+ * A STATE THE SCREEN IS IN, AND THE ONE THING TO DO ABOUT IT.
+ *
+ * Bigger than a `Callout` and smaller than an `EmptyState`: a tone-washed card
+ * with a squircle icon, a title, a sentence, and at most one action. It is for a
+ * condition that is TRUE UNTIL SOMETHING CHANGES — no subscription, payment
+ * failed, access lapsed — which §7 says is a banner rather than a toast,
+ * precisely because a toast would disappear while the fact stayed.
+ *
+ * Three hand-rolled copies preceded it (the two billing banners and the client's
+ * access notice), each ~25 lines of the same absolutely-positioned blur, the
+ * same `color-mix` chip, the same heading and paragraph. They had already
+ * drifted: two hardcoded `danger`, one took a tone; one carried an eyebrow, two
+ * did not; one was tappable with a pill and a chevron, two held a real button.
+ *
+ * Both of those last two are real and both are kept, because they are different
+ * promises. `onClick` makes the WHOLE card the target and renders `action` as a
+ * label — right when the destination is a screen. Without it the card is inert
+ * and `action` is whatever button you pass, which is right when the verb does
+ * something in place, or is refused for this reader, or is one of several.
+ */
+export function Notice({
+  tone = "danger",
+  icon: Icon,
+  eyebrow,
+  title,
+  children,
+  action,
+  onClick,
+  className,
+}: {
+  tone?: Tone;
+  icon: LucideIcon;
+  /** A `micro` overline above the title, in the tone. */
+  eyebrow?: ReactNode;
+  title: ReactNode;
+  /** The sentence. One (§10) — if it needs two, the state needs a screen. */
+  children?: ReactNode;
+  /** A `Button` on an inert card; a label on a tappable one. */
+  action?: ReactNode;
+  /** Makes the whole card the tap target. */
+  onClick?: () => void;
+  className?: string;
+}) {
+  const tint = toneVar[tone];
+  const body = (
+    <>
+      {/* The wash. `pointer-events-none` because it overhangs the card's own
+          bounds and would otherwise eat taps on whatever sits beside it. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-12 -top-14 size-44 rounded-full blur-3xl"
+        style={{ backgroundColor: `color-mix(in oklch, ${tint} 18%, transparent)` }}
+      />
+      <div className="relative flex items-start gap-3.5">
+        <div
+          className="grid size-11 shrink-0 place-items-center rounded-2xl [&_svg]:size-[1.35rem]"
+          style={{ backgroundColor: `color-mix(in oklch, ${tint} 15%, transparent)`, color: tint }}
+        >
+          <Icon aria-hidden />
+        </div>
+        <div className="min-w-0 flex-1">
+          {eyebrow && <div className="text-micro uppercase" style={{ color: tint }}>{eyebrow}</div>}
+          <h3 className="text-body-lg font-semibold tracking-tight" style={onClick ? undefined : { color: tint }}>{title}</h3>
+          {children && <p className="mt-0.5 text-sm text-muted-foreground">{children}</p>}
+          {action && !onClick && <div className="mt-3">{action}</div>}
+        </div>
+        {onClick && <ChevronRight aria-hidden className="size-5 shrink-0 self-center text-muted-foreground" />}
+      </div>
+      {action && onClick && (
+        <div className="relative mt-3">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
+            style={{ color: tint, backgroundColor: `color-mix(in oklch, ${tint} 12%, transparent)` }}
+          >
+            {action} <ArrowRight aria-hidden className="size-3.5" />
+          </span>
+        </div>
+      )}
+    </>
+  );
+  const cls = cn("relative overflow-hidden rounded-2xl bg-card p-4", !onClick && "border", className);
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className={cn(cls, "w-full text-left transition-colors hover:bg-surface-2")}>
+        {body}
+      </button>
+    );
+  }
+  return <div className={cls} style={{ borderColor: `color-mix(in oklch, ${tint} 30%, transparent)` }}>{body}</div>;
 }
 
 /** A tab's one-line "what this is for". */

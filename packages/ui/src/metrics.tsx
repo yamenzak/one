@@ -267,6 +267,87 @@ export function MiniBars({ values, width = 130, height = 52, tone = "activity", 
   );
 }
 
+// ── Meter ────────────────────────────────────────────────────────────────────
+
+/**
+ * ONE VALUE'S SHARE OF A WHOLE, AS A HORIZONTAL BAR.
+ *
+ * The most re-invented shape in the product: seven hand-rolled copies across
+ * five screens — the coach's most-active clients, AI spend by feature, personal
+ * records in two places, fasting zones, wellness pillars, the storage meter.
+ * Every one was the same two divs, and they had already drifted: three
+ * transition durations (500 / 700 / none), two heights, two floors (`max(6, …)`
+ * on some, a raw percentage on others, so a 1% value was invisible on half of
+ * them and a stub on the rest), and one that reached for `bg-danger` classes
+ * where its siblings used `toneVar`.
+ *
+ * Not a `ProgressRing`: a ring is ONE value against its target and earns the
+ * space. A meter is a value in a LIST of values, where what is being read is the
+ * comparison between the rows, and a column of rings is unreadable.
+ *
+ * The label line is optional because two of the seven have no room for one —
+ * the fasting strip labels below the bar, the PR list labels above it with a
+ * thumbnail the bar has to clear. Those pass the bar alone and keep their own
+ * heading.
+ */
+export function Meter({
+  value,
+  max = 1,
+  label,
+  valueLabel,
+  tone = "activity",
+  size = "sm",
+  className,
+}: {
+  /** The filled amount, in the same unit as `max`. */
+  value: number;
+  /** The whole. Defaults to 1, so a 0..1 fraction can be passed as-is. */
+  max?: number;
+  /** Left of the label line. Omit for a bare bar. */
+  label?: ReactNode;
+  /** Right of the label line — the number, already formatted. */
+  valueLabel?: ReactNode;
+  tone?: Tone;
+  /** `sm` 6px (in a list) · `md` 8px (on its own, as a single meter). */
+  size?: "sm" | "md";
+  className?: string;
+}) {
+  const frac = max > 0 && Number.isFinite(value) ? Math.min(1, Math.max(0, value / max)) : 0;
+  /*
+    A NON-ZERO VALUE ALWAYS DRAWS SOMETHING, AND A ZERO NEVER DOES.
+
+    The floor was `Math.max(6, pct)` at four call sites and absent at three, so
+    the same 0.4% either showed a stub or nothing depending on the screen. Worse,
+    an unconditional floor draws a bar for a REAL zero — "0 credits spent" with a
+    visible sliver is a lie about the only value that matters here.
+  */
+  const pct = frac === 0 ? 0 : Math.max(3, frac * 100);
+  const hasLine = label != null || valueLabel != null;
+  return (
+    <div className={cn("min-w-0", className)}>
+      {hasLine && (
+        <div className="flex items-center justify-between gap-2 text-sm">
+          <span className="min-w-0 truncate">{label}</span>
+          {valueLabel != null && <span className="numeral shrink-0 text-muted-foreground">{valueLabel}</span>}
+        </div>
+      )}
+      <div
+        role="img"
+        aria-label={typeof label === "string" ? `${label}: ${Math.round(frac * 100)}%` : `${Math.round(frac * 100)}%`}
+        className={cn("overflow-hidden rounded-full bg-surface-2", size === "md" ? "h-2" : "h-1.5", hasLine && "mt-1")}
+      >
+        <motion.div
+          className="h-full rounded-full"
+          style={{ backgroundColor: toneVar[tone] }}
+          initial={{ width: 0 }}
+          animate={{ width: `${pct}%` }}
+          transition={{ duration: DUR.draw, ease: [0.22, 1, 0.36, 1] }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── WeekDots ─────────────────────────────────────────────────────────────────
 const DAY_LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];

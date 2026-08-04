@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Wallet, Gauge, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag, Anchor, CountUp, Group, Row } from "@4dl/ui";
+import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Wallet, Gauge, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag, Anchor, CountUp, Group, Row, GroupNote, Meter, Notice } from "@4dl/ui";
 import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -263,52 +263,40 @@ function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
               resolved, so it carries the actual action. */}
           {noSub && (
             <Stagger>
-              <Card className="relative overflow-hidden border border-danger/30">
-                <div className="pointer-events-none absolute -right-12 -top-14 size-44 rounded-full blur-3xl" style={{ backgroundColor: `color-mix(in oklch, ${toneVar.danger} 18%, transparent)` }} />
-                <div className="relative flex items-start gap-3.5">
-                  <div className="grid size-11 shrink-0 place-items-center rounded-2xl [&_svg]:size-[1.35rem]" style={{ backgroundColor: `color-mix(in oklch, ${toneVar.danger} 15%, transparent)`, color: toneVar.danger }}><AlertTriangle /></div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold tracking-tight" style={{ color: toneVar.danger }}>
-                      {isPending ? `${pendingName} was never activated` : "No subscription"}
-                    </h3>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      {isPending
-                        ? `You picked ${pendingName} but the card step never completed, so nothing is being billed.`
-                        : "Nothing is being billed for this studio."}
-                      {" "}You're on Kova's free baseline{baselineText ? `: ${baselineText}.` : "."}
-                    </p>
-                    {isOwner && billing.stripeEnabled && isPending && pendingPlanId && (
-                      <Button size="sm" className="mt-3" style={{ backgroundColor: toneVar.danger }} disabled={busy === `plan_${pendingPlanId}`} onClick={() => void startInline("/api/billing/plan-intent", { planId: pendingPlanId }, `Activate ${pendingName}`, () => `Subscribe · ${fmtPrice(usdToCents(pendingPlan?.priceUsdMonth ?? 0))}/mo`, `plan_${pendingPlanId}`)}>
-                        {busy === `plan_${pendingPlanId}` ? "…" : "Finish setup"} <ArrowRight />
-                      </Button>
-                    )}
-                    {/* "configured on this deployment" is a sentence for whoever
-                        runs the servers, shown to whoever runs the gym. */}
-                    {!billing.stripeEnabled && <p className="mt-2 text-xs text-muted-foreground">Card payments aren't switched on yet, so there's nothing to subscribe to right now.</p>}
-                  </div>
-                </div>
-              </Card>
+              <Notice
+                icon={AlertTriangle}
+                title={isPending ? `${pendingName} was never activated` : "No subscription"}
+                action={isOwner && billing.stripeEnabled && isPending && pendingPlanId ? (
+                  <Button size="sm" style={{ backgroundColor: toneVar.danger }} disabled={busy === `plan_${pendingPlanId}`} onClick={() => void startInline("/api/billing/plan-intent", { planId: pendingPlanId }, `Activate ${pendingName}`, () => `Subscribe · ${fmtPrice(usdToCents(pendingPlan?.priceUsdMonth ?? 0))}/mo`, `plan_${pendingPlanId}`)}>
+                    {busy === `plan_${pendingPlanId}` ? "…" : "Finish setup"} <ArrowRight />
+                  </Button>
+                ) : undefined}
+              >
+                {isPending
+                  ? `You picked ${pendingName} but the card step never completed, so nothing is being billed.`
+                  : "Nothing is being billed for this studio."}
+                {" "}You&rsquo;re on Kova&rsquo;s free baseline{baselineText ? `: ${baselineText}.` : "."}
+                {/* "configured on this deployment" is a sentence for whoever runs
+                    the servers, shown to whoever runs the gym. */}
+                {!billing.stripeEnabled && " Card payments aren't switched on yet, so there's nothing to subscribe to right now."}
+              </Notice>
             </Stagger>
           )}
 
           {/* Dunning banner — the visible half of the me→tenant lifecycle. */}
           {!billing.subscription.comp && DUNNING[billing.subscription.status] && (
             <Stagger>
-              <Card className="relative overflow-hidden border border-danger/30">
-                <div className="pointer-events-none absolute -right-12 -top-14 size-44 rounded-full blur-3xl" style={{ backgroundColor: `color-mix(in oklch, ${toneVar.danger} 18%, transparent)` }} />
-                <div className="relative flex items-start gap-3.5">
-                  <div className="grid size-11 shrink-0 place-items-center rounded-2xl [&_svg]:size-[1.35rem]" style={{ backgroundColor: `color-mix(in oklch, ${toneVar.danger} 15%, transparent)`, color: toneVar.danger }}><AlertTriangle /></div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold tracking-tight" style={{ color: toneVar.danger }}>{DUNNING[billing.subscription.status]!.title}</h3>
-                    <p className="mt-0.5 text-sm text-muted-foreground">{DUNNING[billing.subscription.status]!.body}</p>
-                    {isOwner && billing.stripeEnabled && (
-                      <Button size="sm" className="mt-3" style={{ backgroundColor: toneVar.danger }} disabled={busy === "portal"} onClick={() => void redirectTo("/api/billing/portal", "portal")}>
-                        {busy === "portal" ? "Opening…" : "Update payment"} <ArrowRight />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </Card>
+              <Notice
+                icon={AlertTriangle}
+                title={DUNNING[billing.subscription.status]!.title}
+                action={isOwner && billing.stripeEnabled ? (
+                  <Button size="sm" style={{ backgroundColor: toneVar.danger }} disabled={busy === "portal"} onClick={() => void redirectTo("/api/billing/portal", "portal")}>
+                    {busy === "portal" ? "Opening…" : "Update payment"} <ArrowRight />
+                  </Button>
+                ) : undefined}
+              >
+                {DUNNING[billing.subscription.status]!.body}
+              </Notice>
             </Stagger>
           )}
 
@@ -327,12 +315,28 @@ function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
               subscription the red card directly above already names the plan AND
               its state, so this row made "No subscription" the third statement of
               the same fact on one screen (Shell bar, card, row). */}
-          {!noSub && (
+          {/* ONE GROUP, because they answer one question: what is the money doing.
+              The plan row and the getting-paid door were two separate containers
+              stacked 12px apart — and the second was a hand-rolled bordered
+              button with its own icon chip and its own hover, so two adjacent
+              lines doing the same job read as two different kinds of thing. */}
+          {(!noSub || canSell) && (
             <Stagger>
               <Group>
-                <Row icon={CreditCard} sub={STATE_LABEL[billingState]}>
-                  {billing.subscription.planName}
-                </Row>
+                {!noSub && (
+                  <Row icon={CreditCard} sub={STATE_LABEL[billingState]}>
+                    {billing.subscription.planName}
+                  </Row>
+                )}
+                {/* The sub-line says WHAT IS INSIDE, like any index row (§7) —
+                    it used to carry the pitch ("we never hold your money or take
+                    a cut"), which is a sentence for a marketing page and which a
+                    row truncates at the second clause anyway. */}
+                {canSell && (
+                  <Row icon={Store} iconTone="nutrition" onClick={onOpenPayments} sub="How clients pay you, and what's waiting">
+                    Getting paid
+                  </Row>
+                )}
               </Group>
             </Stagger>
           )}
@@ -340,24 +344,6 @@ function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
           {/* Getting paid. No longer a "connect your Stripe to us" card: the
               studio is paid on its OWN account by its OWN provider, so this is a
               route into their setup rather than a handshake with ours. */}
-          {canSell && (
-            <Stagger>
-              <button
-                type="button"
-                onClick={onOpenPayments}
-                className="w-full rounded-2xl border border-border/60 p-3.5 text-left transition-colors hover:bg-muted/40"
-              >
-                <div className="flex items-center gap-3.5">
-                  <div className="grid size-11 shrink-0 place-items-center rounded-2xl [&_svg]:size-[1.35rem]" style={{ backgroundColor: `color-mix(in oklch, ${toneVar.nutrition} 15%, transparent)`, color: toneVar.nutrition }}><Store /></div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold tracking-tight">Getting paid</div>
-                    <p className="text-sm text-muted-foreground">Your clients pay you directly — we never hold your money or take a cut.</p>
-                  </div>
-                  <ArrowRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-                </div>
-              </button>
-            </Stagger>
-          )}
 
           {/* Client delinquency roll-up — card-less counts under a section label. */}
           {canSell && billing.clientBilling && (billing.clientBilling.lapsed > 0 || billing.clientBilling.expiringSoon > 0) && (
@@ -377,40 +363,40 @@ function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
               <ChartCard title="AI usage" icon={Gauge} tone="warning" value={totalCr.toLocaleString()} unit="cr" delta={<Badge tone="neutral">30 days · {totalCalls} runs</Badge>}>
                 <div className="space-y-2.5">
                   {top.map((u) => (
-                    <div key={u.feature} className="min-w-0">
-                      <div className="flex items-center justify-between gap-2 text-sm">
-                        <span className="truncate">{featLabel(u.feature)}</span>
-                        <span className="numeral shrink-0 text-muted-foreground">{u.credits.toLocaleString()} cr <span className="text-muted-foreground/60">· {u.calls}×</span></span>
-                      </div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2">
-                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(4, (u.credits / maxCr) * 100)}%`, backgroundColor: toneVar.warning }} />
-                      </div>
-                    </div>
+                    <Meter
+                      key={u.feature}
+                      tone="warning"
+                      value={u.credits}
+                      max={maxCr}
+                      label={featLabel(u.feature)}
+                      valueLabel={<>{u.credits.toLocaleString()} cr <span className="text-muted-foreground/60">· {u.calls}×</span></>}
+                    />
                   ))}
                 </div>
               </ChartCard>
             </Stagger>
           )}
 
-          {ctx?.entitlements && (
-            <Stagger><PlanFeatures ent={ctx.entitlements} /></Stagger>
-          )}
+          {ctx?.entitlements && <PlanFeatures ent={ctx.entitlements} />}
 
           <section className="space-y-2">
             <Eyebrow>Credit packs</Eyebrow>
-            <Stagger>
-            <Card className="space-y-3">
+            <Stagger className="space-y-3">
               {/*
+                WHERE THE ANCHOR'S NUMBER CAME FROM — the split, which §1
+                explicitly endorses beneath an anchor, in place of restating it.
+
                 Purchased credits never expire; the plan grant resets each period.
-                THAT is the fact this line exists to teach, and it used to be
+                THAT is the fact these two lines exist to teach, and it used to be
                 three fragments — "0 purchased · 0 monthly · resets monthly" —
                 where the only word carrying meaning ("resets") sat in a chip
                 attached to nothing and repeated the word beside it.
+
+                Two lines, not one wrapped one: at phone width the inline
+                separator ended up stranded at the end of the first line, pointing
+                at nothing.
               */}
-              {/* Two lines, not one wrapped one: at phone width the inline
-                  separator ended up stranded at the end of the first line,
-                  pointing at nothing. */}
-              <div className="space-y-0.5 text-xs text-muted-foreground">
+              <div className="space-y-0.5 px-1 text-xs text-muted-foreground">
                 <div><span className="numeral font-medium text-foreground">{billing.balance.purchased.toLocaleString()}</span> bought — these never expire</div>
                 <div><span className="numeral font-medium text-foreground">{billing.balance.granted.toLocaleString()}</span> from your plan — resets each month</div>
               </div>
@@ -447,8 +433,7 @@ function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
                   );
                 })}
               </Group>
-              {!billing.stripeEnabled && <p className="text-xs text-muted-foreground">Card payments aren't switched on yet, so packs can't be bought right now.</p>}
-            </Card>
+              {!billing.stripeEnabled && <GroupNote>Card payments aren&rsquo;t switched on yet, so packs can&rsquo;t be bought right now.</GroupNote>}
             </Stagger>
           </section>
 
@@ -459,19 +444,28 @@ function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
                   `status: 'active'`, and "Change plan" implies they have one. */}
               <Eyebrow>{billing.subscription.paidPlan ? "Change plan" : "Choose a plan"}</Eyebrow>
               <Stagger>
-              <Card className="space-y-3">
-                <div className="space-y-1.5">
-                  {upgrades.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
-                      <div><div className="text-sm font-medium">{p.name}</div><div className="numeral text-xs text-muted-foreground">{fmtPrice(usdToCents(p.priceUsdMonth))}/mo</div></div>
+              {/* A `Group` of `Row`s, like the packs above and the archived
+                  packages on the next tab. These were `bg-surface-2` boxes
+                  stacked 6px apart inside a Card — a list drawn by hand, under
+                  the row floor, with no hairline and no press state. */}
+              <Group>
+                {upgrades.map((p) => (
+                  <Row
+                    key={p.id}
+                    icon={ArrowRight}
+                    iconTone="primary"
+                    sub={`${fmtPrice(usdToCents(p.priceUsdMonth))}/mo`}
+                    trailing={
                       <Button size="sm" variant="tonal" disabled={busy === `plan_${p.id}`} onClick={() => void startInline("/api/billing/plan-intent", { planId: p.id }, `Subscribe to ${p.name}`, () => `Subscribe · ${fmtPrice(usdToCents(p.priceUsdMonth))}/mo`, `plan_${p.id}`)}>
                         {busy === `plan_${p.id}` ? "…" : "Select"}
                       </Button>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">Billed monthly. Plan credits refresh each period; unused plan credits don't roll over.</p>
-              </Card>
+                    }
+                  >
+                    {p.name}
+                  </Row>
+                ))}
+              </Group>
+              <GroupNote>Billed monthly. Plan credits refresh each period; unused plan credits don&rsquo;t roll over.</GroupNote>
               </Stagger>
             </section>
           )}
@@ -484,17 +478,20 @@ function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
             <section className="space-y-2">
               <Eyebrow>Move to a smaller plan</Eyebrow>
               <Stagger>
-              <Card className="space-y-3">
-                <div className="space-y-1.5">
-                  {downgrades.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2.5">
-                      <div><div className="text-sm font-medium">{p.name}</div><div className="numeral text-xs text-muted-foreground">{p.priceUsdMonth > 0 ? `${fmtPrice(usdToCents(p.priceUsdMonth))}/mo` : "Free"}</div></div>
-                      <Button size="sm" variant="secondary" onClick={() => setDowngrade(p.id)}><TrendingDown /> Switch</Button>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-muted-foreground">We'll show you anything that needs sorting out first, and exactly what to do.</p>
-              </Card>
+              <Group>
+                {downgrades.map((p) => (
+                  <Row
+                    key={p.id}
+                    icon={TrendingDown}
+                    iconTone="neutral"
+                    sub={p.priceUsdMonth > 0 ? `${fmtPrice(usdToCents(p.priceUsdMonth))}/mo` : "Free"}
+                    trailing={<Button size="sm" variant="secondary" onClick={() => setDowngrade(p.id)}>Switch</Button>}
+                  >
+                    {p.name}
+                  </Row>
+                ))}
+              </Group>
+              <GroupNote>We&rsquo;ll show you anything that needs sorting out first, and exactly what to do.</GroupNote>
               </Stagger>
             </section>
           )}
@@ -503,17 +500,22 @@ function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
             <section className="space-y-2">
               <Eyebrow>Recent credit activity</Eyebrow>
               <Stagger>
-              <Card className="space-y-3">
-                <div className="divide-y divide-border/40">
-                  {billing.ledger.slice(-8).reverse().map((e, i) => (
-                    <div key={i} className="flex items-center gap-3 py-2">
-                      <IconBadge icon={e.delta >= 0 ? Plus : Minus} tone={e.delta >= 0 ? "success" : "danger"} size="sm" />
-                      <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">{e.reason}</span>
-                      <span className={cn("numeral text-sm font-semibold", e.delta >= 0 ? "text-success" : "text-danger")}>{e.delta >= 0 ? "+" : ""}{e.delta.toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              </Card>
+              {/* The ledger is a list of movements, and a movement is a row: what
+                  happened on the left, what it cost on the right (§9.3). It was
+                  a `divide-y` stack of 32px lines inside a Card — the densest
+                  thing on the tab, and the only place credits changed hands. */}
+              <Group>
+                {billing.ledger.slice(-8).reverse().map((e, i) => (
+                  <Row
+                    key={i}
+                    icon={e.delta >= 0 ? Plus : Minus}
+                    iconTone={e.delta >= 0 ? "success" : "danger"}
+                    value={<span className={e.delta >= 0 ? "text-success" : "text-danger"}>{e.delta >= 0 ? "+" : ""}{e.delta.toLocaleString()}</span>}
+                  >
+                    {e.reason}
+                  </Row>
+                ))}
+              </Group>
               </Stagger>
             </section>
           )}
@@ -761,39 +763,58 @@ function PlanFeatures({ ent }: { ent: Entitlements }) {
     if (label.toLowerCase().endsWith(unit.toLowerCase())) return "";
     return v === 1 && unit.endsWith("s") ? unit.slice(0, -1) : unit;
   };
+  /*
+    A GROUP OF ROWS, AND THE CAPACITIES ARE ROWS TOO.
+
+    This was a `Card` holding a 40px hand-rolled line per feature — under the row
+    floor, no hairline, no press state, the hint at 12px under a 14px label — and
+    then a 2-up grid of `bg-surface-2` boxes for the quotas. Three different
+    spellings of "a labelled value" inside one card.
+
+    The quotas ARE the same thing as the features: a capability and what you have
+    of it. So they join the same list, below a hairline break, with the number in
+    the value slot where every other number in the app sits (§9.3). It also fixes
+    a real ambiguity — a quota tile said "3" over "ACTIVE CLIENTS" with nothing
+    saying whether that was a ceiling or a count.
+  */
   return (
-    <Card className="space-y-3">
-      <SectionHeader icon={CheckCheck} tone="success" title="What's in your plan" count={`${included} of ${features.length}`} />
-      <div className="space-y-1">
+    <section className="space-y-2">
+      <Eyebrow action={<Badge tone="success">{included} of {features.length}</Badge>}>What&rsquo;s in your plan</Eyebrow>
+      <Group>
         {features.map((k) => {
           const on = ent.features[k];
           const meta = FEATURE_META[k]!;
           return (
-            <div key={k} className="flex items-start gap-2.5 rounded-lg px-1 py-1.5">
-              <IconBadge icon={on ? Check : Lock} tone={on ? "success" : "neutral"} size="sm" />
-              <div className="min-w-0 flex-1">
-                <div className={cn("text-sm font-medium", !on && "text-muted-foreground")}>{meta.label}</div>
-                <div className="text-xs text-muted-foreground">{meta.hint}</div>
-              </div>
-              {!on && <Badge tone="neutral">Locked</Badge>}
-            </div>
+            <Row
+              key={k}
+              icon={on ? Check : Lock}
+              iconTone={on ? "success" : undefined}
+              sub={meta.hint}
+              trailing={on ? undefined : <Badge tone="neutral">Locked</Badge>}
+              className={on ? undefined : "opacity-60"}
+            >
+              {meta.label}
+            </Row>
           );
         })}
-      </div>
-      <div className="grid grid-cols-2 gap-2 border-t border-border/40 pt-3">
         {QUOTA_KEYS.map((k) => {
           const label = QUOTA_META[k]?.label ?? k;
           const unit = unitFor(QUOTA_META[k]?.unit, ent.quotas[k], label);
           return (
-            <div key={k} className="rounded-xl bg-surface-2 px-3 py-2.5">
-              <div className="text-micro uppercase text-muted-foreground">{label}</div>
-              {/* "1 seats" was shipping. A unit that never agrees with its number is
-                  the kind of thing nobody reports and everybody notices. */}
-              <div className="numeral mt-0.5 text-sm font-bold">{fmtQuota(ent.quotas[k])}{unit && <span className="ml-1 text-[0.6rem] font-medium text-muted-foreground">{unit}</span>}</div>
-            </div>
+            <Row
+              key={k}
+              icon={Gauge}
+              iconTone="neutral"
+              sub="Included in your plan"
+              /* "1 seats" was shipping. A unit that never agrees with its number
+                 is the kind of thing nobody reports and everybody notices. */
+              value={<>{fmtQuota(ent.quotas[k])}{unit && <span className="ml-1 text-xs font-medium text-muted-foreground">{unit}</span>}</>}
+            >
+              {label}
+            </Row>
           );
         })}
-      </div>
-    </Card>
+      </Group>
+    </section>
   );
 }

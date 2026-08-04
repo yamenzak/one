@@ -8,7 +8,7 @@
  * pillar is lifting the number and which is dragging it.
  */
 
-import { toneVar, IconBadge, Dumbbell, Utensils, Bed, ListChecks, Droplet, Smile, Pill, Scale, HeartPulse, Skeleton, type Tone, type LucideIcon } from "@4dl/ui";
+import { toneVar, IconBadge, Dumbbell, Utensils, Bed, ListChecks, Droplet, Smile, Pill, Scale, HeartPulse, Skeleton, type Tone, type LucideIcon, Meter } from "@4dl/ui";
 
 export interface WellnessPillar { key: string; label: string; score: number | null; weight: number; available: boolean }
 export interface WellnessScoreResult { score: number; band: "start" | "building" | "solid" | "strong" | "peak"; pillars: WellnessPillar[] }
@@ -47,9 +47,7 @@ function PillarBar({ pillar }: { pillar: WellnessPillar }) {
           <span className="truncate font-medium">{pillar.label}</span>
           <span className="numeral shrink-0 font-semibold text-muted-foreground">{pct}</span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
-          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: toneVar[meta.tone] }} />
-        </div>
+        <Meter tone={meta.tone} value={pct} max={100} />
       </div>
     </div>
   );

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fmtWeight, type AttentionType } from "@kova/domain";
-import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, Avatar, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, Anchor, ActionCluster, UserPlus, cn, type Tone, type LucideIcon, NoData } from "@4dl/ui";
+import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, Avatar, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, Anchor, ActionCluster, UserPlus, cn, type Tone, type LucideIcon, NoData, Meter } from "@4dl/ui";
 import { attentionCoding, SEVERITY_TONE } from "../../attention-ui.js";
 import type { WidgetItem } from "@kova/protocol";
 import { api, todayLocal, shiftDay } from "../../api.js";
@@ -168,8 +168,7 @@ export function CoachToday() {
                   const max = analytics.topClients[0]!.logs || 1;
                   return (
                     <button key={t.clientId} onClick={() => nav(`/clients/${t.clientId}/today`)} className="block w-full text-left">
-                      <div className="flex items-center justify-between gap-2 text-sm"><span className="truncate font-medium">{t.name}</span><span className="numeral shrink-0 text-muted-foreground">{t.logs} logs</span></div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${Math.max(6, (t.logs / max) * 100)}%`, backgroundColor: toneVar.activity }} /></div>
+                      <Meter tone="activity" value={t.logs} max={max} label={<span className="font-medium">{t.name}</span>} valueLabel={`${t.logs} logs`} />
                     </button>
                   );
                 })}
