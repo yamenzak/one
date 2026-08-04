@@ -1177,7 +1177,7 @@ the tenancy".
 | `/studio/setup` | O | `screens/Start.tsx:18` → `onboarding/StudioOnboarding.tsx:88` | 3-step studio creation |
 | `/studio/sign-in` | O | `screens/Login.tsx:48` | Owner sign-in on the setup door |
 | `/accept-invitation/:id` | T O | `main.tsx:134` → `screens/AcceptInvite.tsx:25` | Staff invite + OTP (pre-session) |
-| client not onboarded | C | `Shell.tsx:82` → `client/Onboarding.tsx:13` | 5-step intake wizard |
+| client not onboarded | C | `Shell.tsx:75` → `client/Onboarding.tsx:109` | 4-step intake wizard. Runs **above every access gate** — no package needed. |
 | `lockedToStorefront` | C | `Shell.tsx:107` → `client/Shop.tsx:30` | Must buy access before entering |
 
 ### B. Full-screen routes (no tab chrome)
