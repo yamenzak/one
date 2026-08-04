@@ -226,7 +226,11 @@ async function digestForTenant(env: Env, tenantId: string, _brand: string, weekA
   // Every CTA carries the tenant hint (?t=) so a multi-studio recipient lands in
   // THIS studio; the coach CTA deep-links to /today, where the attention queue
   // lives. The app reads + strips ?t= at boot before routing.
-  const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") || null;
+  // The STUDIO's origin, not the vendor's — `tenantBrandKit` resolved it above
+  // (a live custom domain, else their subdomain). `BETTER_AUTH_URL` is the root
+  // signpost, and a weekly recap that sends a studio's clients to `kova.4dl.app`
+  // takes the white label off on the way out.
+  const base = (brand.siteUrl || env.BETTER_AUTH_URL || "").replace(/\/$/, "") || null;
   const hint = (path: string): string | null => (base ? `${base}${path}${path.includes("?") ? "&" : "?"}t=${encodeURIComponent(tenantId)}` : null);
   const appHref = hint("/today");
 

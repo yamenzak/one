@@ -113,6 +113,26 @@ describe("a studio's brand assets survive the trip into an email", () => {
     expect((await kit(id)).siteUrl).toBe(`https://${id}.kova.4dl.app`);
   });
 
+  /**
+   * The origin comes from `canonicalHost`, which derives the subdomain from the
+   * ORG'S SLUG rather than from the `subdomain` row. They normally agree, and
+   * the one time they do not is the one that matters: `resolveHost` resolves a
+   * subdomain by looking the slug up on the organization, so a failed or
+   * half-applied `moveSubdomain` leaves a row naming a hostname that no longer
+   * answers. Reading the row would put that dead host in every email the studio
+   * sends — the logo, the CTA and the footer link all at once.
+   */
+  it("follows the org slug, not a stale subdomain row", async () => {
+    const id = "brandstale";
+    await seedStudio(id, { logoUrl: `/api/media/t/${id}/brand/m_logo.png` });
+    await db().prepare("UPDATE organization SET slug = ? WHERE id = ?").bind("renamed", id).run();
+    await seedDomain(id, `${id}.kova.4dl.app`, "subdomain", "active");
+
+    const b = await kit(id);
+    expect(b.siteUrl).toBe("https://renamed.kova.4dl.app");
+    expect(b.logoUrl).toBe(`https://renamed.kova.4dl.app/api/media/t/${id}/brand/m_logo.png`);
+  });
+
   it("falls back to the studio's name when there is nothing to draw", async () => {
     const id = "brandbare";
     await seedStudio(id, {});

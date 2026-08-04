@@ -13,6 +13,7 @@ import { notifyUser } from "./inbox-do.js";
 import { dispatchNotification, dispatchToRole, type ResolvedNotification } from "@4dl/notify";
 import { sendTenantEmail } from "./email-provider.js";
 import { sendEmail, emailShell, emailButton, escapeHtml, safeColor, KOVA_BRAND, type BrandKit } from "./mailer.js";
+import { canonicalHost } from "./host-context.js";
 import { nowIso } from "./ids.js";
 
 export interface NotifyInput {
@@ -49,27 +50,23 @@ async function userRole(db: D1Database, tenantId: string, userId: string): Promi
 /**
  * The studio's own front door, as an absolute origin.
  *
- * Preferred in this order and for one reason each: an ACTIVE custom domain is
- * the address their clients know them by; the `subdomain` row is the address
- * every studio has from the moment it is created; `BETTER_AUTH_URL` is the root
- * signpost and is the last resort, because a white-labelled studio's email
- * should not be quietly serving its logo off `kova.4dl.app`.
+ * `canonicalHost` already owns the preference order and is what the client and
+ * staff invites mint their links from, so this is a thin `https://` wrapper
+ * rather than a second answer to the same question. Two things it knows that a
+ * hand-rolled `tenant_domains` lookup here would not:
  *
- * A custom domain only counts at `active` — `pending` means Cloudflare has not
- * issued the certificate yet, and an `https://` image on a host with no cert is
- * a broken image in every mail client.
+ *   it prefers an ACTIVE custom domain, and only active. `pending` means
+ *   Cloudflare has not issued the certificate, and an `https://` image on a host
+ *   with no cert is a broken image in every mail client.
+ *
+ *   it derives the subdomain from the ORG'S SLUG rather than from the
+ *   `subdomain` row. Both normally agree, but the org row is what `resolveHost`
+ *   actually resolves against — so a failed or half-applied `moveSubdomain`
+ *   leaves a `subdomain` row pointing at a hostname that no longer answers, and
+ *   reading it would put that dead host in every studio's email.
  */
 async function tenantOrigin(env: Env, tenantId: string): Promise<string | null> {
-  const rows = await env.DB
-    .prepare("SELECT hostname, kind, status FROM tenant_domains WHERE tenant_id = ?")
-    .bind(tenantId)
-    .all<{ hostname: string; kind: string; status: string }>()
-    .catch(() => null);
-  const all = rows?.results ?? [];
-  const host =
-    all.find((r) => r.kind === "custom" && r.status === "active")?.hostname ??
-    all.find((r) => r.kind === "subdomain")?.hostname ??
-    null;
+  const host = await canonicalHost(env, env.DB, tenantId).catch(() => null);
   return host ? `https://${host}` : (env.BETTER_AUTH_URL?.replace(/\/$/, "") || null);
 }
 
@@ -130,6 +127,26 @@ export async function tenantBrandKit(env: Env, tenantId: string): Promise<BrandK
   return { name, accent, accentFg, logoUrl, iconUrl, siteUrl: origin };
 }
 
+/**
+ * The origin every link in an email points at — the SENDER's, not the vendor's.
+ *
+ * `brand.siteUrl` is the studio's own front door, already resolved by
+ * `tenantBrandKit` (a live custom domain, else their subdomain). Every link here
+ * used to be built on `BETTER_AUTH_URL`, which is the ROOT signpost — so a
+ * client of a white-labelled studio who tapped "Open <studio>" or "Manage
+ * notifications" left their coach's domain mid-sentence and arrived at
+ * `kova.4dl.app`. That is the white label coming off on the one action the
+ * message asks them to take, and it is the same defect the studio's LOGO had
+ * one line further down the same footer.
+ *
+ * `BETTER_AUTH_URL` remains the fallback, and it is the correct answer for
+ * platform mail: `KOVA_BRAND.siteUrl` is Kova's own origin, so billing and
+ * dunning still point where they should.
+ */
+function emailOrigin(env: Env, brand: BrandKit): string {
+  return (brand.siteUrl || env.BETTER_AUTH_URL || "").replace(/\/$/, "");
+}
+
 /** The friendly category kicker shown as an eyebrow above every notif email —
  *  a small premium touch that orients the reader ("Personal record", "Body
  *  composition") before they read the headline. */
@@ -146,7 +163,7 @@ function withTenantHint(url: string, tenantId: string): string {
 }
 
 function notifEmailHtml(env: Env, brand: BrandKit, tenantId: string, r: { title: string; message?: string | null; link: string | null; footnote?: string | null; eyebrow?: string }): string {
-  const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
+  const base = emailOrigin(env, brand);
   const href = r.link && base ? withTenantHint(`${base}${r.link.startsWith("/") ? "" : "/"}${r.link}`, tenantId) : null;
   const body = `${r.message ? `<p style="margin:0">${escapeHtml(r.message)}</p>` : ""}${href ? emailButton(`Open ${brand.name}`, href, brand) : ""}`;
   return emailShell(escapeHtml(r.title), body, { brand, preheader: r.message ?? r.title, footnote: r.footnote ?? undefined, eyebrow: r.eyebrow });
@@ -215,7 +232,7 @@ async function sendNotifEmail(env: Env, n: ResolvedNotification<NotifyInput>): P
         if (input.emailHtml) {
           html = input.emailHtml;
         } else if (tpl) {
-          const base = env.BETTER_AUTH_URL?.replace(/\/$/, "") ?? "";
+          const base = emailOrigin(env, brand);
           const href = link && base ? withTenantHint(`${base}${link.startsWith("/") ? "" : "/"}${link}`, input.tenantId) : null;
           // `studioName`, `title` and `message` are available to EVERY template,
           // because notify() always has them. That is what lets a type be
@@ -236,9 +253,13 @@ async function sendNotifEmail(env: Env, n: ResolvedNotification<NotifyInput>): P
             preheader: subject,
             footnote,
             eyebrow,
-            // Preferences and notifications are one destination now, so this is
-            // where "I want fewer of these" actually leads.
-            manageUrl: base ? withTenantHint(`${base}/preferences`, input.tenantId) : undefined,
+            // `/notification-settings`, which is the tab with the per-category
+            // channel switches on it. This read `/preferences` — one destination
+            // back when they were one screen, and two screens since. So the one
+            // link a person reaches for when they want FEWER emails landed them
+            // on their goal, training days and foods to avoid, with no visible
+            // relationship to the message they had just clicked out of.
+            manageUrl: base ? withTenantHint(`${base}/notification-settings`, input.tenantId) : undefined,
           });
         } else {
           html = notifEmailHtml(env, brand, input.tenantId, { title, message: input.message, link, footnote: signature, eyebrow });
