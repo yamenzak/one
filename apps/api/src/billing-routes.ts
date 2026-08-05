@@ -9,9 +9,10 @@ import { emailAdminRoutes } from "@4dl/email/admin-routes";
 import { z } from "zod";
 import {
   checkDowngrade, resolveEntitlements, mergeOverrides, snapshotDowngrade, raiseOverride,
-  isFullyExpired, overallDaysRemaining,
+  isFullyExpired, overallDaysRemaining, resolveRange, addDays,
   FEATURE_KEYS, QUOTA_KEYS, FEATURE_META, QUOTA_META, type Entitlements, type EntitlementGrants, type Budget,
 } from "@kova/domain";
+import { describeReason, KIND_LABEL, type CreditKind } from "./credit-reasons.js";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import { tenantStorageBytes } from "./storage.js";
 import { countClientSeats } from "./clients.js";
@@ -121,7 +122,9 @@ export const billingRoutes = new Hono<AppEnv>()
         monthlyCredits: entitlements.aiCredits.monthlyGrant,
       },
       balance,
-      ledger,
+      // Named on the way out, not in the browser: the AI half of the reason set
+      // is `ai.<feature>` over a registry only this worker holds.
+      ledger: ledger.map((e) => ({ ...e, ...describeReason(e.reason) })),
       plans: plans.map((p) => {
         const ent = resolveEntitlements(p.entitlements_json);
         // `trialDays` is surfaced alongside the price so the picker can say
@@ -134,6 +137,99 @@ export const billingRoutes = new Hono<AppEnv>()
       // Publishable key drives the inline Payment Element (safe to expose).
       publishableKey: cfg.publishableKey || null,
       clientBilling: { lapsed, expiringSoon, active: (csubs.results ?? []).length },
+    });
+  })
+
+  /**
+   * The whole credit history, over a window — the "see all" behind Business's
+   * eight-row activity strip.
+   *
+   * Reads D1's `credit_ledger` MIRROR rather than the Durable Object: the DO
+   * keeps only the last `LEDGER_CAP` movements, which is the right thing for a
+   * balance and useless for a report. The DO stays authoritative for the
+   * BALANCE (that is what `/billing` returns); this endpoint is history, and
+   * history is what the mirror exists for.
+   *
+   * `tz` is the client's offset from UTC in minutes, so the daily buckets are
+   * the studio's days and not Greenwich's. Every other analytics route on this
+   * app takes a `today` in the device's local date for the same reason; a
+   * ledger row only has an epoch, so the offset has to come across instead.
+   */
+  .get("/billing/credits", async (c) => {
+    const who = requireTenant(c)!;
+    const q = c.req.query();
+    const today = /^\d{4}-\d{2}-\d{2}$/.test(q.today ?? "") ? q.today! : nowIso().slice(0, 10);
+    const { start, end } = resolveRange({ range: q.range, start: q.start, end: q.end }, today);
+    // Clamped, not trusted: a bogus `tz` would silently shift every bucket.
+    const tzRaw = Number(q.tz);
+    const tz = Number.isFinite(tzRaw) ? Math.max(-840, Math.min(840, Math.round(tzRaw))) : 0;
+    const shift = tz * 60; // seconds
+
+    // The window in epoch ms, in the client's zone: [start 00:00, end 24:00).
+    const from = Date.parse(`${start}T00:00:00Z`) - tz * 60_000;
+    const to = Date.parse(`${end}T00:00:00Z`) - tz * 60_000 + 86_400_000;
+
+    const rows = await c.env.DB.prepare(
+      `SELECT delta, balance, reason, ref, at,
+              date((at / 1000) + ?, 'unixepoch') AS day
+       FROM credit_ledger
+       WHERE tenant_id = ? AND at >= ? AND at < ?
+       ORDER BY at DESC`,
+    )
+      .bind(shift, who.tenantId, from, to)
+      .all<{ delta: number; balance: number; reason: string; ref: string | null; at: number; day: string }>();
+    const all = rows.results ?? [];
+
+    // ── Roll-ups, computed once, over the WHOLE window ────────────────────────
+    // `entries` below is capped for the wire; the totals and the chart are not,
+    // or a busy studio would read a chart of its most recent page rather than
+    // of the range it asked for.
+    const byDay = new Map<string, { spent: number; added: number }>();
+    const byReason = new Map<string, { reason: string; label: string; kind: CreditKind; credits: number; count: number }>();
+    const byKind = new Map<CreditKind, { kind: CreditKind; label: string; credits: number; count: number }>();
+    let spent = 0, added = 0;
+
+    for (const r of all) {
+      const d = byDay.get(r.day) ?? { spent: 0, added: 0 };
+      if (r.delta < 0) { d.spent += -r.delta; spent += -r.delta; } else { d.added += r.delta; added += r.delta; }
+      byDay.set(r.day, d);
+      // Only SPEND is bucketed by reason: mixing a 5,000-credit monthly grant
+      // into "where did my credits go" makes the one line nobody is asking
+      // about the biggest bar on the screen.
+      if (r.delta >= 0) continue;
+      const { label, kind } = describeReason(r.reason);
+      const br = byReason.get(r.reason) ?? { reason: r.reason, label, kind, credits: 0, count: 0 };
+      br.credits += -r.delta; br.count += 1;
+      byReason.set(r.reason, br);
+      const bk = byKind.get(kind) ?? { kind, label: KIND_LABEL[kind], credits: 0, count: 0 };
+      bk.credits += -r.delta; bk.count += 1;
+      byKind.set(kind, bk);
+    }
+
+    // Every day in the window, zero-filled, oldest first — a chart with holes
+    // in it reads as missing data rather than as a quiet week.
+    const daily: { date: string; spent: number; added: number }[] = [];
+    for (let d = start; d <= end; d = addDays(d, 1)) {
+      const v = byDay.get(d) ?? { spent: 0, added: 0 };
+      daily.push({ date: d, spent: v.spent, added: v.added });
+    }
+
+    const dobj = billingDO(c, who.tenantId);
+    await dobj.bind(who.tenantId);
+
+    return c.json({
+      window: { start, end, days: daily.length },
+      balance: await dobj.view(),
+      totals: { spent, added, net: added - spent, movements: all.length },
+      daily,
+      byKind: [...byKind.values()].sort((a, b) => b.credits - a.credits),
+      byReason: [...byReason.values()].sort((a, b) => b.credits - a.credits),
+      entries: all.slice(0, 300).map((r) => {
+        const { label, kind } = describeReason(r.reason);
+        return { at: r.at, delta: r.delta, balance: r.balance, reason: r.reason, label, kind, ref: r.ref };
+      }),
+      /** True when the list was cut — the screen says so rather than implying the window was quiet. */
+      truncated: all.length > 300,
     });
   })
 

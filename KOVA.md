@@ -1218,6 +1218,7 @@ Routes declared in `Shell.tsx:123-142`.
 | `/business` | O (tab); T by deep link | `coach/Business.tsx:80` | Revenue, packages, getting paid, staff |
 | `/business` → Getting paid | O (write), T (read) | `coach/PaymentSetup.tsx:96` | Choose provider; guided setup for the studio's OWN checkout |
 | `/business` → Getting paid | O, T | `coach/PendingPayments.tsx:47` | Purchases waiting on money; "mark as paid" confirms into access |
+| `/business/credits` | O, T | `coach/Credits.tsx:58` | The credit ledger in full: range picker, spend-per-day chart, breakdown by reason, filterable movements |
 | `*` | all | `Shell.tsx:161` | Redirect → `/today` |
 
 ### D. Sub-tabs

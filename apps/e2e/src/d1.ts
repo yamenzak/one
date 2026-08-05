@@ -72,6 +72,14 @@ function read<T>(fn: (db: DatabaseSync) => T): T {
  * Only for putting the worker into a state no HTTP surface will produce on
  * demand — the billing ladder is driven by a daily cron, and a spec cannot wait
  * 30 days to see the blocked screen. Everything else must go through the API.
+ *
+ * ⚠️ **Never while the worker is serving.** Miniflare's D1 holds a WAL snapshot
+ * for the lifetime of a request, and a write from this process invalidates it —
+ * the failure surfaces INSIDE the worker as
+ * `SQLITE_BUSY_SNAPSHOT / internal error`, on some unrelated route, which reads
+ * as a bug in whatever happened to be running. A seed that wants credit
+ * movements or a lapsed subscription has to arrive through the API like
+ * everything else.
  */
 export function d1Exec(sql: string): void {
   const db = new DatabaseSync(d1File());

@@ -28,6 +28,7 @@ import { WorkoutBuilder } from "./screens/coach/WorkoutBuilder.js";
 import { MealBuilder } from "./screens/coach/MealBuilder.js";
 import { WorkoutPlayer } from "./screens/client/WorkoutPlayer.js";
 import { Business } from "./screens/coach/Business.js";
+import { Credits } from "./screens/coach/Credits.js";
 import { Sessions } from "./screens/coach/Sessions.js";
 import { Library } from "./screens/coach/Library.js";
 import { Settings } from "./screens/Settings.js";
@@ -142,6 +143,11 @@ export function Shell() {
       <Route path="/passkeys" element={<SettingsRoute view="passkeys" />} />
       <Route path="/inbox" element={<InboxRoute />} />
       <Route path="/media" element={<MediaRoute />} />
+      {/* The credit ledger in full. A route rather than a fifth tab on Business:
+          it is a report over a window, not a section of the studio's settings,
+          and Business already carries the four options a segmented control can
+          hold at phone width. */}
+      <Route path="/business/credits" element={<CoachArea><CreditsRoute /></CoachArea>} />
       <Route path="/shop" element={<OverlayWithClient render={(cid, back) => <Shop clientId={cid} onBack={back} />} />} />
       <Route path="/explore" element={<OverlayWithClient render={(cid, back) => <Explore clientId={cid} onBack={back} />} />} />
       {/* Staff invitation deep-link (SPEC §4). Full-screen; the screen drives its
@@ -629,6 +635,11 @@ function InboxRoute() {
 function MediaRoute() {
   const nav = useNavigate();
   return <MediaLibrary onBack={() => nav(-1)} />;
+}
+
+function CreditsRoute() {
+  const nav = useNavigate();
+  return <Credits onBack={() => nav("/business")} />;
 }
 
 

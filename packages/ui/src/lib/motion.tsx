@@ -42,7 +42,22 @@ export function CountUp({ value, decimals = 0, prefix = "", suffix = "", duratio
     return () => cancelAnimationFrame(raf.current);
   }, [value, durationMs]);
   const sign = prefix === "+" && n < 0 ? "" : prefix; // don't render "+-3"
-  return <span className={className}>{sign}{n.toFixed(decimals)}{suffix}</span>;
+  /*
+    GROUPED, like every other numeral in the product.
+
+    This was `toFixed`, which never groups — so the one place a number is set
+    largest was the one place it read "20000" while the same figure rendered
+    "20,000" in the row four inches below it. It is invisible until a value
+    crosses four digits, which is why it survived: a rep count and a day count
+    never do. A credit balance, a calorie target and a tonnage total all do.
+  */
+  return (
+    <span className={className}>
+      {sign}
+      {n.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
+      {suffix}
+    </span>
+  );
 }
 
 /**

@@ -193,6 +193,11 @@ test("the coach's studio", async () => {
     await shoot(page, project, "coach-business", { settle: 600 });
   });
 
+  await test.step("credit activity", async () => {
+    await visit(page, `${base}/business/credits`, page.getByRole("heading", { name: "Credit activity" }));
+    await shoot(page, project, "coach-business-credits", { settle: 900 });
+  });
+
   // Settings is a FULL-SCREEN route, outside the tab shell — so it has no app
   // bar and the studio's name is not on it. Anchoring on `shell` here waits 30s
   // for something that is correctly absent, which is how this step failed the

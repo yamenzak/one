@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Button, Card, Badge, SegmentedControl, Field, Sheet, SubCard, Page, Stagger, ChartCard, SectionHeader, Eyebrow, GlanceStrip, IconBadge, EmptyState, Spinner, cn, toneVar, Reveal, SkeletonStatGrid, SkeletonChart, SkeletonList, Wallet, Gauge, CreditCard, History, Plus, Minus, Store, AlertTriangle, ArrowRight, TrendingDown, CheckCheck, Check, Lock, Tag, Anchor, CountUp, Group, Row, GroupNote, Meter, Notice } from "@4dl/ui";
 import { FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, type Entitlements } from "@kova/domain";
 import { api, errorText } from "../../api.js";
+import { creditKind } from "../../registry/index.js";
 import { useSession } from "../../session.js";
 import { fmtPrice } from "../../money.js";
 import { PaymentSheet, type CheckoutIntent } from "../../PaymentSheet.js";
@@ -28,7 +29,8 @@ interface Billing {
   balance: { balance: number; purchased: number; granted: number; available: number };
   packs: { id: string; name: string; credits: number; price_usd: number }[];
   plans?: { id: string; name: string; priceUsdMonth: number; trialDays?: number | null }[];
-  ledger: { delta: number; reason: string; at: number }[];
+  /** `label`/`kind` are resolved server-side — see apps/api/src/credit-reasons.ts. */
+  ledger: { delta: number; reason: string; label?: string; kind?: string; at: number }[];
   stripeEnabled?: boolean;
   publishableKey?: string | null;
   clientBilling?: { lapsed: number; expiringSoon: number; active: number };
@@ -108,6 +110,7 @@ export function Business() {
 
 function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
   const { ctx } = useSession();
+  const nav = useNavigate();
   const isOwner = ctx?.active?.role === "owner";
   const canSell = !!ctx?.entitlements?.features?.commerce;
   const [billing, setBilling] = useState<Billing | null>(null);
@@ -360,9 +363,21 @@ function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
 
           {top.length > 0 && (
             <Stagger>
-              <ChartCard title="AI usage" icon={Gauge} tone="warning" value={totalCr.toLocaleString()} unit="cr" delta={<Badge tone="neutral">30 days · {totalCalls} runs</Badge>}>
+              {/* The top three, and a way to the rest. This card used to list
+                  seven features with a hand-rolled bar each, which is most of a
+                  report rendered inside an overview — and it named them by
+                  de-hyphenating the registry key ("Coach note", "Lab extract"),
+                  so the same feature had one name here and another on the AI
+                  settings screen. `/business/credits` is the report; this is the
+                  headline that leads to it. */}
+              <ChartCard
+                title="AI usage" icon={Gauge} tone="warning"
+                value={totalCr.toLocaleString()} unit="cr"
+                delta={<Badge tone="neutral">30 days · {totalCalls} runs</Badge>}
+                action={<Button size="sm" variant="ghost" onClick={() => nav("/business/credits")}>See all <ArrowRight /></Button>}
+              >
                 <div className="space-y-2.5">
-                  {top.map((u) => (
+                  {top.slice(0, 3).map((u) => (
                     <Meter
                       key={u.feature}
                       tone="warning"
@@ -496,25 +511,50 @@ function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
             </section>
           )}
 
+          {/*
+            Recent credit activity.
+
+            Every row here used to print the ledger's STORED reason — the string
+            the metering path had at the moment it charged, so an owner read
+            `email.send`, `ai.coach-note`, `ai.client-summary` (§10: product
+            language, never system language). The words now come off the wire
+            (`credit-reasons.ts`, which asks the AI registry for a feature's real
+            name) and the glyph off `registry/credits.ts`, keyed on the KIND of
+            movement rather than on its sign — a column of identical plus and
+            minus badges said nothing the number beside it did not already say.
+          */}
           {billing.ledger.length > 0 && (
             <section className="space-y-2">
-              <Eyebrow>Recent credit activity</Eyebrow>
+              <Eyebrow action={<Button size="sm" variant="ghost" onClick={() => nav("/business/credits")}>See all <ArrowRight /></Button>}>Recent credit activity</Eyebrow>
               <Stagger>
               {/* The ledger is a list of movements, and a movement is a row: what
                   happened on the left, what it cost on the right (§9.3). It was
                   a `divide-y` stack of 32px lines inside a Card — the densest
-                  thing on the tab, and the only place credits changed hands. */}
+                  thing on the tab, and the only place credits changed hands.
+
+                  The WORDS come off the wire: every row used to print the
+                  ledger's stored reason, so an owner read `email.send` and
+                  `ai.coach-note` (§10). `credit-reasons.ts` asks the AI registry
+                  for a feature's real name; `registry/credits.ts` turns the KIND
+                  into the glyph — keyed on what the movement was, not on its
+                  sign, because a column of identical plus and minus badges said
+                  nothing the number beside it did not already say. */}
               <Group>
-                {billing.ledger.slice(-8).reverse().map((e, i) => (
-                  <Row
-                    key={i}
-                    icon={e.delta >= 0 ? Plus : Minus}
-                    iconTone={e.delta >= 0 ? "success" : "danger"}
-                    value={<span className={e.delta >= 0 ? "text-success" : "text-danger"}>{e.delta >= 0 ? "+" : ""}{e.delta.toLocaleString()}</span>}
-                  >
-                    {e.reason}
-                  </Row>
-                ))}
+                {billing.ledger.slice(-6).reverse().map((e, i, arr) => {
+                  const spec = creditKind(e.kind ?? "other");
+                  const up = e.delta >= 0;
+                  return (
+                    <Row
+                      key={`${e.at}-${i}`}
+                      icon={spec.icon}
+                      iconTone={up ? "success" : spec.tone}
+                      divider={i < arr.length - 1}
+                      value={<span className={up ? "text-success" : "text-foreground"}>{up ? "+" : ""}{e.delta.toLocaleString()}</span>}
+                    >
+                      {e.label ?? e.reason}
+                    </Row>
+                  );
+                })}
               </Group>
               </Stagger>
             </section>

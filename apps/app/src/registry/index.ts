@@ -16,6 +16,7 @@
  * every import block.
  */
 
+export * from "./credits.js";
 export * from "./metrics.js";
 export * from "./persona.js";
 export * from "./macros.js";
