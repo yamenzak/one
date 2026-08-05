@@ -168,6 +168,28 @@ export interface MarkOptions {
   style?: WordmarkStyle | null;
   /** Square edge in px. The manifest's install tile is 512. */
   size?: number;
+  /**
+   * Draw the ANDROID ADAPTIVE-ICON contract instead of an app tile.
+   *
+   * A `maskable` icon is not a picture with rounded corners — it is a full-bleed
+   * square the launcher will crop to whatever shape it likes (circle, squircle,
+   * teardrop, rounded square). Two rules follow, and both are the opposite of
+   * what an app tile wants:
+   *
+   *   1. NO CORNER RADIUS, and the plate is never optional. Transparency is the
+   *      bug: Chrome composites a maskable icon onto a WHITE background layer,
+   *      so a bare monogram in the dark theme's pale ink lands as pale-on-white
+   *      and the home screen shows an empty circle. (Observed in production —
+   *      byShujaa's installed icon, 2026-08.)
+   *   2. The content lives in the inner circle of diameter 80%, and everything
+   *      outside it is bleed the crop is allowed to eat.
+   *
+   * So this mode forces the solid plate on, drops the radius, and shrinks the
+   * letters to the safe zone. It is the ONLY rendition that is correct under
+   * every launcher, which is why the install icon is generated separately from
+   * the two themed ones rather than reusing whichever the studio picked.
+   */
+  maskable?: boolean;
   /** Corner rounding as a fraction of the edge. iOS masks its own, and a
    *  22% radius is what reads as "app icon" under every launcher's mask. */
   radius?: number;
@@ -194,9 +216,12 @@ export async function renderMarkPng(opts: MarkOptions): Promise<File | null> {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
 
-  const plate: MarkPlate = opts.plate ?? "accent";
+  // A maskable icon brings its own background, always — see `maskable` above.
+  const plate: MarkPlate = opts.maskable ? "accent" : (opts.plate ?? "accent");
   if (!opts.wide && plate !== "none") {
-    const r = size * (opts.radius ?? 0.22);
+    // Full bleed under a launcher mask: a 22% radius would leave four
+    // transparent slivers inside a circular crop, which composite to white.
+    const r = opts.maskable ? 0 : size * (opts.radius ?? 0.22);
     ctx.fillStyle = opts.bg;
     ctx.globalAlpha = plate === "tint" ? MARK_TINT_ALPHA : 1;
     ctx.beginPath();
@@ -226,8 +251,11 @@ export async function renderMarkPng(opts: MarkOptions): Promise<File | null> {
   // Fit to the box rather than pick a size: two letters and a nine-character
   // name want very different type, and a wordmark that overflows its own canvas
   // is worse than no wordmark.
-  const box = opts.wide ? w * 0.9 : size * 0.56;
-  let px = opts.wide ? size * 0.55 : size * 0.42;
+  // The maskable safe zone is the inner circle at 80% of the edge; sizing the
+  // letters against ~40% of the edge keeps them clear of every launcher's crop
+  // with room for the optical centring below.
+  const box = opts.wide ? w * 0.9 : size * (opts.maskable ? 0.40 : 0.56);
+  let px = opts.wide ? size * 0.55 : size * (opts.maskable ? 0.30 : 0.42);
   const measured = widthAt(px);
   if (measured > box) px = px * (box / measured);
   const total = widthAt(px);
@@ -250,5 +278,5 @@ export async function renderMarkPng(opts: MarkOptions): Promise<File | null> {
 
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
   if (!blob) return null;
-  return new File([blob], opts.wide ? "wordmark.png" : "icon.png", { type: "image/png" });
+  return new File([blob], opts.wide ? "wordmark.png" : opts.maskable ? "install-icon.png" : "icon.png", { type: "image/png" });
 }

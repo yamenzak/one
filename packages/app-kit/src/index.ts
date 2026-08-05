@@ -7,6 +7,7 @@ export * from "./notices.js";
 export * from "./inbox.js";
 export * from "./notifications.js";
 export * from "./passkey.js";
+export * from "./install.js";
 export { PasskeysCard, type PasskeysCardProps } from "./PasskeysCard.js";
 export * from "./stripe.js";
 export * from "./hard-refresh.js";

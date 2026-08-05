@@ -86,6 +86,22 @@ export interface Branding {
   logoUrlLight?: string | null;
   iconUrlLight?: string | null;
   /**
+   * The INSTALLED app's icon — a third rendition, and deliberately not one of
+   * the two above.
+   *
+   * A home screen has no theme to answer to: Chrome composites a web app's
+   * icon onto a WHITE background layer, so the dark-mode mark (pale ink on
+   * transparency) installs as an empty white circle, and the light-mode one
+   * installs as bare letters floating on white with no plate. This one is
+   * always full-bleed and opaque on the brand plate, with the letters inside
+   * the maskable safe zone — see `renderMarkPng`'s `maskable` option.
+   *
+   * Absent = the manifest falls back to the light variant, which at least has
+   * dark ink, and stops claiming `maskable` (a claim only a full-bleed opaque
+   * image may make).
+   */
+  installIconUrl?: string | null;
+  /**
    * How a GENERATED mark was set — the icon's letters and which characters of
    * the name carry the accent or sit quieter.
    *

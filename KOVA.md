@@ -1235,6 +1235,11 @@ scope and powers, never screens.
 | `report` | `coach/ClientReport.tsx:37` |
 | `manage` | `coach/ClientManage.tsx:48` — prefs, supplements, labs, archive/delete |
 
+**Today** (both personas) carries two nudges as rows, not routes: the passkey
+prompt (`PasskeyPrompt.tsx:31`) and the install-to-home-screen row
+(`InstallPrompt.tsx:88` — the guide sheet for iOS/Android/desktop sits behind
+it). Both render nothing once done or declined.
+
 **Business** (in-component state, not routes): Overview `coach/Business.tsx:96` ·
 Packages `coach/Packages.tsx:44` (feature `commerce`) · Staff `coach/Staff.tsx:22`.
 

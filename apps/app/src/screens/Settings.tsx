@@ -2112,6 +2112,8 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   // above works on both", which is true of any full-colour logo.
   const [logoUrlLight, setLogoUrlLight] = useState<string | null>(initial?.logoUrlLight ?? null);
   const [iconUrlLight, setIconUrlLight] = useState<string | null>(initial?.iconUrlLight ?? null);
+  /** The installed app's icon. Generated, never uploaded — see `generateMarks`. */
+  const [installIconUrl, setInstallIconUrl] = useState<string | null>(initial?.installIconUrl ?? null);
   /**
    * The letters for a generated icon — a RECOMMENDATION the owner can rewrite.
    *
@@ -2201,6 +2203,33 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
       const iconLight = await renderMarkPng(iconOf(light));
       if (iconLight) await uploadAsset(iconLight, setIconUrlLight);
 
+      /*
+        The INSTALLED app's icon — a THIRD rendition, and the one that is not a
+        theme.
+
+        A home screen has no mode to answer to. Chrome composites a web app's
+        icon onto a WHITE background layer, so the studio that picked bare
+        letterforms shipped pale ink on transparency and installed as an empty
+        white circle; the light variant would install as letters floating with
+        no plate. Neither is the studio's fault — both are correct choices for
+        the surfaces they were drawn for.
+
+        So the install icon ignores `plate` and takes the solid one, drops the
+        corner radius (a launcher does its own masking, and a 22% radius leaves
+        white slivers inside a circular crop) and sets the letters inside the
+        maskable safe zone. Drawn from the DARK palette because the plate is the
+        brand primary at its saturated value, which is what an app icon wants.
+      */
+      const install = await renderMarkPng({
+        text: letters,
+        bg: dark.primary,
+        fg: dark.onPrimary,
+        accent: dark.onPrimary,
+        maskable: true,
+        style: iconStyle,
+      });
+      if (install) await uploadAsset(install, setInstallIconUrl);
+
       // The wordmark — always bare letterforms, so always two.
       const wideOf = (p: ReturnType<typeof markPaint>) => ({
         text: studioName,
@@ -2214,7 +2243,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
       if (wideDark) await uploadAsset(wideDark, setLogoUrl);
       const wideLight = await renderMarkPng(wideOf(light));
       if (wideLight) await uploadAsset(wideLight, setLogoUrlLight);
-      return "Drawn for light and dark. Save to keep them.";
+      return "Drawn for light, dark and the home screen. Save to keep them.";
     }, "Couldn't draw the marks.");
 
   const uploadAsset = async (file: File, setter: (url: string) => void) => {
@@ -2253,7 +2282,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const save = () =>
     act.run("save", async () => {
       // Tokens carry everything now — null out legacy preset/primary fields.
-      await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, tintedNav, ambient, logoUrl, iconUrl, logoUrlLight, iconUrlLight, aiAvatarUrl, aiName: aiName.trim() || null, mark: { monogram: monogram.trim() || null, plate, icon: iconStyle, ...markStyle }, preset: null, primary: null, primaryForeground: null } });
+      await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, tintedNav, ambient, logoUrl, iconUrl, logoUrlLight, iconUrlLight, installIconUrl, aiAvatarUrl, aiName: aiName.trim() || null, mark: { monogram: monogram.trim() || null, plate, icon: iconStyle, ...markStyle }, preset: null, primary: null, primaryForeground: null } });
       onSaved();
       setMsg(null);
       return "Branding saved.";

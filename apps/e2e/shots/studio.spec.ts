@@ -188,6 +188,21 @@ test("the coach's studio", async () => {
     });
   }
 
+  // The install nudge's guide sheet. Chromium at a desktop viewport resolves to
+  // the `desktop` platform, so this photographs those steps — the iOS copy is
+  // the same component with a different row of the GUIDE table.
+  await test.step("the install guide", async () => {
+    await visit(page, `${base}/today`, shell);
+    // Either verb: `beforeinstallprompt` fires in some Chromium builds and not
+    // others, and the row says "Install" when it does. Asserting rather than
+    // skipping — a step that silently photographs nothing is a step that reports
+    // success for a screen nobody has looked at.
+    const how = page.getByRole("button", { name: /^(How|Install)$/ }).first();
+    await how.click();
+    await shoot(page, project, "install-guide", { ready: page.getByRole("button", { name: "Not now" }) });
+    await page.keyboard.press("Escape");
+  });
+
   await test.step("the business", async () => {
     await visit(page, `${base}/business`, shell);
     await shoot(page, project, "coach-business", { settle: 600 });

@@ -66,6 +66,39 @@ its users were on email codes only, on a platform whose own documentation says
 whether to nag someone to add a passkey is an app's idea rather than part of
 passkeys.
 
+## `useInstallState` — a tab, an installed app, or an iPhone
+
+`install.ts` answers three questions the product could not previously ask: is
+this running from the home screen, is there a real one-tap install here, and
+which platform's instructions apply if there is not.
+
+The third is the reason it exists. An install nudge written against
+`beforeinstallprompt` alone shows **nothing on iOS** — WebKit ships no install
+API by policy, so the event never fires and the only route is Share → Add to
+Home Screen. That is not an edge case to degrade into; on a consumer product it
+is most of the audience. So `mode` has a `manual` value alongside `installable`,
+and the app is expected to have something to say in it.
+
+Two details that are wrong in every naive version:
+
+- **`isInstalled` reads three signals.** `display-mode: standalone` is the spec
+  answer, `navigator.standalone` is iOS's own (and the only one older iOS
+  answers), and an `android-app://` referrer means a Play-store wrapper. A
+  `matchMedia`-only check leaves the nudge on screen forever inside the
+  installed app on exactly the platform that needed the nudge.
+- **`installPlatform` checks touch points.** iPadOS 13+ reports `Macintosh` on
+  purpose, to get desktop sites. Without `maxTouchPoints > 1` an iPad is told to
+  look for an install button in an address bar it does not have.
+
+The event is `preventDefault`ed and held: Chromium otherwise shows its own
+mini-infobar AND spends the event, so an app with its own install row gets two
+prompts and a dead button. It is single-use, so `promptInstall` drops it either
+way — a button that silently does nothing on the second tap is worse than no
+button.
+
+What the nudge SAYS is the app's, like the notification bell's presentation
+half. Kova's is `apps/app/src/InstallPrompt.tsx`.
+
 ## The update prompt is not blocking, and that is a decision
 
 `PwaUpdatePrompt` announces a waiting build; it does not force one. Two reasons,

@@ -70,6 +70,8 @@ export interface TenantBranding {
    */
   logoUrlLight?: string | null;
   iconUrlLight?: string | null;
+  /** The installed app's icon — opaque, full-bleed, maskable-safe. */
+  installIconUrl?: string | null;
   /**
    * How a GENERATED mark was set: the icon's letters, and how many characters at
    * each end of the name take the accent colour or step back.

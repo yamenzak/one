@@ -15,6 +15,7 @@ import { WidgetCarousel, WidgetBuilder } from "../widget-kit.js";
 import { COACH_WIDGETS, DEFAULT_COACH_WIDGETS, type CoachWidgetData } from "./CoachWidgets.js";
 import { featureEnabled } from "@kova/domain";
 import { clientAvatar } from "../../registry/avatars.js";
+import { InstallAppCard } from "../../InstallPrompt.js";
 
 interface Notification { id: string; type: string; title: string; message: string; created_at: string; read: number }
 interface AttentionItem { type: AttentionType; severity: "info" | "warn" | "urgent"; label: string; actionLabel: string; detail: string | null; link: string }
@@ -142,6 +143,11 @@ export function CoachToday() {
                 { icon: Sliders, label: "Customise", onClick: () => setWidgetsOpen(true) },
               ]}
             />
+
+            {/* Coaches install it too — they are on this screen every day, and
+                a coach running the studio from a browser tab is the one most
+                likely to miss a notification. Renders nothing once installed. */}
+            <Stagger><InstallAppCard /></Stagger>
 
             <Stagger>
               <WidgetCarousel catalog={widgetCatalog} items={widgetItems} defaults={DEFAULT_COACH_WIDGETS} data={widgetData} onCustomize={() => setWidgetsOpen(true)} />

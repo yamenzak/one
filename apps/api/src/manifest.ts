@@ -53,7 +53,33 @@ function iconType(url: string): string {
 export function buildManifest(ht: HostTenant | null): string {
   const name = (ht?.name || "Kova").slice(0, 45);
   const b = ht?.branding;
-  const icon = b?.iconUrl || b?.logoUrl || null;
+  /*
+    A LAUNCHER IS NOT A DARK SURFACE.
+
+    This read used to be `b?.iconUrl || b?.logoUrl` — the DARK-mode mark,
+    unconditionally, declared `maskable` on top. Chrome builds an Android
+    adaptive icon by compositing the maskable entry onto a WHITE background
+    layer, so a studio whose mark is bare letterforms (plate `none`, the
+    generator's own option) shipped pale-on-transparent ink onto white: an
+    installed app whose home-screen icon is an empty white circle. Observed in
+    production 2026-08, on byShujaa's phone, at the exact moment a customer
+    installs the app and decides what it is.
+
+    Three renditions, in the order they are correct:
+
+      installIconUrl  purpose-built — opaque, full bleed, letters inside the
+                      maskable safe zone. The only one that may claim
+                      `maskable`.
+      iconUrlLight    the LIGHT-mode mark: dark ink, which at least reads on
+                      the white fill. Declared `any` only.
+      iconUrl         the dark mark, last, because it is the one that fails.
+
+    `apps/app/src/brand-mark.conformance.test.ts` bans exactly this mistake in
+    the app and could not see it here — the file is server-side. It now walks
+    `apps/api/src` too.
+  */
+  const install = b?.installIconUrl || null;
+  const icon = install || b?.iconUrlLight || b?.iconUrl || b?.logoUrl || null;
   const type = icon ? iconType(icon) : "image/svg+xml";
   const theme = oklchToHex(b?.tokens?.dark?.["--primary"]) || oklchToHex(b?.primary) || DEFAULT_BG;
   const background = oklchToHex(b?.tokens?.dark?.["--background"]) || DEFAULT_BG;
@@ -73,7 +99,12 @@ export function buildManifest(ht: HostTenant | null): string {
     : [
         { src: icon, sizes: "192x192", type, purpose: "any" },
         { src: icon, sizes: "512x512", type, purpose: "any" },
-        { src: icon, sizes: "512x512", type, purpose: "maskable" },
+        // `maskable` is a PROMISE about the pixels — full bleed, opaque, content
+        // inside the inner 80% — and only the purpose-built rendition keeps it.
+        // A studio's own upload or a bare generated mark is declared `any` and
+        // left to the launcher's legacy path, which insets it on a plate rather
+        // than cropping into transparency.
+        ...(install ? [{ src: install, sizes: "512x512", type: iconType(install), purpose: "maskable" }] : []),
       ];
 
   return JSON.stringify({

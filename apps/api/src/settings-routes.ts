@@ -91,6 +91,10 @@ export const settingsRoutes = new Hono<AppEnv>()
             // The same two marks for a light surface. Absent = use the dark one.
             logoUrlLight: z.string().max(500).nullish(),
             iconUrlLight: z.string().max(500).nullish(),
+            // The INSTALLED app's icon. A third rendition, not a third theme:
+            // a launcher composites onto white, so this one is always opaque,
+            // full-bleed and maskable-safe. See @4dl/ui `Branding`.
+            installIconUrl: z.string().max(500).nullish(),
             // How a generated mark is drawn. Generator input only — the mark
             // itself is an uploaded PNG — but it has to persist or regenerating
             // after a colour change throws the studio's choices away.

@@ -12,6 +12,7 @@ import { api, todayLocal, shiftDay } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { useSession } from "../../session.js";
 import { usePasskey } from "../../PasskeyPrompt.js";
+import { InstallAppCard } from "../../InstallPrompt.js";
 import { LogSheet } from "./LogSheet.js";
 import { LogDetailSheet } from "./LogDetail.js";
 import { WidgetCarousel, WidgetBuilder } from "../widget-kit.js";
@@ -409,6 +410,13 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
               </Stagger>
             );
           })()}
+
+          {/* The install nudge is its OWN group, not a row inside the profile
+              one: the profile card disappears the moment the profile is
+              complete, and an install nudge that only exists while a form is
+              unfinished is a nudge most people never see. It renders nothing
+              once the app is installed or after a "Not now". */}
+          <Stagger><InstallAppCard /></Stagger>
 
           {data.profile && !data.profile.complete && (() => {
             const total = Object.keys(GAP_LABELS).length;
