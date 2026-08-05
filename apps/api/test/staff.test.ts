@@ -219,3 +219,56 @@ describe("removing a member", () => {
     expect((await readStaff(owner)).invitations).toHaveLength(0);
   }, 30_000);
 });
+
+/**
+ * THE SEAT COUNT ON THE SCREEN IS THE SEAT COUNT THE INVITE ENFORCES.
+ *
+ * `/api/staff` reported `used` as EVERY membership row and `pending` as every
+ * invitation, while `checkStaffSeat` counts only non-customer roles. So a studio
+ * with two coaches and two clients was told it had used four staff seats, and
+ * `remaining` was computed off that inflated number — a five-seat plan showing
+ * one seat left with three actually free, and at the boundary an anchor reading
+ * "none left" over an invite button that worked.
+ *
+ * The whole reason the counters were moved server-side was to stop the screen
+ * and the enforcement disagreeing. They still disagreed; the route re-derived
+ * instead of calling the same functions. These pin them together.
+ */
+describe("a client is not a staff seat", () => {
+  it("counts staff only, however many clients the studio has", async () => {
+    const { db, owner, tenantId } = await studio("stfseat");
+
+    // Two clients, exactly as the client-invite path leaves them: a `member` row
+    // in the customer role.
+    for (const n of [1, 2]) {
+      await db
+        .prepare('INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, 1, \'2026-01-01\', \'2026-01-01\')')
+        .bind(`u_stfseat_${n}`, `Client ${n}`, `stfseat-c${n}@test.dev`)
+        .run();
+      await db
+        .prepare('INSERT INTO "member" (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, ?, \'2026-01-01\')')
+        .bind(`m_stfseat_${n}`, tenantId, `u_stfseat_${n}`, "client")
+        .run();
+    }
+
+    const after = await readStaff(owner);
+    // Three memberships in the tenant; ONE staff seat, which is the owner.
+    expect(after.members).toHaveLength(3);
+    expect(after.seats.used).toBe(1);
+    expect(after.seats.remaining).toBe(after.seats.max - 1);
+  }, 30_000);
+
+  /** The same divergence on the other counter: a customer invitation reserves no
+   *  staff seat, so it must not be subtracted from the ceiling either. */
+  it("does not reserve a seat for a pending CLIENT invitation", async () => {
+    const { db, owner, tenantId } = await studio("stfseat2");
+    await db
+      .prepare('INSERT INTO "invitation" (id, organizationId, email, role, status, expiresAt, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .bind("inv_stfseat2", tenantId, "stfseat2-client@test.dev", "client", "pending", "2030-01-01", "2026-01-01")
+      .run();
+
+    const after = await readStaff(owner);
+    expect(after.seats.pending).toBe(0);
+    expect(after.seats.remaining).toBe(after.seats.max - 1);
+  }, 30_000);
+});

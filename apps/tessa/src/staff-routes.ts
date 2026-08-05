@@ -18,7 +18,7 @@
 import { staffRoutes as sharedStaffRoutes, type StaffRoleMeta } from "@4dl/auth";
 import { emailButton, emailShell, escapeHtml } from "@4dl/email";
 import { type AppEnv } from "./auth-context.js";
-import { CREATOR_ROLE, roles, statement, type RoleName } from "./access.js";
+import { CREATOR_ROLE, CUSTOMER_ROLE, roles, statement, type RoleName } from "./access.js";
 import { checkStaffSeat } from "./auth.js";
 import { canonicalHost } from "./host-context.js";
 import { sendTenantEmail } from "./email-provider.js";
@@ -54,6 +54,9 @@ export const staffRoutes = sharedStaffRoutes<AppEnv>({
     return user && tenantId ? { tenantId, userId: user.id, role: role ?? "" } : null;
   },
   creatorRole: CREATOR_ROLE,
+  // Tessa has no customer role — `CUSTOMER_ROLE` is a sentinel nobody holds, so
+  // every membership is a staff seat. See `access.ts`.
+  customerRole: CUSTOMER_ROLE,
   roleNames: ROLE_NAMES,
   roleCopy: ROLE_COPY,
   roleGrants: Object.fromEntries(

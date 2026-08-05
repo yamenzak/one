@@ -41,7 +41,7 @@
 import { Hono } from "hono";
 import type { Context, Env as HonoEnv } from "hono";
 import { newId, nowIso, type HasDb } from "@4dl/core";
-import type { SeatVerdict } from "./seats.js";
+import { pendingStaffSeats, staffSeatsUsed, type SeatVerdict } from "./seats.js";
 
 /** The slice of an app's Hono env these routes read. */
 export type StaffRouteEnv = { Bindings: HasDb };
@@ -167,6 +167,14 @@ export interface StaffRouteDeps<E extends StaffRouteEnv & HonoEnv> {
   checkSeat: (db: D1Database, tenantId: string, opts: { countPending?: boolean }) => Promise<SeatVerdict>;
   /** The staff-seat ceiling, for the counters. `-1` is unlimited. */
   seatCeiling: (db: D1Database, tenantId: string) => Promise<number>;
+  /**
+   * The role that is NOT a staff seat — the app's end customer.
+   *
+   * Required, and it is the same value `SeatConfig.customerRole` takes, because
+   * the two have to agree: `/staff` reports the seat count and `checkSeat`
+   * enforces it, and they were counting different things. See the route.
+   */
+  customerRole: string;
   /** Deliver the invitation. Failure is REPORTED, never rolled back — see the route. */
   sendInvite: (c: Context<E>, invite: StaffInvite) => Promise<StaffSendResult>;
   /** Invitation lifetime. Seven days: long enough to survive a holiday, short
@@ -229,8 +237,29 @@ export function staffRoutes<E extends StaffRouteEnv & HonoEnv>(deps: StaffRouteD
         deps.seatCeiling(c.env.DB, actor.tenantId),
       ]);
 
-      const used = (members.results ?? []).length;
-      const pending = (invitations.results ?? []).length;
+      /*
+        THE COUNT THE SCREEN SHOWS AND THE COUNT THE INVITE ENFORCES ARE THE
+        SAME COUNT — through the same two functions, which is the only way to
+        keep them that way.
+
+        This read `members.results.length`: EVERY membership row, customers
+        included. A studio with two coaches and two clients was told it had used
+        four staff seats, and `remaining` was computed off that inflated number
+        — so a five-seat plan reported one seat left with three actually free,
+        and at the boundary the screen said "none left" while the invite button
+        worked perfectly. The seat count was moved server-side in the first place
+        to stop exactly this kind of divergence; it just moved the divergence
+        rather than removing it, because the route re-derived instead of calling
+        `staffSeatsUsed`.
+
+        The same applied to `pending`: `invitation` rows were counted whatever
+        their role, while `pendingStaffSeats` filters customers out and drops
+        expired ones.
+      */
+      const [used, pending] = await Promise.all([
+        staffSeatsUsed(c.env.DB, actor.tenantId, deps.customerRole),
+        pendingStaffSeats(c.env.DB, actor.tenantId, deps.customerRole),
+      ]);
 
       return c.json({
         members: members.results ?? [],
