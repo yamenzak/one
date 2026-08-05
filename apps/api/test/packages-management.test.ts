@@ -123,7 +123,7 @@ async function newClient(name: string): Promise<string> {
   return ((await res.json()) as { client: { id: string } }).client.id;
 }
 
-interface SubView { id: string; packageId: string | null; status: string; daysRemaining: number }
+interface SubView { id: string; packageId: string | null; packageName: string | null; status: string; daysRemaining: number }
 const subscriptions = async (clientId: string): Promise<SubView[]> =>
   ((await (await SELF.fetch(`${ORIGIN}/api/subscriptions?clientId=${clientId}`, { headers: auth(ownerCookie) })).json()) as { subscriptions: SubView[] }).subscriptions;
 
@@ -266,6 +266,42 @@ describe("packages — archiving (DELETE) and restoring", () => {
     expect(after[0]!.id).toBe(before[0]!.id);
     expect(after[0]!.status).toBe("active");
     expect(after[0]!.daysRemaining).toBe(before[0]!.daysRemaining);
+
+    /*
+      AND THEY KEEP THE NAME.
+
+      This assertion is the one that was missing, and its absence shipped the
+      bug. The screen used to resolve the plan's name itself, by looking
+      `packageId` up in `GET /packages` — which is `active = 1` only. So the
+      moment a studio archived a package, every client still holding one
+      rendered "Plan · Not yet" beside a day count that was still ticking down
+      correctly. Reported across several clients on a live tenant.
+
+      "Archived" means "no longer for sale". It does not mean "the people who
+      bought it are now on nothing".
+    */
+    expect(after[0]!.packageName).toBe("Retiring Pack");
+  });
+
+  it("names the package from the GRANT LEDGER when the subscription's own column cannot", async () => {
+    /*
+      `subject_subscriptions.package_id` is only ever the package that OPENED
+      the row — a repeat grant folds in and leaves it alone. The append-only
+      `subject_package_grants` is what was actually applied, so it is the better
+      answer whenever the column is null or dangling (legacy redemption rows
+      created package-less subscriptions before /redeem was made a top-up).
+    */
+    const opener = await createPackage({ name: "Opening Pack", oneTimePriceCents: 5000, budgets: [{ feature: "all", days: 10 }] });
+    const clientId = await newClient("Ledger Reader");
+    expect((await grant(clientId, opener)).status).toBeLessThan(300);
+    const subId = (await subscriptions(clientId))[0]!.id;
+
+    // Null the column, exactly as a legacy row carries it.
+    await (env.DB as D1Database).prepare("UPDATE subject_subscriptions SET package_id = NULL WHERE id = ?").bind(subId).run();
+
+    const after = await subscriptions(clientId);
+    expect(after[0]!.packageId).toBeNull();
+    expect(after[0]!.packageName).toBe("Opening Pack");
   });
 
   it("an archived package can no longer be granted, and PATCH active:true puts it back on sale", async () => {

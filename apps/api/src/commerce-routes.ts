@@ -114,12 +114,37 @@ interface SubRow {
   stripe_sub_id?: string | null;
 }
 
-function subView(row: SubRow, nowIsoStr: string) {
+/**
+ * @param packageName Resolved by the CALLER, and resolved without the catalogue's
+ *   `active` filter — see `GET /subscriptions`.
+ */
+function subView(row: SubRow, nowIsoStr: string, packageName?: string | null) {
   const budgets = parseJson<Budget[]>(row.budgets_json, []);
   return {
     id: row.id,
     clientId: row.subject_id,
     packageId: row.package_id,
+    /*
+      THE NAME TRAVELS WITH THE ROW.
+
+      The client screen used to resolve it itself — `packages.find(p => p.id ===
+      sub.packageId)` against `GET /packages`, which returns `active = 1` ONLY.
+      "Delete" on a package is an ARCHIVE (`active = 0`), so the moment a studio
+      tidied its catalogue, every client still holding one of those packages
+      rendered "Plan · Not yet" while their days went on counting down
+      correctly. Reported across several clients on a live tenant.
+
+      Two more ways the same lookup came back empty, both ordinary:
+        · a repeat grant FOLDS into the live row, so `package_id` stays whichever
+          package OPENED it — archive that one and the name goes even though a
+          newer, live package was granted since;
+        · legacy rows can carry `package_id` NULL (the old redemption lane
+          created package-less subscriptions before /redeem was made a top-up).
+
+      A screen cannot fix any of that with the catalogue it is given. The server
+      knows the answer, so the server says it.
+    */
+    packageName: packageName ?? null,
     status: row.status,
     paymentStatus: row.payment_status,
     budgets,
@@ -281,13 +306,42 @@ export const commerceRoutes = new Hono<AppEnv>()
     const access = await requireClientAccess(c, clientId);
     if ("response" in access) return access.response;
     const now = nowIso();
+    // LEFT JOIN with NO `active` filter: an archived package still named this
+    // client's subscription, and hiding the name is not what archiving means.
     const rows = await c.env.DB.prepare(
-      "SELECT * FROM subject_subscriptions WHERE subject_id = ? ORDER BY started_at DESC",
+      `SELECT s.*, p.name AS package_name
+       FROM subject_subscriptions s LEFT JOIN packages p ON p.id = s.package_id
+       WHERE s.subject_id = ? ORDER BY s.started_at DESC`,
     )
       .bind(clientId)
-      .all<SubRow>();
+      .all<SubRow & { package_name: string | null }>();
+
+    /*
+      The LEDGER is the fallback, and it is the better answer where it exists.
+
+      `subject_subscriptions.package_id` is only ever the package that OPENED
+      the row; `subject_package_grants` is the append-only record of what was
+      actually applied to it. So when the column is null (legacy redemption
+      rows) or points at a package that has since been hard-deleted, the most
+      recent grant against this subscription still knows what the client was
+      given.
+    */
+    const grants = await c.env.DB.prepare(
+      `SELECT g.subscription_id, p.name AS package_name
+       FROM subject_package_grants g LEFT JOIN packages p ON p.id = g.package_id
+       WHERE g.subject_id = ? AND p.name IS NOT NULL ORDER BY g.at DESC`,
+    )
+      .bind(clientId)
+      .all<{ subscription_id: string | null; package_name: string }>();
+    const latestGrantName = new Map<string, string>();
+    for (const g of grants.results ?? []) {
+      if (g.subscription_id && !latestGrantName.has(g.subscription_id)) latestGrantName.set(g.subscription_id, g.package_name);
+    }
+
     const out = [];
-    for (const row of rows.results ?? []) out.push(subView(await reconcile(c.env.DB, row, now), now));
+    for (const row of rows.results ?? []) {
+      out.push(subView(await reconcile(c.env.DB, row, now), now, row.package_name ?? latestGrantName.get(row.id) ?? null));
+    }
     return c.json({ subscriptions: out });
   })
 

@@ -27,7 +27,12 @@ import { Markdown } from "../../Markdown.js";
 import { AiErrorBox } from "../../AiError.js";
 import { staffAvatar } from "../../registry/avatars.js";
 
-interface Sub { id: string; status: string; daysRemaining: number; daysByFeature?: Record<string, number>; packageId: string | null }
+interface Sub {
+  id: string; status: string; daysRemaining: number; daysByFeature?: Record<string, number>;
+  packageId: string | null;
+  /** Resolved server-side, archived packages included — see commerce-routes.ts. */
+  packageName: string | null;
+}
 interface GrantRow { id: string; packageName: string | null; source: string; days: { feature: string; days: number }[]; at: string }
 interface Pkg { id: string; name: string }
 interface Swap { id: string; reason: string | null; status: string; day_index: number | null; current_exercise_id: string | null; suggested_exercise_id: string | null }
@@ -162,7 +167,19 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
   const setSuppStatus = async (id: string, status: "active" | "paused") => { await api.patch(`/api/supplements/${id}`, { status }); await load(); };
 
   const active = subs?.find((s) => s.status === "active");
-  const activePkg = active ? packages.find((p) => p.id === active.packageId) : undefined;
+  /*
+    The plan's NAME comes off the wire, not from the catalogue.
+
+    This was `packages.find(p => p.id === active.packageId)` against
+    `GET /packages`, which returns `active = 1` only — and "Delete" on a package
+    is an archive. So a studio tidying its catalogue turned "Plan · <name>" into
+    "Plan · Not yet" for every client still holding one, while the day count
+    beside it kept counting down correctly. The row still needs the CATALOGUE
+    entry for the grant sheet (you may only grant something live), which is why
+    `packages` stays — but the name of what they already have is the server's to
+    answer.
+  */
+  const activePkgName = active?.packageName ?? null;
   const pending = swaps.filter((s) => s.status === "pending");
 
   return (
@@ -204,7 +221,7 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
         className="pt-1"
         word={active ? undefined : "No access"}
         sub={active
-          ? `${active.daysRemaining === 1 ? "day left" : "days left"}${activePkg?.name ? ` · ${activePkg.name}` : ""}`
+          ? `${active.daysRemaining === 1 ? "day left" : "days left"}${activePkgName ? ` · ${activePkgName}` : ""}`
           : "Grant a package — or a $0 comp — to unlock their features."}
         /* Three actions only when the studio actually has three (§1's floor);
            a permanently-disabled circle is noise, not an affordance. */
@@ -232,7 +249,7 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
           <Stagger>
             <GlanceStrip items={[
               { icon: Check, tone: "activity", value: "Active", label: "Status" },
-              { icon: ClipboardList, tone: "neutral", value: activePkg?.name ?? null, label: "Plan" },
+              { icon: ClipboardList, tone: "neutral", value: activePkgName, label: "Plan" },
             ]} />
             {/*
               PER SCOPE, next to the headline. The anchor above shows a MAX
