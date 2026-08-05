@@ -50,7 +50,7 @@ function iconType(url: string): string {
   return "image/png";
 }
 
-export function buildManifest(ht: HostTenant | null): string {
+export function buildManifest(ht: HostTenant | null, origin?: string): string {
   const name = (ht?.name || "Kova").slice(0, 45);
   const b = ht?.branding;
   /*
@@ -107,6 +107,25 @@ export function buildManifest(ht: HostTenant | null): string {
         ...(install ? [{ src: install, sizes: "512x512", type: iconType(install), purpose: "maskable" }] : []),
       ];
 
+  /*
+    A SELF-REFERENCE, so the app can find out it is ALREADY INSTALLED.
+
+    `navigator.getInstalledRelatedApps()` is the only way a page can learn that
+    its own PWA is installed on this device, and it answers only for apps named
+    here. Without it, an installed app opened in a browser TAB — from an email
+    link, a push notification, a shared URL, which is how most people arrive —
+    reports `display-mode: browser` and gets no `beforeinstallprompt`, because
+    Chrome suppresses that once the app is installed. The app then concludes
+    "not installed, and no install available here" and offers Add-to-Home-Screen
+    instructions to someone who did it last week.
+
+    ⚠️ `prefer_related_applications` is deliberately ABSENT. Set true beside
+    this entry it tells Chromium to promote the related app INSTEAD of offering
+    to install — it would switch the install prompt off entirely, which is the
+    exact opposite of why the entry is here.
+  */
+  const manifestUrl = origin ? `${origin.replace(/\/$/, "")}/manifest.webmanifest` : null;
+
   return JSON.stringify({
     name,
     short_name: name.slice(0, 12),
@@ -118,5 +137,6 @@ export function buildManifest(ht: HostTenant | null): string {
     background_color: background,
     theme_color: theme,
     icons,
+    ...(manifestUrl ? { related_applications: [{ platform: "webapp", url: manifestUrl }] } : {}),
   });
 }

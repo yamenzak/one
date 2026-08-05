@@ -17,6 +17,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { installPlatform, isInstalled, resolveInstallMode } from "../src/install.js";
 
 /** Stand up just enough `window`/`navigator`/`document` for the two readers. */
@@ -127,5 +128,41 @@ describe("resolveInstallMode", () => {
     // `appinstalled` clears the event, but the two are independent signals and
     // a nudge inside the installed app is the one outcome with no excuse.
     expect(resolveInstallMode(true, true, true)).toBe("installed");
+  });
+});
+
+
+/**
+ * THE LISTENER MUST BE AT MODULE SCOPE.
+ *
+ * `beforeinstallprompt` fires once, shortly after load, and does not replay for
+ * a listener that turns up later. The first version of this file attached it
+ * inside the hook's `useEffect`, so it was only ever armed once the nudge had
+ * mounted — behind a session fetch, a host resolve, an onboarding check and the
+ * screen's own load. Seconds late. The event was always gone, and every Android
+ * phone was shown the iPhone instructions.
+ *
+ * A source-shape assertion because that is what the property IS: nothing about
+ * the module's exported behaviour distinguishes an early listener from a late
+ * one, and the failure is invisible in every environment that does not fire the
+ * event at all — which is every test runner, and the screenshot suite.
+ */
+describe("beforeinstallprompt is captured before anything renders", () => {
+  const src = readFileSync(new URL("../src/install.ts", import.meta.url), "utf8");
+
+  it("registers the listener above the hook, not inside it", () => {
+    const listener = src.indexOf('addEventListener("beforeinstallprompt"');
+    const hook = src.indexOf("export function useInstallState");
+    expect(listener, "no beforeinstallprompt listener at all").toBeGreaterThan(-1);
+    expect(
+      listener < hook,
+      "the listener moved inside the hook — it will miss the event on every real page load",
+    ).toBe(true);
+  });
+
+  it("holds the event in module state, so a hook mounting later still sees it", () => {
+    // The seed is the other half: capturing early is useless if `useState(null)`
+    // throws the captured value away on the first render.
+    expect(src).toMatch(/useState(<[^>]*>)?\(\(\) => heldPrompt\)/);
   });
 });

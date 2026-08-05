@@ -86,6 +86,17 @@ Home Screen. That is not an edge case to degrade into; on a consumer product it
 is most of the audience. So `mode` has a `manual` value alongside `installable`,
 and the app is expected to have something to say in it.
 
+**The listener is at MODULE SCOPE, and that is the whole design.**
+`beforeinstallprompt` fires once, shortly after load, and does not replay. A
+hook that attaches it in `useEffect` only catches it if the component happens
+to be mounted in that window — and in a real app it is not: the nudge lives on
+the home screen, behind a session fetch, a host resolve, an onboarding check
+and the screen's own load. The event fires and is discarded long before. The
+symptom is not a crash: it is an Android phone with a perfectly installable app
+showing the iPhone instructions, forever. So the module captures on evaluation
+and hooks seed from what it caught; `subscribers` tells whoever is already
+mounted.
+
 `mode` has a FOURTH value, `unknown`, and it is not padding. The event fires
 asynchronously, after Chromium has checked its criteria — so a hook that
 reports `manual` on mount renders the "no install here" affordance on an
@@ -103,6 +114,16 @@ Two more details that are wrong in every naive version:
   answers), and an `android-app://` referrer means a Play-store wrapper. A
   `matchMedia`-only check leaves the nudge on screen forever inside the
   installed app on exactly the platform that needed the nudge.
+- **`isInstalledElsewhere` asks `getInstalledRelatedApps()`.** The three
+  synchronous signals all answer "is this window running AS the app", and none
+  answers "is the app installed on this device". They come apart in the most
+  ordinary case there is: the app is installed and the person tapped a link, so
+  they are in a tab. `display-mode` says browser, Chrome fires no
+  `beforeinstallprompt` (it only offers to install what is not installed), and
+  the app nags someone who already did it. The method needs the manifest to
+  name itself under `related_applications` — and `prefer_related_applications`
+  must stay absent, or Chromium promotes the related app INSTEAD of offering
+  the install.
 - **`installPlatform` checks touch points.** iPadOS 13+ reports `Macintosh` on
   purpose, to get desktop sites. Without `maxTouchPoints > 1` an iPad is told to
   look for an install button in an address bar it does not have.

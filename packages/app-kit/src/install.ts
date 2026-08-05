@@ -33,7 +33,7 @@
  *
  * ── Detecting "installed" ────────────────────────────────────────────────────
  *
- * Three signals, because no single one covers the field:
+ * Three SYNCHRONOUS signals, because no single one covers the field:
  *   `display-mode: standalone`   the spec answer; Chromium, Edge, Samsung, and
  *                                modern iOS.
  *   `navigator.standalone`       iOS's own, non-standard and still the only
@@ -43,6 +43,27 @@
  * And it is a LIVE query: a desktop install swaps the window's display mode
  * without a reload, so a one-shot read leaves the nudge on screen inside the
  * app it just installed.
+ *
+ * ── …and the one they all miss ───────────────────────────────────────────────
+ *
+ * All three answer "is this window running AS the app". None answers "is the
+ * app installed on this device", and those come apart in the most ordinary
+ * situation there is: the app IS installed, and the person tapped a link — from
+ * an email, a push notification, a message — which opens a browser TAB.
+ *
+ * In that tab `display-mode` is `browser`, so every signal above says no. And
+ * Chrome will not fire `beforeinstallprompt` either, because it only offers to
+ * install what is not installed. So the honest-looking conclusion is "not
+ * installed, no install available" → the manual lane → a page of
+ * Add-to-Home-Screen instructions for someone who did it last week. Reported
+ * from a real phone (Chrome/Android, coaching.byshujaa.com, 2026-08).
+ *
+ * `navigator.getInstalledRelatedApps()` is the fix, and it is the only thing
+ * that answers the question. It needs the manifest to name ITSELF under
+ * `related_applications` (see the app's manifest builder), it is async, and it
+ * is Chromium-only — Safari and Firefox have no such method, which costs us
+ * nothing: iOS has no install API to suppress, so its `beforeinstallprompt`
+ * silence is not ambiguous the way Chrome's is.
  */
 
 import { useCallback, useEffect, useState } from "react";
@@ -84,6 +105,30 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 const STANDALONE_QUERIES = ["(display-mode: standalone)", "(display-mode: fullscreen)", "(display-mode: minimal-ui)"];
+
+/** The Chromium-only method, absent everywhere else. Not in lib.dom. */
+interface RelatedApp { platform?: string; id?: string; url?: string }
+type MaybeRelatedApps = Navigator & { getInstalledRelatedApps?: () => Promise<RelatedApp[]> };
+
+/**
+ * Is THIS app installed on this device, even though we are in a browser tab?
+ *
+ * Resolves false wherever the method does not exist, which is every non-Chromium
+ * browser — see the header. `platform: "webapp"` is the entry a PWA matches;
+ * anything else in the list would be a native app we do not ship.
+ */
+export async function isInstalledElsewhere(): Promise<boolean> {
+  const nav = typeof navigator === "undefined" ? null : (navigator as MaybeRelatedApps);
+  if (!nav?.getInstalledRelatedApps) return false;
+  try {
+    const apps = await nav.getInstalledRelatedApps();
+    return apps.some((a) => a.platform === "webapp");
+  } catch {
+    // The method throws on an insecure context and in a cross-origin frame.
+    // Neither is a statement about installation, so neither may claim one.
+    return false;
+  }
+}
 
 /** Running from the home screen / an installed window, by any of the signals. */
 export function isInstalled(): boolean {
@@ -140,30 +185,84 @@ export interface InstallState {
   promptInstall: () => Promise<boolean>;
 }
 
+/*
+  ══════════════════════════════════════════════════════════════════════════════
+  THE LISTENER IS AT MODULE SCOPE, AND THAT IS THE WHOLE POINT OF THIS BLOCK.
+
+  `beforeinstallprompt` fires ONCE, shortly after load, as soon as Chromium has
+  checked the install criteria. It does not replay for a listener that turns up
+  later. So a hook that attaches its listener in `useEffect` only ever catches
+  the event if the component happens to be mounted within that window — and in
+  a real app it is not: the nudge lives on the home screen, behind a session
+  fetch, a host resolve, an onboarding check and the screen's own data load.
+  Seconds. The event fired and was discarded long before.
+
+  The symptom is not a crash or a warning. It is an Android phone, with a
+  perfectly installable app, showing the iPhone instructions — reported from a
+  real device (Chrome/Android, coaching.byshujaa.com, 2026-08) with the app
+  UNINSTALLED specifically to test it, which is what ruled out every other
+  explanation.
+
+  So the module captures the event the moment this file is evaluated — which is
+  during the entry chunk, before React renders anything — and hooks read what it
+  caught. `subscribers` exists because the capture can happen before ANY hook
+  mounts and also long after: whoever is listening gets told, and whoever mounts
+  later reads the stored value on their first render.
+  ══════════════════════════════════════════════════════════════════════════════
+*/
+
+/** The event, held from whenever it fired until someone spends it. */
+let heldPrompt: BeforeInstallPromptEvent | null = null;
+/** Set by `appinstalled`, which can also arrive with no hook mounted. */
+let installedSinceLoad = false;
+const subscribers = new Set<() => void>();
+const notify = () => subscribers.forEach((fn) => fn());
+
+if (typeof window !== "undefined") {
+  /*
+    PREVENT-DEFAULT AND KEEP IT.
+
+    Without `preventDefault()` Chromium shows its own mini-infobar and the event
+    is then spent — so an app that renders its own install row ends up with two
+    prompts and a dead button. Holding the event is the documented way to move
+    the moment into the product.
+  */
+  window.addEventListener("beforeinstallprompt", (e: Event) => {
+    e.preventDefault();
+    heldPrompt = e as BeforeInstallPromptEvent;
+    notify();
+  });
+  window.addEventListener("appinstalled", () => {
+    heldPrompt = null;
+    installedSinceLoad = true;
+    notify();
+  });
+}
+
+/** Test seam: forget what the module captured. Never called by the app. */
+export function __resetInstallCapture(): void {
+  heldPrompt = null;
+  installedSinceLoad = false;
+}
+
 export function useInstallState(): InstallState {
-  const [installed, setInstalled] = useState(isInstalled);
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  // Seeded from the module, not from zero: on a phone the event has usually
+  // already been captured by the time this mounts, and re-deriving from a blank
+  // slate is exactly the bug above.
+  const [installed, setInstalled] = useState(() => isInstalled() || installedSinceLoad);
+  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(() => heldPrompt);
   /** Has Chromium had its beat to fire `beforeinstallprompt`? See `InstallMode`. */
-  const [settled, setSettled] = useState(false);
+  const [settled, setSettled] = useState(() => heldPrompt != null);
 
   useEffect(() => {
-    /*
-      PREVENT-DEFAULT AND KEEP IT.
-
-      Without `preventDefault()` Chromium shows its own mini-infobar, and the
-      event is then spent — so an app that renders its own install row ends up
-      with two prompts and a dead button. Holding the event is the documented
-      way to move the moment into the product.
-    */
-    const onPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
-      // The answer arrived early — no reason to keep waiting for the deadline.
-      setSettled(true);
+    const onCapture = () => {
+      setDeferred(heldPrompt);
+      if (installedSinceLoad) setInstalled(true);
+      // The answer arrived — no reason to keep waiting for the deadline.
+      if (heldPrompt) setSettled(true);
     };
-    const onInstalled = () => { setDeferred(null); setInstalled(true); };
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    window.addEventListener("appinstalled", onInstalled);
+    subscribers.add(onCapture);
+    onCapture();
 
     // A desktop install changes the window's display mode with no reload, so the
     // query is watched rather than read once — otherwise the nudge to install
@@ -174,11 +273,17 @@ export function useInstallState(): InstallState {
 
     const deadline = setTimeout(() => setSettled(true), PROMPT_GRACE_MS);
 
+    // The async question the three synchronous signals cannot answer. `alive`
+    // because it can resolve after unmount — a nudge is mounted on a tab people
+    // navigate away from constantly.
+    let alive = true;
+    void isInstalledElsewhere().then((yes) => { if (alive && yes) setInstalled(true); });
+
     return () => {
-      window.removeEventListener("beforeinstallprompt", onPrompt);
-      window.removeEventListener("appinstalled", onInstalled);
+      subscribers.delete(onCapture);
       mqs.forEach((m) => m.removeEventListener?.("change", sync));
       clearTimeout(deadline);
+      alive = false;
     };
   }, []);
 
@@ -187,12 +292,17 @@ export function useInstallState(): InstallState {
     try {
       await deferred.prompt();
       const { outcome } = await deferred.userChoice;
-      // Spent either way: the event is single-use, and keeping it would leave a
-      // button that silently does nothing on the second tap.
+      // Spent either way, and spent MODULE-WIDE: the event is single-use, and a
+      // copy left behind in another mounted hook is a button that silently does
+      // nothing on the next tap.
+      heldPrompt = null;
       setDeferred(null);
+      notify();
       return outcome === "accepted";
     } catch {
+      heldPrompt = null;
       setDeferred(null);
+      notify();
       return false;
     }
   }, [deferred]);

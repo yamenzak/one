@@ -222,7 +222,10 @@ app.route("/api", onboardingRoutes);
 // Per-tenant PWA manifest (white-label). Served by the worker (run_worker_first
 // lists this path) so the installed app wears the host tenant's name/icon/colors.
 app.get("/manifest.webmanifest", (c) =>
-  new Response(buildManifest(c.get("hostTenant")), {
+  // The origin travels with it: the manifest names ITSELF under
+  // `related_applications`, which is what lets `getInstalledRelatedApps()` tell
+  // the app it is already installed. See manifest.ts.
+  new Response(buildManifest(c.get("hostTenant"), new URL(c.req.url).origin), {
     headers: { "content-type": "application/manifest+json", "cache-control": "public, max-age=300" },
   }),
 );

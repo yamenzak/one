@@ -32,8 +32,11 @@ import type { HostTenant } from "../src/host-context.js";
 
 type Icon = { src: string; sizes: string; type: string; purpose: string };
 
-const parse = (ht: HostTenant | null): { icons: Icon[]; name: string; short_name: string } =>
-  JSON.parse(buildManifest(ht));
+const parse = (ht: HostTenant | null, origin?: string): {
+  icons: Icon[]; name: string; short_name: string;
+  related_applications?: { platform: string; url: string }[];
+  prefer_related_applications?: boolean;
+} => JSON.parse(buildManifest(ht, origin));
 
 /** A tenant carrying exactly the branding under test. */
 const tenant = (branding: Record<string, unknown>): HostTenant =>
@@ -96,5 +99,40 @@ describe("the installed app wears an icon that survives a launcher", () => {
   it("keeps the short name inside what a home screen will show", () => {
     const m = parse(tenant({}));
     expect(m.short_name.length).toBeLessThanOrEqual(12);
+  });
+});
+
+
+/**
+ * THE MANIFEST NAMES ITSELF.
+ *
+ * `navigator.getInstalledRelatedApps()` is the only way a page can learn that
+ * its own PWA is installed, and it answers only for apps listed under
+ * `related_applications`. Without the entry, an installed app opened from a
+ * link — a tab, so `display-mode: browser`, and no `beforeinstallprompt`
+ * because Chrome only offers to install what is not installed — concludes it is
+ * not installed and offers Add-to-Home-Screen instructions to someone who did
+ * it last week.
+ */
+describe("the manifest names itself, so the app can detect its own install", () => {
+  it("declares a webapp relation pointing at this origin's manifest", () => {
+    const m = parse(tenant({}), "https://coaching.example.com");
+    expect(m.related_applications).toEqual([
+      { platform: "webapp", url: "https://coaching.example.com/manifest.webmanifest" },
+    ]);
+  });
+
+  it("NEVER sets prefer_related_applications", () => {
+    // True beside that entry, it tells Chromium to promote the related app
+    // instead of offering to install — switching off the very prompt the entry
+    // exists to make detectable.
+    const m = parse(tenant({}), "https://coaching.example.com");
+    expect(m.prefer_related_applications).toBeUndefined();
+  });
+
+  it("omits the relation entirely when no origin is known, rather than guessing one", () => {
+    // A wrong URL here is worse than none: the method would answer about an app
+    // that is not this one.
+    expect(parse(tenant({})).related_applications).toBeUndefined();
   });
 });
