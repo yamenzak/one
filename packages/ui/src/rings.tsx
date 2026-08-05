@@ -69,7 +69,23 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
           transition={{ duration: DUR.draw, ease: [0.22, 1, 0.36, 1] }}
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
+      {/*
+        INSET BY THE STROKE, not `inset-0`.
+
+        The caption block used to fill the whole square, arc included, so any
+        sublabel wider than the ring's INNER diameter sat on the stroke —
+        crossing the arc at both ends, which reads as a rendering fault rather
+        than as a caption. Reported on a hero ring whose sublabel was a target
+        ("of N units"), i.e. the most ordinary thing a sublabel says.
+
+        The arc geometrically occupies the outer `sw`; one pixel more is the
+        breathing room. Centred and allowed to wrap inside that box, because a
+        caption that silently overflows is the thing being fixed.
+      */}
+      <div
+        className="absolute flex flex-col items-center justify-center text-center"
+        style={{ inset: sw + 1 }}
+      >
         {/* Floor the ring's caption text at 12px (UI-LANGUAGE.md §5 — the type scale's floor). The pure
             proportional size rendered the label at 7.5px on the hero ring most
             screens use (size 116) — the inline style silently beat the `text-xs`

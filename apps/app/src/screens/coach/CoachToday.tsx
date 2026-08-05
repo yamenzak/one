@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fmtWeight, type AttentionType } from "@kova/domain";
-import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, Avatar, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, Anchor, ActionCluster, UserPlus, cn, type Tone, type LucideIcon, NoData, Meter } from "@4dl/ui";
+import { Card, InsightCard, Badge, Button, Page, Stagger, EmptyState, Reveal, SkeletonHero, SkeletonChart, SkeletonStatGrid, SkeletonList, IconBadge, ChartCard, BarChart, StatCard, SectionHeader, Avatar, toneVar, ClipboardList, Bell, ArrowLeftRight, AlertTriangle, Dumbbell, Weight, Footprints, FlaskConical, Activity, Trophy, Sliders, ChevronRight, Percent, CountUp, Anchor, ActionCluster, UserPlus, cn, type Tone, type LucideIcon, NoData, Meter, Eyebrow, Group, Row, GroupNote, TrendingDown } from "@4dl/ui";
 import { attentionCoding, SEVERITY_TONE } from "../../attention-ui.js";
 import type { WidgetItem } from "@kova/protocol";
 import { api, todayLocal, shiftDay } from "../../api.js";
@@ -155,7 +155,7 @@ export function CoachToday() {
 
       {analytics && analytics.roster.total > 0 && (
         <Stagger className="space-y-3">
-          <h3 className="px-1 text-micro uppercase text-muted-foreground">Roster analytics</h3>
+          <Eyebrow>Roster analytics</Eyebrow>
           <ChartCard title="Active clients" icon={Activity} tone="cardio" value={analytics.engagement.avgActivePerDay} unit={`/ day · of ${analytics.roster.total}`} delta={<Badge tone="neutral">{analytics.daily.length}-day trend</Badge>}>
             <BarChart values={analytics.daily.map((d) => d.active)} labels={analytics.daily.map((d) => dm(d.date))} tone="cardio" target={analytics.roster.total} format={(v) => `${v} active`} />
           </ChartCard>
@@ -181,27 +181,55 @@ export function CoachToday() {
               </div>
             </Card>
           )}
+          {/*
+            Body composition, on the components the rest of this screen uses.
+
+            It was a `Card` containing two hand-rolled stat blocks — a muted
+            label div over a `text-2xl` numeral, twice — and a hand-rolled
+            `rounded-xl bg-surface-2` button. All three exist already, and two
+            `StatCard`s of exactly this shape sit forty lines above under
+            "Check-in rate" / "Workout rate", so the same kind of figure was
+            being set two different ways on one scroll. The empty case was
+            hand-rolled too; `StatCard`'s `value={null}` is the contract for
+            it (§5).
+          */}
           {analytics.composition && analytics.composition.tracked > 0 && (
-            <Card className="space-y-3">
-              <SectionHeader icon={Percent} tone="sleep" title="Body composition" />
+            <>
+              <Eyebrow>Body composition</Eyebrow>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-xs text-muted-foreground">Trending down</div>
-                  <div className="numeral text-2xl font-bold"><CountUp value={analytics.composition.improving} /><span className="text-sm font-medium text-muted-foreground"> / {analytics.composition.withTrend}</span></div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Avg body-fat Δ · 90d</div>
-                  <div className={analytics.composition.avgDeltaPct != null ? "numeral text-2xl font-bold" : ""}>{analytics.composition.avgDeltaPct != null ? <CountUp value={analytics.composition.avgDeltaPct} decimals={1} prefix={analytics.composition.avgDeltaPct > 0 ? "+" : ""} suffix="%" /> : <NoData className="text-xs">No scans yet</NoData>}</div>
-                </div>
+                <StatCard
+                  stack
+                  label="Trending down"
+                  value={<><CountUp value={analytics.composition.improving} /><span className="text-sm font-medium text-muted-foreground"> / {analytics.composition.withTrend}</span></>}
+                  icon={TrendingDown}
+                  tone="sleep"
+                />
+                <StatCard
+                  stack
+                  label="Body-fat Δ"
+                  value={analytics.composition.avgDeltaPct == null ? null : <CountUp value={analytics.composition.avgDeltaPct} decimals={1} prefix={analytics.composition.avgDeltaPct > 0 ? "+" : ""} suffix="%" />}
+                  emptyText="No scans yet"
+                  icon={Percent}
+                  tone="sleep"
+                  badge={<Badge tone="neutral">90-day</Badge>}
+                />
               </div>
               {analytics.composition.mostImproved && (
-                <button onClick={() => nav(`/clients/${analytics.composition.mostImproved!.clientId}/progress`)} className="flex w-full items-center justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2 text-left">
-                  <span className="min-w-0 truncate text-sm"><span className="text-muted-foreground">Most improved · </span><span className="font-medium">{analytics.composition.mostImproved.name}</span></span>
-                  <Badge tone="success">{analytics.composition.mostImproved.delta}%</Badge>
-                </button>
+                <Group>
+                  <Row
+                    icon={Trophy}
+                    iconTone="success"
+                    sub="Most improved"
+                    divider={false}
+                    value={<Badge tone="success">{analytics.composition.mostImproved.delta}%</Badge>}
+                    onClick={() => nav(`/clients/${analytics.composition!.mostImproved!.clientId}/progress`)}
+                  >
+                    {analytics.composition.mostImproved.name}
+                  </Row>
+                </Group>
               )}
-              <p className="text-xs text-muted-foreground">{analytics.composition.tracked} client{analytics.composition.tracked === 1 ? "" : "s"} with a body-fat reading in the last 90 days.</p>
-            </Card>
+              <GroupNote>{analytics.composition.tracked} client{analytics.composition.tracked === 1 ? "" : "s"} with a body-fat reading in the last 90 days.</GroupNote>
+            </>
           )}
         </Stagger>
       )}

@@ -1508,6 +1508,8 @@ invisible cursor.
 | `ChartCard` | A chart with a headline number. Three `value` states — see §5. | A chart with no story. If the title is the whole point, it is a `Section`. | ✅ |
 | `Delta` | A change between two versions of a number: its size, its direction, and whether that direction is good. | A value. A delta is always secondary to the thing that changed. | ✅ |
 | `Meter` | One value's share of a whole, as a horizontal bar — in a LIST, where the comparison between rows is what is being read. Optional label line above it. | One value against its target on its own — that is a `ProgressRing`, which earns the space. A column of rings is unreadable, which is the whole reason both exist. | ✅ |
+
+`MacroBar`-style triads have TWO layouts and the choice is about WIDTH, not taste: three pills across when the triad owns the full column, three stacked `Meter`s when it shares its row. The meal builder ran the row layout inside a `flex-1` beside a 104px ring — about 85px a pill — so all three labels rendered as ellipses ("Pro…", "Ca…", "Fat…"). A chip that has truncated its own NAME is not a compact readout, it is a broken one; the width that forces that is the signal to stack, not to shrink the type.
 | `Notice` | A state the screen is IN, with the one thing to do about it: no subscription, payment failed, access lapsed. True until something changes, which §7 says is a banner rather than a toast. | A transient outcome (`toast`), a sentence of guidance (`Callout`), or an empty surface (`EmptyState`). | ✅ |
 | `NoData` | Rendered *by* the components above when their `value` is `null`. Call it directly only in a hand-rolled value slot. | A dash. Ever. See §5. | ✅ |
 

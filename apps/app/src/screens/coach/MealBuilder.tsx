@@ -552,11 +552,27 @@ function PlanHealth({ allTypes, byType, foods, targets, mode }: {
   return (
     <Card className="space-y-4 p-4">
       <Eyebrow action={<Badge tone="neutral">{meals.length} meal{meals.length > 1 ? "s" : ""}</Badge>}>Daily plan health</Eyebrow>
-      <div className="flex items-center gap-4">
+      {/*
+        THE RING IS THE ANCHOR, AND THE MACROS ARE THE BREAKDOWN UNDER IT.
+
+        This was one horizontal row: a 104px ring, then `MacroBar` in the
+        remaining `flex-1`. Three macro pills in ~250px is ~85px each, so every
+        label truncated — "Pro…", "Ca…", "Fat…" — and the verdict badge
+        ("404 kcal under") floated at the right end of a column it did not
+        belong to. A readout whose three labels are all ellipses has stopped
+        being a readout.
+
+        Vertical instead. The ring owns its line with the verdict beside it —
+        the two numbers that answer "is this day right?" — and the macros run
+        full width beneath as three meters, which is how the rest of the product
+        grades a value against a target. Nothing truncates, and the target
+        stops being a 12%-opacity wash behind the text.
+      */}
+      <div className="flex items-center justify-center gap-5">
         {target ? (
           <ProgressRing
-            size={104}
-            strokeWidth={10}
+            size={116}
+            strokeWidth={11}
             progress={total.calories / target}
             tone={over && !onTarget ? "warning" : "calories"}
             softTrack
@@ -571,18 +587,16 @@ function PlanHealth({ allTypes, byType, foods, targets, mode }: {
             <span className="text-xs font-medium text-muted-foreground">{mode === "fixed" ? "The day" : "Sample day"}</span>
           </div>
         )}
-        <div className="min-w-0 flex-1 space-y-2">
-          <MacroBar
-            proteinG={total.proteinG}
-            carbsG={total.carbsG}
-            fatG={total.fatG}
-            targets={target ? { proteinG: targets?.targetProteinG, carbsG: targets?.targetCarbsG, fatG: targets?.targetFatG } : null}
-          />
-          {deltaLabel && (
-            <div className="flex justify-end"><Badge tone={deltaTone}>{deltaLabel}</Badge></div>
-          )}
-        </div>
+        {deltaLabel && <Badge tone={deltaTone}>{deltaLabel}</Badge>}
       </div>
+
+      <MacroBar
+        layout="stacked"
+        proteinG={total.proteinG}
+        carbsG={total.carbsG}
+        fatG={total.fatG}
+        targets={target ? { proteinG: targets?.targetProteinG, carbsG: targets?.targetCarbsG, fatG: targets?.targetFatG } : null}
+      />
 
       {/* The per-meal spread folds: it is a check on the variety the client can
           pick within, not the number the coach is steering. A fixed plan has no

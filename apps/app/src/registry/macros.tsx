@@ -10,7 +10,7 @@
 import { METRICS, MACRO_KEYS, type MetricKey } from "./metrics.js";
 import type { ReactNode } from "react";
 import { kcalToDisplay } from "@kova/domain";
-import { cn, toneVar, toneText, toneSoft } from "@4dl/ui";
+import { cn, toneVar, toneText, toneSoft, Meter } from "@4dl/ui";
 import { useUnits } from "../units.js";
 
 export function MetricChip({ metric, value, className }: { metric: MetricKey; value: ReactNode; className?: string }) {
@@ -40,10 +40,61 @@ export function MacroInline({ proteinG, carbsG, fatG, className }: { proteinG: n
   );
 }
 
-/** The protein/carbs/fat triad, colored + iconed from the registry. */
-export function MacroBar({ proteinG, carbsG, fatG, targets, className }: { proteinG: number; carbsG: number; fatG: number; targets?: { proteinG?: number; carbsG?: number; fatG?: number } | null; className?: string }) {
-  const grams = { protein: proteinG, carbs: carbsG, fat: fatG };
+/**
+ * The protein/carbs/fat triad, coloured + iconed from the registry.
+ *
+ * TWO LAYOUTS, and the choice is about WIDTH, not taste.
+ *
+ *   row      three equal pills across. Correct when the triad owns the full
+ *            column — under an anchor, across a card.
+ *   stacked  three full-width meters, one per line. Correct anywhere the triad
+ *            shares its row with something else.
+ *
+ * `stacked` exists because `row` was being used in a `flex-1` beside a 104px
+ * ring in the meal builder: ~85px per pill, so "Protein" rendered as "Pro…",
+ * "Carbs" as "Ca…" and "Fat / 70" as "Fat…". Three macro chips whose labels are
+ * all ellipses is a readout that has stopped reading. The old comment below
+ * anticipated truncation and mispriced it — it assumed the loss would be the
+ * TARGET's tail, and the actual loss was the macro's name.
+ *
+ * Stacked also upgrades the target from a 12%-opacity wash behind the text to a
+ * real `Meter`: the same grammar the rest of the product grades a value against
+ * a maximum with, and readable at a glance rather than by inspection.
+ */
+export function MacroBar({ proteinG, carbsG, fatG, targets, layout = "row", className }: {
+  proteinG: number; carbsG: number; fatG: number;
+  targets?: { proteinG?: number; carbsG?: number; fatG?: number } | null;
+  layout?: "row" | "stacked";
+  className?: string;
+}) {
+  const grams: Record<string, number> = { protein: proteinG, carbs: carbsG, fat: fatG };
   const tgt: Record<string, number | undefined> = { protein: targets?.proteinG, carbs: targets?.carbsG, fat: targets?.fatG };
+
+  if (layout === "stacked") {
+    return (
+      <div className={cn("space-y-2.5", className)}>
+        {MACRO_KEYS.map((k) => {
+          const m = METRICS[k];
+          const t = tgt[k];
+          const g = Math.round(grams[k]!);
+          return (
+            <Meter
+              key={k}
+              value={g}
+              // No target → a full bar would claim completion against nothing,
+              // so the meter draws the value against ITSELF and reads as a
+              // label with a rule under it.
+              max={t ?? g ?? 1}
+              tone={m.tone}
+              label={<span className="inline-flex items-center gap-1.5"><m.icon className="size-3.5" style={{ color: toneVar[m.tone] }} />{m.label}</span>}
+              valueLabel={<>{g}{t ? <span className="text-muted-foreground"> / {t}</span> : null} g</>}
+            />
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className={cn("grid grid-cols-3 gap-2", className)}>
       {MACRO_KEYS.map((k) => {
@@ -51,15 +102,17 @@ export function MacroBar({ proteinG, carbsG, fatG, targets, className }: { prote
         const t = tgt[k];
         return (
           <div key={k} className={cn("relative flex items-center gap-2 overflow-hidden rounded-xl px-2.5 py-2", toneSoft[m.tone])}>
-            {t ? <span aria-hidden className="absolute inset-y-0 left-0 bg-current opacity-[0.12]" style={{ width: `${Math.min(100, (grams[k] / t) * 100)}%` }} /> : null}
+            {t ? <span aria-hidden className="absolute inset-y-0 left-0 bg-current opacity-[0.12]" style={{ width: `${Math.min(100, (grams[k]! / t) * 100)}%` }} /> : null}
             <m.icon className="relative size-4 shrink-0" style={{ color: toneVar[m.tone] }} />
             {/* `truncate`, not wrap. "Protein / 165" in a third of a phone
                 wrapped to two lines and pushed the chip taller than its two
                 neighbours, so a row designed as three equal pills rendered as
                 two pills and a box. Losing the tail of a target is a smaller
-                cost than losing the rhythm of the row. */}
+                cost than losing the rhythm of the row — but if the pill is so
+                narrow that the macro's NAME goes too, the answer is `stacked`,
+                not a narrower pill. */}
             <span className="relative min-w-0">
-              <span className="numeral block text-sm font-bold leading-none">{Math.round(grams[k])}<span className="text-xs font-medium opacity-70"> g</span></span>
+              <span className="numeral block text-sm font-bold leading-none">{Math.round(grams[k]!)}<span className="text-xs font-medium opacity-70"> g</span></span>
               <span className="block truncate text-xs font-medium leading-tight opacity-70">{m.label}{t ? ` / ${t}` : ""}</span>
             </span>
           </div>
