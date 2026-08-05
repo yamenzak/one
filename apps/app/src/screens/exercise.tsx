@@ -175,6 +175,7 @@ export function ExerciseHero({ ex, ratio = "photo" }: { ex: ExerciseInfo; ratio?
       />
       {both && (
         <SegmentedControl
+          fill
           value={tab}
           onChange={setTab}
           options={[{ value: "photo" as const, label: "Demo" }, { value: "video" as const, label: "Video" }]}

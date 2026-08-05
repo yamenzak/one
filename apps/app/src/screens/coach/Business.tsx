@@ -92,7 +92,10 @@ export function Business() {
   ];
   return (
     <div>
-      <div className="column p-4 pb-0"><SegmentedControl options={options} value={activeTab} onChange={(v) => setTab(v as Tab)} /></div>
+      {/* `fill`, like every other surface-level rail (Library, Plans): the tabs
+          span the column instead of hugging their labels, so the strip lines up
+          with the cards beneath it rather than ending in a ragged edge. */}
+      <div className="column p-4 pb-0"><SegmentedControl fill options={options} value={activeTab} onChange={(v) => setTab(v as Tab)} /></div>
       {activeTab === "overview" && <Overview onOpenPayments={() => setTab("getting-paid")} />}
       {activeTab === "packages" && <Packages />}
       {activeTab === "getting-paid" && (

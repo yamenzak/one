@@ -281,7 +281,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
               <CountUp value={groups.length} />
             </Anchor>
 
-            <div><SegmentedControl options={[{ value: "plan", label: "My meals" }, { value: "shop", label: "Shopping list" }]} value={view} onChange={setView} /></div>
+            <SegmentedControl fill options={[{ value: "plan", label: "My meals" }, { value: "shop", label: "Shopping list" }]} value={view} onChange={setView} />
 
             {view === "plan" ? (
               groups.length === 0 ? <EmptyState icon={Utensils} title="No options yet" /> : (
