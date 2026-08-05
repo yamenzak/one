@@ -144,7 +144,7 @@ export function Progress({ clientId }: { clientId: string }) {
                 >
                   {data.wellness.index != null && <CountUp value={data.wellness.index} decimals={1} />}
                 </Anchor>
-                <Overview data={data} units={units} dateLabel={dateLabel} canNutrition={canNutrition} canTraining={canTraining} />
+                <Overview data={data} units={units} dateLabel={dateLabel} canNutrition={canNutrition} canTraining={canTraining} canBody={canBody} />
               </>
             )}
             {tab === "body" && <Body data={data} units={units} dateLabel={dateLabel} clientId={clientId} canBodyScan={canBodyScan} />}
@@ -161,7 +161,7 @@ export function Progress({ clientId }: { clientId: string }) {
 }
 
 // ── Overview ──
-function Overview({ data, units, dateLabel, canNutrition, canTraining }: { data: ProgressData; units: ReturnType<typeof useUnits>; dateLabel: (i: number) => string; canNutrition: boolean; canTraining: boolean }) {
+function Overview({ data, units, dateLabel, canNutrition, canTraining, canBody }: { data: ProgressData; units: ReturnType<typeof useUnits>; dateLabel: (i: number) => string; canNutrition: boolean; canTraining: boolean; canBody: boolean }) {
   const { consistency, wellness, nutrition, body } = data;
   const days = data.range.days;
   const cals = nutrition.perDay.map((p) => (p.logged ? p.calories : null));
@@ -181,7 +181,11 @@ function Overview({ data, units, dateLabel, canNutrition, canTraining }: { data:
           <div className="relative space-y-3">
             <MiniStat icon={Flame} tone="calories" label="Check-in streak" value={`${consistency.streak}`} sub={consistency.streak === 1 ? "day" : "days"} />
             <MiniStat icon={Gauge} tone="activity" label="Consistency" value={`${consistency.consistencyPct}`} sub="%" />
-            <MiniStat icon={METRICS.weight.icon} tone="cardio" label="Weight trend" value={body.deltas.weight ? `${body.deltas.weight.delta > 0 ? "+" : ""}${kgToDisplay(body.deltas.weight.delta, units).toFixed(1)}` : null} sub={weightLabel(units)} />
+            {/* Weight trend is body-report data (`bodyMetrics`) like the Body
+                lens itself. Un-gated it promised "Not yet" forever to a client
+                whose package excludes it — and since the server now withholds
+                the series, "forever" was literal. */}
+            {canBody && <MiniStat icon={METRICS.weight.icon} tone="cardio" label="Weight trend" value={body.deltas.weight ? `${body.deltas.weight.delta > 0 ? "+" : ""}${kgToDisplay(body.deltas.weight.delta, units).toFixed(1)}` : null} sub={weightLabel(units)} />}
           </div>
         </Card>
       </Stagger>

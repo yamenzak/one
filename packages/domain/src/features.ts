@@ -42,6 +42,18 @@ export interface FeatureSpec {
   notifTypes?: NotifType[];
   /** Metric keys this feature surfaces (keys into @4dl/ui METRICS). */
   metrics?: MetricRef[];
+  /**
+   * There is NO route to gate — the feature decides how data the client already
+   * holds is DISPLAYED, so `featureEnabled` in the UI is the whole enforcement.
+   *
+   * Declaring it is the point. Every other client-flag feature must be named by
+   * at least one `gateFeature` call (asserted by
+   * apps/api/test/flag-enforcement.test.ts), and a flag sold in the package
+   * builder that no route checks is the exact bug that test exists to catch.
+   * This field is how a feature says "there is nothing to check" out loud
+   * instead of looking like one that was forgotten.
+   */
+  uiOnly?: boolean;
 }
 
 /**
@@ -74,10 +86,15 @@ export const FEATURES = {
     key: "mealPlanEditing", label: "Meal-option swaps",
     clientFlag: "canEditMealPlan", permission: "tracking",
   },
+  // UI-only, and it has to be: the per-macro split is computed from the food
+  // entries the client typed in themselves, returned by the diary that
+  // `foodLogging` already governs. Withholding `protein_g` from a client's own
+  // food row server-side would break logging to hide a bar chart. What this
+  // sells is the BREAKDOWN, and the only place a breakdown exists is the screen.
   macroBreakdown: {
     key: "macroBreakdown", label: "Macro breakdown",
     clientFlag: "showMacroBreakdown", permission: "tracking",
-    metrics: ["protein", "carbs", "fat"],
+    metrics: ["protein", "carbs", "fat"], uiOnly: true,
   },
   nutritionReports: {
     key: "nutritionReports", label: "Nutrition reports",

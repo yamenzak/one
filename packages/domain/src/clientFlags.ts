@@ -172,6 +172,74 @@ export const FORM_ONLY_CLIENT_FLAGS = CLIENT_FLAG_KEYS.filter((k) => CLIENT_FLAG
 /** The flags a tenant may put on a package: everything with a real surface. */
 export const SELLABLE_CLIENT_FLAG_KEYS = CLIENT_FLAG_KEYS.filter((k) => !CLIENT_FLAG_META[k].reserved);
 
+/**
+ * The flags a budget scope actually gates, derived from `budgetGate`. `meal`
+ * days buy the meal plan and meal-option swaps and nothing else; `workout` days
+ * buy the training plan, swap requests and the strength report. Nothing else in
+ * the flag set is budget-gated, which is the fact both checks below turn on.
+ */
+export function flagsGatedByScope(scope: BudgetFeature): (keyof ClientFlags)[] {
+  return CLIENT_FLAG_KEYS.filter((k) => CLIENT_FLAG_META[k].budgetGate === scope);
+}
+
+/** One thing wrong with how a package's budgets and flags fit together. */
+export interface PackageContradiction {
+  kind: "budget-buys-nothing" | "flag-has-no-days";
+  /** The budget scope involved (`workout` / `meal`). */
+  scope: BudgetFeature;
+  /** For `flag-has-no-days`, the flags that will resolve OFF anyway. */
+  flags: (keyof ClientFlags)[];
+}
+
+/**
+ * Does this package's day budget agree with its capability toggles?
+ *
+ * The two halves of the builder are independent, and they can be set to
+ * contradict each other in both directions:
+ *
+ *   budget-buys-nothing  30 meal days sold with BOTH meal-gated flags off. The
+ *                        client pays for days that unlock nothing, the days tick
+ *                        down, and `overallDaysRemaining` — a MAX across scopes —
+ *                        can even report the headline runway from the scope they
+ *                        cannot use. This is the case that prompted the check:
+ *                        a package carrying workout AND meal days with the meal
+ *                        plan switched off is indistinguishable, at purchase,
+ *                        from one that includes meals.
+ *   flag-has-no-days     the meal plan switched ON with no meal (or `all`)
+ *                        budget. Harmless but useless: `resolveClientFlags`
+ *                        gates on the budget and forces the flag off, so the
+ *                        toggle in the builder shows a capability the client
+ *                        will never have.
+ *
+ * Pure, and deliberately a REPORT rather than a refusal. A studio may have a
+ * reason we have not thought of, and refusing to save a package because two
+ * toggles disagree is the kind of validation that makes a product feel like it
+ * is arguing with you. The builder shows it; the coach decides.
+ */
+export function packageContradictions(
+  flags: Partial<ClientFlags> | null | undefined,
+  budgets: readonly { feature: BudgetFeature }[],
+  scopes: readonly BudgetFeature[],
+  wildcard: BudgetFeature = "all",
+): PackageContradiction[] {
+  const effective = applyPartial(DEFAULT_CLIENT_FLAGS, flags);
+  const sold = new Set(budgets.map((b) => b.feature));
+  const out: PackageContradiction[] = [];
+  for (const scope of scopes) {
+    const gatedFlags = flagsGatedByScope(scope);
+    // A reserved flag grants nothing today, so it cannot be what a day buys.
+    const live = gatedFlags.filter((k) => !CLIENT_FLAG_META[k].reserved);
+    if (live.length === 0) continue;
+    const on = live.filter((k) => effective[k]);
+    // A wildcard budget covers every scope, so it is never "for" one of them —
+    // judging it per-scope would report `all` days as dead the moment any one
+    // scope is switched off, which is the opposite of what a wildcard means.
+    if (sold.has(scope) && on.length === 0) out.push({ kind: "budget-buys-nothing", scope, flags: live });
+    else if (!sold.has(scope) && !sold.has(wildcard) && on.length > 0) out.push({ kind: "flag-has-no-days", scope, flags: on });
+  }
+  return out;
+}
+
 function applyPartial(base: ClientFlags, partial: Partial<ClientFlags> | null | undefined): ClientFlags {
   // Always return a fresh object — the resolver mutates the result in place
   // (budget gating, entitlement intersection), so returning `base` by reference

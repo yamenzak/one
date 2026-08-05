@@ -19,7 +19,7 @@ import {
 } from "@kova/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { requireClientAccess, visibleClientIds } from "./clients.js";
-import { gateFeature } from "./client-flags.js";
+import { featureShaper, gateFeature } from "./client-flags.js";
 import { parseJson } from "./db.js";
 import { loadGoalTimeline, dayCalorieTarget } from "./goals.js";
 
@@ -43,6 +43,13 @@ export const reportRoutes = new Hono<AppEnv>()
     // staff (requireClientFlag exempts them); it only bounds a CLIENT reading
     // their own report on a package that didn't include it.
     { const g = await gateFeature(c, "bodyMetrics", access.client.id); if (g) return g; }
+    // The STRENGTH half of the same report is a second thing a package sells
+    // (`canViewExerciseReport`), and it was riding in on the body-metrics gate:
+    // `prs` and `totalTonnage` shipped to any client who held bodyMetrics,
+    // whatever their strength flag said. Shaped, not 403'd — refusing the whole
+    // report would take the compliance and weight halves with it.
+    const mayReport = await featureShaper(c, access.client.id);
+    const seeStrength = mayReport("exerciseReport");
     // "today" comes from the caller's tz; validate the LocalDate shape (it feeds
     // resolveRange → addDays, which throws on an unparseable date) and fall back.
     const today = safeDate(c.req.query("today"), todayLocal());
@@ -113,8 +120,8 @@ export const reportRoutes = new Hono<AppEnv>()
       },
       weightSeries: (measurements.results ?? []).filter((m) => m.weight_kg != null).map((m) => ({ date: m.date_local, kg: m.weight_kg })),
       bodyFatSeries: (measurements.results ?? []).filter((m) => m.body_fat_percent != null).map((m) => ({ date: m.date_local, pct: m.body_fat_percent })),
-      totalTonnage,
-      prs,
+      totalTonnage: seeStrength ? totalTonnage : 0,
+      prs: seeStrength ? prs : [],
     });
   })
 

@@ -25,6 +25,7 @@ import {
   type LoggedSetLike,
 } from "@kova/domain";
 import { type AppEnv } from "./auth-context.js";
+import { featureShaper } from "./client-flags.js";
 import { requireClientAccess } from "./clients.js";
 import { parseJson } from "./db.js";
 import { loadGoalTimeline, dayCalorieTarget } from "./goals.js";
@@ -216,10 +217,26 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
   const latestWeight = latestOf("weight_kg");
   const wRange = timeline.ranges.weightKg;
   const weightStatus = latestWeight != null && wRange ? rangeStatus(latestWeight, wRange.min, wRange.max) : null;
+  // Three of the four lenses are SOLD, so the payload is shaped by what this
+  // client's package includes rather than answered whole. The blocks keep their
+  // shape (empty series, null summaries) so every reader keeps working — a
+  // withheld lens reads as "no data", which is what the UI already renders for
+  // a client who logged nothing. `wellness` and `consistency` are governed by
+  // no flag and always ship. Staff get everything: `featureShaper` returns the
+  // permissive predicate for any non-client caller.
+  const may = await featureShaper(c, clientId);
+  const seeBody = may("bodyMetrics");
+  const seeTraining = may("exerciseReport");
+  const seeNutrition = may("nutritionReports");
+  const noSeries: { d: string; v: number }[] = [];
   return c.json({
     range: { start, end, days },
     today,
-    body: {
+    // `included` is the shaping, declared. Without it the client cannot tell a
+    // lens their package excludes from one they simply have no data for, and
+    // neither can anyone reading a bug report.
+    included: { body: seeBody, training: seeTraining, nutrition: seeNutrition },
+    body: seeBody ? {
       weight, bodyFat, waist, chest, hips, posture, leanMass, fatMass, ffmi,
       ranges: timeline.ranges,
       latest: {
@@ -230,9 +247,23 @@ export const progressRoutes = new Hono<AppEnv>().get("/progress/:clientId", asyn
         weightStatus,
       },
       deltas: { weight: deltaOf(weight), bodyFat: deltaOf(bodyFat), waist: deltaOf(waist), chest: deltaOf(chest), hips: deltaOf(hips) },
+    } : {
+      weight: noSeries, bodyFat: noSeries, waist: noSeries, chest: noSeries, hips: noSeries,
+      posture: noSeries, leanMass: noSeries, fatMass: noSeries, ffmi: noSeries,
+      ranges: {},
+      latest: {
+        weightKg: null, bodyFatPct: null, waistCm: null, neckCm: null, hipsCm: null, chestCm: null,
+        leanMassKg: null, fatMassKg: null, ffmi: null,
+        somatotype: null, postureSeverity: null, postureCva: null, weightStatus: null,
+      },
+      deltas: { weight: null, bodyFat: null, waist: null, chest: null, hips: null },
     },
-    nutrition: { perDay: nutritionPerDay, targets, adherencePct: calorieAdherencePct(calByDay, calTargetForDay), loggedDays: foodDays.size },
-    training: { perDay: trainingPerDay, weekly, totalTonnage: Math.round(totalTonnage), totalSets, workoutDays: workoutDaySet.size, prs },
+    nutrition: seeNutrition
+      ? { perDay: nutritionPerDay, targets, adherencePct: calorieAdherencePct(calByDay, calTargetForDay), loggedDays: foodDays.size }
+      : { perDay: [], targets, adherencePct: null, loggedDays: 0 },
+    training: seeTraining
+      ? { perDay: trainingPerDay, weekly, totalTonnage: Math.round(totalTonnage), totalSets, workoutDays: workoutDaySet.size, prs }
+      : { perDay: [], weekly: [], totalTonnage: 0, totalSets: 0, workoutDays: 0, prs: [] },
     wellness: {
       perDay: wellnessPerDay,
       averages: { mood: avgMood, energy: avgEnergy, stress: avgStress, sleepQuality: avgSleepQ, sleepHours: avgSleepHours },

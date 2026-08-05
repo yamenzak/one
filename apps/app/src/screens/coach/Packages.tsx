@@ -1,8 +1,8 @@
 /** Package editor + redemption codes + promo codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Textarea, Switch, Sheet, Chip, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X, PencilLine, Archive, RotateCcw, AlertTriangle, Group, Row, Eyebrow, ActionResult, Disclosure } from "@4dl/ui";
-import { CLIENT_FLAG_META, CLIENT_FLAG_CATEGORIES, SELLABLE_CLIENT_FLAG_KEYS, DEFAULT_CLIENT_FLAGS, type ClientFlags } from "@kova/domain";
+import { Button, Card, Badge, Field, Textarea, Switch, Sheet, Chip, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, Callout, CreditCard, Ticket, Tag, Trash2, Plus, X, PencilLine, Archive, RotateCcw, AlertTriangle, Group, Row, Eyebrow, ActionResult, Disclosure } from "@4dl/ui";
+import { BUDGET_SCOPES, CLIENT_FLAG_META, CLIENT_FLAG_CATEGORIES, SELLABLE_CLIENT_FLAG_KEYS, DEFAULT_CLIENT_FLAGS, packageContradictions, type ClientFlags, type PackageContradiction } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
 import { FeatureLock } from "../../FeatureLock.js";
@@ -10,6 +10,19 @@ import { fmtPrice } from "../../money.js";
 
 type BudgetFeature = "all" | "workout" | "meal";
 const BUDGET_FEATURES: readonly BudgetFeature[] = ["all", "workout", "meal"];
+
+/** What a budget scope is called in the coach's words, not the column's. */
+const SCOPE_WORD: Record<string, string> = { workout: "training", meal: "meal" };
+const listFlags = (keys: readonly (keyof ClientFlags)[]) =>
+  keys.map((k) => `“${CLIENT_FLAG_META[k].label}”`).join(" and ");
+
+/** One contradiction, said in terms of what the client will experience. */
+function contradictionText(c: PackageContradiction): string {
+  const word = SCOPE_WORD[c.scope] ?? c.scope;
+  return c.kind === "budget-buys-nothing"
+    ? `This package sells ${word} days, but ${listFlags(c.flags)} ${c.flags.length > 1 ? "are" : "is"} switched off — so those days unlock nothing. Clients still pay for them and still watch them count down.`
+    : `${listFlags(c.flags)} ${c.flags.length > 1 ? "are" : "is"} on, but there are no ${word} days in this package. Access follows the days, so clients won't get ${c.flags.length > 1 ? "them" : "it"}.`;
+}
 type PkgFlags = Partial<Record<keyof ClientFlags, boolean>>;
 
 interface Pkg {
@@ -461,6 +474,10 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
     ?? (priceMode === "monthly" && !parsed.cents ? "A monthly package needs a price."
       : null);
   const badDays = budgets.some((b) => !Number.isInteger(b.days) || b.days < 1);
+  // Days and toggles are set independently and can disagree in both directions.
+  // Reported, never enforced — see `packageContradictions`. The coach sees what
+  // the combination will actually do and decides; nothing blocks the save.
+  const contradictions = packageContradictions(flags, budgets, BUDGET_SCOPES);
   const canSave = name.trim().length >= 2 && budgets.length > 0 && !badDays && !priceError
     && !(visibility === "client_specific" && !restrictedClientId);
 
@@ -586,6 +603,16 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
               </div>
             );
           })}
+
+          {/* The days and the toggles are two independent controls that decide
+              one thing between them, so the builder says what the combination
+              will actually do. A warning, not a block — see
+              `packageContradictions`. */}
+          {contradictions.map((ct) => (
+            <Callout key={`${ct.kind}:${ct.scope}`} tone="warning" icon={AlertTriangle}>
+              {contradictionText(ct)}
+            </Callout>
+          ))}
         </div>
 
         <div className="flex items-center justify-between"><span className="text-sm">Once per customer</span><Switch checked={oncePerCustomer} onCheckedChange={setOncePerCustomer} /></div>

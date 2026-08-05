@@ -445,6 +445,29 @@ remote bindings without editing the config (this is what the E2E suite does).
 - **Two flag systems** (don't merge): platform entitlements (tenant bought from
   Kova, `entitlements.ts`) vs per-package client flags (client bought from the
   tenant, `clientFlags.ts`). Client capability = the intersection.
+  - **A capability a package SELLS must be checked by a route, and hiding a tab
+    is not checking it.** The package builder auto-renders a toggle for every
+    entry in `SELLABLE_CLIENT_FLAG_KEYS`, so adding a flag is one line and
+    forgetting to enforce it is invisible. `/api/progress` shipped that way: no
+    gate at all, four lenses in one payload, and the app hiding three of them —
+    so a client whose package excluded the strength report still received every
+    PR and the whole tonnage series over the wire. `scripts/flag-enforcement.test.mjs`
+    (in `pnpm gate`) now fails on any feature that names a `clientFlag` and is
+    not named by a `gateFeature`/`featureShaper` call in `apps/api/src`.
+  - **A route that answers with several features SHAPES, it does not 403** —
+    `featureShaper` in `client-flags.ts`. Refusing `/api/progress` outright would
+    take the ungated wellness and consistency lenses down with the sold ones.
+    `included: {body, training, nutrition}` reports the shaping so a withheld
+    lens is distinguishable from an empty one.
+  - **`uiOnly` is the one honest exemption**, and it holds exactly one feature:
+    `macroBreakdown` computes from the client's own food entries, so there is
+    nothing a route could withhold without breaking logging. Adding a second
+    entry means editing `EXPECTED_UI_ONLY` in the guard, on purpose, in review.
+  - **Budgets and flags can contradict, and the builder says so** —
+    `packageContradictions` (pure, `clientFlags.ts`). Meal days sold with both
+    meal-gated flags off buy nothing and still count down; a meal flag on with no
+    meal days resolves off anyway. Reported in the package editor, never
+    refused — a studio may have a reason, and the coach decides.
 - **The host IS the tenancy** (read this before touching routing or auth).
   `@4dl/tenancy` `hosts.ts` classifies every hostname into five doors:
   `kova.4dl.app` = a signpost (not an app, refuses to send a sign-in code),

@@ -191,6 +191,26 @@ test("the coach's studio", async () => {
     });
   }
 
+  // The package editor, driven into the state that prompted the coherence check:
+  // meal days sold with the meal plan switched off, so the days buy nothing. The
+  // warning is computed, not seeded, which is why this drives the controls
+  // rather than photographing a fixture.
+  await test.step("a package whose days and toggles disagree", async () => {
+    await visit(page, `${base}/business`, shell);
+    await page.getByRole("tab", { name: "Packages", exact: true }).first().click();
+    await page.getByRole("button", { name: "New", exact: true }).click();
+    await page.getByLabel("Name").fill("Training + meals");
+    // A second budget row, switched to `meal` — the package now sells meal days.
+    await page.getByRole("button", { name: "+ Budget" }).click();
+    await page.locator("button", { hasText: /^meal$/ }).last().click();
+    // …and the meal capabilities off, which is what makes those days dead.
+    await page.getByRole("switch").and(page.locator(`xpath=//div[div/div[text()="Meal plan"]]//button`)).click();
+    await page.getByRole("switch").and(page.locator(`xpath=//div[div/div[text()="Swap meal options"]]//button`)).click();
+    await page.getByText(/those days unlock nothing/).scrollIntoViewIfNeeded();
+    await shoot(page, project, "coach-package-contradiction", { ready: page.getByText(/those days unlock nothing/) });
+    await page.keyboard.press("Escape");
+  });
+
   // The install nudge's guide sheet. Chromium at a desktop viewport resolves to
   // the `desktop` platform, so this photographs those steps — the iOS copy is
   // the same component with a different row of the GUIDE table.

@@ -170,3 +170,37 @@ export async function gateFeature(
   }
   return null;
 }
+
+/**
+ * `gateFeature`'s SHAPING counterpart, for a route that answers with several
+ * features in one payload.
+ *
+ * `/api/progress` is the case that forced it: one response carries the body,
+ * training, nutrition and wellness lenses, and only the first three are sold.
+ * A 403 is the wrong answer there — refusing the response takes the ungated
+ * wellness and consistency lenses down with it — so the route serves what the
+ * package includes and withholds the rest. The UI already hid those lenses;
+ * until this existed, it hid them from the SCREEN while the wire still carried
+ * every PR, every body-fat reading and every calorie day to a client whose
+ * package excluded them. Hiding a tab is a layout decision, not enforcement.
+ *
+ * Returns a predicate over feature keys. Staff get `() => true`: a client's
+ * package never bounds their coach.
+ */
+export async function featureShaper(
+  c: Context<AppEnv>,
+  clientId: string,
+): Promise<(feature: FeatureKey) => boolean> {
+  const tenantId = c.get("tenantId");
+  if (c.get("role") !== "client" || !tenantId) return () => true;
+  const [flags, entitlements] = await Promise.all([
+    resolveClientFlagsFor(c.env.DB, tenantId, clientId),
+    tenantEntitlements(c.env.DB, tenantId),
+  ]);
+  return (feature: FeatureKey) => {
+    const gate = gateSpecOf(feature);
+    if (gate.entitlement && !entitlements.features[gate.entitlement]) return false;
+    if (gate.clientFlag && !flags[gate.clientFlag]) return false;
+    return true;
+  };
+}
