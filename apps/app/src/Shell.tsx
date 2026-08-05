@@ -64,6 +64,24 @@ export function Shell() {
   const { ctx, host } = useSession();
   const active = ctx!.active!;
   const loc = useLocation();
+
+  /*
+    EVERY ROUTE OPENS AT THE TOP.
+
+    This lived in `TabLayout`, which meant it covered the tabbed surfaces and
+    nothing else — so Settings, the inbox, the media library, the plan builders
+    and the credit ledger all inherited the scroll position of the screen you
+    left. Tapping "See all" from the credit strip, which sits two thirds of the
+    way down Business, opened the new page two thirds of the way down: it reads
+    as a page that lost its header, not as a page that kept your place.
+
+    `useLayoutEffect`, not `useEffect`: the reset has to land BEFORE paint, or
+    the old offset is visible for a frame. It sits here rather than in each
+    screen because "a new screen starts at its beginning" is a fact about
+    navigation, and a fact belongs in one place.
+  */
+  useLayoutEffect(() => { window.scrollTo(0, 0); }, [loc.pathname]);
+
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
   const gateClientId = active.role === "client" ? active.clientId : null;
   useEffect(() => {
@@ -221,7 +239,10 @@ function TabLayout() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-  useLayoutEffect(() => { window.scrollTo(0, 0); setScrolled(false); }, [loc.pathname]);
+  // The SCROLL reset itself now lives in `Shell` (one home, every route). What
+  // stays here is the pill state it implies: a page that opens at the top opens
+  // with a bare app bar, and `scroll` will not fire to tell us so.
+  useLayoutEffect(() => { setScrolled(false); }, [loc.pathname]);
 
   const enterTrainMode = async () => {
     if (!active.clientId) { await api.post("/api/clients/self"); await refresh(); }
