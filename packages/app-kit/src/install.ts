@@ -9,16 +9,24 @@
  * This is platform mechanics with no product vocabulary in it, which is why it
  * lives here rather than in an app. What a nudge SAYS is the app's.
  *
- * ── The three answers, and why there are three ───────────────────────────────
+ * ── The four answers ─────────────────────────────────────────────────────────
  *
+ *   unknown       We have not waited long enough to say. `beforeinstallprompt`
+ *                 fires asynchronously, so this is the honest answer for the
+ *                 first moment of every page — see `InstallMode`.
  *   installed     Already running from the home screen. Nothing to ask.
  *   installable   Chromium fired `beforeinstallprompt`, so there is a real
- *                 one-tap install and we hold the event that triggers it.
+ *                 one-tap install and we hold the event that triggers it. This
+ *                 is ANDROID CHROME's normal state on a site that meets the
+ *                 install criteria (manifest, icons, a service worker with a
+ *                 fetch handler) — Android is not the manual lane.
  *   manual        It can be installed, but only by hand through the browser's
  *                 own menu. This is EVERY iPhone and iPad: WebKit has no
  *                 install API at all, by policy, and never fires the event —
  *                 so an app that only listens for it shows nothing to the
- *                 platform whose users most need telling.
+ *                 platform whose users most need telling. Also anywhere the
+ *                 install criteria are not met, which includes any environment
+ *                 that blocks the service worker (the screenshot suite does).
  *
  * The manual lane is the reason this hook exists rather than a two-line
  * `useState` around the event.
@@ -39,8 +47,32 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-/** How the app is being run, and what we can offer. */
-export type InstallMode = "installed" | "installable" | "manual";
+/**
+ * How the app is being run, and what we can offer.
+ *
+ * `unknown` is the fourth one and it is not padding. `beforeinstallprompt`
+ * fires ASYNCHRONOUSLY — after load, once Chromium has checked its install
+ * criteria — so a hook that reports `manual` the moment it mounts renders the
+ * "no install here" affordance on an ANDROID PHONE THAT HAS ONE, then changes
+ * the button's verb under the reader's thumb a second later. Tap inside that
+ * window and you get a page of instructions for a dialog the browser was about
+ * to open for you.
+ *
+ * So: say nothing until Chromium has had its beat. A nudge that appears a
+ * moment late is invisible; a nudge that changes what it does while you are
+ * reaching for it is not.
+ */
+export type InstallMode = "unknown" | "installed" | "installable" | "manual";
+
+/**
+ * How long to wait for `beforeinstallprompt` before concluding there isn't one.
+ *
+ * Generous on purpose, and the asymmetry is the whole argument: waiting too
+ * long costs a row appearing slightly late on a screen nobody has finished
+ * reading, and waiting too little costs the label flip above. Chromium fires
+ * within a few hundred milliseconds of load in practice.
+ */
+const PROMPT_GRACE_MS = 1200;
 
 /** Which set of instructions the manual lane needs. */
 export type InstallPlatform = "ios" | "android" | "desktop";
@@ -80,6 +112,20 @@ export function installPlatform(): InstallPlatform {
   return "desktop";
 }
 
+/**
+ * The mode, derived from the three facts that decide it.
+ *
+ * Pulled out of the hook and exported so the ORDER can be tested without a DOM
+ * or a React renderer — the order is the whole rule, and it is the part that
+ * was wrong: reporting `manual` before `settled` is what put the "no install
+ * here" affordance on Android phones that had one.
+ */
+export function resolveInstallMode(installed: boolean, hasPrompt: boolean, settled: boolean): InstallMode {
+  if (installed) return "installed";
+  if (hasPrompt) return "installable";
+  return settled ? "manual" : "unknown";
+}
+
 export interface InstallState {
   mode: InstallMode;
   platform: InstallPlatform;
@@ -97,6 +143,8 @@ export interface InstallState {
 export function useInstallState(): InstallState {
   const [installed, setInstalled] = useState(isInstalled);
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  /** Has Chromium had its beat to fire `beforeinstallprompt`? See `InstallMode`. */
+  const [settled, setSettled] = useState(false);
 
   useEffect(() => {
     /*
@@ -110,6 +158,8 @@ export function useInstallState(): InstallState {
     const onPrompt = (e: Event) => {
       e.preventDefault();
       setDeferred(e as BeforeInstallPromptEvent);
+      // The answer arrived early — no reason to keep waiting for the deadline.
+      setSettled(true);
     };
     const onInstalled = () => { setDeferred(null); setInstalled(true); };
     window.addEventListener("beforeinstallprompt", onPrompt);
@@ -122,10 +172,13 @@ export function useInstallState(): InstallState {
     const sync = () => setInstalled(isInstalled());
     mqs.forEach((m) => m.addEventListener?.("change", sync));
 
+    const deadline = setTimeout(() => setSettled(true), PROMPT_GRACE_MS);
+
     return () => {
       window.removeEventListener("beforeinstallprompt", onPrompt);
       window.removeEventListener("appinstalled", onInstalled);
       mqs.forEach((m) => m.removeEventListener?.("change", sync));
+      clearTimeout(deadline);
     };
   }, []);
 
@@ -145,7 +198,7 @@ export function useInstallState(): InstallState {
   }, [deferred]);
 
   return {
-    mode: installed ? "installed" : deferred ? "installable" : "manual",
+    mode: resolveInstallMode(installed, deferred != null, settled),
     platform: installPlatform(),
     promptInstall,
   };

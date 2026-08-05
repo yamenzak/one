@@ -100,7 +100,10 @@ export function InstallAppCard() {
   const [guide, setGuide] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  if (mode === "installed" || snoozed) return null;
+  // `unknown` too: for the first beat after load we do not yet know whether this
+  // browser has a one-tap install, and a row that says "How" and then says
+  // "Install" a second later is worse than a row that arrives a second late.
+  if (mode === "installed" || mode === "unknown" || snoozed) return null;
 
   const studio = host?.tenant?.name ?? "the app";
   const snooze = () => {

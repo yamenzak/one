@@ -14,7 +14,7 @@
  * derived from the URL.
  */
 
-import { test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { buildDemoWorld, DEMO_CLIENT, DEMO_STUDIO, prepare, type DemoWorld } from "../src/demo.js";
 import { shoot, visit } from "../src/shoot.js";
 import { teardown } from "../src/provision.js";
@@ -41,7 +41,10 @@ test("the coach's studio", async () => {
 
   await test.step("today", async () => {
     await visit(page, `${base}/today`, shell);
-    await shoot(page, project, "coach-today", { settle: 600 });
+    // 1500 > `PROMPT_GRACE_MS`: the install nudge deliberately says nothing
+    // until Chromium has had its beat to fire `beforeinstallprompt`, so a
+    // shorter settle photographs a Today screen with the row missing.
+    await shoot(page, project, "coach-today", { settle: 1500 });
   });
 
   await test.step("roster", async () => {
@@ -198,6 +201,9 @@ test("the coach's studio", async () => {
     // skipping — a step that silently photographs nothing is a step that reports
     // success for a screen nobody has looked at.
     const how = page.getByRole("button", { name: /^(How|Install)$/ }).first();
+    // The row holds itself back for `PROMPT_GRACE_MS`, so wait for it rather
+    // than asserting on a control that is correctly not there yet.
+    await expect(how).toBeVisible({ timeout: 15_000 });
     await how.click();
     await shoot(page, project, "install-guide", { ready: page.getByRole("button", { name: "Not now" }) });
     await page.keyboard.press("Escape");
@@ -235,7 +241,8 @@ test("the client's app", async () => {
 
   await test.step("today", async () => {
     await visit(page, `${base}/today`, shell);
-    await shoot(page, project, "client-today", { settle: 800 });
+    // See coach-today: outlast the install nudge's grace window.
+    await shoot(page, project, "client-today", { settle: 1500 });
   });
 
   await test.step("train", async () => {

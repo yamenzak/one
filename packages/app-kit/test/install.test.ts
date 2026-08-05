@@ -17,7 +17,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { installPlatform, isInstalled } from "../src/install.js";
+import { installPlatform, isInstalled, resolveInstallMode } from "../src/install.js";
 
 /** Stand up just enough `window`/`navigator`/`document` for the two readers. */
 function browser(opts: {
@@ -93,5 +93,39 @@ describe("installPlatform", () => {
   it("falls back to desktop for anything it cannot place", () => {
     browser({ ua: "SomeBrowser/1.0" });
     expect(installPlatform()).toBe("desktop");
+  });
+});
+
+
+/**
+ * THE GRACE WINDOW — the Android bug the fourth mode exists for.
+ *
+ * `beforeinstallprompt` fires after Chromium has checked its install criteria,
+ * not on mount. Without the wait, an Android phone with a perfectly good
+ * one-tap install renders the "no install here" affordance first and swaps the
+ * button's verb a second later — and a tap inside that window opens a page of
+ * instructions for a dialog the browser was about to open itself.
+ *
+ * The ORDER is the rule, which is why it is a pure function rather than a
+ * rendered hook: the timer and the listeners are thin wiring, and the thing
+ * that was wrong was the precedence.
+ */
+describe("resolveInstallMode", () => {
+  it("says `unknown` before the window closes, so nothing renders too early", () => {
+    expect(resolveInstallMode(false, false, false)).toBe("unknown");
+  });
+
+  it("says `installable` the moment the event lands, without waiting the window out", () => {
+    expect(resolveInstallMode(false, true, false)).toBe("installable");
+  });
+
+  it("only says `manual` once the window has closed with no event — iOS, and not before", () => {
+    expect(resolveInstallMode(false, false, true)).toBe("manual");
+  });
+
+  it("lets `installed` outrank everything, including a stale held event", () => {
+    // `appinstalled` clears the event, but the two are independent signals and
+    // a nudge inside the installed app is the one outcome with no excuse.
+    expect(resolveInstallMode(true, true, true)).toBe("installed");
   });
 });

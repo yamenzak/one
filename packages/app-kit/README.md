@@ -72,6 +72,13 @@ passkeys.
 this running from the home screen, is there a real one-tap install here, and
 which platform's instructions apply if there is not.
 
+**Android is not the manual lane.** Chrome fires `beforeinstallprompt` on any
+site meeting the install criteria — manifest, a 192 and a 512 icon, a service
+worker with a fetch handler — so `mode` is `installable` there and the app gets
+Chrome's own install dialog on one tap. If you are seeing `manual` on Android,
+the criteria are not being met; the screenshot suite is the deliberate case
+(`serviceWorkers: "block"`).
+
 The third is the reason it exists. An install nudge written against
 `beforeinstallprompt` alone shows **nothing on iOS** — WebKit ships no install
 API by policy, so the event never fires and the only route is Share → Add to
@@ -79,7 +86,17 @@ Home Screen. That is not an edge case to degrade into; on a consumer product it
 is most of the audience. So `mode` has a `manual` value alongside `installable`,
 and the app is expected to have something to say in it.
 
-Two details that are wrong in every naive version:
+`mode` has a FOURTH value, `unknown`, and it is not padding. The event fires
+asynchronously, after Chromium has checked its criteria — so a hook that
+reports `manual` on mount renders the "no install here" affordance on an
+Android phone that has one, and then changes the button's verb under the
+reader's thumb. Tap inside that window and you get instructions for a dialog
+the browser was about to open. `unknown` holds for `PROMPT_GRACE_MS` (1.2s) or
+until the event arrives, whichever is first, and callers render nothing. A
+nudge that appears a moment late is invisible; one that changes what it does
+while you reach for it is not.
+
+Two more details that are wrong in every naive version:
 
 - **`isInstalled` reads three signals.** `display-mode: standalone` is the spec
   answer, `navigator.standalone` is iOS's own (and the only one older iOS
