@@ -1,7 +1,7 @@
 /** Package editor + redemption codes + promo codes. */
 
 import { useCallback, useEffect, useState } from "react";
-import { Button, Card, Badge, Field, Textarea, Switch, Sheet, Chip, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X, PencilLine, Archive, RotateCcw, AlertTriangle, Group, Row, Eyebrow, ActionResult } from "@4dl/ui";
+import { Button, Card, Badge, Field, Textarea, Switch, Sheet, Chip, Select, Page, Stagger, EmptyState, IconBadge, SectionHeader, ConfirmDialog, Reveal, SkeletonHeader, SkeletonList, CreditCard, Ticket, Tag, Trash2, Plus, X, PencilLine, Archive, RotateCcw, AlertTriangle, Group, Row, Eyebrow, ActionResult, Disclosure } from "@4dl/ui";
 import { CLIENT_FLAG_META, CLIENT_FLAG_CATEGORIES, SELLABLE_CLIENT_FLAG_KEYS, DEFAULT_CLIENT_FLAGS, type ClientFlags } from "@kova/domain";
 import { api, errorText } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -29,13 +29,36 @@ interface Pkg {
 }
 interface ClientOpt { id: string; displayName: string }
 interface AddOnType { id: string; label: string; duration_minutes: number }
-interface Code { id: string; code: string; days_to_add: number; target_feature: string; used_count: number; max_uses: number; restricted_package_id?: string | null; restricted_subject_id?: string | null }
+interface Code { id: string; code: string; days_to_add: number; target_feature: string; used_count: number; max_uses: number; expires_at?: string | null; active?: number; restricted_package_id?: string | null; restricted_subject_id?: string | null }
 interface Promo { id: string; code: string; discount_type: string; percent_off: number | null; amount_off_cents: number | null; redemption_count: number; max_redemptions: number | null; restricted_package_id?: string | null; restricted_subject_id?: string | null; active: number }
 
-/** `marketplace` is what puts a package in every client's in-app Shop, where it
- *  can actually be bought — so it's labelled for that, not "Public" (there is no
- *  public web storefront that renders these). */
-const VISIBILITY_LABEL: Record<string, string> = { marketplace: "In client Shop", private: "Grant only", client_specific: "One client" };
+/**
+ * The three shelves, in the order a studio thinks about them: what is on sale,
+ * what one named person may buy, and what is only ever handed over.
+ *
+ * Order is deliberate — the marketplace first, because that is the one a coach
+ * opens this screen to check.
+ */
+const SECTIONS: { visibility: string; title: string; note: string }[] = [
+  { visibility: "marketplace", title: "On sale", note: "Every client sees these in their Shop and can buy them." },
+  { visibility: "client_specific", title: "By invitation", note: "Visible only to the one client each is pinned to." },
+  { visibility: "private", title: "Grant only", note: "Never on sale — staff hand these over from a client's Access screen." },
+];
+
+/**
+ * Why a code can no longer be redeemed, or null while it still can.
+ *
+ * Three separate reasons and they are not interchangeable: "Spent" is the
+ * studio's own success, "Expired" is a date they set, "Off" is a switch
+ * somebody flipped. Collapsing them into "unavailable" would lose the only
+ * information an owner looking at this list actually wants.
+ */
+function codeState(c: Code): string | null {
+  if (c.active === 0) return "Off";
+  if (c.expires_at && Date.parse(c.expires_at) < Date.now()) return "Expired";
+  if (c.used_count >= c.max_uses) return "Spent";
+  return null;
+}
 
 const priceLabel = (p: Pkg): string =>
   p.monthly_price_cents ? `${fmtPrice(p.monthly_price_cents)}/mo`
@@ -104,6 +127,10 @@ export function Packages() {
     finally { setRowBusy(null); }
   };
 
+  // Live first, everything spent/expired/off behind a fold — see the section.
+  const liveCodes = codes.filter((c) => codeState(c) === null);
+  const spentCodes = codes.filter((c) => codeState(c) !== null);
+
   return (
     <Page className="column space-y-4 p-4 pb-28">
     <FeatureLock feature="commerce">
@@ -147,43 +174,74 @@ export function Packages() {
           allows. Tapping the row edits it, so the pencil goes: never render a
           control for the thing the row already does.
         */
-        <Stagger>
-          <Group>
-            {packages.map((p) => {
-              const terms = [
-                ...p.budgets.map((b) => `${b.days}d ${b.feature}`),
-                p.once_per_customer ? "once per customer" : null,
-                VISIBILITY_LABEL[p.visibility] ?? p.visibility,
-              ].filter(Boolean).join(" · ");
-              return (
-                <Row
-                  key={p.id}
-                  /* No glyph: every package row would carry the same card, which
-                     distinguishes nothing (§7) and was eating the 48px the NAME
-                     needed — "12-week transformation" truncated its terms to
-                     "…once per customer · In c…" with an icon it shared with
-                     all three of its neighbours. */
-                  onClick={() => setEditing(p)}
-                  /* The TERMS, not the description: the description is the
-                     studio's sales copy and belongs where the client reads it
-                     (the Shop) and where it is written (the editor). What a
-                     coach scans this list for is what each package grants. */
-                  sub={terms}
-                  /* `Row` renders `trailing ?? (value + chevron)`, so the price
-                     has to be composed in here beside the button rather than
-                     passed as `value`. */
-                  trailing={
-                    <span className="flex shrink-0 items-center gap-0.5">
-                      <span className="numeral pr-1 text-body-lg">{priceLabel(p)}</span>
-                      <Button size="icon" variant="ghost" className="text-muted-foreground" disabled={rowBusy === p.id} aria-label={`Archive ${p.name}`} onClick={(e) => { e.stopPropagation(); setToArchive(p); }}><Archive /></Button>
-                    </span>
-                  }
-                >
-                  {p.name}
-                </Row>
-              );
-            })}
-          </Group>
+        /*
+          SECTIONED BY VISIBILITY, because they are three different jobs.
+
+          One list mixed what the studio SELLS with what it only ever hands out,
+          and every row spent part of its sub-line repeating which it was — so
+          the marketplace could not be read without reading the whole list, and
+          "In client Shop" appeared as often as the packages it described. A
+          repeated token across every sibling is texture, not identity (§7): it
+          belongs in the heading, once.
+
+          It also answers the "should grant-only packages stop being packages"
+          question the right way round. They should stay packages — a grant has
+          to name what it granted, and `subject_package_grants` records it by id
+          — but they should stop crowding the shelf.
+        */
+        /* `space-y-5` on the container, not `space-y-2` inside each section:
+           the sections are siblings, and without it a section's closing note sat
+           flush against the next section's eyebrow — two different things at the
+           same distance, which reads as one paragraph. */
+        <Stagger className="space-y-5">
+          {SECTIONS.map(({ visibility, title, note }) => {
+            const rows = packages.filter((p) => (p.visibility || "marketplace") === visibility);
+            if (rows.length === 0) return null;
+            return (
+              <section key={visibility} className="space-y-2">
+                <Eyebrow action={<Badge tone="neutral">{rows.length}</Badge>}>{title}</Eyebrow>
+                <Group>
+                  {rows.map((p) => {
+                    // The visibility token is GONE from the terms — the heading
+                    // above says it, and it was the longest thing in the line.
+                    const terms = [
+                      ...p.budgets.map((b) => `${b.days}d ${b.feature}`),
+                      p.once_per_customer ? "once per customer" : null,
+                    ].filter(Boolean).join(" · ");
+                    return (
+                      <Row
+                        key={p.id}
+                        /* No glyph: every package row would carry the same card, which
+                           distinguishes nothing (§7) and was eating the 48px the NAME
+                           needed — "12-week transformation" truncated its terms to
+                           "…once per customer · In c…" with an icon it shared with
+                           all three of its neighbours. */
+                        onClick={() => setEditing(p)}
+                        /* The TERMS, not the description: the description is the
+                           studio's sales copy and belongs where the client reads it
+                           (the Shop) and where it is written (the editor). What a
+                           coach scans this list for is what each package grants. */
+                        sub={terms}
+                        divider={p.id !== rows[rows.length - 1]!.id}
+                        /* `Row` renders `trailing ?? (value + chevron)`, so the price
+                           has to be composed in here beside the button rather than
+                           passed as `value`. */
+                        trailing={
+                          <span className="flex shrink-0 items-center gap-0.5">
+                            <span className="numeral pr-1 text-body-lg">{priceLabel(p)}</span>
+                            <Button size="icon" variant="ghost" className="text-muted-foreground" disabled={rowBusy === p.id} aria-label={`Archive ${p.name}`} onClick={(e) => { e.stopPropagation(); setToArchive(p); }}><Archive /></Button>
+                          </span>
+                        }
+                      >
+                        {p.name}
+                      </Row>
+                    );
+                  })}
+                </Group>
+                <p className="px-1 text-xs text-muted-foreground">{note}</p>
+              </section>
+            );
+          })}
         </Stagger>
       )}
 
@@ -209,18 +267,56 @@ export function Packages() {
         </>
       )}
 
+      {/*
+        A SPENT CODE IS KEPT, AND STOPS BEING IN THE WAY.
+
+        Not deleted: `used_by_json` records who redeemed it and when, and that
+        is the only trace of days somebody was actually given — the same reason
+        `subject_package_grants` is append-only. Deleting also frees the string
+        to be re-issued, and a re-issued code with no history is a code nobody
+        can prove was already used.
+
+        But a code with nothing left on it is not an action, and a list of them
+        buries the ones that are. So the section shows what can still be
+        redeemed, and everything else folds away behind a count.
+      */}
       <Eyebrow className="pt-2" action={<Button size="sm" onClick={() => setCodeOpen(true)}><Plus /> Code</Button>}>Redemption codes</Eyebrow>
       {codes.length === 0 ? <p className="px-1 text-xs text-muted-foreground">One-off access codes you can hand to a client to redeem.</p> : (
-        <Group>
-          {codes.map((c) => (
-            <Row
-              key={c.id}
-              sub={`${c.days_to_add}d ${c.target_feature} · used ${c.used_count}/${c.max_uses}`}
-            >
-              <span className="font-mono">{c.code}</span>
-            </Row>
-          ))}
-        </Group>
+        <>
+          {liveCodes.length > 0 ? (
+            <Group>
+              {liveCodes.map((c, i) => (
+                <Row
+                  key={c.id}
+                  sub={`${c.days_to_add}d ${c.target_feature}`}
+                  divider={i < liveCodes.length - 1}
+                  value={`${c.max_uses - c.used_count} left`}
+                >
+                  <span className="font-mono">{c.code}</span>
+                </Row>
+              ))}
+            </Group>
+          ) : (
+            <p className="px-1 text-xs text-muted-foreground">Every code has been used. Make another to hand out.</p>
+          )}
+          {spentCodes.length > 0 && (
+            <Disclosure label={`Used & expired (${spentCodes.length})`}>
+              <Group>
+                {spentCodes.map((c, i) => (
+                  <Row
+                    key={c.id}
+                    sub={`${c.days_to_add}d ${c.target_feature} · used ${c.used_count}/${c.max_uses}`}
+                    divider={i < spentCodes.length - 1}
+                    trailing={<Badge tone="neutral">{codeState(c)}</Badge>}
+                  >
+                    <span className="font-mono text-muted-foreground">{c.code}</span>
+                  </Row>
+                ))}
+              </Group>
+              <p className="px-1 pt-2 text-xs text-muted-foreground">Kept as a record of who redeemed what — and so the same code can never be issued twice.</p>
+            </Disclosure>
+          )}
+        </>
       )}
 
       <Eyebrow className="pt-2" action={<Button size="sm" onClick={() => setPromoOpen(true)}><Plus /> Promo</Button>}>Promo codes</Eyebrow>

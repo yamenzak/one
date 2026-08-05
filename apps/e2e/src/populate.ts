@@ -553,10 +553,20 @@ export async function seedCommerce(studio: Studio): Promise<void> {
     { name: "Online coaching", description: "Rolling month, cancel any time.", monthlyPriceCents: 14_900, budgets: [{ feature: "all", days: 31 }], visibility: "marketplace" },
     { name: "Nutrition only", description: "Meal plans and food coaching.", monthlyPriceCents: 6_900, budgets: [{ feature: "meal", days: 31 }], visibility: "marketplace" },
     { name: "Trial week", oneTimePriceCents: 0, budgets: [{ feature: "all", days: 7 }], visibility: "private" },
+    { name: "Comeback comp", oneTimePriceCents: 0, budgets: [{ feature: "all", days: 30 }], visibility: "private" },
   ];
   try {
     for (const p of packages) await callJson(studio.page, studio.base, "/api/packages", p);
     await callJson(studio.page, studio.base, "/api/redemption-codes", { code: "WELCOME14", daysToAdd: 14, targetFeature: "all", maxUses: 25 });
+    /*
+      A DEAD code beside a live one. The Packages screen folds used, expired and
+      switched-off codes behind a count, and a list carrying only live codes
+      photographs the fold as absent — i.e. files the OLD behaviour under the new
+      shot id. An expiry in the past is the cheapest reachable dead state:
+      `maxUses` is `positive()` server-side, so a zero-use code cannot be made,
+      and actually redeeming one would need a client session mid-seed.
+    */
+    await callJson(studio.page, studio.base, "/api/redemption-codes", { code: "LAUNCH50", daysToAdd: 30, targetFeature: "all", maxUses: 1, expiresAt: dayBefore(20) });
     await callJson(studio.page, studio.base, "/api/promo-codes", { code: "SUMMER20", discountType: "percent", percentOff: 20, maxRedemptions: 50 });
   } catch (e) {
     console.warn(`[seedCommerce] skipped: ${String(e).slice(0, 200)}`);
