@@ -9,7 +9,8 @@
  *   setup.localhost:8789        where a workspace is created
  *   admin.localhost:8789        the operator console
  *   <slug>.localhost:8789       a workspace. The tenancy is pinned by this host.
- *   play.localhost:8790         the DEVICE door — a different WORKER, see below
+ *   play.localhost:8789         the DEVICE door — pairing, manifests, assets
+ *   localhost:8790              the PLAYER itself — a different WORKER, see below
  *
  * ⚠️ **Port 8789.** Kova's suite owns 8787 and Tessa's 8788. Sharing one would
  * make whichever suite ran second silently drive another product's worker, which
@@ -45,6 +46,18 @@ export const ROOT_URL = `http://${ROOT_DOMAIN}:${APP_PORT}`;
 export const SETUP_URL = `http://setup.${ROOT_DOMAIN}:${APP_PORT}`;
 export const ADMIN_URL = `http://admin.${ROOT_DOMAIN}:${APP_PORT}`;
 export const workspaceUrl = (slug: string): string => `http://${slug}.${ROOT_DOMAIN}:${APP_PORT}`;
+
+/**
+ * THE DEVICE DOOR — where every screen's pairing, manifest and asset request
+ * goes, and the only door that answers them.
+ *
+ * `play.` is not decoration: `@4dl/tenancy` classifies it as a door of its own
+ * and the route guard skips the whole member/standing engine for it, because a
+ * screen is a device with a pinned URL rather than a user session. Everywhere
+ * else those routes answer `{"error":"wrong_door"}` — which is exactly how the
+ * player's misconfigured API base surfaced when this suite first ran it.
+ */
+export const DEVICE_URL = `http://play.${ROOT_DOMAIN}:${APP_PORT}`;
 
 /** The player's own origin. No tenant in the hostname — see the header. */
 export const PLAYER_URL = `http://${ROOT_DOMAIN}:${PLAYER_PORT}`;

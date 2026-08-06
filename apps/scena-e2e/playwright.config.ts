@@ -93,17 +93,9 @@ export default defineConfig({
       // is wrangler serving `dist` and nothing else. It still has to be a
       // worker rather than `vite preview`, because the Service Worker
       // registration and the cache scope are what the offline half depends on.
-      /*
-        BUILT HERE, not by turbo, and with `VITE_API_BASE` pointed at this
-        suite's worker.
-
-        `API_BASE` is baked in at build time — the player is a separate origin
-        and cannot say `/api/…` — so a player built for production and served
-        here would call `scena.4dl.app` from a test. Building it in the command
-        keeps the port the suite owns and the port the player calls in one
-        place, which is the only way they cannot drift.
-      */
-      command: `VITE_API_BASE=http://localhost:${APP_PORT} pnpm --filter @scena/player build && pnpm --filter @scena/player exec wrangler dev --local --log-level ${logLevel} --port ${PLAYER_PORT} --inspector-port 9232`,
+      // Built by `globalSetup`, against this suite's port — see there for why
+      // it cannot be built here.
+      command: `pnpm --filter @scena/player exec wrangler dev --local --log-level ${logLevel} --port ${PLAYER_PORT} --inspector-port 9232`,
       url: `http://localhost:${PLAYER_PORT}/`,
       cwd: "../..",
       timeout: 180_000,

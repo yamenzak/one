@@ -271,6 +271,24 @@ loud, which is the only kind this repo has actually had.
   each spec creates its own studio + users, so runs never collide. Stop any
   `wrangler dev` you started with `pnpm dev` first — it shares `.wrangler` state.
   `E2E_SERVER_LOGS=1 pnpm e2e` un-mutes the worker's request log.
+  `pnpm e2e` runs EVERY app's suite through turbo — Kova's on :8787, Tessa's on
+  :8788, Scena's on :8789 (plus :8790 for its player, which is a second worker
+  because a screen is a device with its own pinned origin). The ports are not
+  taste: sharing one makes whichever suite runs second drive another product's
+  worker, and it fails as "element not found" rather than as a conflict.
+  ⚠️ **Scena has a SECOND config, `pnpm --filter @scena/e2e wall`**, and the
+  split is the same one Kova draws between its gate and its shots suite. `free`
+  allows ONE screen, so the two-screens-same-slide spec cannot run on the plan a
+  fresh workspace lands on — and the only route to a paid plan without Stripe is
+  a platform admin comping it. The GATE must never have that lane, so
+  `wall.config.ts` boots the worker with `--var ADMIN_EMAILS:` (an empty
+  allow-list turns on the development admin fallback) and never reuses a running
+  worker, because one already up is almost certainly the gate's.
+  ⚠️ **Scena's suite rebuilds `apps/scena-player/dist` against `play.localhost`**
+  (in `globalSetup` — see there for why not in the `webServer` command). CI
+  builds and deploys from separate clean checkouts so production is unaffected,
+  but a local checkout that has just run the suite holds a player pointed at a
+  test port: build again before deploying by hand.
 - `pnpm shots` — the SCREENSHOT suite (`apps/e2e/shots`,
   `shots.config.ts`). Seeds one demo studio through the real API — a comped
   `pro` plan, a ten-person roster, six weeks of a client's history, a published
@@ -716,7 +734,13 @@ Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
 The pricing and normalizer suites live
 in `apps/api/test` and are already *inside* the API count — the older
 "protocol/pricing/normalizer" phrasing double-counted them. **E2E is separate**
-(`pnpm e2e`, not part of `pnpm test`): 3 Playwright specs, ~40 s all in, all green.
+(`pnpm e2e`, not part of `pnpm test`): 3 Playwright specs for Kova, ~40 s all in,
+all green — plus Tessa's 2 and Scena's, each in its own package on its own port
+(**8787 Kova, 8788 Tessa, 8789 Scena + 8790 its player**). Sharing a port makes
+whichever suite runs second drive another product's worker, which fails as
+"element not found" rather than as a conflict; the same is true of wrangler's
+DEFAULT devtools inspector on 9229, so each suite past the first pins its own
+(`--inspector-port`, Tessa 9230, Scena 9231/9232).
 
 **Built and tested:** foundation, auth (OTP + passkeys, incl. autofill /
 conditional UI), tenancy + row-level scope, the AI suite (credits reserve →
@@ -880,7 +904,8 @@ by the size of the fleet. Stage 3 added the `device` door to `@4dl/tenancy` for
 exactly this (`play.` — opt-in per app, because `play` is a slug a Kova studio
 can hold today); the player worker still binds no D1 or R2 of its own.
 
-**Status: Stages 0–6 done, 7a+7b landed; the rest of 7 and 8–9 remain.** `SCHEMA_MODULES` in
+**Status: Stages 0–7 done (7a–7g), Stage 8's E2E harness landed; the shots
+suite, the rest of 8 and Stage 9 remain.** `SCHEMA_MODULES` in
 `apps/scena/src/db.ts` is the migration's progress bar — six entries now
 (`AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_RAIL_SCHEMA`, `STORAGE_SCHEMA`,
 `NOTIFY_SCHEMA`, `SCENA_SCHEMA`), and the diff that removes a table from Scena's
@@ -890,6 +915,42 @@ dependency order**: `NOTIFY_SCHEMA` ALTERs `tenant_settings`, which
 the ALTER and an owner's email veto silently never persists. Its resource ids
 are deliberately placeholders (the old account's real ids were replaced), so
 `deploy.yml` skips it until the Provision workflow runs.
+
+**The UI rewrite is done, and `docs/SCENA-UI-INVENTORY.md` is its record** —
+one section per sub-stage, each naming the defects it closed rather than the
+files it touched. Roughly twenty swallowed failures went with it, all the same
+shape: a `catch` that answers a failure with a confident fact. `catch(() => [])`
+on a two-second poll rendered "Create your first live board" over a workspace
+with five; `catch(() => setFeed(null))` made a dropped connection
+indistinguishable from a deleted record. **The rule that came out of it, and
+that every polling screen now follows: a failed poll is only shown while there
+is nothing to show.**
+
+Two of those were regressions Stage 7a caused, both silent, and both worth
+knowing about because the same trap is still open for anyone touching the
+palette: 7a moved the theme from a `.dark` CLASS to a `data-theme` ATTRIBUTE,
+which made `className="dark"` inert (the kiosk and the counter tablet stopped
+being dark) and — worse — left `brandCss` emitting `:root { …light… }` /
+`.dark { …dark… }`, so **a tenant's dark tokens applied nowhere and their light
+tokens were injected into the dark theme.** `apps/scena-app` has a test suite
+now (19 tests, its first) whose whole job is that neither can come back.
+
+⚠️ **`scripts/player-api-base.test.mjs` (in `pnpm gate`) exists because that
+constant ships un-reviewed and has been wrong twice.** It asserts the fallback
+is https, is not a local address, starts with `play.` and names `scena` — each
+a mistake this repo has made or came one edit from making.
+
+⚠️ **`apps/scena-e2e` builds the player itself, and must keep doing so.** The
+player is a separate origin, so `API_BASE` is baked in at build time from
+`VITE_API_BASE` — a variable set NOWHERE in this repo, which means the fallback
+is what ships. It was `http://localhost:8787`: unreachable from a television,
+and in this monorepo it is *Kova's* port. It must be the **device door**
+(`play.`) — the pairing, manifest and asset routes answer there and
+`{"error":"wrong_door"}` everywhere else, which the player surfaces as
+"offline — no cached channel yet", two steps removed from its cause. It is
+`https://play.scena.4dl.app` now, and the suite overrides it in `globalSetup` (not in the `webServer` command —
+`reuseExistingServer` means that command does not run when a wrangler is already
+listening, and the suite then drives yesterday's bundle).
 
 ⚠️ **Scena's erasure is DERIVED, and it has to stay that way.**
 `apps/scena/src/purge.ts` reads `tenantCascade(SCHEMA_MODULES)`;

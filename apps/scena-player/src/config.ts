@@ -1,24 +1,30 @@
 /**
- * WHERE THE EDGE API LIVES.
+ * WHERE THE EDGE API LIVES — the DEVICE DOOR, not the dashboard's.
  *
  * The player is its own worker on its own origin (`tv.4dl.app`), so unlike the
- * dashboard it cannot say `/api/…` and be done — every call is cross-origin by
+ * dashboard it cannot say `/api/…` and be done: every call is cross-origin by
  * design, and this constant is the whole of the player's knowledge of where
  * Scena is.
  *
- * ⚠️ THE FALLBACK USED TO BE `http://localhost:8787`, WHICH IS WRONG TWICE.
- * `VITE_API_BASE` is set nowhere in this repo — not in a `.env`, not in the
- * deploy workflow — so the fallback is what SHIPPED: a player at `tv.4dl.app`
- * whose every request went to a loopback address that does not exist on a
- * television. And 8787 is Kova's worker in this monorepo, so a developer
- * running the player locally against Scena was pointing it at another product.
+ * ⚠️ IT MUST BE `play.`, THE DEVICE DOOR. Stage 3 gave Scena that door
+ * precisely because a screen is not a user session — the pairing routes,
+ * manifests and assets answer there and `{"error":"wrong_door"}` anywhere else.
+ * `host-context.ts` calls the label "the one origin a whole fleet is pinned to",
+ * and changing it strands every device that has already cached the old one.
  *
- * So the fallback is Scena's real API origin, which is the correct answer for
- * every deployed screen, and `VITE_API_BASE` stays the override for local work
- * and for the E2E suite (which builds the player against its own port).
+ * ⚠️ AND THE FALLBACK IS WHAT SHIPS. `VITE_API_BASE` is set NOWHERE in this
+ * repo — not in a `.env`, not in `deploy.yml`, not in the wrangler config — so
+ * whatever is written here is what a television runs. It was
+ * `http://localhost:8787`, which is a loopback address no TV has and, in this
+ * monorepo, *Kova's* port. Both halves of that were wrong and neither failed
+ * anywhere a test could see it, because the player has no server-side suite and
+ * the E2E suite that would have caught it did not exist until Stage 8.
+ *
+ * `VITE_API_BASE` stays the override, for local work and for the E2E suite,
+ * which points it at its own `play.localhost` port.
  */
 export const API_BASE: string =
-  (import.meta.env.VITE_API_BASE as string | undefined) ?? "https://scena.4dl.app";
+  (import.meta.env.VITE_API_BASE as string | undefined) ?? "https://play.scena.4dl.app";
 
 /** localStorage key holding this screen's reserved DO id + ws path. */
 export const STORAGE_KEY = "scena.screen";

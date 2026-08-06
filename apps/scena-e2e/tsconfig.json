@@ -9,5 +9,5 @@
     "sourceMap": false,
     "noEmit": true
   },
-  "include": ["playwright.config.ts", "src/**/*", "tests/**/*"]
+  "include": ["playwright.config.ts", "wall.config.ts", "src/**/*", "tests/**/*", "wall/**/*"]
 }

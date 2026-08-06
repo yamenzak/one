@@ -125,7 +125,7 @@ Splitting it, because "21,910 lines" is not a task and these are:
 | **7e** | ScreenDetail + Studio + LiveBoards — the product's core surfaces | most design judgement, do last when the vocabulary is settled |
 | **7f** | Station / Kiosk / BoardControl — the shared-device surfaces | different rules, small |
 | **7g** | Builder restyle (tokens + motion + loading only) | explicitly bounded by §4.5 |
-| **7h** | Shots suite + the design review | the images are the deliverable |
+| **7h** | Shots suite + the design review | the images are the deliverable. **Merged into Stage 8 — see the §7h/8 section below for why they are not separable.** |
 
 ---
 
@@ -675,3 +675,210 @@ inconsistency — every other confirmation in the app is `ConfirmDialog` — but
 replacing it inside a `<Link onClick>` means making navigation async, which is
 a rebuild of the leave path rather than a restyle. It is listed here so the
 next person finds it named rather than discovers it.
+
+
+---
+
+## 7h / Stage 8 — proving it, and what the proof found
+
+**The order in the plan is wrong, and this is the correction.** 7h ("shots
+suite + design review") and Stage 8 ("prove it — E2E") were listed as separate
+sub-stages, and 7h was first. They are not separable: a screenshot suite is an
+E2E suite that photographs instead of asserting, and both need the same
+harness — a worker on a port nobody else owns, a `*.localhost` topology, an OTP
+read out of Miniflare's D1 file, a session cookie carried across hosts. Building
+that twice would be building it wrong once. So the harness landed first, and the
+shots suite rides on it.
+
+### What the suite is, and why it is not the integration suite
+
+`apps/scena/test` is 204 tests through Miniflare and covers the schema, the
+cascade, the boards, the storage ledger and every refusal. What it structurally
+cannot see is the browser — and in a signage product the browser is half the
+system:
+
+- a pairing code that renders but never claims,
+- a publish that answers `200` while the screen keeps the old manifest,
+- two screens that drift apart.
+
+None of those is a route bug and none of them fails a server test.
+
+### Port hygiene, which sounds like trivia and is not
+
+Kova's suite owns 8787 and Tessa's 8788, and each writes into its own
+`.wrangler` state — so a shared port makes whichever suite runs second silently
+drive **another product's worker**, which fails as a baffling "element not
+found". Scena takes 8789 for the dashboard and 8790 for the player.
+
+The inspector ports matter for the same reason and are less obvious: `wrangler
+dev` opens a devtools inspector on **9229 by default**, so several workers
+booting at once race for it and the loser exits before serving a single request.
+Playwright reports that as "Process from config.webServer exited early", which
+reads as a broken app. Tessa pinned 9230; Scena takes 9231 and 9232.
+
+### The player is a second worker, and that is the product
+
+A screen is a DEVICE: one pinned URL, Service-Worker-cached, running for months
+offline, resolving no tenant from its host. Driving it on the dashboard's origin
+would prove a topology Scena deliberately does not have. So the suite boots two
+workers and the two-screens spec opens the player on its own.
+
+### ⚠️ The first thing the harness found is a shipping defect
+
+The player cannot say `/api/…` — it is a separate origin — so `API_BASE` is
+baked in at build time from `VITE_API_BASE`.
+
+**That variable is set nowhere in this repo.** Not in a `.env`, not in
+`deploy.yml`, not in the wrangler config. So the FALLBACK is what ships, and the
+fallback was `http://localhost:8787`:
+
+- a loopback address that does not exist on a television, so a deployed screen
+  at `tv.4dl.app` could not reach Scena at all; and
+- 8787 is **Kova's** worker in this monorepo, so a developer running the player
+  locally against Scena was pointing it at another product.
+
+**And the first fix was still wrong.** `https://scena.4dl.app` is the DASHBOARD's
+origin; the pairing, manifest and asset routes answer on the **device door**,
+`play.`, which Stage 3 gave Scena precisely because a screen is not a user
+session. Everywhere else they answer `{"error":"wrong_door"}` — and the way that
+surfaced in the player was a screen reporting itself **"offline — no cached
+channel yet"**, a symptom two steps removed from its cause, which is exactly why
+this needed a browser to find. It is `https://play.scena.4dl.app` now, with
+`VITE_API_BASE` still the override for local work and for this suite.
+
+**And the way the suite builds the player is itself a lesson.** The build was in
+the `webServer` command first, which looks right and is not: `reuseExistingServer`
+is true locally, so a wrangler already listening on the player's port means
+Playwright never runs the command — and the suite drove yesterday's bundle,
+built against the production origin, which reserved nothing. It is in
+`globalSetup` now, which always runs.
+
+### The second thing it found, in the suite rather than the product
+
+A screen's reservation is a cross-origin `POST` with **no custom headers** — a
+SIMPLE request, in the CORS sense, which needs no preflight. The suite's
+`newParty()` helper adds a `cf-connecting-ip` header so each signing-in PERSON
+spends their own OTP budget, and applying it to a device turned that simple
+request into a preflighted one. The worker allows `content-type` and nothing
+else, so the preflight was refused — and what the player showed for it was
+**"offline — no cached channel yet"**, with nothing in the request log shaped
+like a failure.
+
+Not a product bug: a screen is not a person and has no OTP budget to protect.
+But it is the same lesson as the API base, one level up — in this system the
+symptom is always two steps from the cause, which is what a browser-level suite
+is for.
+
+### The guard that makes a third mistake impossible
+
+`scripts/player-api-base.test.mjs`, in `pnpm gate`. It reads the `??` arm of
+`config.ts` — the override may be anything a developer needs; the FALLBACK is
+what ships — and asserts four things, each of which is a mistake this repo has
+actually made or came one edit from making:
+
+| assertion | the mistake it catches |
+|---|---|
+| there is a fallback at all | deleting it and relying on a variable nobody sets |
+| it is `https:` and not a local address | `http://localhost:8787` — what shipped |
+| its host starts with `play.` | `https://scena.4dl.app` — the first "fix", still the wrong door |
+| its host names `scena` | 8787 is Kova's port; the same slip with a real hostname |
+
+Mutation-tested against all three historical values.
+
+**One local footgun the guard does not cover, deliberately:** the E2E's
+`globalSetup` rebuilds `apps/scena-player/dist` against `play.localhost`, so a
+checkout that has just run the suite holds a player pointed at a test port. CI
+builds and deploys in separate jobs from clean checkouts, so production is
+unaffected; locally, run the suite and then build again before deploying by
+hand. The durable protection is the source fallback, which is what the guard
+checks.
+
+### The specs
+
+1. **`01-workspace`** — an owner arrives with nothing: emailed code, workspace
+   created, session carried onto `<slug>.localhost`, first-run panel, and the
+   workspace genuinely empty rather than a fixture pretending to be. This is the
+   path every other spec depends on and the first to break when the door
+   classification, the OTP lane, the org-create call or the auto-select moves.
+2. **`wall/two-screens`** — `position(t) = (t − T0) mod cycleLength`, in two
+   browsers. `@scena/timeline` has 40 unit tests proving the function; none of
+   them proves that two BROWSERS, pairing separately against a real worker and
+   fetching a real manifest, land on the same slide. The pairing is real UI on
+   both sides; binding both screens to one channel and publishing goes through
+   the API with the browser's own cookie, because driving those through forms
+   would make it a test of forms rather than of the clock.
+
+   It reads the frame through the player's own **debug overlay**, whose header
+   says it exists to make exactly this invariant observable by putting two
+   players side by side. Using the product's instrument beats reaching into
+   internals: an instrument that lies is itself worth failing on.
+
+### ⚠️ And the third thing it found is that a wall costs money
+
+The second `pair/claim` is refused: **`plan limit reached (1 screen)`**. Which
+is the product working — `free` allows one screen, because a video wall is what
+people pay for — and it means the two-screens spec **cannot run on the plan a
+fresh workspace lands on**.
+
+There is exactly one route to a bigger plan without Stripe, and
+`billing-routes.ts` states it: *"A paid plan can't be granted for free: without
+Stripe configured, only a platform admin may comp a tenant onto a paid plan."*
+So the spec needs the development platform-admin lane — and **the launch gate
+must never have it**, because a gate that hands itself platform admin cannot see
+an authorization bug.
+
+That is a config split, not a workaround, and Kova already draws the same line
+between `playwright.config.ts` and `shots.config.ts`. `wall.config.ts` runs the
+worker with `--var ADMIN_EMAILS:` — an EMPTY allow-list, which is what makes
+`isPlatformAdminFor` fall back to `ENVIRONMENT === "development"` — and the spec
+comps itself onto `starter` (3 screens) through the ordinary
+`/api/billing/change-plan` endpoint, taking the admin branch the product itself
+documents. It never reuses a running worker: one already up is almost certainly
+the gate's, whose real `ADMIN_EMAILS` would refuse the comp as a 402 three steps
+into a spec about clocks.
+
+    pnpm --filter @scena/e2e e2e     # the gate: real authorization
+    pnpm --filter @scena/e2e wall    # the wall: needs an operator
+
+`apps.json` gains `"e2e": "@scena/e2e"` so `ci.yml` picks it up from the
+registry rather than from a hardcoded list, and turbo's `e2e` task now declares
+all three SPA builds — an `assets.directory` is a filesystem path, not a package
+dependency, so nothing else connects them.
+
+### ⚠️ And a fourth: the overlay reported "(no manifest)" when the manifest was there
+
+Getting the wall spec green took three more diagnoses, and all three had the
+same shape — a symptom that names the wrong subsystem.
+
+**A stale manifest that satisfied the poll.** The first version waited for each
+player's cached manifest to carry the right `channelId`, then compared the two.
+It failed on the comparison, which reads as two screens one publish apart. It
+was not: the LEFT screen was already on that channel — it is the display it was
+auto-wired — and `currentManifest` lazily publishes v1 the first time a player
+fetches a channel, so `{ channelId }` was satisfied by a manifest that predated
+the seed. Poll for the version the publish RETURNED, and the ambiguity is gone.
+
+**A frozen `requestAnimationFrame` loop.** With the manifests agreeing, both
+players' debug overlays still said `slide — (no manifest)` forever. They had the
+manifest. Playout is a rAF loop, Chromium does not run rAF in a BACKGROUND page,
+and two players in two contexts means one of them is always backgrounded — so
+the loop never ticked and `onFrame` never fired. The overlay's null-frame branch
+prints "(no manifest)", which is true of its own state and false about the
+screen. `page.bringToFront()` before reading is the fix.
+
+**And the stale reading that fix introduces.** Foregrounding restarts the loop,
+but the overlay still holds the last frame from before it froze. Parsing that
+would compare a live reading on one screen against a stale one on the other —
+precisely the mistake the spec exists to catch, arriving through the harness.
+So `readFrame` captures the overlay text first, foregrounds, and waits for the
+text to MOVE before parsing.
+
+**The sampling window is handled, not tuned away.** Only one page can be
+foreground at a time, so the two readings are necessarily a moment apart, and
+the seeded slides turn over every 6.5–7 s — short enough that a boundary
+sometimes falls inside the window. The spec reads **A, then B, then A again**:
+A's two readings bracket B's in time, so whatever A was showing while B was read
+is one of them. No boundary crossed → the bracket is one slide and the assertion
+is exact equality; one crossed → B must be on the slide A was leaving or the one
+it was entering. A clock that genuinely disagreed lands outside the bracket
+either way. No retry, and no slide duration lengthened to make a test pass.
