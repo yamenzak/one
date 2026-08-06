@@ -291,11 +291,24 @@ Transactional mail, the alert inbox + bell, and derived GDPR erasure.
 ### Stage 7 — The UI rewrite
 The big one, and deliberately last: it is the only stage that benefits from
 everything above being settled.
-- `@4dl/ui` replaces `@scena/ui`.
-- `@4dl/admin` replaces `Admin.tsx` (1,448 lines → a section registry).
-- Every screen rebuilt on the design language, with §4.5's exemption written
-  down.
-- `apps/api/src/index.ts` (1,604 lines, one router) split into route modules.
+
+**[SCENA-UI-INVENTORY.md](SCENA-UI-INVENTORY.md) is the screen-by-screen
+breakdown** — 24 routes measured, tiered by cost, split into eight sub-stages
+(7a…7h). Read it before starting; "21,910 lines" is not a task and its eight
+parts are.
+
+Two things the inventory changed:
+
+- **`Admin.tsx` moves to Stage 4.** 1,448 lines that `@4dl/admin` deletes
+  outright, carrying no product logic, holding exactly the Stripe/plans/AI-model
+  config Stages 4 and 5 touch anyway. Doing it there means those stages edit
+  ~200 lines of section declarations instead of a 1,448-line page, twice.
+- **The 11 `catch(() => set…)` sites do not wait.** A failed load rendering as
+  "nothing here" is a correctness bug, not a styling one, and each is a two-line
+  fix. They land in whichever stage next touches their file.
+
+The real target is **~15,000 lines of rebuild**: ~2,300 deleted outright, the
+2,708-line builder restyled only (§4.5), the rest rebuilt.
 
 *Exit:* the design conformance lints pass; every surface photographed in both
 themes.
