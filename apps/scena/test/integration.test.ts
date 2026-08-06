@@ -542,6 +542,67 @@ describe("stations", () => {
   });
 });
 
+describe("what a plan bought, as the app actually reads it", () => {
+  it("reports the PLAN's capabilities to a workspace in good standing", async () => {
+    const { cookie, slug, door } = await newWorkspace("ent");
+    await setPlan(slug, "pro");
+    const me = (await (await SELF.fetch(`${door}/api/me`, { headers: { cookie } })).json()) as {
+      features: Record<string, unknown>;
+      quotas: Record<string, number>;
+    };
+    expect(me.features.aiGeneration).toBe(true);
+    expect(me.features.roomQueueManagement).toBe(true);
+    expect(me.quotas.pairedDevices).toBe(15);
+  });
+
+  it("CLAMPS a suspended workspace to the free baseline", async () => {
+    /*
+      The rule Scena had nowhere. `tenantEntitlements` used to resolve the plan
+      whatever the subscription said, with a comment claiming "playout is gated
+      elsewhere" — which describes the HOST gate, and that answers a different
+      question: it closes an origin, this decides capability.
+
+      So a suspended workspace kept its full paid entitlements at every gate that
+      asks what it may DO — the AI generator, the ads module, the music library,
+      and the compile-time widget gate that decides what goes into a manifest a
+      screen replays offline for weeks.
+
+      Asserted through `/api/me` — i.e. through the resolver the gates read — not
+      against the pure function, which is where the unit test looks and where the
+      missing CALL was equally invisible.
+    */
+    const { cookie, slug, door } = await newWorkspace("clamp");
+    await setPlan(slug, "pro");
+    const org = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>();
+    await db().prepare("UPDATE subscriptions SET status = 'suspended', comp = 0 WHERE tenant_id = ?").bind(org!.id).run();
+
+    const me = (await (await SELF.fetch(`${door}/api/me`, { headers: { cookie } })).json()) as {
+      features: Record<string, unknown>;
+      quotas: Record<string, number>;
+    };
+    expect(me.features.aiGeneration).toBe(false);
+    expect(me.features.roomQueueManagement).toBe(false);
+    expect(me.quotas.pairedDevices).toBe(1);
+    // …and the one capability that must survive every rung. Scena's screens
+    // carry fire and evacuation messages.
+    expect(me.features.emergencyOverride).toBe(true);
+  });
+
+  it("exempts a COMPED workspace from the clamp", async () => {
+    // The whole point of comping is that the STATUS does not decide, an operator
+    // does. A demo account parked on `suspended` must still demo.
+    const { cookie, slug, door } = await newWorkspace("comped");
+    await setPlan(slug, "pro");
+    const org = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>();
+    await db().prepare("UPDATE subscriptions SET status = 'suspended', comp = 1 WHERE tenant_id = ?").bind(org!.id).run();
+
+    const me = (await (await SELF.fetch(`${door}/api/me`, { headers: { cookie } })).json()) as {
+      features: Record<string, unknown>;
+    };
+    expect(me.features.aiGeneration).toBe(true);
+  });
+});
+
 describe("the per-member grant can only narrow", () => {
   it("refuses to hand a role a power its preset does not carry", async () => {
     /*

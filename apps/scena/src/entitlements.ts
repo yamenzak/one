@@ -1,16 +1,55 @@
 /**
- * Plan entitlements + downgrade eligibility (BLUEPRINT §25) — pure.
+ * WHAT A PLAN BOUGHT — Scena's registry, on `@4dl/billing`'s engine.
  *
- * Each plan carries an `entitlements_json` blob resolved onto the tenant. Value
- * is metered on three axes: capacity **quotas**, feature **gates**, and **AI
- * credits**. Enforcement happens at two points (both call into this module):
- * on dashboard write (block creating beyond quota) and at manifest-compile
- * (strip gated features so a screen can never bypass them).
+ * The engine owns three rules that all point the same way, and none of them was
+ * true of the resolver this replaces:
  *
- * Downgrade is compliance-gated: you cannot shed a plan while still using what
- * it paid for. `checkDowngrade` diffs current usage against a target plan and
- * returns an exact remediation checklist.
+ *   RESOLUTION COERCES BY TYPE.  A feature is enabled only by a literal `true`,
+ *   a quota only by a finite number. The old resolver was `{ ...free, ...raw }`,
+ *   so an operator typo in the plan JSON (`"aiGeneration": 1`, `"true"`,
+ *   `"yes"`) switched on a paid capability, and a string in a quota flowed
+ *   straight into a `>=` comparison.
+ *
+ *   OVERRIDES ARE GRANT-ONLY.  A per-tenant blob may raise a quota or enable a
+ *   feature and can never lower or disable one. The old `mergeOverrides` was a
+ *   plain spread in both directions, so the "gift" blob could silently TAKE a
+ *   feature away.
+ *
+ *   A SUSPENDED STATUS CLAMPS TO FREE.  Applied once, at resolution, so every
+ *   gate inherits it. Scena clamped nowhere: `tenantEntitlements` resolved the
+ *   plan whatever the subscription said, and the comment claiming "playout is
+ *   gated elsewhere" was describing the HOST gate, which answers a different
+ *   question — that one closes an origin, this one decides capability.
+ *
+ * ── The list features are gone, and they were carrying one bit each ────────
+ *
+ * Four features were `string[]` — `ticker`, `clock`, `weather`, `alerting` —
+ * enumerating the variants a plan included. The engine coerces a feature to a
+ * boolean, so they could not survive the move as-is. What they actually varied
+ * across the four plans settled how to split them:
+ *
+ *   clock      `["digital"]` → `["digital","analog"]`.  `digital` is on EVERY
+ *              plan, so it was never a gate. One real bit: analog.
+ *   weather    `[]` → `["small","large"]`.  Both sizes always moved together.
+ *              One real bit.
+ *   alerting   `["dashboard"]` → `["dashboard","webhook"]`.  `dashboard` is on
+ *              every plan — not a gate. `email` was in the catalog and granted
+ *              by NO plan: a dead option an operator could see and never sell.
+ *   ticker     `[]` → `["basic"]` → `["basic","advanced"]`.  Genuinely two bits.
+ *
+ * Six booleans replace four lists, and three non-gates plus one dead option stop
+ * pretending to be product decisions. Nothing was lost.
+ *
+ * ── And `sync` stopped being a fourth axis ─────────────────────────────────
+ *
+ * `resyncIntervalSec` lived in its own `sync: {}` block. It is a numeric ceiling
+ * that varies per plan — which is what a quota is, and `feedRefreshMinSec` was
+ * already exactly that shape one key away. Under the engine an unknown top-level
+ * axis is not merged at all, so leaving it there would have frozen every plan on
+ * the free tier's 60 seconds, silently.
  */
+
+import { bindEntitlements, type EntitlementShape } from "@4dl/billing";
 
 export interface Quotas {
   pairedDevices: number;
@@ -18,7 +57,11 @@ export interface Quotas {
   channelsPerProfile: number;
   slidesPerPlaylist: number;
   feeds: number;
+  /** ⚠️ A MINIMUM interval — see `INVERTED_QUOTAS`. */
   feedRefreshMinSec: number;
+  /** How often a screen re-fetches its manifest. ⚠️ Also a minimum — see
+   *  `INVERTED_QUOTAS`. Was `sync.resyncIntervalSec`, its own axis. */
+  resyncIntervalSec: number;
   scheduleRules: number;
   historyVersions: number;
   liveBoards: number;
@@ -38,38 +81,88 @@ export interface Quotas {
   seats: number;
 }
 
+/**
+ * THE TWO QUOTAS WHERE A BIGGER NUMBER IS WORSE.
+ *
+ * Every other quota is a ceiling: more screens, more seats, more feeds. These
+ * two are FLOORS on an interval — the fastest a tenant may poll — so a premium
+ * plan carries a SMALLER number, and the engine's grant-only override (`max`,
+ * with `-1` absorbing) RAISES them, which makes a tenant's feeds and screens
+ * slower. A gift that degrades the thing it is gifting.
+ *
+ * Left as-is deliberately rather than inverted into a rate: `feedRefreshMinSec`
+ * is what the feed scheduler and the manifest compiler both read, and renaming
+ * it is a change to the playout path inside a stage about billing. What is NOT
+ * left alone is the silence — `entitlements.test.ts` pins this list, so a third
+ * inverted quota cannot be added without someone reading this note.
+ */
+export const INVERTED_QUOTAS = ["feedRefreshMinSec", "resyncIntervalSec"] as const;
+
 export interface Features {
-  ticker: string[];
-  clock: string[];
-  weather: string[];
+  /** A scrolling headline ticker at all. */
+  ticker: boolean;
+  /** The richer ticker: multiple sources, styling, transitions. */
+  tickerAdvanced: boolean;
+  /** The analog clock face. Digital is on every plan and is not a gate. */
+  clockAnalog: boolean;
+  /** Live weather widgets. Both sizes always moved together. */
+  weather: boolean;
   widgetStack: boolean;
   htmlSandbox: boolean;
   screenSaver: boolean;
   dayparting: boolean;
   roomQueueManagement: boolean;
   proofOfPlay: boolean;
-  alerting: string[];
+  /** Deliver alerts to a webhook. The dashboard list is on every plan. */
+  alertsWebhook: boolean;
+  /** Deliver alerts by email. No plan has ever granted this — it is here so the
+   *  catalog and the shape agree, and so turning it on is one edit. */
+  alertsEmail: boolean;
+  /** Safety — never paywalled (§12). Present so the shape is complete and so a
+   *  plan blob cannot be the thing that disables it. */
   emergencyOverride: boolean;
-  /** AI slide/widget/TTS/image generation (§24). Gated like any premium feature. */
+  /** AI slide/widget/TTS/image generation (§24). */
   aiGeneration: boolean;
   /** Scheduled ads / interrupts (§21) — the ad system is a premium module. */
   ads: boolean;
   /** Access to the admin-curated licensed music library (§16 extension). */
   musicLibrary: boolean;
   /** Frame-accurate sync across multiple screens (§7). Off = each screen
-   *  free-runs on its own clock (single-screen mode); on = the fleet plays in
-   *  lockstep. A premium upsell — one screen never needs it. */
+   *  free-runs on its own clock; on = the fleet plays in lockstep. A premium
+   *  upsell — one screen never needs it. */
   multiScreenSync: boolean;
+  /**
+   * Serve the dashboard from the tenant's OWN domain.
+   *
+   * New in Stage 4, and it closes a real placeholder: Stage 3 wired custom
+   * domains with no flag to gate them on, so `domain-routes.ts` read a PROXY —
+   * "does this plan have unlimited library tracks" — which happened to be true
+   * on exactly the tier we wanted and was a lie about why.
+   */
+  customDomain: boolean;
 }
 
-export interface Entitlements {
+export interface Entitlements extends EntitlementShape {
   quotas: Quotas;
-  sync: { resyncIntervalSec: number };
   features: Features;
   aiCredits: { monthlyGrant: number };
+  /** Free-trial days on a NEW subscription. Scena sells none today; the key
+   *  exists because the engine consumes it when opening a Stripe subscription. */
+  trialDays: number;
 }
 
-/** The most restrictive baseline — an unknown/free tenant resolves to this. */
+/**
+ * The most restrictive baseline — an unknown, free or SUSPENDED tenant resolves
+ * to this. It is also the key registry: a key absent here does not exist, which
+ * is what makes every merge above fail closed.
+ *
+ * ⚠️ `emergencyOverride` IS `true` HERE, and that is the point. A suspended
+ * tenant clamps to this object. Scena's screens carry fire, evacuation and
+ * incident messages, so the one capability that must survive every rung of the
+ * ladder has to be true in the BASELINE, not merely true on every plan.
+ * `route-guard.ts` exempts `/api/emergency` from the read-only gate for the same
+ * reason; this is the other half of it.
+ */
 export const FREE_ENTITLEMENTS: Entitlements = {
   quotas: {
     pairedDevices: 1,
@@ -79,6 +172,7 @@ export const FREE_ENTITLEMENTS: Entitlements = {
     slidesPerPlaylist: 10,
     feeds: 0,
     feedRefreshMinSec: 3600,
+    resyncIntervalSec: 60,
     scheduleRules: 0,
     historyVersions: 3,
     liveBoards: 0,
@@ -86,65 +180,49 @@ export const FREE_ENTITLEMENTS: Entitlements = {
     boardsPerStation: 1,
     libraryTracks: 0,
   },
-  sync: { resyncIntervalSec: 60 },
   features: {
-    ticker: [],
-    clock: ["digital"],
-    weather: [],
+    ticker: false,
+    tickerAdvanced: false,
+    clockAnalog: false,
+    weather: false,
     widgetStack: false,
     htmlSandbox: false,
     screenSaver: true,
     dayparting: false,
     roomQueueManagement: false,
     proofOfPlay: false,
-    alerting: ["dashboard"],
-    emergencyOverride: true, // safety — never paywalled (§12)
+    alertsWebhook: false,
+    alertsEmail: false,
+    emergencyOverride: true,
     aiGeneration: false,
     ads: false,
     musicLibrary: false,
-    multiScreenSync: false, // single-screen by default; sync is a premium upsell
+    multiScreenSync: false,
+    customDomain: false,
   },
   aiCredits: { monthlyGrant: 0 },
+  trialDays: 0,
 };
 
-/** Deep-ish merge of a stored (possibly partial) blob onto the free baseline. */
-export function resolveEntitlements(json: string | null | undefined): Entitlements {
-  if (!json) return FREE_ENTITLEMENTS;
-  let raw: Partial<Entitlements>;
-  try {
-    raw = JSON.parse(json) as Partial<Entitlements>;
-  } catch {
-    return FREE_ENTITLEMENTS;
-  }
-  return {
-    quotas: { ...FREE_ENTITLEMENTS.quotas, ...(raw.quotas ?? {}) },
-    sync: { ...FREE_ENTITLEMENTS.sync, ...(raw.sync ?? {}) },
-    features: { ...FREE_ENTITLEMENTS.features, ...(raw.features ?? {}) },
-    aiCredits: { ...FREE_ENTITLEMENTS.aiCredits, ...(raw.aiCredits ?? {}) },
-  };
-}
+const engine = bindEntitlements<Entitlements>(FREE_ENTITLEMENTS);
 
-/**
- * Layer a per-tenant override blob (a partial Entitlements) on top of the plan's
- * resolved entitlements — an admin "gift" (§25): a few extra screens, an unlocked
- * feature, a bigger credit grant. Only the keys present in the override win;
- * everything else inherits the plan.
- */
-export function mergeOverrides(base: Entitlements, json: string | null | undefined): Entitlements {
-  if (!json) return base;
-  let o: Partial<Entitlements>;
-  try {
-    o = JSON.parse(json) as Partial<Entitlements>;
-  } catch {
-    return base;
-  }
-  return {
-    quotas: { ...base.quotas, ...(o.quotas ?? {}) },
-    sync: { ...base.sync, ...(o.sync ?? {}) },
-    features: { ...base.features, ...(o.features ?? {}) },
-    aiCredits: { ...base.aiCredits, ...(o.aiCredits ?? {}) },
-  };
-}
+/** Merge a plan's stored blob onto the free baseline, coercing by type. */
+export const resolveEntitlements = (json: string | null | undefined): Entitlements => engine.resolve(json);
+
+/** Layer a per-tenant override — GRANT-ONLY, so a gift can never take. */
+export const mergeOverrides = (base: Entitlements, json: string | null | undefined): Entitlements =>
+  engine.merge(base, json);
+
+/** An operator's ABSOLUTE per-tenant setting, applied AFTER the override. The
+ *  two are different things: one is grandfathering and must only ratchet, the
+ *  other is a deliberate adjustment that has to be reversible. */
+export const adjustEntitlements = engine.adjust;
+
+/** Clamp to free when the status withholds service. */
+export const clampForStatus = engine.clamp;
+
+/** The whole resolution with its working shown, for the operator console. */
+export const explainEntitlements = engine.explain;
 
 /** A tenant's current resource usage, gathered for a downgrade check. */
 export interface Usage {
@@ -166,19 +244,29 @@ export interface DowngradeResult {
 }
 
 /**
- * Diff current usage against a target plan's entitlements (§25). Returns the
- * exact remediation checklist; `eligible` is true only when nothing is over the
- * line. The plan change is blocked until this returns eligible.
+ * Diff current usage against a target plan (§25). Returns the exact remediation
+ * checklist; `eligible` is true only when nothing is over the line, and the plan
+ * change is blocked until it is.
+ *
+ * ⚠️ `-1` IS UNLIMITED and every comparison here has to know it. It did not:
+ * `have > max` with `max === -1` reports a violation for every existing row, so
+ * moving TO a plan with an unlimited quota would have been refused with a
+ * checklist telling the owner to delete everything they own. No plan currently
+ * sets `-1` on one of the six checked quotas, which is the only reason it never
+ * fired — a latent bug waiting for a pricing change.
  */
 export function checkDowngrade(usage: Usage, target: Entitlements): DowngradeResult {
   const v: Violation[] = [];
   const q = target.quotas;
 
   const overQuota = (resource: string, have: number, max: number) => {
+    if (max < 0) return; // unlimited
     if (have > max) v.push({ type: "quota", resource, have, max, removeCount: have - max });
   };
   overQuota("pairedDevices", usage.pairedDevices, q.pairedDevices);
-  overQuota("channels", usage.channels, q.channelsPerProfile * q.profiles);
+  // A product of two quotas, so EITHER being unlimited makes the product so.
+  const channelCeiling = q.channelsPerProfile < 0 || q.profiles < 0 ? -1 : q.channelsPerProfile * q.profiles;
+  overQuota("channels", usage.channels, channelCeiling);
   overQuota("feeds", usage.feeds, q.feeds);
   overQuota("scheduleRules", usage.scheduleRules, q.scheduleRules);
   overQuota("liveBoards", usage.liveBoards, q.liveBoards);

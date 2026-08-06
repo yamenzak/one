@@ -34,15 +34,15 @@ export function gateWidgets<T>(widgets: T, f: Features): T {
     .filter((w) => {
       if (w?.type === "html" && !f.htmlSandbox) return false;
       if (w?.type === "stack" && !f.widgetStack) return false;
-      // A plan with no ticker/weather variants excludes the widget entirely.
-      if (w?.type === "ticker" && f.ticker.length === 0) return false;
-      if (w?.type === "weather" && f.weather.length === 0) return false;
+      // A plan without the feature excludes the widget entirely.
+      if (w?.type === "ticker" && !f.ticker) return false;
+      if (w?.type === "weather" && !f.weather) return false;
       return true;
     })
     .map((w) => {
       const cfg = (w?.config ?? {}) as Record<string, unknown>;
       // Downgrade the analog clock to digital when analog isn't in the plan.
-      if (w?.type === "clock" && cfg.variant === "analog" && !f.clock.includes("analog")) {
+      if (w?.type === "clock" && cfg.variant === "analog" && !f.clockAnalog) {
         return { ...w, config: { ...cfg, variant: "digital" } };
       }
       return w;

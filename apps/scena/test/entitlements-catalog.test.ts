@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { FEATURE_CATALOG, QUOTA_CATALOG } from "@scena/manifest";
+import { FEATURE_CATALOG, FEATURE_CATEGORIES, QUOTA_CATALOG } from "@scena/manifest";
 import { FREE_ENTITLEMENTS } from "../src/entitlements.js";
 
 /**
@@ -21,17 +21,32 @@ describe("entitlements catalog ↔ plan shape", () => {
     expect(catalog).toEqual(shape);
   });
 
-  it("kinds match the default value types (bool vs list)", () => {
+  it("has a BOOLEAN default for every catalogued feature", () => {
+    /*
+      There is no other kind now. Four features were `string[]` variant lists,
+      and `@4dl/billing`'s engine coerces a feature to a boolean — so a list
+      would resolve to `false` on every plan, silently disabling the tiered
+      feature it was describing. This assertion is what catches a list sneaking
+      back in through the plan shape.
+    */
     for (const f of FEATURE_CATALOG) {
       const def = (FREE_ENTITLEMENTS.features as unknown as Record<string, unknown>)[f.key];
-      if (f.kind === "list") expect(Array.isArray(def)).toBe(true);
-      else expect(typeof def).toBe("boolean");
+      expect(typeof def, `${f.key} is not a boolean`).toBe("boolean");
     }
   });
 
-  it("list features declare their options", () => {
+  it("has a NUMERIC default for every catalogued quota", () => {
+    for (const q of QUOTA_CATALOG) {
+      const def = (FREE_ENTITLEMENTS.quotas as unknown as Record<string, unknown>)[q.key];
+      expect(typeof def, `${q.key} is not a number`).toBe("number");
+    }
+  });
+
+  it("puts every feature in a declared category", () => {
+    // A category typo does not fail anything — it produces a group the admin
+    // editor renders last, or not at all, depending on how it iterates.
     for (const f of FEATURE_CATALOG) {
-      if (f.kind === "list") expect(f.options && f.options.length > 0).toBe(true);
+      expect(FEATURE_CATEGORIES as readonly string[], `${f.key}: "${f.category}"`).toContain(f.category);
     }
   });
 });

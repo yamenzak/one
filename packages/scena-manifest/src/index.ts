@@ -19,5 +19,5 @@ export {
 export {
   FEATURE_CATALOG, QUOTA_CATALOG, FEATURE_CATEGORIES,
   featureDef, quotaDef, featureMeta, quotaMeta, humanizeKey,
-  type FeatureDef, type QuotaDef, type FeatureKind,
+  type FeatureDef, type QuotaDef,
 } from "./entitlements-catalog.js";

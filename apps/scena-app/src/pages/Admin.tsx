@@ -467,9 +467,14 @@ function PlanRow({ plan, onPrice, onGrant, onConfigure }: { plan: Plan; onPrice:
 // a feature to the catalog and it shows up in this editor, the tenant overrides,
 // the billing cards, and the dashboard gates at once (no drifting hand lists).
 const PLAN_QUOTAS = QUOTA_CATALOG;
-const PLAN_BOOL_FEATURES = FEATURE_CATALOG.filter((f) => f.kind === "bool");
-const PLAN_LIST_FEATURES = FEATURE_CATALOG.filter((f) => f.kind === "list");
-/** Bool features grouped by catalog category, in category order, for a tidy editor. */
+/*
+  EVERY FEATURE IS A BOOLEAN NOW. Four used to be variant allow-lists (`ticker`,
+  `clock`, `weather`, `alerting`); Stage 4 flattened them into booleans, and the
+  two "Variant & channel allow-lists" editors that rendered them are gone with
+  the `kind` field they filtered on.
+*/
+const PLAN_BOOL_FEATURES = FEATURE_CATALOG;
+/** Features grouped by catalog category, in category order, for a tidy editor. */
 const FEATURE_GROUPS = FEATURE_CATEGORIES
   .map((cat) => ({ cat, items: PLAN_BOOL_FEATURES.filter((f) => f.category === cat) }))
   .filter((g) => g.items.length > 0);
@@ -558,32 +563,6 @@ function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose
                     </div>
                   </div>
                 ))}
-              </div>
-
-              <div className="space-y-2">
-                <SectionLabel>Variant &amp; channel allow-lists</SectionLabel>
-                <div className="space-y-2">
-                  {PLAN_LIST_FEATURES.map((x) => {
-                    const cur = Array.isArray(ent.features[x.key]) ? (ent.features[x.key] as string[]) : [];
-                    return (
-                      <div key={x.key} className="flex flex-wrap items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm">
-                        <span className="w-32 shrink-0 text-muted-foreground">{x.label}</span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(x.options ?? []).map((opt) => {
-                            const on = cur.includes(opt);
-                            return (
-                              <button key={opt} type="button" onClick={() => toggleList(x.key, opt)}
-                                className={cn("rounded-full border px-2.5 py-1 text-xs font-medium capitalize transition-colors", on ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent")}>
-                                {opt}
-                              </button>
-                            );
-                          })}
-                          {cur.length === 0 && <span className="text-xs text-muted-foreground">none</span>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
 
               <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
@@ -1303,16 +1282,14 @@ function AdjustCreditsModal({ tenant, onClose, onDone }: { tenant: AdminTenant |
 // Overrides cover every quota + feature the catalog knows (safety features are
 // always-on, so they're excluded from the per-tenant gift editor).
 const OVR_QUOTAS = QUOTA_CATALOG;
-const OVR_FEATURES = FEATURE_CATALOG.filter((f) => f.kind === "bool" && !f.safety);
-const OVR_LIST = FEATURE_CATALOG.filter((f) => f.kind === "list");
+const OVR_FEATURES = FEATURE_CATALOG.filter((f) => !f.safety);
 
 function OverridesModal({ tenantId, onClose }: { tenantId: string; onClose: () => void }) {
   const [data, setData] = useState<Awaited<ReturnType<typeof adminGetTenantEntitlements>> | null>(null);
-  // Local edit state: quotas as strings ("" = inherit), bool features tri-state,
-  // list features (null = inherit / array = override), grant string.
+  // Local edit state: quotas as strings ("" = inherit), features tri-state,
+  // grant string.
   const [q, setQ] = useState<Record<string, string>>({});
   const [f, setF] = useState<Record<string, "inherit" | "on" | "off">>({});
-  const [l, setL] = useState<Record<string, string[] | null>>({});
   const [grant, setGrant] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -1321,32 +1298,17 @@ function OverridesModal({ tenantId, onClose }: { tenantId: string; onClose: () =
       setData(d);
       setQ(Object.fromEntries(OVR_QUOTAS.map((x) => [x.key, d.overrides.quotas?.[x.key] != null ? String(d.overrides.quotas![x.key]) : ""])));
       setF(Object.fromEntries(OVR_FEATURES.map((x) => [x.key, d.overrides.features?.[x.key] == null ? "inherit" : d.overrides.features[x.key] ? "on" : "off"])) as Record<string, "inherit" | "on" | "off">);
-      setL(Object.fromEntries(OVR_LIST.map((x) => {
-        const v = d.overrides.features?.[x.key];
-        return [x.key, Array.isArray(v) ? v : null];
-      })));
       setGrant(d.overrides.aiCredits?.monthlyGrant != null ? String(d.overrides.aiCredits.monthlyGrant) : "");
     }).catch(() => {});
   }, [tenantId]);
-
-  // A list override starts from the plan's current list, so toggling one chip
-  // reads as "same as the plan, plus/minus this variant"; reset clears to inherit.
-  const toggleOvrList = (key: string, opt: string) => setL((cur) => {
-    const planList = Array.isArray(data?.plan.features?.[key]) ? (data!.plan.features[key] as string[]) : [];
-    const base = cur[key] ?? [...planList];
-    const next = base.includes(opt) ? base.filter((x) => x !== opt) : [...base, opt];
-    return { ...cur, [key]: next };
-  });
-  const resetOvrList = (key: string) => setL((cur) => ({ ...cur, [key]: null }));
 
   async function save() {
     setSaving(true);
     const quotas: Record<string, number> = {};
     for (const { key } of OVR_QUOTAS) if (q[key]?.trim() !== "" && q[key] != null && !Number.isNaN(Number(q[key]))) quotas[key] = Math.trunc(Number(q[key]));
-    const features: Record<string, boolean | string[]> = {};
+    const features: Record<string, boolean> = {};
     for (const { key } of OVR_FEATURES) if (f[key] === "on") features[key] = true; else if (f[key] === "off") features[key] = false;
-    for (const { key } of OVR_LIST) if (l[key] != null) features[key] = l[key]!; // array = override; null = inherit
-    const overrides: { quotas?: Record<string, number>; features?: Record<string, boolean | string[]>; aiCredits?: { monthlyGrant: number } } = {};
+    const overrides: { quotas?: Record<string, number>; features?: Record<string, boolean>; aiCredits?: { monthlyGrant: number } } = {};
     if (Object.keys(quotas).length) overrides.quotas = quotas;
     if (Object.keys(features).length) overrides.features = features;
     if (grant.trim() !== "" && !Number.isNaN(Number(grant))) overrides.aiCredits = { monthlyGrant: Math.trunc(Number(grant)) };
@@ -1399,44 +1361,13 @@ function OverridesModal({ tenantId, onClose }: { tenantId: string; onClose: () =
                   ))}
                 </div>
               </div>
-              <div className="space-y-2">
-                <SectionLabel>Variant &amp; channel allow-lists</SectionLabel>
-                <div className="space-y-2">
-                  {OVR_LIST.map((x) => {
-                    const ov = l[x.key]; // null = inherit
-                    const planList = Array.isArray(data.plan.features?.[x.key]) ? (data.plan.features[x.key] as string[]) : [];
-                    const shown = ov ?? planList;
-                    return (
-                      <div key={x.key} className="rounded-md border bg-card px-3 py-2 text-sm">
-                        <div className="mb-1.5 flex items-center justify-between gap-2">
-                          <span className="text-muted-foreground">{x.label}</span>
-                          {ov == null
-                            ? <span className="text-[11px] text-muted-foreground/60">inherit ({planList.join(", ") || "none"})</span>
-                            : <button type="button" onClick={() => resetOvrList(x.key)} className="text-[11px] font-medium text-primary hover:underline">reset to inherit</button>}
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(x.options ?? []).map((opt) => {
-                            const on = shown.includes(opt);
-                            return (
-                              <button key={opt} type="button" onClick={() => toggleOvrList(x.key, opt)}
-                                className={cn("rounded-full border px-2.5 py-1 text-xs font-medium capitalize transition-colors", on ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent", ov == null && "opacity-70")}>
-                                {opt}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
+                            <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
                 <span className="flex-1">Monthly AI credit grant</span>
                 <Input value={grant} onChange={(e) => setGrant(e.target.value)} placeholder={String(planGrant)} className="h-8 w-24 text-right font-mono tabular-nums" />
               </label>
             </div>
             <DialogFooter className="border-t pt-3">
-              <Button variant="ghost" onClick={() => { setQ(Object.fromEntries(OVR_QUOTAS.map((x) => [x.key, ""]))); setF(Object.fromEntries(OVR_FEATURES.map((x) => [x.key, "inherit"])) as Record<string, "inherit" | "on" | "off">); setL(Object.fromEntries(OVR_LIST.map((x) => [x.key, null]))); setGrant(""); }}>Clear all</Button>
+              <Button variant="ghost" onClick={() => { setQ(Object.fromEntries(OVR_QUOTAS.map((x) => [x.key, ""]))); setF(Object.fromEntries(OVR_FEATURES.map((x) => [x.key, "inherit"])) as Record<string, "inherit" | "on" | "off">); setGrant(""); }}>Clear all</Button>
               <Button variant="ghost" onClick={onClose}>Cancel</Button>
               <Button disabled={saving} onClick={save}>{saving ? "Saving…" : "Save overrides"}</Button>
             </DialogFooter>

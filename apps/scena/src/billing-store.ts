@@ -9,7 +9,7 @@
 import { getConfig as coreGetConfig, type ConfigSource } from "@4dl/core";
 import { ensureSchema, DEMO_TENANT } from "./db.js";
 import { DEFAULT_PLANS, DEFAULT_PACKS, DEFAULT_MODELS, CONFIG_DEFAULTS } from "./billing-seed.js";
-import { resolveEntitlements, mergeOverrides, type Entitlements } from "./entitlements.js";
+import { resolveEntitlements, mergeOverrides, clampForStatus, type Entitlements } from "./entitlements.js";
 
 export interface PlanRow {
   id: string;
@@ -281,14 +281,33 @@ export async function updateSubscription(db: D1Database, tenantId: string, patch
     .run();
 }
 
-/** Resolve the tenant's effective entitlements from its current plan. */
+/**
+ * The tenant's EFFECTIVE entitlements: plan → override → clamp.
+ *
+ * ⚠️ THE CLAMP IS NEW, and its absence was a real hole rather than an omission.
+ *
+ * This read "a suspended tenant keeps its plan's feature shape but playout is
+ * gated elsewhere". The second half describes the HOST gate, which closes an
+ * origin — a different question from what a tenant may DO. So a suspended
+ * workspace resolved its full paid entitlements at every call site that asks
+ * about capability: the AI generator's `aiGeneration` check, the ads module, the
+ * music library, the compile-time widget gate. The host gate refuses WRITES, so
+ * the practical exposure was reads and the manifest — but the manifest is the
+ * artifact a screen replays offline for weeks, which is exactly the thing a
+ * downgrade has to strip.
+ *
+ * `clampForStatus` applies the free baseline once, here, so every gate inherits
+ * it with no per-caller bookkeeping. `emergencyOverride` is `true` in that
+ * baseline on purpose — see `entitlements.ts`.
+ */
 export async function tenantEntitlements(db: D1Database, tenantId = DEMO_TENANT): Promise<Entitlements> {
   const sub = await getSubscription(db, tenantId);
-  // A suspended tenant keeps its plan's feature shape but playout is gated
-  // elsewhere; entitlements still resolve from the plan for the dashboard.
   const plan = await getPlan(db, sub.plan_id);
   // Layer any admin-granted per-tenant overrides on top of the plan (§25).
-  return mergeOverrides(resolveEntitlements(plan?.entitlements_json), sub.overrides_json);
+  const granted = mergeOverrides(resolveEntitlements(plan?.entitlements_json), sub.overrides_json);
+  // A comped tenant is exempt: the whole point of comping is that the status
+  // does not decide, an operator does.
+  return sub.comp ? granted : clampForStatus(granted, sub.status);
 }
 
 /**

@@ -340,9 +340,11 @@ function planHighlights(p: Plan): string[] {
   // Then feature lines, in catalog order.
   for (const feat of FEATURE_CATALOG) {
     if (!feat.billing) continue;
-    const v = f[feat.key];
-    const on = feat.kind === "list" ? Array.isArray(v) && v.length > 0 : Boolean(v);
-    if (on) out.push(feat.billing);
+    // Every feature is a boolean now — and `=== true` rather than truthiness,
+    // to match how the server resolves one. A plan blob carrying `1` or `"true"`
+    // does NOT enable the feature there, so advertising it here would promise
+    // something the gate refuses.
+    if (f[feat.key] === true) out.push(feat.billing);
   }
   return out;
 }

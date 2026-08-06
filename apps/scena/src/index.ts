@@ -916,7 +916,7 @@ app.get("/api/weather", async (c) => {
 /** Add a location (by coordinates, or a city name we geocode). Fetches once. */
 app.post("/api/weather", async (c) => {
   const wEnt = await tenantEntitlements(c.env.DB, tenantOf(c));
-  if (!wEnt.features.weather.length) return c.json({ error: "weather not in plan" }, 403);
+  if (!wEnt.features.weather) return c.json({ error: "weather not in plan" }, 403);
   const body = await c.req.json<{ label?: string; lat?: number; lon?: number; city?: string; openHour?: number; closeHour?: number; tz?: string; units?: string }>().catch(() => ({}) as Record<string, never>);
   let label = (body.label ?? "").trim();
   let lat = body.lat;
@@ -956,7 +956,7 @@ app.post("/api/weather/:id/refresh", async (c) => {
   if (!owns(c, src)) return c.json({ error: "not found" }, 404);
   // This spends credits (chargeCall), so gate it on the plan like the create route.
   const wrEnt = await tenantEntitlements(c.env.DB, tenantOf(c));
-  if (!wrEnt.features.weather.length) return c.json({ error: "weather not in plan" }, 403);
+  if (!wrEnt.features.weather) return c.json({ error: "weather not in plan" }, 403);
   const data = await refreshSource(c.env, src!);
   return c.json({ ok: true, current: data.current });
 });
@@ -990,10 +990,20 @@ app.get("/api/alerts/rules", async (c) => c.json({ rules: await listAlertRules(c
 app.post("/api/alerts/rules", async (c) => {
   const body = await c.req.json<{ type?: string; thresholdSec?: number; channel?: string; target?: string }>().catch(() => ({}) as Record<string, never>);
   const channel = body.channel === "webhook" ? "webhook" : body.channel === "email" ? "email" : "dashboard";
-  // Gate the delivery channel on the plan's allowed alert channels (§ alerting).
+  /*
+    Gate the DELIVERY CHANNEL on the plan.
+
+    `dashboard` is not gated and never was — it was in every plan's `alerting`
+    list, which made it look like something that could be withheld. The two
+    channels a plan actually buys are the two flags. Keeping the allow-list in
+    the refusal so a client can still say what IS available.
+  */
   const aEnt = await tenantEntitlements(c.env.DB, tenantOf(c));
-  if (!aEnt.features.alerting.includes(channel)) {
-    return c.json({ error: `${channel} alerts aren't included in your plan`, allowed: aEnt.features.alerting }, 403);
+  const CHANNEL_FLAG = { webhook: "alertsWebhook", email: "alertsEmail" } as const;
+  const needed = CHANNEL_FLAG[channel as keyof typeof CHANNEL_FLAG];
+  if (needed && !aEnt.features[needed]) {
+    const allowed = ["dashboard", ...(["webhook", "email"] as const).filter((ch) => aEnt.features[CHANNEL_FLAG[ch]])];
+    return c.json({ error: `${channel} alerts aren't included in your plan`, allowed }, 403);
   }
   const id = await addAlertRule(c.env.DB, tenantOf(c), {
     type: body.type ?? "offline",

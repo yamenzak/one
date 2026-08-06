@@ -17,8 +17,20 @@
  * silently hidden even before its catalog entry is written.
  */
 
-export type FeatureKind = "bool" | "list";
-
+/**
+ * ⚠️ `FeatureKind` and `options` are GONE, and so is every `kind: "bool"`.
+ *
+ * Four features used to be `kind: "list"` with variant options — `ticker`,
+ * `clock`, `weather`, `alerting`. Stage 4 flattened them into booleans (see the
+ * app's `entitlements.ts` for what each list actually varied across the four
+ * plans: one real bit each, plus three non-gates and one option no plan ever
+ * granted). With no list features left, a `kind` field with a single inhabitant
+ * is a branch every consumer still has to write and nothing can ever take.
+ *
+ * A feature is a boolean. If a genuinely tiered one ever arrives, it is two
+ * booleans — which is what `ticker`/`tickerAdvanced` is, and it reads better at
+ * the gate than `features.ticker.includes("advanced")` did.
+ */
 export interface FeatureDef {
   /** Key in the entitlements `features` blob. */
   key: string;
@@ -28,10 +40,6 @@ export interface FeatureDef {
   description: string;
   /** Grouping for the admin editors. */
   category: string;
-  /** Boolean gate, or an allow-list of variants. */
-  kind: FeatureKind;
-  /** For `list` features: the selectable variants. */
-  options?: string[];
   /** Safety features are never paywalled — surfaced, but not an upsell. */
   safety?: boolean;
   /** Marketing phrasing for the Billing plan card when on. Omit to keep it off
@@ -55,6 +63,7 @@ export const FEATURE_CATEGORIES = [
   "Data & sources",
   "Scheduling & sync",
   "Boards & queues",
+  "Workspace",
   "Advertising & audio",
   "Analytics & alerts",
   "Safety",
@@ -65,42 +74,58 @@ const plural = (n: number) => (n === 1 ? "" : "s");
 /** Every plan feature, in display order. Keys must match `Features` exactly. */
 export const FEATURE_CATALOG: FeatureDef[] = [
   // Content & widgets
-  { key: "htmlSandbox", label: "Custom HTML slides & widget", category: "Content & widgets", kind: "bool",
+  { key: "htmlSandbox", label: "Custom HTML slides & widget", category: "Content & widgets",
     description: "Author sandboxed HTML/CSS/JS slides and a custom HTML widget.", billing: "Custom HTML slides & widget" },
-  { key: "widgetStack", label: "Widget stacks", category: "Content & widgets", kind: "bool",
+  { key: "widgetStack", label: "Widget stacks", category: "Content & widgets",
     description: "Layer several widgets in one frame that rotate on a dwell timer.", billing: "Rotating widget stacks" },
-  { key: "clock", label: "Clock styles", category: "Content & widgets", kind: "list", options: ["digital", "analog"],
-    description: "Which clock faces are available (analog is premium).", billing: "Analog & digital clocks" },
+  { key: "clockAnalog", label: "Analog clock", category: "Content & widgets",
+    description: "The analog clock face. Digital is included on every plan.", billing: "Analog clock face" },
   // AI
-  { key: "aiGeneration", label: "AI generation", category: "AI", kind: "bool",
+  { key: "aiGeneration", label: "AI generation", category: "AI",
     description: "Generate slides, images, layouts, and voiceovers with AI.", billing: "AI slide, image & layout generation" },
   // Data & sources
-  { key: "ticker", label: "News / RSS ticker", category: "Data & sources", kind: "list", options: ["basic", "advanced"],
+  { key: "ticker", label: "News / RSS ticker", category: "Data & sources",
     description: "Scrolling headline ticker fed by RSS/JSON sources.", billing: "News / RSS ticker" },
-  { key: "weather", label: "Weather widgets", category: "Data & sources", kind: "list", options: ["small", "large"],
-    description: "Live weather widgets in the allowed sizes.", billing: "Weather widgets" },
+  { key: "tickerAdvanced", label: "Advanced ticker", category: "Data & sources",
+    description: "Multiple sources, custom styling and transitions on the ticker.", billing: "Advanced ticker" },
+  { key: "weather", label: "Weather widgets", category: "Data & sources",
+    description: "Live weather widgets, in both sizes.", billing: "Weather widgets" },
   // Scheduling & sync
-  { key: "dayparting", label: "Dayparting", category: "Scheduling & sync", kind: "bool",
+  { key: "dayparting", label: "Dayparting", category: "Scheduling & sync",
     description: "Switch a screen's channel by time of day and day of week.", billing: "Dayparting & scheduling" },
-  { key: "screenSaver", label: "Screen saver", category: "Scheduling & sync", kind: "bool",
+  { key: "screenSaver", label: "Screen saver", category: "Scheduling & sync",
     description: "Blank or dim idle screens on a schedule to protect the panel." },
-  { key: "multiScreenSync", label: "Multi-screen sync", category: "Scheduling & sync", kind: "bool",
+  { key: "multiScreenSync", label: "Multi-screen sync", category: "Scheduling & sync",
     description: "Keep screens sharing a channel frame-aligned (a video wall reads as one picture).", billing: "Frame-accurate multi-screen sync" },
   // Boards & queues
-  { key: "roomQueueManagement", label: "Queues & rooms", category: "Boards & queues", kind: "bool",
+  { key: "roomQueueManagement", label: "Queues & rooms", category: "Boards & queues",
     description: "Live queue, room, and score boards with operator control apps.", billing: "Live queue, room & score boards" },
   // Advertising & audio
-  { key: "ads", label: "Scheduled ads & interrupts", category: "Advertising & audio", kind: "bool",
+  { key: "ads", label: "Scheduled ads & interrupts", category: "Advertising & audio",
     description: "Time- or trigger-based full-screen ad breaks with audio.", billing: "Scheduled ads & interrupts" },
-  { key: "musicLibrary", label: "Licensed music library", category: "Advertising & audio", kind: "bool",
+  { key: "musicLibrary", label: "Licensed music library", category: "Advertising & audio",
     description: "Play from the curated, licensed background-music library.", billing: "Licensed music library" },
   // Analytics & alerts
-  { key: "proofOfPlay", label: "Proof-of-play analytics", category: "Analytics & alerts", kind: "bool",
+  { key: "proofOfPlay", label: "Proof-of-play analytics", category: "Analytics & alerts",
     description: "Per-play logs and exportable playout reports.", billing: "Proof-of-play analytics" },
-  { key: "alerting", label: "Alert channels", category: "Analytics & alerts", kind: "list", options: ["dashboard", "webhook", "email"],
-    description: "Where alerts can be delivered (webhook/email are premium).", billing: "Webhook & email alerts" },
+  /*
+    ⚠️ THE DASHBOARD CHANNEL IS NOT LISTED, and its absence is the point.
+
+    This was one `list` feature with three options, and `dashboard` was granted
+    by every plan — so it appeared in the operator's catalog as something that
+    could be sold or withheld, and it never was. `email` was the opposite: an
+    option in the catalog that NO plan has ever granted. Flattening surfaced
+    both. Alerts always reach the dashboard; these two are what a plan buys.
+  */
+  { key: "alertsWebhook", label: "Webhook alerts", category: "Analytics & alerts",
+    description: "Deliver alerts to a URL you own.", billing: "Webhook alerts" },
+  { key: "alertsEmail", label: "Email alerts", category: "Analytics & alerts",
+    description: "Deliver alerts by email. Not included in any plan yet.", billing: "Email alerts" },
+  // Workspace
+  { key: "customDomain", label: "Custom domain", category: "Workspace",
+    description: "Serve the dashboard from your own domain.", billing: "Your own domain" },
   // Safety (never paywalled)
-  { key: "emergencyOverride", label: "Emergency override", category: "Safety", kind: "bool", safety: true,
+  { key: "emergencyOverride", label: "Emergency override", category: "Safety", safety: true,
     description: "Interrupt every screen with an emergency message. Always included." },
 ];
 
@@ -119,7 +144,15 @@ export const QUOTA_CATALOG: QuotaDef[] = [
   { key: "slidesPerPlaylist", label: "Slides / playlist", description: "Max slides in one playlist." },
   { key: "feeds", label: "Live data sources", description: "RSS/JSON/Sheet data sources.",
     billing: (n) => (n > 0 ? `${n} live data source${plural(n)}` : null) },
+  /*
+    ⚠️ THE TWO QUOTAS WHERE A SMALLER NUMBER IS BETTER. They are floors on an
+    interval, not ceilings on a count — see `INVERTED_QUOTAS` in the app's
+    entitlements.ts, and note that the grant-only override raises them, which
+    makes a gift slower. Neither carries `billing` copy: "3600 minimum feed
+    refresh" is not a selling point, it is the absence of one.
+  */
   { key: "feedRefreshMinSec", label: "Min feed refresh (sec)", description: "Fastest allowed source refresh." },
+  { key: "resyncIntervalSec", label: "Screen resync (sec)", description: "How often a screen re-fetches its manifest. Was its own `sync` axis." },
   { key: "scheduleRules", label: "Schedule rules", description: "Per-device dayparting rules." },
   { key: "historyVersions", label: "History versions", description: "Retained channel revisions." },
   { key: "liveBoards", label: "Live boards", description: "Queue/room/score boards.",
@@ -153,7 +186,7 @@ export function humanizeKey(key: string): string {
  *  keys still render with a sensible label/description. */
 export function featureMeta(key: string): FeatureDef {
   return FEATURE_BY_KEY.get(key) ?? {
-    key, label: humanizeKey(key), description: "", category: "Other", kind: "bool",
+    key, label: humanizeKey(key), description: "", category: "Other",
   };
 }
 export function quotaMeta(key: string): QuotaDef {

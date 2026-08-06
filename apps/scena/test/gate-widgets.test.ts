@@ -8,9 +8,9 @@ const ALL: Features = {
   ...FREE_ENTITLEMENTS.features,
   htmlSandbox: true,
   widgetStack: true,
-  clock: ["digital", "analog"],
-  ticker: ["basic", "advanced"],
-  weather: ["small", "large"],
+  clockAnalog: true,
+  ticker: true,
+  weather: true,
 };
 
 /** The restrictive baseline: no html sandbox, no stacks, digital-only clock,
@@ -19,9 +19,9 @@ const NONE: Features = {
   ...FREE_ENTITLEMENTS.features,
   htmlSandbox: false,
   widgetStack: false,
-  clock: ["digital"],
-  ticker: [],
-  weather: [],
+  clockAnalog: false,
+  ticker: false,
+  weather: false,
 };
 
 const sample = () => [

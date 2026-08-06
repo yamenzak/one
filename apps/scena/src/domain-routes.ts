@@ -43,21 +43,18 @@ const GUARDS: RouteGuards = {
   requirePermission: (c, p) => requirePermission(c as never, p),
   isPlatformAdmin: (c) => isPlatformAdmin(c as never),
   /**
-   * Custom domains are a paid capability, gated on the plan.
+   * Custom domains are a paid capability, gated on the plan's own flag.
    *
-   * Scena's entitlements have no `customDomain` flag yet — the catalog predates
-   * the feature — so this reads the highest tier's marker instead of inventing
-   * one: a workspace with unlimited library tracks is on `business`. That is a
-   * PROXY and it is deliberately named as one, because a wrong-looking gate that
-   * says why is better than a `customDomain: true` added to four plan blobs in a
-   * stage that is not about pricing. Stage 4 owns the catalog; it should replace
-   * this with a real flag.
+   * Stage 3 had no flag to read — the catalog predated the feature — so this
+   * read a PROXY: "does this plan have unlimited library tracks", which happened
+   * to be true on exactly the tier we wanted and was a lie about why. Stage 4
+   * added `features.customDomain`, so the gate now asks the question it means.
    */
   gateCustomDomain: async (c) => {
     const who = requireTenant(c as never);
     if (!who) return null;
     const ent = await tenantEntitlements(c.env.DB as D1Database, who.tenantId).catch(() => null);
-    return ent && ent.quotas.libraryTracks < 0
+    return ent?.features.customDomain
       ? null
       : c.json({ error: "custom domains aren't included in this plan" }, 403);
   },

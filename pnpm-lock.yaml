@@ -245,6 +245,9 @@ importers:
       '@4dl/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@4dl/billing':
+        specifier: workspace:*
+        version: link:../../packages/billing
       '@4dl/core':
         specifier: workspace:*
         version: link:../../packages/core
