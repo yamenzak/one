@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   ADMIN_LABEL,
+  DEFAULT_DEVICE_LABEL,
   RESERVED_LABELS,
   SETUP_LABEL,
   SLUG_MAX,
   SLUG_MIN,
   adminHostname,
+  deviceHostname,
   checkSlug,
   classifyHost,
   cookieDomainFor,
@@ -280,5 +282,70 @@ describe("cookieDomainFor — one session across our doors, and no further", () 
     // The bug this pins: widening to `4dl.app` would ship our session cookie to
     // every unrelated app in the zone.
     expect(cookieDomainFor(classifyHost(`acme.${ROOT}`, ROOT))).not.toBe("4dl.app");
+  });
+});
+
+describe("the device door — opt-in, and off by default", () => {
+  const PLAY = `${DEFAULT_DEVICE_LABEL}.${ROOT}`;
+
+  it("is NOT a door for an app that never asked for one", () => {
+    /*
+      The whole reason it is opt-in. `play` is not in `RESERVED_LABELS`, so it is
+      a slug a Kova studio can hold TODAY. Making it a universal door would
+      silently reclassify a live tenant's hostname as infrastructure — their
+      dashboard would stop resolving and nothing would say why.
+    */
+    const h = classifyHost(PLAY, ROOT);
+    expect(h.role).toBe("tenant");
+    expect(h.slug).toBe(DEFAULT_DEVICE_LABEL);
+  });
+
+  it("is a door for an app that declares one", () => {
+    const h = classifyHost(PLAY, ROOT, { deviceLabel: DEFAULT_DEVICE_LABEL });
+    expect(h.role).toBe("device");
+    // No tenant comes from the hostname. That is the point: the tenancy arrives
+    // from the pairing claim, so the whole fleet shares one pinned origin and
+    // survives being re-paired.
+    expect(h.slug).toBeNull();
+    expect(h.underRoot).toBe(true);
+  });
+
+  it("takes the label the app names, not a hardcoded one", () => {
+    expect(classifyHost(`screens.${ROOT}`, ROOT, { deviceLabel: "screens" }).role).toBe("device");
+    // …and the default label is then an ordinary slug again.
+    expect(classifyHost(PLAY, ROOT, { deviceLabel: "screens" }).role).toBe("tenant");
+  });
+
+  it("cannot be claimed as a tenant slug once declared", () => {
+    // Declaring the door RESERVES it. A tenant that claimed the origin the fleet
+    // is pinned to would be served every screen's manifest request.
+    expect(checkSlug(DEFAULT_DEVICE_LABEL, { deviceLabel: DEFAULT_DEVICE_LABEL })).toEqual({
+      ok: false,
+      reason: "reserved",
+    });
+    // And is a perfectly ordinary slug for an app with no device door.
+    expect(checkSlug(DEFAULT_DEVICE_LABEL)).toEqual({ ok: true, slug: DEFAULT_DEVICE_LABEL });
+  });
+
+  it("shares the root's passkey and cookie, like every other door under it", () => {
+    // A device holds no session today, but the door is under our root, so if one
+    // ever does it must not be an island. This is an assertion about the SHAPE
+    // being consistent, not about a screen signing in.
+    const h = classifyHost(PLAY, ROOT, { deviceLabel: DEFAULT_DEVICE_LABEL });
+    expect(rpIdFor(h)).toBe(ROOT);
+    // No leading dot: RFC 6265 dropped it, and every browser treats a Domain
+    // attribute as covering the name and its subdomains either way.
+    expect(cookieDomainFor(h)).toBe(ROOT);
+  });
+
+  it("names its own hostname", () => {
+    expect(deviceHostname(ROOT)).toBe(PLAY);
+    expect(deviceHostname(ROOT, "screens")).toBe(`screens.${ROOT}`);
+  });
+
+  it("still classifies against localhost in dev, like the other doors", () => {
+    const h = classifyHost(`${DEFAULT_DEVICE_LABEL}.localhost`, ROOT, { deviceLabel: DEFAULT_DEVICE_LABEL });
+    expect(h.role).toBe("device");
+    expect(h.root).toBe("localhost");
   });
 });

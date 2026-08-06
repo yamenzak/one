@@ -46,6 +46,13 @@ export interface TenancyConfig {
   /** Labels this app reserves beyond the universal list — its own brand names. */
   reserved?: ReadonlySet<string>;
   /**
+   * The label this app serves DEVICES on, if it has any (Scena: `play`).
+   * Unset means no device door, which is every other app here. Threaded through
+   * to `classifyHost` AND to slug validation, so the label cannot be claimed as
+   * a tenant. See `DEFAULT_DEVICE_LABEL`.
+   */
+  deviceLabel?: string;
+  /**
    * The tenant's CURRENT standing with the platform, read live on every request.
    *
    * Omit it and every tenant resolves `ok`. That is the correct behaviour for an
@@ -125,7 +132,7 @@ export function rootDomain(env: RootDomainEnv): string {
   return env.BETTER_AUTH_URL ? hostnameOf(env.BETTER_AUTH_URL) : "";
 }
 
-const slugOpts = (cfg: TenancyConfig): SlugOptions => ({ reserved: cfg.reserved });
+const slugOpts = (cfg: TenancyConfig): SlugOptions => ({ reserved: cfg.reserved, deviceLabel: cfg.deviceLabel });
 
 /** Classify a request's hostname against the configured root. Pure. */
 export function shapeOf(hostname: string, cfg: TenancyConfig): HostShape {

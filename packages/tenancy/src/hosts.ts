@@ -52,7 +52,7 @@
  */
 
 /** Which kind of door a hostname is. Total: every hostname classifies. */
-export type HostRole = "root" | "setup" | "admin" | "tenant" | "custom" | "invalid";
+export type HostRole = "root" | "setup" | "admin" | "device" | "tenant" | "custom" | "invalid";
 
 export interface HostShape {
   role: HostRole;
@@ -70,6 +70,34 @@ export interface HostShape {
 export const SETUP_LABEL = "setup";
 /** The platform-operator console's label. */
 export const ADMIN_LABEL = "admin";
+
+/**
+ * THE DEVICE DOOR — opt-in, because most products do not have devices.
+ *
+ * A screen bolted to a wall is not a person and not a tenant. It has one pinned
+ * URL, a Service-Worker cache, and it runs for months without anybody signing
+ * in. Which tenant it belongs to arrives from its PAIRING CLAIM, not from its
+ * hostname — and that difference is the whole reason this door exists:
+ *
+ *   • A tenant subdomain would give every tenant's screens a DIFFERENT address,
+ *     so re-pairing a screen to another tenant would orphan its cache and it
+ *     would boot to nothing until someone cleared the device by hand.
+ *   • Custom domains would multiply certificates by the size of the fleet.
+ *   • The host gate must not reach it. A screen in a public waiting room going
+ *     dark because its owner's card expired is a different decision from a
+ *     dashboard going read-only, and it is the app's to make in its own copy —
+ *     not the edge's to make by refusing the request.
+ *
+ * So: one fixed origin, no tenant resolved, exempt from the gate. It is the same
+ * shape as the `admin.` exemption, one door along.
+ *
+ * ⚠️ OPT-IN VIA `SlugOptions.deviceLabel`, and it must stay that way. Making
+ * `play` a universal door would silently reclassify `play.<root>` in every app
+ * on this platform — a hostname a tenant can hold today, since it is not in
+ * `RESERVED_LABELS`. An app that wants the door names its label; an app that
+ * does not is unchanged.
+ */
+export const DEFAULT_DEVICE_LABEL = "play";
 
 /**
  * Labels a studio may never claim, because something else already answers there
@@ -168,6 +196,15 @@ export interface SlugOptions {
    * accumulates every app's brand names is a list nobody can safely edit.
    */
   reserved?: ReadonlySet<string>;
+  /**
+   * The label this app serves DEVICES on, if it has any (Scena: `play`).
+   * Unset — the default — means the app has no device door and the label is an
+   * ordinary slug, exactly as before. See `DEFAULT_DEVICE_LABEL`.
+   *
+   * Passing it also RESERVES the label: `checkSlug` refuses it, so a tenant
+   * cannot claim the origin the whole fleet is pinned to.
+   */
+  deviceLabel?: string;
 }
 
 /**
@@ -192,7 +229,12 @@ export function checkSlug(raw: string | null | undefined, opts: SlugOptions = {}
   // `xn--` is the live one; the rest are reserved for future use, and a label
   // shaped like an encoding can be re-interpreted by intermediaries.
   if (slug.length >= 4 && slug[2] === "-" && slug[3] === "-") return { ok: false, reason: "punycode" };
-  if (RESERVED_LABELS.has(slug) || opts.reserved?.has(slug)) return { ok: false, reason: "reserved" };
+  // The device door is a door, so it cannot also be a tenant. Checked here and
+  // not only in `classifyHost` because a slug is validated at CREATE time, which
+  // is the only moment refusing it is cheap.
+  if (RESERVED_LABELS.has(slug) || opts.reserved?.has(slug) || slug === opts.deviceLabel) {
+    return { ok: false, reason: "reserved" };
+  }
   return { ok: true, slug };
 }
 
@@ -265,6 +307,10 @@ export function classifyHost(rawHostname: string, rawRoot: string, opts: SlugOpt
 
   if (label === SETUP_LABEL) return { ...base, role: "setup", slug: null, underRoot: true };
   if (label === ADMIN_LABEL) return { ...base, role: "admin", slug: null, underRoot: true };
+  // Only when the app declared one — see `DEFAULT_DEVICE_LABEL`.
+  if (opts.deviceLabel && label === opts.deviceLabel) {
+    return { ...base, role: "device", slug: null, underRoot: true };
+  }
 
   // A reserved label under our root is NOT a candidate custom domain — see the
   // module header. It serves nothing.
@@ -287,6 +333,11 @@ export function setupHostname(root: string): string {
 /** The operator console's full hostname. */
 export function adminHostname(root: string): string {
   return `${ADMIN_LABEL}.${normalizeHostname(root)}`;
+}
+
+/** The device door's full hostname — the ONE origin a whole fleet is pinned to. */
+export function deviceHostname(root: string, label = DEFAULT_DEVICE_LABEL): string {
+  return `${label}.${normalizeHostname(root)}`;
 }
 
 /**

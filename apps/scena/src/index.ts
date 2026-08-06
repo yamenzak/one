@@ -10,11 +10,13 @@
  *   GET  /api/screen/:id/status  fleet-view status
  */
 
-import { Hono } from "hono";
+import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import type { Env } from "./env.js";
 import { type AppEnv, type AppContext, sessionMiddleware, tenantOf, owns } from "./auth-context.js";
 import { routeGuard } from "./route-guard.js";
+import { domainRoutes, domainAdminRoutes, orgCreateGuard, orgUpdateGuard } from "./domain-routes.js";
+import { maintenanceMiddleware } from "@4dl/tenancy";
 import { contentHash, parseManifest, type Manifest } from "@scena/manifest";
 import { demoAssetSvg, DEFAULT_WIDGETS } from "./demo.js";
 import { provisionDisplay, provisionDisplayForScreen, seedSampleDisplay } from "./provision.js";
@@ -91,19 +93,57 @@ app.use(
   cors({ origin: (o) => o ?? "*", credentials: true, allowHeaders: ["content-type"], allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"] }),
 );
 
-// Resolve the Better Auth session onto the context (user + active-org tenant +
-// role) for every API request, and ensure the auth schema exists.
-app.use("/api/*", sessionMiddleware);
+/*
+  ⚠️ MOUNTED ON `*`, NOT `/api/*`.
 
-// The auth boundary: public/device routes pass, /api/admin/* needs platform
-// admin, everything else needs an authenticated session bound to an org.
-app.use("/api/*", routeGuard);
+  The guard's first act is to classify the HOST, and `/health` is one of the
+  paths it decides about — so it has to reach the middleware. Under `/api/*` the
+  probe would bypass the wall entirely, which is harmless for `/health` and
+  would not be for the next non-API path somebody adds.
+
+  The order is the security property and is not negotiable: identity resolves
+  the host BEFORE the session is read, so a session pointed at a workspace the
+  caller does not belong to grants nothing.
+*/
+app.use("*", sessionMiddleware);
+
+/*
+  The maintenance switch, resolved once per request and read by BOTH the guard
+  (which refuses on it) and `/api/host` (which reports it). Between the session
+  and the guard because the guard's gate 1b needs it and the probe needs the
+  same value the guard used.
+*/
+app.use("*", maintenanceMiddleware() as unknown as MiddlewareHandler<AppEnv>);
+
+// The auth boundary: six gates, in order. See route-guard.ts.
+app.use("*", routeGuard);
+
+/*
+  THE SLUG GUARDS sit in FRONT of Better Auth's own organization endpoints.
+
+  Better Auth will happily store whatever slug it is sent — the create call is a
+  plain POST — so without these a workspace could claim `admin`, `setup`, `play`
+  or `autodiscover` and be served that origin. They also provision the
+  subdomain, without which a new workspace has no address at all.
+*/
+app.use("/api/auth/organization/create", orgCreateGuard as unknown as MiddlewareHandler<AppEnv>);
+app.use("/api/auth/organization/update", orgUpdateGuard as unknown as MiddlewareHandler<AppEnv>);
 
 // Better Auth handler: sign-up/in, magic-link, Google, organization + member
 // management all live under /api/auth/*.
 app.on(["POST", "GET"], "/api/auth/*", (c) => c.get("auth").handler(c.req.raw));
 
 app.get("/health", (c) => c.json({ ok: true, service: "scena-api" }));
+
+/**
+ * `/api/host` — the ONE public read the pre-auth client makes, and the custom-
+ * domain surface behind it. Both are `@4dl/tenancy`'s, which is why this app
+ * does not hand-write a host probe: the door classification, the whole-gate
+ * spread and the 404-vs-network distinction are decisions the package already
+ * made correctly.
+ */
+app.route("/api", domainRoutes);
+app.route("/api", domainAdminRoutes);
 
 registerBilling(app);
 registerContentRoutes(app);

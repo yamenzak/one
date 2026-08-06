@@ -30,7 +30,25 @@ import { ensureSchema } from "../src/db.js";
 import { ensureBilling } from "../src/billing-store.js";
 import { STATION_DOMAIN } from "../src/auth.js";
 
-const ORIGIN = "http://localhost:8787";
+/*
+  THE HOST IS THE TENANCY, IN TESTS TOO.
+
+  Miniflare preserves the Host header exactly as the edge does, and `*.localhost`
+  resolves to loopback, so this is the shipped topology rather than a simulation
+  of it: sign-in happens on `setup.localhost`, workspace behaviour is asserted on
+  `<slug>.localhost`, and the device door is a third address.
+
+  This suite used to drive one origin. Stage 3 broke six of its tests, correctly:
+  a tenant-scoped route on the ROOT door is a route on a signpost, and the guard
+  now refuses it. Pointing them at the right door is the fix; widening the guard
+  would not have been.
+*/
+const ROOT = "http://localhost:8787";
+const SETUP = "http://setup.localhost:8787";
+const DEVICE = "http://play.localhost:8787";
+/** A workspace's own door. */
+const at = (slug: string) => `http://${slug}.localhost:8787`;
+
 const db = () => env.DB as D1Database;
 
 /** Cookie jar helper — the session cookie is HttpOnly, so tests carry it by hand. */
@@ -39,9 +57,11 @@ function cookies(res: Response): string {
   return (h.getSetCookie?.() ?? []).map((c) => c.split(";")[0]).join("; ");
 }
 
-const json = (cookie?: string): Record<string, string> => ({
+/** JSON headers with the ORIGIN matching the door being driven — Better Auth
+ *  1.6.23 trusts only the request's own origin, whatever `trustedOrigins` says. */
+const json = (origin: string, cookie?: string): Record<string, string> => ({
   "content-type": "application/json",
-  origin: ORIGIN,
+  origin,
   ...(cookie ? { cookie } : {}),
 });
 
@@ -62,42 +82,51 @@ async function latestOtp(email: string): Promise<string> {
   return otp;
 }
 
+/** Sign in on the SETUP door — the only place a workspace is created. */
 async function signIn(email: string): Promise<string> {
-  await SELF.fetch(`${ORIGIN}/api/auth/email-otp/send-verification-otp`, {
+  await SELF.fetch(`${SETUP}/api/auth/email-otp/send-verification-otp`, {
     method: "POST",
-    headers: json(),
+    headers: json(SETUP),
     body: JSON.stringify({ email, type: "sign-in" }),
   });
-  const res = await SELF.fetch(`${ORIGIN}/api/auth/sign-in/email-otp`, {
+  const res = await SELF.fetch(`${SETUP}/api/auth/sign-in/email-otp`, {
     method: "POST",
-    headers: json(),
+    headers: json(SETUP),
     body: JSON.stringify({ email, otp: await latestOtp(email) }),
   });
   expect(res.status, `sign-in for ${email}`).toBe(200);
   return cookies(res);
 }
 
-/** A fresh owner with their own workspace. Unique per call, so tests never collide. */
-async function newWorkspace(tag: string): Promise<{ cookie: string; slug: string; email: string }> {
+/**
+ * A fresh owner with their own workspace, and its DOOR.
+ *
+ * `door` is what every later call uses. The cookie is carried by hand across
+ * hosts because a `Domain` attribute is rejected for `localhost`, so each
+ * `*.localhost` has its own jar in a browser — production issues one cookie for
+ * the whole root and one sign-in covers every workspace. That is a documented
+ * dev-only difference, not a shortcut here.
+ */
+async function newWorkspace(tag: string): Promise<{ cookie: string; slug: string; door: string; email: string }> {
   const n = Math.abs(Number(BigInt(Date.now()) % 1_000_000n)) + Math.floor(performance.now());
   const slug = `${tag}-${n}`;
   const email = `${slug}@example.com`;
   let cookie = await signIn(email);
 
-  const created = await SELF.fetch(`${ORIGIN}/api/auth/organization/create`, {
+  const created = await SELF.fetch(`${SETUP}/api/auth/organization/create`, {
     method: "POST",
-    headers: json(cookie),
+    headers: json(SETUP, cookie),
     body: JSON.stringify({ name: `Workspace ${n}`, slug }),
   });
   expect(created.status, "organization/create").toBe(200);
 
-  const active = await SELF.fetch(`${ORIGIN}/api/auth/organization/set-active`, {
+  const active = await SELF.fetch(`${SETUP}/api/auth/organization/set-active`, {
     method: "POST",
-    headers: json(cookie),
+    headers: json(SETUP, cookie),
     body: JSON.stringify({ organizationSlug: slug }),
   });
   cookie = cookies(active) || cookie;
-  return { cookie, slug, email };
+  return { cookie, slug, door: at(slug), email };
 }
 
 /** Put a workspace on a named plan without going through Stripe. */
@@ -181,10 +210,115 @@ describe("the composed schema actually applies", () => {
   });
 });
 
+describe("the doors", () => {
+  it("answers the host probe with the door it is on", async () => {
+    const body = (await (await SELF.fetch(`${SETUP}/api/host`)).json()) as {
+      role: string;
+      tenant: unknown;
+    };
+    expect(body.role).toBe("setup");
+    // No workspace behind a platform door — and `null` here is an ANSWER, not an
+    // absence. A client that reads it as "still loading" renders forever.
+    expect(body.tenant).toBeNull();
+  });
+
+  it("names the workspace on its own door", async () => {
+    const { slug, door } = await newWorkspace("door");
+    const body = (await (await SELF.fetch(`${door}/api/host`)).json()) as {
+      role: string;
+      tenant: { slug: string } | null;
+    };
+    expect(body.role).toBe("tenant");
+    expect(body.tenant?.slug).toBe(slug);
+  });
+
+  it("serves NOTHING but the probe on a well-formed subdomain nobody owns", async () => {
+    // Not a 500 and not a sign-in form. A sign-in form on an unclaimed
+    // subdomain is an invitation to authenticate somewhere that does not exist.
+    const nowhere = at("nobody-owns-this-one");
+    const probe = await SELF.fetch(`${nowhere}/api/host`);
+    expect(probe.status).toBe(200);
+    expect(((await probe.json()) as { tenant: unknown }).tenant).toBeNull();
+
+    /*
+      THE HOLE THIS CLOSES, and it is why `allowedWithoutTenant` is narrower
+      than `allowedOnRoot`: the auth lane is PUBLIC, so on an unowned hostname —
+      including the `*.workers.dev` name Cloudflare publishes for every worker,
+      which anyone can guess — a stranger could otherwise request a sign-in code,
+      verify it, and mint a workspace from an address that belongs to nobody.
+    */
+    const auth = await SELF.fetch(`${nowhere}/api/auth/email-otp/send-verification-otp`, {
+      method: "POST",
+      headers: json(nowhere),
+      body: JSON.stringify({ email: "stranger@example.com", type: "sign-in" }),
+    });
+    expect(auth.status).toBe(404);
+  });
+
+  it("keeps the ROOT a signpost — a workspace route is not served there", async () => {
+    const { cookie } = await newWorkspace("rootdoor");
+    const res = await SELF.fetch(`${ROOT}/api/staff`, { headers: { cookie } });
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { error: string }).error).toBe("wrong_door");
+  });
+
+  it("REFUSES a reserved label as a workspace slug", async () => {
+    // A DNS label is an origin and an origin is a trust boundary. A workspace at
+    // `admin` would be served the operator console's URL; one at `play` would be
+    // served every screen's manifest request.
+    const cookie = await signIn(`reserved-${Math.floor(performance.now())}@example.com`);
+    for (const slug of ["admin", "setup", "play", "autodiscover", "api"]) {
+      const res = await SELF.fetch(`${SETUP}/api/auth/organization/create`, {
+        method: "POST",
+        headers: json(SETUP, cookie),
+        body: JSON.stringify({ name: "Nope", slug }),
+      });
+      expect(res.status, `"${slug}" was accepted as a slug`).toBe(400);
+    }
+  });
+
+  it("gives a new workspace an ADDRESS, not just a row", async () => {
+    // A workspace with no hostname is a workspace nobody can reach: every invite
+    // link, every screen's pairing target and the owner's next visit are built
+    // from it. The slug guard provisions it at create time for that reason.
+    const { slug } = await newWorkspace("addr");
+    const row = await db()
+      .prepare("SELECT hostname, kind FROM tenant_domains WHERE hostname = ?")
+      .bind(`${slug}.localhost`)
+      .first<{ hostname: string; kind: string }>();
+    expect(row?.hostname).toBe(`${slug}.localhost`);
+  });
+});
+
+describe("the device door", () => {
+  it("is its own door and resolves no workspace", async () => {
+    /*
+      A screen is a DEVICE: one pinned URL, Service-Worker-cached, running for
+      months offline. Its tenancy arrives from the pairing CLAIM, so the whole
+      fleet shares this one origin and survives being re-paired — which a
+      workspace subdomain could not do, and custom domains would price by the
+      size of the fleet.
+    */
+    const body = (await (await SELF.fetch(`${DEVICE}/api/host`)).json()) as {
+      role: string;
+      tenant: unknown;
+    };
+    expect(body.role).toBe("device");
+    expect(body.tenant).toBeNull();
+  });
+
+  it("does not 404 for the missing tenant the way an unowned subdomain does", async () => {
+    // The distinction the guard has to make: `play.` is not a hostname that
+    // FAILED to resolve a workspace, it is one that was never going to.
+    const res = await SELF.fetch(`${DEVICE}/health`);
+    expect(res.status).toBe(200);
+  });
+});
+
 describe("signing in", () => {
   it("takes a person from an address to a session with no password anywhere", async () => {
-    const { cookie, email } = await newWorkspace("signin");
-    const me = (await (await SELF.fetch(`${ORIGIN}/api/me`, { headers: { cookie } })).json()) as {
+    const { cookie, door, email } = await newWorkspace("signin");
+    const me = (await (await SELF.fetch(`${door}/api/me`, { headers: { cookie } })).json()) as {
       authenticated: boolean;
       email: string;
       role: string;
@@ -207,9 +341,9 @@ describe("signing in", () => {
       `autoSignIn: false` withholds the token on the sign-up RESPONSE, which is
       what made it easy to miss: the endpoint reads as though it refused.
     */
-    const res = await SELF.fetch(`${ORIGIN}/api/auth/sign-up/email`, {
+    const res = await SELF.fetch(`${SETUP}/api/auth/sign-up/email`, {
       method: "POST",
-      headers: json(),
+      headers: json(SETUP),
       body: JSON.stringify({ email: "stranger@example.com", password: "hunter2hunter2", name: "S" }),
     });
     expect(res.status).not.toBe(200);
@@ -222,9 +356,9 @@ describe("signing in", () => {
 
   it("does not let a password sign-in reach a real person's address", async () => {
     const { email } = await newWorkspace("nopass");
-    const res = await SELF.fetch(`${ORIGIN}/api/auth/sign-in/email`, {
+    const res = await SELF.fetch(`${SETUP}/api/auth/sign-in/email`, {
       method: "POST",
-      headers: json(),
+      headers: json(SETUP),
       body: JSON.stringify({ email, password: "anything-at-all" }),
     });
     expect(res.status).not.toBe(200);
@@ -233,10 +367,10 @@ describe("signing in", () => {
 
 describe("the team", () => {
   it("reports seats from the SERVER, not from a row count", async () => {
-    const { cookie, slug } = await newWorkspace("seats");
+    const { cookie, slug, door } = await newWorkspace("seats");
     await setPlan(slug, "pro");
 
-    const res = await SELF.fetch(`${ORIGIN}/api/staff`, { headers: { cookie } });
+    const res = await SELF.fetch(`${door}/api/staff`, { headers: { cookie } });
     expect(res.status, "the staff routes must be mounted under /api").toBe(200);
     const body = (await res.json()) as {
       seats: { used: number; pending: number; max: number; remaining: number };
@@ -253,12 +387,12 @@ describe("the team", () => {
   it("refuses an invitation at the ceiling and admits one after an upgrade", async () => {
     // Authorization observable WITHOUT the route guard: the seat check runs
     // inside the staff routes and does not consult platform-admin status.
-    const { cookie, slug } = await newWorkspace("ceiling");
+    const { cookie, slug, door } = await newWorkspace("ceiling");
     await setPlan(slug, "free"); // seats: 1, and the owner is already in it
 
-    const refused = await SELF.fetch(`${ORIGIN}/api/staff/invite`, {
+    const refused = await SELF.fetch(`${door}/api/staff/invite`, {
       method: "POST",
-      headers: json(cookie),
+      headers: json(door, cookie),
       body: JSON.stringify({ email: "colleague@example.com", role: "operator" }),
     });
     expect(refused.status).toBe(403);
@@ -267,9 +401,9 @@ describe("the team", () => {
     expect(body.error).toMatch(/upgrade your plan/);
 
     await setPlan(slug, "pro");
-    const admitted = await SELF.fetch(`${ORIGIN}/api/staff/invite`, {
+    const admitted = await SELF.fetch(`${door}/api/staff/invite`, {
       method: "POST",
-      headers: json(cookie),
+      headers: json(door, cookie),
       body: JSON.stringify({ email: "colleague@example.com", role: "operator" }),
     });
     expect(admitted.status).toBe(201);
@@ -280,14 +414,14 @@ describe("the team", () => {
   });
 
   it("counts a pending invitation as a RESERVED seat", async () => {
-    const { cookie, slug } = await newWorkspace("pending");
+    const { cookie, slug, door } = await newWorkspace("pending");
     await setPlan(slug, "pro");
-    await SELF.fetch(`${ORIGIN}/api/staff/invite`, {
+    await SELF.fetch(`${door}/api/staff/invite`, {
       method: "POST",
-      headers: json(cookie),
+      headers: json(door, cookie),
       body: JSON.stringify({ email: "held@example.com", role: "viewer" }),
     });
-    const body = (await (await SELF.fetch(`${ORIGIN}/api/staff`, { headers: { cookie } })).json()) as {
+    const body = (await (await SELF.fetch(`${door}/api/staff`, { headers: { cookie } })).json()) as {
       seats: { used: number; pending: number; remaining: number };
     };
     expect(body.seats.pending).toBe(1);
@@ -299,11 +433,11 @@ describe("the team", () => {
   it("will not invite anyone into a BOARD role", async () => {
     // A station account promoted to `operator` is a device bolted to a wall in a
     // waiting room holding the run of the fleet.
-    const { cookie, slug } = await newWorkspace("boardrole");
+    const { cookie, slug, door } = await newWorkspace("boardrole");
     await setPlan(slug, "pro");
-    const res = await SELF.fetch(`${ORIGIN}/api/staff/invite`, {
+    const res = await SELF.fetch(`${door}/api/staff/invite`, {
       method: "POST",
-      headers: json(cookie),
+      headers: json(door, cookie),
       body: JSON.stringify({ email: "device@example.com", role: "board_station" }),
     });
     expect(res.status).toBe(400);
@@ -312,19 +446,19 @@ describe("the team", () => {
 
 describe("stations", () => {
   it("provisions a board's users and signs one in on its own credential", async () => {
-    const { cookie, slug } = await newWorkspace("station");
+    const { cookie, slug, door } = await newWorkspace("station");
     await setPlan(slug, "business");
 
-    const created = await SELF.fetch(`${ORIGIN}/api/boards`, {
+    const created = await SELF.fetch(`${door}/api/boards`, {
       method: "POST",
-      headers: json(cookie),
+      headers: json(door, cookie),
       body: JSON.stringify({ kind: "queue", name: "Front desk", config: { counters: [{ id: "c1", name: "Counter 1" }] } }),
     });
     expect(created.status).toBe(200);
     const board = (await created.json()) as { id: string };
 
     const roster = (await (
-      await SELF.fetch(`${ORIGIN}/api/boards/${board.id}/users`, { headers: { cookie } })
+      await SELF.fetch(`${door}/api/boards/${board.id}/users`, { headers: { cookie } })
     ).json()) as { users: { id: string; kind: string; username: string }[] };
     const station = roster.users.find((u) => u.kind === "station")!;
     expect(station).toBeTruthy();
@@ -342,24 +476,24 @@ describe("stations", () => {
 
     const code = (
       (await (
-        await SELF.fetch(`${ORIGIN}/api/boards/${board.id}/users/${station.id}/regenerate`, {
+        await SELF.fetch(`${door}/api/boards/${board.id}/users/${station.id}/regenerate`, {
           method: "POST",
-          headers: json(cookie),
+          headers: json(door, cookie),
         })
       ).json()) as { password: string }
     ).password;
     expect(code).toBeTruthy();
 
     const stationCookie = cookies(
-      await SELF.fetch(`${ORIGIN}/api/auth/sign-in/email`, {
+      await SELF.fetch(`${SETUP}/api/auth/sign-in/email`, {
         method: "POST",
-        headers: json(),
+        headers: json(SETUP),
         body: JSON.stringify({ email: `${station.username}${STATION_DOMAIN}`, password: code }),
       }),
     );
     expect(stationCookie).toBeTruthy();
 
-    const me = (await (await SELF.fetch(`${ORIGIN}/api/me`, { headers: { cookie: stationCookie } })).json()) as {
+    const me = (await (await SELF.fetch(`${door}/api/me`, { headers: { cookie: stationCookie } })).json()) as {
       role: string;
       board: { boardId: string; stationId: string } | null;
       permissions: Record<string, string[]>;
@@ -384,15 +518,15 @@ describe("stations", () => {
     // The reason `@4dl/auth`'s seat-free set had to become a list: board users
     // are minted PER BOARD, so a clinic with eight rooms would otherwise exhaust
     // its plan before hiring anybody.
-    const { cookie, slug } = await newWorkspace("seatfree");
+    const { cookie, slug, door } = await newWorkspace("seatfree");
     await setPlan(slug, "business");
-    const before = (await (await SELF.fetch(`${ORIGIN}/api/staff`, { headers: { cookie } })).json()) as {
+    const before = (await (await SELF.fetch(`${door}/api/staff`, { headers: { cookie } })).json()) as {
       seats: { used: number };
     };
 
-    await SELF.fetch(`${ORIGIN}/api/boards`, {
+    await SELF.fetch(`${door}/api/boards`, {
       method: "POST",
-      headers: json(cookie),
+      headers: json(door, cookie),
       body: JSON.stringify({
         kind: "room",
         name: "Rooms",
@@ -400,7 +534,7 @@ describe("stations", () => {
       }),
     });
 
-    const after = (await (await SELF.fetch(`${ORIGIN}/api/staff`, { headers: { cookie } })).json()) as {
+    const after = (await (await SELF.fetch(`${door}/api/staff`, { headers: { cookie } })).json()) as {
       seats: { used: number };
     };
     // A coordinator plus two station accounts — three memberships, zero seats.
@@ -420,7 +554,7 @@ describe("the per-member grant can only narrow", () => {
       reads — not against the pure function, which is where the unit test looks
       and where the bug was equally invisible.
     */
-    const { cookie, slug } = await newWorkspace("narrow");
+    const { cookie, slug, door } = await newWorkspace("narrow");
     await setPlan(slug, "pro");
 
     const org = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>();
@@ -432,13 +566,13 @@ describe("the per-member grant can only narrow", () => {
     // Demote the owner to a receptionist so the ceiling is a real one, then try
     // to buy billing back with a grant.
     await db().prepare('UPDATE "member" SET role = ? WHERE id = ?').bind("receptionist", member!.id).run();
-    await SELF.fetch(`${ORIGIN}/api/members/${member!.id}/permissions`, {
+    await SELF.fetch(`${door}/api/members/${member!.id}/permissions`, {
       method: "POST",
-      headers: json(cookie),
+      headers: json(door, cookie),
       body: JSON.stringify({ permissions: { billing: ["manage"], settings: ["manage"], board: ["read", "operate"] } }),
     });
 
-    const me = (await (await SELF.fetch(`${ORIGIN}/api/me`, { headers: { cookie } })).json()) as {
+    const me = (await (await SELF.fetch(`${door}/api/me`, { headers: { cookie } })).json()) as {
       permissions: Record<string, string[]>;
     };
     expect(me.permissions.billing).toBeUndefined();
@@ -457,9 +591,9 @@ describe("the routes that used to be public", () => {
       ["POST", "/api/username/resolve"],
       ["GET", "/api/username/available?u=anything"],
     ] as const) {
-      const res = await SELF.fetch(`${ORIGIN}${path}`, {
+      const res = await SELF.fetch(`${SETUP}${path}`, {
         method,
-        headers: json(),
+        headers: json(SETUP),
         ...(method === "POST" ? { body: JSON.stringify({ username: "anything" }) } : {}),
       });
       expect([401, 404], `${method} ${path} is still reachable`).toContain(res.status);

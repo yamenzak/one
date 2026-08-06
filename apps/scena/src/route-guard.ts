@@ -1,17 +1,34 @@
 /**
- * Central request guard — the auth boundary for the API.
+ * THE ROUTE TABLE — Scena's half of `@4dl/auth`'s six-gate guard.
  *
- * Three lanes:
- *   • PUBLIC / device / station-token routes  → pass through (own auth or none)
- *   • /api/admin/*                            → platform super-admin only
- *   • every other /api/* route               → an authenticated user bound to an
- *                                               active organization (tenant)
+ * The ENGINE runs the gates in a fixed order and is not the app's to reorder:
  *
- * This replaces the pre-auth state where the whole API was open (CORS-only) and
- * every request was silently treated as the single OPERATOR_EMAIL admin.
+ *   1.  the HOST gate       an unserved hostname 404s; the root is a signpost; a
+ *                           hostname owning no tenant answers almost nothing
+ *   1b. MAINTENANCE         the deployment-wide switch, above the public gate
+ *   2.  the PUBLIC lane     the route carries its own auth, or needs none
+ *   3.  the ADMIN gate      platform operator, on the operator door only
+ *   4.  the MEMBER gate     a member OF THE HOST'S TENANT, and the grant the
+ *                           route requires
+ *   5.  the STANDING gate   a lapsed tenant's writes refuse — reads NEVER do
+ *
+ * ── What Scena's own guard could not do ────────────────────────────────────
+ *
+ * It had three lanes and no host at all: public, `/api/admin/*`, everything
+ * else. "Everything else" meant *a session bound to any organization* — so with
+ * one origin there was nothing more to check, and with a door per workspace
+ * there would have been no check at all. The engine's gate 4 is the difference:
+ * membership of the HOST's tenant, not of some tenant.
+ *
+ * The route table below is unchanged. It was right; it just had no wall to
+ * stand on.
  */
 import type { MiddlewareHandler } from "hono";
-import { type AppEnv, requireTenant, isPlatformAdmin, can } from "./auth-context.js";
+import { routeGuard as buildRouteGuard, type AuthEnv, type Grant } from "@4dl/auth";
+import { isPlatformAdmin, type AppContext } from "./auth-context.js";
+import type { Auth } from "./auth.js";
+import type { Branding } from "./host-context.js";
+import type { Env } from "./env.js";
 
 /** Routes reachable without an operator session. Method-aware where it matters. */
 function isPublic(method: string, path: string): boolean {
@@ -20,6 +37,18 @@ function isPublic(method: string, path: string): boolean {
   if (path.startsWith("/api/auth/")) return true;
   // Identity probe — returns the session or null so the dashboard can bootstrap.
   if (path === "/api/me") return true;
+  /*
+    THE HOST PROBE, and it must be public on every door including the ones that
+    resolve no workspace.
+
+    It is the ONE read the app makes before it knows anything: which door am I
+    on, is there a workspace here, is it in good standing, is the deployment in
+    maintenance. Behind a session it could not answer the question that decides
+    whether to SHOW a session form — the app would have to guess, and the guess
+    on an unclaimed subdomain is a sign-in screen for somewhere that does not
+    exist.
+  */
+  if (isGet && path === "/api/host") return true;
   // Workspace resolver — maps a typed workspace to its canonical slug so the
   // sign-in surface can send someone to the right door (returns only slug/name).
   if (isGet && path === "/api/org/resolve") return true;
@@ -58,7 +87,7 @@ function isPublic(method: string, path: string): boolean {
  * broad write access, receptionist is boards-only, viewer is read-only — the
  * matrix lives in access.ts; this maps routes onto it.
  */
-export function permissionFor(method: string, path: string): Record<string, string[]> | null {
+export function permissionFor(method: string, path: string): Grant | null {
   const isGet = method === "GET";
   const read = isGet;
   // Method → permission verb: DELETE needs the stricter `delete` capability
@@ -159,31 +188,83 @@ export function permissionFor(method: string, path: string): Record<string, stri
 }
 
 /**
- * Enforce the lanes above. Runs after sessionMiddleware (which has populated
- * user/tenant/role), so it reads context; RBAC checks call Better Auth (no D1
- * writes). Owner/operator pass most gates; receptionist/viewer are restricted.
+ * ROUTES THAT MUST ANSWER ON THE ROOT DOOR.
+ *
+ * The root is a signpost, not an app — but it still has to serve the two things
+ * a browser needs before it knows where to go, plus the webhook a provider
+ * posts to whatever hostname is on file.
  */
-export const routeGuard: MiddlewareHandler<AppEnv> = async (c, next) => {
-  const path = c.req.path;
-  // Only guard the API surface; non-/api/* (static assets, later) passes.
-  if (!path.startsWith("/api/")) return next();
+const allowedOnRoot = (path: string): boolean =>
+  path === "/api/host" ||
+  path === "/health" ||
+  path.startsWith("/api/auth/") ||
+  path === "/api/me" ||
+  path === "/api/org/resolve" ||
+  path === "/api/stripe/webhook";
 
-  const method = c.req.method;
-  if (method === "OPTIONS" || isPublic(method, path)) return next();
+/**
+ * The ONLY routes a well-formed hostname owning NO tenant may answer.
+ *
+ * Deliberately much narrower than `allowedOnRoot`, and the difference is a real
+ * hole rather than tidiness: the auth lane is public, so on an unowned hostname
+ * — including the `*.workers.dev` name Cloudflare publishes for every worker,
+ * which anyone can guess — a stranger could otherwise request a sign-in code,
+ * verify it, and mint a workspace from an address that belongs to nobody.
+ *
+ * The host probe survives because it is how the app learns to render "nothing
+ * here" instead of a sign-in form on an unclaimed subdomain.
+ */
+const allowedWithoutTenant = (path: string): boolean => path === "/api/host";
 
-  if (path.startsWith("/api/admin/")) {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    return next();
-  }
+/**
+ * Writes that must survive a lapsed workspace.
+ *
+ * Paying must be A way out, not the ONLY way out. Billing so the owner can
+ * settle up, and the auth lane so they can sign in to do it — withholding the
+ * product is not the same as holding a screen's content hostage.
+ *
+ * ⚠️ THE EMERGENCY OVERRIDE IS HERE, and it is not a convenience. Scena's
+ * screens carry fire, evacuation and incident messages. A workspace whose card
+ * expired must still be able to put an emergency on every screen it owns, and
+ * that has to hold at EVERY rung of the ladder. Removing this line would make an
+ * unpaid invoice into a safety control.
+ */
+const allowedWhileReadOnly = (path: string): boolean =>
+  path.startsWith("/api/billing") ||
+  path.startsWith("/api/auth/") ||
+  path.startsWith("/api/emergency") ||
+  path === "/api/stripe/webhook";
 
-  // Everything else is an operator/tenant route: require a session bound to an org.
-  if (!requireTenant(c)) return c.json({ error: "unauthenticated" }, 401);
+/**
+ * Paths that answer while the whole DEPLOYMENT is closed.
+ *
+ * The host probe, because it is how the app learns to render the notice at all,
+ * and the signature-verified provider callback, because a payment webhook
+ * dropped during a maintenance window is not retried forever — the provider
+ * gives up and disables the endpoint, turning a planned twenty minutes into
+ * silently lost money.
+ */
+const maintenanceExempt = (path: string): boolean =>
+  path === "/api/host" || path === "/api/stripe/webhook";
 
-  // Role check (owner/operator/receptionist/viewer). Platform admins bypass —
-  // console operators may act across tenants for support.
-  const perm = permissionFor(method, path);
-  if (perm && !isPlatformAdmin(c) && !(await can(c, perm))) {
-    return c.json({ error: "forbidden" }, 403);
-  }
-  return next();
-};
+// Annotated for the same reason `sessionMiddleware` is — see auth-context.ts.
+export const routeGuard: MiddlewareHandler<AuthEnv<Env, Auth, Branding>> = buildRouteGuard<Env, Auth, Branding>({
+  isPublic,
+  permissionFor,
+  allowedOnRoot,
+  allowedWithoutTenant,
+  allowedWhileReadOnly,
+  maintenanceExempt,
+  isPlatformAdmin: (c) => isPlatformAdmin(c as unknown as AppContext),
+  /*
+    The STANDING gate, INJECTED — this is what keeps `@4dl/auth` independent of
+    billing, and what makes the device door work: the engine skips this entirely
+    for `role === "device"`, so a screen keeps playing while its owner's
+    dashboard goes read-only. What a lapsed workspace's screens actually SHOW is
+    Scena's decision, made where the manifest is compiled, not the edge's to make
+    by refusing the request.
+  */
+  gate: (c) => c.get("host").gate,
+  isBillingWrite: (path) => path.startsWith("/api/billing"),
+  billingPermission: { billing: ["manage"] },
+});

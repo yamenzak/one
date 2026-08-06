@@ -300,21 +300,58 @@ all four plus the seat ceiling, the station sign-in, the bounded per-member
 grant, and the removed enumeration routes. Every remaining stage moves schema
 and routes; none of them should have to be found by hand.
 
-### Stage 3 — `@4dl/tenancy` (the biggest gain)
+### Stage 3 — `@4dl/tenancy` ✅ DONE
 Five doors + the new `device` door (§4.1). Subdomains, custom domains, slug
 validation, the standing/host gate, maintenance.
 Wire §4.6's screen-behaviour mapping.
 
-**Carried forward from Stage 2, and blocking until this lands:**
-`auth-context.ts` and `route-guard.ts` are still Scena's own, because
-`@4dl/auth`'s session middleware and six-gate guard both read `c.get("host")`.
-They swap here, with the host resolution that makes them possible — that is the
-right order, not a slip. So does the `routes` block in `wrangler.jsonc`, which
-today collapses every door onto one hostname under `wrangler dev`.
+Landed: `host-context.ts` (the adapter), `domain-routes.ts` (the host probe, the
+slug guards, custom domains), `auth-context.ts` and `route-guard.ts` swapped onto
+`@4dl/auth`'s engines, `TENANCY_SCHEMA` in the module list, `ROOT_DOMAIN` set,
+and the `routes` block deleted.
 
-*Exit:* a tenant reachable at `<slug>.scena.4dl.app` and at their own domain; a
-suspended tenant's screens show the holding card; the player origin is exempt;
-`auth-context.ts` and `route-guard.ts` are `@4dl/auth`'s.
+**The change that matters is not the packages, it is where the tenant comes
+from.** Scena resolved it from `session.activeOrganizationId` — a value Better
+Auth stamps ONCE, at session creation, to the user's oldest membership. With one
+origin that was the only source available. With a door per workspace it is a
+hole: a person in two workspaces could open B's address, see B's brand, and have
+every screen, channel and board call scoped to A, with nothing on screen to say
+so and no route able to notice. The host pins the tenancy now and the session
+only proves identity.
+
+**The SIXTH door.** `@4dl/tenancy` gained an OPT-IN `device` role
+(`SlugOptions.deviceLabel`, `DEFAULT_DEVICE_LABEL = "play"`). Opt-in matters:
+`play` is not in `RESERVED_LABELS`, so making it universal would silently
+reclassify a hostname a Kova studio can hold today. Declaring it also reserves
+it, so no workspace can claim the origin the fleet is pinned to. In the guard the
+device door resolves no tenant WITHOUT being treated as a failed resolution, and
+it skips the standing gate — a screen in a public waiting room going dark because
+its owner's card expired is a different act from a dashboard going read-only, and
+it is Scena's decision to make where the manifest is compiled.
+
+**Two things found by doing it:**
+
+- `tenantOf(c)` fell back to `DEMO_TENANT` — a single-tenant leftover that turned
+  "no tenancy" into "the demo workspace", so an unscoped request did not fail, it
+  wrote into a real workspace's data. Forty-one routes call it and none checked.
+  It now throws, which is safe because the guard refuses any request without a
+  tenant and no public route calls it (checked).
+- `/api/host` was not in the public lane, so the one read the app makes before it
+  knows anything answered 401 on every door.
+
+*Exit met:* the integration suite drives the REAL topology — sign-in on
+`setup.localhost`, workspace behaviour on `<slug>.localhost`, the device door on
+`play.localhost` — and covers the probe on each door, an unowned subdomain
+serving nothing but the probe, the root refusing a workspace route, reserved
+labels being refused as slugs, and a new workspace getting an ADDRESS rather than
+just a row. 23 tests.
+
+**Still outstanding here:** a suspended workspace's screens showing a holding
+card. The gate is enforced and the device door is exempt from it; what a lapsed
+workspace's screens actually DISPLAY is a manifest-compile decision, and the
+compile-time entitlement gate is Stage 4's (§4.4). Custom domains are wired but
+their capability gate reads a PROXY (the highest tier's unlimited library) rather
+than a real `customDomain` flag — Stage 4 owns the catalog and should replace it.
 
 ### Stage 4 — `@4dl/billing` + `@4dl/billing-rail`
 Entitlements engine with Scena's quota/feature registry. `TenantBillingDO`

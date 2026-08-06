@@ -1,5 +1,6 @@
 import { schemaGate, type SchemaModule } from "@4dl/core";
 import { AUTH_SCHEMA } from "@4dl/auth";
+import { TENANCY_SCHEMA } from "@4dl/tenancy";
 import { SCENA_SCHEMA, DEMO_TENANT } from "./schema.js";
 
 export { DEMO_TENANT };
@@ -53,7 +54,7 @@ export interface ScreenRow {
  * file used to hand-roll, and short-circuits on a marker row PER MODULE — so a
  * change to Scena's DDL does not re-run auth's.
  */
-export const SCHEMA_MODULES: readonly SchemaModule[] = [AUTH_SCHEMA, SCENA_SCHEMA];
+export const SCHEMA_MODULES: readonly SchemaModule[] = [AUTH_SCHEMA, TENANCY_SCHEMA, SCENA_SCHEMA];
 
 const gate = schemaGate(SCHEMA_MODULES);
 export const ensureSchema = (db: D1Database): Promise<void> => gate({ DB: db });

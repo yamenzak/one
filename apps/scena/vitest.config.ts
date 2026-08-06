@@ -69,6 +69,21 @@ export default defineWorkersConfig({
             ADMIN_EMAILS: "",
             ENVIRONMENT: "development",
             BETTER_AUTH_URL: "http://localhost:8787",
+            /*
+              `localhost` HERE and the real apex in `wrangler.jsonc`.
+
+              Without the override the slug guard provisions
+              `<slug>.scena.4dl.app` while the suite drives `<slug>.localhost`,
+              and the two never meet — the workspace still RESOLVES (the lookup
+              is by slug), so only the `tenant_domains` row is missing and the
+              failure looks like a provisioning bug rather than a config one.
+
+              It is not a fudge: the whole topology is exercised for real.
+              `setup.localhost` is the setup door, `play.localhost` is the
+              device door, `<slug>.localhost` is a workspace, and Miniflare
+              preserves the Host header exactly as the edge does.
+            */
+            ROOT_DOMAIN: "localhost",
           },
         },
       },

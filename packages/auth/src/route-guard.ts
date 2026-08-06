@@ -142,6 +142,30 @@ export function routeGuard<E extends object, A, B>(cfg: GuardConfig<E, A, B>): M
     }
 
     /**
+     * THE DEVICE DOOR resolves no tenant BY DESIGN, and that is not the same
+     * absence the check above refuses.
+     *
+     * A screen's tenancy arrives from its pairing claim, not its hostname —
+     * which is why the fleet can share one pinned origin and survive being
+     * re-paired (see `DEFAULT_DEVICE_LABEL` in `@4dl/tenancy`). So `device` is
+     * deliberately absent from the roles above: it is not a hostname that
+     * FAILED to resolve a tenant, it is one that was never going to.
+     *
+     * What it is NOT is unauthenticated-and-open. The routes it answers carry
+     * their own credential (a claim token, a content-addressed manifest id) and
+     * must be in the app's `isPublic` list to reach a handler at all. This gate
+     * only declines to 404 them for a missing tenant.
+     *
+     * It also skips the STANDING gate below, and that is a product decision
+     * worth stating: a screen in a public waiting room going dark because its
+     * owner's card expired is a different act from a dashboard going read-only.
+     * The app decides what a lapsed tenant's screens show, in its own copy, by
+     * reading the gate where it compiles the manifest — not by having the edge
+     * refuse the request.
+     */
+    const isDevice = role === "device";
+
+    /**
      * ── 1b. MAINTENANCE ─────────────────────────────────────────────────────
      *
      * The deployment-wide switch, and it sits ABOVE the public gate on purpose:
@@ -244,7 +268,7 @@ export function routeGuard<E extends object, A, B>(cfg: GuardConfig<E, A, B>): M
     // 402 rather than 403: this is not an authorization failure, it is a billing
     // state, and the app has to tell them apart to know whether to say "you don't
     // have permission" or "this needs renewing".
-    const gate = cfg.gate(c);
+    const gate = isDevice ? null : cfg.gate(c);
     if (gate?.readOnly && WRITE_METHODS.has(method) && !cfg.allowedWhileReadOnly(path)) {
       const payer =
         gate.billingWritable &&

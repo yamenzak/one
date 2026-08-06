@@ -76,7 +76,7 @@ export function orgSlugGuards(
   /** The app's word for a tenant, for the rejection copy a user reads. */
   noun = "workspace",
 ): { create: MiddlewareHandler<RouteEnv>; update: MiddlewareHandler<RouteEnv> } {
-  const slugOpts = (c: { env: RootDomainEnv }) => ({ reserved: config(c.env).reserved });
+  const slugOpts = (c: { env: RootDomainEnv }) => ({ reserved: config(c.env).reserved, deviceLabel: config(c.env).deviceLabel });
 
   /**
    * `POST /api/auth/organization/create` — validate the slug, then give the new

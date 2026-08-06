@@ -30,10 +30,27 @@
     "run_worker_first": ["/api/*", "/health"]
   },
 
-  // Single-level host under 4dl.app so it's covered by the zone's *.4dl.app
-  // Universal SSL cert (deeper *.scena.4dl.app names need paid Advanced Cert).
-  // Screens + the player worker point at this origin.
-  "routes": [{ "pattern": "scena.4dl.app", "custom_domain": true }],
+  /*
+    ⚠️ NO `routes` BLOCK, AND THAT IS DELIBERATE. Do not add one back.
+
+    It used to declare `scena.4dl.app` as a custom domain. Declaring routes makes
+    `wrangler dev` REWRITE the incoming Host to the route's hostname, which
+    collapses every door onto one name locally: `setup.localhost`,
+    `admin.localhost`, `play.localhost` and `<slug>.localhost` all arrive as
+    `scena.4dl.app`. The host model then cannot be exercised at all in dev or in
+    the integration suite — and it presented as an invitation email containing a
+    link to `scena.4dl.app` from a worker running on port 8801, which is the
+    kind of clue that is only obvious afterwards.
+
+    The production routes are a DASHBOARD step (see DEPLOY.md). Scena now needs
+    a wildcard as well as the apex, because a workspace is a subdomain:
+
+        scena.4dl.app          the root — a signpost
+        *.scena.4dl.app        every workspace, plus setup./admin./play.
+
+    Kova removed its own routes block for exactly this reason; read its
+    `wrangler.jsonc` header before reintroducing one here.
+  */
 
   // Feed refresh + daypart/offline sweeps (§19, §13) run every 15 min; the
   // daily 00:10 UTC tick drives monthly credit grants + the dunning lifecycle
@@ -48,7 +65,18 @@
   "vars": {
     "OPERATOR_EMAIL": "zakhouryamen@gmail.com",
     "ADMIN_EMAILS": "zakhouryamen@gmail.com",
-    "BETTER_AUTH_URL": "https://scena.4dl.app"
+    "BETTER_AUTH_URL": "https://scena.4dl.app",
+    /*
+      The apex workspaces are served under. SET IT EXPLICITLY: this and the
+      advertised origin are different things the moment the root door redirects
+      somewhere else, and getting it wrong silently reclassifies every workspace
+      subdomain as a foreign custom domain — which fails closed (no tenant
+      resolves) but presents as "everything 404s", with nothing pointing at why.
+
+      Loopback is ALWAYS classified against `localhost` whatever this says, so
+      dev and the test suite exercise the real topology without a deployed zone.
+    */
+    "ROOT_DOMAIN": "scena.4dl.app"
   },
 
   // Workers AI — HTML/TTS/image generation (§24). Local dev without a
