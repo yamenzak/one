@@ -63,7 +63,7 @@ export interface LifecycleAction {
  * Comped subscriptions (promo/gift/demo) never enter dunning.
  */
 export async function lifecycleSweep(env: Env, now = Date.now()): Promise<LifecycleAction[]> {
-  const cfg = await import("./billing-store.js").then((m) => m.getConfig(env.DB));
+  const cfg = await import("./billing-store.js").then((m) => m.getConfig(env));
   const graceMs = days(cfg["billing.grace_days"]) ;
   const deleteMs = days(cfg["billing.delete_days"]);
   const actions: LifecycleAction[] = [];

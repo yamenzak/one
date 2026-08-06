@@ -6,6 +6,7 @@
  * db.ts / content.ts (ensureSchema first, `XxxRow` interfaces, DEMO_TENANT).
  */
 
+import { getConfig as coreGetConfig, type ConfigSource } from "@4dl/core";
 import { ensureSchema, DEMO_TENANT } from "./db.js";
 import { DEFAULT_PLANS, DEFAULT_PACKS, DEFAULT_MODELS, CONFIG_DEFAULTS } from "./billing-seed.js";
 import { resolveEntitlements, mergeOverrides, type Entitlements } from "./entitlements.js";
@@ -150,19 +151,48 @@ async function seed(db: D1Database): Promise<void> {
 
 /* ------------------------------- config ---------------------------------- */
 
-export async function getConfig(db: D1Database): Promise<Record<string, string>> {
+/**
+ * CONFIG READS THE APP'S OWN ROWS FIRST, THEN THE PLATFORM'S.
+ *
+ * This was a bare `SELECT key, value FROM app_config`. It still is, underneath —
+ * `@4dl/core`'s `getConfig` reads the same table — but it now falls THROUGH to a
+ * shared KV bound with the same id into every 4DL worker.
+ *
+ * That matters to Scena more than to most: it authenticates against ONE Google
+ * account (`gemini.ts`), ONE Stripe account, and one Turnstile widget, and every
+ * one of those keys was a per-app copy that had to be re-pasted on rotation or
+ * quietly kept the old value. `SHARED_CONFIG_KEYS` in `@4dl/core` is the
+ * allow-list, enforced on read AND write.
+ *
+ * **Non-empty wins, not present wins.** Every consumer here already reads `""`
+ * as unconfigured, so a blank local row falls through rather than masking the
+ * shared value. The consequence to know: you cannot switch a shared key off for
+ * one app by blanking it — give that app its own value, or do not share the key.
+ *
+ * **Unbound changes nothing.** No `PLATFORM_CONFIG` binding, no behaviour
+ * change, which is what `wrangler dev` and the whole test suite run.
+ *
+ * `src` is a `ConfigSource`: pass `c.env` to get the merge, or a bare D1 handle
+ * where the bindings are not to hand (the DOs) and get local-only.
+ */
+export async function getConfig(src: ConfigSource): Promise<Record<string, string>> {
+  const db = "prepare" in src ? src : src.DB;
   await ensureBilling(db);
-  const res = await db.prepare("SELECT key, value FROM app_config").all<{ key: string; value: string }>();
-  const out: Record<string, string> = { ...CONFIG_DEFAULTS };
-  for (const r of res.results ?? []) out[r.key] = r.value;
-  return out;
+  return { ...CONFIG_DEFAULTS, ...(await coreGetConfig(src)) };
 }
 
-export async function getConfigValue(db: D1Database, key: string): Promise<string> {
-  const cfg = await getConfig(db);
+export async function getConfigValue(src: ConfigSource, key: string): Promise<string> {
+  const cfg = await getConfig(src);
   return cfg[key] ?? "";
 }
 
+/**
+ * Writes go to the APP's `app_config`, never to the shared store.
+ *
+ * The shared store is written from the operator console (`@4dl/admin`), which is
+ * the one surface that knows it is editing something every product reads. A
+ * product route writing there would let one app silently re-key another.
+ */
 export async function setConfig(db: D1Database, entries: Record<string, string>): Promise<void> {
   await ensureBilling(db);
   const now = Date.now();

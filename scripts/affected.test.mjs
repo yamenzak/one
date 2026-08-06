@@ -49,7 +49,11 @@ test("a change to an app's SPA deploys that app", () => {
 });
 
 test("a change to a shared package deploys every app that reaches it", () => {
-  assert.deepEqual(ids(["packages/core/src/config.ts"]), ["kova", "tessa"]);
+  // `@4dl/core` reaches Scena as of Stage 1 and `@4dl/ui` does not yet — Scena
+  // still has its own `@scena/ui` until Stage 7. The difference between these
+  // two lines is the migration's actual state, so a stage that rewires a
+  // package should turn one of them red until it is updated here.
+  assert.deepEqual(ids(["packages/core/src/config.ts"]), ["kova", "scena", "tessa"]);
   assert.deepEqual(ids(["packages/ui/src/index.ts"]), ["kova", "tessa"]);
 });
 

@@ -11,6 +11,7 @@
  * Crypto for webhook signature verification — no SDK, Workers-native.
  */
 
+import type { ConfigSource } from "@4dl/core";
 import type { Env } from "./env.js";
 import { DEMO_TENANT } from "./db.js";
 import {
@@ -35,8 +36,19 @@ export interface StripeCfg {
   webhookSecret: string;
 }
 
-export async function stripeCfg(db: D1Database): Promise<StripeCfg> {
-  const cfg = await getConfig(db);
+/**
+ * ONE STRIPE ACCOUNT, MANY APPS.
+ *
+ * `src` is a `ConfigSource` so this reads the shared store: the account keys and
+ * the mode are the platform's, and only `stripe.webhook_secret` is per-endpoint
+ * (hence per-app) — which is exactly how `SHARED_CONFIG_KEYS` is drawn.
+ *
+ * Stage 4 moves this onto `@4dl/billing-rail`, which adds event→app attribution
+ * so a webhook for Kova cannot be answered by Scena. Until then the shared keys
+ * are the useful half.
+ */
+export async function stripeCfg(src: ConfigSource): Promise<StripeCfg> {
+  const cfg = await getConfig(src);
   return {
     mode: cfg["stripe.mode"] ?? "disabled",
     secretKey: cfg["stripe.secret_key"] ?? "",
@@ -87,7 +99,7 @@ export interface SyncSummary {
  * in D1. Idempotent — skips anything that already has a `stripe_price_id`.
  */
 export async function syncCatalog(env: Env): Promise<SyncSummary> {
-  const cfg = await stripeCfg(env.DB);
+  const cfg = await stripeCfg(env);
   if (!stripeEnabled(cfg)) throw new Error("stripe not configured");
   const out: SyncSummary = { plans: [], packs: [] };
 
@@ -140,7 +152,7 @@ async function ensureCustomer(env: Env, cfg: StripeCfg, tenantId: string): Promi
 }
 
 export async function subscriptionCheckout(env: Env, planId: string, urls: { success: string; cancel: string }, tenantId = DEMO_TENANT): Promise<{ url: string }> {
-  const cfg = await stripeCfg(env.DB);
+  const cfg = await stripeCfg(env);
   if (!stripeEnabled(cfg)) throw new Error("stripe not configured");
   const plan = await getPlan(env.DB, planId);
   if (!plan?.stripe_price_id) throw new Error("plan not synced to stripe");
@@ -158,7 +170,7 @@ export async function subscriptionCheckout(env: Env, planId: string, urls: { suc
 }
 
 export async function packCheckout(env: Env, packId: string, urls: { success: string; cancel: string }, tenantId = DEMO_TENANT): Promise<{ url: string }> {
-  const cfg = await stripeCfg(env.DB);
+  const cfg = await stripeCfg(env);
   if (!stripeEnabled(cfg)) throw new Error("stripe not configured");
   const pack = await getPack(env.DB, packId);
   if (!pack?.stripe_price_id) throw new Error("pack not synced to stripe");
@@ -282,7 +294,7 @@ function metaOf(obj: Record<string, unknown>): Record<string, unknown> {
 
 /** Exposed for the admin "test connection" button. */
 export async function stripePing(env: Env): Promise<{ ok: boolean; account?: string; error?: string }> {
-  const cfg = await stripeCfg(env.DB);
+  const cfg = await stripeCfg(env);
   if (!stripeEnabled(cfg)) return { ok: false, error: "not configured" };
   try {
     const acct = await stripeApi<{ id: string }>(cfg, "account", "GET");

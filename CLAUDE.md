@@ -878,8 +878,21 @@ re-pairing would orphan the cache and custom domains would multiply certificates
 by the size of the fleet. Stage 3 adds a `device` door to `@4dl/tenancy` for
 exactly this; until then the player worker binds no D1 or R2 of its own.
 
-**Status: Stage 0 done** — landed, registered in `apps.json`, typechecking and
-testing green in this workspace with NOTHING rewired yet. Its resource ids are
+**Status: Stage 1 done.** Stage 0 landed it; Stage 1 put its schema on
+`@4dl/core`'s composed runner and its config on the SHARED platform store — so
+Scena now reads the same Google key, Stripe account and Turnstile widget as
+every other 4DL app, and `SCHEMA_MODULES` in `apps/scena/src/db.ts` is the
+migration's progress bar (one entry today; each stage moves tables out of
+`SCENA_SCHEMA` and adds its package there, in the same commit). Its resource ids are
 deliberately placeholders (the old account's real ids were replaced), so
-`deploy.yml` skips it until the Provision workflow runs. Stages 1–9 are the
-rewiring; the plan has the order and the reasoning.
+`deploy.yml` skips it until the Provision workflow runs. Stages 2–9 are the
+rest of the rewiring; the plan has the order and the reasoning.
+
+⚠️ **`apps/scena/test/schema-module.test.ts` reads the ORIGINAL `db.ts` out of
+git** and asserts all 100 DDL statements survived the port. It is there because
+the port silently dropped ten of them — every statement whose SQL quotes an
+identifier (`"user"`, `"member"`…), which is all seven Better Auth tables — and
+a schema missing `"user"` is not a test failure anywhere, it is sign-in
+returning 500 on a fresh database, later. **Delete that test at the end of Stage
+2**, when the auth tables move to `@4dl/auth` and the comparison stops being
+right.

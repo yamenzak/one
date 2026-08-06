@@ -132,7 +132,7 @@ export function registerBilling(app: App): void {
       listLedger(c.env.DB, t, 30),
       tenantEntitlements(c.env.DB, t),
     ]);
-    const cfg = await stripeCfg(c.env.DB);
+    const cfg = await stripeCfg(c.env);
     return c.json({
       subscription: sub,
       plan,
@@ -176,7 +176,7 @@ export function registerBilling(app: App): void {
       if (!check.eligible) return c.json({ blocked: true, ...check }, 409);
     }
 
-    const cfg = await stripeCfg(c.env.DB);
+    const cfg = await stripeCfg(c.env);
     const paid = target.price_cents > 0 && !sub.comp;
     if (stripeEnabled(cfg) && paid) {
       const origin = new URL(c.req.url).origin;
@@ -353,7 +353,7 @@ export function registerBilling(app: App): void {
   app.get("/api/admin/config", async (c) => {
     const deny = await requireAdmin(c);
     if (deny) return deny;
-    const cfg = await getConfig(c.env.DB);
+    const cfg = await getConfig(c.env);
     // Mask the secret key so it never round-trips to the client in full.
     const masked = { ...cfg, "stripe.secret_key": maskKey(cfg["stripe.secret_key"]), "stripe.webhook_secret": maskKey(cfg["stripe.webhook_secret"]), "email.api_key": maskKey(cfg["email.api_key"]), "google.gemini_key": maskKey(cfg["google.gemini_key"]), "weather.api_key": maskKey(cfg["weather.api_key"]) };
     return c.json({ config: masked });
@@ -374,7 +374,7 @@ export function registerBilling(app: App): void {
   app.post("/api/admin/email/test", async (c) => {
     const deny = await requireAdmin(c);
     if (deny) return deny;
-    const cfg = await getConfig(c.env.DB);
+    const cfg = await getConfig(c.env);
     const to = cfg["email.admin"] || c.env.OPERATOR_EMAIL || "";
     const result = await sendEmail(c.env.DB, {
       to,
@@ -608,7 +608,7 @@ export function registerBilling(app: App): void {
 
   /* --------------------------- stripe webhook ---------------------------- */
   app.post("/api/stripe/webhook", async (c) => {
-    const cfg = await stripeCfg(c.env.DB);
+    const cfg = await stripeCfg(c.env);
     const payload = await c.req.text();
     const sig = c.req.header("stripe-signature") ?? "";
     if (!(await verifySignature(payload, sig, cfg.webhookSecret))) return c.json({ error: "bad signature" }, 400);

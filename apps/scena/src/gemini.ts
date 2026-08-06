@@ -36,7 +36,10 @@ export function isGoogleGenModel(cfModel: string): boolean {
 
 /** Resolve the API key — always Scena's platform key (no per-tenant BYO). */
 async function resolveKey(env: Env, _tenantId: string): Promise<string> {
-  return (await getConfigValue(env.DB, "google.gemini_key")) || "";
+  // `env`, not `env.DB`: there is ONE Google account behind every 4DL product,
+  // and the key lives in the shared store so a rotation is one paste rather than
+  // one per app (with the app somebody forgets keeping the dead key).
+  return (await getConfigValue(env, "google.gemini_key")) || "";
 }
 
 /** Whether Gemini generation is possible (a platform key is configured). */

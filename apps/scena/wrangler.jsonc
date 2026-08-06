@@ -80,6 +80,20 @@
   "kv_namespaces": [
     // Pairing code → ScreenDO id, and channel → current manifest version pointer.
     { "binding": "PAIRING", "id": "0000000000000000000000000000cafe" }
+    /*
+      PLATFORM_CONFIG is deliberately NOT bound here yet.
+
+      It is the ONE resource that is not per-app: a single KV namespace bound
+      with the SAME id into every 4DL worker. `deploy.yml`'s `wire` job
+      find-or-creates it by title and commits the id into every app's config, so
+      it arrives on the first deploy rather than being typed here.
+
+      It must stay ABSENT until that id is real: `apps.mjs ready` reads every id
+      in this file, so a placeholder would mark a live app un-provisioned and
+      deploy.yml would silently SKIP it. Unbound, `getConfig` reads this app's
+      own `app_config` and nothing changes — which is what wrangler dev and the
+      whole test suite run.
+    */
   ],
 
   "d1_databases": [

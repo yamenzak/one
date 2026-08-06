@@ -19,6 +19,13 @@ export interface Env {
   BILLING: DurableObjectNamespace<TenantBillingDO>;
   /** Pairing code → ScreenDO id, and channel → current manifest pointer. */
   PAIRING: KVNamespace;
+  /**
+   * The SHARED platform config store — one KV namespace bound with the same id
+   * into every 4DL worker (see `@4dl/core` config.ts). Optional: unbound, every
+   * read falls back to this app's own `app_config`, which is what `wrangler dev`
+   * and the test suite run.
+   */
+  PLATFORM_CONFIG?: KVNamespace;
   /** Relational authoring source of truth (tenants, screens, …). */
   DB: D1Database;
   /** Proof-of-play / playout telemetry sink (§22). Optional in local dev. */

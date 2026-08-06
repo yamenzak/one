@@ -139,7 +139,7 @@ async function promptHash(req: GenerateRequest): Promise<string> {
 }
 
 async function mockMode(env: Env): Promise<"on" | "off" | "auto"> {
-  const mode = await getConfigValue(env.DB, "ai.mock");
+  const mode = await getConfigValue(env, "ai.mock");
   return mode === "on" || mode === "off" ? mode : "auto";
 }
 
