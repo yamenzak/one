@@ -112,13 +112,24 @@ test("the operator's workspace", async () => {
   // music bed and the widget layer of one display, edited as one thing.
   await test.step("the studio", async () => {
     const lobby = world.screens.find((s) => s.name === LOBBY_SCREEN)!;
-    await visit(page, `${base}/screens/${lobby.id}/studio`, page.getByText(/studio/i).first());
+    await visit(page, `${base}/screens/${lobby.id}/studio`, inMain(page, /live preview|slides/i));
     await shoot(page, project, "studio", { settle: 1000 });
   });
 
+  /*
+    THE BUILDER NEEDS A PROFILE. `/widgets` on its own renders "No widget
+    profile selected" — so the first version of this step produced a convincing
+    photograph of an empty screen, filed under the name of the surface an
+    operator spends the most time in, and the loose anchor it used
+    (`getByText(/widget/i)`) was satisfied by the sidebar's own "Widget
+    profiles" label before the page had loaded anything at all.
+
+    `?profile=<id>` is the same deep link the Studio's "Open builder" button
+    uses, and the id comes from the lobby display the world already built.
+  */
   await test.step("the widget builder", async () => {
-    await visit(page, `${base}/widgets`, page.getByText(/widget/i).first());
-    await shoot(page, project, "widget-builder", { settle: 1000 });
+    await visit(page, `${base}/widgets?profile=${world.widgetProfileId}`, inMain(page, /widget|clock|layer/i));
+    await shoot(page, project, "widget-builder", { settle: 1200 });
   });
 
   await test.step("channels", async () => {
