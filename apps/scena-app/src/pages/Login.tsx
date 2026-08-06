@@ -21,7 +21,7 @@ import { Loader2, Mail, ArrowLeft, MonitorSmartphone } from "lucide-react";
 import { Button } from "../components/ui/button.js";
 import { Input } from "../components/ui/input.js";
 import { Label } from "../components/ui/label.js";
-import { ScenaMascot } from "@scena/ui";
+import { ScenaMascot } from "../brand.js";
 import { authClient, signIn, emailOtp } from "../auth-client.js";
 
 /** The non-routable suffix every station account carries. Mirrors

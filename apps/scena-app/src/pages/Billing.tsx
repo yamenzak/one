@@ -7,11 +7,11 @@ import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { PageHeader } from "../components/page-header.js";
-import { EmptyState } from "../components/empty-state.js";
-import { toast } from "../components/toast.js";
 import { LegalDialog, LegalLinks, type LegalDoc } from "../legal/content.js";
 import { cn } from "@/lib/utils";
 import { FEATURE_CATALOG, QUOTA_CATALOG } from "@scena/manifest";
+import { toast } from "@4dl/ui";
+import { EmptyState } from "../components/empty.js";
 import {
   getBilling,
   changePlan,
@@ -301,7 +301,7 @@ export function BillingPage() {
         </CardHeader>
         <CardContent>
           {ledger.length === 0 ? (
-            <EmptyState icon={<Receipt />} title="No activity yet" description="Credit grants, purchases, and AI usage will appear here as they happen." />
+            <EmptyState icon={Receipt} title="No activity yet" description="Credit grants, purchases, and AI usage will appear here as they happen." />
           ) : (
             <div className="overflow-x-auto">
               <Table>

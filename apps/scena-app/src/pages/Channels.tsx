@@ -17,15 +17,15 @@ import { Skeleton } from "../components/ui/skeleton.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { PageHeader } from "../components/page-header.js";
-import { EmptyState } from "../components/empty-state.js";
 import { DevicePreview } from "../components/device-preview.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { TagEditor } from "../components/tag-editor.js";
 import { TagFilter } from "../components/tag-filter.js";
 import { ConfirmDialog } from "../components/confirm-dialog.js";
-import { toast } from "../components/toast.js";
 import { useCan } from "../permissions.js";
 import { cn } from "@/lib/utils";
+import { toast } from "@4dl/ui";
+import { EmptyState } from "../components/empty.js";
 import {
   listChannels, createChannel, publishChannelNote, setChannelComposition, updateChannel, deleteChannel,
   getChannelPublishState, setVersionNote,
@@ -325,7 +325,7 @@ export function ChannelDetailPage() {
     return (
       <div>
         {back}
-        <EmptyState icon={<Tv />} title="Channel not found" description="It may have been removed. Head back to the channel list." />
+        <EmptyState icon={Tv} title="Channel not found" description="It may have been removed. Head back to the channel list." />
       </div>
     );
   }
@@ -355,10 +355,10 @@ export function ChannelDetailPage() {
       <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
         {/* Composer */}
         <div className="space-y-3">
-          <ComposerRow icon={<Layers className="size-5" />} title="Slide playlist" description="The visual loop shown on screen." value={channel.slide_playlist_id ?? null} options={slidePlaylists} disabled={saving || !writable} onChange={(v) => compose({ slidePlaylistId: v })} />
-          <ComposerRow icon={<Music className="size-5" />} title="Music playlist" description="Background audio for the channel." value={channel.music_playlist_id ?? null} options={musicPlaylists} disabled={saving || !writable} onChange={(v) => compose({ musicPlaylistId: v })} />
-          <ComposerRow icon={<LayoutGrid className="size-5" />} title="Widget profile" description="Overlay widgets (clock, weather, feeds…)." value={channel.widget_profile_id ?? null} options={profiles} disabled={saving || !writable} onChange={(v) => compose({ widgetProfileId: v })} />
-          <ComposerRow icon={<Megaphone className="size-5" />} title="Ad profile" description="Scheduled interrupts (audio, video, command)." value={channel.ad_profile_id ?? null} options={adProfiles} disabled={saving || !writable} onChange={(v) => compose({ adProfileId: v })} />
+          <ComposerRow icon={<Layers />} title="Slide playlist" description="The visual loop shown on screen." value={channel.slide_playlist_id ?? null} options={slidePlaylists} disabled={saving || !writable} onChange={(v) => compose({ slidePlaylistId: v })} />
+          <ComposerRow icon={<Music />} title="Music playlist" description="Background audio for the channel." value={channel.music_playlist_id ?? null} options={musicPlaylists} disabled={saving || !writable} onChange={(v) => compose({ musicPlaylistId: v })} />
+          <ComposerRow icon={<LayoutGrid />} title="Widget profile" description="Overlay widgets (clock, weather, feeds…)." value={channel.widget_profile_id ?? null} options={profiles} disabled={saving || !writable} onChange={(v) => compose({ widgetProfileId: v })} />
+          <ComposerRow icon={<Megaphone />} title="Ad profile" description="Scheduled interrupts (audio, video, command)." value={channel.ad_profile_id ?? null} options={adProfiles} disabled={saving || !writable} onChange={(v) => compose({ adProfileId: v })} />
         </div>
 
         {/* Live preview */}

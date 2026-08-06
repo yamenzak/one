@@ -16,14 +16,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../components/ui/select.js";
 import { PageHeader } from "../components/page-header.js";
-import { EmptyState } from "../components/empty-state.js";
 import { StatTile, StatusDot, Pill, type Tone } from "../components/status.js";
 import { usePageChrome } from "../components/page-chrome.js";
-import { toast } from "../components/toast.js";
 import { confirmDialog } from "../components/confirm.js";
 import { Loader2, Music, Ticket, Users, RefreshCw, AlertTriangle, CreditCard, Package, Sparkles, Tag, Search, Upload, Trash2, ImagePlus, Plus, Pencil } from "lucide-react";
 import { cn } from "../lib/utils.js";
 import { FEATURE_CATALOG, QUOTA_CATALOG, FEATURE_CATEGORIES } from "@scena/manifest";
+import { toast } from "@4dl/ui";
+import { EmptyState } from "../components/empty.js";
 import {
   getAdminConfig,
   setAdminConfig,
@@ -769,7 +769,7 @@ function LibraryTab({ addOpen, onAddOpenChange }: { addOpen: boolean; onAddOpenC
         </CardHeader>
         <CardContent>
           {tracks.length === 0 ? (
-            <EmptyState icon={<Music />} title="No public tracks yet" description="Upload licensed audio to build the shared library every tenant can use." action={<Button onClick={() => setDialog("new")}><Plus className="size-4" /> Add your first track</Button>} className="border-0 bg-transparent py-8" />
+            <EmptyState icon={Music} title="No public tracks yet" description="Upload licensed audio to build the shared library every tenant can use." action={<Button onClick={() => setDialog("new")}><Plus className="size-4" /> Add your first track</Button>} className="border-0 bg-transparent py-8" />
           ) : visible.length === 0 ? (
             <div className="py-10 text-center text-sm text-muted-foreground">No tracks match your search.</div>
           ) : (
@@ -983,7 +983,7 @@ function PromosTab({ addOpen, onAddOpenChange }: { addOpen: boolean; onAddOpenCh
       </CardHeader>
       <CardContent>
         {promos.length === 0 ? (
-          <EmptyState icon={<Ticket />} title="No promo codes yet" description="Create a credit top-up or plan gift to share with a tenant." action={<Button onClick={() => setDialogOpen(true)}><Plus className="size-4" /> Create a code</Button>} className="border-0 bg-transparent py-8" />
+          <EmptyState icon={Ticket} title="No promo codes yet" description="Create a credit top-up or plan gift to share with a tenant." action={<Button onClick={() => setDialogOpen(true)}><Plus className="size-4" /> Create a code</Button>} className="border-0 bg-transparent py-8" />
         ) : (
           <div className="overflow-x-auto">
             <Table>
@@ -1181,7 +1181,7 @@ function TenantsTab() {
         </CardHeader>
         <CardContent>
           {tenants.length === 0 ? (
-            <EmptyState icon={<Users />} title="No tenants yet" description="Tenants appear here once workspaces sign up." className="border-0 bg-transparent py-8" />
+            <EmptyState icon={Users} title="No tenants yet" description="Tenants appear here once workspaces sign up." className="border-0 bg-transparent py-8" />
           ) : visible && visible.length === 0 ? (
             <div className="py-10 text-center text-sm text-muted-foreground">No tenants match your search.</div>
           ) : (

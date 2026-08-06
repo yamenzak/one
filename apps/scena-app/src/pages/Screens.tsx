@@ -20,9 +20,9 @@ import { StatusDot as SharedStatusDot } from "../components/status.js";
 import { useCan } from "../permissions.js";
 import { cn } from "@/lib/utils";
 import { listScreens, createDisplay, listAlerts, type Screen } from "../api.js";
-import { toast } from "../components/toast.js";
 import { GetStarted } from "../components/get-started.js";
 import { StatTile } from "../components/status.js";
+import { toast } from "@4dl/ui";
 
 /** Compact "last seen" label for offline devices. */
 function lastSeenLabel(ts?: number | null): string | null {

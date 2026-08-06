@@ -14,7 +14,7 @@
  */
 import { channelsUsingPlaylist, publishChannel } from "../api.js";
 import { confirmDialog } from "./confirm.js";
-import { toast } from "./toast.js";
+import { toast } from "@4dl/ui";
 
 export type PublishKind = "slide" | "music" | "widget" | "ad";
 

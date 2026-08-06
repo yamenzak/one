@@ -8,7 +8,7 @@
  * It disappears the moment the first screen is paired.
  */
 import { MonitorPlay, Sparkles, LayoutGrid, Rocket, ArrowRight } from "lucide-react";
-import { ScenaMascot } from "@scena/ui";
+import { ScenaMascot } from "../brand.js";
 import { Button } from "./ui/button.js";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +32,7 @@ export function GetStarted({
   onNewDisplay: () => void;
 }) {
   return (
-    <div className="animate-rise mx-auto max-w-4xl">
+    <div className="mx-auto max-w-4xl">
       {/* Hero */}
       <div className="flex flex-col items-center px-6 pb-8 pt-6 text-center">
         <ScenaMascot mood="happy" size={132} className="mb-2" />

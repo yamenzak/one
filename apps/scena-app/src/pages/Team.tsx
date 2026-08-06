@@ -48,11 +48,10 @@ import {
 } from "../api.js";
 import { PERMISSION_CATALOG, ROLE_PRESETS } from "../permissions.js";
 import { PageHeader } from "../components/page-header.js";
-import { LoadError } from "../components/load-error.js";
 import { usePageChrome } from "../components/page-chrome.js";
-import { toast } from "../components/toast.js";
 import { confirmDialog } from "../components/confirm.js";
 import { cn } from "@/lib/utils";
+import { LoadError, toast } from "@4dl/ui";
 
 type Grant = Record<string, string[]>;
 const cloneGrant = (g: Grant): Grant => Object.fromEntries(Object.entries(g).map(([k, v]) => [k, [...v]]));
@@ -191,7 +190,7 @@ export function TeamPage() {
     <div>
       <PageHeader title="Team" description={description} />
 
-      {loadFailed && <LoadError what="the team" onRetry={reload} />}
+      {loadFailed && <LoadError what="the team" error="We couldn’t reach the server." onRetry={reload} />}
 
       {staff && staff.invitations.length > 0 && (
         <Card className="mb-4">

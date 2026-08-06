@@ -318,6 +318,12 @@ importers:
 
   apps/scena-app:
     dependencies:
+      '@4dl/app-kit':
+        specifier: workspace:*
+        version: link:../../packages/app-kit
+      '@4dl/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@radix-ui/react-dialog':
         specifier: ^1.1.18
         version: 1.1.19(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -348,6 +354,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.11
         version: 1.2.12(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      '@scena/brand':
+        specifier: workspace:*
+        version: link:../../packages/scena-brand
       '@scena/manifest':
         specifier: workspace:*
         version: link:../../packages/scena-manifest
@@ -357,9 +366,6 @@ importers:
       '@scena/timeline':
         specifier: workspace:*
         version: link:../../packages/scena-timeline
-      '@scena/ui':
-        specifier: workspace:*
-        version: link:../../packages/scena-ui
       '@scena/widgets':
         specifier: workspace:*
         version: link:../../packages/scena-widgets
@@ -955,28 +961,6 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@22.20.1)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.49.0)(tsx@4.23.9)
-
-  packages/scena-ui:
-    dependencies:
-      '@scena/brand':
-        specifier: workspace:*
-        version: link:../scena-brand
-    devDependencies:
-      '@types/react':
-        specifier: ^19.0.0
-        version: 19.2.17
-      '@types/react-dom':
-        specifier: ^19.0.0
-        version: 19.2.3(@types/react@19.2.17)
-      react:
-        specifier: ^19.2.0
-        version: 19.2.7
-      react-dom:
-        specifier: ^19.2.0
-        version: 19.2.7(react@19.2.7)
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
 
   packages/scena-widgets:
     devDependencies:

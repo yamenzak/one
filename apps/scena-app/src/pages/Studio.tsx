@@ -16,13 +16,13 @@ import { Button } from "../components/ui/button.js";
 import { Badge } from "../components/ui/badge.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
-import { EmptyState } from "../components/empty-state.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { DevicePreview } from "../components/device-preview.js";
 import { assetSrc } from "../components/media-picker.js";
-import { toast } from "../components/toast.js";
 import { cn } from "@/lib/utils";
 import { useCan } from "../permissions.js";
+import { toast } from "@4dl/ui";
+import { EmptyState } from "../components/empty.js";
 import {
   getScreen, getChannel, getSlidePlaylist, getMusicPlaylist,
   addPlaylistSlide, deletePlaylistSlide, reorderPlaylistSlidesApi,

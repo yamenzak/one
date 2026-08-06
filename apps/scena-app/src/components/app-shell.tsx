@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Circle, Menu, PanelLeft, MoreVertical } from "lucide-react";
 
-import { ScenaIcon } from "@scena/ui";
+import { ScenaIcon } from "../brand.js";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";

@@ -16,7 +16,6 @@ import { Label } from "../components/ui/label.js";
 import { Badge } from "../components/ui/badge.js";
 import { Switch } from "../components/ui/switch.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { EmptyState } from "../components/empty-state.js";
 import { useFeature } from "../entitlements.js";
 import { LockedFeatureCard } from "../components/feature-gate.js";
 import { PageHeader } from "../components/page-header.js";
@@ -25,7 +24,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../components/ui/select.js";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs.js";
-import { toast } from "../components/toast.js";
 import { cn } from "@/lib/utils";
 import {
   getScreen, sendCommand, listChannels, setDeviceDimensions, setDeviceActiveChannel,
@@ -39,6 +37,8 @@ import { TagEditor } from "../components/tag-editor.js";
 import { useCan } from "../permissions.js";
 import { StatusDot, dimsOf } from "./Screens.js";
 import { Pill } from "../components/status.js";
+import { toast } from "@4dl/ui";
+import { EmptyState } from "../components/empty.js";
 
 const NONE = "__none__";
 
@@ -113,7 +113,7 @@ export function ScreenDetailPage() {
   return (
     <div className="space-y-5">
       {error ? (
-        <EmptyState icon={<MonitorPlay />} title="Couldn't load this device" description={error} />
+        <EmptyState icon={MonitorPlay} title="Couldn't load this device" description={error} />
       ) : !screen ? (
         <DetailSkeleton />
       ) : (
@@ -354,7 +354,7 @@ function RemoteControl({ screen }: { screen: Screen }) {
     </button>
   );
   return (
-    <Panel title="Remote control" icon={<Radio className="size-4" />}>
+    <Panel title="Remote control" icon={<Radio />}>
       <div className="grid grid-cols-2 gap-2">
         <Tile active={muted} icon={muted ? <Volume2 /> : <VolumeX />} label={muted ? "Unmute" : "Mute"} onClick={() => cmd(muted ? "unmute" : "mute", muted ? "Unmuted" : "Muted")} />
         <Tile icon={<RefreshCw />} label="Refresh" onClick={() => cmd("refresh", "Refreshing device")} />
@@ -410,7 +410,7 @@ function DisplayPanel({ screen }: { screen: Screen }) {
   return (
     <Panel
       title="Display"
-      icon={<MonitorPlay className="size-4" />}
+      icon={<MonitorPlay />}
       action={
         <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={autoDetect} disabled={!detected} title={detected ? "Use the resolution the device reported" : "The device reports its resolution when it connects"}>
           <ScanLine className="size-3.5" /> Auto-detect

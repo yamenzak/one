@@ -22,12 +22,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu.js";
 import { PageHeader } from "../components/page-header.js";
-import { EmptyState } from "../components/empty-state.js";
-import { LoadError } from "../components/load-error.js";
 import { StatusDot as SharedStatusDot } from "../components/status.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { useCan } from "../permissions.js";
-import { toast } from "../components/toast.js";
 import { confirmDialog } from "../components/confirm.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
 import {
@@ -51,6 +48,8 @@ import {
 } from "../api.js";
 import { MediaPicker } from "./MediaLibrary.js";
 import { GEMINI_VOICES, AD_STYLE_PRESETS, DEFAULT_GEMINI_VOICE, DEFAULT_AD_STYLE, composeAdSpeech } from "../voices.js";
+import { LoadError, toast } from "@4dl/ui";
+import { EmptyState } from "../components/empty.js";
 
 type Kind = "audio" | "video" | "command";
 const KINDS: { id: Kind; label: string; hint: string }[] = [
@@ -100,7 +99,7 @@ export function AdsPage() {
         description={profiles ? `${profiles.length} profile${profiles.length === 1 ? "" : "s"} · reusable rotations you bind to any channel` : "Reusable ad rotations you can bind to any number of channels."}
       />
 
-      {loadFailed && <LoadError what="ad profiles" onRetry={reload} />}
+      {loadFailed && <LoadError what="ad profiles" error="We couldn’t reach the server." onRetry={reload} />}
       {!profiles ? (
         <div className="overflow-hidden rounded-xl bg-card shadow-sm">
           {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="m-2 h-12 rounded-lg" />)}
@@ -289,7 +288,7 @@ export function AdProfileDetailPage() {
               <div className="mb-3 font-semibold">Ad rotation</div>
               {ads.length === 0 ? (
                 <EmptyState
-                  icon={<Megaphone />}
+                  icon={Megaphone}
                   title="No ads in this profile"
                   description="Create an interrupt on the left to start the rotation."
                   className="py-12"

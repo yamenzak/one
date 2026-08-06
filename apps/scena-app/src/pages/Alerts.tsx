@@ -15,13 +15,13 @@ import { Badge } from "../components/ui/badge.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { PageHeader } from "../components/page-header.js";
-import { EmptyState } from "../components/empty-state.js";
 import { usePageChrome } from "../components/page-chrome.js";
-import { toast } from "../components/toast.js";
 import { confirmDialog } from "../components/confirm.js";
 import { cn } from "@/lib/utils";
 import { StatusDot } from "../components/status.js";
 import { listAlerts, listAlertRules, addAlertRule, deleteAlertRule, listScreens, type AlertRow, type AlertRule, type Screen } from "../api.js";
+import { toast } from "@4dl/ui";
+import { EmptyState } from "../components/empty.js";
 
 export function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertRow[] | null>(null);

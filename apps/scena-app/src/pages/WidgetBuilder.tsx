@@ -28,7 +28,6 @@ import {
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround, PanelRightClose, Plus, SlidersHorizontal, Sparkles, Lock,
 } from "lucide-react";
 import { Button } from "../components/ui/button.js";
-import { EmptyState } from "../components/empty-state.js";
 import { Badge } from "../components/ui/badge.js";
 import { Separator } from "../components/ui/separator.js";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../components/ui/sheet.js";
@@ -48,8 +47,9 @@ import { useHistory } from "../builder/history.js";
 import { TransformBox, GroupBox, type Phase } from "../builder/TransformBox.js";
 import { AiLayoutDialog } from "../builder/AiLayoutDialog.js";
 import { intersects, alignPatches, distributePatches, clampPos, type AlignKind } from "../builder/geometry.js";
-import { toast } from "../components/toast.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
+import { toast } from "@4dl/ui";
+import { EmptyState } from "../components/empty.js";
 
 /** Accept both the flat WNode shape and the manifest rect-tuple shape. */
 function hydrateNode(raw: unknown, i: number): WNode | null {
@@ -79,7 +79,7 @@ function NoProfile() {
   return (
     <div className="mx-auto max-w-2xl">
       <EmptyState
-        icon={<LayersIcon />}
+        icon={LayersIcon}
         title="No widget profile selected"
         description="Open a widget profile from the Widget profiles page to edit its overlay layout."
         action={<Button asChild variant="outline"><Link to="/profiles"><ArrowLeft className="size-4" /> Widget profiles</Link></Button>}
@@ -511,18 +511,18 @@ function Builder({ profileId }: { profileId: string }) {
             {/* Full tool cluster on ≥ md; on mobile it moves to the strip below so
                 the top bar stays uncramped (just back · title · save). */}
             <div className="hidden items-center gap-1 md:flex">
-              <TB icon={<Undo2 className="size-4" />} label="Undo (⌘Z)" disabled={!history.canUndo} onClick={history.undo} />
-              <TB icon={<Redo2 className="size-4" />} label="Redo (⇧⌘Z)" disabled={!history.canRedo} onClick={history.redo} />
+              <TB icon={<Undo2 />} label="Undo (⌘Z)" disabled={!history.canUndo} onClick={history.undo} />
+              <TB icon={<Redo2 />} label="Redo (⇧⌘Z)" disabled={!history.canRedo} onClick={history.redo} />
               <Separator orientation="vertical" className="mx-0.5 h-5" />
-              <TB icon={<Grid3x3 className="size-4" />} label="Grid" active={showGrid} onClick={() => setShowGrid((v) => !v)} />
-              <TB icon={<Magnet className="size-4" />} label="Snap" active={snap} onClick={() => setSnap((v) => !v)} />
+              <TB icon={<Grid3x3 />} label="Grid" active={showGrid} onClick={() => setShowGrid((v) => !v)} />
+              <TB icon={<Magnet />} label="Snap" active={snap} onClick={() => setSnap((v) => !v)} />
               <Separator orientation="vertical" className="mx-0.5 h-5" />
-              <TB icon={<ZoomOut className="size-4" />} label="Zoom out" onClick={() => zoomBy(1 / 1.2)} />
+              <TB icon={<ZoomOut />} label="Zoom out" onClick={() => zoomBy(1 / 1.2)} />
               <button onClick={fit} className="w-11 rounded-md py-1 text-center text-xs font-medium tabular-nums text-muted-foreground hover:bg-accent" title="Zoom to fit">{Math.round(scale * 100)}%</button>
-              <TB icon={<ZoomIn className="size-4" />} label="Zoom in" onClick={() => zoomBy(1.2)} />
-              <TB icon={<Maximize2 className="size-4" />} label="Fit" onClick={fit} />
+              <TB icon={<ZoomIn />} label="Zoom in" onClick={() => zoomBy(1.2)} />
+              <TB icon={<Maximize2 />} label="Fit" onClick={fit} />
               <Separator orientation="vertical" className="mx-0.5 h-5" />
-              <TB icon={<PanelRightClose className="size-4" />} label="Toggle panel" active={showPanel} onClick={() => setShowPanel((v) => !v)} />
+              <TB icon={<PanelRightClose />} label="Toggle panel" active={showPanel} onClick={() => setShowPanel((v) => !v)} />
             </div>
             <Button variant="outline" size="sm" onClick={() => (canAi ? setAiOpen(true) : navigate("/billing"))} disabled={loading} className="ml-1 gap-1.5">
               {canAi ? <Sparkles className="size-4 text-primary" /> : <Lock className="size-3.5 text-muted-foreground" />}
@@ -536,16 +536,16 @@ function Builder({ profileId }: { profileId: string }) {
 
         {/* Mobile tool strip (< md) — scrollable so nothing crowds the top bar. */}
         <div className="flex items-center gap-1 overflow-x-auto border-b px-2 py-1 md:hidden">
-          <TB icon={<Undo2 className="size-4" />} label="Undo" disabled={!history.canUndo} onClick={history.undo} />
-          <TB icon={<Redo2 className="size-4" />} label="Redo" disabled={!history.canRedo} onClick={history.redo} />
+          <TB icon={<Undo2 />} label="Undo" disabled={!history.canUndo} onClick={history.undo} />
+          <TB icon={<Redo2 />} label="Redo" disabled={!history.canRedo} onClick={history.redo} />
           <Separator orientation="vertical" className="mx-0.5 h-5" />
-          <TB icon={<Grid3x3 className="size-4" />} label="Grid" active={showGrid} onClick={() => setShowGrid((v) => !v)} />
-          <TB icon={<Magnet className="size-4" />} label="Snap" active={snap} onClick={() => setSnap((v) => !v)} />
+          <TB icon={<Grid3x3 />} label="Grid" active={showGrid} onClick={() => setShowGrid((v) => !v)} />
+          <TB icon={<Magnet />} label="Snap" active={snap} onClick={() => setSnap((v) => !v)} />
           <Separator orientation="vertical" className="mx-0.5 h-5" />
-          <TB icon={<ZoomOut className="size-4" />} label="Zoom out" onClick={() => zoomBy(1 / 1.2)} />
+          <TB icon={<ZoomOut />} label="Zoom out" onClick={() => zoomBy(1 / 1.2)} />
           <button onClick={fit} className="w-11 shrink-0 rounded-md py-1 text-center text-xs font-medium tabular-nums text-muted-foreground hover:bg-accent" title="Zoom to fit">{Math.round(scale * 100)}%</button>
-          <TB icon={<ZoomIn className="size-4" />} label="Zoom in" onClick={() => zoomBy(1.2)} />
-          <TB icon={<Maximize2 className="size-4" />} label="Fit" onClick={fit} />
+          <TB icon={<ZoomIn />} label="Zoom in" onClick={() => zoomBy(1.2)} />
+          <TB icon={<Maximize2 />} label="Fit" onClick={fit} />
           <Separator orientation="vertical" className="mx-0.5 h-5" />
           <TB icon={canAi ? <Sparkles className="size-4 text-primary" /> : <Lock className="size-4 text-muted-foreground" />} label={canAi ? "Design with AI" : "AI — Upgrade"} onClick={() => (canAi ? setAiOpen(true) : navigate("/billing"))} />
         </div>
@@ -719,15 +719,15 @@ function MultiPanel({ count, onAlign, onDistribute, onDuplicate, onDelete }: {
   );
   return (
     <div>
-      <SectionLabel icon={<MousePointer2 className="size-3.5" />} title={`${count} selected`} />
+      <SectionLabel icon={<MousePointer2 />} title={`${count} selected`} />
       <div className="mb-2 text-xs font-medium text-muted-foreground">Align</div>
       <div className="mb-3 flex flex-wrap gap-1">
-        <A k="left" icon={<AlignHorizontalJustifyStart className="size-4" />} label="Align left" />
-        <A k="hcenter" icon={<AlignHorizontalJustifyCenter className="size-4" />} label="Align center" />
-        <A k="right" icon={<AlignHorizontalJustifyEnd className="size-4" />} label="Align right" />
-        <A k="top" icon={<AlignVerticalJustifyStart className="size-4" />} label="Align top" />
-        <A k="vcenter" icon={<AlignVerticalJustifyCenter className="size-4" />} label="Align middle" />
-        <A k="bottom" icon={<AlignVerticalJustifyEnd className="size-4" />} label="Align bottom" />
+        <A k="left" icon={<AlignHorizontalJustifyStart />} label="Align left" />
+        <A k="hcenter" icon={<AlignHorizontalJustifyCenter />} label="Align center" />
+        <A k="right" icon={<AlignHorizontalJustifyEnd />} label="Align right" />
+        <A k="top" icon={<AlignVerticalJustifyStart />} label="Align top" />
+        <A k="vcenter" icon={<AlignVerticalJustifyCenter />} label="Align middle" />
+        <A k="bottom" icon={<AlignVerticalJustifyEnd />} label="Align bottom" />
       </div>
       <div className="mb-2 text-xs font-medium text-muted-foreground">Distribute</div>
       <div className="mb-3 flex gap-1">

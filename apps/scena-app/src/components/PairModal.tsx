@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { MonitorSmartphone, Sparkles } from "lucide-react";
-import { ScenaMascot } from "@scena/ui";
+import { ScenaMascot } from "../brand.js";
 import { Dialog, DialogContent } from "./ui/dialog.js";
 import { Button } from "./ui/button.js";
 import { Input } from "./ui/input.js";

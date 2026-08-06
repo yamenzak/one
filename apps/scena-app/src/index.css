@@ -1,255 +1,61 @@
+/**
+ * Scena's stylesheet — the PLATFORM's tokens, plus what is genuinely Scena's.
+ *
+ * ── What this replaces ─────────────────────────────────────────────────────
+ *
+ * 284 lines defining a complete, parallel token system: its own `:root`, its own
+ * `.dark` block, its own `@theme inline` mapping. Every value in it had a
+ * counterpart in `@4dl/ui/tokens.css` and the two had already drifted — Scena's
+ * was light-first with a `.dark` CLASS, the platform's is dark-first with a
+ * `data-theme` ATTRIBUTE, so a shared component dropped into a Scena screen
+ * resolved its surfaces against the wrong mode. It compiled, it rendered, and
+ * the colours were simply wrong.
+ *
+ * What survives below is the part that is a fact about Scena rather than about
+ * interfaces in general: the brand violet, and the widget-transition keyframes
+ * the builder's preview shares with the player's injected ones.
+ */
+
 @import "tailwindcss";
-@import "tw-animate-css";
+@import "@4dl/ui/tokens.css";
 
-@custom-variant dark (&:is(.dark *));
+/*
+  Tailwind v4: scan every workspace package that RENDERS, for class names.
 
+  Tailwind only sees source it is pointed at, and a package resolved through
+  node_modules is not scanned by the automatic detection. Miss one and its
+  components still mount, still typecheck and still pass every test — they just
+  render with a subset of their classes, whichever ones some other file happened
+  to use too.
+
+  Adding a workspace package with JSX in it? Add it here in the same commit.
+*/
+@source "../../../packages/ui/src";
+@source "../../../packages/app-kit/src";
+
+/* ── Scena's brand ─────────────────────────────────────────────────────────
+   The violet. Declared AFTER the platform tokens so it overrides `--primary`
+   in both modes, and nothing else — a brand is one hue, not a second palette.
+   `brand-theme.ts` overwrites these at runtime when a workspace sets its own.  */
 :root {
-  --radius: 0.625rem;
-
-  /* Refined card elevation — a soft, layered, faintly brand-tinted shadow (vs a
-     flat neutral one) for a touch more depth. Kept subtle on purpose. */
-  --shadow-card: 0 1px 2px oklch(0.45 0.05 300 / 0.05), 0 2px 6px -1px oklch(0.45 0.05 300 / 0.06);
-
-  --background: oklch(0.99 0.003 300);
-  --foreground: oklch(0.24 0.015 300);
-
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.24 0.015 300);
-
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.24 0.015 300);
-
-  /* Scena brand violet */
+  --primary: oklch(0.66 0.16 300);
+  --primary-foreground: oklch(0.16 0.02 300);
+}
+:root[data-theme="light"] {
   --primary: oklch(0.58 0.17 300);
   --primary-foreground: oklch(0.99 0.003 300);
-
-  --secondary: oklch(0.96 0.006 300);
-  --secondary-foreground: oklch(0.32 0.015 300);
-
-  --muted: oklch(0.96 0.006 300);
-  --muted-foreground: oklch(0.5 0.013 300);
-
-  --accent: oklch(0.95 0.02 300);
-  --accent-foreground: oklch(0.45 0.16 300);
-
-  --destructive: oklch(0.58 0.22 27);
-  --destructive-foreground: oklch(0.99 0.003 300);
-
-  /* Semantic status tones — the green/amber/blue halves that used to be
-     hardcoded (destructive is the red half). Not brand-derived by default so
-     "success" stays green even for a green brand; overridable in Advanced. */
-  --success: oklch(0.6 0.14 155);
-  --success-foreground: oklch(0.99 0.02 155);
-  --warning: oklch(0.7 0.15 70);
-  --warning-foreground: oklch(0.27 0.06 70);
-  --info: oklch(0.6 0.13 245);
-  --info-foreground: oklch(0.99 0.02 245);
-
-  --border: oklch(0.93 0.005 300);
-  --input: oklch(0.93 0.005 300);
-  --ring: oklch(0.58 0.17 300);
-
-  --chart-1: oklch(0.58 0.17 300);
-  --chart-2: oklch(0.65 0.15 250);
-  --chart-3: oklch(0.7 0.14 190);
-  --chart-4: oklch(0.72 0.16 130);
-  --chart-5: oklch(0.68 0.18 60);
-
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.24 0.015 300);
-  --sidebar-primary: oklch(0.58 0.17 300);
-  --sidebar-primary-foreground: oklch(0.99 0.003 300);
-  --sidebar-accent: oklch(0.95 0.02 300);
-  --sidebar-accent-foreground: oklch(0.45 0.16 300);
-  --sidebar-border: oklch(0.93 0.005 300);
-  --sidebar-ring: oklch(0.58 0.17 300);
-
-  /* Widget theme (§6) — the brand-tinted "glass" token set widgets default to.
-     Signage-tuned (translucent dark surfaces + light text) so widgets read on
-     any content; brand-derived values override these on a themed screen. */
-  --w-surface: oklch(0.18 0.02 300 / 0.62);
-  --w-surface-2: oklch(1 0 0 / 0.06);
-  --w-fg: oklch(0.99 0.008 300);
-  --w-fg-muted: oklch(0.99 0.008 300 / 0.72);
-  --w-accent: oklch(0.66 0.19 300);
-  --w-accent-2: oklch(0.78 0.15 70);
-  --w-border: oklch(1 0 0 / 0.14);
-  --w-radius: 18px;
-  --w-font: "Hanken Grotesk", system-ui, sans-serif;
-  --w-font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
-.dark {
-  /* Deeper, neutral shadow on dark surfaces where a tinted one would muddy. */
-  --shadow-card: 0 1px 2px oklch(0 0 0 / 0.35), 0 2px 8px -1px oklch(0 0 0 / 0.35);
-
-  --background: oklch(0.18 0.01 300);
-  --foreground: oklch(0.95 0.005 300);
-
-  --card: oklch(0.22 0.012 300);
-  --card-foreground: oklch(0.95 0.005 300);
-
-  --popover: oklch(0.22 0.012 300);
-  --popover-foreground: oklch(0.95 0.005 300);
-
-  --primary: oklch(0.68 0.17 300);
-  --primary-foreground: oklch(0.18 0.01 300);
-
-  --secondary: oklch(0.28 0.015 300);
-  --secondary-foreground: oklch(0.95 0.005 300);
-
-  --muted: oklch(0.28 0.015 300);
-  --muted-foreground: oklch(0.68 0.012 300);
-
-  --accent: oklch(0.32 0.03 300);
-  --accent-foreground: oklch(0.9 0.02 300);
-
-  --destructive: oklch(0.65 0.2 27);
-  --destructive-foreground: oklch(0.98 0.005 300);
-
-  --success: oklch(0.7 0.15 158);
-  --success-foreground: oklch(0.18 0.03 158);
-  --warning: oklch(0.8 0.14 80);
-  --warning-foreground: oklch(0.24 0.05 80);
-  --info: oklch(0.7 0.13 245);
-  --info-foreground: oklch(0.18 0.03 245);
-
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.68 0.17 300);
-
-  --chart-1: oklch(0.68 0.17 300);
-  --chart-2: oklch(0.7 0.15 250);
-  --chart-3: oklch(0.72 0.14 190);
-  --chart-4: oklch(0.74 0.16 130);
-  --chart-5: oklch(0.72 0.18 60);
-
-  --sidebar: oklch(0.2 0.012 300);
-  --sidebar-foreground: oklch(0.95 0.005 300);
-  --sidebar-primary: oklch(0.68 0.17 300);
-  --sidebar-primary-foreground: oklch(0.18 0.01 300);
-  --sidebar-accent: oklch(0.32 0.03 300);
-  --sidebar-accent-foreground: oklch(0.9 0.02 300);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.68 0.17 300);
-}
-
-@theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-info: var(--info);
-  --color-info-foreground: var(--info-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-
-  --font-sans: "Hanken Grotesk", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  html {
-    -webkit-text-size-adjust: 100%;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-    /* A hair of negative tracking reads crisper/more designed at UI sizes. */
-    letter-spacing: -0.006em;
-  }
-  /* Respect the OS reduced-motion preference everywhere. */
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.001ms !important;
-      transition-duration: 0.001ms !important;
-    }
-  }
-  /* Quiet, theme-aware scrollbars (premium chrome, both modes). */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
-  }
-  ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
-  }
-  ::-webkit-scrollbar-thumb {
-    background: color-mix(in oklch, var(--muted-foreground) 28%, transparent);
-    border-radius: 8px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: color-mix(in oklch, var(--muted-foreground) 45%, transparent);
-    background-clip: padding-box;
-  }
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-}
-
-/* Shared motion utilities used across pages for a consistent premium feel. */
 @layer utilities {
-  @keyframes scena-rise {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-    to {
-      opacity: 1;
-      transform: none;
-    }
-  }
-  .animate-rise {
-    animation: scena-rise 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-  /* Widget-stack item transitions (match the player's injected keyframes). */
+  /*
+    Widget-stack transitions.
+
+    These are NOT decoration and must not be folded into the shared motion
+    utilities: the builder's on-canvas preview and the player's runtime inject
+    the same keyframes under the same names, so a widget animates identically in
+    the editor and on a screen in a lobby. Renaming one half silently
+    desynchronises the preview from the thing it is previewing.
+  */
   @keyframes wxfade {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -266,19 +72,9 @@
     from { opacity: 0; transform: perspective(1200px) rotateX(32deg); }
     to { opacity: 1; transform: none; }
   }
-  /* Now Playing equalizer bars (matches the player's injected keyframes). */
+  /* Now Playing equaliser bars — same rule, same reason. */
   @keyframes wxeq {
     0%, 100% { transform: scaleY(0.35); }
     50% { transform: scaleY(1); }
-  }
-  /* Card hover lift — subtle, springy, GPU-friendly. */
-  .hover-lift {
-    transition:
-      transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-      box-shadow 0.18s ease,
-      border-color 0.18s ease;
-  }
-  .hover-lift:hover {
-    transform: translateY(-2px);
   }
 }

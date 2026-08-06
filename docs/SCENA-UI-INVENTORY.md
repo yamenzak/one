@@ -118,7 +118,7 @@ Splitting it, because "21,910 lines" is not a task and these are:
 
 | Sub-stage | Content | Est. |
 |---|---|---|
-| **7a** | `@4dl/ui` swap + delete the 860 lines of duplicated components + the shell | the foundation; everything else depends on it |
+| **7a** | `@4dl/ui` swap + delete the 860 lines of duplicated components + the shell | the foundation; everything else depends on it. **Part done — see §7a below.** |
 | **7b** | Admin → `@4dl/admin` section registry (1,448 → ~200) | biggest single win, lowest risk, no product logic |
 | **7c** | The four collection screens (Channels, Playlists, MusicPlaylists, Media) onto one `Collection` grammar | they are the same screen four times |
 | **7d** | Settings + Billing + Team + Alerts → index-and-page | the settings grammar, wholesale |
@@ -152,3 +152,63 @@ whichever stage next touches their file.
 
 "Every pixel" is real and it is **~15,000 lines of rebuild**, sequenced into
 eight sub-stages of which two (7a, 7b) unlock the rest.
+
+
+---
+
+## 7a — what has landed, and what has not
+
+**Done.**
+
+- **`@4dl/ui` and `@4dl/app-kit` are dependencies of `@scena/app`.**
+- **`packages/scena-ui` is deleted.** Its 302 lines of components had no
+  importers left; the only thing anything used was `ScenaMascot`/`ScenaIcon`, a
+  React wrapper around `@scena/brand`'s framework-agnostic SVG builders. The
+  wrapper moved to `apps/scena-app/src/brand.tsx`, which is where a product's
+  own mark belongs — `@scena/brand` stays React-free because the player imports
+  it.
+- **One token system.** Scena's 284-line `index.css` defined a complete parallel
+  palette: its own `:root`, its own dark block, its own `@theme inline`. It is
+  now `@import "@4dl/ui/tokens.css"` plus the brand violet and the widget
+  keyframes — the two things that are facts about Scena rather than about
+  interfaces in general.
+- **The theme mechanism was WRONG, not merely different.** `@4dl/ui`'s tokens
+  are dark-first (`:root` is dark; light lives under
+  `:root[data-theme="light"]`); Scena toggled a `.dark` CLASS. A shared
+  component dropped into a Scena screen therefore resolved every surface against
+  the wrong mode — it compiled, it rendered, and the colours were simply wrong.
+  `theme.tsx` stamps `data-theme` now.
+- **`@source` for `packages/ui/src` and `packages/app-kit/src`.** Tailwind v4
+  only scans what it is pointed at, and a package resolved through
+  `node_modules` is not scanned automatically. Missing one does not fail — the
+  components mount and typecheck and render with whichever classes some other
+  file happened to use too.
+- **`toast`, `Toaster`, `LoadError` and `EmptyState`** are the shared ones
+  across 21 files; the three local modules are deleted. `EmptyState` keeps a
+  thin app wrapper (`components/empty.tsx`) because the mascot mood is product
+  vocabulary a design system may not carry — the same split CLAUDE.md describes
+  for Kova's `StudioPausedBanner`.
+- **`animate-rise` and `hover-lift` are gone.** Motion is UI-LANGUAGE's, and
+  `hover-lift` was a mouse idiom in a touch surface — the same finding as the
+  `hover:scale` row in §4.
+
+**Not done, and the app is consistent without it.** The 18 vendored shadcn
+primitives in `components/ui/` are still in place and still correct: they are
+built on the same CSS variables, so they picked up the platform palette with no
+change. Replacing them is what forces every page to change, because the APIs
+genuinely differ — `@4dl/ui`'s `Card` is one element where Scena's has six
+sub-components, its `Select` is `value`/`onChange`/`options` where Scena's is
+the Radix compound, its `Dialog` requires `open`. That is a per-screen rewrite
+and it belongs with the screens, in 7c–7e.
+
+Also outstanding from this sub-stage: `page-header`/`page-chrome` (17 and 18
+importers) → `Page`/`SettingsPage`, `confirm` → `ConfirmDialog`, `status` →
+`Badge` + tones, `feature-gate` → `FeatureLock`, `media-picker` → `Collection` +
+`Thumb`, `tag-editor` → chips, and `app-shell` → the shared shell. Each is a
+sweep of the same shape as the four above.
+
+⚠️ **Three `LoadError` call sites now pass a placeholder reason.** The pages
+track `loadFailed: boolean` and never captured the error, so "We couldn't reach
+the server." is the most honest thing available — it is accurate for a failed
+fetch and it is actionable. Carrying the real error is per-screen work in
+7c–7e, and it is the same fix as the eleven `catch(() => set…)` sites.

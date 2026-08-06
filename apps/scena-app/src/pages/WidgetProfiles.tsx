@@ -14,12 +14,12 @@ import { Badge } from "../components/ui/badge.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { PageHeader } from "../components/page-header.js";
-import { EmptyState } from "../components/empty-state.js";
 import { usePageChrome } from "../components/page-chrome.js";
-import { toast } from "../components/toast.js";
 import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { ProfileStartDialog } from "../builder/ProfileStartDialog.js";
+import { toast } from "@4dl/ui";
+import { EmptyState } from "../components/empty.js";
 import {
   listWidgetProfiles, updateWidgetProfile, deleteWidgetProfile,
   type WidgetProfile,
@@ -113,7 +113,7 @@ export function WidgetProfilesPage() {
             <Card
               key={p.id}
               onClick={() => navigate(`/widgets?profile=${p.id}`)}
-              className="hover-lift group cursor-pointer hover:border-primary/40 hover:shadow-md"
+              className="group cursor-pointer hover:border-primary/40 hover:shadow-md"
             >
               <CardContent className="flex items-start gap-3.5">
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">

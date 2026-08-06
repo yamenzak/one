@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router-dom";
 import { Siren, LogOut, Sun, Moon, Scale } from "lucide-react";
-import { ScenaMascot } from "@scena/ui";
+import { ScenaMascot } from "./brand.js";
 import { AppShell, type NavGroup } from "./components/app-shell.js";
 import { PageChromeProvider } from "./components/page-chrome.js";
 import { RoleProvider } from "./permissions.js";
@@ -16,7 +16,6 @@ import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { navForRole, canAccessKey, PAGE_META } from "./nav.js";
 import { signOut, authClient } from "./auth-client.js";
 import { useTheme } from "./theme.js";
-import { toast } from "./components/toast.js";
 import { LoginScreen, OrgOnboard } from "./pages/Login.js";
 import { LegalDialog, type LegalDoc } from "./legal/content.js";
 import { BoardControlApp } from "./pages/BoardControlApp.js";
@@ -40,6 +39,7 @@ import { WidgetProfilesPage } from "./pages/WidgetProfiles.js";
 import { SettingsPage } from "./pages/Settings.js";
 import { AdminPage } from "./pages/Admin.js";
 import { PairModal } from "./components/PairModal.js";
+import { toast } from "@4dl/ui";
 
 /**
  * Poll `fn` every `ms`, but skip while the tab is hidden and refetch the moment
@@ -126,7 +126,7 @@ function SidebarFooter({
         {themeBtn}
         {emergencyActive && <span className="ml-1 text-[11px] font-medium text-destructive">Takeover active</span>}
       </div>
-      <button onClick={onNavigateBilling} className="hover-lift w-full rounded-xl bg-sidebar-accent/50 p-3 text-left transition-colors hover:bg-sidebar-accent">
+      <button onClick={onNavigateBilling} className="w-full rounded-xl bg-sidebar-accent/50 p-3 text-left transition-colors hover:bg-sidebar-accent">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs font-semibold">{planName}</span>
           <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{bal.toLocaleString()} cr</span>
@@ -261,7 +261,7 @@ export function App() {
         )}
       >
         <ErrorBoundary resetKey={pathname}>
-          <div key={pathname} className="animate-rise">
+          <div key={pathname} className="">
             <Routes>
               <Route path="/" element={<ScreensPage key={refreshKey} onPair={() => setPairOpen(true)} />} />
               <Route path="/screens/:id" element={<ScreenDetailPage />} />

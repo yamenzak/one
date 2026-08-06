@@ -10,7 +10,7 @@ import { Button } from "./ui/button.js";
 import { Textarea } from "./ui/textarea.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select.js";
-import { toast } from "./toast.js";
+import { toast } from "@4dl/ui";
 import { slideDocument } from "@scena/manifest";
 import { aiGenerate, listAiModels, type AiModel } from "../api.js";
 

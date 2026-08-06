@@ -101,10 +101,10 @@ export function AiLayoutDialog({ open, nodes, designW, designH, onOpenChange, on
         {hasCanvas && (
           <div className="grid grid-cols-2 gap-2">
             <ModeCard active={mode === "improve"} onClick={() => setMode("improve")}
-              icon={<Wand2 className="size-4" />} title="Improve current"
+              icon={<Wand2 />} title="Improve current"
               desc="Keep what's here — add, resize and rebalance the layout." />
             <ModeCard active={mode === "fresh"} onClick={() => setMode("fresh")}
-              icon={<PencilRuler className="size-4" />} title="Start fresh"
+              icon={<PencilRuler />} title="Start fresh"
               desc="Ignore the canvas and design a new layout from scratch." />
           </div>
         )}

@@ -10,10 +10,10 @@ import { Download, BarChart3 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { PageHeader } from "../components/page-header.js";
-import { EmptyState } from "../components/empty-state.js";
 import { StatTile } from "../components/status.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { getAnalytics, analyticsCsvUrl, type AnalyticsSummary } from "../api.js";
+import { EmptyState } from "../components/empty.js";
 
 /** Trigger a CSV download without navigating away from the page. */
 function downloadCsv() {
@@ -163,7 +163,7 @@ function Row({ left, right, sub, bar }: { left: string; right: string; sub?: str
 }
 
 const Empty = () => (
-  <EmptyState icon={<BarChart3 />} title="No plays recorded yet" description="Once your screens start playing content, proof-of-play data will show up here." />
+  <EmptyState icon={BarChart3} title="No plays recorded yet" description="Once your screens start playing content, proof-of-play data will show up here." />
 );
 
 function AnalyticsSkeleton() {

@@ -108,3 +108,7 @@ export function ScenaIcon({
     />
   );
 }
+
+/** Re-exported so a consumer needs one import for the mark and its moods.
+ *  `@scena/ui` used to do this; it is gone (see docs/SCENA-REWRITE.md §7a). */
+export type { ScenaMood } from "@scena/brand";

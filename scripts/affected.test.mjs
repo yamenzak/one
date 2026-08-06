@@ -49,12 +49,12 @@ test("a change to an app's SPA deploys that app", () => {
 });
 
 test("a change to a shared package deploys every app that reaches it", () => {
-  // `@4dl/core` reaches Scena as of Stage 1 and `@4dl/ui` does not yet — Scena
-  // still has its own `@scena/ui` until Stage 7. The difference between these
-  // two lines is the migration's actual state, so a stage that rewires a
-  // package should turn one of them red until it is updated here.
+  // These lines ARE the migration's state, which is why a stage that rewires a
+  // package turns one of them red until it is updated here. `@4dl/ui` reached
+  // Scena in Stage 7a — the same commit that deleted `@scena/ui`, whose whole
+  // remaining content was a React wrapper around the mascot.
   assert.deepEqual(ids(["packages/core/src/config.ts"]), ["kova", "scena", "tessa"]);
-  assert.deepEqual(ids(["packages/ui/src/index.ts"]), ["kova", "tessa"]);
+  assert.deepEqual(ids(["packages/ui/src/index.ts"]), ["kova", "scena", "tessa"]);
 });
 
 test("a change to one product's own domain package deploys only that product", () => {

@@ -90,15 +90,15 @@ export function DevicePreview({ channelId, online = true, chrome = false, classN
     >
       {/* States: no channel / failed / loading / live frame */}
       {!channelId ? (
-        <Center icon={<Radio className="size-5" />} label="No channel" />
+        <Center icon={<Radio />} label="No channel" />
       ) : failed ? (
-        <Center icon={<ImageOff className="size-5" />} label="No manifest" />
+        <Center icon={<ImageOff />} label="No manifest" />
       ) : !manifest ? (
         <div className="absolute inset-0 animate-pulse bg-neutral-900" />
       ) : slide ? (
         <SlideFrame slide={slide} url={url} dims={dims} scale={scale} />
       ) : (
-        <Center icon={<ImageOff className="size-5" />} label="Empty" />
+        <Center icon={<ImageOff />} label="Empty" />
       )}
 
       {/* Offline veil — the frame is what it *should* show; dim it when dark. */}
@@ -140,7 +140,7 @@ function SlideFrame({ slide, url, dims, scale }: { slide: Slide; url?: string; d
       />
     );
   }
-  if (!url) return <Center icon={<ImageOff className="size-5" />} label={slide.type} />;
+  if (!url) return <Center icon={<ImageOff />} label={slide.type} />;
   if (slide.type === "video") {
     return <video src={url} muted loop autoPlay playsInline className="absolute inset-0 size-full object-contain" />;
   }

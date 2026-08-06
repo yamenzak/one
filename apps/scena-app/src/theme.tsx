@@ -1,7 +1,18 @@
 /**
  * Theme (light/dark) — system preference on first load, with a manual override
- * remembered per-device. The choice stamps `.dark` on <html> so the CSS-var
- * theme (index.css) flips instantly. Kept tiny and dependency-free.
+ * remembered per-device.
+ *
+ * ⚠️ The choice stamps `data-theme` on <html>, NOT a `.dark` class.
+ *
+ * `@4dl/ui`'s tokens are DARK-FIRST: `:root` is the dark palette and the light
+ * one lives under `:root[data-theme="light"]`. Toggling a class therefore did
+ * nothing at all to a shared component — it kept resolving `--card`,
+ * `--muted-foreground` and the rest against dark while Scena's own screens
+ * flipped. Both halves compiled and rendered; only the colours disagreed.
+ *
+ * Dark is the default because that is what `:root` holds: a first paint before
+ * any script runs is dark, which is the app's own surface language rather than
+ * a flash of the wrong one.
  */
 import { useEffect, useState, useCallback } from "react";
 
@@ -17,7 +28,11 @@ function resolved(choice: Choice): boolean {
 }
 
 function apply(choice: Choice): void {
-  document.documentElement.classList.toggle("dark", resolved(choice));
+  // Set, never toggle: the attribute has two meaningful values and the absence
+  // of one is "dark", which is what `:root` already is.
+  const el = document.documentElement;
+  if (resolved(choice)) el.removeAttribute("data-theme");
+  else el.setAttribute("data-theme", "light");
 }
 
 /** Read the stored choice (called once at boot in main.tsx too). */

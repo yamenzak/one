@@ -19,7 +19,6 @@ import { Textarea } from "../components/ui/textarea.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { ScrollArea } from "../components/ui/scroll-area.js";
 import { cn } from "@/lib/utils";
-import { toast } from "../components/toast.js";
 import { useFeature } from "../entitlements.js";
 import {
   createWidgetProfile, saveProfileWidgets, getWidgetProfile, aiLayout, listAiModels, type WidgetProfile, type AiModel,
@@ -27,6 +26,7 @@ import {
 import { WidgetContent } from "./WidgetView.js";
 import { DESIGN_W, DESIGN_H, type WNode } from "./types.js";
 import { templatesByCategory, type Template } from "./templates.js";
+import { toast } from "@4dl/ui";
 
 const DEFAULT_W = 1920, DEFAULT_H = 1080;
 

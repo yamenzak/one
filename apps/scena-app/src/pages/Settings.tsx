@@ -14,12 +14,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
-import { toast } from "../components/toast.js";
 import { useCan } from "../permissions.js";
 import { useFeature } from "../entitlements.js";
 import { FeatureLockBadge } from "../components/feature-gate.js";
 import { applyBrandTheme, deriveTokens, parseThemeCss, THEME_TOKENS } from "../brand-theme.js";
 import { assetStoreUrl } from "../components/media-picker.js";
+import { toast } from "@4dl/ui";
 import {
   listAiModels,
   getAiDefaults,

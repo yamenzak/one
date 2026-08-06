@@ -13,7 +13,7 @@ import { Input } from "./ui/input.js";
 import { Label } from "./ui/label.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog.js";
 import { TagEditor } from "./tag-editor.js";
-import { toast } from "./toast.js";
+import { toast } from "@4dl/ui";
 import { uploadAsset, assetUrl } from "../api.js";
 
 export interface TrackMeta {

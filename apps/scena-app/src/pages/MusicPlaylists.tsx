@@ -27,19 +27,18 @@ import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from ".
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { PageHeader } from "../components/page-header.js";
-import { EmptyState } from "../components/empty-state.js";
-import { LoadError } from "../components/load-error.js";
 import { TagEditor } from "../components/tag-editor.js";
 import { TagFilter } from "../components/tag-filter.js";
 import { ConfirmDialog } from "../components/confirm-dialog.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { useCan } from "../permissions.js";
-import { toast } from "../components/toast.js";
 import { confirmDialog } from "../components/confirm.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
 import { TrackMetaDialog, mmss } from "../components/track-meta-dialog.js";
 import { LicenseBadge, LicenseNote } from "../components/licensing.js";
 import { MediaPicker } from "./MediaLibrary.js";
+import { LoadError, toast } from "@4dl/ui";
+import { EmptyState } from "../components/empty.js";
 import {
   listMusicPlaylists, createMusicPlaylist, getMusicPlaylist, updateMusicPlaylist, deleteMusicPlaylist,
   addPlaylistTrack, updatePlaylistTrack, deletePlaylistTrack, reorderPlaylistTracksApi, addPublicTrackToPlaylist,
@@ -113,7 +112,7 @@ export function MusicPlaylistsPage() {
         }
       />
 
-      {loadFailed && <LoadError what="playlists" onRetry={reload} />}
+      {loadFailed && <LoadError what="playlists" error="We couldn’t reach the server." onRetry={reload} />}
       {!playlists ? (
         <div className="overflow-hidden rounded-xl bg-card shadow-sm">
           {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="m-2 h-12 rounded-lg" />)}
@@ -421,7 +420,7 @@ export function MusicPlaylistDetailPage() {
               {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="m-2 h-12 rounded-lg" />)}
             </div>
           ) : tracks.length === 0 ? (
-            <EmptyState icon={<Music2 />} title="No tracks yet" description={canWrite ? "Use Add to upload audio, generate with AI, or pick from your Media or the public library." : "This playlist has no tracks yet."} />
+            <EmptyState icon={Music2} title="No tracks yet" description={canWrite ? "Use Add to upload audio, generate with AI, or pick from your Media or the public library." : "This playlist has no tracks yet."} />
           ) : (
             <div className="overflow-hidden rounded-xl bg-card shadow-sm">
               <Table>
@@ -783,7 +782,7 @@ function PublicLibraryDialog({ open, onOpenChange, onAdd }: {
         {!data ? (
           <div className="space-y-2 py-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}</div>
         ) : !data.enabled ? (
-          <EmptyState icon={<Library />} title="Public library not in your plan" description="Upgrade to a plan that includes the licensed music library to use these tracks." className="border-0 bg-transparent py-8" />
+          <EmptyState icon={Library} title="Public library not in your plan" description="Upgrade to a plan that includes the licensed music library to use these tracks." className="border-0 bg-transparent py-8" />
         ) : (
           <>
             <p className="text-xs text-muted-foreground">Licensed for your commercial use. {data.limit >= 0 ? `Using ${data.used}/${data.limit} library tracks.` : `Using ${data.used} library tracks (unlimited).`}</p>

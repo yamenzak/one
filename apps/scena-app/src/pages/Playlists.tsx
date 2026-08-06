@@ -21,13 +21,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu.js";
 import { PageHeader } from "../components/page-header.js";
-import { EmptyState } from "../components/empty-state.js";
 import { TagEditor } from "../components/tag-editor.js";
 import { TagFilter } from "../components/tag-filter.js";
 import { ConfirmDialog } from "../components/confirm-dialog.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { useCan } from "../permissions.js";
-import { toast } from "../components/toast.js";
 import { confirmDialog } from "../components/confirm.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
 import {
@@ -39,6 +37,8 @@ import {
 import { MediaPicker } from "./MediaLibrary.js";
 import { HtmlEditorDialog, HtmlThumb } from "../components/html-editor.js";
 import { LicenseNote } from "../components/licensing.js";
+import { toast } from "@4dl/ui";
+import { EmptyState } from "../components/empty.js";
 
 const STARTER_HTML = `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;background:linear-gradient(135deg,#6366f1,#312e81);color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:8%">
   <div style="font-size:1.4vw;letter-spacing:.3em;text-transform:uppercase;opacity:.75">Your brand</div>
@@ -453,7 +453,7 @@ export function PlaylistDetailPage() {
               {[0, 1, 2, 3].map((i) => <Card key={i} className="overflow-hidden py-0"><Skeleton className="aspect-video w-full rounded-none" /><div className="p-2.5"><Skeleton className="h-4 w-16" /></div></Card>)}
             </div>
           ) : slides.length === 0 ? (
-            <EmptyState icon={<Layers />} title="No slides yet" description={canWrite ? "Use Add to upload images, video or GIFs, write an HTML slide, or generate one with AI." : "This playlist has no slides yet."} />
+            <EmptyState icon={Layers} title="No slides yet" description={canWrite ? "Use Add to upload images, video or GIFs, write an HTML slide, or generate one with AI." : "This playlist has no slides yet."} />
           ) : (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
               {slides.map((s, i) => (

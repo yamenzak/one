@@ -12,7 +12,7 @@ import {
   Plus, MonitorPlay, Radio, Ticket, Trash2, LayoutGrid, Rows3,
   KeyRound, RefreshCw, ShieldUser, Eye, EyeOff, Trophy,
 } from "lucide-react";
-import { ScenaMascot } from "@scena/ui";
+import { ScenaMascot } from "../brand.js";
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent } from "../components/ui/card.js";
 import { Input } from "../components/ui/input.js";
@@ -31,11 +31,11 @@ import {
   setBoardCategories, setBoardCounters, setBoardRooms, setBoardSides, mintKiosk, getBoardUsers, regenerateBoardUser, deleteBoard, API_BASE,
   type Board, type BoardKind, type BoardAnnounce, type AnnounceConfig, type QueueCategory, type QueueCounter, type BoardUser,
 } from "../api.js";
-import { toast } from "../components/toast.js";
 import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { GEMINI_TTS_VOICES } from "@scena/protocol";
 import type { QueueState, RoomState, ScoreState } from "@scena/protocol";
+import { toast } from "@4dl/ui";
 
 /** The three board kinds, treated equally in the picker + empty state. */
 const BOARD_TYPES: { kind: BoardKind; label: string; hint: string; icon: typeof Ticket }[] = [
@@ -148,7 +148,7 @@ export function LiveBoardsPage() {
           ))}
         </div>
       ) : boards.length === 0 ? (
-        <div className="animate-rise flex flex-col items-center rounded-xl border border-dashed bg-card/40 px-6 py-14 text-center">
+        <div className="flex flex-col items-center rounded-xl border border-dashed bg-card/40 px-6 py-14 text-center">
           <ScenaMascot mood="idle" size={116} className="mb-1" />
           <h3 className="text-base font-semibold">{canCreate ? "Create your first live board" : "No live boards yet"}</h3>
           <p className="mt-1 max-w-md text-sm text-muted-foreground">Each board issues its own logins and goes live the moment you bind a widget to it.{canCreate ? " Pick a type to start." : " Ask an admin to create one."}</p>
@@ -412,7 +412,7 @@ function BoardBody({ board }: { board: Board }) {
 function BoardCard({ board, onDelete }: { board: Board; onDelete?: () => void }) {
   const Icon = boardIcon(board.kind);
   return (
-    <Card className="hover-lift hover:border-primary/40 hover:shadow-md">
+    <Card className="hover:border-primary/40 hover:shadow-md">
       <CardContent className="flex flex-col gap-4">
         <div className="flex items-center gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
