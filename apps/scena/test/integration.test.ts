@@ -1207,3 +1207,49 @@ describe("the inbox", () => {
     expect((await list()).filter((n) => n.read).length).toBe(2);
   });
 });
+
+/* ─────────────── Stage 7b — the console's own door ─────────────────────── */
+
+describe("the operator console answers on its door and nowhere else", () => {
+  /*
+    The bug this closes: the SPA rendered the console at `/admin` INSIDE the
+    studio Shell, on any host, while `/api/admin/*` has been restricted to the
+    `admin.` door since Stage 3. In production that route rendered 1,448 lines
+    of console and then 404'd on every call — invisible in dev, where one root
+    means the guard correctly stands down.
+
+    ⚠️ This suite runs on `localhost`, where `isDevRoot` spares the door check,
+    so it CANNOT observe the refusal. What it can observe is that every endpoint
+    the console needs actually exists and answers — which is the half that was
+    missing: Scena had none of the four shared operator surfaces mounted, so
+    six of the console's thirteen sections would have called routes that were
+    never registered.
+  */
+  const ADMIN_SURFACES = [
+    "/api/admin/email",
+    "/api/admin/shared-config",
+    "/api/admin/maintenance",
+    "/api/admin/rail/parked",
+    "/api/admin/domains/config",
+    "/api/admin/turnstile/config",
+  ];
+
+  it("registers every endpoint the console's shared panels call", async () => {
+    const { cookie, door } = await newWorkspace("console");
+    for (const path of ADMIN_SURFACES) {
+      const res = await SELF.fetch(`${door}${path}`, { headers: { cookie } });
+      // 404 here means the route was never mounted — a panel that renders and
+      // then fails on its first read. Anything else (200, 403, 503) means the
+      // surface exists and the guard is doing its job.
+      expect(res.status, `${path} is not mounted`).not.toBe(404);
+    }
+  });
+
+  it("refuses an unauthenticated reader on every one of them", async () => {
+    const { door } = await newWorkspace("console-anon");
+    for (const path of ADMIN_SURFACES) {
+      const res = await SELF.fetch(`${door}${path}`);
+      expect([401, 403, 404], `${path} answered an anonymous caller ${res.status}`).toContain(res.status);
+    }
+  });
+});

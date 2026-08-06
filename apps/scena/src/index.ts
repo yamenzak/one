@@ -13,7 +13,7 @@
 import { Hono, type MiddlewareHandler } from "hono";
 import { cors } from "hono/cors";
 import type { Env } from "./env.js";
-import { type AppEnv, type AppContext, sessionMiddleware, tenantOf, owns } from "./auth-context.js";
+import { type AppEnv, type AppContext, sessionMiddleware, tenantOf, owns, isPlatformAdmin } from "./auth-context.js";
 import { routeGuard } from "./route-guard.js";
 import { domainRoutes, domainAdminRoutes, orgCreateGuard, orgUpdateGuard } from "./domain-routes.js";
 import { maintenanceMiddleware } from "@4dl/tenancy";
@@ -67,6 +67,11 @@ import { listLibrary, listGenres, getLibraryTrack, countLibraryUsage, canAddLibr
 import { weatherConfig, weatherConfigured, callsPerDay, geocode, listSources, getSource, createSource, updateSource, deleteSource, refreshSource, readCache, refreshStale, withinOpenHours } from "./weather-store.js";
 import { storeAsset, StorageQuotaError } from "./storage.js";
 import { notifyRoutes } from "@4dl/notify";
+import { emailAdminRoutes } from "@4dl/email/admin-routes";
+import { sharedConfigRoutes } from "@4dl/core/admin-routes";
+import { railAdminRoutes } from "@4dl/billing-rail/admin-routes";
+import { maintenanceAdminRoutes } from "@4dl/tenancy";
+import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
 // Importing the delivery binding also installs the notification REGISTRY
 // (`notifications.ts` calls `configureNotify` at module scope), so this import
 // must survive even if nothing in this file calls `notify` directly.
@@ -198,6 +203,80 @@ app.route("/api", domainAdminRoutes);
   is why the DO is keyed by user and the routes never consult the host.
 */
 app.route("/api", notifyRoutes<AppEnv>({ currentUserId: (c) => c.get("user")?.id ?? null }));
+
+/* ─────────────── the operator console's shared endpoints ────────────────────
+ *
+ * Four route factories, all on the `admin.` door, all guarded by the same
+ * `isPlatformAdmin`. `c as never` is the house idiom for an injected guard: the
+ * seam is structural, but Hono's `Context` is invariant enough that this app's
+ * fuller env is not assignable to a package's narrower one, and threading a type
+ * parameter through every handler would force each call site to name the full
+ * env — the coupling the seam exists to avoid.
+ */
+
+/**
+ * Email configuration.
+ *
+ * Mounted for the reason `@4dl/email` fails closed: without `email.provider` and
+ * `email.from` a fresh deployment cannot send the sign-in code that is the only
+ * way in. Scena's own `/api/admin/config` still carries these fields; this adds
+ * the surface `@4dl/admin`'s panel speaks to, and the two write the same rows.
+ */
+app.route("/api", emailAdminRoutes(
+  { isPlatformAdmin: (c) => isPlatformAdmin(c as never) },
+  // What the console SHOWS when nothing is stored. It has to match what
+  // provisioning seeds, or the screen advertises a sender the deployment does
+  // not use.
+  { from: PLATFORM_FROM_DEFAULT },
+) as unknown as Hono<AppEnv>);
+
+/**
+ * The SHARED platform config store.
+ *
+ * Every 4DL app's console writes the SAME namespace, which is the point: the
+ * Google key, the Stripe account, the Cloudflare token and the Turnstile widget
+ * are one fact about the platform rather than one per product. This app's own
+ * `app_config` rows still win — see `packages/core/src/config.ts`.
+ */
+app.route("/api", sharedConfigRoutes({ isPlatformAdmin: (c) => isPlatformAdmin(c as never) }) as unknown as Hono<AppEnv>);
+
+/**
+ * The Stripe rail's DEAD LETTER.
+ *
+ * The rail parks an event it cannot attribute to any app — money captured,
+ * nothing granted — and Stage 4b gave Scena the parking table without a way to
+ * read one back. One Stripe account serves every 4DL product, so the queue is
+ * the platform's rather than this app's; it answers on whichever worker Stripe
+ * delivered to.
+ */
+app.route("/api", railAdminRoutes({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  // The audit line on a closed event. `user.email` is the same field
+  // `isPlatformAdmin` checks against ADMIN_EMAILS, so it names whoever the
+  // allowlist let in.
+  operatorRef: (c) => (c as unknown as AppContext).get("user")?.email ?? "operator",
+}) as unknown as Hono<AppEnv>);
+
+/**
+ * The deployment-wide maintenance switch.
+ *
+ * `signOutEveryone` is injected because the session table is `@4dl/auth`'s and
+ * because WHO counts as an operator is this app's answer — signing the operator
+ * out along with everyone else would take away the console they are standing in.
+ */
+app.route("/api", maintenanceAdminRoutes(
+  { isPlatformAdmin: (c) => isPlatformAdmin(c as never) },
+  {
+    signOutEveryone: async (c) => {
+      const res = await (c.env as Env).DB
+        .prepare('DELETE FROM "session" WHERE userId NOT IN (SELECT id FROM "user" WHERE LOWER(email) IN (SELECT value FROM json_each(?)))')
+        .bind(JSON.stringify(((c.env as Env).ADMIN_EMAILS ?? "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)))
+        .run()
+        .catch(() => null);
+      return res?.meta?.changes ?? 0;
+    },
+  },
+) as unknown as Hono<AppEnv>);
 
 registerBilling(app);
 registerContentRoutes(app);

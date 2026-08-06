@@ -318,6 +318,9 @@ importers:
 
   apps/scena-app:
     dependencies:
+      '@4dl/admin':
+        specifier: workspace:*
+        version: link:../../packages/admin
       '@4dl/app-kit':
         specifier: workspace:*
         version: link:../../packages/app-kit

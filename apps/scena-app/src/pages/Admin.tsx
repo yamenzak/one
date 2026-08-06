@@ -1,3 +1,24 @@
+/**
+ * THE OPERATOR CONSOLE'S SCENA-SPECIFIC PANELS.
+ *
+ * ⚠️ This file no longer renders a page. It exports the seven panels that are
+ * genuinely Scena's — the plan catalog, the AI model rates, the public track
+ * library, promo codes, the workspace list, the Stripe/config form and the
+ * factory reset — and `AdminDoor.tsx` mounts them as sections alongside the
+ * platform's own.
+ *
+ * What it used to be: a `TabsList` at `/admin` INSIDE the studio Shell. Two
+ * things were wrong with that and only one was cosmetic. `/api/admin/*` has
+ * been restricted to the `admin.` door since Stage 3, so in production the
+ * route rendered the whole console and then 404'd on every call. And a tab
+ * strip puts each subject one scroll apart with the rest invisible below —
+ * "Workspaces" lists every workspace, "Public library" every track.
+ *
+ * The panels themselves are unchanged apart from losing the `addOpen` prop the
+ * old shell threaded in to inject an "Add" into the page chrome. Both list
+ * panels already rendered their own Add button, so that was a duplicate
+ * control, not a lost one.
+ */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
@@ -7,7 +28,6 @@ import { Badge } from "../components/ui/badge.js";
 import { Switch } from "../components/ui/switch.js";
 import { Separator } from "../components/ui/separator.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -15,9 +35,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../components/ui/select.js";
-import { PageHeader } from "../components/page-header.js";
 import { StatTile, StatusDot, Pill, type Tone } from "../components/status.js";
-import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
 import { Loader2, Music, Ticket, Users, RefreshCw, AlertTriangle, CreditCard, Package, Sparkles, Tag, Search, Upload, Trash2, ImagePlus, Plus, Pencil } from "lucide-react";
 import { cn } from "../lib/utils.js";
@@ -58,17 +76,6 @@ import {
   type LibraryTrack,
 } from "../api.js";
 
-type Tab = "stripe" | "plans" | "models" | "library" | "promos" | "tenants" | "danger";
-const TABS: { id: Tab; label: string; icon: typeof CreditCard }[] = [
-  { id: "stripe", label: "Stripe & config", icon: CreditCard },
-  { id: "plans", label: "Plans", icon: Package },
-  { id: "models", label: "AI models", icon: Sparkles },
-  { id: "library", label: "Public library", icon: Music },
-  { id: "promos", label: "Promo codes", icon: Tag },
-  { id: "tenants", label: "Tenants", icon: Users },
-  { id: "danger", label: "Danger zone", icon: AlertTriangle },
-];
-
 const num = (n: number) => n.toLocaleString();
 
 /** A compact search field, matching the list pages' toolbar pattern. */
@@ -96,44 +103,7 @@ function Loading() {
   );
 }
 
-export function AdminPage() {
-  const [tab, setTab] = useState<Tab>("stripe");
-  // Each list tab injects its own primary "Add" action into the shell top bar
-  // (opening a dialog), so the header control matches the rest of the app.
-  const [addOpen, setAddOpen] = useState(false);
-  const actions =
-    tab === "library" ? [{ key: "add", label: "Add track", icon: <Plus className="size-4" />, onClick: () => setAddOpen(true) }]
-    : tab === "promos" ? [{ key: "add", label: "New code", icon: <Plus className="size-4" />, onClick: () => setAddOpen(true) }]
-    : [];
-  usePageChrome({ crumbs: [{ label: "Admin" }], actions }, [tab]);
-  return (
-    <div>
-      <PageHeader title="Admin" description="Stripe, catalog, credits, and tenants" />
-      <Tabs value={tab} onValueChange={(v) => { setTab(v as Tab); setAddOpen(false); }}>
-        <TabsList className="mb-5">
-          {TABS.map((t) => {
-            const Icon = t.icon;
-            return <TabsTrigger key={t.id} value={t.id}><Icon className="size-4" /> {t.label}</TabsTrigger>;
-          })}
-        </TabsList>
-        <TabsContent value="stripe"><StripeTab /></TabsContent>
-        <TabsContent value="plans"><PlansTab /></TabsContent>
-        <TabsContent value="models"><ModelsTab /></TabsContent>
-        <TabsContent value="library"><LibraryTab addOpen={addOpen} onAddOpenChange={setAddOpen} /></TabsContent>
-        <TabsContent value="promos"><PromosTab addOpen={addOpen} onAddOpenChange={setAddOpen} /></TabsContent>
-        <TabsContent value="tenants"><TenantsTab /></TabsContent>
-        <TabsContent value="danger"><DangerTab /></TabsContent>
-      </Tabs>
-    </div>
-  );
-}
-
-/**
- * Factory reset ("nuke") — WIPES ALL DATA and returns the deployment to a fresh
- * install. Two gates: an emailed one-time code, and a typed confirmation phrase.
- * On success the admin's own session is wiped too, so we bounce to the login.
- */
-function DangerTab() {
+export function DangerTab() {
   const [stage, setStage] = useState<"idle" | "sent">("idle");
   const [sentTo, setSentTo] = useState("");
   const [otp, setOtp] = useState("");
@@ -218,7 +188,7 @@ function DangerTab() {
 }
 
 /* -------------------------------- Stripe --------------------------------- */
-function StripeTab() {
+export function StripeTab() {
   const [cfg, setCfg] = useState<Record<string, string> | null>(null);
   const [ping, setPing] = useState<{ ok: boolean; account?: string; error?: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -384,7 +354,7 @@ function StripeTab() {
 }
 
 /* --------------------------------- Plans --------------------------------- */
-function PlansTab() {
+export function PlansTab() {
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [editing, setEditing] = useState<Plan | null>(null);
   const reload = () => adminListPlans().then(setPlans).catch(() => {});
@@ -608,7 +578,7 @@ const TASK_FILTERS: { id: string; label: string }[] = [
   { id: "music", label: "Music" },
 ];
 
-function ModelsTab() {
+export function ModelsTab() {
   const [models, setModels] = useState<AdminModel[] | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [q, setQ] = useState("");
@@ -723,15 +693,14 @@ function ModelRow({ model, onSave }: { model: AdminModel; onSave: (m: AdminModel
 }
 
 /* ---------------------------- Public library ----------------------------- */
-function LibraryTab({ addOpen, onAddOpenChange }: { addOpen: boolean; onAddOpenChange: (o: boolean) => void }) {
+export function LibraryTab() {
   const [tracks, setTracks] = useState<LibraryTrack[] | null>(null);
   const [q, setQ] = useState("");
-  // null = closed · "new" = add · a track = edit. The header "Add" toggles addOpen.
+  // null = closed · "new" = add · a track = edit.
   const [dialog, setDialog] = useState<LibraryTrack | "new" | null>(null);
   const reload = () => adminListLibrary().then((r) => setTracks(r.tracks)).catch(() => setTracks([]));
   useEffect(() => { reload(); }, []);
-  useEffect(() => { if (addOpen) setDialog("new"); }, [addOpen]);
-  const close = () => { setDialog(null); onAddOpenChange(false); };
+  const close = () => setDialog(null);
   if (!tracks) return <Loading />;
 
   const needle = q.trim().toLowerCase();
@@ -959,14 +928,13 @@ function audioFileDuration(file: File): Promise<number> {
 }
 
 /* -------------------------------- Promos --------------------------------- */
-function PromosTab({ addOpen, onAddOpenChange }: { addOpen: boolean; onAddOpenChange: (o: boolean) => void }) {
+export function PromosTab() {
   const [promos, setPromos] = useState<PromoCode[] | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const reload = () => adminListPromos().then(setPromos).catch(() => {});
   useEffect(() => { reload(); adminListPlans().then(setPlans).catch(() => {}); }, []);
-  useEffect(() => { if (addOpen) setDialogOpen(true); }, [addOpen]);
-  const close = () => { setDialogOpen(false); onAddOpenChange(false); };
+  const close = () => setDialogOpen(false);
   if (!promos) return <Loading />;
 
   return (
@@ -1122,7 +1090,7 @@ const TENANT_TONE: Record<string, Tone> = { active: "success", suspended: "muted
  *  from suspend/delete — nuking it would break the public demo. */
 const DEMO_TENANT_ID = "tenant_demo";
 
-function TenantsTab() {
+export function TenantsTab() {
   const [tenants, setTenants] = useState<AdminTenant[] | null>(null);
   const [overridesFor, setOverridesFor] = useState<string | null>(null);
   const [creditsFor, setCreditsFor] = useState<AdminTenant | null>(null);

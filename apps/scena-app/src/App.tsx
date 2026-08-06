@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router-dom";
 import { Siren, LogOut, Sun, Moon, Scale } from "lucide-react";
 import { ScenaMascot } from "./brand.js";
+import { adminUrl } from "@4dl/app-kit";
+import { useHost } from "./host.js";
+import { AdminDoor } from "./pages/AdminDoor.js";
 import { AppShell, type NavGroup } from "./components/app-shell.js";
 import { PageChromeProvider } from "./components/page-chrome.js";
 import { RoleProvider } from "./permissions.js";
@@ -37,7 +40,6 @@ import { AdsPage, AdProfileDetailPage } from "./pages/Ads.js";
 import { MusicPlaylistsPage, MusicPlaylistDetailPage } from "./pages/MusicPlaylists.js";
 import { WidgetProfilesPage } from "./pages/WidgetProfiles.js";
 import { SettingsPage } from "./pages/Settings.js";
-import { AdminPage } from "./pages/Admin.js";
 import { PairModal } from "./components/PairModal.js";
 import { toast } from "@4dl/ui";
 
@@ -155,6 +157,7 @@ function SidebarFooter({
 
 export function App() {
   const navigate = useNavigate();
+  const host = useHost();
   const [pairOpen, setPairOpen] = useState(false);
   const [emgOpen, setEmgOpen] = useState(false);
   const [emergency, setEmergency] = useState<ActiveEmergency | null>(null);
@@ -216,6 +219,26 @@ export function App() {
     navigate("/");
   };
 
+  /*
+    THE DOOR DECIDES BEFORE ANYTHING ELSE.
+
+    ⚠️ An UNRESOLVED host renders nothing, not the studio. Treating `null` as
+    "tenant" would mount the whole Shell for the length of one round trip and
+    then replace it — and on the operator's address that means flashing a
+    workspace at somebody who has none.
+
+    The operator console is standalone rather than a route inside the Shell for
+    the reason `AdminDoor.tsx` gives at length: `/api/admin/*` is refused on
+    every host but this one, so a console reachable from inside a workspace is a
+    console that 404s on every call. `/admin` was exactly that until now.
+  */
+  if (!host) return <Splash />;
+  if (host.role === "admin") {
+    if (!meLoaded) return <Splash />;
+    if (!me?.authenticated) return <LoginScreen onDone={reloadMe} />;
+    return <AdminDoor isAdmin={Boolean(me.isAdmin)} />;
+  }
+
   // Auth gate: not-loaded → spinner, unauthenticated → login, no active org →
   // onboarding, else the operator app.
   if (!meLoaded) {
@@ -244,7 +267,22 @@ export function App() {
       <AppShell
         navGroups={navGroups}
         active={active}
-        onNavigate={(key) => navigate(key === "screens" ? "/" : `/${key}`)}
+        onNavigate={(key) => {
+          /*
+            "Admin" is a DOOR, not a route.
+
+            It used to navigate to `/admin` inside this Shell, which rendered
+            the console and then 404'd on every call — `/api/admin/*` answers on
+            the `admin.` host and nowhere else. A full page load to the other
+            origin is the only honest destination, and it is what the console
+            actually has an address at.
+          */
+          if (key === "admin") {
+            window.location.href = adminUrl(host.rootDomain);
+            return;
+          }
+          navigate(key === "screens" ? "/" : `/${key}`);
+        }}
         fallbackCrumb={PAGE_META[active]?.title}
         onCrumb={(to) => navigate(to)}
         footer={(collapsed) => (
@@ -286,7 +324,6 @@ export function App() {
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/team" element={<TeamPage />} />
-              {me?.isAdmin && <Route path="/admin" element={<AdminPage />} />}
               <Route path="*" element={<NotFound onHome={() => navigate("/")} />} />
             </Routes>
           </div>

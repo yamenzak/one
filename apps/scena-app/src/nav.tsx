@@ -64,7 +64,10 @@ export const PAGE_META: Record<string, { title: string; subtitle: string }> = {
   billing: { title: "Billing", subtitle: "Plan, quotas, and AI credits" },
   music: { title: "Music playlists", subtitle: "Reusable clock-synced playlists, shared across channels" },
   ads: { title: "Ad profiles", subtitle: "Reusable rotations of audio, video, and command interrupts" },
-  admin: { title: "Admin", subtitle: "Stripe, catalog, credits, and tenants" },
+  // Kept because the sidebar item still needs a label, but it is no longer a
+  // page in this app: selecting it loads the `admin.` origin (App.tsx). The
+  // console lives there and nowhere else — see AdminDoor.tsx.
+  admin: { title: "Admin", subtitle: "The platform console, on its own address" },
   team: { title: "Team", subtitle: "Staff logins, roles, and access" },
   settings: { title: "Settings", subtitle: "Weather, locations, and integrations" },
 };

@@ -880,7 +880,7 @@ by the size of the fleet. Stage 3 added the `device` door to `@4dl/tenancy` for
 exactly this (`play.` — opt-in per app, because `play` is a slug a Kova studio
 can hold today); the player worker still binds no D1 or R2 of its own.
 
-**Status: Stages 0–6 done; 7–9 remain.** `SCHEMA_MODULES` in
+**Status: Stages 0–6 done, 7a+7b landed; the rest of 7 and 8–9 remain.** `SCHEMA_MODULES` in
 `apps/scena/src/db.ts` is the migration's progress bar — six entries now
 (`AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_RAIL_SCHEMA`, `STORAGE_SCHEMA`,
 `NOTIFY_SCHEMA`, `SCENA_SCHEMA`), and the diff that removes a table from Scena's
@@ -900,6 +900,14 @@ library, playlists, ads, tracks, manifest history and AI history — while the
 sweep reported success and emailed the owner to say otherwise. A purge swallows
 every delete error by construction (an old database may legitimately lack a
 table), which is why the check is structural rather than behavioural.
+
+⚠️ **The console is on `admin.` and NOWHERE else, as of Stage 7b.** It used to
+render at `/admin` inside the studio Shell on any host, while `/api/admin/*` has
+answered on the operator door only since Stage 3 — so in production it drew the
+whole console and 404'd on every call, exactly as Kova's did before that route
+was removed. `apps/scena-app/src/pages/AdminDoor.tsx` is the door;
+`pages/Admin.tsx` is now panels only. The sidebar's Admin item is a full page
+load to the other origin, because that is the console's only address.
 
 ⚠️ **The inbox has a server but no BELL yet.** `@4dl/notify` is wired
 end-to-end — schema, `InboxDO` (migration `v5`, class name permanent), the four

@@ -119,7 +119,7 @@ Splitting it, because "21,910 lines" is not a task and these are:
 | Sub-stage | Content | Est. |
 |---|---|---|
 | **7a** | `@4dl/ui` swap + delete the 860 lines of duplicated components + the shell | the foundation; everything else depends on it. **Part done — see §7a below.** |
-| **7b** | Admin → `@4dl/admin` section registry (1,448 → ~200) | biggest single win, lowest risk, no product logic |
+| **7b** | Admin → `@4dl/admin` section registry | **Done — but the 1,448 → ~200 estimate was wrong. See §7b.** |
 | **7c** | The four collection screens (Channels, Playlists, MusicPlaylists, Media) onto one `Collection` grammar | they are the same screen four times |
 | **7d** | Settings + Billing + Team + Alerts → index-and-page | the settings grammar, wholesale |
 | **7e** | ScreenDetail + Studio + LiveBoards — the product's core surfaces | most design judgement, do last when the vocabulary is settled |
@@ -212,3 +212,51 @@ track `loadFailed: boolean` and never captured the error, so "We couldn't reach
 the server." is the most honest thing available — it is accurate for a failed
 fetch and it is actionable. Carrying the real error is per-screen work in
 7c–7e, and it is the same fix as the eleven `catch(() => set…)` sites.
+
+
+---
+
+## 7b — the console moved doors, and the line count did not move much
+
+**The estimate in §5 said 1,448 → ~200, and that was wrong.** It came from
+Kova's console, whose seven tabs were all PLATFORM config — Stripe, email,
+domains, Turnstile, AI, maintenance, shared config — every one of which
+`@4dl/admin` already ships a panel for. Scena's seven are not the same seven.
+Five of them (plans, AI model rates, the public track library, promo codes, the
+workspace list) manage **Scena's own catalog**, and no shared panel exists or
+should: a design system that knew what a licensed track was would not be one.
+
+So `Admin.tsx` went 1,389 → 1,357 lines. What was actually deleted is the ~90
+lines of tab shell; what was added is a 239-line `AdminDoor.tsx` that is mostly
+a section registry and its prose.
+
+**The win is not line count.** It is three things:
+
+1. **A production 404 is closed.** The console rendered at `/admin` INSIDE the
+   studio Shell, on any host, while `/api/admin/*` has been restricted to the
+   `admin.` door since Stage 3. In production that route drew the whole console
+   and then failed on every call it made. It is the exact failure CLAUDE.md
+   records Kova having and removing, and it is invisible in dev, where one root
+   means the guard correctly stands down (`isDevRoot`). The sidebar's "Admin"
+   item is a full page load to the other origin now, because that is the only
+   address the console has.
+2. **Six sections that did not exist.** Email delivery, the shared platform
+   config store, custom domains, the bot check, maintenance, and the Stripe
+   rail's dead letter — the last of which Stage 4b created the table for and
+   gave nothing that could read one back. Four route factories had to be mounted
+   on the worker for them (`emailAdminRoutes`, `sharedConfigRoutes`,
+   `railAdminRoutes`, `maintenanceAdminRoutes`); Scena had none of them, so six
+   of the console's thirteen sections would have called routes that were never
+   registered. `apps/scena/test/integration.test.ts` now fails if any of the six
+   endpoints is unmounted — mutation-verified.
+3. **A tab strip became an index and a page per section.** Kova's console
+   measured 61,541px in its first tab on a seeded install with the other six
+   invisible below it; Scena's "Workspaces" lists every workspace and "Public
+   library" every track. The open section is in the URL over the History API, so
+   it is linkable, bookmarkable and survives a reload.
+
+**Still Scena's, deliberately:** the `stripe` section. `@4dl/admin`'s
+`PlatformStripeSection` calls `/admin/stripe/config` and `/status`; Scena has
+`/ping` and keeps its keys in `/api/admin/config`. Reconciling those is the same
+shape of work as the `ai_models` catalog Stage 5 deferred, and for the same
+reason — it is a data change, not a wiring one.
