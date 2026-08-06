@@ -289,6 +289,12 @@ loud, which is the only kind this repo has actually had.
   builds and deploys from separate clean checkouts so production is unaffected,
   but a local checkout that has just run the suite holds a player pointed at a
   test port: build again before deploying by hand.
+  **Scena has a THIRD config, `pnpm --filter @scena/e2e shots`** — the same
+  split again, and for the same two reasons: it needs the operator lane (so the
+  images are of the plan being sold rather than of the free tier's one screen
+  and locked boards), and it takes minutes. It builds a furnished workspace
+  through the real API, pairs two REAL players on the device door, and sweeps
+  every surface at desktop/narrow × light/dark into `apps/scena-e2e/shots-out/`.
 - `pnpm shots` — the SCREENSHOT suite (`apps/e2e/shots`,
   `shots.config.ts`). Seeds one demo studio through the real API — a comped
   `pro` plan, a ten-person roster, six weeks of a client's history, a published
@@ -850,13 +856,30 @@ The vision suite is still dead until `google.gemini_key` is set
 
 See SPEC §13 for the phase map.
 
-## Scena — the third app, mid-migration
+## Scena — the third app
 
 **Scena is cloud digital-signage SaaS**, imported from its own repo at `0cff6c6`
-and being rewired onto the shared packages stage by stage.
-**[docs/SCENA-REWRITE.md](docs/SCENA-REWRITE.md) is the plan** — what is kept,
-what is rewired, the six decisions and their rationale, and the ten stages. Read
-it before touching anything under `apps/scena*` or `packages/scena-*`.
+and rewired onto the shared packages stage by stage.
+
+**Everything Scena is lives in [SCENA.md](SCENA.md)**: Part I the product (the
+clock, the doors, pairing, manifests, plans, roles), Part II how it is built
+(layout, the seven DOs, the schema order, derived erasure, the theme, the test
+suites), **Part III the screen index** — every surface, per door, mapped to
+`file:line`. **Looking for the file that draws a screen? Part III.** Grepping
+for a screen's name usually fails: several routes render different files per
+persona, and most sub-surfaces live inside their parent's file. **Update it in
+the same commit as any screen you add or move.**
+
+Two neighbours: **[docs/SCENA-REWRITE.md](docs/SCENA-REWRITE.md) is the plan** —
+what was kept, what was rewired, the six decisions and their rationale, and the
+ten stages — and **[docs/SCENA-UI-INVENTORY.md](docs/SCENA-UI-INVENTORY.md)** is
+the record of the UI rewrite, one section per sub-stage, each naming the defects
+it closed. **[apps/scena/DEPLOY.md](apps/scena/DEPLOY.md)** is how it ships, and
+it is genuinely different from the other two apps' — Scena deploys **two workers
+and a marketing site**, and `tv.4dl.app` (where the player bundle is served) and
+`play.scena.4dl.app` (the device door the bundle calls) are two different things
+that both have to exist. Read the relevant one before touching anything under
+`apps/scena*` or `packages/scena-*`.
 
 **The idea the whole product rests on is one line**, and nothing in the migration
 touches it:
@@ -904,8 +927,9 @@ by the size of the fleet. Stage 3 added the `device` door to `@4dl/tenancy` for
 exactly this (`play.` — opt-in per app, because `play` is a slug a Kova studio
 can hold today); the player worker still binds no D1 or R2 of its own.
 
-**Status: Stages 0–7 done (7a–7g), Stage 8's E2E harness landed; the shots
-suite, the rest of 8 and Stage 9 remain.** `SCHEMA_MODULES` in
+**Status: Stages 0–9 done.** The E2E gate, the wall spec, the screenshot suite
+and the docs (`SCENA.md`, `apps/scena/DEPLOY.md`, this section) all landed.
+`SCHEMA_MODULES` in
 `apps/scena/src/db.ts` is the migration's progress bar — six entries now
 (`AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_RAIL_SCHEMA`, `STORAGE_SCHEMA`,
 `NOTIFY_SCHEMA`, `SCENA_SCHEMA`), and the diff that removes a table from Scena's

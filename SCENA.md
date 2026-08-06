@@ -1,0 +1,447 @@
+# SCENA.md
+
+**Scena** — cloud digital signage. The third app on this repo's shared platform,
+imported from its own repository and rewired onto the `@4dl/*` packages.
+
+This file is the product and technical spec, and **Part III is the screen index**
+— every surface, per door, mapped to `file:line`. Grepping for a screen's name
+usually fails: several routes render different files depending on the persona,
+and most sub-surfaces live inside their parent's file. **Update Part III in the
+same commit as any screen you add or move.**
+
+Two neighbours to read first:
+[docs/SCENA-REWRITE.md](docs/SCENA-REWRITE.md) is the migration plan — what was
+kept, what was rewired, the six decisions and their rationale.
+[docs/SCENA-UI-INVENTORY.md](docs/SCENA-UI-INVENTORY.md) is the record of the UI
+rewrite, one section per sub-stage, each naming the defects it closed.
+[apps/scena/DEPLOY.md](apps/scena/DEPLOY.md) is how it ships.
+
+---
+
+# Part I — The product
+
+## 1. The idea, in one line
+
+```
+position(t) = (t − T0) mod cycleLength
+```
+
+The server never says "show slide 3 now". Playout is a **pure function of a
+synced clock**, which is why multi-screen sync, offline playback and live
+updates are one mechanism rather than three features:
+
+- **Sync** falls out for free. Two screens with the same manifest and the same
+  clock compute the same slide, with no coordination between them at all.
+  Measured cross-screen skew: **0.3 ms**.
+- **Offline** falls out for free. A screen with a cached manifest and a
+  wall-clock bridge keeps playing correctly with no server, for as long as its
+  lease allows.
+- **Live updates** are a nudge, not a push of content. The server says "refetch";
+  the screen fetches the pointed manifest snapshot and recomputes.
+
+`packages/scena-timeline` is that function, and it is **pure — zero
+dependencies, no I/O, no DOM, no platform APIs.** The compiler, the player and
+the tests all run byte-identical code. Nothing in the migration touched it and
+nothing should.
+
+## 2. What a customer buys
+
+A **workspace** on its own subdomain, some number of **screens**, and the tools
+to decide what those screens show:
+
+- **Displays** — a screen and the channel bound to it. A newly paired device is
+  auto-wired its own editable display (a channel composing a fresh slide
+  playlist, music playlist and widget profile), so an operator adds content in
+  one place instead of assembling and binding a graph across five pages.
+- **Building blocks** — slide playlists, music playlists, widget profiles, the
+  media library, data sources and ad profiles. Reusable, shared across channels.
+  You compose these when you scale; you do not start here.
+- **Live boards** — queue, room-status and scoreboard boards. Each issues its own
+  logins and is bound to a screen through a widget.
+- **Insights** — proof-of-play analytics, and health alerts driven by each
+  screen's dead-man's switch.
+
+## 3. The five doors
+
+**The host IS the tenancy.** `@4dl/tenancy`'s `classifyHost` sorts every hostname
+into a door, and the route guard, the auth context and the app's entry routing
+all read that classification rather than a path prefix. Read
+`packages/tenancy/README.md` before touching anything routing-shaped.
+
+| Host | Door | What answers there |
+|---|---|---|
+| `scena.4dl.app` | root | A signpost. Not an app; refuses to send a sign-in code. |
+| `setup.scena.4dl.app` | setup | The **only** place a workspace is created. |
+| `admin.scena.4dl.app` | admin | The operator console. `/api/admin/*` answers here and nowhere else. |
+| `<slug>.scena.4dl.app` | tenant | A workspace. The tenancy is pinned by this host. |
+| a workspace's own domain | custom | The same workspace, on a domain it owns. |
+| `play.scena.4dl.app` | **device** | Pairing, manifests and assets. **No session.** |
+
+**The device door is Scena's, and it is why the door model has six entries
+rather than five.** A screen is a DEVICE: one pinned URL, Service-Worker-cached,
+running for months offline. It resolves no tenant from its host — the tenant
+arrives from the pairing claim. The route guard skips the whole member/standing
+engine for it. Everywhere else those routes answer `{"error":"wrong_door"}`,
+which the player surfaces as *"offline — no cached channel yet"*, two steps
+removed from its cause.
+
+The door is **opt-in per app** (`play` is a slug a Kova studio could hold today),
+and `DEFAULT_DEVICE_LABEL` is `"play"`.
+
+## 4. The player is a separate worker, on a separate origin
+
+`apps/scena-player` has its own `wrangler.jsonc`, its own origin, and binds no
+D1 or R2 of its own. That is the design, not a convenience:
+
+- A screen has **one pinned URL**. A tenant subdomain would give every
+  workspace's screens a different address, so re-pairing would orphan the
+  Service Worker cache, and custom domains would multiply certificates by the
+  size of the fleet.
+- **It is dependency-free on purpose.** Its `package.json` lists only workspace
+  packages. It is a TV render loop plus a Service Worker and it needs full
+  control of both; a well-meaning `@4dl/app-kit` import for its fetch layer would
+  put React-shaped weight on a device with 512 MB of RAM.
+
+⚠️ **`API_BASE` is baked in at BUILD time** from `VITE_API_BASE`, a variable set
+nowhere in this repo — so `apps/scena-player/src/config.ts`'s fallback is what
+actually ships to televisions. It must be the **device door**. It was
+`http://localhost:8787` once, which is unreachable from a TV and, in this
+monorepo, *Kova's* port. `scripts/player-api-base.test.mjs` (in `pnpm gate`)
+now asserts the fallback is https, is not a local address, starts with `play.`
+and names Scena — each a mistake this repo has made or come one edit from making.
+
+## 5. Pairing, and what a screen is allowed to do
+
+1. The player POSTs `/api/screen/new` on the **device door**. The response
+   reserves a `ScreenDO` and returns a pairing **code** and a WebSocket path.
+   The reservation is persisted in `localStorage` under `scena.screen`.
+2. The player draws the code and opens the socket.
+3. An operator submits the code from the dashboard: `POST /api/pair/claim`.
+   A **new** device counts against `quotas.pairedDevices`; a **re-pair** (a
+   device already on this tenant, e.g. one that was unpaired) does not —
+   otherwise an unpaired screen could not be paired again without deleting it.
+4. A new device is auto-wired its own display, optionally seeded with the sample
+   scene. A re-pair keeps whatever the device was already showing.
+
+⚠️ **The reservation POST is a SIMPLE cross-origin request** — no custom headers,
+so no preflight. The worker's CORS allows `content-type` and nothing else, so
+adding any header turns it into a preflighted request the worker refuses, and
+the player then renders "offline — no cached channel yet" with nothing in the
+log that looks like a failure. (This is documented in
+`apps/scena-e2e/src/screen.ts`, where a test helper hit it.)
+
+**The server is authoritative about whether a screen may play.** If the DO
+reports anything other than `assigned` while the player is already playing, the
+player wipes its cached channel and assets and reloads to pairing. An
+`OFFLINE_LEASE_MS` of 14 days bounds how long a disconnected screen keeps
+playing — long enough for any real outage, short enough that unplugging a device
+cannot dodge the paid-screen limit forever.
+
+## 6. Manifests, versions and publishing
+
+A **channel** composes a slide playlist, a music playlist and a widget profile.
+Publishing snapshots a **manifest version** into `manifest_versions` and moves a
+KV pointer; screens run the pointed snapshot, so rollback is a repoint rather
+than a recompile.
+
+- `POST /api/channels/:id/publish` → `{ version, hash, nudged }`.
+- The nudge fans out to every screen subscribed to the channel; each refetches
+  the pointed snapshot. **Always refetch on a nudge** — a publish may change the
+  widget layer without bumping the version the nudge carries.
+- The first fetch of a never-published channel **lazily publishes v1**, so
+  history always exists. (This is worth knowing: it means a channel can already
+  have a manifest before anyone pressed Publish.)
+- A **suspended** workspace's screens get a holding-card manifest instead. The
+  manifest route is device-facing with no session, so the owning tenant is
+  resolved from the channel row.
+
+⚠️ **The R2 key is the CONTENT HASH, and that is not a detail to tidy.** The
+compiled manifest references an asset by hash, the player caches
+`/api/assets/<hash>` immutably for months offline, and `library_tracks` is a
+platform-wide catalog every workspace draws from — a tenant-prefixed key would
+break all three. `@4dl/storage`'s ledger row is qualified instead
+(`PutMediaInput.ledgerKey` = `<tenantId>:<hash>`): one row per tenant per object,
+one copy in the bucket. The bucket deduplicates; the accounting does not.
+
+`apps/scena/src/storage.ts` is the ONE module that may touch `MEDIA`, and
+`scripts/storage-chokepoint.test.mjs` (in `pnpm gate`) fails on a bare
+`MEDIA.put` anywhere else — an object written behind the ledger is invisible to
+the quota and to erasure, forever, and nothing else would notice.
+
+## 7. Plans and entitlements
+
+Four plans, seeded by `apps/scena/src/billing-seed.ts`. `free` is the parking
+state; the paid tiers are `starter`, `pro`, `business`.
+
+| | free | starter | pro | business |
+|---|---|---|---|---|
+| price / month | — | $19 | $49 | $149 |
+| paired devices | 1 | 3 | 15 | 60 |
+| seats | 1 | 3 | 10 | ∞ |
+| widget profiles | 1 | 1 | 3 | 10 |
+| channels per profile | 1 | 3 | 4 | 8 |
+| slides per playlist | 10 | 30 | 60 | — |
+| data sources | 0 | 2 | 8 | 25 |
+| live boards | 0 | 0 | 3 | 20 |
+| storage | 100 MB | 2 GB | 20 GB | 100 GB |
+| AI credits / month | 0 | 250 | 1,000 | 5,000 |
+
+Two consequences worth stating because they surprised a test harness into
+thinking the product was broken:
+
+- **Each display provisions its own widget profile**, named after it. Three
+  displays on `pro` therefore use all three profiles, and a fourth is refused.
+  That is the quota working.
+- **An owner cannot issue or call a queue ticket.** A board provisions its own
+  coordinator and station USERS, and `canControlBoard` admits one of those or a
+  board-scoped token. The people who press those buttons are a receptionist at a
+  desk and a tablet bolted to a wall, not whoever pays the bill. Mint the kiosk
+  or station token instead.
+
+`business` sells `customDomain`; the rest of the feature flags gate widgets
+(`ticker`, `clockAnalog`, `weather`, `widgetStack`, `htmlSandbox`), scheduling
+(`dayparting`), boards (`roomQueueManagement`), reporting (`proofOfPlay`),
+alerting (`alertsWebhook`, `alertsEmail`), `aiGeneration`, `ads`, `musicLibrary`
+and `multiScreenSync`. `screenSaver` and `emergencyOverride` are on for
+everyone, deliberately: neither is a thing to withhold from a screen in a lobby.
+
+## 8. Roles
+
+`apps/scena/src/access.ts`. Six roles, four of them invitable:
+
+- **owner** — everything, including billing and closing the workspace.
+- **operator** — the day-to-day content and fleet role.
+- **receptionist** — the front-desk role.
+- **viewer** — read.
+- **board_coordinator** / **board_station** — **provisioned, not invited.** A
+  board creates them, and they are **seat-free**: a queue needs a station login
+  per counter before a single person is hired, so charging a staff seat for a
+  tablet would price the feature out of the use case it exists for.
+
+---
+
+# Part II — How it is built
+
+## 9. Layout
+
+```
+apps/
+  scena/         # THE worker — Hono + seven DOs; serves the dashboard SPA
+  scena-app/     # the operator dashboard (React 19 SPA)
+  scena-player/  # the SCREEN. Its own worker and its own origin (§4)
+  scena-www/     # marketing
+  scena-e2e/     # Playwright — the gate, the wall, and the screenshot suite
+packages/
+  scena-timeline/  # @scena/timeline — the pure clock engine. ZERO deps.
+  scena-manifest/  # @scena/manifest — Zod schema + canonical JSON + SHA-256
+  scena-widgets/   # @scena/widgets — the pure widget core, shared by the
+                   # player's DOM renderer and the builder's React preview
+  scena-protocol/  # @scena/protocol — screen⇄DO + board WS message types
+  scena-brand/     # @scena/brand — mascot + marks (the player uses it)
+```
+
+## 10. Durable Objects
+
+Seven bindings, in `apps/scena/wrangler.jsonc`.
+
+| Binding | Class | What it is |
+|---|---|---|
+| `SCREEN` | `ScreenDO` | One per screen: pairing state, the live socket, the dead-man's switch. |
+| `CHANNEL` | `ChannelDO` | Per-channel coordination. |
+| `QUEUE` | `QueueDO` | A queue board's live state. |
+| `ROOM` | `RoomBoardDO` | A room-status board. |
+| `SCORE` | `ScoreDO` | A scoreboard. |
+| `BILLING` | `TenantBillingDO` | The authoritative credit balance (`@4dl/billing` subclass). |
+| `INBOX` | `InboxDO` | **One DO per USER, not per tenant** — it holds that person's open sockets. |
+
+⚠️ **Every class name above is PERMANENT.** A migration binds each to durable
+storage, so renaming one orphans every workspace's balance or every user's
+inbox — the DO comes up empty and nothing says why.
+
+## 11. The schema, and why its order matters
+
+`SCHEMA_MODULES` in `apps/scena/src/db.ts` is the migration's progress bar. Six
+entries today: `AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_RAIL_SCHEMA`,
+`STORAGE_SCHEMA`, `NOTIFY_SCHEMA`, `SCENA_SCHEMA`. **The diff that removes a
+table from Scena's own module is the same diff that adds its package here.**
+
+⚠️ **Order in that list IS dependency order, and a wrong order does not fail.**
+`NOTIFY_SCHEMA` ALTERs `tenant_settings`, which `@4dl/tenancy` creates. Run
+first, the ALTER hits a table that does not exist, the composed runner swallows
+it, and an owner's email veto silently never persists.
+
+Two modules are **deliberately still Scena's**, both for the same reason, and
+the plan names them so nobody "fixes" them casually: the billing STORE
+(`BILLING_SCHEMA`) and the `ai_models` CATALOG (`AI_SCHEMA`). Both packages'
+tables share a NAME with Scena's and differ in COLUMNS — `price_cents` +
+`currency` + `interval` against `price_usd_month`, a `cf_model` column against
+an `id` that IS the provider id. A `CREATE TABLE IF NOT EXISTS` is won by
+whichever module runs first and the loser's columns silently never exist, which
+is exactly how a fresh Stage 1 deployment ended up unable to save any setting.
+Adopting either means reconciling the shapes first — a data change, not a wiring
+one.
+
+## 12. Erasure is DERIVED
+
+`apps/scena/src/purge.ts` reads `tenantCascade(SCHEMA_MODULES)`;
+`apps/scena/test/purge-cascade.test.ts` fails on a table that carries a scope
+column and declares none.
+
+The hand-written list it replaced named **seven** tables against a declaration
+of **twenty-five**, so a deleted workspace kept its media library, playlists,
+ads, tracks, manifest history and AI history — while the sweep reported success
+and emailed the owner to say otherwise. A purge swallows every delete error by
+construction (an old database may legitimately lack a table), which is why the
+check is structural rather than behavioural.
+
+## 13. The theme is an ATTRIBUTE, not a class
+
+`@4dl/ui`'s tokens are **dark-first**: `:root` is the dark palette and the light
+one lives under `:root[data-theme="light"]`. `apps/scena-app/src/theme.tsx`
+stamps `data-theme` on `<html>`; there is no `.dark` class.
+
+Two silent regressions came out of that move and `apps/scena-app` has a test
+suite whose whole job is that neither can come back:
+
+- `className="dark"` became **inert**, so the kiosk and the counter tablet
+  stopped being dark. `useForcedDark()` is the replacement, and it restores the
+  previous attribute on unmount.
+- `brandCss` kept emitting `:root { …light… }` / `.dark { …dark… }`, so **a
+  tenant's dark tokens applied nowhere and their light tokens were injected into
+  the dark theme.** Both halves compiled and rendered; only the colours
+  disagreed.
+
+## 14. A failed poll is only shown while there is nothing to show
+
+The rule the UI rewrite produced, and the one every polling screen now follows.
+Roughly twenty swallowed failures went with it, all the same shape: a `catch`
+that answers a failure with a confident fact. `catch(() => [])` on a two-second
+poll rendered "Create your first live board" over a workspace with five;
+`catch(() => setFeed(null))` made a dropped connection indistinguishable from a
+deleted record.
+
+## 15. Tests
+
+- **`pnpm test`** — the Miniflare integration suite (`apps/scena/test`) plus
+  `apps/scena-app`'s conformance tests. Build the SPA first; `turbo.json`
+  declares the `@4dl/scena#test` → `@scena/app#build` edge so anything going
+  through turbo does it for you.
+- **`pnpm --filter @scena/e2e e2e`** — the launch gate, on :8789 (+ :8790 for the
+  player). Runs against **the authorization the product ships**.
+- **`pnpm --filter @scena/e2e wall`** — the two-screens spec. Needs a paid plan,
+  so it runs the worker with an empty `ADMIN_EMAILS` to reach the development
+  platform-admin lane. **The gate must never have that lane**: a gate that hands
+  itself platform admin cannot see an authorization bug.
+- **`pnpm --filter @scena/e2e shots`** — the screenshot suite, four projects
+  (desktop/narrow × light/dark). Same split, same reason, plus a plan big enough
+  that the images are of the product being sold rather than of the free tier.
+
+Ports are not taste: Kova owns 8787, Tessa 8788, Scena 8789 + 8790. Sharing one
+makes whichever suite runs second drive another product's worker, and it fails
+as "element not found" rather than as a conflict. The same is true of wrangler's
+default devtools inspector on 9229, so Scena pins 9231 and 9232.
+
+---
+
+# Part III — The screen index
+
+Every surface, mapped to the file that draws it. Routes are declared in
+`apps/scena-app/src/App.tsx:304-327`.
+
+## The workspace door — `<slug>.scena.4dl.app`
+
+| Route | Screen | File |
+|---|---|---|
+| `/` | Screens (the fleet) | `apps/scena-app/src/pages/Screens.tsx` |
+| `/screens/:id` | One screen | `apps/scena-app/src/pages/ScreenDetail.tsx` |
+| `/screens/:id/studio` | Studio, screen-scoped | `apps/scena-app/src/pages/Studio.tsx` (`mode="screen"`) |
+| `/displays/:channelId` | Studio, display-scoped | `apps/scena-app/src/pages/Studio.tsx` (`mode="display"`) |
+| `/widgets` | Widget builder | `apps/scena-app/src/pages/WidgetBuilder.tsx` |
+| `/channels` | Channels | `apps/scena-app/src/pages/Channels.tsx` |
+| `/channels/:id` | One channel | `apps/scena-app/src/pages/Channels.tsx` (detail half) |
+| `/playlists` | Slide playlists | `apps/scena-app/src/pages/Playlists.tsx` |
+| `/playlists/:id` | One slide playlist | `apps/scena-app/src/pages/Playlists.tsx` (detail half) |
+| `/media` | Media library | `apps/scena-app/src/pages/MediaLibrary.tsx` |
+| `/music` | Music playlists | `apps/scena-app/src/pages/MusicPlaylists.tsx` |
+| `/music/:id` | One music playlist | `apps/scena-app/src/pages/MusicPlaylists.tsx` (detail half) |
+| `/profiles` | Widget profiles | `apps/scena-app/src/pages/WidgetProfiles.tsx` |
+| `/boards` | Live boards | `apps/scena-app/src/pages/LiveBoards.tsx` |
+| `/feeds` | Sources | `apps/scena-app/src/pages/Feeds.tsx` |
+| `/feeds/:id` | One source | `apps/scena-app/src/pages/Feeds.tsx` (detail half) |
+| `/ads` | Ad profiles | `apps/scena-app/src/pages/Ads.tsx` |
+| `/ads/:id` | One ad profile | `apps/scena-app/src/pages/Ads.tsx` (detail half) |
+| `/analytics` | Analytics | `apps/scena-app/src/pages/Analytics.tsx` |
+| `/alerts` | Alerts | `apps/scena-app/src/pages/Alerts.tsx` |
+| `/billing` | Billing | `apps/scena-app/src/pages/Billing.tsx` |
+| `/settings` | Settings | `apps/scena-app/src/pages/Settings.tsx` |
+| `/team` | Team | `apps/scena-app/src/pages/Team.tsx` |
+| anything else | Not found | `apps/scena-app/src/App.tsx` (`NotFound`) |
+
+**Not routes.** The pair-a-screen dialog is opened from the fleet's header
+action; below `sm` the app-shell collapses every header action into one ⋮ menu,
+so there are two affordances for it and both are the product. The emergency
+takeover and the theme toggle live in the sidebar footer
+(`apps/scena-app/src/App.tsx`, `SidebarFooter`).
+
+**The sidebar registry is `apps/scena-app/src/nav.tsx`** — five groups
+(Displays, Building blocks, Live boards, Insights, Account), with **Admin
+appended for platform admins only**. `navForRole` filters by role, entitlements
+and grants, and `PAGE_META` carries each key's title and subtitle.
+
+## The other doors
+
+| Door | Screen | File |
+|---|---|---|
+| setup | Sign in / create a workspace | `apps/scena-app/src/pages/Login.tsx` |
+| admin | The operator console | `apps/scena-app/src/pages/AdminDoor.tsx` → `pages/Admin.tsx` |
+| device (`play.`) | The screen itself | `apps/scena-player/src/main.ts` |
+
+⚠️ **The console is on `admin.` and NOWHERE else.** It used to render at `/admin`
+inside the workspace shell on any host, while `/api/admin/*` has answered on the
+operator door only since Stage 3 — so in production it drew the whole console and
+404'd on every call, exactly as Kova's did before that route was removed. The
+sidebar's Admin item is a **full page load** to the other origin, because that is
+the console's only address.
+
+## Token-gated surfaces
+
+These are reached with a board-scoped token rather than a session, and they are
+**dark by design** — they hang in a lobby or sit on a counter, and they are not
+somebody's dashboard to have opinions about.
+
+| Path | Screen | File |
+|---|---|---|
+| `/kiosk?token=&board=` | Take-a-ticket | `apps/scena-app/src/pages/Kiosk.tsx` |
+| `/station?token=&board=` | The counter tablet | `apps/scena-app/src/pages/Station.tsx` |
+| (role-routed) | Board control | `apps/scena-app/src/pages/BoardControlApp.tsx` |
+
+## The player
+
+One page, one render loop. `apps/scena-player/src/main.ts` wires it: the socket
+(`socket.ts`), playout (`player.ts`), music (`music.ts`), the ad and emergency
+overlays, the announcer, the screensaver, and the **debug overlay**
+(`hud.ts`, toggled with `d` or the `debug.on` command), which exists to make
+"same clock ⇒ same slide" observable by putting two players side by side.
+
+⚠️ Playout is a `requestAnimationFrame` loop, and **Chromium does not run rAF in
+a background page.** Any tool that drives two players at once has to foreground
+one before reading its frame, or the overlay reports `slide — (no manifest)`
+forever — which names the wrong subsystem entirely.
+
+---
+
+## Status
+
+**Stages 0–8 are done.** The E2E harness, the wall spec and the screenshot suite
+all run. Stage 9 (this file, `apps/scena/DEPLOY.md`, the CLAUDE.md section) is
+the last of the plan.
+
+**Deliberately not adopted yet**, each for a stated reason: the billing STORE and
+the `ai_models` catalog (§11 — a column collision, not a wiring gap), and the
+`NotificationBell` / `InboxScreen` surfaces from `@4dl/app-kit` (the server side
+of the inbox is wired end to end; until the bell lands, a notification is
+reachable at `GET /api/notifications`).
+
+**Resource ids in `apps/scena/wrangler.jsonc` are placeholders** — the old
+account's real ids were replaced — so `deploy.yml` SKIPS Scena until the Provision
+workflow has run. See [apps/scena/DEPLOY.md](apps/scena/DEPLOY.md).
