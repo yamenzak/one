@@ -134,27 +134,27 @@ test("the operator's workspace", async () => {
   });
 
   await test.step("analytics", async () => {
-    await visit(page, `${base}/analytics`, page.getByRole("heading", { name: "Analytics" }));
+    await visit(page, `${base}/analytics`, page.getByRole("heading", { name: "Analytics", exact: true }));
     await shoot(page, project, "analytics", { settle: 800 });
   });
 
   await test.step("alerts", async () => {
-    await visit(page, `${base}/alerts`, page.getByRole("heading", { name: "Alerts" }));
+    await visit(page, `${base}/alerts`, page.getByRole("heading", { name: "Alerts", exact: true }));
     await shoot(page, project, "alerts", { settle: 600 });
   });
 
   await test.step("billing", async () => {
-    await visit(page, `${base}/billing`, page.getByRole("heading", { name: "Billing" }));
+    await visit(page, `${base}/billing`, page.getByRole("heading", { name: "Billing", exact: true }));
     await shoot(page, project, "billing", { settle: 800 });
   });
 
   await test.step("the team", async () => {
-    await visit(page, `${base}/team`, page.getByRole("heading", { name: "Team" }));
+    await visit(page, `${base}/team`, page.getByRole("heading", { name: "Team", exact: true }));
     await shoot(page, project, "team", { settle: 600 });
   });
 
   await test.step("settings", async () => {
-    await visit(page, `${base}/settings`, page.getByRole("heading", { name: "Settings" }));
+    await visit(page, `${base}/settings`, page.getByRole("heading", { name: "Settings", exact: true }));
     await shoot(page, project, "settings", { settle: 600 });
   });
 

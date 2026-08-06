@@ -74,14 +74,19 @@ export async function shoot(page: Page, project: string, name: string, opts: Sho
  * immediately produces a convincing photograph of "no boards yet" over a
  * workspace with three.
  *
- * ⚠️ A GENEROUS timeout, because every visit is a FULL PAGE LOAD. The sweep
+ * A generous timeout, because every visit is a FULL PAGE LOAD. The sweep
  * deep-links each screen by URL rather than clicking through the nav — a click
  * that silently missed would photograph the previous screen under the next
  * one's name — so each one re-boots the SPA, re-resolves the session and
- * re-fetches. With two players holding WebSockets and polling alongside, one of
- * those cold boots crossing 30 s is contention, not a broken screen, and it
- * failed as "the heading never appeared" on a page whose own failure snapshot
- * showed the heading.
+ * re-fetches, with two players holding WebSockets alongside.
+ *
+ * ⚠️ AND `getByRole(..., { name })` IS A SUBSTRING MATCH BY DEFAULT. Pass
+ * `exact: true` for any heading whose words recur further down the page.
+ * `{ name: "Alerts" }` also matched the "Recent alerts" section heading, and two
+ * matches is a strict-mode violation that surfaces here as an ordinary timeout —
+ * "the heading never appeared", on a page whose own failure snapshot showed the
+ * heading, twice, in plain sight. Raising the timeout does not fix it and
+ * spending two runs proving that is how this note came to be written.
  */
 export async function visit(page: Page, url: string, ready: Locator): Promise<void> {
   await page.goto(url);
