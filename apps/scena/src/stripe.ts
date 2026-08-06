@@ -213,10 +213,40 @@ interface StripeEvent {
   data: { object: Record<string, unknown> };
 }
 
-/** Process a verified webhook event (§25). */
+/**
+ * Process a verified, ATTRIBUTED webhook event (§25).
+ *
+ * Called by `@4dl/billing-rail`'s dispatcher, which has already verified the
+ * signature, claimed the event id (so a Stripe retry is not applied twice) and
+ * decided the event is Scena's. What is left is deciding WHOSE.
+ *
+ * ⚠️ THIS USED TO FALL BACK TO `DEMO_TENANT`. An event whose metadata did not
+ * carry `scena_tenant` — one of Scena's own where it did not survive, or one
+ * belonging to another app before the rail existed — was applied to a real
+ * workspace: its plan changed, its balance was topped up, its dunning state
+ * moved. A guess about whose money this is has no right answer, so there is no
+ * fallback now: resolve by metadata, then by Stripe customer id, then give up
+ * loudly. Throwing releases the rail's claim on the event id, so Stripe retries
+ * — which is what should happen when the answer might arrive with better data.
+ */
+async function tenantOfEvent(env: Env, obj: Record<string, unknown>): Promise<string> {
+  const fromMeta = metaOf(obj)["scena_tenant"];
+  if (typeof fromMeta === "string" && fromMeta) return fromMeta;
+  const customer = typeof obj["customer"] === "string" ? obj["customer"] : null;
+  if (customer) {
+    const row = await env.DB
+      .prepare("SELECT tenant_id FROM subscriptions WHERE stripe_customer_id = ?")
+      .bind(customer)
+      .first<{ tenant_id: string }>()
+      .catch(() => null);
+    if (row?.tenant_id) return row.tenant_id;
+  }
+  throw new Error(`stripe event carries no resolvable tenant (customer=${customer ?? "none"})`);
+}
+
 export async function handleWebhook(env: Env, event: StripeEvent): Promise<void> {
   const obj = event.data.object;
-  const tenantId = (metaOf(obj)["scena_tenant"] as string) || DEMO_TENANT;
+  const tenantId = await tenantOfEvent(env, obj);
 
   switch (event.type) {
     case "checkout.session.completed": {

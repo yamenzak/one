@@ -603,6 +603,201 @@ describe("what a plan bought, as the app actually reads it", () => {
   });
 });
 
+describe("the credit ledger", () => {
+  /** A fresh, isolated credit DO. Its id is arbitrary — the DO IS the tenant. */
+  const ledger = (name: string) => {
+    const ns = env.BILLING as DurableObjectNamespace;
+    return ns.get(ns.idFromName(name)) as unknown as {
+      view(): Promise<{ balance: number; purchased: number; granted: number; held: number; available: number }>;
+      topUp(credits: number, reason?: string): Promise<unknown>;
+      grantMonthly(credits: number, periodKey: string): Promise<unknown>;
+      charge(credits: number, reason?: string): Promise<{ ok: boolean }>;
+      reserve(estimate: number): Promise<{ ok: boolean }>;
+    };
+  };
+
+  it("keeps the two buckets apart", async () => {
+    const d = ledger(`buckets-${performance.now()}`);
+    await d.topUp(500, "pack");
+    await d.grantMonthly(1000, "2026-01");
+    const v = await d.view();
+    expect(v.purchased).toBe(500);
+    expect(v.granted).toBe(1000);
+    expect(v.balance).toBe(1500);
+  });
+
+  it("LAPSES an unused grant instead of rolling it over", async () => {
+    /*
+      Scena's own DO kept ONE counter and implemented `grantMonthly` as a top-up,
+      under a comment reading "a floor top-up: purchased credits persist
+      alongside it" — which it could not do, having nothing to distinguish them.
+      What actually happened: an unused monthly grant accumulated forever, so a
+      top-tier workspace that generated nothing banked 5,000 credits a month and
+      could spend a year's worth in an afternoon.
+    */
+    const d = ledger(`lapse-${performance.now()}`);
+    await d.grantMonthly(1000, "2026-01");
+    await d.grantMonthly(1000, "2026-02");
+    const v = await d.view();
+    expect(v.granted).toBe(1000); // reset, not 2000
+    expect(v.balance).toBe(1000);
+  });
+
+  it("is idempotent within a period, so a re-run of the sweep grants nothing", async () => {
+    const d = ledger(`idem-${performance.now()}`);
+    await d.grantMonthly(1000, "2026-01");
+    await d.grantMonthly(1000, "2026-01");
+    expect((await d.view()).granted).toBe(1000);
+  });
+
+  it("spends the GRANT first, so a tenant never loses a credit they paid for", async () => {
+    // Use-it-or-lose-it: the bucket that expires is the one that drains.
+    const d = ledger(`order-${performance.now()}`);
+    await d.topUp(500, "pack");
+    await d.grantMonthly(1000, "2026-01");
+    await d.charge(600, "usage");
+    const v = await d.view();
+    expect(v.granted).toBe(400);
+    expect(v.purchased).toBe(500);
+  });
+
+  it("refuses a spend it cannot cover, rather than going negative", async () => {
+    const d = ledger(`short-${performance.now()}`);
+    await d.grantMonthly(10, "2026-01");
+    expect((await d.charge(50, "usage")).ok).toBe(false);
+    expect((await d.view()).balance).toBe(10);
+    // A reserve is the same question asked before an expensive call, so the
+    // caller can skip the upstream request entirely.
+    expect((await d.reserve(50)).ok).toBe(false);
+  });
+
+  it("HOLDS a reserve against the available balance", async () => {
+    // The whole reason the meter is a DO and not a D1 row: two concurrent
+    // requests reading the same row both pass the check and both debit.
+    const d = ledger(`hold-${performance.now()}`);
+    await d.grantMonthly(100, "2026-01");
+    expect((await d.reserve(80)).ok).toBe(true);
+    const v = await d.view();
+    expect(v.held).toBe(80);
+    expect(v.available).toBe(20);
+    expect((await d.reserve(50)).ok).toBe(false);
+  });
+});
+
+describe("the Stripe rail", () => {
+  const SECRET = "whsec_scena_integration";
+
+  /** Stripe's own signature scheme, so the rail verifies for real. */
+  async function sign(payload: string): Promise<string> {
+    const t = Math.floor(Date.now() / 1000);
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${payload}`));
+    return `t=${t},v1=${[...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+  }
+
+  const post = async (payload: string, signature?: string) =>
+    SELF.fetch(`${ROOT}/api/stripe/webhook`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "stripe-signature": signature ?? (await sign(payload)) },
+      body: payload,
+    });
+
+  beforeAll(async () => {
+    await db()
+      .prepare("INSERT INTO app_config (key, value, updated_at) VALUES ('stripe.webhook_secret', ?, 0) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .bind(SECRET)
+      .run();
+  });
+
+  it("refuses an unsigned or wrongly-signed payload", async () => {
+    const payload = JSON.stringify({ id: "evt_bad", type: "invoice.paid", data: { object: {} } });
+    expect((await post(payload, "t=1,v1=deadbeef")).status).toBe(400);
+  });
+
+  it("GRANTS A CREDIT PACK ONCE, however many times Stripe delivers it", async () => {
+    /*
+      Scena had NO idempotency — no seen-set, no event-id check. Stripe retries
+      on any non-2xx and occasionally redelivers a success, so every redelivery
+      of this event ran `topUp` again: the pack granted twice, three times, as
+      many times as the delivery repeated, each answered a correct-looking 200.
+    */
+    const { slug } = await newWorkspace("pack");
+    const org = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>();
+    const payload = JSON.stringify({
+      id: `evt_pack_${slug}`,
+      type: "checkout.session.completed",
+      data: { object: { id: "cs_test_1", metadata: { app: "scena", scena_tenant: org!.id, scena_pack: "p1", scena_credits: "2500" } } },
+    });
+
+    expect((await post(payload)).status).toBe(200);
+    // The SAME event id, delivered again — which is what a Stripe retry is.
+    expect((await post(payload)).status).toBe(200);
+    expect((await post(payload)).status).toBe(200);
+
+    const ns = env.BILLING as DurableObjectNamespace;
+    const view = await (ns.get(ns.idFromName(org!.id)) as unknown as { view(): Promise<{ purchased: number }> }).view();
+    expect(view.purchased).toBe(2500);
+  });
+
+  it("PARKS an event it cannot attribute instead of answering 200 and forgetting", async () => {
+    /*
+      The old handler read `metadata.scena_tenant || DEMO_TENANT`, so an event
+      belonging to another app on the same Stripe account — or one of Scena's own
+      whose metadata did not survive — was applied to a REAL workspace: its plan
+      changed, its balance moved, its dunning state advanced.
+
+      Parking keeps the payload so an operator can read it, and does NOT claim
+      the id, so the event is still replayable once someone works out whose it is.
+    */
+    const payload = JSON.stringify({
+      id: "evt_someone_elses",
+      type: "invoice.paid",
+      data: { object: { id: "in_other", customer: "cus_not_ours", metadata: { app: "someotherapp" } } },
+    });
+    const res = await post(payload);
+    expect(res.status).toBe(200); // Stripe must not retry an event that is not ours.
+
+    const parked = await db()
+      .prepare("SELECT event_id, payload FROM rail_parked_events WHERE event_id = ?")
+      .bind("evt_someone_elses")
+      .first<{ event_id: string; payload: string }>();
+    expect(parked?.event_id).toBe("evt_someone_elses");
+    expect(parked?.payload).toContain("someotherapp");
+
+    // And nothing was applied to anybody.
+    const seen = await db().prepare("SELECT id FROM stripe_events WHERE id = ?").bind("evt_someone_elses").first();
+    expect(seen, "an unattributed event must not claim the id — Stripe could not then retry it").toBeNull();
+  });
+
+  it("still handles an event that is ours only by CUSTOMER id", async () => {
+    /*
+      `claims` is what stops metadata-routing being a regression. `invoice.paid`
+      and the subscription events routinely carry no app metadata at all; they
+      are Scena's because the Stripe customer on them is.
+    */
+    const { slug } = await newWorkspace("byc");
+    // `setPlan` first: the subscription row is created LAZILY on first read, so
+    // a bare UPDATE here matches nothing and the customer id is never stored —
+    // whereupon `claims` correctly says no and the test fails for its setup.
+    await setPlan(slug, "pro");
+    const org = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>();
+    await db()
+      .prepare("UPDATE subscriptions SET stripe_customer_id = ? WHERE tenant_id = ?")
+      .bind("cus_scena_known", org!.id)
+      .run();
+
+    const payload = JSON.stringify({
+      id: `evt_byc_${slug}`,
+      type: "invoice.paid",
+      data: { object: { id: "in_ours", customer: "cus_scena_known" } },
+    });
+    expect((await post(payload)).status).toBe(200);
+    // It was ATTRIBUTED, so the id is claimed and a retry is a no-op.
+    const seen = await db().prepare("SELECT id FROM stripe_events WHERE id = ?").bind(`evt_byc_${slug}`).first();
+    expect(seen).toBeTruthy();
+  });
+});
+
 describe("the per-member grant can only narrow", () => {
   it("refuses to hand a role a power its preset does not carry", async () => {
     /*

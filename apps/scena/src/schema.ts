@@ -76,7 +76,7 @@ export const DEMO_TENANT = "tenant_demo";
 
 export const SCENA_SCHEMA: SchemaModule = {
   id: "scena",
-  version: "2026-08-06d",
+  version: "2026-08-06e",
   ddl: [
     "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, email TEXT, name TEXT, created_at INTEGER);",
     // Devices (screens). channel_id is the active/default channel; a device
@@ -144,6 +144,26 @@ export const SCENA_SCHEMA: SchemaModule = {
     // Promo codes (§25 gifting/demo): redeemable for credits or a comped plan.
     "CREATE TABLE IF NOT EXISTS promo_codes (code TEXT PRIMARY KEY, kind TEXT, credits INTEGER, plan_id TEXT, plan_months INTEGER, max_redemptions INTEGER, redeemed_count INTEGER, per_tenant_limit INTEGER, expires_at INTEGER, note TEXT, active INTEGER, created_at INTEGER);",
     "CREATE TABLE IF NOT EXISTS promo_redemptions (id TEXT PRIMARY KEY, code TEXT, tenant_id TEXT, kind TEXT, credits INTEGER, plan_id TEXT, redeemed_at INTEGER);",
+    /*
+      WEBHOOK IDEMPOTENCY, and Scena had NONE.
+
+      Stripe retries on any non-2xx and occasionally redelivers a successful
+      one, so without a seen-set every retry of `checkout.session.completed`
+      ran `topUp` again — a credit pack granted twice, three times, as many
+      times as the delivery was repeated. Free credits, silently, with a
+      correct-looking 200 each time.
+
+      This is `@4dl/billing`'s table by rights, but adopting `BILLING_SCHEMA`
+      wholesale is not possible yet: its `plans`, `subscriptions`,
+      `credit_packs` and `credit_ledger` have DIFFERENT COLUMNS from Scena's
+      (`price_usd_month REAL` vs `price_cents INTEGER` + `currency` +
+      `interval`, `at` vs `created_at`, TEXT vs INTEGER timestamps). Whichever
+      module runs first wins a `CREATE TABLE IF NOT EXISTS`, and the loser's
+      columns simply never exist — which is precisely the `app_config.updated_at`
+      failure this schema already carries a scar from. The store moves when its
+      queries do; the idempotency cannot wait for that.
+    */
+    "CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, at INTEGER);",
     // Workers AI catalog + markup (§24), admin-editable neuron rate table.
     "CREATE TABLE IF NOT EXISTS ai_models (id TEXT PRIMARY KEY, label TEXT, task TEXT, cf_model TEXT, input_rate REAL, output_rate REAL, unit_rate REAL, unit_kind TEXT, markup REAL, enabled INTEGER, sort INTEGER);",
     // AI generation cache (by prompt hash) + audit log.

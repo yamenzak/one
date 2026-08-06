@@ -1,192 +1,49 @@
 /**
- * TenantBillingDO (BLUEPRINT §24) — one Durable Object per tenant, the single
- * authority for its AI credit balance. Being single-threaded, concurrent
- * generations serialize, so a burst can never overspend (the whole reason the
- * meter is a DO and not a D1 row).
+ * Scena's credit authority — `@4dl/billing`'s `CreditLedgerDO`, bound to D1.
  *
- *   reserve(estimate) → hold      // atomic; rejects if available < estimate
- *   settle(hold, actual)          // finalize debit, release the remainder
- *   release(hold)                 // generation failed — drop the hold, no charge
- *   topUp / grantMonthly          // credit packs, promos, the recurring grant
+ * ⚠️ **The class name is load-bearing.** `wrangler.jsonc`'s `migrations` bind
+ * `TenantBillingDO` to durable storage, and every tenant's balance lives under
+ * that binding. Renaming this class orphans all of them — the DO would come up
+ * empty and every tenant would silently be at zero credits. It stays.
  *
- * The balance + a rolling ledger live in DO storage; every mutation is also
- * mirrored to D1 `credit_ledger` for invoices/history (append-only).
+ * The only thing the base class cannot do is write the append-only mirror,
+ * because that is the app's table.
+ *
+ * ── What changed: the balance is TWO buckets now, and a grant LAPSES ───────
+ *
+ * Scena's own DO kept a single `balance` and implemented `grantMonthly` as a
+ * top-up, with a comment reading "a floor top-up: purchased credits persist
+ * alongside it". With one counter it could not distinguish them, so what
+ * actually happened is that **an unused monthly grant rolled over forever**: a
+ * workspace on the top tier accrued its 5,000 credits every month whether or not
+ * it generated anything, and could bank 60,000 in a year and spend them in an
+ * afternoon. That is not what a monthly grant is, and it is not what the pricing
+ * page describes.
+ *
+ * The shared base splits the balance:
+ *
+ *   purchased  credit packs, promos, admin top-ups. Never expire.
+ *   granted    the current period's plan grant. RESET (overwritten) each period,
+ *              not added, so an unused grant lapses.
+ *
+ * Spending drains `granted` first — use-it-or-lose-it — then `purchased`, so a
+ * tenant never loses a credit they paid for. Both halves ship in `BalanceView`,
+ * which is what lets the billing screen say "1,200 this month + 340 you bought"
+ * instead of one number that hides which is which.
+ *
+ * ⚠️ The storage layout differs from the old single-counter one. There are no
+ * live Scena tenants, so this is a re-seed rather than a migration; a deployment
+ * that DID have balances would need one, and it would be a real one.
  */
 
-import { DurableObject } from "cloudflare:workers";
+import { CreditLedgerDO, type CreditLedgerMirror } from "@4dl/billing";
 import type { Env } from "./env.js";
 import { appendLedger } from "./billing-store.js";
 
-interface Hold {
-  credits: number;
-  at: number;
-}
+export type { BalanceView, LedgerEntry } from "@4dl/billing";
 
-export interface BalanceView {
-  balance: number;
-  held: number;
-  available: number;
-}
-
-export interface LedgerEntry {
-  delta: number;
-  balance: number;
-  reason: string;
-  ref?: string;
-  at: number;
-}
-
-const LEDGER_CAP = 50; // rolling window kept in the DO; full history in D1
-// A hold older than this is orphaned (its request died between reserve and
-// settle/release — isolate eviction, dropped connection, CPU kill). Reap it so a
-// stuck hold can't permanently subtract from the tenant's available balance. The
-// longest AI run is ~180s, so 10 min is comfortably past any live generation.
-const HOLD_TTL_MS = 600_000;
-
-export class TenantBillingDO extends DurableObject<Env> {
-  /** The tenant id this DO represents (set on first use so we can mirror to D1). */
-  private async tenant(): Promise<string> {
-    return (await this.ctx.storage.get<string>("tenant")) ?? "tenant_demo";
+export class TenantBillingDO extends CreditLedgerDO<Env> {
+  protected override async mirror(entry: CreditLedgerMirror): Promise<void> {
+    await appendLedger(this.env.DB, entry);
   }
-
-  /** Bind the DO to its tenant id (idempotent; called from the router). */
-  async bind(tenantId: string): Promise<void> {
-    if ((await this.ctx.storage.get<string>("tenant")) === undefined) {
-      await this.ctx.storage.put("tenant", tenantId);
-    }
-  }
-
-  async view(): Promise<BalanceView> {
-    const balance = (await this.ctx.storage.get<number>("balance")) ?? 0;
-    const holds = await this.reapStaleHolds();
-    const held = Object.values(holds).reduce((s, h) => s + h.credits, 0);
-    return { balance, held, available: Math.max(0, balance - held) };
-  }
-
-  /** Drop holds past their TTL (orphaned by a died request) and persist if any
-   *  were removed, so a stuck hold can't erode `available` forever. */
-  private async reapStaleHolds(): Promise<Record<string, Hold>> {
-    const holds = (await this.ctx.storage.get<Record<string, Hold>>("holds")) ?? {};
-    const cutoff = Date.now() - HOLD_TTL_MS;
-    let dropped = false;
-    for (const [id, h] of Object.entries(holds)) {
-      if (h.at < cutoff) { delete holds[id]; dropped = true; }
-    }
-    if (dropped) await this.ctx.storage.put("holds", holds);
-    return holds;
-  }
-
-  /**
-   * Atomically hold `estimate` credits against the available balance. Returns a
-   * hold id to settle/release against, or `{ ok: false }` if funds are short.
-   */
-  async reserve(estimate: number): Promise<{ ok: true; hold: string; available: number } | { ok: false; available: number; needed: number }> {
-    const est = Math.max(0, Math.ceil(estimate));
-    const { available } = await this.view();
-    if (est > available) return { ok: false, available, needed: est };
-    const holds = (await this.ctx.storage.get<Record<string, Hold>>("holds")) ?? {};
-    const hold = `hold_${randomHex(8)}`;
-    holds[hold] = { credits: est, at: Date.now() };
-    await this.ctx.storage.put("holds", holds);
-    const after = await this.view();
-    return { ok: true, hold, available: after.available };
-  }
-
-  /**
-   * Finalize a hold: debit the *actual* credits (from real Workers AI usage),
-   * release the reserved remainder, append a ledger entry. Never drives the
-   * balance below zero.
-   */
-  async settle(hold: string, actual: number, reason = "ai.generation", ref?: string): Promise<BalanceView> {
-    const holds = (await this.ctx.storage.get<Record<string, Hold>>("holds")) ?? {};
-    const charge = Math.max(0, Math.ceil(actual));
-    const balance = (await this.ctx.storage.get<number>("balance")) ?? 0;
-    const next = Math.max(0, balance - charge);
-    delete holds[hold];
-    await this.ctx.storage.put("holds", holds);
-    await this.ctx.storage.put("balance", next);
-    if (charge > 0) await this.record(-charge, next, reason, ref);
-    return this.view();
-  }
-
-  /** Drop a hold without charging (generation failed / cache hit). */
-  async release(hold: string): Promise<BalanceView> {
-    const holds = (await this.ctx.storage.get<Record<string, Hold>>("holds")) ?? {};
-    delete holds[hold];
-    await this.ctx.storage.put("holds", holds);
-    return this.view();
-  }
-
-  /**
-   * Pay-as-you-go debit for an external metered call (e.g. a weather API fetch):
-   * atomically charge `credits` if the available balance covers it, else no-op.
-   * Unlike reserve→settle this is a single round trip with no hold — right for a
-   * fixed-price call whose cost is known up front. Returns `ok:false` (and does
-   * not fetch/charge) when funds are short, so the caller skips the upstream call.
-   */
-  async charge(credits: number, reason = "usage", ref?: string): Promise<{ ok: boolean } & BalanceView> {
-    const cost = Math.max(0, Math.ceil(credits));
-    const { available } = await this.view();
-    if (cost > available) return { ok: false, ...(await this.view()) };
-    const balance = (await this.ctx.storage.get<number>("balance")) ?? 0;
-    const next = Math.max(0, balance - cost);
-    await this.ctx.storage.put("balance", next);
-    if (cost > 0) await this.record(-cost, next, reason, ref);
-    return { ok: true, ...(await this.view()) };
-  }
-
-  /** Add credits (credit pack, promo top-up, admin adjustment). */
-  async topUp(credits: number, reason = "topup", ref?: string): Promise<BalanceView> {
-    const add = Math.max(0, Math.floor(credits));
-    const balance = (await this.ctx.storage.get<number>("balance")) ?? 0;
-    const next = balance + add;
-    await this.ctx.storage.put("balance", next);
-    if (add > 0) await this.record(add, next, reason, ref);
-    return this.view();
-  }
-
-  /**
-   * Apply the recurring monthly grant for a plan, keyed by `periodKey`
-   * (e.g. "2026-07") so repeated cron/webhook calls in the same period are a
-   * no-op. The grant is a floor top-up: purchased credits persist alongside it.
-   */
-  async grantMonthly(credits: number, periodKey: string): Promise<BalanceView> {
-    const last = await this.ctx.storage.get<string>("lastGrantKey");
-    if (last === periodKey) return this.view();
-    await this.ctx.storage.put("lastGrantKey", periodKey);
-    return this.topUp(credits, "grant.monthly", periodKey);
-  }
-
-  /** Admin: set the balance to an exact value (audited). */
-  async setBalance(credits: number, reason = "admin.adjust"): Promise<BalanceView> {
-    const target = Math.max(0, Math.floor(credits));
-    const balance = (await this.ctx.storage.get<number>("balance")) ?? 0;
-    await this.ctx.storage.put("balance", target);
-    await this.record(target - balance, target, reason);
-    return this.view();
-  }
-
-  /** Recent ledger entries held in the DO (full history is in D1). */
-  async recentLedger(): Promise<LedgerEntry[]> {
-    return (await this.ctx.storage.get<LedgerEntry[]>("ledger")) ?? [];
-  }
-
-  private async record(delta: number, balance: number, reason: string, ref?: string): Promise<void> {
-    const entry: LedgerEntry = { delta, balance, reason, ref, at: Date.now() };
-    const ledger = ((await this.ctx.storage.get<LedgerEntry[]>("ledger")) ?? []).concat(entry).slice(-LEDGER_CAP);
-    await this.ctx.storage.put("ledger", ledger);
-    // Mirror to D1 for invoices/history. Best-effort: a mirror failure must not
-    // corrupt the authoritative DO balance.
-    try {
-      await appendLedger(this.env.DB, { tenant_id: await this.tenant(), delta, balance, reason, ref: ref ?? null });
-    } catch {
-      /* D1 unavailable — the DO ledger remains the source of truth */
-    }
-  }
-}
-
-function randomHex(bytes: number): string {
-  const buf = new Uint8Array(bytes);
-  crypto.getRandomValues(buf);
-  return [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
 }

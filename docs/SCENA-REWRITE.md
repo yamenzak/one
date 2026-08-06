@@ -353,13 +353,64 @@ compile-time entitlement gate is Stage 4's (§4.4). Custom domains are wired but
 their capability gate reads a PROXY (the highest tier's unlimited library) rather
 than a real `customDomain` flag — Stage 4 owns the catalog and should replace it.
 
-### Stage 4 — `@4dl/billing` + `@4dl/billing-rail`
-Entitlements engine with Scena's quota/feature registry. `TenantBillingDO`
-becomes a `CreditLedgerDO` subclass (**keep the class name** — migrations bind
-it). Stripe moves onto the rail with `metadata.app`. Dunning ladder.
-**Keep the compile-time gate** (§4.4).
+### Stage 4 — `@4dl/billing` + `@4dl/billing-rail` ✅ MOSTLY DONE
 
-*Exit:* a real test-mode subscription; the compile-gate conformance test passes.
+Landed: the entitlements ENGINE, the credit DO, and the Stripe RAIL. What is
+outstanding is named at the end.
+
+**The engine brought three rules, and Scena had none of them.** Resolution now
+coerces by type (an operator typo — `"aiGeneration": 1` — no longer switches on a
+paid capability); overrides are GRANT-ONLY (the "gift" blob could previously TAKE
+a feature away); and a suspended status CLAMPS to free. The third was a hole
+rather than a nicety: `tenantEntitlements` resolved the plan whatever the
+subscription said, under a comment claiming "playout is gated elsewhere" — which
+describes the HOST gate, and that closes an origin rather than deciding
+capability. A comped workspace is exempt, because the point of comping is that
+the status does not decide.
+
+**Four list features became six booleans.** `ticker`, `clock`, `weather` and
+`alerting` were `string[]` variant allow-lists; the engine coerces a feature to a
+boolean, so a list would have resolved `false` on every plan. Looking at what
+each actually varied across the four plans showed they carried one real bit each
+— plus three non-gates (`clock:digital`, `alerting:dashboard` were on EVERY plan)
+and one dead option (`alerting:email`, granted by none). `FeatureKind` and
+`options` are gone from `@scena/manifest` with them.
+
+**The credit DO's balance is two buckets now**, and this changed a real number:
+Scena's `grantMonthly` was a top-up on a single counter, so an unused monthly
+grant ROLLED OVER FOREVER — a top-tier workspace banking 5,000 credits a month
+and spending a year's worth in an afternoon. `purchased` persists, `granted` is
+reset each period, and spending drains the grant first so nobody loses a credit
+they paid for.
+
+**The Stripe webhook had two money bugs**, both closed by the rail:
+
+- **No idempotency at all** — no seen-set, no event-id check. Stripe retries on
+  any non-2xx and occasionally redelivers a success, so every redelivery of a
+  credit-pack `checkout.session.completed` ran `topUp` again.
+- **`metadata.scena_tenant || DEMO_TENANT`** — an event with no Scena metadata
+  was applied to a real workspace's plan, balance and dunning state.
+
+*Exit:* 36 integration tests including four on the rail (signature,
+grant-exactly-once across three deliveries, park-don't-guess, and the
+customer-id `claims` path that stops metadata routing being a regression).
+Mutation-tested.
+
+**Still outstanding, and deliberately:**
+
+- **The billing STORE stays Scena's.** `BILLING_SCHEMA`'s `plans`,
+  `subscriptions`, `credit_packs` and `credit_ledger` have DIFFERENT COLUMNS
+  from Scena's (`price_usd_month REAL` vs `price_cents` + `currency` +
+  `interval`; `at` vs `created_at`; TEXT vs INTEGER timestamps). A
+  `CREATE TABLE IF NOT EXISTS` is won by whichever module runs first and the
+  loser's columns silently never exist — the exact `app_config.updated_at`
+  failure this schema already carries a scar from. The store moves when its
+  ~1,000 lines of queries do. `stripe_events` was added to Scena's own module
+  because idempotency could not wait for that.
+- **The DUNNING ladder** is still Scena's `lifecycleSweep`.
+- **The compile-time entitlement gate** (§4.4) survives and now reads the clamped
+  resolver, so both gates share one source — but the conformance test asserting
+  every gated feature is checked at compile as well as at write is not written.
 
 ### Stage 5 — `@4dl/ai` + `@4dl/storage`
 `ai.ts`/`gemini.ts` onto the shared runner (Workers AI + Gemini + the mock

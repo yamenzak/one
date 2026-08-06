@@ -1,6 +1,7 @@
 import { schemaGate, type SchemaModule } from "@4dl/core";
 import { AUTH_SCHEMA } from "@4dl/auth";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
+import { BILLING_RAIL_SCHEMA } from "@4dl/billing-rail/schema";
 import { SCENA_SCHEMA, DEMO_TENANT } from "./schema.js";
 
 export { DEMO_TENANT };
@@ -54,7 +55,26 @@ export interface ScreenRow {
  * file used to hand-roll, and short-circuits on a marker row PER MODULE — so a
  * change to Scena's DDL does not re-run auth's.
  */
-export const SCHEMA_MODULES: readonly SchemaModule[] = [AUTH_SCHEMA, TENANCY_SCHEMA, SCENA_SCHEMA];
+export const SCHEMA_MODULES: readonly SchemaModule[] = [
+  AUTH_SCHEMA,
+  TENANCY_SCHEMA,
+  /*
+    ⚠️ `BILLING_SCHEMA` IS DELIBERATELY ABSENT, and it is not an oversight.
+
+    Its `plans`, `subscriptions`, `credit_packs` and `credit_ledger` have
+    different COLUMNS from Scena's — `price_usd_month REAL` against
+    `price_cents INTEGER` + `currency` + `interval`, `at` against `created_at`,
+    TEXT timestamps against INTEGER. A `CREATE TABLE IF NOT EXISTS` is won by
+    whichever module runs first, and the loser's columns silently never exist:
+    the exact shape of the `app_config.updated_at` regression that made a fresh
+    Stage 1 deployment unable to save any setting.
+
+    The rail is additive (`rail_parked_events` only), so it comes in now. The
+    STORE moves when its 1,000 lines of queries do.
+  */
+  BILLING_RAIL_SCHEMA,
+  SCENA_SCHEMA,
+];
 
 const gate = schemaGate(SCHEMA_MODULES);
 export const ensureSchema = (db: D1Database): Promise<void> => gate({ DB: db });

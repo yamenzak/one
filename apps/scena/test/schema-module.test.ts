@@ -54,6 +54,9 @@ describe("the Scena schema module", () => {
     // a failure here rather than a 500 in production. They go UP when a column
     // or table is added.
     //
+    // Stage 4 added `stripe_events` — webhook idempotency, which this app had
+    // none of, so every Stripe retry of a credit-pack purchase granted it again.
+    //
     // Stage 2 took EIGHT DDL statements and TWO ALTERs out: Better Auth's seven
     // tables and the `"user"(username)` unique index, plus the ALTERs that added
     // `"user".username` and `"member".permissions_json`. `AUTH_SCHEMA` owns the
@@ -61,7 +64,7 @@ describe("the Scena schema module", () => {
     // why, including the ordering bug that made that index unrunnable on a fresh
     // database.
     const ddl = schemaStatements(SCENA_SCHEMA);
-    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(34);
+    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(35);
     expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(10);
     expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(0);
     expect(SCENA_SCHEMA.alters ?? []).toHaveLength(52);
@@ -126,9 +129,22 @@ describe("erasure is derivable from the declaration", () => {
     // tenant's rows and had no way to say whose, so a derived erasure stepped
     // straight over them.
     const scoped = new Set(SCENA_SCHEMA.scoped?.tenantTables ?? []);
-    const platform = new Set(["plans", "credit_packs", "promo_codes", "ai_models", "library_tracks", "app_config", "ai_cache", "weather_cache", "tenants"]);
-    const authOwned = new Set(["user", "session", "account", "verification", "organization", "member", "invitation"]);
-    const missed = [...created].filter((t) => !scoped.has(t) && !platform.has(t) && !authOwned.has(t));
+    /*
+      PLATFORM-WIDE tables: shared across every tenant, so deleting one tenant
+      must not touch them, and they carry no tenant column to key a cascade on.
+
+      `stripe_events` is the newest and the least obvious: it holds nothing but
+      webhook event IDS and a timestamp, as the idempotency seen-set. There is
+      no tenant in it to erase, and clearing a tenant's entries would make
+      Stripe's next retry of an already-applied event apply it again.
+    */
+    const platform = new Set([
+      "plans", "credit_packs", "promo_codes", "ai_models", "library_tracks",
+      "app_config", "ai_cache", "weather_cache", "tenants", "stripe_events",
+    ]);
+    // Better Auth's tables left in Stage 2 — this module does not create them
+    // any more, so nothing here can be one of them.
+    const missed = [...created].filter((t) => !scoped.has(t) && !platform.has(t));
     expect(missed, `these hold tenant data but are not in tenantTables:\n  ${missed.join("\n  ")}`).toEqual([]);
   });
 });

@@ -44,7 +44,31 @@ import { listLibrary, listGenres, createLibraryTrack, updateLibraryTrack, delete
 import { generate, type AiTask } from "./ai.js";
 import { addSlide } from "./content.js";
 import { grantForTenant, lifecycleSweep, deleteTenantData } from "./billing-service.js";
-import { stripeCfg, stripeEnabled, syncCatalog, subscriptionCheckout, packCheckout, stripePing, verifySignature, handleWebhook } from "./stripe.js";
+import { stripeCfg, stripeEnabled, syncCatalog, subscriptionCheckout, packCheckout, stripePing, handleWebhook } from "./stripe.js";
+import { dispatchEvent } from "@4dl/billing-rail";
+import { firstSeen, unmarkSeen } from "@4dl/billing";
+
+/** This app's slug on the shared Stripe rail. Stamped into `metadata.app` on
+ *  every product, and what an event is attributed to. */
+export const SCENA_APP = "scena";
+
+/**
+ * Does this Stripe customer belong to a Scena workspace?
+ *
+ * The `claims` lookup — a SILENCE resolver, never a contradiction. Several event
+ * types carry no metadata at all (`invoice.paid` is the common one) and are ours
+ * only by customer id, so metadata-only routing would park events that work.
+ */
+async function tenantByCustomer(db: D1Database, customer: unknown): Promise<boolean> {
+  const id = typeof customer === "string" ? customer : null;
+  if (!id) return false;
+  const row = await db
+    .prepare("SELECT tenant_id FROM subscriptions WHERE stripe_customer_id = ?")
+    .bind(id)
+    .first<{ tenant_id: string }>()
+    .catch(() => null);
+  return Boolean(row);
+}
 import { sendEmail, emailShell } from "./mailer.js";
 import { requestNuke, confirmNuke } from "./nuke.js";
 import { type AppEnv, isPlatformAdmin, tenantOf } from "./auth-context.js";
@@ -605,17 +629,59 @@ export function registerBilling(app: App): void {
   });
 
   /* --------------------------- stripe webhook ---------------------------- */
+  /**
+   * The platform webhook, on `@4dl/billing-rail`.
+   *
+   * ONE STRIPE ACCOUNT, MANY APPS. The rail verifies the signature once,
+   * attributes the event to an app, and parks what it cannot attribute in
+   * `rail_parked_events` — with its payload, so an operator can read it.
+   *
+   * ── Two things this replaces, and both were real ──────────────────────────
+   *
+   * **There was NO IDEMPOTENCY.** Stripe retries on any non-2xx and sometimes
+   * redelivers a successful one. Every redelivery of a
+   * `checkout.session.completed` carrying a credit pack ran `topUp` again — the
+   * pack granted twice, three times, as many times as the delivery repeated,
+   * each answered a correct-looking 200. `firstSeen` claims the id; `release`
+   * gives it back when the handler throws, so a genuine transient failure is
+   * still retried rather than swallowed as a duplicate.
+   *
+   * **An unattributable event became the DEMO TENANT.** `handleWebhook` read
+   * `meta.scena_tenant || DEMO_TENANT`, so an event with no Scena metadata — one
+   * belonging to another app on the same account, or one of Scena's own where
+   * the metadata did not survive — was applied to a real workspace's
+   * subscription and balance. The rail refuses to guess: no attribution, no
+   * handler, the event parks.
+   *
+   * `claims` is what stops the switch to metadata-routing being a regression:
+   * `invoice.paid` and `customer.subscription.*` often carry no metadata at all
+   * and are Scena's only by their Stripe CUSTOMER id.
+   */
   app.post("/api/stripe/webhook", async (c) => {
     const cfg = await stripeCfg(c.env);
     const payload = await c.req.text();
     const sig = c.req.header("stripe-signature") ?? "";
-    if (!(await verifySignature(payload, sig, cfg.webhookSecret))) return c.json({ error: "bad signature" }, 400);
-    try {
-      await handleWebhook(c.env, JSON.parse(payload));
-    } catch {
-      return c.json({ error: "handler failed" }, 500);
-    }
-    return c.json({ received: true });
+    const outcome = await dispatchEvent(
+      { DB: c.env.DB },
+      {
+        apps: [{
+          slug: SCENA_APP,
+          metadataPrefix: "scena",
+          claims: async (e) => tenantByCustomer(c.env.DB, (e.data.object as { customer?: unknown }).customer),
+          handle: (e) => handleWebhook(c.env, e as never),
+        }],
+        firstSeen: (id) => firstSeen(c.env.DB, id),
+        // A failure inside the handler (DO/D1 transient) must NOT leave the id
+        // marked seen, or Stripe's retry is dropped as a duplicate. The rail
+        // releases the claim and rethrows, so the worker 500s and Stripe
+        // redelivers.
+        release: (id) => unmarkSeen(c.env.DB, id),
+      },
+      payload,
+      sig,
+      cfg.webhookSecret,
+    );
+    return c.json(outcome.body, outcome.status as 200);
   });
 }
 

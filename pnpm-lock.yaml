@@ -248,6 +248,9 @@ importers:
       '@4dl/billing':
         specifier: workspace:*
         version: link:../../packages/billing
+      '@4dl/billing-rail':
+        specifier: workspace:*
+        version: link:../../packages/billing-rail
       '@4dl/core':
         specifier: workspace:*
         version: link:../../packages/core
