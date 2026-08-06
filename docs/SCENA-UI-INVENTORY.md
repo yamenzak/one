@@ -882,3 +882,82 @@ is one of them. No boundary crossed → the bracket is one slide and the asserti
 is exact equality; one crossed → B must be on the slide A was leaving or the one
 it was entering. A clock that genuinely disagreed lands outside the bracket
 either way. No retry, and no slide duration lengthened to make a test pass.
+
+---
+
+## The screenshot suite — §16, for Scena
+
+`pnpm --filter @scena/e2e shots`. Four projects (desktop/narrow × light/dark),
+21 images each, into `apps/scena-e2e/shots-out/<project>/<id>.png`. A workspace
+is created through the sign-up form, two screens are **real players pairing on
+the real device door**, and every piece of content is a POST the dashboard
+itself makes. There is no fixture layer and no mocked endpoint anywhere in it,
+which is the whole point: the images are of the product, so a redesign that
+looks wrong photographs wrong.
+
+It is a THIRD config, and the split is the one Kova already draws twice:
+
+    pnpm --filter @scena/e2e e2e      # the gate: real authorization
+    pnpm --filter @scena/e2e wall     # the wall: needs an operator
+    pnpm --filter @scena/e2e shots    # the images: needs an operator, takes minutes
+
+The demo workspace is comped onto `pro`. Without that the fleet caps at one
+screen, boards render a locked card and sources say "not in plan" — **a
+screenshot run of a smaller product than the one being sold**, which is the most
+flattering possible mistake and the hardest to notice, because every individual
+picture looks fine.
+
+### What it found, and the one thing it got wrong itself
+
+Three of the four failures were **the product refusing correctly**, and the
+seeder now goes through the paths it actually offers rather than around them:
+
+- **`pro` allows three widget profiles, and each display provisions its own.**
+  Three displays use all three; a fourth is refused. The profiles shot points at
+  the lobby display's own profile rather than one the suite invents.
+- **An owner cannot issue or call a queue ticket.** A board provisions its own
+  coordinator and station USERS, and `canControlBoard` admits one of those or a
+  board-scoped token. The people who press those buttons are a receptionist at a
+  desk and a tablet bolted to a wall, not whoever pays the bill. The world mints
+  the kiosk and station tokens the product mints and uses each for what it is
+  for.
+- **Below `sm` the app-shell collapses every header action into one ⋮ menu**, so
+  the "Pair screen" button does not exist at the narrow viewport. Widening the
+  viewport or dropping the shot would both have been the wrong fix; both
+  affordances are the product, so the step takes whichever one is on screen.
+
+The fourth was the suite's own, and it is the one worth remembering because it
+produced a bad IMAGE rather than a failing run — which is worse, because it
+looks finished. **A readiness anchor must not be satisfiable by anything except
+the screen being photographed.** Two ways it was:
+
+- `getByRole("heading", { name })` is a **substring** match by default. `"Alerts"`
+  also matched the "Recent alerts" section heading, and two matches is a
+  strict-mode violation that surfaces through `toBeVisible` as an ordinary
+  timeout — "the heading never appeared", on a page whose own failure snapshot
+  showed the heading, twice, in plain sight. Raising the timeout does not fix it,
+  and two runs were spent proving that.
+- `page.getByText(...)` reaches the SIDEBAR. It is `hidden md:block`, so at the
+  narrow viewport it is still in the DOM with `display: none` and `.first()`
+  picks a hidden nav item — and at desktop it is visible, so a loose anchor is
+  satisfied *before the screen has loaded anything*. That is how `/widgets` came
+  to be photographed as "No widget profile selected": the builder needs
+  `?profile=<id>`, the anchor `/widget/i` was satisfied by the sidebar's own
+  "Widget profiles" label, and the surface an operator spends the most time in
+  shipped as a picture of an empty screen.
+
+Every anchor is `page.getByRole("main")`-scoped now, and every heading anchor is
+`exact: true`.
+
+### And two traps in the player, both naming the wrong subsystem
+
+- **Playout is a `requestAnimationFrame` loop, and Chromium does not run rAF in
+  a background page.** Two players in two contexts means one is always
+  backgrounded, so its loop never ticks — and the debug overlay's null-frame
+  branch prints `slide — (no manifest)`, which is true of its own state and
+  false about the screen.
+- **Foregrounding restarts the loop but the overlay still holds the last frame
+  from before it froze.** Parsing that compares a live reading on one screen
+  against a stale one on the other, which is precisely the failure the wall spec
+  exists to catch, arriving through the harness. `readFrame` captures the
+  overlay text first, foregrounds, and waits for the text to MOVE.
