@@ -23,7 +23,7 @@
  * it in the suite that photographs the fix.
  */
 
-import { test } from "@playwright/test";
+import { test, type Page } from "@playwright/test";
 import {
   buildDemoWorld,
   closeDemoWorld,
@@ -55,12 +55,25 @@ test.afterAll(async () => {
   if (world) await closeDemoWorld(world);
 });
 
+/**
+ * Readiness anchors, scoped to `<main>`.
+ *
+ * ⚠️ NOT `page.getByText(...)`. The desktop sidebar is `hidden md:block` — it
+ * stays in the DOM at the narrow viewport with `display: none`, and every nav
+ * label is text. `.first()` then picks a HIDDEN nav item and `toBeVisible`
+ * waits out its timeout on a page that rendered correctly. Worse on the way in:
+ * at desktop the nav item IS visible, so a loose anchor is satisfied by the
+ * sidebar before the screen has loaded anything — which is how the widget
+ * builder came to be photographed as its own empty state.
+ */
+const inMain = (page: Page, text: string | RegExp) => page.getByRole("main").getByText(text).first();
+
 test("the operator's workspace", async () => {
   const page = world.page;
   await page.bringToFront();
 
   await test.step("the fleet", async () => {
-    await visit(page, `${base}/`, page.getByText(LOBBY_SCREEN).first());
+    await visit(page, `${base}/`, inMain(page, LOBBY_SCREEN));
     await shoot(page, project, "fleet", { settle: 800 });
   });
 
@@ -77,7 +90,7 @@ test("the operator's workspace", async () => {
     affordances are the product, so the step takes whichever one is on screen.
   */
   await test.step("pairing a screen", async () => {
-    await visit(page, `${base}/`, page.getByText(LOBBY_SCREEN).first());
+    await visit(page, `${base}/`, inMain(page, LOBBY_SCREEN));
     const direct = page.getByRole("button", { name: "Pair screen", exact: true });
     if (await direct.isVisible()) {
       await direct.click();
@@ -91,7 +104,7 @@ test("the operator's workspace", async () => {
 
   await test.step("a screen", async () => {
     const lobby = world.screens.find((s) => s.name === LOBBY_SCREEN)!;
-    await visit(page, `${base}/screens/${lobby.id}`, page.getByText(/online|offline/i).first());
+    await visit(page, `${base}/screens/${lobby.id}`, inMain(page, /online|offline/i));
     await shoot(page, project, "screen", { settle: 800 });
   });
 
@@ -109,67 +122,67 @@ test("the operator's workspace", async () => {
   });
 
   await test.step("channels", async () => {
-    await visit(page, `${base}/channels`, page.getByText(LOBBY_SCREEN).first());
+    await visit(page, `${base}/channels`, inMain(page, LOBBY_SCREEN));
     await shoot(page, project, "channels", { settle: 600 });
   });
 
   await test.step("slide playlists", async () => {
-    await visit(page, `${base}/playlists`, page.getByText(DEMO_PLAYLIST).first());
+    await visit(page, `${base}/playlists`, inMain(page, DEMO_PLAYLIST));
     await shoot(page, project, "playlists", { settle: 600 });
   });
 
   await test.step("the media library", async () => {
-    await visit(page, `${base}/media`, page.getByText(DEMO_MEDIA).first());
+    await visit(page, `${base}/media`, inMain(page, DEMO_MEDIA));
     await shoot(page, project, "media", { settle: 600 });
   });
 
   await test.step("music", async () => {
-    await visit(page, `${base}/music`, page.getByText(DEMO_MUSIC).first());
+    await visit(page, `${base}/music`, inMain(page, DEMO_MUSIC));
     await shoot(page, project, "music", { settle: 600 });
   });
 
   await test.step("widget profiles", async () => {
-    await visit(page, `${base}/profiles`, page.getByText(DEMO_PROFILE).first());
+    await visit(page, `${base}/profiles`, inMain(page, DEMO_PROFILE));
     await shoot(page, project, "profiles", { settle: 600 });
   });
 
   await test.step("data sources", async () => {
-    await visit(page, `${base}/feeds`, page.getByText(DEMO_SOURCE).first());
+    await visit(page, `${base}/feeds`, inMain(page, DEMO_SOURCE));
     await shoot(page, project, "feeds", { settle: 600 });
   });
 
   await test.step("ads", async () => {
-    await visit(page, `${base}/ads`, page.getByText(DEMO_ADS).first());
+    await visit(page, `${base}/ads`, inMain(page, DEMO_ADS));
     await shoot(page, project, "ads", { settle: 600 });
   });
 
   await test.step("live boards", async () => {
-    await visit(page, `${base}/boards`, page.getByText(DEMO_BOARD).first());
+    await visit(page, `${base}/boards`, inMain(page, DEMO_BOARD));
     await shoot(page, project, "boards", { settle: 1000 });
   });
 
   await test.step("analytics", async () => {
-    await visit(page, `${base}/analytics`, page.getByRole("heading", { name: "Analytics", exact: true }));
+    await visit(page, `${base}/analytics`, page.getByRole("main").getByRole("heading", { name: "Analytics", exact: true }));
     await shoot(page, project, "analytics", { settle: 800 });
   });
 
   await test.step("alerts", async () => {
-    await visit(page, `${base}/alerts`, page.getByRole("heading", { name: "Alerts", exact: true }));
+    await visit(page, `${base}/alerts`, page.getByRole("main").getByRole("heading", { name: "Alerts", exact: true }));
     await shoot(page, project, "alerts", { settle: 600 });
   });
 
   await test.step("billing", async () => {
-    await visit(page, `${base}/billing`, page.getByRole("heading", { name: "Billing", exact: true }));
+    await visit(page, `${base}/billing`, page.getByRole("main").getByRole("heading", { name: "Billing", exact: true }));
     await shoot(page, project, "billing", { settle: 800 });
   });
 
   await test.step("the team", async () => {
-    await visit(page, `${base}/team`, page.getByRole("heading", { name: "Team", exact: true }));
+    await visit(page, `${base}/team`, page.getByRole("main").getByRole("heading", { name: "Team", exact: true }));
     await shoot(page, project, "team", { settle: 600 });
   });
 
   await test.step("settings", async () => {
-    await visit(page, `${base}/settings`, page.getByRole("heading", { name: "Settings", exact: true }));
+    await visit(page, `${base}/settings`, page.getByRole("main").getByRole("heading", { name: "Settings", exact: true }));
     await shoot(page, project, "settings", { settle: 600 });
   });
 

@@ -53,6 +53,15 @@ export interface DemoWorld {
   page: Page;
   slug: string;
   screens: { id: string; name: string; channelId: string }[];
+  /**
+   * The lobby display's widget profile.
+   *
+   * The builder is `/widgets?profile=<id>` and renders "No widget profile
+   * selected" without one — so a shot of `/widgets` alone is a photograph of an
+   * empty screen filed under the name of the surface an operator spends the
+   * most time in. It shipped that way for one run.
+   */
+  widgetProfileId: string;
   /** The booted players. Kept OPEN: closing them turns the fleet offline. */
   devices: BootedScreen[];
 }
@@ -98,6 +107,8 @@ export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"):
   if (screens.length !== 2) throw new Error(`expected 2 paired screens, got ${screens.length}`);
   const lobby = screens.find((s) => s.name === LOBBY_SCREEN) ?? screens[0]!;
   const channelId = lobby.channel_id!;
+  const lobbyChannel = await api<{ widget_profile_id: string | null }>(page, "GET", `/api/channels/${channelId}`);
+  const widgetProfileId = lobbyChannel.widget_profile_id!;
 
   /* ── content the operator would have ─────────────────────────────────────── */
   // A third display with no screen on it yet — preparing content ahead of a
@@ -166,6 +177,7 @@ export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"):
     page,
     slug,
     screens: screens.map((s) => ({ id: s.id, name: s.name, channelId: s.channel_id! })),
+    widgetProfileId,
     devices,
   };
 }
