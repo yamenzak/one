@@ -4,9 +4,9 @@
  * view: create/open playlists. Detail view: a grid of slides you build from
  * uploaded images, uploaded video, hand-written HTML, or AI generation.
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Plus, ImageIcon, Video, Code2, Trash2, Clock, Layers, MoreVertical, Search, Tag as TagIcon, Pencil, GripVertical, Settings2, Images, FileImage, Sparkles } from "lucide-react";
+import { Plus, ImageIcon, Video, Code2, Trash2, Clock, Layers, Tag as TagIcon, Pencil, GripVertical, Settings2, Images, FileImage, Sparkles } from "lucide-react";
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent } from "../components/ui/card.js";
 import { Input } from "../components/ui/input.js";
@@ -18,12 +18,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Switch } from "../components/ui/switch.js";
 import { Skeleton } from "../components/ui/skeleton.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu.js";
 import { PageHeader } from "../components/page-header.js";
 import { TagEditor } from "../components/tag-editor.js";
-import { TagFilter } from "../components/tag-filter.js";
-import { ConfirmDialog } from "../components/confirm-dialog.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { useCan } from "../permissions.js";
 import { confirmDialog } from "../components/confirm.js";
@@ -37,8 +34,9 @@ import {
 import { MediaPicker } from "./MediaLibrary.js";
 import { HtmlEditorDialog, HtmlThumb } from "../components/html-editor.js";
 import { LicenseNote } from "../components/licensing.js";
-import { toast } from "@4dl/ui";
+import { LoadError, Row, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
+import { PlaylistLibrary } from "../components/playlist-library.js";
 
 const STARTER_HTML = `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;background:linear-gradient(135deg,#6366f1,#312e81);color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:8%">
   <div style="font-size:1.4vw;letter-spacing:.3em;text-transform:uppercase;opacity:.75">Your brand</div>
@@ -55,217 +53,77 @@ function fmtDur(ms: number | null): string {
   return s >= 1 ? `${s % 1 === 0 ? s : s.toFixed(1)}s` : `${ms}ms`;
 }
 
+/**
+ * The three table columns that became one line.
+ *
+ * Tags ride along at the end rather than as chips: a `Row`'s secondary line
+ * truncates, and a chip that is half-cut reads as a rendering fault while
+ * truncated text reads as truncated text. They are also a facet, so the way to
+ * see everything carrying one is to filter by it.
+ */
+function subLine(p: SlidePlaylist): string {
+  const n = p.slideCount ?? 0;
+  const parts = [
+    `${n} slide${n === 1 ? "" : "s"}`,
+    `${fmtDur(p.default_duration_ms)} each`,
+    TRANSITION_LABELS[p.transition ?? "fade"] ?? p.transition ?? "Fade",
+    ...(p.tags?.length ? [p.tags.map((t) => `#${t}`).join(" ")] : []),
+  ];
+  return parts.join(" · ");
+}
+
 export function PlaylistsPage() {
   const can = useCan();
-  const canCreate = can("content", "create");
-  const canWrite = can("content", "update");
-  const canDelete = can("content", "delete");
   const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<SlidePlaylist[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [q, setQ] = useState("");
-  const [activeTags, setActiveTags] = useState<string[]>([]);
-  const [newOpen, setNewOpen] = useState(false);
-  const [rename, setRename] = useState<SlidePlaylist | null>(null);
-  const [tagsOf, setTagsOf] = useState<SlidePlaylist | null>(null);
-  const [del, setDel] = useState<SlidePlaylist | null>(null);
 
-  const reload = () => { setError(null); return listSlidePlaylists().then(setPlaylists).catch((e) => setError(String(e))); };
+  const reload = () => {
+    setError(null);
+    return listSlidePlaylists().then(setPlaylists).catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  };
   useEffect(() => { reload(); }, []);
 
-  usePageChrome(
-    { crumbs: [{ label: "Slide playlists" }], actions: canCreate ? [{ key: "new", label: "New playlist", icon: <Plus className="size-4" />, onClick: () => setNewOpen(true) }] : [] },
-    [canCreate],
-  );
+  /*
+    What this replaces: a <Table> with four columns and a ⋮ cell, for rows whose
+    interesting content is a name and three short facts — it read as a
+    spreadsheet on a phone, where Default and Transition were the first columns
+    squeezed out. Plus the same four hand-rolled states the media library and
+    the channel list had, and the same defect in the first of them: a failed
+    load rendered `Couldn't reach the API: [object Object]` with nothing to
+    press, and the no-results line named no control at all.
 
-  const allTags = useMemo(() => [...new Set((playlists ?? []).flatMap((p) => p.tags ?? []))].sort(), [playlists]);
-  const filtered = useMemo(() => {
-    if (!playlists) return null;
-    const needle = q.trim().toLowerCase();
-    return playlists.filter(
-      (p) => (!needle || p.name.toLowerCase().includes(needle)) && (activeTags.length === 0 || (p.tags ?? []).some((t) => activeTags.includes(t))),
-    );
-  }, [playlists, q, activeTags]);
-
-
+    The search box, the tag facet, the ⋮ menu and the three dialogs are
+    `PlaylistLibrary`'s, shared with the music library — see its header for why
+    the row is NOT.
+  */
   return (
-    <div>
-      <PageHeader
-        title="Slide playlists"
-        description={playlists ? `${playlists.length} playlist${playlists.length === 1 ? "" : "s"} · reusable across channels` : "Reusable sequences of slides you can assign to any channel."}
-        actions={
-          playlists && playlists.length > 0 ? (
-            <>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search playlists…" className="w-full pl-8 sm:w-56" />
-              </div>
-              <TagFilter allTags={allTags} active={activeTags} onChange={setActiveTags} />
-            </>
-          ) : null
-        }
-      />
-
-      {error ? (
-        <Card className="border-dashed">
-          <CardContent className="py-14 text-center text-sm text-muted-foreground">Couldn't reach the API: {error}</CardContent>
-        </Card>
-      ) : !playlists ? (
-        <div className="overflow-hidden rounded-xl bg-card shadow-sm">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="m-2 h-12 rounded-lg" />)}
-        </div>
-      ) : playlists.length === 0 ? (
-        <EmptyState
-          scena="idle"
-          title="No slide playlists yet"
-          description="Create one, fill it with slides, then assign it to any channel — author once, reuse everywhere."
-          action={canCreate ? <Button onClick={() => setNewOpen(true)}><Plus className="size-4" /> New playlist</Button> : undefined}
-        />
-      ) : filtered && filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed py-16 text-center text-sm text-muted-foreground">No playlists match your filters.</div>
-      ) : (
-        <div className="overflow-hidden rounded-xl bg-card shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Name</TableHead>
-                <TableHead className="w-20 text-right">Slides</TableHead>
-                <TableHead className="w-28">Default</TableHead>
-                <TableHead className="w-28">Transition</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(filtered ?? []).map((p) => (
-                <TableRow key={p.id} className="cursor-pointer" onClick={() => navigate(`/playlists/${p.id}`)}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Layers className="size-4" /></div>
-                      <div className="min-w-0">
-                        <div className="truncate font-medium">{p.name}</div>
-                        {(p.tags?.length ?? 0) > 0 && (
-                          <div className="mt-0.5 flex flex-wrap gap-1">
-                            {p.tags!.slice(0, 4).map((t) => <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">{t}</span>)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">{p.slideCount ?? 0}</TableCell>
-                  <TableCell className="text-muted-foreground">{fmtDur(p.default_duration_ms)}</TableCell>
-                  <TableCell className="text-muted-foreground">{TRANSITION_LABELS[p.transition ?? "fade"] ?? p.transition}</TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    {(canWrite || canDelete) && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-8" aria-label="Playlist actions"><MoreVertical className="size-4" /></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {canWrite && <DropdownMenuItem onClick={() => setRename(p)}><Pencil className="size-4" /> Rename</DropdownMenuItem>}
-                          {canWrite && <DropdownMenuItem onClick={() => setTagsOf(p)}><TagIcon className="size-4" /> Tags…</DropdownMenuItem>}
-                          {canDelete && <DropdownMenuItem className="text-destructive" onClick={() => setDel(p)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+    <PlaylistLibrary
+      noun="playlists"
+      items={playlists}
+      error={error}
+      reload={reload}
+      perms={{ create: can("content", "create"), write: can("content", "update"), delete: can("content", "delete") }}
+      create={(name) => createSlidePlaylist(name)}
+      update={(id, patch) => updateSlidePlaylist(id, patch)}
+      remove={(id) => deleteSlidePlaylist(id)}
+      onCreated={(id) => navigate(`/playlists/${id}`)}
+      createLabel="New playlist"
+      createTitle="New slide playlist"
+      createPlaceholder="e.g. Lobby loop"
+      defaultName="Slide playlist"
+      empty={{
+        icon: Layers,
+        title: "No slide playlists yet",
+        description: "Create one, fill it with slides, then assign it to any channel — author once, reuse everywhere.",
+      }}
+      deleteDescription="This removes the playlist. Any channel using it loses these slides (the slides themselves are deleted). This can't be undone."
+      row={(p, menu) => (
+        <Row icon={Layers} iconTone="primary" onClick={() => navigate(`/playlists/${p.id}`)} sub={subLine(p)} trailing={menu}>
+          {p.name}
+        </Row>
       )}
-
-      <NewPlaylistDialog open={newOpen} onOpenChange={setNewOpen} onCreated={(id) => navigate(`/playlists/${id}`)} />
-      <RenamePlaylistDialog playlist={rename} onClose={() => setRename(null)} onSaved={reload} />
-      <TagsPlaylistDialog playlist={tagsOf} onClose={() => setTagsOf(null)} onSaved={reload} />
-      <ConfirmDialog
-        open={!!del}
-        onOpenChange={(o) => !o && setDel(null)}
-        title={del ? `Delete "${del.name}"?` : ""}
-        description="This removes the playlist. Any channel using it loses these slides (the slides themselves are deleted). This can't be undone."
-        confirmLabel="Delete playlist"
-        destructive
-        onConfirm={async () => {
-          if (!del) return;
-          try { await deleteSlidePlaylist(del.id); toast.success("Playlist deleted"); setDel(null); reload(); }
-          catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); }
-        }}
-      />
-    </div>
-  );
-}
-
-function NewPlaylistDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: (id: string) => void }) {
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  async function create() {
-    setBusy(true);
-    try {
-      const id = await createSlidePlaylist(name.trim() || "Slide playlist");
-      onOpenChange(false); setName(""); onCreated(id); toast.success("Playlist created.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not create playlist");
-    } finally { setBusy(false); }
-  }
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>New slide playlist</DialogTitle></DialogHeader>
-        <div className="space-y-2">
-          <Input autoFocus placeholder="e.g. Lobby loop" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} />
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={create} disabled={busy}>{busy ? "Creating…" : "Create"}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function RenamePlaylistDialog({ playlist, onClose, onSaved }: { playlist: SlidePlaylist | null; onClose: () => void; onSaved: () => void }) {
-  const [name, setName] = useState("");
-  useEffect(() => { setName(playlist?.name ?? ""); }, [playlist]);
-  async function save() {
-    if (!playlist) return;
-    const n = name.trim();
-    if (!n || n === playlist.name) { onClose(); return; }
-    try { await updateSlidePlaylist(playlist.id, { name: n }); toast.success("Renamed"); onClose(); onSaved(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Rename failed"); }
-  }
-  return (
-    <Dialog open={!!playlist} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Rename playlist</DialogTitle></DialogHeader>
-        <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} maxLength={80} />
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save}>Save</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function TagsPlaylistDialog({ playlist, onClose, onSaved }: { playlist: SlidePlaylist | null; onClose: () => void; onSaved: () => void }) {
-  const [tags, setTags] = useState<string[]>([]);
-  useEffect(() => { setTags(playlist?.tags ?? []); }, [playlist]);
-  async function save() {
-    if (!playlist) return;
-    try { await updateSlidePlaylist(playlist.id, { tags }); toast.success("Tags saved"); onClose(); onSaved(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Could not save tags"); }
-  }
-  return (
-    <Dialog open={!!playlist} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Tags · {playlist?.name}</DialogTitle></DialogHeader>
-        <TagEditor tags={tags} onChange={setTags} placeholder="Add a tag…" />
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save}>Save</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    />
   );
 }
 
@@ -329,7 +187,13 @@ export function PlaylistDetailPage() {
   const defaultDur = pl?.default_duration_ms ?? 6000;
   const transition = pl?.transition ?? "fade";
 
-  const load = () => { setError(null); return getSlidePlaylist(id).then(setPl).catch((e) => setError(String(e))).finally(() => setLoading(false)); };
+  const load = () => {
+    setError(null);
+    return getSlidePlaylist(id)
+      .then(setPl)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  };
   useEffect(() => { load(); }, [id]);
 
   async function uploadMany(files: FileList | null) {
@@ -445,9 +309,10 @@ export function PlaylistDetailPage() {
         <div>
           <LicenseNote scope="slides" />
           {error && !loading ? (
-            <Card className="border-dashed">
-              <CardContent className="py-14 text-center text-sm text-muted-foreground">Couldn't load this playlist: {error}</CardContent>
-            </Card>
+            // Was a dashed card reading `Couldn't load this playlist: [object
+            // Object]` with nothing to press. `LoadError` is the same state with
+            // the message the server actually sent and a way back.
+            <LoadError what="this playlist" error={error} onRetry={() => { setLoading(true); void load(); }} />
           ) : loading ? (
             <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
               {[0, 1, 2, 3].map((i) => <Card key={i} className="overflow-hidden py-0"><Skeleton className="aspect-video w-full rounded-none" /><div className="p-2.5"><Skeleton className="h-4 w-16" /></div></Card>)}

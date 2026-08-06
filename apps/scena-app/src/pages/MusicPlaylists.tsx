@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  Plus, Music, Music2, Upload, Trash2, Shuffle, MoreVertical, Search, Tag as TagIcon,
+  Plus, Music, Music2, Upload, Trash2, Shuffle, Search, Tag as TagIcon,
   Pencil, GripVertical, SlidersHorizontal, Sparkles, Library, Images, ShieldCheck, Mic, Disc3,
 } from "lucide-react";
 import { Button } from "../components/ui/button.js";
@@ -28,8 +28,6 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuIte
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { PageHeader } from "../components/page-header.js";
 import { TagEditor } from "../components/tag-editor.js";
-import { TagFilter } from "../components/tag-filter.js";
-import { ConfirmDialog } from "../components/confirm-dialog.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { useCan } from "../permissions.js";
 import { confirmDialog } from "../components/confirm.js";
@@ -37,7 +35,8 @@ import { offerPublishAffected } from "../components/publish-affected.js";
 import { TrackMetaDialog, mmss } from "../components/track-meta-dialog.js";
 import { LicenseBadge, LicenseNote } from "../components/licensing.js";
 import { MediaPicker } from "./MediaLibrary.js";
-import { LoadError, toast } from "@4dl/ui";
+import { LoadError, Row, toast } from "@4dl/ui";
+import { PlaylistLibrary } from "../components/playlist-library.js";
 import { EmptyState } from "../components/empty.js";
 import {
   listMusicPlaylists, createMusicPlaylist, getMusicPlaylist, updateMusicPlaylist, deleteMusicPlaylist,
@@ -53,6 +52,27 @@ function fmtTotal(ms: number): string {
   if (min < 60) return `${min} min`;
   return `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, "0")}m`;
 }
+/**
+ * The four table columns that became one line — count, length, genres, tags.
+ *
+ * Shuffle was a small icon beside the name with no label, which is a state a
+ * screenshot cannot explain; it is the row's icon now AND named here. The genre
+ * list is capped at three because a playlist with a dozen would push the count
+ * and the length off the end of a truncating line.
+ */
+function subLine(p: MusicPlaylist): string {
+  const n = p.trackCount ?? 0;
+  const genres = p.genres ?? [];
+  const parts = [
+    `${n} track${n === 1 ? "" : "s"}`,
+    p.totalMs ? fmtTotal(p.totalMs) : null,
+    p.shuffle ? "Shuffled" : null,
+    genres.length ? genres.slice(0, 3).join(", ") + (genres.length > 3 ? ` +${genres.length - 3}` : "") : null,
+    p.tags?.length ? p.tags.map((t) => `#${t}`).join(" ") : null,
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
 function parseGenres(raw: string | null | undefined): string[] {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw;
@@ -63,217 +83,60 @@ function parseGenres(raw: string | null | undefined): string[] {
 
 export function MusicPlaylistsPage() {
   const can = useCan();
-  const canCreate = can("content", "create");
-  const canWrite = can("content", "update");
-  const canDelete = can("content", "delete");
   const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<MusicPlaylist[] | null>(null);
-  const [q, setQ] = useState("");
-  const [activeTags, setActiveTags] = useState<string[]>([]);
-  const [newOpen, setNewOpen] = useState(false);
-  const [rename, setRename] = useState<MusicPlaylist | null>(null);
-  const [tagsOf, setTagsOf] = useState<MusicPlaylist | null>(null);
-  const [del, setDel] = useState<MusicPlaylist | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const [loadFailed, setLoadFailed] = useState(false);
-  const reload = () => listMusicPlaylists().then((p) => { setPlaylists(p); setLoadFailed(false); }).catch(() => { setPlaylists((prev) => prev ?? []); setLoadFailed(true); });
+  const reload = () => {
+    setError(null);
+    return listMusicPlaylists().then(setPlaylists).catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  };
   useEffect(() => { reload(); }, []);
 
-  usePageChrome(
-    { crumbs: [{ label: "Music playlists" }], actions: canCreate ? [{ key: "new", label: "New playlist", icon: <Plus className="size-4" />, onClick: () => setNewOpen(true) }] : [] },
-    [canCreate],
-  );
-
-  const allTags = useMemo(() => [...new Set((playlists ?? []).flatMap((p) => p.tags ?? []))].sort(), [playlists]);
-  const filtered = useMemo(() => {
-    if (!playlists) return null;
-    const needle = q.trim().toLowerCase();
-    return playlists.filter(
-      (p) => (!needle || p.name.toLowerCase().includes(needle) || (p.genres ?? []).some((g) => g.toLowerCase().includes(needle))) &&
-        (activeTags.length === 0 || (p.tags ?? []).some((t) => activeTags.includes(t))),
-    );
-  }, [playlists, q, activeTags]);
-
+  /*
+    The failed-load branch here was its own bug, distinct from the slide list's:
+    the catch wrote `[]` into the same state the empty branch reads, so a server
+    that could not be reached rendered `LoadError` AND "No music playlists yet"
+    STACKED — a retry button under a sentence claiming there is nothing to
+    retry for. `Collection` has one state at a time by construction.
+  */
   return (
-    <div>
-      <PageHeader
-        title="Music playlists"
-        description={playlists ? `${playlists.length} playlist${playlists.length === 1 ? "" : "s"} · reusable across channels` : "Reusable sequences of tracks you can assign to any channel."}
-        actions={
-          playlists && playlists.length > 0 ? (
-            <>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search playlists…" className="w-full pl-8 sm:w-56" />
-              </div>
-              <TagFilter allTags={allTags} active={activeTags} onChange={setActiveTags} />
-            </>
-          ) : null
-        }
-      />
-
-      {loadFailed && <LoadError what="playlists" error="We couldn’t reach the server." onRetry={reload} />}
-      {!playlists ? (
-        <div className="overflow-hidden rounded-xl bg-card shadow-sm">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="m-2 h-12 rounded-lg" />)}
-        </div>
-      ) : playlists.length === 0 ? (
-        <EmptyState
-          scena="idle"
-          title="No music playlists yet"
-          description="Create one, fill it with tracks, then assign it to any channel — author once, reuse everywhere."
-          action={canCreate ? <Button onClick={() => setNewOpen(true)}><Plus className="size-4" /> New playlist</Button> : undefined}
-        />
-      ) : filtered && filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed py-16 text-center text-sm text-muted-foreground">No playlists match your filters.</div>
-      ) : (
-        <div className="overflow-hidden rounded-xl bg-card shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Name</TableHead>
-                <TableHead className="w-20 text-right">Tracks</TableHead>
-                <TableHead className="w-28">Length</TableHead>
-                <TableHead className="hidden md:table-cell">Genres</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(filtered ?? []).map((p) => (
-                <TableRow key={p.id} className="cursor-pointer" onClick={() => navigate(`/music/${p.id}`)}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Music className="size-4" /></div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate font-medium">{p.name}</span>
-                          {p.shuffle ? <Shuffle className="size-3.5 shrink-0 text-muted-foreground" /> : null}
-                        </div>
-                        {(p.tags?.length ?? 0) > 0 && (
-                          <div className="mt-0.5 flex flex-wrap gap-1">
-                            {p.tags!.slice(0, 4).map((t) => <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">{t}</span>)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">{p.trackCount ?? 0}</TableCell>
-                  <TableCell className="text-muted-foreground">{p.totalMs ? fmtTotal(p.totalMs) : "—"}</TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <div className="flex flex-wrap gap-1">
-                      {(p.genres ?? []).slice(0, 3).map((g) => <Badge key={g} variant="secondary" className="font-normal">{g}</Badge>)}
-                      {(p.genres?.length ?? 0) > 3 && <span className="text-xs text-muted-foreground">+{p.genres!.length - 3}</span>}
-                    </div>
-                  </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    {(canWrite || canDelete) && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-8" aria-label="Playlist actions"><MoreVertical className="size-4" /></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {canWrite && <DropdownMenuItem onClick={() => setRename(p)}><Pencil className="size-4" /> Rename</DropdownMenuItem>}
-                          {canWrite && <DropdownMenuItem onClick={() => setTagsOf(p)}><TagIcon className="size-4" /> Tags…</DropdownMenuItem>}
-                          {canDelete && <DropdownMenuItem className="text-destructive" onClick={() => setDel(p)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+    <PlaylistLibrary
+      noun="playlists"
+      items={playlists}
+      error={error}
+      reload={reload}
+      perms={{ create: can("content", "create"), write: can("content", "update"), delete: can("content", "delete") }}
+      create={(name) => createMusicPlaylist(name)}
+      update={(id, patch) => updateMusicPlaylist(id, patch)}
+      remove={(id) => deleteMusicPlaylist(id)}
+      onCreated={(id) => navigate(`/music/${id}`)}
+      createLabel="New playlist"
+      createTitle="New music playlist"
+      createPlaceholder="e.g. Cafe ambient"
+      defaultName="Music playlist"
+      empty={{
+        icon: Music,
+        title: "No music playlists yet",
+        description: "Create one, fill it with tracks, then assign it to any channel — author once, reuse everywhere.",
+      }}
+      deleteDescription="This removes the playlist. Any channel using it loses this music (the tracks in the Media library are kept). This can't be undone."
+      // A playlist is findable by the music in it, not only by what it was
+      // called — the genre summary is the closest thing to a track listing the
+      // list view has.
+      searchText={(p) => (p.genres ?? []).join(" ")}
+      row={(p, menu) => (
+        <Row
+          icon={p.shuffle ? Shuffle : Music}
+          iconTone="primary"
+          onClick={() => navigate(`/music/${p.id}`)}
+          sub={subLine(p)}
+          trailing={menu}
+        >
+          {p.name}
+        </Row>
       )}
-
-      <NewPlaylistDialog open={newOpen} onOpenChange={setNewOpen} onCreated={(id) => navigate(`/music/${id}`)} />
-      <RenamePlaylistDialog playlist={rename} onClose={() => setRename(null)} onSaved={reload} />
-      <TagsPlaylistDialog playlist={tagsOf} onClose={() => setTagsOf(null)} onSaved={reload} />
-      <ConfirmDialog
-        open={!!del}
-        onOpenChange={(o) => !o && setDel(null)}
-        title={del ? `Delete "${del.name}"?` : ""}
-        description="This removes the playlist. Any channel using it loses this music (the tracks in the Media library are kept). This can't be undone."
-        confirmLabel="Delete playlist"
-        destructive
-        onConfirm={async () => {
-          if (!del) return;
-          try { await deleteMusicPlaylist(del.id); toast.success("Playlist deleted"); setDel(null); reload(); }
-          catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); }
-        }}
-      />
-    </div>
-  );
-}
-
-function NewPlaylistDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (o: boolean) => void; onCreated: (id: string) => void }) {
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  async function create() {
-    setBusy(true);
-    try {
-      const id = await createMusicPlaylist(name.trim() || "Music playlist");
-      onOpenChange(false); setName(""); onCreated(id); toast.success("Playlist created.");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not create playlist"); }
-    finally { setBusy(false); }
-  }
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>New music playlist</DialogTitle></DialogHeader>
-        <Input autoFocus placeholder="e.g. Cafe ambient" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} />
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={create} disabled={busy}>{busy ? "Creating…" : "Create"}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function RenamePlaylistDialog({ playlist, onClose, onSaved }: { playlist: MusicPlaylist | null; onClose: () => void; onSaved: () => void }) {
-  const [name, setName] = useState("");
-  useEffect(() => { setName(playlist?.name ?? ""); }, [playlist]);
-  async function save() {
-    if (!playlist) return;
-    const n = name.trim();
-    if (!n || n === playlist.name) { onClose(); return; }
-    try { await updateMusicPlaylist(playlist.id, { name: n }); toast.success("Renamed"); onClose(); onSaved(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Rename failed"); }
-  }
-  return (
-    <Dialog open={!!playlist} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Rename playlist</DialogTitle></DialogHeader>
-        <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} maxLength={80} />
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save}>Save</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function TagsPlaylistDialog({ playlist, onClose, onSaved }: { playlist: MusicPlaylist | null; onClose: () => void; onSaved: () => void }) {
-  const [tags, setTags] = useState<string[]>([]);
-  useEffect(() => { setTags(playlist?.tags ?? []); }, [playlist]);
-  async function save() {
-    if (!playlist) return;
-    try { await updateMusicPlaylist(playlist.id, { tags }); toast.success("Tags saved"); onClose(); onSaved(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Could not save tags"); }
-  }
-  return (
-    <Dialog open={!!playlist} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Tags · {playlist?.name}</DialogTitle></DialogHeader>
-        <TagEditor tags={tags} onChange={setTags} placeholder="Add a tag…" />
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save}>Save</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    />
   );
 }
 
@@ -299,7 +162,17 @@ export function MusicPlaylistDetailPage() {
 
   const tracks = pl?.tracks ?? [];
 
-  const load = () => getMusicPlaylist(id).then((p) => setPl({ ...p, tracks: p.tracks.map((t) => ({ ...t, genres: parseGenres(t.genres as unknown as string) })) })).catch(() => {}).finally(() => setLoading(false));
+  const [error, setError] = useState<string | null>(null);
+  // `.catch(() => {})` left `pl` null, `loading` false and nothing said — which
+  // renders "No tracks yet" to somebody whose playlist did not load. A failed
+  // load is a state of its own, with the message and a retry.
+  const load = () => {
+    setError(null);
+    return getMusicPlaylist(id)
+      .then((p) => setPl({ ...p, tracks: p.tracks.map((t) => ({ ...t, genres: parseGenres(t.genres as unknown as string) })) }))
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false));
+  };
   useEffect(() => { load(); }, [id]);
 
   async function uploadMany(files: FileList | null) {
@@ -415,7 +288,9 @@ export function MusicPlaylistDetailPage() {
         {/* Tracks */}
         <div>
           {!loading && tracks.length > 0 && <LicenseNote scope="music" />}
-          {loading ? (
+          {error && !loading ? (
+            <LoadError what="this playlist" error={error} onRetry={() => { setLoading(true); void load(); }} />
+          ) : loading ? (
             <div className="overflow-hidden rounded-xl bg-card shadow-sm">
               {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="m-2 h-12 rounded-lg" />)}
             </div>

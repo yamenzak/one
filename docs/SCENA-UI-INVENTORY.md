@@ -40,7 +40,7 @@ Ordered by what it costs, not by the nav.
 | `Admin.tsx` | 1,448 | **Deleted, not rewritten.** `@4dl/admin`'s section registry replaces it wholesale — Stripe, plans, AI models, promo codes, tenants and shared config are all panels the platform already ships. Kova's equivalent is ~200 lines of section declarations. |
 | `LiveBoards.tsx` | 904 | Queue + room + score boards, station provisioning, announcement config in one file. Three subjects, one page. Wants an index and a page per board (§7 settings grammar applies to any config-shaped surface). |
 | `Playlists.tsx` | 899 | Slide playlist list **and** detail **and** the slide editor. Three screens in one component. |
-| `MusicPlaylists.tsx` | 833 | Same shape as Playlists, duplicated — the two should share one collection surface with a different item renderer. |
+| `MusicPlaylists.tsx` | 832 | Same shape as Playlists, duplicated — the two should share one collection surface with a different item renderer. |
 | `Feeds.tsx` | 755 | Sources list + detail + the per-provider config forms (RSS/api/gsheet/weather). |
 | `ScreenDetail.tsx` | 731 | The fleet's most-used screen. Pairing state, channel assignment, schedule rules, remote commands, health. |
 
@@ -260,3 +260,88 @@ a section registry and its prose.
 `/ping` and keeps its keys in `/api/admin/config`. Reconciling those is the same
 shape of work as the `ai_models` catalog Stage 5 deferred, and for the same
 reason — it is a data change, not a wiring one.
+
+
+---
+
+## 7c — the collection screens became one collection
+
+**Four screens, one grammar.** `Channels`, `MediaLibrary`, `Playlists` and
+`MusicPlaylists` each hand-rolled the same five-state machine and got a
+different subset of it right. `@4dl/ui`'s `Collection` owns all five —
+LOADING / EMPTY / NO RESULTS / FAILED / FULL — plus the search field, the facet
+button and the list⇄grid toggle.
+
+| file | before | after | what it lost |
+|---|---:|---:|---|
+| `MediaLibrary.tsx` | 357 | 381 | the six kind chips + the tag dropdown (now facets), a grid-only view |
+| `Channels.tsx` | 596 | 577 | its own `PageHeader`, search box and tag filter |
+| `Playlists.tsx` | 899 | 764 | a five-column `<Table>` and three dialogs |
+| `MusicPlaylists.tsx` | 832 | 707 | a five-column `<Table>` and three dialogs |
+
+**The net is roughly flat, and that is the honest number**: 2,684 lines across
+the four became 2,429 plus a 271-line `playlist-library.tsx`. Two of the four
+files still hold their whole detail view — 7c is the LIST half — and the prose
+that explains why each state is the state it is costs more lines than the
+branches it replaced. What went down is the number of ways these screens can
+behave: four hand-rolled state machines became one, and the defects below are
+what the other three were getting wrong.
+
+**Four real defects went with them**, one per screen, and each was the kind that
+only shows up on a bad day:
+
+1. **`String(e)` in a dashed card.** Slide playlists, channels and the media
+   library all rendered `Couldn't reach the API: [object Object]` — an `Error`
+   stringified through the wrong door — with nothing to press. `Collection`'s
+   FAILED state is `LoadError`: the message the server actually sent, and a
+   retry.
+2. **A no-results line that named the wrong control.** Channels said
+   `No channels match ""` when you narrowed by TAG to nothing; slide playlists
+   said "No playlists match your filters" whichever control you had touched.
+   `Collection` is told `narrowed` separately from `query`, so it offers to
+   clear the one you actually set.
+3. **A failed load rendered as an empty library.** The music list's catch wrote
+   `[]` into the state its EMPTY branch reads, so an unreachable server drew
+   `LoadError` **and** "No music playlists yet" stacked. The media library's
+   `catch(() => setItems([]))` did the same thing without even the error.
+4. **A create button that fired twice.** Of the four name dialogs across the two
+   playlist files, one kept its button disabled while the write was in flight.
+   The other three created two playlists on a double-tap.
+
+**`PlaylistLibrary` is the second extraction, and it is the app's, not the
+package's.** Slide playlists and music playlists were the same screen written
+twice — same table, same search, same tag filter, and the same three dialogs
+(create / rename / tags) with different API functions inside them. What is
+shared is the *plumbing*: which verbs create and rename one of these, where a
+row navigates, the ⋮ menu, the delete confirmation. What is NOT shared is the
+row — a slide playlist's second line is its timing and transition, a music
+playlist's is its length and genres — so `row` is a parameter and there is no
+`kind` prop with two branches inside it. It sits in `apps/scena-app/src/components/`
+because "playlist" is product vocabulary and `@4dl/ui`'s ALLOW list is empty.
+
+**A `<Table>` for four short facts was the wrong container.** Both playlist
+lists were spreadsheets: Name / Slides / Default / Transition / ⋮ and
+Name / Tracks / Length / Genres / ⋮. On a phone the last columns were the first
+to be squeezed out, which is to say the facts were hidden exactly where there
+was least room to go and look them up. They are a `Row`'s `sub` line now, in one
+sentence, in the order you would say them.
+
+**Two things were deliberately dropped:**
+
+- **The mascot on these four empty states.** `Collection.empty` takes a Lucide
+  icon, because UI-LANGUAGE §7 fixes the shape of an empty state and a design
+  system cannot carry a product's mascot. `components/empty.tsx` still wraps
+  `EmptyState` with the mood for every screen that renders one directly — the
+  detail views, `Screens`, `Studio` — so the mascot did not leave the app, it
+  left the four collections.
+- **Tag chips in a row.** A `Row`'s secondary line truncates, and a chip cut in
+  half reads as a rendering fault where truncated text reads as truncated text.
+  Tags ride the end of the `sub` line as `#tag`, and the way to see everything
+  carrying one is the facet.
+
+**`Screens.tsx` is the fifth collection and is NOT in this sub-stage.** Its
+empty state is `GetStarted` — a 110-line first-run panel with a mascot, two
+choice cards and a three-step explainer — which is not a `Collection.empty` and
+should not be flattened into one. It also carries the fleet `StatTile` row above
+the grid. It moves in **7e** with `ScreenDetail`, and `components/tag-filter.tsx`
+stays alive until then as its last consumer.

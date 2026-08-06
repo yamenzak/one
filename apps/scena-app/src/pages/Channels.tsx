@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, Tv, Layers, Music, LayoutGrid, Megaphone, Rocket, History, Clock, ChevronRight, ArrowLeft, Search, Tag, Pencil, Check, Trash2 } from "lucide-react";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent } from "../components/ui/card.js";
+import { Card } from "../components/ui/card.js";
 import { Input } from "../components/ui/input.js";
 import { Label } from "../components/ui/label.js";
 import { Badge } from "../components/ui/badge.js";
@@ -20,11 +20,10 @@ import { PageHeader } from "../components/page-header.js";
 import { DevicePreview } from "../components/device-preview.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { TagEditor } from "../components/tag-editor.js";
-import { TagFilter } from "../components/tag-filter.js";
 import { ConfirmDialog } from "../components/confirm-dialog.js";
 import { useCan } from "../permissions.js";
 import { cn } from "@/lib/utils";
-import { toast } from "@4dl/ui";
+import { Collection, Filters, toast, type FacetSelection } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   listChannels, createChannel, publishChannelNote, setChannelComposition, updateChannel, deleteChannel,
@@ -62,85 +61,67 @@ export function ChannelsPage() {
   const [channels, setChannels] = useState<ComposedChannel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [facets, setFacets] = useState<FacetSelection>({ tag: null });
   const [newOpen, setNewOpen] = useState(false);
 
   const reload = () => {
     setError(null);
     return listChannels()
       .then((cs) => setChannels(cs as ComposedChannel[]))
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   };
 
   useEffect(() => { reload(); }, []);
 
-  usePageChrome(
-    { crumbs: [{ label: "Channels" }], actions: canCreate ? [{ key: "new", label: "New channel", icon: <Plus className="size-4" />, onClick: () => setNewOpen(true) }] : [] },
-    [canCreate],
-  );
-
   const allTags = useMemo(() => [...new Set((channels ?? []).flatMap((c) => c.tags ?? []))].sort(), [channels]);
-  const filtered = useMemo(() => {
-    if (!channels) return channels;
+  const facetGroups = useMemo(
+    () => [{ key: "tag", label: "Tag", options: allTags.map((t) => ({ value: t, label: t })) }],
+    [allTags],
+  );
+  const shown = useMemo(() => {
+    if (!channels) return null;
     const needle = q.trim().toLowerCase();
     return channels.filter(
-      (c) =>
-        (!needle || c.name.toLowerCase().includes(needle)) &&
-        (activeTags.length === 0 || (c.tags ?? []).some((t) => activeTags.includes(t))),
+      (c) => (!needle || c.name.toLowerCase().includes(needle)) && (!facets.tag || (c.tags ?? []).includes(facets.tag)),
     );
-  }, [channels, q, activeTags]);
+  }, [channels, q, facets]);
+
+  const newButton = canCreate ? (
+    <Button onClick={() => setNewOpen(true)}><Plus className="size-4" /> New channel</Button>
+  ) : undefined;
 
   return (
     <div>
-      <PageHeader
-        title="Channels"
-        description={
-          channels && channels.length > 0
-            ? `${channels.length} channel${channels.length === 1 ? "" : "s"} · slides, music, and widgets composed together`
-            : "Compose a slide playlist, music, and widgets — then publish to your screens."
-        }
-        actions={
-          channels && channels.length > 0 ? (
-            <>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search channels…" className="w-full pl-8 sm:w-56" />
-              </div>
-              <TagFilter allTags={allTags} active={activeTags} onChange={setActiveTags} />
-            </>
-          ) : null
-        }
+      {/*
+        The same four hand-rolled branches this screen shared with the media
+        library, and the same bug in each: a failed load rendered
+        `Couldn't reach the API: [object Object]` with no retry, and the
+        no-results line named the SEARCH only — so narrowing by tag to nothing
+        told you no channels matched "", which is a sentence about the wrong
+        control.
+      */}
+      <Collection
+        items={shown}
+        itemKey={(c: ComposedChannel) => c.id}
+        error={error}
+        onRetry={() => void reload()}
+        noun="channels"
+        query={q}
+        onQuery={setQ}
+        narrowed={Boolean(facets.tag)}
+        onClearFilters={() => setFacets({ tag: null })}
+        filter={<Filters groups={facetGroups} value={facets} onChange={setFacets} />}
+        action={newButton}
+        empty={{
+          icon: Layers,
+          title: "No channels yet",
+          description: "Create one, pick its slides, music, and widgets, then publish to your screens — it goes live in seconds.",
+          action: newButton,
+        }}
+        renderList={(c: ComposedChannel) => (
+          <ChannelCard key={c.id} channel={c} onOpen={() => navigate(`/channels/${c.id}`)} />
+        )}
       />
-
-      {error ? (
-        <Card className="border-dashed">
-          <CardContent className="py-14 text-center text-sm text-muted-foreground">Couldn't reach the API: {error}</CardContent>
-        </Card>
-      ) : !channels ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <Card key={i} className="overflow-hidden p-0">
-              <Skeleton className="aspect-video rounded-none" />
-              <div className="space-y-2 p-4"><Skeleton className="h-4 w-1/2" /><Skeleton className="h-5 w-32 rounded-full" /></div>
-            </Card>
-          ))}
-        </div>
-      ) : channels.length === 0 ? (
-        <EmptyState
-          scena="idle"
-          title="No channels yet"
-          description="Create one, pick its slides, music, and widgets, then publish to your screens — it goes live in seconds."
-          action={canCreate ? <Button onClick={() => setNewOpen(true)}><Plus className="size-4" /> New channel</Button> : undefined}
-        />
-      ) : filtered && filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed py-16 text-center text-sm text-muted-foreground">No channels match "{q}".</div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {(filtered ?? []).map((c) => (
-            <ChannelCard key={c.id} channel={c} onOpen={() => navigate(`/channels/${c.id}`)} />
-          ))}
-        </div>
-      )}
 
       <NewChannelDialog open={newOpen} onOpenChange={setNewOpen} onCreated={(id) => navigate(`/channels/${id}`)} />
     </div>
