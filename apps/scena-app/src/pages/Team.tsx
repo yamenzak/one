@@ -23,16 +23,14 @@
  * Guarded to owner by the API; this screen assumes the caller can manage the
  * team.
  */
-import { useEffect, useState } from "react";
-import { Loader2, UserPlus, Trash2, SlidersHorizontal, Copy, MailWarning } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Check, Loader2, MailWarning, MoreVertical, SlidersHorizontal, Copy, Trash2, UserPlus, UserRound, UserX } from "lucide-react";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent } from "../components/ui/card.js";
 import { Input } from "../components/ui/input.js";
 import { Label } from "../components/ui/label.js";
-import { Badge } from "../components/ui/badge.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog.js";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "../components/ui/dropdown-menu.js";
 import {
   getTeam,
   getStaff,
@@ -51,7 +49,7 @@ import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
 import { cn } from "@/lib/utils";
-import { LoadError, toast } from "@4dl/ui";
+import { Badge, Collection, Group, Row, Section, toast } from "@4dl/ui";
 
 type Grant = Record<string, string[]>;
 const cloneGrant = (g: Grant): Grant => Object.fromEntries(Object.entries(g).map(([k, v]) => [k, [...v]]));
@@ -103,20 +101,28 @@ export function TeamPage() {
   const [team, setTeam] = useState<TeamState | null>(null);
   const [staff, setStaff] = useState<StaffState | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [q, setQ] = useState("");
 
   /*
     A FAILED LOAD MUST NOT RENDER AS AN EMPTY TEAM.
 
     `.catch(() => setTeam({ members: [] }))` is the shape this had, and it draws
     "No members yet" over a network error — on the one screen where that reads as
-    "your colleagues' access is gone". `team` stays null and `loadFailed` carries
+    "your colleagues' access is gone". `team` stays null and the error carries
     the retry.
+
+    ⚠️ The error is the SERVER'S message now. Stage 7a left this as a
+    `loadFailed: boolean` and a hardcoded "We couldn't reach the server.", which
+    is honest about a dropped connection and a lie about a 403 — the two cases
+    an owner most needs told apart.
   */
-  const [loadFailed, setLoadFailed] = useState(false);
-  const reload = () =>
-    Promise.all([getTeam(), getStaff()])
-      .then(([t, st]) => { setTeam(t); setStaff(st); setLoadFailed(false); })
-      .catch(() => setLoadFailed(true));
+  const [error, setError] = useState<string | null>(null);
+  const reload = () => {
+    setError(null);
+    return Promise.all([getTeam(), getStaff()])
+      .then(([t, st]) => { setTeam(t); setStaff(st); })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  };
   useEffect(() => { reload(); }, []);
 
   const [editAccess, setEditAccess] = useState<TenantMember | null>(null);
@@ -186,102 +192,130 @@ export function TeamPage() {
       : `${seats.used} of ${seats.max} seat${seats.max === 1 ? "" : "s"} in use${seats.pending ? `, ${seats.pending} invited` : ""}`
     : "Who can sign in, and what they can do.";
 
+  const shown = useMemo(() => {
+    if (!team) return null;
+    const needle = q.trim().toLowerCase();
+    if (!needle) return team.members;
+    return team.members.filter((m) => `${m.name} ${m.email ?? ""}`.toLowerCase().includes(needle));
+  }, [team, q]);
+
+  const inviteButton = <Button onClick={() => setInviteOpen(true)}><UserPlus className="size-4" /> Invite</Button>;
+
   return (
     <div>
       <PageHeader title="Team" description={description} />
 
-      {loadFailed && <LoadError what="the team" error="We couldn’t reach the server." onRetry={reload} />}
-
+      {/*
+        Pending invitations sit ABOVE the roster and are not part of it: each one
+        is holding a seat, so an owner who cannot see them cannot understand the
+        count. They are their own group rather than ghost rows in the list,
+        because everything you can do to a member — change their role, narrow
+        their access — you cannot do to an invitation.
+      */}
       {staff && staff.invitations.length > 0 && (
-        <Card className="mb-4">
-          <CardContent className="p-0">
-            <div className="border-b px-4 py-2.5 text-xs font-semibold text-muted-foreground">
-              Invited — not signed in yet. Each one is holding a seat.
-            </div>
-            <div className="divide-y">
-              {staff.invitations.map((inv) => (
-                <div key={inv.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{inv.email}</div>
-                    <div className="text-xs capitalize text-muted-foreground">{inv.role}</div>
-                  </div>
+        <Section title="Invited — not signed in yet" className="mb-6">
+          <Group>
+            {staff.invitations.map((inv) => (
+              <Row
+                key={inv.id}
+                icon={MailWarning}
+                iconTone="warning"
+                sub={`${inv.role} · holding a seat`}
+                trailing={
                   <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => cancelInvite(inv.id, inv.email)}>
                     Cancel
                   </Button>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                }
+              >
+                {inv.email}
+              </Row>
+            ))}
+          </Group>
+        </Section>
       )}
 
-      <Card>
-        <CardContent className="p-0">
-          {!team ? (
-            <div className="grid place-items-center p-10 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
-          ) : team.members.length === 0 ? (
-            <div className="p-10 text-center text-sm text-muted-foreground">Nobody here yet. Invite someone to get started.</div>
-          ) : (
-            <>
-              {/* Desktop: table */}
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead>Member</TableHead>
-                      <TableHead>Sign in</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {team.members.map((m) => (
-                      <TableRow key={m.memberId}>
-                        <TableCell>
-                          <div className="font-medium">{m.name}</div>
-                          {m.email && <div className="text-xs text-muted-foreground">{m.email}</div>}
-                        </TableCell>
-                        <TableCell><SignIn m={m} /></TableCell>
-                        <TableCell>
-                          <RoleSelect m={m} roles={roles} onChange={changeRole} />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-1">
-                            <MemberActions m={m} onRevoke={revoke} onEdit={setEditAccess} />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Mobile: stacked cards */}
-              <div className="divide-y md:hidden">
-                {team.members.map((m) => (
-                  <div key={m.memberId} className="flex flex-col gap-3 p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="font-medium">{m.name}</div>
-                        {m.email && <div className="truncate text-xs text-muted-foreground">{m.email}</div>}
-                        <div className="mt-1.5"><SignIn m={m} /></div>
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        <MemberActions m={m} onRevoke={revoke} onEdit={setEditAccess} />
-                      </div>
-                    </div>
-                    <RoleSelect m={m} roles={roles} onChange={changeRole} className="w-full" />
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {/*
+        One rendering, not two. This was a desktop `<Table>` and a duplicated
+        stack of mobile cards — the same four facts written twice, which is how
+        the two drift. A `Row` is the same object at every width, and the role
+        moved from an inline 150px `<Select>` into the ⋮ menu so nothing has to
+        be cramped to fit a phone.
+      */}
+      <Collection
+        items={shown}
+        itemKey={(m: TenantMember) => m.memberId}
+        error={error}
+        onRetry={reload}
+        noun="members"
+        query={q}
+        onQuery={setQ}
+        action={inviteButton}
+        empty={{
+          icon: UserPlus,
+          title: "Nobody here yet",
+          description: "Invite a colleague — they set themselves up and sign in with a one-time code.",
+          action: inviteButton,
+        }}
+        renderList={(m: TenantMember) => (
+          <Row
+            icon={m.email ? UserRound : UserX}
+            iconTone={m.email ? "primary" : "warning"}
+            sub={m.email ?? "No address — this member cannot be sent a sign-in code"}
+            value={<Badge className="capitalize">{m.role}</Badge>}
+            trailing={
+              <MemberMenu
+                m={m}
+                roles={roles}
+                onRole={changeRole}
+                onEdit={setEditAccess}
+                onRevoke={revoke}
+              />
+            }
+          >
+            {m.name}
+          </Row>
+        )}
+      />
 
       <InviteDialog open={inviteOpen} onClose={() => setInviteOpen(false)} roles={roles} onSent={reload} />
       <EditAccessDialog member={editAccess} onClose={() => setEditAccess(null)} onSaved={reload} />
     </div>
+  );
+}
+
+/**
+ * Everything you can do to one member, in one menu.
+ *
+ * The role lives here rather than in an always-visible `<Select>` because
+ * changing somebody's role is not a thing you do while scanning a roster — and
+ * a select that is always armed on every row is a mis-tap away from demoting a
+ * colleague.
+ */
+function MemberMenu({ m, roles, onRole, onEdit, onRevoke }: {
+  m: TenantMember;
+  roles: Role[];
+  onRole: (m: TenantMember, r: Role) => void;
+  onEdit: (m: TenantMember) => void;
+  onRevoke: (m: TenantMember) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${m.name}`}><MoreVertical className="size-4" /></Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuLabel>Role</DropdownMenuLabel>
+        {roles.map((r) => (
+          <DropdownMenuItem key={r} disabled={r === m.role} onClick={() => onRole(m, r)}>
+            <span className="capitalize">{r}</span>
+            {r === m.role && <Check className="ml-auto size-4" />}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => onEdit(m)}><SlidersHorizontal className="size-4" /> Narrow access…</DropdownMenuItem>
+        <DropdownMenuItem className="text-destructive" onClick={() => onRevoke(m)}><Trash2 className="size-4" /> Remove</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -327,50 +361,6 @@ function EditAccessDialog({ member, onClose, onSaved }: { member: TenantMember |
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/**
- * How a member signs in. There is one answer now, which is the point.
- *
- * The badge stays rather than being deleted because the column used to carry
- * real information — some people signed in with a handle and a password — and
- * an owner who remembers that needs to be told it is no longer true.
- */
-function SignIn({ m }: { m: TenantMember }) {
-  return m.email ? <Badge variant="outline">email code · passkey</Badge> : <Badge variant="secondary">no address</Badge>;
-}
-
-/** Inline role changer (shared by the desktop table + mobile cards). */
-function RoleSelect({ m, roles, onChange, className }: { m: TenantMember; roles: Role[]; onChange: (m: TenantMember, r: Role) => void; className?: string }) {
-  return (
-    <Select value={m.role} onValueChange={(v) => onChange(m, v as Role)}>
-      <SelectTrigger className={cn("h-8 w-[150px]", className)}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {roles.map((r) => (
-          <SelectItem key={r} value={r}>
-            <span className="capitalize">{r}</span>
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
-/** Edit-access (permissions) + remove. The reset-password control that sat
- *  between them is gone with the passwords. */
-function MemberActions({ m, onRevoke, onEdit }: { m: TenantMember; onRevoke: (m: TenantMember) => void; onEdit: (m: TenantMember) => void }) {
-  return (
-    <>
-      <Button size="sm" variant="ghost" onClick={() => onEdit(m)} title="Edit access">
-        <SlidersHorizontal className="size-4" />
-      </Button>
-      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => onRevoke(m)} title="Remove">
-        <Trash2 className="size-4" />
-      </Button>
-    </>
   );
 }
 

@@ -4,47 +4,57 @@
  * and lets the operator add rules (dashboard or webhook delivery). In-dashboard
  * status is for everyone; email/webhook + shorter thresholds are the higher-tier
  * levers (§25).
+ *
+ * ── What changed in 7d ──────────────────────────────────────────────────────
+ *
+ * Two of the three writes on this screen were unguarded — `await addAlertRule`
+ * and `await deleteAlertRule` with no catch — so a refused rule rejected into
+ * the app-wide "Something didn't load" toast, which names neither the control
+ * nor the reason, and the form kept the text it had failed to submit with no
+ * sign anything was wrong. Both go through `useAction` now, which cannot leave
+ * a rejection unhandled or a button stuck busy.
+ *
+ * The failed-load branch said "Check your connection — retrying automatically",
+ * which is true of a dropped connection and a lie about a 403. It carries the
+ * server's own message now, and the poll keeps running underneath.
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, X, Webhook, Mail } from "lucide-react";
+import { Plus, X, Webhook, Mail, Monitor, Wifi, WifiOff, BellRing } from "lucide-react";
+import { GlanceStrip, Group, LoadError, Row, Section, SkeletonList, toast, useAction } from "@4dl/ui";
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
 import { Input } from "../components/ui/input.js";
 import { Badge } from "../components/ui/badge.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
-import { cn } from "@/lib/utils";
-import { StatusDot } from "../components/status.js";
 import { listAlerts, listAlertRules, addAlertRule, deleteAlertRule, listScreens, type AlertRow, type AlertRule, type Screen } from "../api.js";
-import { toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
+
+const errorText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 
 export function AlertsPage() {
   const [alerts, setAlerts] = useState<AlertRow[] | null>(null);
-  const [rules, setRules] = useState<AlertRule[]>([]);
+  const [rules, setRules] = useState<AlertRule[] | null>(null);
   const [screens, setScreens] = useState<Screen[]>([]);
-  const [loadFailed, setLoadFailed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Component-scoped so the rule add/delete handlers can trigger a refresh too.
-  // Handles errors — a failed poll must surface an error, not an unhandled
-  // rejection or a permanent loading skeleton.
   const reload = useCallback(async () => {
     try {
       const [a, r, s] = await Promise.all([listAlerts(), listAlertRules(), listScreens()]);
-      setAlerts(a); setRules(r); setScreens(s); setLoadFailed(false);
-    } catch {
-      setLoadFailed(true);
+      setAlerts(a); setRules(r); setScreens(s); setError(null);
+    } catch (e) {
+      setError(errorText(e, "We couldn’t reach the server."));
     }
   }, []);
   useEffect(() => {
     reload();
     const t = setInterval(reload, 3000);
     return () => clearInterval(t);
-  }, []);
+  }, [reload]);
 
   const online = screens.filter((s) => s.live?.online).length;
   const offline = screens.length - online;
@@ -56,162 +66,165 @@ export function AlertsPage() {
     <div>
       <PageHeader title="Alerts" description="Health monitoring and delivery" />
 
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatTile label="Screens" value={alerts ? screens.length : undefined} />
-        <StatTile label="Online" value={alerts ? online : undefined} dot="bg-success" valueClass="text-success" />
-        <StatTile label="Offline" value={alerts ? offline : undefined} dot="bg-destructive" valueClass={offline > 0 ? "text-destructive" : undefined} />
-        <StatTile label="Open alerts" value={alerts ? active : undefined} accent={active > 0} />
+      {/*
+        Four boxed stat cards became one strip. They are a COMPARISON — how many
+        screens, how many of them are up — and four cards in a row on a phone is
+        four half-empty boxes stacked. `GlanceStrip` is the shape for this, and
+        `null` renders "Not yet" rather than a confident 0 during the first poll.
+      */}
+      <div className="mb-6 rounded-2xl bg-card py-4">
+        <GlanceStrip
+          items={[
+            { icon: Monitor, tone: "neutral", value: alerts ? screens.length : null, label: "Screens" },
+            { icon: Wifi, tone: "success", value: alerts ? online : null, label: "Online" },
+            { icon: WifiOff, tone: offline > 0 ? "danger" : "neutral", value: alerts ? offline : null, label: "Offline" },
+            { icon: BellRing, tone: active > 0 ? "danger" : "neutral", value: alerts ? active : null, label: "Open alerts" },
+          ]}
+        />
       </div>
 
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Recent alerts</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {!alerts && loadFailed ? (
-              <EmptyState title="Couldn't load alerts" description="Check your connection — retrying automatically." />
-            ) : !alerts ? (
-              <div className="space-y-3">
-                {[0, 1, 2].map((i) => (
-                  <div key={i} className="flex items-center gap-3 py-1">
-                    <Skeleton className="size-2 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-3.5 w-1/3" />
-                      <Skeleton className="h-3 w-2/3" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : alerts.length === 0 ? (
-              <EmptyState
-                scena="happy"
-                title="All clear"
-                description="No alerts right now — the fleet is healthy. New offline events will show up here."
-                className="border-0 bg-transparent py-10"
-              />
-            ) : (
-              <div className="-my-1">
-                {alerts.map((a) => {
-                  const recovery = a.type === "recovery";
-                  const open = a.type !== "recovery" && a.resolved_at === null;
-                  return (
-                    <div key={a.id} className="flex items-center gap-3 border-b py-3 last:border-0">
-                      <StatusDot tone={recovery ? "success" : open ? "destructive" : "muted"} />
-                      <div className="min-w-0">
-                        <div className="text-[13px] font-medium">
-                          {a.screen_name ?? "Screen"} <span className="text-muted-foreground">·</span>{" "}
-                          <span className={cn(recovery && "text-success", open && "text-destructive")}>{recovery ? "Recovered" : a.type}</span>
-                        </div>
-                        <div className="truncate font-mono text-[11px] text-muted-foreground">{a.message}</div>
-                      </div>
-                      <div className="flex-1" />
-                      <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/70">{new Date(a.at).toLocaleTimeString()}</span>
-                      {open ? <Badge variant="destructive" className="text-[10px]">OPEN</Badge> : null}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[1.4fr_1fr]">
+        <Section title="Recent alerts">
+          {error && !alerts ? (
+            <LoadError what="alerts" error={error} onRetry={() => void reload()} />
+          ) : !alerts ? (
+            <SkeletonList rows={4} card />
+          ) : alerts.length === 0 ? (
+            <EmptyState
+              scena="happy"
+              title="All clear"
+              description="No alerts right now — the fleet is healthy. New offline events will show up here."
+            />
+          ) : (
+            <Group>
+              {alerts.map((a) => {
+                const recovery = a.type === "recovery";
+                const open = !recovery && a.resolved_at === null;
+                return (
+                  <Row
+                    key={a.id}
+                    icon={recovery ? Wifi : WifiOff}
+                    iconTone={recovery ? "success" : open ? "danger" : "neutral"}
+                    sub={a.message}
+                    value={new Date(a.at).toLocaleTimeString()}
+                    valueSub={open ? <Badge variant="destructive" className="text-[10px]">OPEN</Badge> : recovery ? "Recovered" : "Resolved"}
+                  >
+                    {a.screen_name ?? "Screen"}
+                  </Row>
+                );
+              })}
+            </Group>
+          )}
+        </Section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Alert rules</CardTitle>
-            <p className="text-xs text-muted-foreground">Where offline alerts are delivered, beyond this dashboard.</p>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {!alerts ? (
-              <div className="space-y-3">
-                {[0, 1].map((i) => (
-                  <Skeleton key={i} className="h-10 w-full rounded-lg" />
-                ))}
-              </div>
-            ) : rules.length === 0 ? (
-              <p className="py-2 text-[13px] text-muted-foreground">No delivery rules yet — alerts stay in the dashboard. Add a webhook or email below.</p>
-            ) : (
-              <div className="-mt-1">
-                {rules.map((r) => (
-                  <div key={r.id} className="flex items-center gap-3 border-b py-3 last:border-0">
-                    <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground [&_svg]:size-4">
-                      {r.channel === "email" ? <Mail /> : <Webhook />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[13px] font-medium capitalize">{r.type} &gt; {r.threshold_sec}s</div>
-                      <div className="truncate font-mono text-[11px] text-muted-foreground">{r.channel}{r.target ? ` · ${r.target}` : ""}</div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
-                      aria-label="Delete rule"
-                      onClick={async () => {
-                        const ok = await confirmDialog({ title: "Delete this alert rule?", description: "Offline alerts will stop being delivered to this destination.", confirmText: "Delete rule", destructive: true });
-                        if (!ok) return;
-                        await deleteAlertRule(r.id);
-                        await reload();
-                        toast.success("Alert rule deleted.");
-                      }}
-                    >
-                      <X />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <WebhookForm onAdd={reload} />
-          </CardContent>
-        </Card>
+        <Section title="Alert rules">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm">Where alerts go</CardTitle>
+              <p className="text-xs text-muted-foreground">Beyond this dashboard. Offline alerts always appear here.</p>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {rules === null ? (
+                <SkeletonList rows={2} />
+              ) : rules.length === 0 ? (
+                <p className="py-2 text-[13px] text-muted-foreground">No delivery rules yet — alerts stay in the dashboard. Add a webhook or email below.</p>
+              ) : (
+                <Group className="bg-transparent">
+                  {rules.map((r) => (
+                    <RuleRow key={r.id} rule={r} onDeleted={reload} />
+                  ))}
+                </Group>
+              )}
+              <RuleForm onAdd={reload} />
+            </CardContent>
+          </Card>
+        </Section>
       </div>
     </div>
   );
 }
 
-function StatTile({ label, value, accent, dot, valueClass }: { label: string; value?: React.ReactNode; accent?: boolean; dot?: string; valueClass?: string }) {
+function RuleRow({ rule, onDeleted }: { rule: AlertRule; onDeleted: () => Promise<void> }) {
+  const { busy, err, run } = useAction(errorText);
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          {dot ? <span aria-hidden className={cn("inline-block size-2 rounded-full", dot)} /> : null}
-          {label}
-        </div>
-        {value === undefined ? (
-          <Skeleton className="mt-2 h-7 w-10" />
-        ) : (
-          <div className={cn("mt-1 text-2xl font-semibold tabular-nums", accent ? "text-primary" : valueClass)}>{value}</div>
-        )}
-      </CardContent>
-    </Card>
+    <>
+      <Row
+        icon={rule.channel === "email" ? Mail : Webhook}
+        sub={`${rule.channel}${rule.target ? ` · ${rule.target}` : ""}`}
+        trailing={
+          <Button
+            variant="ghost" size="icon"
+            className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
+            aria-label={`Delete the ${rule.channel} rule`}
+            disabled={busy === "delete"}
+            onClick={() =>
+              run("delete", async () => {
+                const ok = await confirmDialog({
+                  title: "Delete this alert rule?",
+                  description: "Offline alerts will stop being delivered to this destination.",
+                  confirmText: "Delete rule",
+                  destructive: true,
+                });
+                if (!ok) return;
+                await deleteAlertRule(rule.id);
+                await onDeleted();
+                toast.success("Alert rule deleted.");
+              }, "Couldn’t delete the rule — it is still in place.")
+            }
+          >
+            <X />
+          </Button>
+        }
+      >
+        <span className="capitalize">{rule.type} &gt; {rule.threshold_sec}s</span>
+      </Row>
+      {/* The refusal belongs on the control that was refused, not in a global
+          toast that has scrolled past by the time you look for it. */}
+      {err && <p className="px-4 pb-2 text-caption text-danger">{err}</p>}
+    </>
   );
 }
 
-function WebhookForm({ onAdd }: { onAdd: () => void }) {
+function RuleForm({ onAdd }: { onAdd: () => Promise<void> }) {
   const [channel, setChannel] = useState<"webhook" | "email">("webhook");
   const [target, setTarget] = useState("");
+  const { busy, err, run } = useAction(errorText);
   return (
     <form
-      onSubmit={async (e) => {
+      onSubmit={(e) => {
         e.preventDefault();
         if (!target.trim()) return;
-        await addAlertRule({ type: "offline", thresholdSec: 90, channel, target: target.trim() });
-        setTarget("");
-        onAdd();
-        toast.success(channel === "email" ? "Email alert recipient added." : "Webhook alert added.");
+        void run("add", async () => {
+          await addAlertRule({ type: "offline", thresholdSec: 90, channel, target: target.trim() });
+          // Cleared only AFTER the server took it. Clearing first is how a
+          // refused address disappears with nothing to correct.
+          setTarget("");
+          await onAdd();
+          toast.success(channel === "email" ? "Email alert recipient added." : "Webhook alert added.");
+        }, "Couldn’t add the rule — nothing was changed.");
       }}
-      className="mt-4 flex gap-2"
+      className="mt-4 space-y-2"
     >
-      <Select value={channel} onValueChange={(v) => setChannel(v as "webhook" | "email")}>
-        <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value="webhook">Webhook</SelectItem>
-          <SelectItem value="email">Email</SelectItem>
-        </SelectContent>
-      </Select>
-      <Input value={target} onChange={(e) => setTarget(e.target.value)} placeholder={channel === "email" ? "alerts@company.com" : "https://webhook…"} className="h-8 flex-1 font-mono text-xs" />
-      <Button variant="outline" size="sm" type="submit" disabled={!target.trim()}>
-        <Plus className="size-4" /> Add
-      </Button>
+      <div className="flex gap-2">
+        <Select value={channel} onValueChange={(v) => setChannel(v as "webhook" | "email")}>
+          <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="webhook">Webhook</SelectItem>
+            <SelectItem value="email">Email</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+          placeholder={channel === "email" ? "alerts@company.com" : "https://webhook…"}
+          className="h-8 flex-1 font-mono text-xs"
+          aria-label={channel === "email" ? "Email address" : "Webhook URL"}
+        />
+        <Button variant="outline" size="sm" type="submit" disabled={!target.trim() || busy === "add"}>
+          <Plus className="size-4" /> {busy === "add" ? "Adding…" : "Add"}
+        </Button>
+      </div>
+      {err && <p className="text-caption text-danger">{err}</p>}
     </form>
   );
 }

@@ -345,3 +345,91 @@ choice cards and a three-step explainer — which is not a `Collection.empty` an
 should not be flattened into one. It also carries the fleet `StatTile` row above
 the grid. It moves in **7e** with `ScreenDetail`, and `components/tag-filter.tsx`
 stays alive until then as its last consumer.
+
+
+---
+
+## 7d — Settings, Team, Alerts and Billing
+
+### `Settings.tsx` — three tabs became an index and a page per section
+
+581 → 741 lines, and the growth is the point: what was added is the INDEX, and
+what an index costs is one sub-line per row saying the current value.
+
+The old shape was three tabs over one page — Account (one card), Brand kit (four
+stacked cards, the last a 30-row token grid), AI (two cards). Two things were
+wrong with it beyond the tabs:
+
+- **Three save semantics in three adjacent cards, and nothing said which.** The
+  brand form had "Save brand". The palette generator wrote into that same
+  unsaved form and its only Save was a card away, so a generated palette got
+  previewed and abandoned. The asset uploader saved immediately. Each of the
+  four is its own sub-page now and each says how it saves; the palette page has
+  its own Save on the same row as Generate.
+- **The index could not have been written from the old page.** "Is multi-screen
+  sync on" was a question you answered by opening the control that changes it.
+  Every row now states its value — `Multi-screen sync on`, `4 custom tokens · 2
+  logos`, `3 of 4 generators pinned`, the sign-in address — which is the whole
+  trick the settings grammar turns on.
+
+**`?s=brand&sub=palette`.** The open section is in the URL, over the router this
+app already has. `useState` compiles and means every section shares one address:
+Back leaves Settings from three levels deep, nothing is linkable, and a reload
+lands on the index.
+
+**Two writes stopped lying.** `toggleSync` and `pickDefault` both set state,
+awaited, and never put the control back on a refusal — so a plan that refused
+the change left the switch showing "on". Both snapshot and roll back now. And
+`freeRun` is `null` until known rather than `false`, because a settings index
+that renders "Screens free-run" during the first round trip has told somebody
+their video wall is out of sync when it is not.
+
+### `Team.tsx` — one rendering, not two
+
+477 → 467. It shipped a desktop `<Table>` **and** a duplicated stack of mobile
+cards: the same four facts written twice, which is how two renderings drift.
+It is one `Collection` of `Row`s now, searchable, at every width.
+
+- **The role moved into the ⋮ menu.** It was an always-armed 150px `<Select>` on
+  every row — a mis-tap away from demoting a colleague, and the first thing to
+  be cramped on a phone. It is a `Badge` you read and a menu item you choose.
+- **The `LoadError` placeholder is gone.** 7a left this screen (and two others)
+  passing a hardcoded "We couldn't reach the server.", which is honest about a
+  dropped connection and a lie about a 403 — the two cases an owner most needs
+  told apart. It carries the server's message now.
+- Pending invitations stay a separate group above the roster, because each one
+  holds a seat and because nothing you can do to a member applies to one.
+
+### `Alerts.tsx` — two unguarded writes
+
+217 → 230. `await addAlertRule(…)` and `await deleteAlertRule(…)` had no catch
+at all, so a refused rule rejected into the app-wide "Something didn't load"
+toast — which names neither the control nor the reason — and the form kept the
+text it had failed to submit with no sign anything was wrong. Both go through
+`@4dl/ui`'s `useAction` now, which cannot leave a rejection unhandled or a
+button stuck busy, and the refusal renders **on the control that was refused**.
+The target field is cleared only after the server takes it.
+
+The four boxed stat cards became one `GlanceStrip` — they are a comparison, and
+four half-empty boxes stacked on a phone is not one — and the values are `null`
+rather than `0` while the first poll is in flight.
+
+### `Billing.tsx` — the money screen had the unguarded write
+
+525 → 525. `purchase()` had a `finally` and no `catch`: a refused credit-pack
+checkout rejected into the generic toast, on the one screen where "we could not
+take your money" has to be said out loud, with "you have not been charged".
+
+The failed-load card asserted "We couldn't reach the API" whatever the server
+answered — now `LoadError` with the real message. The three hand-rolled progress
+bars are `@4dl/ui`'s `Meter`, which is where the "a real zero draws nothing, a
+non-zero always draws something" rule lives. The ledger's five-column `<Table>`
+is a `Row` list: Reference and Balance were the first columns squeezed out on a
+phone, and Balance is the column somebody opens a ledger to read.
+
+### Still outstanding after 7d
+
+`components/status.js`'s `StatTile` now has one caller (`Screens.tsx`) and
+should go with it in 7e — `GlanceStrip` is the shape. `page-header` and
+`page-chrome` are still the app's own; they are the largest remaining sweep
+(17 and 18 importers) and are not per-screen work, so they get their own pass.

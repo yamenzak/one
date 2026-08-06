@@ -1,16 +1,31 @@
+/**
+ * BILLING (§25): plan, AI credits, one-time packs, promo redemption, ledger.
+ *
+ * ── What 7d changed ─────────────────────────────────────────────────────────
+ *
+ * `purchase()` had a `finally` and no `catch`, so a refused credit-pack
+ * checkout rejected into the app-wide "Something didn't load" toast — the one
+ * screen where "we could not take your money" has to be said out loud.
+ *
+ * The failed-load card said "We couldn't reach the API" whatever the server
+ * actually answered; it carries the real message now, through `LoadError`.
+ *
+ * The ledger's five-column `<Table>` is a `Row` list: on a phone the Reference
+ * and Balance columns were the first to be squeezed out, and Balance is the
+ * column somebody opens a ledger to read.
+ */
 import { useEffect, useState } from "react";
 import { Receipt, Check, Sparkles, ArrowRight, Lock, Loader2 } from "lucide-react";
+import { Group, LoadError, Meter, Row, toast } from "@4dl/ui";
 import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
 import { Input } from "../components/ui/input.js";
 import { Skeleton } from "../components/ui/skeleton.js";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { PageHeader } from "../components/page-header.js";
 import { LegalDialog, LegalLinks, type LegalDoc } from "../legal/content.js";
 import { cn } from "@/lib/utils";
 import { FEATURE_CATALOG, QUOTA_CATALOG } from "@scena/manifest";
-import { toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   getBilling,
@@ -44,29 +59,23 @@ export function BillingPage() {
   const [promoMsg, setPromoMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
   const [pending, setPending] = useState<Plan | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const reload = () => getBilling().then((s) => { setState(s); setLoadFailed(false); }).catch(() => setLoadFailed(true));
-  useEffect(() => {
-    reload();
-  }, []);
+  const reload = () => {
+    setError(null);
+    return getBilling().then(setState).catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  };
+  useEffect(() => { reload(); }, []);
 
   if (!state) {
-    // Distinguish a genuine outage from first-load so the page doesn't hang on a
-    // skeleton forever when the API is unreachable.
-    if (loadFailed) return (
-      <div className="mx-auto max-w-md rounded-xl border bg-card px-6 py-10 text-center">
-        <h3 className="text-base font-semibold">Couldn't load billing</h3>
-        <p className="mt-1 text-sm text-muted-foreground">We couldn't reach the API. Check your connection and try again.</p>
-        <Button className="mt-5" onClick={reload}>Retry</Button>
-      </div>
-    );
+    // A genuine outage and a first load are different states. Hanging on the
+    // skeleton is the failure this distinction exists to prevent.
+    if (error) return <div className="mx-auto max-w-md py-10"><LoadError what="billing" error={error} onRetry={reload} /></div>;
     return <BillingSkeleton />;
   }
 
   const { subscription: sub, plan, balance, plans, packs, ledger, entitlements, storage } = state;
   const grant = entitlements.aiCredits.monthlyGrant || 0;
-  const pct = grant > 0 ? Math.min(100, Math.round((balance.balance / grant) * 100)) : 0;
   // Media storage is the second thing the plan caps, and until Stage 5 it was
   // capped by nothing at all. Shown beside the credit balance because a ceiling
   // you cannot see is one that surprises you at the moment an upload matters.
@@ -95,6 +104,10 @@ export function BillingPage() {
       const r = await buyPack(packId);
       if (r.checkoutUrl) window.location.href = r.checkoutUrl;
       else toast.error(r.error === "stripe not configured" ? "Stripe is not configured — ask your admin to enable payments." : r.error ?? "Checkout unavailable");
+    } catch (e) {
+      // Was a bare `finally`. A refused checkout rejected into the app-wide
+      // "Something didn't load" toast, which names neither the pack nor why.
+      toast.error(e instanceof Error ? e.message : "Couldn’t start checkout — you have not been charged.");
     } finally {
       setBusy(null);
     }
@@ -163,16 +176,16 @@ export function BillingPage() {
             <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">AI credit balance</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="font-mono text-3xl font-semibold tabular-nums">{num(balance.balance)}</div>
+            <div className="numeral text-3xl font-semibold">{num(balance.balance)}</div>
             {grant > 0 && (
-              <>
-                <div className="mt-3 mb-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
-                </div>
-                <div className="font-mono text-xs tabular-nums text-muted-foreground">
-                  {num(balance.balance)} / {num(grant)} grant · {num(balance.available)} available
-                </div>
-              </>
+              <Meter
+                className="mt-3"
+                size="md"
+                value={balance.balance}
+                max={grant}
+                tone="primary"
+                valueLabel={`${num(balance.balance)} / ${num(grant)} grant · ${num(balance.available)} available`}
+              />
             )}
             <div className="mt-3 text-xs text-muted-foreground/70">$1 = 1,000 credits · charged per model at generation time.</div>
           </CardContent>
@@ -186,17 +199,16 @@ export function BillingPage() {
           <CardContent>
             <div className="font-mono text-3xl font-semibold tabular-nums">{storage ? mb(storage.usedBytes) : "—"}</div>
             {storage && storage.limitBytes > 0 && (
-              <>
-                <div className="mt-3 mb-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={`h-full rounded-full transition-all ${storagePct >= 90 ? "bg-destructive" : "bg-primary"}`}
-                    style={{ width: `${storagePct}%` }}
-                  />
-                </div>
-                <div className="font-mono text-xs tabular-nums text-muted-foreground">
-                  {mb(storage.usedBytes)} / {mb(storage.limitBytes)} used
-                </div>
-              </>
+              <Meter
+                className="mt-3"
+                size="md"
+                value={storage.usedBytes}
+                max={storage.limitBytes}
+                // Past 90% the bar is the warning — the number beside it is the
+                // same number it was at 40%, and nobody reads two of those.
+                tone={storagePct >= 90 ? "danger" : "primary"}
+                valueLabel={`${mb(storage.usedBytes)} / ${mb(storage.limitBytes)} used`}
+              />
             )}
             {storage && storage.limitBytes < 0 && <div className="mt-3 text-xs text-muted-foreground">Unlimited on this plan.</div>}
             <div className="mt-3 text-xs text-muted-foreground/70">Uploads and generated assets. Deleting media from the library frees it.</div>
@@ -303,32 +315,20 @@ export function BillingPage() {
           {ledger.length === 0 ? (
             <EmptyState icon={Receipt} title="No activity yet" description="Credit grants, purchases, and AI usage will appear here as they happen." />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Activity</TableHead>
-                    <TableHead>Reference</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {ledger.map((l) => (
-                    <TableRow key={l.id}>
-                      <TableCell className="font-medium">{reasonLabel(l.reason)}</TableCell>
-                      <TableCell className="font-mono text-xs text-muted-foreground">{l.ref ?? "—"}</TableCell>
-                      <TableCell className="font-mono text-xs tabular-nums text-muted-foreground">{fmtDate(l.created_at)}</TableCell>
-                      <TableCell className={cn("text-right font-mono font-semibold tabular-nums", l.delta >= 0 ? "text-success" : "text-foreground")}>
-                        {l.delta >= 0 ? "+" : ""}{num(l.delta)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono tabular-nums text-muted-foreground">{num(l.balance)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <Group>
+              {ledger.map((l) => (
+                <Row
+                  key={l.id}
+                  icon={Receipt}
+                  iconTone={l.delta >= 0 ? "success" : "neutral"}
+                  sub={`${fmtDate(l.created_at)}${l.ref ? ` · ${l.ref}` : ""}`}
+                  value={<span className={l.delta >= 0 ? "text-success" : undefined}>{l.delta >= 0 ? "+" : ""}{num(l.delta)}</span>}
+                  valueSub={`balance ${num(l.balance)}`}
+                >
+                  {reasonLabel(l.reason)}
+                </Row>
+              ))}
+            </Group>
           )}
         </CardContent>
       </Card>
