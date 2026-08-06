@@ -85,14 +85,13 @@ export function registerBilling(app: App): void {
   // the caller's role in it; `isAdmin` is the platform-admin axis.
   app.get("/api/me", async (c) => {
     const user = c.get("user");
-    let username: string | null = null;
-    let board: { boardId: string; stationId: string | null; kind: string; label: string } | null = null;
-    if (user) {
-      const row = await c.env.DB.prepare('SELECT username FROM "user" WHERE id = ?').bind(user.id).first<{ username: string | null }>();
-      username = row?.username ?? null;
-      // Board-scoped users land on their control surface, not the operator app.
-      board = await boardUserScope(c.env.DB, user.id);
-    }
+    // Board-scoped users land on their control surface, not the operator app.
+    // `username` used to ride along here, read off a `"user".username` column
+    // Scena added to a table `@4dl/auth` now owns. Nothing signs in with a handle
+    // any more, and a station's handle is already in `board.label` and in its
+    // `board_users` row — so the field was a second copy of something that had
+    // stopped being an identity.
+    const board = user ? await boardUserScope(c.env.DB, user.id) : null;
     // The tenant's effective plan gates (features + quotas), so the dashboard can
     // hide/disable what the plan doesn't include — the same source the server enforces.
     const tenantId = c.get("tenantId");
@@ -105,7 +104,6 @@ export function registerBilling(app: App): void {
     return c.json({
       user,
       email: user?.email ?? null,
-      username,
       tenantId,
       role: c.get("role"),
       isAdmin: isPlatformAdmin(c),

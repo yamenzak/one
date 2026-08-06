@@ -3,11 +3,22 @@
  *
  * Every board is provisioned a **coordinator** (controls the whole board) plus
  * one **station** user per option (a room to flip, a counter to call from, a
- * competitor to score). Each is an ordinary Better Auth credential account with
- * an auto-issued 6-char username + 6-char password, a restricted board role, and
- * a `board_users` row binding it to its board (and station). They sign in through
- * the normal username+password form and land on their scoped control surface.
- * When the board is deleted, its users vanish with it.
+ * competitor to score). Each is a Better Auth credential account with an
+ * auto-issued 6-char handle + 6-char code, a restricted board role, and a
+ * `board_users` row binding it to its board (and station). When the board is
+ * deleted, its users vanish with it.
+ *
+ * ⚠️ THESE ARE THE ONLY ACCOUNTS ON THIS PLATFORM THAT HOLD A PASSWORD.
+ *
+ * Every other 4DL app is passwordless for people, and Scena is too: staff are
+ * invited by email and sign in with a code or a passkey. A station is not a
+ * person — it is a shared device at a counter, operated by whoever is standing
+ * there, dozens of times an hour. `@4dl/auth` makes that distinction checkable
+ * rather than conventional: the account's address is synthetic and non-routable
+ * (`<handle>@bd.scena` — `STATION_DOMAIN`), `isStationPrincipal` is the one
+ * place it is asked, and `packages/auth/test/station-credentials.test.ts`
+ * asserts the lane stays opt-in. Mint an account here with a ROUTABLE address
+ * and you have quietly given a human being a password.
  *
  * ⚠️ THE CODE IS SHOWN ONCE AND NEVER STORED.
  *
@@ -27,11 +38,9 @@
  */
 import { hashPassword } from "better-auth/crypto";
 import type { BoardRole } from "./access.js";
-import { usernameTaken, randomHandle } from "./members.js";
+import { STATION_DOMAIN } from "./auth.js";
+import { randomHandle } from "./members.js";
 import type { BoardRow } from "./board-store.js";
-
-/** Non-routable suffix marking an auto-provisioned board account. */
-const BOARD_DOMAIN = "@bd.scena";
 
 /**
  * ⚠️ `password` is ALWAYS NULL on a row read back. It is typed as nullable so a
@@ -82,11 +91,23 @@ export function boardOptions(kind: string, config: Record<string, unknown>): Boa
   return [];
 }
 
-/** A 6-char handle guaranteed unique across all accounts (retries, then widens). */
+/**
+ * A 6-char handle guaranteed unique across all accounts (retries, then widens).
+ *
+ * Uniqueness is asked of `"user".email`, which is where it is actually ENFORCED
+ * — the column is `TEXT UNIQUE` in `@4dl/auth`'s schema. It used to be asked of
+ * a separate `"user".username` column that Scena added, so the question and the
+ * constraint were two different things and could disagree; the address is
+ * derived from the handle, so one answers for both.
+ */
 async function uniqueHandle(db: D1Database): Promise<string> {
   for (let i = 0; i < 10; i++) {
     const u = randomHandle(6);
-    if (!(await usernameTaken(db, u))) return u;
+    const taken = await db
+      .prepare('SELECT 1 AS x FROM "user" WHERE email = ?')
+      .bind(`${u}${STATION_DOMAIN}`)
+      .first<{ x: number }>();
+    if (!taken) return u;
   }
   return randomHandle(9);
 }
@@ -98,13 +119,15 @@ export async function provisionBoardUser(
 ): Promise<{ userId: string; username: string; password: string }> {
   const username = await uniqueHandle(db);
   const password = randomHandle(6);
-  const email = `${username}${BOARD_DOMAIN}`;
+  const email = `${username}${STATION_DOMAIN}`;
   const role: BoardRole = opts.stationId ? "board_station" : "board_coordinator";
   const now = new Date().toISOString();
   const userId = rid("usr"), accountId = rid("acc"), memberId = rid("mem"), buId = rid("bu");
   const hash = await hashPassword(password);
   await db.batch([
-    db.prepare('INSERT INTO "user" (id, name, email, username, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, ?, ?)').bind(userId, opts.label, email, username, now, now),
+    // No `username` column: `@4dl/auth` owns `"user"` and the handle lives in
+    // the synthetic address, which is the unique one.
+    db.prepare('INSERT INTO "user" (id, name, email, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, 1, ?, ?)').bind(userId, opts.label, email, now, now),
     db.prepare('INSERT INTO "account" (id, accountId, providerId, userId, password, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(accountId, userId, "credential", userId, hash, now, now),
     db.prepare('INSERT INTO "member" (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, ?, ?)').bind(memberId, opts.orgId, userId, role, now),
     // `password` is intentionally absent from this INSERT — the column survives

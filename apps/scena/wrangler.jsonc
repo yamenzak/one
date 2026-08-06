@@ -17,8 +17,15 @@
   // API surface so Hono handles /api/* and /health, and fall back to the SPA
   // shell (index.html) for client-side routes. Build the dashboard before
   // deploying: `pnpm --filter @scena/app build`.
+  //
+  // ⚠️ This said `../dashboard/dist` — the SPA's path in the repo Scena came
+  // from. `wrangler dev` refuses to start on a missing assets directory, so it
+  // was loud here; a deploy is not, and turbo cannot infer the edge either
+  // (an `assets.directory` is a filesystem path, not a package dependency).
+  // `apps.json`'s `spa: "@scena/app"` is the machine-readable half of the same
+  // fact — keep the two pointing at one package.
   "assets": {
-    "directory": "../dashboard/dist",
+    "directory": "../scena-app/dist",
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*", "/health"]
   },

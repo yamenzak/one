@@ -9,6 +9,24 @@
 
 import type { Entitlements } from "./entitlements.js";
 
+/**
+ * The platform's ONE onboarded transactional address, with Scena's display name.
+ * Kept identical to `apps.json`'s `defaultEmailAddress` — `sender-default.test.mjs`
+ * enforces it, because a sending domain is onboarded in Cloudflare per DOMAIN, by
+ * hand, once, and anything else bounces in production and looks like any other
+ * failure.
+ *
+ * ⚠️ It lives HERE, not in `mailer.ts`, and the reason is a cycle rather than a
+ * preference. `mailer.ts` reads `getConfig` from `billing-store.ts`, which reads
+ * `DEFAULT_CONFIG` from this file — so a seed importing the constant from the
+ * mailer closes the loop, and at module-init time the import resolves to
+ * `undefined`. That is not a type error and not a crash on boot: it surfaces
+ * later as `D1_TYPE_ERROR: Type 'undefined' not supported`, from the seed, on a
+ * fresh database, which reads as a database problem. This file imports only a
+ * TYPE, so it is a leaf and cannot be in a cycle.
+ */
+export const PLATFORM_FROM_DEFAULT = "Scena <noreply@4dl.app>";
+
 export interface PlanSeed {
   id: string;
   name: string;
@@ -21,6 +39,7 @@ export interface PlanSeed {
 const base = (over: Partial<Entitlements["quotas"]>, feat: Partial<Entitlements["features"]>, grant: number, resync: number): Entitlements => ({
   quotas: {
     pairedDevices: 1,
+    seats: 1,
     profiles: 1,
     channelsPerProfile: 1,
     slidesPerPlaylist: 10,
@@ -72,7 +91,7 @@ export const DEFAULT_PLANS: PlanSeed[] = [
     interval: "month",
     sort: 1,
     entitlements: base(
-      { pairedDevices: 3, channelsPerProfile: 3, slidesPerPlaylist: 30, feeds: 2, feedRefreshMinSec: 1800, scheduleRules: 5, historyVersions: 10, libraryTracks: 10 },
+      { pairedDevices: 3, seats: 3, channelsPerProfile: 3, slidesPerPlaylist: 30, feeds: 2, feedRefreshMinSec: 1800, scheduleRules: 5, historyVersions: 10, libraryTracks: 10 },
       { ticker: ["basic"], dayparting: true, htmlSandbox: true, aiGeneration: true, musicLibrary: true },
       250,
       30,
@@ -87,6 +106,7 @@ export const DEFAULT_PLANS: PlanSeed[] = [
     entitlements: base(
       {
         pairedDevices: 15,
+        seats: 10,
         profiles: 3,
         channelsPerProfile: 4,
         slidesPerPlaylist: 60,
@@ -127,6 +147,7 @@ export const DEFAULT_PLANS: PlanSeed[] = [
     entitlements: base(
       {
         pairedDevices: 60,
+        seats: -1,
         profiles: 10,
         channelsPerProfile: 8,
         slidesPerPlaylist: 120,
@@ -278,7 +299,14 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   "ai.default_model.music": "musicgen",
   "email.provider": "cloudflare", // disabled | mock | resend | cloudflare (env.EMAIL binding)
   "email.api_key": "", // only used by the resend provider
-  "email.from": "Scena <noreply@fourdegreelabs.com>", // sender domain must be onboarded for the cloudflare provider
+  /*
+    ⚠️ THE SEEDED ROW WINS OVER `PLATFORM_FROM_DEFAULT`, so it must be the same
+    address. This said `Scena <noreply@fourdegreelabs.com>` — a domain nobody
+    onboarded — and because it is a real `app_config` row it beat the constant
+    that `sender-default.test.mjs` checks. Every message from a fresh
+    deployment would have been refused at the provider.
+  */
+  "email.from": PLATFORM_FROM_DEFAULT, // sender domain must be onboarded for the cloudflare provider
   "email.admin": "", // billing/system notices go here (falls back to OPERATOR_EMAIL)
   "weather.api_key": "", // Platform OpenWeather One Call key — all weather sources run on this company key (empty ⇒ mock conditions, free)
   "weather.credits_per_call": "3", // Credits charged per real weather fetch (per location, hourly within opening hours)

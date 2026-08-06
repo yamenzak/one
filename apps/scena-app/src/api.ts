@@ -971,7 +971,6 @@ export type Role = "owner" | "operator" | "receptionist" | "viewer" | "board_coo
 export interface Me {
   user: { id: string; email: string; name?: string | null; image?: string | null } | null;
   email: string | null;
-  username: string | null;
   tenantId: string | null;
   role: Role | null;
   isAdmin: boolean;
@@ -1000,52 +999,104 @@ export interface TenantMember {
   userId: string;
   role: Role;
   name: string;
-  username: string | null;
   email: string | null;
-  isStaff: boolean;
   /** Effective per-user permission grant (custom if set, else the role preset). */
   permissions: Record<string, string[]>;
   createdAt: string | null;
 }
 
+/** An invitation that has been sent and not yet accepted. It RESERVES a seat. */
+export interface PendingInvitation {
+  id: string;
+  email: string;
+  role: Role;
+  expiresAt: string;
+}
+
 export interface TeamState {
   members: TenantMember[];
-  /** Workspace slug staff type on the login screen. */
+  /** The workspace's canonical slug — its door. */
   loginSlug: string | null;
   roles: Role[];
 }
 
 export async function getTeam(): Promise<TeamState> {
-  return (await (await fetch(`${API_BASE}/api/members`)).json()) as TeamState;
+  const res = await fetch(`${API_BASE}/api/members`);
+  if (!res.ok) throw new Error(`getTeam ${res.status}`);
+  return (await res.json()) as TeamState;
 }
 
-/** Provision a staff account. Returns the created login slug/username or throws the API error. */
-export async function createStaffMember(input: { username: string; password: string; role: Role; name?: string; permissions?: Record<string, string[]> }): Promise<{ username: string; loginSlug: string }> {
-  const res = await fetch(`${API_BASE}/api/members`, { method: "POST", headers: jhead, body: JSON.stringify(input) });
-  const body = (await res.json()) as { username?: string; loginSlug?: string; error?: string };
-  if (!res.ok) throw new Error(body.error ?? "Could not create member");
-  return { username: body.username ?? input.username, loginSlug: body.loginSlug ?? "" };
+/**
+ * The seat accounting, from `@4dl/auth`'s staff routes.
+ *
+ * Read from the SERVER rather than derived from `members.length`, because the
+ * two are not the same number: board users are memberships that do not consume
+ * a seat, and a pending invitation consumes one without being a membership at
+ * all. A screen that counts rows tells an owner they have seats they cannot use,
+ * or none when several are free.
+ */
+export interface StaffSeats {
+  used: number;
+  pending: number;
+  /** `-1` is unlimited. Never compare it numerically. */
+  max: number;
+  remaining: number;
 }
 
-/** Set a member's custom permission grant (empty ⇒ falls back to the role preset). */
-export async function setMemberPermissions(memberId: string, permissions: Record<string, string[]>): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/members/${memberId}/permissions`, { method: "POST", headers: jhead, body: JSON.stringify({ permissions }) });
-  if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Could not update permissions");
+export interface StaffState {
+  members: { id: string; userId: string; role: Role; name: string | null; email: string | null; createdAt: string }[];
+  invitations: PendingInvitation[];
+  seats: StaffSeats;
+  roles: { name: Role; label: string; blurb: string; grant: Record<string, string[]> }[];
+  catalog: Record<string, string[]>;
+  canManage: boolean;
 }
 
-export async function resetMemberPassword(memberId: string, password: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/members/${memberId}/password`, { method: "POST", headers: jhead, body: JSON.stringify({ password }) });
-  if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Could not reset password");
+export async function getStaff(): Promise<StaffState> {
+  const res = await fetch(`${API_BASE}/api/staff`);
+  if (!res.ok) throw new Error(`getStaff ${res.status}`);
+  return (await res.json()) as StaffState;
 }
 
-export async function setMemberRole(memberId: string, role: Role): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/members/${memberId}/role`, { method: "POST", headers: jhead, body: JSON.stringify({ role }) });
+/**
+ * Invite somebody by email. They sign in with a one-time code — there is no
+ * password for an admin to choose, hand over, or later read back.
+ *
+ * The accept URL comes back even when the mail did not, which is what makes an
+ * invitation survive a misconfigured mailer: the owner can pass the link on.
+ */
+export async function inviteStaff(input: { email: string; role: Role }): Promise<{ id: string; url: string; emailed: boolean; emailError: string | null }> {
+  const res = await fetch(`${API_BASE}/api/staff/invite`, { method: "POST", headers: jhead, body: JSON.stringify(input) });
+  const body = (await res.json()) as { id?: string; url?: string; emailed?: boolean; emailError?: string | null; error?: string };
+  if (!res.ok) throw new Error(body.error ?? "Could not send the invitation");
+  return { id: body.id ?? "", url: body.url ?? "", emailed: body.emailed ?? false, emailError: body.emailError ?? null };
+}
+
+export async function cancelInvitation(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/staff/invitations/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Could not cancel the invitation");
+}
+
+export async function setMemberRole(userId: string, role: Role): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/staff/${userId}/role`, { method: "PATCH", headers: jhead, body: JSON.stringify({ role }) });
   if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Could not change role");
 }
 
-export async function revokeMember(memberId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/members/${memberId}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Could not revoke member");
+export async function revokeMember(userId: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/staff/${userId}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Could not remove them");
+}
+
+/**
+ * Narrow a member below their role. An empty grant clears the override.
+ *
+ * ⚠️ This can only ever REMOVE capability — the server intersects what is sent
+ * here with the role's preset. Sending a power the role does not carry is not an
+ * error and is not applied; it simply resolves to nothing.
+ */
+export async function setMemberPermissions(memberId: string, permissions: Record<string, string[]>): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/members/${memberId}/permissions`, { method: "POST", headers: jhead, body: JSON.stringify({ permissions }) });
+  if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Could not update permissions");
 }
 
 /** Public: resolve a typed workspace (slug or name) to its canonical login slug. */
@@ -1053,19 +1104,6 @@ export async function resolveWorkspace(q: string): Promise<{ slug: string; name:
   const res = await fetch(`${API_BASE}/api/org/resolve?q=${encodeURIComponent(q)}`);
   if (!res.ok) return null;
   return (await res.json()) as { slug: string; name: string };
-}
-
-/** Public: resolve a global username → its login email (for username sign-in). */
-export async function resolveUsername(username: string): Promise<string | null> {
-  const res = await fetch(`${API_BASE}/api/username/resolve`, { method: "POST", headers: jhead, body: JSON.stringify({ username }) });
-  if (!res.ok) return null;
-  return ((await res.json()) as { email?: string }).email ?? null;
-}
-
-/** Authed: claim/rename the current user's global username. */
-export async function claimUsername(username: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/username/claim`, { method: "POST", headers: jhead, body: JSON.stringify({ username }) });
-  if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Could not set username");
 }
 
 /* ------------------------ admin: factory reset (nuke) --------------------- */

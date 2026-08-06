@@ -43,6 +43,30 @@
  *
  * `tenants` is absent too: the row IS the tenant, and the runner's caller
  * deletes it last, after the cascade.
+ *
+ * ── What this module NO LONGER owns ────────────────────────────────────────
+ *
+ * Better Auth's seven tables (`"user"`, `"session"`, `"account"`,
+ * `"verification"`, `"organization"`, `"member"`, `"invitation"`) left in Stage
+ * 2 — `@4dl/auth`'s `AUTH_SCHEMA` owns them now, along with `"passkey"`,
+ * `auth_logs` and `action_otps`, which Scena never had. `db.ts` composes the two
+ * with auth FIRST, because the app is allowed to depend on auth's tables and not
+ * the other way round.
+ *
+ * Scena's `"user".username` column and its unique index went with them, and did
+ * NOT come back as an extension. Two reasons:
+ *
+ *   • It had stopped being needed. It existed so staff could sign in with a
+ *     handle instead of an email; staff are invited by email now. The only
+ *     remaining handle-holder is a STATION, whose synthetic address
+ *     (`<handle>@bd.scena`) is already UNIQUE in `"user".email` — so uniqueness
+ *     was being enforced twice, by two columns that could disagree.
+ *   • It was BROKEN as ported. The unique index sat in `ddl` while the ALTER
+ *     that adds the column sat in `alters`, and the runner applies `ddl` first
+ *     as ONE batched `exec` — so on a fresh database that whole batch would have
+ *     failed on a column that did not exist yet, taking every table in this
+ *     module with it. It never fired because the original's hand-rolled runner
+ *     ordered the two statements by hand.
  */
 
 import type { SchemaModule } from "@4dl/core";
@@ -52,7 +76,7 @@ export const DEMO_TENANT = "tenant_demo";
 
 export const SCENA_SCHEMA: SchemaModule = {
   id: "scena",
-  version: "2026-08-06b",
+  version: "2026-08-06d",
   ddl: [
     "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, email TEXT, name TEXT, created_at INTEGER);",
     // Devices (screens). channel_id is the active/default channel; a device
@@ -126,6 +150,22 @@ export const SCENA_SCHEMA: SchemaModule = {
     "CREATE TABLE IF NOT EXISTS ai_cache (hash TEXT PRIMARY KEY, task TEXT, model TEXT, output TEXT, asset_hash TEXT, neurons REAL, created_at INTEGER);",
     "CREATE TABLE IF NOT EXISTS ai_generations (id TEXT PRIMARY KEY, tenant_id TEXT, task TEXT, model TEXT, prompt TEXT, neurons REAL, credits INTEGER, output_ref TEXT, created_at INTEGER);",
     // Admin-editable key/value config (Stripe keys, dunning windows, markup).
+    /*
+      ⚠️ `app_config` IS `@4dl/core`'s TABLE, and this line cannot widen it.
+
+      The runner has to create `app_config` before it can read a single marker
+      row, so it bootstraps `(key TEXT PRIMARY KEY, value TEXT)` ahead of every
+      module. This `CREATE … IF NOT EXISTS` therefore always finds the table
+      already there and does nothing — including nothing about `updated_at`.
+
+      That is not theoretical. On a fresh database the plan-catalog seed and
+      every config write are `INSERT INTO app_config (key, value, updated_at)`,
+      and each one failed with `table app_config has no column named updated_at`
+      — so a brand-new Scena deployment could not seed its catalog or save any
+      setting, while an existing one (whose table predates the shared runner)
+      worked perfectly. The line below is kept for readers; the ALTER in
+      `alters` is what actually adds the column, on both.
+    */
     "CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT, updated_at INTEGER);",
     // Ads & interrupts (§21): scheduled interrupts (audio / video / command),
     // fired epoch-stamped via the ChannelDO alarm. Ads belong to a reusable
@@ -155,28 +195,6 @@ export const SCENA_SCHEMA: SchemaModule = {
     "CREATE INDEX IF NOT EXISTS idx_ads_profile ON ads(profile_id);",
     "CREATE INDEX IF NOT EXISTS idx_board_users_board ON board_users(board_id);",
     "CREATE INDEX IF NOT EXISTS idx_playout_events_tenant ON playout_events(tenant_id, ts);",
-    /*
-      BETTER AUTH'S SEVEN TABLES, and the quoting is load-bearing.
-
-      Every one is a RESERVED-ish identifier ("user", "session", "account",
-      "member"…) so the SQL quotes them — which is why they arrived last in the
-      port and nearly did not arrive at all: the first pass matched statements
-      with a quote class that truncated at the `"` inside `"user"`, silently
-      dropping all ten quoted statements. The pinned count is what noticed.
-
-      ⚠️ These LEAVE in Stage 2, when `@4dl/auth`'s AUTH_SCHEMA takes over. The
-      commit that removes them from here is the one that adds AUTH_SCHEMA to
-      `SCHEMA_MODULES` — never one without the other, or sign-in loses its
-      tables on the next fresh database.
-    */
-    'CREATE TABLE IF NOT EXISTS "user" (id TEXT PRIMARY KEY, name TEXT, email TEXT UNIQUE, emailVerified INTEGER, image TEXT, createdAt DATE, updatedAt DATE);',
-    'CREATE TABLE IF NOT EXISTS "session" (id TEXT PRIMARY KEY, expiresAt DATE, token TEXT UNIQUE, createdAt DATE, updatedAt DATE, ipAddress TEXT, userAgent TEXT, userId TEXT, activeOrganizationId TEXT);',
-    'CREATE TABLE IF NOT EXISTS "account" (id TEXT PRIMARY KEY, accountId TEXT, providerId TEXT, userId TEXT, accessToken TEXT, refreshToken TEXT, idToken TEXT, accessTokenExpiresAt DATE, refreshTokenExpiresAt DATE, scope TEXT, password TEXT, createdAt DATE, updatedAt DATE);',
-    'CREATE TABLE IF NOT EXISTS "verification" (id TEXT PRIMARY KEY, identifier TEXT, value TEXT, expiresAt DATE, createdAt DATE, updatedAt DATE);',
-    'CREATE TABLE IF NOT EXISTS "organization" (id TEXT PRIMARY KEY, name TEXT, slug TEXT UNIQUE, logo TEXT, createdAt DATE, metadata TEXT);',
-    'CREATE TABLE IF NOT EXISTS "member" (id TEXT PRIMARY KEY, organizationId TEXT, userId TEXT, role TEXT, permissions_json TEXT, createdAt DATE);',
-    'CREATE TABLE IF NOT EXISTS "invitation" (id TEXT PRIMARY KEY, organizationId TEXT, email TEXT, role TEXT, status TEXT, expiresAt DATE, inviterId TEXT, createdAt DATE);',
-    'CREATE UNIQUE INDEX IF NOT EXISTS user_username_unique ON "user"(username);',
   ],
   alters: [
     // Best-effort migrations for columns added after a table first shipped;
@@ -264,13 +282,18 @@ export const SCENA_SCHEMA: SchemaModule = {
       scoping — a query that forgets a join can still be caught by a tenant
       predicate — and it costs one indexed TEXT column.
     */
+    /*
+      The column `@4dl/core`'s bootstrap does not create — see the note beside
+      `app_config`'s CREATE above. An ALTER is the only shape that works on both
+      a fresh database (where core got there first) and an existing one (where
+      the column is already present and the runner swallows "duplicate column").
+    */
+    "ALTER TABLE app_config ADD COLUMN updated_at INTEGER",
     "ALTER TABLE slides ADD COLUMN tenant_id TEXT",
     "ALTER TABLE device_channels ADD COLUMN tenant_id TEXT",
     "ALTER TABLE device_schedule_rules ADD COLUMN tenant_id TEXT",
     "ALTER TABLE manifest_versions ADD COLUMN tenant_id TEXT",
     "ALTER TABLE feed_items ADD COLUMN tenant_id TEXT",
-    'ALTER TABLE "member" ADD COLUMN permissions_json TEXT',
-    'ALTER TABLE "user" ADD COLUMN username TEXT',
   ],
   backfills: [
     /*

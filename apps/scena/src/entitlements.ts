@@ -26,6 +26,16 @@ export interface Quotas {
   boardsPerStation: number;
   /** Distinct licensed-library tracks a tenant may use at once (-1 = unlimited). */
   libraryTracks: number;
+  /**
+   * People who can sign in to the dashboard — the OWNER INCLUDED, because the
+   * label is "owner + staff". A one-seat plan is a one-person tenant by design.
+   *
+   * Board users do NOT count: they are shared devices at a counter, they are
+   * minted per board, and they are already metered by `stations`. Charging for
+   * them twice would make an eight-room clinic buy eight staff seats to run a
+   * queue. `SEAT_FREE_ROLES` in access.ts is the other half of that decision.
+   */
+  seats: number;
 }
 
 export interface Features {
@@ -63,6 +73,7 @@ export interface Entitlements {
 export const FREE_ENTITLEMENTS: Entitlements = {
   quotas: {
     pairedDevices: 1,
+    seats: 1,
     profiles: 1,
     channelsPerProfile: 1,
     slidesPerPlaylist: 10,

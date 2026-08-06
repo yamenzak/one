@@ -1,24 +1,32 @@
 /**
- * Auth screens shown before the operator Shell (§auth). Two populations:
+ * Auth screens shown before the operator Shell. Two populations, and the split
+ * is now PEOPLE vs DEVICES rather than owners vs everyone else:
  *
- *   • **Owners + platform admins** sign in with an **email code (OTP)** — never a
- *     password. Provisioning a workspace is the same OTP flow + naming the org.
- *   • **Everyone else** — staff (operator/receptionist/viewer) and board-scoped
- *     users (desks, referees, door tablets) — sign in with **username + password**
- *     only, no email. Globally-unique usernames mean there's no workspace to type.
+ *   • **People** — owners, operators, front desk, viewers, platform admins —
+ *     sign in with an **email code**, or a passkey. There is no password.
+ *   • **Stations** — the shared tablet at a counter, the referee's phone, the
+ *     door screen — sign in with the **handle + code** an owner provisioned on
+ *     the Live Boards screen. They have no inbox and the device is shared, so a
+ *     one-time code emailed to nobody is not a control, it is a locked door.
  *
- * So the default view is username + password (the everyday staff login) with a
- * secondary **"Log in with email"** OTP path for owners/admins, and **Create a
- * workspace** (also OTP) for a brand-new owner.
+ * So the DEFAULT view is email, and the station lane is secondary. It used to be
+ * the other way round, because staff held handles too — they do not any more,
+ * and the change matters beyond ordering: the old form asked the SERVER to turn
+ * a handle into a login address, which made a public endpoint that would confirm
+ * whether any given handle existed on the platform. A station's address is
+ * `<handle>@bd.scena`, a constant this file can build on its own.
  */
 import { useState } from "react";
-import { Loader2, Mail, ArrowLeft } from "lucide-react";
+import { Loader2, Mail, ArrowLeft, MonitorSmartphone } from "lucide-react";
 import { Button } from "../components/ui/button.js";
 import { Input } from "../components/ui/input.js";
 import { Label } from "../components/ui/label.js";
 import { ScenaMascot } from "@scena/ui";
 import { authClient, signIn, emailOtp } from "../auth-client.js";
-import { resolveUsername } from "../api.js";
+
+/** The non-routable suffix every station account carries. Mirrors
+ *  `STATION_DOMAIN` in the worker's `auth.ts`; they must not drift. */
+const STATION_DOMAIN = "@bd.scena";
 import { LegalDialog, LegalLinks, type LegalDoc } from "../legal/content.js";
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -53,28 +61,36 @@ function ErrLine({ children }: { children: React.ReactNode }) {
   return <div className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{children}</div>;
 }
 
-type View = "password" | "email" | "create";
+type View = "email" | "station" | "create";
 
 export function LoginScreen({ onDone }: { onDone: () => void }) {
-  const [view, setView] = useState<View>("password");
+  const [view, setView] = useState<View>("email");
   return (
     <Shell>
       {view === "create" ? (
-        <CreateWorkspace onDone={onDone} onBack={() => setView("password")} />
-      ) : view === "email" ? (
-        <EmailSignIn onDone={onDone} onBack={() => setView("password")} />
+        <CreateWorkspace onDone={onDone} onBack={() => setView("email")} />
+      ) : view === "station" ? (
+        <StationSignIn onDone={onDone} onBack={() => setView("email")} />
       ) : (
-        <PasswordSignIn onDone={onDone} onEmail={() => setView("email")} onCreate={() => setView("create")} />
+        <EmailSignIn onDone={onDone} onStation={() => setView("station")} onCreate={() => setView("create")} />
       )}
     </Shell>
   );
 }
 
-/** Default: username + password. Resolves the global username → login email, then
- *  signs in through the normal email+password provider. */
-function PasswordSignIn({ onDone, onEmail, onCreate }: { onDone: () => void; onEmail: () => void; onCreate: () => void }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+/**
+ * The STATION lane: the handle and code from the Live Boards screen.
+ *
+ * The address is built here (`<handle>@bd.scena`) rather than asked for, because
+ * asking meant a public endpoint that answered "does this handle exist" for any
+ * string anybody sent it. The suffix is a constant; there is nothing to look up.
+ *
+ * The refusal is deliberately one sentence for both halves. "No such station"
+ * and "wrong code" are two different answers to somebody guessing.
+ */
+function StationSignIn({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
+  const [handle, setHandle] = useState("");
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -83,10 +99,9 @@ function PasswordSignIn({ onDone, onEmail, onCreate }: { onDone: () => void; onE
     setBusy(true);
     setErr(null);
     try {
-      const email = await resolveUsername(username.trim());
-      if (!email) throw new Error("Wrong username or password.");
-      const res = await signIn.email({ email, password });
-      if (res.error) throw new Error("Wrong username or password.");
+      const email = `${handle.trim().toLowerCase()}${STATION_DOMAIN}`;
+      const res = await signIn.email({ email, password: code });
+      if (res.error) throw new Error("That handle and code don't match.");
       onDone();
     } catch (e2) {
       setErr(e2 instanceof Error ? e2.message : "Could not sign in");
@@ -97,33 +112,31 @@ function PasswordSignIn({ onDone, onEmail, onCreate }: { onDone: () => void; onE
 
   return (
     <form onSubmit={submit}>
-      <h1 className="text-lg font-semibold">Sign in to Scena</h1>
-      <p className="mb-4 mt-1 text-sm text-muted-foreground">Enter your username and password.</p>
+      <h1 className="text-lg font-semibold">Sign in this station</h1>
+      <p className="mb-4 mt-1 text-sm text-muted-foreground">
+        Use the handle and code from the Live Boards screen. Ask an owner to regenerate one if you've lost it.
+      </p>
       <div className="mb-3">
-        <Label htmlFor="uname">Username</Label>
-        <Input id="uname" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="frontdesk" autoCapitalize="none" autoComplete="username" autoFocus required className="mt-1.5" />
+        <Label htmlFor="handle">Handle</Label>
+        <Input id="handle" value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="k7m2xp" autoCapitalize="none" autoComplete="username" autoFocus required className="mt-1.5 font-mono" />
       </div>
       <div className="mb-1">
-        <Label htmlFor="pass">Password</Label>
-        <Input id="pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" required className="mt-1.5" />
+        <Label htmlFor="code">Code</Label>
+        <Input id="code" type="password" value={code} onChange={(e) => setCode(e.target.value)} placeholder="••••••" autoComplete="current-password" required className="mt-1.5 font-mono" />
       </div>
       {err && <ErrLine>{err}</ErrLine>}
-      <Button type="submit" disabled={busy || !username.trim() || !password} className="mt-4 w-full">
+      <Button type="submit" disabled={busy || !handle.trim() || !code} className="mt-4 w-full">
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
       </Button>
-      <button type="button" onClick={onEmail} className="mt-4 flex w-full items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-        <Mail className="size-3.5" /> Log in with email instead
+      <button type="button" onClick={onBack} className="mt-4 flex w-full items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="size-3.5" /> I'm a person, not a station
       </button>
-      <div className="mt-5 border-t pt-4 text-center text-sm text-muted-foreground">
-        New to Scena?{" "}
-        <button type="button" onClick={onCreate} className="font-medium text-primary hover:underline">Create a workspace</button>
-      </div>
     </form>
   );
 }
 
-/** Secondary: email → 6-digit OTP (owner passwordless + recovery). */
-function EmailSignIn({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
+/** The default: email → 6-digit code. Everyone who is a person signs in here. */
+function EmailSignIn({ onDone, onStation, onCreate }: { onDone: () => void; onStation: () => void; onCreate: () => void }) {
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -180,24 +193,26 @@ function EmailSignIn({ onDone, onBack }: { onDone: () => void; onBack: () => voi
 
   return (
     <form onSubmit={sendCode}>
-      <h1 className="text-lg font-semibold">Log in with email</h1>
-      <p className="mb-4 mt-1 text-sm text-muted-foreground">We'll email you a one-time code — no password to remember.</p>
+      <h1 className="text-lg font-semibold">Sign in to Scena</h1>
+      <p className="mb-4 mt-1 text-sm text-muted-foreground">We'll email you a one-time code — there's no password to remember.</p>
       <Label htmlFor="email">Email</Label>
       <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="email" autoFocus required className="mt-1.5" />
       {err && <ErrLine>{err}</ErrLine>}
       <Button type="submit" disabled={busy} className="mt-4 w-full">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (<><Mail className="mr-2 h-4 w-4" /> Email me a code</>)}</Button>
-      <button type="button" onClick={onBack} className="mt-4 flex w-full items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-3.5" /> Back to username & password
+      <button type="button" onClick={onStation} className="mt-4 flex w-full items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <MonitorSmartphone className="size-3.5" /> Sign in a station instead
       </button>
+      <div className="mt-5 border-t pt-4 text-center text-sm text-muted-foreground">
+        New to Scena?{" "}
+        <button type="button" onClick={onCreate} className="font-medium text-primary hover:underline">Create a workspace</button>
+      </div>
     </form>
   );
 }
 
-/** Create a workspace (owner provisioning). Owners — like platform admins —
- *  always sign in with an **email code**, never a password (§auth); only staff
- *  and board users use username + password. So this collects a workspace name +
- *  email, verifies an OTP (which creates + signs in the owner), then creates the
- *  organization. */
+/** Create a workspace (owner provisioning). Collects a workspace name + email,
+ *  verifies a code (which creates and signs in the owner), then creates the
+ *  organization. No password is chosen at any point — there is none to choose. */
 function CreateWorkspace({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
   const [step, setStep] = useState<"form" | "otp">("form");
   const [workspace, setWorkspace] = useState("");

@@ -13,10 +13,37 @@ describe("sanitizePermissions", () => {
 });
 
 describe("resolvePermissions", () => {
-  it("uses the custom grant when present", () => {
-    const g = resolvePermissions("viewer", JSON.stringify({ billing: ["manage"] }));
-    expect(g).toEqual({ billing: ["manage"] });
+  it("NARROWS with a custom grant, and only narrows", () => {
+    // A viewer's preset carries `channel: ["read"]`, so this keeps the read and
+    // drops the publish. The old resolver returned the blob verbatim the moment
+    // it sanitized to something non-empty, which made
+    // `POST /api/members/:id/permissions` a privilege-escalation primitive.
+    const g = resolvePermissions("viewer", JSON.stringify({ channel: ["read", "publish"] }));
+    expect(g).toEqual({ channel: ["read"] });
   });
+
+  it("cannot hand a role a power its preset does not carry", () => {
+    // The exact escalation: a receptionist has no `billing` at all, so a stored
+    // grant naming it resolves to nothing rather than to `billing: ["manage"]`.
+    expect(resolvePermissions("receptionist", JSON.stringify({ billing: ["manage"] }))).toEqual({});
+    expect(resolvePermissions("viewer", JSON.stringify({ settings: ["manage"] }))).toEqual({});
+  });
+
+  it("leaves an OWNER unbounded — a blob must not lock a tenant out of billing", () => {
+    const g = resolvePermissions("owner", JSON.stringify({ screen: ["read"] }));
+    expect(g.billing).toContain("manage");
+  });
+
+  it("gives a BOARD user its own preset, not the viewer's", () => {
+    // Board roles were absent from the hand-mirrored presets, so every station
+    // account fell through to `viewer` — which carries `billing: ["read"]` and
+    // read access to the whole fleet. A counter device in a waiting room.
+    const g = resolvePermissions("board_station", null);
+    expect(g).toEqual({ board: ["read", "operate"] });
+    expect(g.billing).toBeUndefined();
+    expect(g.screen).toBeUndefined();
+  });
+
   it("falls back to the role preset when no custom grant", () => {
     expect(resolvePermissions("operator", null)).toEqual(ROLE_PRESETS.operator);
     expect(resolvePermissions(null, null)).toEqual(ROLE_PRESETS.viewer);

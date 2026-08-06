@@ -20,13 +20,15 @@ function isPublic(method: string, path: string): boolean {
   if (path.startsWith("/api/auth/")) return true;
   // Identity probe — returns the session or null so the dashboard can bootstrap.
   if (path === "/api/me") return true;
-  // Workspace resolver — maps a typed workspace to its login slug so the staff
-  // sign-in form can build the credential email (returns only slug/name).
+  // Workspace resolver — maps a typed workspace to its canonical slug so the
+  // sign-in surface can send someone to the right door (returns only slug/name).
   if (isGet && path === "/api/org/resolve") return true;
-  // Username → login email resolver + availability check, so the sign-in form
-  // works with just username+password pre-auth (§auth). No membership data.
-  if (path === "/api/username/resolve") return true;
-  if (isGet && path === "/api/username/available") return true;
+  // ⚠️ `/api/username/resolve` and `/api/username/available` used to be here.
+  // Both were PUBLIC and both answered questions about accounts: one mapped a
+  // handle to its login address, the other confirmed whether a handle existed.
+  // Together that is an enumeration oracle over every account on the platform,
+  // open to anyone, and it existed only to make handle+password sign-in work.
+  // Nothing signs in with a handle now. Do not add them back.
   // Health + Stripe webhook (signature-verified in its handler).
   if (path === "/health") return true;
   if (path === "/api/stripe/webhook") return true;
@@ -56,7 +58,7 @@ function isPublic(method: string, path: string): boolean {
  * broad write access, receptionist is boards-only, viewer is read-only — the
  * matrix lives in access.ts; this maps routes onto it.
  */
-function permissionFor(method: string, path: string): Record<string, string[]> | null {
+export function permissionFor(method: string, path: string): Record<string, string[]> | null {
   const isGet = method === "GET";
   const read = isGet;
   // Method → permission verb: DELETE needs the stricter `delete` capability
@@ -114,11 +116,31 @@ function permissionFor(method: string, path: string): Record<string, string[]> |
   if (/^\/api\/boards\/[^/]+\/(categories|announce)$/.test(path) && !isGet) return { board: ["update"] };
   if (path.startsWith("/api/boards")) return { board: [read ? "read" : "update"] };
 
-  // Team management (staff provisioning). Owner/operator manage members;
-  // receptionist/viewer can't reach the Team screen at all. Reads + writes both
-  // require member management, so front-desk staff never see the roster.
-  if (path === "/api/members") return { member: ["create"] };
-  if (path.startsWith("/api/members/")) return { member: ["update"] };
+  /*
+    THE TEAM.
+
+    `/api/staff*` is `@4dl/auth`'s route tree and it does its OWN authorization:
+    the roster is readable by any member (knowing who else works here is not
+    privileged, and a tenant where only one person can check who holds a
+    capability before handing over a shift is worse off), while every write is
+    owner-only inside the routes themselves. So this returns `null` for it —
+    "any authenticated member" — rather than a permission that would close the
+    read half. Do NOT tighten it here without reading `staff-routes.ts`; a
+    duplicate gate in front of a route that already gates itself is how the two
+    end up disagreeing.
+
+    `/api/members*` is Scena's own remainder — the roster with each member's
+    resolved grant, and the per-member grant editor. Both are owner/operator
+    work, and both stay behind member management so front-desk staff never see
+    the roster's permission detail.
+  */
+  //
+  // ⚠️ `member` has no `read` action — Better Auth's org statements are
+  // `["create","update","delete"]` and this app layers nothing onto them. A gate
+  // asking for `member: ["read"]` is unsatisfiable by every role including the
+  // owner, so it does not restrict the route, it CLOSES it.
+  if (path === "/api/staff" || path.startsWith("/api/staff/")) return null;
+  if (path === "/api/members" || path.startsWith("/api/members/")) return { member: ["update"] };
 
   // Alerts (rules are a settings concern; the list is a read).
   if (path === "/api/alerts" || path === "/api/alerts/rules") return isGet ? { analytics: ["read"] } : { settings: ["manage"] };

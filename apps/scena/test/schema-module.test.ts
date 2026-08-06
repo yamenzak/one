@@ -9,7 +9,6 @@
  * same reason: the runner's contract is unenforceable at the type level.
  */
 
-import { execSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { schemaStatements } from "@4dl/core";
 import { SCENA_SCHEMA } from "../src/schema.js";
@@ -55,15 +54,17 @@ describe("the Scena schema module", () => {
     // a failure here rather than a 500 in production. They go UP when a column
     // or table is added.
     //
-    // Stage 1 baseline: 41 tables (including Better Auth's seven, which leave in
-    // Stage 2) + 11 indexes, 53 ALTERs (48 imported + 5 tenant_id denormalisers)
-    // and 7 backfills (six for those five columns, one clearing the stored station
-    // credentials).
+    // Stage 2 took EIGHT DDL statements and TWO ALTERs out: Better Auth's seven
+    // tables and the `"user"(username)` unique index, plus the ALTERs that added
+    // `"user".username` and `"member".permissions_json`. `AUTH_SCHEMA` owns the
+    // tables now and `username` did not come back — see schema.ts's header for
+    // why, including the ordering bug that made that index unrunnable on a fresh
+    // database.
     const ddl = schemaStatements(SCENA_SCHEMA);
-    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(41);
+    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(34);
     expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(10);
-    expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(1);
-    expect(SCENA_SCHEMA.alters ?? []).toHaveLength(53);
+    expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(0);
+    expect(SCENA_SCHEMA.alters ?? []).toHaveLength(52);
     expect(SCENA_SCHEMA.backfills ?? []).toHaveLength(7);
   });
 });
@@ -147,43 +148,5 @@ describe("the module list", () => {
         seen.set(t, m.id);
       }
     }
-  });
-});
-
-/**
- * THE PORT LOST NOTHING — asserted against the file it was ported FROM.
- *
- * The move from `db.ts`'s `db.exec([...])` to a `SchemaModule` is a
- * transcription, and a transcription that drops a statement produces a database
- * missing a table with no error anywhere. It nearly did: the first pass matched
- * statements with a quote class that truncated at the `"` inside `"user"`, so
- * all TEN quoted statements — every Better Auth table, the username index and
- * two ALTERs — were silently dropped. The pinned count noticed one; this test
- * would have named all ten.
- *
- * It reads the ORIGINAL out of git rather than a copied fixture, because a
- * fixture is another transcription and would have inherited the same bug.
- *
- * ⚠️ DELETE THIS TEST at the end of Stage 2, when the auth tables move to
- * `@4dl/auth` and the original stops being the right comparison. Until then it
- * is the only thing standing between a silent drop and production.
- */
-describe("the port from db.ts lost nothing", () => {
-  it("carries every statement the original applied", () => {
-    const original = execSync("git show 7ab9b66:apps/scena/src/db.ts", { encoding: "utf8" });
-    // Both shapes the original used: array literals, and `db.exec("…")` calls.
-    const want = new Set<string>();
-    for (const re of [
-      /db\.exec\(\s*(['"])((?:CREATE|ALTER|DROP)(?:(?!\1).)*)\1/g,
-      /^\s*(['"])((?:CREATE|ALTER|DROP)(?:(?!\1).)*)\1,?\s*$/gm,
-    ]) {
-      for (const m of original.matchAll(re)) want.add(m[2]!.replace(/;$/, ""));
-    }
-    const have = new Set(
-      [...schemaStatements(SCENA_SCHEMA), ...(SCENA_SCHEMA.alters ?? [])].map((s) => s.replace(/;$/, "")),
-    );
-    const missing = [...want].filter((s) => !have.has(s));
-    expect(missing, `dropped in the port:\n  ${missing.join("\n  ")}`).toEqual([]);
-    expect(want.size).toBe(100);
   });
 });

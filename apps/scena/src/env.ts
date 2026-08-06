@@ -42,6 +42,16 @@ export interface Env {
    *  Separate from tenant RBAC roles — these emails reach the platform console. */
   ADMIN_EMAILS?: string;
 
+  /**
+   * The DEV LANE signal — `development` and nothing else.
+   *
+   * ⚠️ It must NEVER appear in `wrangler.jsonc`'s top-level `vars`, which is the
+   * DEPLOYED config. In production it would let auth start on the repo-public
+   * fallback secret (forgeable sessions) and put sign-in codes in retained logs.
+   * It belongs in `.dev.vars`, which is gitignored and never uploaded.
+   */
+  ENVIRONMENT?: string;
+
   // ── Better Auth (multi-tenancy) ──────────────────────────────────────────
   /** Signing/encryption key. MUST be set in production (openssl rand -base64 32).
    *  A dev-only fallback is used when unset so local wrangler dev works. */

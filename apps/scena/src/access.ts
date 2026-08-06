@@ -94,3 +94,48 @@ export type RoleName = keyof typeof roles;
 /** Roles a board user can hold (kept out of the staff-assignable ROLE_NAMES). */
 export const BOARD_ROLES = ["board_coordinator", "board_station"] as const;
 export type BoardRole = (typeof BOARD_ROLES)[number];
+
+/** The roles a human can be invited into. Board roles are provisioned, not
+ *  invited, so they are deliberately absent. */
+export const ROLE_NAMES = ["owner", "operator", "receptionist", "viewer"] as const;
+
+/**
+ * ⚠️ THREE CONSTANTS `@4dl/auth` asks for, and they are easy to conflate.
+ *
+ *   CREATOR_ROLE    what the person who creates a tenant receives.
+ *   FALLBACK_ROLE   the preset used when a member's role cannot be resolved. It
+ *                   must be the LEAST privileged one — falling back to
+ *                   `operator` would hand an unknown member the whole fleet.
+ *   SEAT_FREE_ROLES the roles that do NOT consume a staff seat.
+ *
+ * The third is the one Scena forced a platform change for. Board users are
+ * `member` rows like anybody else, and they are minted PER BOARD — a clinic with
+ * eight rooms has eight of them. Counted as staff they would exhaust a plan
+ * before a single person was hired, so both board roles are seat-free. They are
+ * also the reason `seatFreeRoles` is a list rather than the single
+ * `customerRole` string every other app here passes.
+ */
+export const CREATOR_ROLE = "owner";
+export const FALLBACK_ROLE = "viewer";
+export const SEAT_FREE_ROLES: readonly string[] = [...BOARD_ROLES];
+
+/**
+ * The resources a tenant admin may hand out in the permission editor: this app's
+ * own, without Better Auth's org-management statements (`organization`,
+ * `invitation`, `team`, `ac`) which ride along on the owner role and are not
+ * things anyone picks from a checklist.
+ *
+ * `member` is deliberately kept — managing the roster IS a grantable power here.
+ */
+export const GRANTABLE_RESOURCES = [
+  "screen",
+  "channel",
+  "widget",
+  "content",
+  "board",
+  "station",
+  "member",
+  "analytics",
+  "billing",
+  "settings",
+] as const;

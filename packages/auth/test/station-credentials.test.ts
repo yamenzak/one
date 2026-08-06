@@ -28,6 +28,20 @@ describe("the station credential lane is opt-in", () => {
     expect(credentialLane({ stationCredentials: { stationDomain: "@bd.scena" } }).enabled).toBe(true);
   });
 
+  it("CLOSES public sign-up, which the provider opens by default", () => {
+    /*
+      The hole this assertion exists for, found against a running worker rather
+      than reasoned about: enabling the provider also enables Better Auth's own
+      `POST /sign-up/email`, so a stranger could register `attacker@example.com`
+      with a password of their choosing and sign in with it on the next request
+      — a routable address holding a password on a platform that has none.
+
+      `autoSignIn: false` masks it (the sign-up response carries no token), so
+      the endpoint reads as though it refused. It did not.
+    */
+    expect(credentialLane({ stationCredentials: { stationDomain: "@bd.scena" } }).disableSignUp).toBe(true);
+  });
+
   it("does not auto-sign-in on credential creation", () => {
     // Provisioning a station must not hand the ADMIN who created it that
     // station's session.

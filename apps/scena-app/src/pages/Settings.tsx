@@ -29,7 +29,6 @@ import {
   getPlayback,
   setPlayback,
   getMe,
-  claimUsername,
   uploadToLibrary,
   type AiModel,
   type AiDefaults,
@@ -47,60 +46,46 @@ const AI_TASKS: { id: string; label: string; hint: string }[] = [
   { id: "music", label: "Music beds", hint: "Generated background music on the Music page" },
 ];
 
-/** Claim/change the caller's global username (so they can use username+password
- *  sign-in). Owners created via email OTP start without one. */
-function UsernameCard() {
-  const [role, setRole] = useState<string | null>(null);
+/**
+ * How the signed-in person signs in.
+ *
+ * This was a form for claiming a global USERNAME, so a person could sign in with
+ * a handle and a password. Both are gone: everyone who is a person signs in with
+ * an emailed code or a passkey, and the only handle left belongs to a STATION,
+ * which is provisioned on the Live Boards screen and never edits its own.
+ *
+ * The card stays because "how do I sign in" is a real question a settings page
+ * should answer — it just has one answer now instead of two.
+ */
+function SignInCard() {
   const [emailAddr, setEmailAddr] = useState<string | null>(null);
-  const [current, setCurrent] = useState<string | null>(null);
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
-    getMe().then((m) => { setRole(m.role); setEmailAddr(m.email); setCurrent(m.username); setValue(m.username ?? ""); }).catch(() => {}).finally(() => setLoaded(true));
+    getMe()
+      .then((m) => setEmailAddr(m.email))
+      // A failed load must not render as "no email" — that reads as an account
+      // with no way in. Leave it null and say so below.
+      .catch(() => setEmailAddr(null))
+      .finally(() => setLoaded(true));
   }, []);
-  async function save() {
-    setBusy(true);
-    try {
-      await claimUsername(value.trim());
-      setCurrent(value.trim());
-      toast.success("Username saved — sign in with it next time.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not set username");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  // Owners (and platform admins) sign in with an email code, not a password —
-  // there's no username to manage here (§auth).
-  if (loaded && role === "owner") {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm"><Mail className="size-4 text-muted-foreground" /> Sign-in</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0">
-          <p className="text-sm text-muted-foreground">You sign in with a one-time code emailed to <span className="font-medium text-foreground">{emailAddr}</span> — no password to manage. Staff you add on the Team page sign in with a username + password instead.</p>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-sm"><AtSign className="size-4 text-muted-foreground" /> Username</CardTitle>
+        <CardTitle className="flex items-center gap-2 text-sm"><Mail className="size-4 text-muted-foreground" /> Sign-in</CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
-        <p className="mb-3 text-sm text-muted-foreground">Your global username — sign in with just this and your password, no workspace to type.</p>
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <Label htmlFor="me-user">Username</Label>
-            <Input id="me-user" value={value} onChange={(e) => setValue(e.target.value.toLowerCase())} placeholder="jane" autoCapitalize="none" className="mt-1.5" />
-          </div>
-          <Button onClick={save} disabled={busy || !value.trim() || value.trim() === current}>{busy ? "Saving…" : current ? "Update" : "Set username"}</Button>
-        </div>
+        {!loaded ? (
+          <Skeleton className="h-9 w-full" />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            {emailAddr ? (
+              <>You sign in with a one-time code emailed to <span className="font-medium text-foreground">{emailAddr}</span>, or with a passkey. There is no password to manage.</>
+            ) : (
+              <>We couldn't load your account just now. Reload the page to try again.</>
+            )}
+          </p>
+        )}
       </CardContent>
     </Card>
   );
@@ -178,7 +163,7 @@ export function SettingsPage() {
         </TabsList>
 
         <TabsContent value="account" className="mt-5">
-          <UsernameCard />
+          <SignInCard />
         </TabsContent>
 
         <TabsContent value="brand" className="mt-5">

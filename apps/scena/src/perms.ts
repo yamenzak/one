@@ -1,96 +1,90 @@
 /**
- * Per-user permissions (§25 · custom access). A member's authorization is a
- * `{ resource: action[] }` grant map. Historically this was derived from a fixed
- * role; now an admin can grant any subset at user-creation, stored per member as
- * `permissions_json`. Roles survive as convenient PRESETS that fill the grant.
+ * Per-member permissions — Scena's registry bound to `@4dl/auth`'s grant algebra.
  *
- * This is the single source of truth for the grantable surface (CATALOG) and the
- * role presets, used by: the create/update member store, the session `can()`
- * check, `/api/me` resolution, and (mirrored) the dashboard's permission editor.
+ * A member's authorization is a `{ resource: action[] }` map. Roles are PRESETS
+ * that fill it, and an admin may attach a custom per-member grant stored as
+ * `member.permissions_json`.
+ *
+ * ── The presets are DERIVED from `access.ts`, never restated ────────────────
+ *
+ * This file used to carry a second copy of every role, hand-written to mirror
+ * `access.ts`. Two registries that must agree with nothing checking that they
+ * do; Tessa had the same shape and three of its roles had silently degraded to
+ * read-only. Scena's copy had not drifted on the four staff roles — but it
+ * omitted the two BOARD roles entirely, so every station account fell through to
+ * the `viewer` preset and a counter device at a reception desk resolved a grant
+ * containing `billing: ["read"]`, `analytics: ["read"]` and read access to the
+ * whole fleet. It could not reach much of that through the route guard, which is
+ * luck rather than design.
+ *
+ * Deriving removes the second registry: a role added to `access.ts` arrives here
+ * with the grant it was written with, and `roles.test.ts` asserts every role
+ * still resolves to its own.
+ *
+ * ── And the custom grant is now BOUNDED ────────────────────────────────────
+ *
+ * The old `resolvePermissions` returned a stored custom grant as-is whenever it
+ * sanitized to something non-empty. A `permissions_json` blob written to a
+ * receptionist could therefore hand them `billing: ["manage"]` and
+ * `settings: ["manage"]` — the role preset was never consulted once a blob
+ * existed. `bindGrants` INTERSECTS the two, so a custom grant may narrow a role
+ * and can never widen it.
  */
 
-/** Every grantable resource → its actions (the Scena-relevant subset of the
- *  Better Auth access statement; org-management perms stay role-driven). */
-export const PERMISSION_CATALOG: Record<string, string[]> = {
-  screen: ["read", "control", "create", "update", "delete"],
-  channel: ["read", "create", "update", "delete", "publish"],
-  widget: ["read", "create", "update", "delete"],
-  content: ["read", "create", "update", "delete"],
-  board: ["read", "operate", "create", "update", "delete"],
-  station: ["read", "create", "update", "delete"],
-  member: ["read", "create", "update"],
-  analytics: ["read"],
-  billing: ["read", "manage"],
-  settings: ["read", "manage"],
-};
+import { bindGrants, grantSatisfies as sharedGrantSatisfies, type Grant } from "@4dl/auth/model";
+import { statement, roles, FALLBACK_ROLE, GRANTABLE_RESOURCES } from "./access.js";
 
-type Grant = Record<string, string[]>;
+export type { Grant };
 
-const full = (): Grant => {
-  const g: Grant = {};
-  for (const [r, a] of Object.entries(PERMISSION_CATALOG)) g[r] = [...a];
-  return g;
-};
+/**
+ * Resource → the actions that exist on it, as the permission editor should show
+ * it: this app's own resources, without Better Auth's org-management statements.
+ *
+ * `statement` is the authority for what an action IS; this is a projection of it
+ * for a checklist, so a resource cannot appear here that the access control does
+ * not define.
+ */
+export const PERMISSION_CATALOG: Record<string, string[]> = Object.fromEntries(
+  GRANTABLE_RESOURCES.map((r) => [r, [...((statement as Record<string, readonly string[]>)[r] ?? [])]]),
+);
 
-/** Role presets — the default grant a role fills in. Mirror of access.ts. */
-export const ROLE_PRESETS: Record<string, Grant> = {
-  owner: full(),
-  operator: {
-    screen: ["read", "control", "create", "update"],
-    channel: ["read", "create", "update", "delete", "publish"],
-    widget: ["read", "create", "update", "delete"],
-    content: ["read", "create", "update", "delete"],
-    board: ["read", "operate", "create", "update", "delete"],
-    station: ["read", "update"],
-    member: ["read", "create", "update"],
-    analytics: ["read"],
-    billing: ["read"],
-    settings: ["read"],
-  },
-  receptionist: {
-    screen: ["read", "control"],
-    channel: ["read"],
-    board: ["read", "operate"],
-    station: ["read"],
-  },
-  viewer: {
-    screen: ["read"],
-    channel: ["read"],
-    widget: ["read"],
-    content: ["read"],
-    board: ["read"],
-    station: ["read"],
-    analytics: ["read"],
-    billing: ["read"],
-  },
-};
+/**
+ * Role → its default grant, read off the access-control instance.
+ *
+ * Better Auth's `newRole` keeps the grant on `.statements` — the same object
+ * literal `access.ts` passed in. Filtered to this app's own resources for the
+ * same reason the catalog is: `organization`/`invitation`/`team`/`ac` ride along
+ * on the owner role, are never asked for by the route guard, and only make a
+ * resolved grant harder to read in a debugger.
+ */
+export const ROLE_PRESETS: Record<string, Grant> = Object.fromEntries(
+  Object.entries(roles).map(([name, role]) => [
+    name,
+    Object.fromEntries(
+      Object.entries((role as { statements: Record<string, readonly string[]> }).statements)
+        .filter(([resource]) => resource in PERMISSION_CATALOG)
+        .map(([resource, actions]) => [resource, [...actions]]),
+    ),
+  ]),
+);
+
+const grants = bindGrants({
+  catalog: PERMISSION_CATALOG,
+  presets: ROLE_PRESETS,
+  fallbackRole: FALLBACK_ROLE,
+  // An owner always holds the full preset: there is nothing above them to narrow
+  // toward, and letting a stored blob clip an owner is how a tenant locks itself
+  // out of its own billing.
+  unboundedRoles: ["owner"],
+});
 
 /** Keep only catalogue-valid resource/action pairs (drops anything unknown). */
-export function sanitizePermissions(input: unknown): Grant {
-  const out: Grant = {};
-  if (!input || typeof input !== "object") return out;
-  for (const [res, acts] of Object.entries(input as Record<string, unknown>)) {
-    const allowed = PERMISSION_CATALOG[res];
-    if (!allowed || !Array.isArray(acts)) continue;
-    const keep = acts.filter((a): a is string => typeof a === "string" && allowed.includes(a));
-    if (keep.length) out[res] = [...new Set(keep)];
-  }
-  return out;
-}
+export const sanitizePermissions = (input: unknown): Grant => grants.sanitize(input);
 
-/** The effective grant for a member: their stored custom grant if any, else the
- *  role preset (falling back to viewer). */
-export function resolvePermissions(role: string | null, permsJson: string | null | undefined): Grant {
-  if (permsJson) {
-    try {
-      const g = sanitizePermissions(JSON.parse(permsJson));
-      if (Object.keys(g).length) return g;
-    } catch { /* fall through to role preset */ }
-  }
-  return ROLE_PRESETS[role ?? "viewer"] ?? ROLE_PRESETS.viewer!;
-}
+/** The effective grant for a member: their stored custom grant INTERSECTED with
+ *  the role preset, else the preset alone. */
+export const resolvePermissions = (role: string | null, permsJson: string | null | undefined): Grant =>
+  grants.resolve(role, permsJson ?? null);
 
 /** Does a grant satisfy a required `{ resource: action[] }` permission set? */
-export function grantSatisfies(grant: Grant, needed: Record<string, string[]>): boolean {
-  return Object.entries(needed).every(([res, acts]) => acts.every((a) => grant[res]?.includes(a)));
-}
+export const grantSatisfies = sharedGrantSatisfies;

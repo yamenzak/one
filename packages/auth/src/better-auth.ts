@@ -168,6 +168,21 @@ function seatError(verdict: SeatVerdict): APIError {
  * throws "Failed to initialize database adapter" — so the test could only ever
  * assert that construction fails, not what was decided.
  *
+ * ⚠️ `disableSignUp` IS THE LOAD-BEARING ONE, and it was missing.
+ *
+ * Turning the provider on also opens `POST /api/auth/sign-up/email` — Better
+ * Auth's own public registration endpoint — to ANY address. Verified against a
+ * running Scena worker: a stranger POSTed `attacker@example.com` with a password
+ * of their choosing, got a `user` row back, and signed in with it on the next
+ * request. `autoSignIn: false` hides that by withholding the token on the
+ * sign-up response, which is exactly what makes it easy to miss: the endpoint
+ * looks like it refused.
+ *
+ * That is the drift this whole lane's doc comment promises cannot happen — a
+ * ROUTABLE address holding a password on a platform that has none. Stations are
+ * provisioned by direct database writes (Scena's `board-users.ts`), never
+ * through the sign-up endpoint, so closing it costs the lane nothing.
+ *
  * `minPasswordLength` is deliberately low. A station credential is a
  * 6-character handle an admin reads aloud, scoped to one board, revocable, and
  * attached to an address that cannot receive mail. Holding it to a human
@@ -177,9 +192,9 @@ function seatError(verdict: SeatVerdict): APIError {
  * not hand the ADMIN who created it that station's session.
  */
 export function credentialLane(cfg: Pick<AuthConfig, "stationCredentials">):
-  { enabled: boolean; minPasswordLength?: number; autoSignIn?: boolean } {
+  { enabled: boolean; disableSignUp?: boolean; minPasswordLength?: number; autoSignIn?: boolean } {
   return cfg.stationCredentials
-    ? { enabled: true, minPasswordLength: 6, autoSignIn: false }
+    ? { enabled: true, disableSignUp: true, minPasswordLength: 6, autoSignIn: false }
     : { enabled: false };
 }
 

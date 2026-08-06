@@ -17,13 +17,12 @@
  */
 
 import { getConfig } from "./billing-store.js";
+import { PLATFORM_FROM_DEFAULT } from "./billing-seed.js";
 import type { SendEmailBinding } from "./env.js";
 
-/**
- * The platform's ONE onboarded transactional address, with Scena's display name.
- * Kept identical to `apps.json`'s `defaultEmailAddress` — the guard enforces it.
- */
-export const PLATFORM_FROM_DEFAULT = "Scena <noreply@4dl.app>";
+/** Re-exported so readers find it where every other app keeps it. It is DEFINED
+ *  in `billing-seed.ts`, which is a leaf — see the note there for the cycle. */
+export { PLATFORM_FROM_DEFAULT } from "./billing-seed.js";
 
 export interface EmailConfig {
   provider: string; // disabled | mock | resend | cloudflare

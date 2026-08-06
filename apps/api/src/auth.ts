@@ -40,16 +40,19 @@ export type { SeatVerdict };
  * (`@kova/domain` entitlements.ts) and `checkDowngrade` counts it the same way.
  * So Free/Solo (`staffSeats: 1`) is a one-coach studio by design.
  */
+/** The one role a studio does not pay a seat for. */
+export const SEAT_FREE_ROLES = ["client"] as const;
+
 const seatConfig = (env: AuthBindings): SeatConfig => ({
-  seatFreeRoles: ["client"],
+  seatFreeRoles: SEAT_FREE_ROLES,
   quota: (tenantId, used) => withinQuota(env.DB, tenantId, "staffSeats", used),
 });
 
 export const staffSeatsUsed = (db: D1Database, tenantId: string): Promise<number> =>
-  sharedStaffSeatsUsed(db, tenantId, "client");
+  sharedStaffSeatsUsed(db, tenantId, SEAT_FREE_ROLES);
 
 export const pendingStaffSeats = (db: D1Database, tenantId: string): Promise<number> =>
-  sharedPendingStaffSeats(db, tenantId, "client");
+  sharedPendingStaffSeats(db, tenantId, SEAT_FREE_ROLES);
 
 export const checkStaffSeat = (
   db: D1Database,
@@ -108,7 +111,7 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape): Shared
     ac: ac as never,
     roles,
     creatorRole: "owner",
-    seatFreeRoles: ["client"],
+    seatFreeRoles: SEAT_FREE_ROLES,
     rpName: "Kova",
     cookiePrefix: "kova",
     seats: seatConfig,

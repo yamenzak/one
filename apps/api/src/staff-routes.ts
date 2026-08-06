@@ -28,7 +28,7 @@
 import { staffRoutes as sharedStaffRoutes, type StaffRoleMeta } from "@4dl/auth";
 import { type AppEnv } from "./auth-context.js";
 import { ac, roles, STAFF_ROLES } from "./access.js";
-import { checkStaffSeat } from "./auth.js";
+import { checkStaffSeat, SEAT_FREE_ROLES } from "./auth.js";
 import { tenantEntitlements } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
 import { canonicalHost } from "./host-context.js";
@@ -55,10 +55,10 @@ export const staffRoutes = sharedStaffRoutes<AppEnv>({
     return user && tenantId ? { tenantId, userId: user.id, role: c.get("role") ?? "" } : null;
   },
   creatorRole: "owner",
-  // The one role that is not a staff seat — it has to match `auth.ts`'s
-  // `customerRole`, or the count the screen shows and the count the invite
-  // enforces disagree.
-  seatFreeRoles: ["client"],
+  // Imported rather than restated: this and `auth.ts`'s seat config are the two
+  // halves of one question — the count the screen shows and the count the invite
+  // enforces — and two literals is how they end up disagreeing.
+  seatFreeRoles: SEAT_FREE_ROLES,
   roleNames: STAFF_ROLES,
   /**
    * `client` is a demotion target and NOT an invitable role. A studio moving

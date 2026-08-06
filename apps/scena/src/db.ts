@@ -1,4 +1,5 @@
 import { schemaGate, type SchemaModule } from "@4dl/core";
+import { AUTH_SCHEMA } from "@4dl/auth";
 import { SCENA_SCHEMA, DEMO_TENANT } from "./schema.js";
 
 export { DEMO_TENANT };
@@ -32,20 +33,27 @@ export interface ScreenRow {
 /**
  * EVERY MODULE THIS APP APPLIES, in dependency order.
  *
- * One entry today, and that is the point: this list is the migration's progress
- * bar. Scena's module currently carries Better Auth's seven tables and the
- * billing/AI/media catalogs because it owns them at Stage 1 — each moves OUT to
- * its package as that stage lands (`AUTH_SCHEMA` in Stage 2, `BILLING_SCHEMA`
- * in Stage 4, and so on), and the diff that removes a table from `SCENA_SCHEMA`
- * is the same diff that adds its package here. `docs/SCENA-REWRITE.md` has the
- * order.
+ * This list is the migration's progress bar. Scena's module still carries the
+ * billing/AI/media catalogs because it owns them today — each moves OUT to its
+ * package as that stage lands (`BILLING_SCHEMA` in Stage 4, and so on), and the
+ * diff that removes a table from `SCENA_SCHEMA` is the same diff that adds its
+ * package here. `docs/SCENA-REWRITE.md` has the order.
+ *
+ * ⚠️ ORDER IS DEPENDENCY ORDER, and auth is first for a reason: the app's
+ * backfills may read `"member"` and `"organization"`, and nothing in auth reads
+ * a Scena table. SQLite does not enforce foreign keys here, so a wrong order
+ * does not fail — it produces a backfill that quietly updates nothing.
+ *
+ * `AUTH_SCHEMA` also brings THREE tables Scena never had: `"passkey"`,
+ * `auth_logs` (the audit trail and the rate limiter's backing store) and
+ * `action_otps` (step-up confirmation). They arrive with the module rather than
+ * needing to be remembered.
  *
  * `schemaGate` supplies the per-isolate memo and the retry-on-failure that this
- * file used to hand-roll, and short-circuits on a marker row — so once the
- * module is at version, a request costs one indexed SELECT rather than 44
- * `CREATE … IF NOT EXISTS`.
+ * file used to hand-roll, and short-circuits on a marker row PER MODULE — so a
+ * change to Scena's DDL does not re-run auth's.
  */
-export const SCHEMA_MODULES: readonly SchemaModule[] = [SCENA_SCHEMA];
+export const SCHEMA_MODULES: readonly SchemaModule[] = [AUTH_SCHEMA, SCENA_SCHEMA];
 
 const gate = schemaGate(SCHEMA_MODULES);
 export const ensureSchema = (db: D1Database): Promise<void> => gate({ DB: db });

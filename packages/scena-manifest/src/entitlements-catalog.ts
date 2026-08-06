@@ -108,6 +108,11 @@ export const FEATURE_CATALOG: FeatureDef[] = [
 export const QUOTA_CATALOG: QuotaDef[] = [
   { key: "pairedDevices", label: "Screens", description: "Paired display devices.",
     billing: (n) => (n > 0 ? `${n} screen${plural(n)}` : null) },
+  // People, not devices. Board users are metered by `stations` and are seat-free
+  // — see `SEAT_FREE_ROLES` in the app's access.ts for why charging twice for a
+  // counter would be wrong.
+  { key: "seats", label: "Team members", description: "People who can sign in — the owner included.",
+    billing: (n) => (n > 0 ? `${n} team member${plural(n)}` : n < 0 ? "Unlimited team members" : null) },
   { key: "profiles", label: "Widget profiles", description: "Reusable widget layouts.",
     billing: (n) => (n > 0 ? `${n} widget profile${plural(n)}` : null) },
   { key: "channelsPerProfile", label: "Channels / profile", description: "Channels each profile may carry." },

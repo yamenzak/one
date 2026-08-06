@@ -1,0 +1,27 @@
+# Local-only worker vars for `wrangler dev`. Copy this file to `.dev.vars`
+# (gitignored) before your first `pnpm dev`:
+#
+#     cp apps/scena/.dev.vars.example apps/scena/.dev.vars
+#
+# Wrangler loads `.dev.vars` automatically for `wrangler dev` ONLY. It is never
+# uploaded by `wrangler deploy`.
+
+# ── The dev lane switch ──────────────────────────────────────────────────────
+# `ENVIRONMENT=development` is the single explicit signal that this worker is a
+# throwaway local one. It is what lets `@4dl/auth` start without a real
+# BETTER_AUTH_SECRET (outside development it REFUSES to start rather than sign
+# sessions with a key that is public in this repo), and what the mock email
+# provider reads before logging a sign-in code to the console instead of failing
+# closed.
+ENVIRONMENT=development
+
+# ── DANGER: never move this into wrangler.jsonc ──────────────────────────────
+# `wrangler.jsonc`'s top-level `vars` block IS the deployed configuration. If
+# `ENVIRONMENT: "development"` is added there it ships to production: sessions
+# signed with a forgeable key, and sign-in codes written to retained logs.
+# Keep this variable in `.dev.vars` only.
+
+# ── Optional local overrides ─────────────────────────────────────────────────
+# Uncomment to test the real Better Auth signing path locally (otherwise the
+# dev fallback key is used):
+# BETTER_AUTH_SECRET=run-openssl-rand-base64-32-and-paste-here

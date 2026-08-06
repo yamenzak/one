@@ -28,7 +28,7 @@
  * CI. Plain Node, no dependencies, like the rest of `scripts/`.
  */
 
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { registry, apps } from "./apps.mjs";
 
@@ -42,29 +42,95 @@ if (!shared) fail("apps.json has no `defaultEmailAddress` — every check below 
 /** `Name <a@b.c>` → `a@b.c`; a bare address → itself. */
 const bareAddress = (s) => (/<([^<>]+)>/.exec(s)?.[1] ?? s).trim().toLowerCase();
 
+/** Every `.ts` under an app's `src/`, one level deep — enough for every app here. */
+function appSources(dir) {
+  const out = [];
+  for (const sub of ["src"]) {
+    let names;
+    try {
+      names = readdirSync(join(ROOT, dir, sub));
+    } catch {
+      continue;
+    }
+    for (const n of names) if (n.endsWith(".ts")) out.push(`${sub}/${n}`);
+  }
+  return out;
+}
+
 for (const a of apps) {
   // An app with no `email` entry sends no transactional mail and needs no sender.
   if (!a.email) continue;
-  const file = join(ROOT, a.dir, "src/mailer.ts");
-  let src;
-  try {
-    src = readFileSync(file, "utf8");
-  } catch {
-    fail(`${a.id} declares an email sender in apps.json but has no ${a.dir}/src/mailer.ts to hold its default.`);
+
+  /*
+    The constant is searched for across the app's `src/`, not read out of
+    `mailer.ts` by name.
+
+    It used to be the latter, and Scena had to move its definition into
+    `billing-seed.ts` to break an import cycle (mailer → billing-store →
+    billing-seed → mailer, which resolved the constant to `undefined` at module
+    init and surfaced as a D1 type error on a fresh database). A guard that
+    insists on a FILENAME turns a legitimate refactor into a failure and invites
+    someone to weaken it. What it actually cares about is that the app has ONE
+    sender constant and that it matches the registry.
+  */
+  const found = [];
+  for (const f of appSources(a.dir)) {
+    let src;
+    try {
+      src = readFileSync(join(ROOT, a.dir, f), "utf8");
+    } catch {
+      continue;
+    }
+    for (const hit of src.matchAll(/PLATFORM_FROM_DEFAULT\s*=\s*"([^"]+)"/g)) found.push({ f, value: hit[1] });
+  }
+  if (found.length === 0) {
+    fail(`${a.dir}/src has no PLATFORM_FROM_DEFAULT. The tenant lane falls back to @4dl/email's fail-loud address instead.`);
     continue;
   }
-  const m = /PLATFORM_FROM_DEFAULT\s*=\s*"([^"]+)"/.exec(src);
-  if (!m) {
-    fail(`${a.dir}/src/mailer.ts has no PLATFORM_FROM_DEFAULT. The tenant lane falls back to @4dl/email's fail-loud address instead.`);
+  if (found.length > 1) {
+    fail(`${a.dir}/src defines PLATFORM_FROM_DEFAULT ${found.length} times (${found.map((x) => x.f).join(", ")}). Two answers to one question.`);
     continue;
   }
+  const m = [null, found[0].value];
   const got = bareAddress(m[1]);
   if (got !== shared.toLowerCase()) {
     fail(
-      `${a.dir}/src/mailer.ts sends the tenant lane from "${got}", but the platform's onboarded address is "${shared}".\n` +
+      `${a.dir}/${found[0].f} sends the tenant lane from "${got}", but the platform's onboarded address is "${shared}".\n` +
         `     Cloudflare onboards a sending DOMAIN, so a subdomain is a different domain and is not covered. Sign-in codes\n` +
         `     would still deliver (they read email.from), so this fails on the tenant lane only — the client invite.`,
     );
+  }
+
+  /*
+    THE SEED IS THE OTHER DOOR, and it is the one that actually decides.
+
+    `PLATFORM_FROM_DEFAULT` is only a FALLBACK: it applies when `email.from`
+    has no row. An app that SEEDS that key on first boot writes a real row, and
+    the row wins — so an app can pass every check above and still send from a
+    domain nobody onboarded. Scena did: its catalog seed carried
+    `Scena <noreply@fourdegreelabs.com>` while its constant was correct.
+
+    Checked by literal, deliberately. Any `"email.from": "…"` in the app's
+    source with an address in it is a second answer to a question that has one,
+    and the fix is always the same — reference the constant.
+  */
+  for (const f of appSources(a.dir)) {
+    let seedSrc;
+    try {
+      seedSrc = readFileSync(join(ROOT, a.dir, f), "utf8");
+    } catch {
+      continue;
+    }
+    for (const hit of seedSrc.matchAll(/"email\.from"\s*:\s*"([^"]*@[^"]*)"/g)) {
+      const seeded = bareAddress(hit[1]);
+      if (seeded !== shared.toLowerCase()) {
+        fail(
+          `${a.dir}/${f} SEEDS email.from as "${seeded}", but the platform's onboarded address is "${shared}".\n` +
+            `     A seeded row beats PLATFORM_FROM_DEFAULT, so this silently overrides the constant checked above.\n` +
+            `     Reference PLATFORM_FROM_DEFAULT instead of writing a second literal.`,
+        );
+      }
+    }
   }
 }
 

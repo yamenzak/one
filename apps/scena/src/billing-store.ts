@@ -291,6 +291,27 @@ export async function tenantEntitlements(db: D1Database, tenantId = DEMO_TENANT)
   return mergeOverrides(resolveEntitlements(plan?.entitlements_json), sub.overrides_json);
 }
 
+/**
+ * Is one more of `quota` within the tenant's plan?
+ *
+ * `-1` means unlimited, and the comparison is `currentCount < max` — a ceiling,
+ * not a retroactive sweep. A tenant that DOWNGRADES below its current usage
+ * keeps every existing row fully readable and writable; it simply cannot add
+ * another. Nothing here should ever archive, hide or brick an over-quota row:
+ * retroactive enforcement turns a billing problem into a data-loss one.
+ */
+export async function withinQuota(
+  db: D1Database,
+  tenantId: string,
+  quota: keyof Entitlements["quotas"],
+  currentCount: number,
+): Promise<{ ok: boolean; max: number }> {
+  const quotas = (await tenantEntitlements(db, tenantId)).quotas as unknown as Record<string, number>;
+  const max = quotas[quota as string] ?? 0;
+  if (max < 0) return { ok: true, max };
+  return { ok: currentCount < max, max };
+}
+
 /** Admin: set a tenant's entitlement override blob (a partial Entitlements). */
 export async function setTenantOverrides(db: D1Database, tenantId: string, json: string | null): Promise<void> {
   await getSubscription(db, tenantId); // ensure the row exists
