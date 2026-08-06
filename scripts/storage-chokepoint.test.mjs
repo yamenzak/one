@@ -73,7 +73,7 @@ function sources(dir) {
  * so every entry is asserted to exist.
  */
 const R2_OWNERS = [
-  { app: "apps/scena", adapters: ["src/storage.ts"] },
+  { app: "apps/scena", adapters: ["src/storage.ts", "src/purge.ts"] },
   // Kova predates the package and routes its writes through `@4dl/storage`
   // directly from its own adapter; `purge.ts` deletes by prefix, which is the
   // package's own escape hatch for objects the ledger never recorded.

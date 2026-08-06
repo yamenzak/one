@@ -1,133 +1,123 @@
 /**
- * Transactional email (BLUEPRINT §23 delivery, §25 billing notices).
+ * Scena's binding of `@4dl/email`.
  *
- * One sender for alert delivery, billing notices, and pairing/receipt mail.
- * Provider + credentials live in admin-editable `app_config` (like Stripe), so
- * nothing is hardcoded. Sends via the Resend HTTP API; a `mock` provider logs
- * and reports success so the whole notification path is exercisable in dev
- * without a real key (mirrors the Workers AI mock).
+ * ── The Cloudflare send path was BROKEN, and this is what fixes it ──────────
  *
- * ⚠️ STAGE 0 SHIM. This module is Scena's own and is replaced by `@4dl/email`
- * in Stage 6 (docs/SCENA-REWRITE.md). `PLATFORM_FROM_DEFAULT` is declared here
- * ahead of that move because the sender is the one thing that cannot wait: the
- * fallback read `noreply@scena.local`, and a sending domain is onboarded in
- * Cloudflare per DOMAIN, by hand, once — so anything but the platform's single
- * verified address bounces in production and looks like any other failure.
- * `scripts/sender-default.test.mjs` is what noticed, and it is right to.
+ * Scena's own mailer called the Email Sending binding like this:
+ *
+ *     email.send({ to, from, subject, html, text })
+ *
+ * That is not what the binding takes. `send()` wants a `cloudflare:email`
+ * `EmailMessage` carrying a raw RFC 5322 body, so every call threw
+ * `could not parse email: Cannot read properties of undefined (reading 'value')`
+ * — and `email.provider` defaults to `cloudflare` in `billing-seed.ts`, so on a
+ * correctly-configured production deployment **nothing was ever delivered**.
+ * Not the billing notices, not the suspension warning, not the factory-reset
+ * confirmation code. `@4dl/email` builds real MIME (multipart when both bodies
+ * are present, base64 so a long HTML line survives transport) and sends that.
+ *
+ * ── Two fail-OPEN paths went with it ───────────────────────────────────────
+ *
+ *   • **A missing binding degraded to the mock**, in every environment:
+ *     `if (!email) { console.info(…); return { ok: true, mocked: true } }`. On a
+ *     deploy where the binding was absent, every send reported success and
+ *     delivered nothing.
+ *   • **`mock` itself reported success in production.** The shared mailer fails
+ *     CLOSED outside development, for the reason its own comment gives: the mock
+ *     writes the message body — including sign-in codes — to retained Workers
+ *     logs, and a deployment left on it must be told, not humoured.
+ *
+ * ── What was dropped ───────────────────────────────────────────────────────
+ *
+ * The `resend` provider and `email.api_key`. The platform sends from ONE
+ * address (`noreply@4dl.app`) through Cloudflare Email Sending, onboarded once
+ * per zone by hand — which is the entire reason the address is shared rather
+ * than per-app. A second provider lane with its own key was a path nothing
+ * used and nobody would have noticed rotting.
  */
 
-import { getConfig } from "./billing-store.js";
+import {
+  configureEmailBrand,
+  emailShell as sharedShell,
+  sendEmail as sharedSend,
+  type BrandKit,
+  type SendResult,
+} from "@4dl/email";
 import { PLATFORM_FROM_DEFAULT } from "./billing-seed.js";
-import type { SendEmailBinding } from "./env.js";
+import type { Env, SendEmailBinding } from "./env.js";
 
 /** Re-exported so readers find it where every other app keeps it. It is DEFINED
  *  in `billing-seed.ts`, which is a leaf — see the note there for the cycle. */
 export { PLATFORM_FROM_DEFAULT } from "./billing-seed.js";
-
-export interface EmailConfig {
-  provider: string; // disabled | mock | resend | cloudflare
-  apiKey: string;
-  from: string;
-  admin: string; // where system/billing notices go
-}
-
-export async function emailConfig(db: D1Database): Promise<EmailConfig> {
-  const cfg = await getConfig(db);
-  return {
-    provider: cfg["email.provider"] ?? "disabled",
-    apiKey: cfg["email.api_key"] ?? "",
-    from: cfg["email.from"] ?? PLATFORM_FROM_DEFAULT,
-    admin: cfg["email.admin"] ?? "",
-  };
-}
-
-export interface SendResult {
-  ok: boolean;
-  mocked?: boolean;
-  skipped?: boolean;
-  id?: string;
-  error?: string;
-}
-
-/** Just the bare-email address out of a `Name <addr>` header (Cloudflare's
- *  send binding wants the address, not the display-name form). */
-function bareAddress(from: string): string {
-  const m = from.match(/<([^>]+)>/);
-  return (m?.[1] ?? from).trim();
-}
+export type { SendResult };
 
 /**
- * Send an email. Returns `{skipped}` when disabled, `{mocked}` in mock mode,
- * or the provider result. Never throws — delivery is best-effort so it can't
- * break the flow that triggered it (an alert, a webhook, an OTP, a sweep).
+ * Scena's mark, in the one place an email can carry it.
  *
- * `email` is the Cloudflare Email Sending binding (`env.EMAIL`); pass it when
- * the provider is `cloudflare`. Without it, a `cloudflare` provider degrades to
- * the dev mock so local runs and unconfigured accounts never hard-fail (which,
- * on the OTP path, would lock owners out).
+ * The accent is the same violet the app's tokens use. Bound once at module load
+ * rather than passed per send, because a brand handed to some call sites and not
+ * others is how two products' emails come to look like three.
+ */
+const SCENA_BRAND: BrandKit = { name: "Scena", accent: "#8b5cf6", accentFg: "#0b1220", logoUrl: null };
+configureEmailBrand(SCENA_BRAND, PLATFORM_FROM_DEFAULT);
+
+/**
+ * Whether the dev lane is open.
+ *
+ * The mock provider logs the whole message body, sign-in codes included, so it
+ * may only "succeed" in development — the same rule and the same reason as the
+ * AI mock lane (`ai.ts`). Derived from `ENVIRONMENT`, never hardcoded.
+ */
+const isDev = (env: Env): boolean => env.ENVIRONMENT === "development";
+
+/**
+ * Send an email. Never throws — delivery is best-effort so it cannot break the
+ * flow that triggered it (an alert, a webhook, an OTP, a sweep) — but it now
+ * REPORTS a failure honestly instead of returning `{ok: true}` for a message
+ * that went nowhere.
+ *
+ * Takes the whole `env`, not just `env.DB`: `email.provider` is on the shared
+ * platform-config allow-list, and a bare `D1Database` cannot see the shared
+ * store. An operator who set the provider once for the platform and cleared this
+ * app's own row — which the console offers as "Use shared" — would otherwise
+ * fall through to the `mock` default while every screen reported a provider.
  */
 export async function sendEmail(
-  db: D1Database,
+  env: Env,
   msg: { to: string; subject: string; html: string; text?: string },
-  email?: SendEmailBinding,
+  binding?: SendEmailBinding,
 ): Promise<SendResult> {
-  const cfg = await emailConfig(db);
-  if (!msg.to) return { ok: false, skipped: true };
-  if (cfg.provider === "disabled") return { ok: false, skipped: true };
-
-  // Cloudflare Email Sending: native SPF/DKIM/DMARC, no API key. The sender
-  // domain must be onboarded (Cloudflare → Email → Email Sending).
-  if (cfg.provider === "cloudflare") {
-    if (!email) {
-      console.info("[scena] email (cloudflare binding missing → mock)", { to: msg.to, subject: msg.subject });
-      return { ok: true, mocked: true };
-    }
-    try {
-      const r = await email.send({ to: msg.to, from: bareAddress(cfg.from), subject: msg.subject, html: msg.html, text: msg.text });
-      return { ok: true, id: (r && "messageId" in r ? r.messageId : undefined) };
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : "cloudflare send failed" };
-    }
-  }
-
-  if (cfg.provider === "mock" || !cfg.apiKey) {
-    console.info("[scena] email (mock)", { to: msg.to, subject: msg.subject });
-    return { ok: true, mocked: true };
-  }
-
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${cfg.apiKey}`, "content-type": "application/json" },
-      body: JSON.stringify({ from: cfg.from, to: msg.to, subject: msg.subject, html: msg.html, text: msg.text }),
-    });
-    const body = (await res.json().catch(() => ({}))) as { id?: string; message?: string };
-    if (!res.ok) return { ok: false, error: body.message ?? `resend ${res.status}` };
-    return { ok: true, id: body.id };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "send failed" };
-  }
+  if (!msg.to) return { ok: false, error: "no recipient" };
+  return sharedSend(env, msg, binding ?? env.EMAIL, undefined, isDev(env));
 }
 
-/** Send to the operator/admin address (billing + system notices). */
-export async function notifyAdmin(
-  db: D1Database,
-  operatorEmail: string | undefined,
-  msg: { subject: string; html: string },
-  email?: SendEmailBinding,
-): Promise<SendResult> {
-  const cfg = await emailConfig(db);
-  const to = cfg.admin || operatorEmail || "";
-  return sendEmail(db, { to, ...msg }, email);
+/*
+  `notifyAdmin` IS GONE, and it was not just unused — it was the wrong shape.
+
+  It sent to `email.admin` or `OPERATOR_EMAIL`: ONE address for the whole
+  deployment. Every caller was a message about ONE workspace — a suspension
+  warning, a credit-pack receipt, a failed payment — so every studio's billing
+  mail went to whoever runs the platform, and to nobody who could act on it.
+  Those four call sites now go through `notify.ts`, which resolves the actual
+  owners of the workspace in question.
+
+  `email.admin` survives for the one thing it was ever right for: the operator
+  console's "send a test email" button, which is genuinely addressed to the
+  operator. Leaving the helper behind would have been an invitation to
+  reintroduce the bug.
+*/
+
+/**
+ * A branded HTML wrapper for a transactional email.
+ *
+ * Signature-compatible with the one this replaces, so every call site is
+ * unchanged — but it is now `@4dl/email`'s shell, which means Scena's mail picks
+ * up the dark-first surface language, the preheader line, the escape helpers and
+ * the component kit (`emailButton`, `emailPanel`, `emailStatRow`) the other apps
+ * already use.
+ */
+export function emailShell(heading: string, bodyHtml: string, opts: Parameters<typeof sharedShell>[2] = {}): string {
+  return sharedShell(heading, bodyHtml, { brand: SCENA_BRAND, ...opts });
 }
 
-/** A minimal branded HTML wrapper for a transactional email. */
-export function emailShell(heading: string, bodyHtml: string): string {
-  return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1523">
-    <div style="font-size:20px;font-weight:800;letter-spacing:-0.02em;margin-bottom:4px">Scena</div>
-    <div style="height:3px;width:44px;background:oklch(0.58 0.17 300);border-radius:2px;margin-bottom:20px"></div>
-    <div style="font-size:17px;font-weight:700;margin-bottom:10px">${heading}</div>
-    <div style="font-size:14px;line-height:1.55;color:#4a4458">${bodyHtml}</div>
-    <div style="margin-top:24px;font-size:12px;color:#8a8494">Scena digital signage</div>
-  </div>`;
-}
+export { emailButton, emailDivider, emailKicker, emailListRow, emailPanel, emailStatRow, escapeHtml } from "@4dl/email";

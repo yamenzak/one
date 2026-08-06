@@ -317,8 +317,18 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   "ai.default_model.image": "flux-schnell",
   "ai.default_model.tts": "aura-1",
   "ai.default_model.music": "musicgen",
-  "email.provider": "cloudflare", // disabled | mock | resend | cloudflare (env.EMAIL binding)
-  "email.api_key": "", // only used by the resend provider
+  /*
+    disabled | mock | cloudflare (env.EMAIL binding).
+
+    `resend` and its `email.api_key` are GONE with Stage 6. The platform sends
+    from one address through Cloudflare Email Sending, onboarded per zone by
+    hand — which is the whole reason the address is shared rather than per-app —
+    so a second provider lane with its own stored key was a path nothing used.
+    `mock` now fails CLOSED outside development (@4dl/email): it logs the whole
+    message body, sign-in codes included, so a deployment left on it must be
+    told rather than humoured.
+  */
+  "email.provider": "cloudflare",
   /*
     ⚠️ THE SEEDED ROW WINS OVER `PLATFORM_FROM_DEFAULT`, so it must be the same
     address. This said `Scena <noreply@fourdegreelabs.com>` — a domain nobody
@@ -327,7 +337,10 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
     deployment would have been refused at the provider.
   */
   "email.from": PLATFORM_FROM_DEFAULT, // sender domain must be onboarded for the cloudflare provider
-  "email.admin": "", // billing/system notices go here (falls back to OPERATOR_EMAIL)
+  // Where the console's TEST email goes (falls back to OPERATOR_EMAIL). It is
+  // no longer where billing notices go — those reach the workspace's own owners
+  // through the inbox (`notify.ts`), which is what they always should have done.
+  "email.admin": "",
   "weather.api_key": "", // Platform OpenWeather One Call key — all weather sources run on this company key (empty ⇒ mock conditions, free)
   "weather.credits_per_call": "3", // Credits charged per real weather fetch (per location, hourly within opening hours)
   "google.gemini_key": "", // Platform Gemini API key — all Gemini/Lyria generation runs on this company key (metered per model rate; no BYO)

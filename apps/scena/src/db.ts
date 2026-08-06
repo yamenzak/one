@@ -2,6 +2,7 @@ import { schemaGate, type SchemaModule } from "@4dl/core";
 import { AUTH_SCHEMA } from "@4dl/auth";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
 import { BILLING_RAIL_SCHEMA } from "@4dl/billing-rail/schema";
+import { NOTIFY_SCHEMA } from "@4dl/notify";
 import { STORAGE_SCHEMA } from "@4dl/storage";
 import { SCENA_SCHEMA, DEMO_TENANT } from "./schema.js";
 
@@ -82,6 +83,15 @@ export const SCHEMA_MODULES: readonly SchemaModule[] = [
     `@4dl/purge` find a workspace's files in Stage 6 without walking the bucket.
   */
   STORAGE_SCHEMA,
+  /*
+    `notifications`, `user_prefs`, `digest_sent` — and one ALTER that is the
+    reason this entry sits AFTER tenancy rather than anywhere convenient:
+    `NOTIFY_SCHEMA` adds `notif_policy_json` to `tenant_settings`, which
+    `@4dl/tenancy` creates. Run first, the ALTER hits a table that does not
+    exist, the runner swallows it, and an owner's email veto silently never
+    persists. Ordering in this list IS dependency order.
+  */
+  NOTIFY_SCHEMA,
   SCENA_SCHEMA,
 ];
 

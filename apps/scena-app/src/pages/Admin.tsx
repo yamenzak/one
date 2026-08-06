@@ -332,14 +332,17 @@ function StripeTab() {
               <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="disabled">Disabled</SelectItem>
-                <SelectItem value="mock">Mock (log only)</SelectItem>
-                <SelectItem value="resend">Resend</SelectItem>
+                <SelectItem value="cloudflare">Cloudflare Email Sending</SelectItem>
+                <SelectItem value="mock">Mock (development only)</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-xs text-muted-foreground">
+              Mock logs the message instead of sending it, including sign-in codes — outside development it refuses rather than
+              reporting a delivery that never happened.
+            </p>
           </div>
-          {field("email.api_key", "Resend API key", "re_…")}
           {field("email.from", "From address", "Scena <noreply@yourdomain>")}
-          {field("email.admin", "Admin/billing notices to", "you@company.com")}
+          {field("email.admin", "Send test emails to", "you@company.com", "Where the Send test button below delivers. Billing and screen notices go to each workspace's own owners, not here.")}
 
           <Separator />
           <SectionLabel>Platform provider keys</SectionLabel>

@@ -35,7 +35,7 @@ export async function requestNuke(env: Env, adminEmail: string): Promise<void> {
   const otp = sixDigit();
   await env.PAIRING.put(OTP_KEY, otp, { expirationTtl: OTP_TTL_SEC });
   await sendEmail(
-    env.DB,
+    env,
     {
       to: adminEmail,
       subject: `${otp} — confirm Scena factory reset`,

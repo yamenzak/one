@@ -518,10 +518,97 @@ Workers-pool test can change the binding it would need to observe.
   nothing, but it is a pool limitation worth knowing before adding a suite that
   does.
 
-### Stage 6 — `@4dl/email` + `@4dl/notify` + `@4dl/purge`
-Transactional mail, the alert inbox + bell, and derived GDPR erasure.
+### Stage 6 — `@4dl/email` + `@4dl/notify` + `@4dl/purge` ✅ DONE (server half)
 
-*Exit:* purge conformance passes (no forgotten table); alerts land in an inbox.
+Three packages, and each one landed on a defect that was live.
+
+**Erasure was missing eighteen tables.** `deleteTenantData` named SEVEN by hand —
+`screens`, `channels`, `boards`, `feeds`, `alert_rules`, `alerts`,
+`playout_events` — plus three parent-keyed joins, while `SCENA_SCHEMA.scoped`
+declared twenty-five. Nothing connected the two. A workspace deleted at the end
+of the dunning ladder kept its media library, its slide and music playlists, its
+widget profiles, its ad rotations and ads, its tracks, its manifest version
+history, its weather sources, its board users, its device→channel assignments,
+its promo redemptions and its AI generation history — indefinitely, while the
+sweep reported success and emailed the owner to say their content had been
+removed. `tenantCascade(SCHEMA_MODULES)` derives the list from the declaration
+beside each module's DDL, so `media_assets` (Stage 5) and `notifications`
+(this one) are swept from the day they exist.
+
+The purge also owns what a package cannot: the R2 objects behind the ledger
+(batched, and asking across tenants whether a content hash is still referenced
+before deleting it), the credit DO's `wipe()`, and the KV entries keyed by a row
+the cascade is about to delete — `manifest:cur:<channel>` has **no expiry**, so
+one left behind is permanent.
+
+Two things the derivation forced into the open. `subscriptions` and
+`credit_ledger` are both in `scoped.tenantTables`, so the declaration and the
+hand-written list had always disagreed about whether a deleted workspace keeps
+its billing history; the declaration wins, and the notice no longer claims
+otherwise. And the deletion notice is the ONE message that cannot go to an
+inbox — the cascade clears `member` and `notifications`, so the owners' addresses
+have to be read *before* the purge runs.
+
+**Email did not work at all on the configured provider.** Scena's mailer called
+the binding as `email.send({ to, from, subject, html, text })`. The real API
+takes a `cloudflare:email` `EmailMessage` carrying a raw MIME body, so every
+call threw `could not parse email` — and `email.provider` defaults to
+`cloudflare`. Nothing was delivered: not billing notices, not the suspension
+warning, not the factory-reset confirmation code. A hand-written binding
+interface that is merely *plausible* typechecks perfectly and fails only against
+the real thing, which is why `SendEmailBinding` now comes from `@4dl/core`.
+
+Two fail-OPEN paths went with it: a missing binding degraded to the mock and
+returned `{ok: true}` in every environment, and `mock` itself reported success in
+production — where it logs the whole message body, sign-in codes included.
+`@4dl/email` fails closed on both. The `resend` lane and `email.api_key` are
+gone; the console's provider dropdown never offered `cloudflare` at all, so an
+operator could not select the one that was actually configured.
+
+**Nothing notified a person.** Screen alerts addressed a webhook URL or a bare
+email string on an `alert_rules` row — never a user — so an operator with no rule
+configured learned that a screen went dark by walking past it. Billing notices
+went to `email.admin`/`OPERATOR_EMAIL`, one address for the whole *deployment*,
+so every workspace's suspension warning reached the platform operator and nobody
+who could act on it. Both now dispatch through `@4dl/notify`: role resolution,
+per-category preferences, the owner's email veto, an inbox row and a socket poke.
+The webhook stays — it is the only channel that reaches someone who is not a
+Scena user at all.
+
+Scena's registry is four categories (`screens`, `content`, `staff`, `billing`)
+and thirteen types. Two decisions worth knowing: `screens` defaults to
+**inbox-only**, because a sixty-screen fleet on a flaky venue network generates
+offline/recover pairs all day and an emailed one of each teaches people to filter
+the sender; and the emergency takeover dispatches with **`force`**, the one place
+preferences are skipped, for the same reason `emergencyOverride` is true in
+`FREE_ENTITLEMENTS` and `/api/emergency` survives the read-only gate.
+
+Board roles are absent from every category — a station tablet is a shared
+credential at a counter, not a person with an inbox, and putting a workspace's
+payment state on a screen in a waiting room is not a notification.
+
+*Exit:* 202 tests (49 integration + a 4-test cascade conformance suite). Five
+mutations verified non-vacuous: the cascade narrowed back to the old seven, a
+shared object deleted anyway, alerts no longer reaching the inbox, a table
+declaring a scope column with no cascade, and a module dropped from
+`SCHEMA_MODULES`.
+
+**Still outstanding, and deliberately:**
+
+- **The BELL and the inbox screen are Stage 7.** They are `@4dl/app-kit`'s
+  (`NotificationBell`, `InboxScreen`, registry injected), and wiring them means
+  touching the SPA shell — which is exactly what Stage 7 rebuilds. The server
+  half is complete and testable without them, but until then a notification is
+  reachable only at `GET /api/notifications`. That is the "a mechanism with no
+  surface reads as done and is not" trap `@4dl/notify`'s README names, so it is
+  written down here rather than left to be discovered.
+- **`@4dl/email`'s `emailAdminRoutes` are not mounted.** Scena's own
+  `/api/admin/config` still owns the email fields. Replacing it is part of
+  swapping `Admin.tsx` for `@4dl/admin`, which the inventory puts in Stage 7.
+- **Six notification types have no caller yet** — `channel_published`,
+  `channel_rolled_back`, `feed_stalled`, `staff_joined`, `staff_role_changed`,
+  `credits_low`. The registry is where they belong; the dispatch calls land with
+  the surfaces that raise them.
 
 ### Stage 7 — The UI rewrite
 The big one, and deliberately last: it is the only stage that benefits from

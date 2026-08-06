@@ -437,7 +437,7 @@ export function registerBilling(app: App): void {
     if (deny) return deny;
     const cfg = await getConfig(c.env);
     const to = cfg["email.admin"] || c.env.OPERATOR_EMAIL || "";
-    const result = await sendEmail(c.env.DB, {
+    const result = await sendEmail(c.env, {
       to,
       subject: "Scena test email",
       html: emailShell("Test email", "<p>Your Scena email delivery is configured correctly.</p>"),

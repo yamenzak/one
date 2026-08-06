@@ -206,7 +206,7 @@ export class ScreenDO extends DurableObject<Env> {
     const st = await this.load();
     await this.patch({ online: false });
     if (st.online && st.screenId) {
-      await raiseAlert(this.env.DB, { screenId: st.screenId, type: "offline", message: "Screen disconnected" }, this.env.EMAIL);
+      await raiseAlert(this.env, { screenId: st.screenId, type: "offline", message: "Screen disconnected" });
     }
   }
 
@@ -229,7 +229,7 @@ export class ScreenDO extends DurableObject<Env> {
       await this.patch({ online: false });
       // Dead-man's-switch tripped → raise an offline alert (§23).
       if (fresh.screenId) {
-        await raiseAlert(this.env.DB, { screenId: fresh.screenId, type: "offline", message: "Screen stopped responding" }, this.env.EMAIL);
+        await raiseAlert(this.env, { screenId: fresh.screenId, type: "offline", message: "Screen stopped responding" });
       }
     }
     // Dayparting boundary (§13): re-resolve the active channel and swap if due.
@@ -451,7 +451,7 @@ export class ScreenDO extends DurableObject<Env> {
     if (!st.online && st.screenId) {
       // Best-effort: this runs in the WebSocket-accept path, so a failed alert
       // resolution / notification must never throw and break the 101 upgrade.
-      await resolveAlert(this.env.DB, st.screenId, "offline", "Screen back online", undefined, this.env.EMAIL).catch(() => {});
+      await resolveAlert(this.env, st.screenId, "offline", "Screen back online").catch(() => {});
     }
     await this.patch({ online: true });
   }

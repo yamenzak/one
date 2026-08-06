@@ -90,7 +90,9 @@
       { "name": "QUEUE", "class_name": "QueueDO" },
       { "name": "ROOM", "class_name": "RoomBoardDO" },
       { "name": "SCORE", "class_name": "ScoreDO" },
-      { "name": "BILLING", "class_name": "TenantBillingDO" }
+      { "name": "BILLING", "class_name": "TenantBillingDO" },
+      // One DO per USER, not per tenant: it holds that person's open sockets.
+      { "name": "INBOX", "class_name": "InboxDO" }
     ]
   },
   "migrations": [
@@ -109,6 +111,15 @@
     {
       "tag": "v4",
       "new_sqlite_classes": ["ScoreDO"]
+    },
+    /*
+      ⚠️ THE CLASS NAMES ABOVE AND BELOW ARE PERMANENT. A migration binds each
+      to durable storage, so renaming one orphans every workspace's balance or
+      every user's inbox — the DO would come up empty and nothing would say why.
+    */
+    {
+      "tag": "v5",
+      "new_sqlite_classes": ["InboxDO"]
     }
   ],
 
@@ -148,9 +159,18 @@
     { "binding": "MEDIA", "bucket_name": "scena-media" }
   ],
 
-  // Cloudflare Email Sending (transactional: owner OTP codes, alert + billing
-  // notices). The mailer sends via env.EMAIL when email.provider = "cloudflare".
-  // Onboard the sender domain (fourdegreelabs.com) at Cloudflare → Email → Email
-  // Sending first; until then the mailer falls back to a dev mock (see mailer.ts).
+  /*
+    Cloudflare Email Sending — transactional mail (sign-in codes, invitations,
+    alert + billing notices). `email.provider = "cloudflare"` is the default and
+    sends through this binding.
+
+    The sender is `noreply@4dl.app`, onboarded ONCE for the whole platform at
+    Cloudflare → Email → Email Sending, which is the entire reason the address is
+    shared across apps rather than per-app. It said `fourdegreelabs.com` here —
+    a domain nobody onboarded.
+
+    ⚠️ Absent, a `cloudflare` provider now REFUSES. It used to degrade to the dev
+    mock and report success for a message that went nowhere.
+  */
   "send_email": [{ "name": "EMAIL" }]
 }

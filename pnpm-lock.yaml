@@ -257,6 +257,15 @@ importers:
       '@4dl/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@4dl/email':
+        specifier: workspace:*
+        version: link:../../packages/email
+      '@4dl/notify':
+        specifier: workspace:*
+        version: link:../../packages/notify
+      '@4dl/purge':
+        specifier: workspace:*
+        version: link:../../packages/purge
       '@4dl/storage':
         specifier: workspace:*
         version: link:../../packages/storage

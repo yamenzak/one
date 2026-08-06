@@ -27,7 +27,7 @@ import {
   type PlanRow,
 } from "./billing-store.js";
 import { grantForTenant } from "./billing-service.js";
-import { notifyAdmin, emailShell } from "./mailer.js";
+import { notifyRole } from "./notify.js";
 
 export interface StripeCfg {
   mode: string; // disabled | test | live
@@ -258,9 +258,14 @@ export async function handleWebhook(env: Env, event: StripeEvent): Promise<void>
           const billing = env.BILLING.get(env.BILLING.idFromName(tenantId));
           await billing.bind(tenantId);
           await billing.topUp(credits, "pack.purchase", String(obj["id"] ?? ""));
-          await notifyAdmin(env.DB, env.OPERATOR_EMAIL, {
-            subject: `Receipt: ${credits.toLocaleString()} Scena credits`,
-            html: emailShell("Credit pack purchased", `<p>${credits.toLocaleString()} credits were added to your balance.</p>`),
+          // The BUYER's workspace, not the deployment operator. `notifyAdmin`
+          // sends to one address for the whole install, so every studio's
+          // receipt went to whoever runs the platform — see billing-service.ts.
+          await notifyRole(env, tenantId, "owner", {
+            type: "credits_purchased",
+            title: `${credits.toLocaleString()} credits added`,
+            message: `Your credit pack was applied to this workspace's balance.`,
+            dedupeKey: `pack:${String(obj["id"] ?? "")}`,
           }).catch(() => undefined);
         }
       } else if (meta["scena_plan"]) {
@@ -299,9 +304,12 @@ export async function handleWebhook(env: Env, event: StripeEvent): Promise<void>
     case "invoice.payment_failed": {
       // Enter dunning: mark past_due; the lifecycle cron schedules suspend/delete.
       await updateSubscription(env.DB, tenantId, { status: "past_due", past_due_at: Date.now() });
-      await notifyAdmin(env.DB, env.OPERATOR_EMAIL, {
-        subject: "Payment failed — action needed",
-        html: emailShell("Your payment failed", "<p>We couldn't process your latest payment. Update your card to keep your screens live — after a grace period the account is suspended.</p>"),
+      await notifyRole(env, tenantId, "owner", {
+        type: "billing_past_due",
+        message: "We couldn't process your latest payment. Update your card to keep your screens live — after a grace period the workspace is suspended.",
+        // Per dunning ENTRY, not per delivery: Stripe retries a failed invoice
+        // several times and each retry fires this event.
+        dedupeKey: `past_due:${tenantId}`,
       }).catch(() => undefined);
       break;
     }

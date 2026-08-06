@@ -880,13 +880,33 @@ by the size of the fleet. Stage 3 added the `device` door to `@4dl/tenancy` for
 exactly this (`play.` — opt-in per app, because `play` is a slug a Kova studio
 can hold today); the player worker still binds no D1 or R2 of its own.
 
-**Status: Stages 0–5 done; 6–9 remain.** `SCHEMA_MODULES` in
-`apps/scena/src/db.ts` is the migration's progress bar — five entries now
+**Status: Stages 0–6 done; 7–9 remain.** `SCHEMA_MODULES` in
+`apps/scena/src/db.ts` is the migration's progress bar — six entries now
 (`AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_RAIL_SCHEMA`, `STORAGE_SCHEMA`,
-`SCENA_SCHEMA`), and the diff that removes a table from Scena's module is the
-same diff that adds its package there. Its resource ids are deliberately
-placeholders (the old account's real ids were replaced), so `deploy.yml` skips
-it until the Provision workflow runs.
+`NOTIFY_SCHEMA`, `SCENA_SCHEMA`), and the diff that removes a table from Scena's
+module is the same diff that adds its package there. **Order in that list IS
+dependency order**: `NOTIFY_SCHEMA` ALTERs `tenant_settings`, which
+`@4dl/tenancy` creates, and a wrong order does not fail — the runner swallows
+the ALTER and an owner's email veto silently never persists. Its resource ids
+are deliberately placeholders (the old account's real ids were replaced), so
+`deploy.yml` skips it until the Provision workflow runs.
+
+⚠️ **Scena's erasure is DERIVED, and it has to stay that way.**
+`apps/scena/src/purge.ts` reads `tenantCascade(SCHEMA_MODULES)`;
+`apps/scena/test/purge-cascade.test.ts` fails on a table that carries a scope
+column and declares none. The hand-written list it replaced named seven tables
+against a declaration of twenty-five, so a deleted workspace kept its media
+library, playlists, ads, tracks, manifest history and AI history — while the
+sweep reported success and emailed the owner to say otherwise. A purge swallows
+every delete error by construction (an old database may legitimately lack a
+table), which is why the check is structural rather than behavioural.
+
+⚠️ **The inbox has a server but no BELL yet.** `@4dl/notify` is wired
+end-to-end — schema, `InboxDO` (migration `v5`, class name permanent), the four
+routes, the registry in `notifications.ts`, dispatch from screen alerts, the
+dunning ladder and the emergency takeover — but `NotificationBell` and
+`InboxScreen` are `@4dl/app-kit`'s and land with the Stage 7 UI rewrite. Until
+then a notification is reachable only at `GET /api/notifications`.
 
 Two things are DELIBERATELY still Scena's, both for the same reason, and the
 plan names them so nobody "fixes" them casually: the billing STORE

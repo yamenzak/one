@@ -1,6 +1,8 @@
 import type { ScreenDO } from "./screen-do.js";
 import type { ChannelDO } from "./channel-do.js";
 import type { QueueDO, RoomBoardDO, ScoreDO } from "./board-do.js";
+import type { SendEmailBinding } from "@4dl/core";
+import type { InboxDO } from "@4dl/notify";
 import type { TenantBillingDO } from "./billing-do.js";
 
 /** Cloudflare bindings for the Scena API Worker. */
@@ -17,6 +19,14 @@ export interface Env {
   SCORE: DurableObjectNamespace<ScoreDO>;
   /** One Durable Object per tenant — the single-threaded credit authority (§24). */
   BILLING: DurableObjectNamespace<TenantBillingDO>;
+  /**
+   * One Durable Object per USER — the inbox relay (`@4dl/notify`).
+   *
+   * Per user, not per tenant, because it holds that person's open WebSockets and
+   * a person can belong to several workspaces. The payload it pushes is
+   * "refetch", never the notification, so a dropped push costs nothing.
+   */
+  INBOX: DurableObjectNamespace<InboxDO>;
   /** Pairing code → ScreenDO id, and channel → current manifest pointer. */
   PAIRING: KVNamespace;
   /**
@@ -66,14 +76,21 @@ export interface Env {
 
   /** Cloudflare Email Sending binding (`send_email`). When present + the sender
    *  domain is onboarded, the mailer sends transactional email (OTP codes, alert
-   *  + billing notices) with native SPF/DKIM/DMARC — no third-party key. Optional:
-   *  the mailer falls back to Resend or a dev mock when unset (see mailer.ts). */
+   *  + billing notices) with native SPF/DKIM/DMARC. Optional — but absent, a
+   *  `cloudflare` provider now REFUSES rather than degrading to the dev mock,
+   *  which used to report success for a message that went nowhere. */
   EMAIL?: SendEmailBinding;
 }
 
-/** Minimal shape of Cloudflare's `send_email` binding (Email Sending). The
- *  workers-types package may not yet type the new `.send()` API, so we declare
- *  just what the mailer calls. The `from` domain must be onboarded on the account. */
-export interface SendEmailBinding {
-  send(message: { to: string; from: string; subject: string; html?: string; text?: string }): Promise<{ messageId?: string } | void>;
-}
+/**
+ * Cloudflare's `send_email` binding, re-exported from `@4dl/core`.
+ *
+ * ⚠️ Scena declared this shape itself, and declared it WRONG:
+ * `send({ to, from, subject, html, text })`. The real API takes a
+ * `cloudflare:email` `EmailMessage` carrying a raw MIME body, so every call
+ * threw at the provider — on a deployment whose `email.provider` is
+ * `cloudflare`, which is the default. A hand-written interface that is merely
+ * plausible typechecks perfectly and fails only against the real binding, which
+ * is why this now comes from the package that builds the MIME.
+ */
+export type { SendEmailBinding } from "@4dl/core";

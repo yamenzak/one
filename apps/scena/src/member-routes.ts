@@ -95,7 +95,7 @@ const staff = sharedStaffRoutes<AppEnv>({
     const url = acceptUrl(new URL(c.req.url).origin, inv.invitationId);
     const orgName = inv.tenantName || "the workspace";
     return sendEmail(
-      c.env.DB,
+      c.env as Env,
       {
         to: inv.email,
         subject: `Join ${orgName} on Scena`,
@@ -108,7 +108,7 @@ const staff = sharedStaffRoutes<AppEnv>({
       },
       (c.env as Env).EMAIL,
     )
-      .then((r) => ({ ok: r.ok, error: r.ok ? null : (r.skipped ? "email is not configured" : (r.error ?? "unknown")), url }))
+      .then((r) => ({ ok: r.ok, error: r.ok ? null : (r.error ?? "unknown"), url }))
       // The link comes back even when the mail did not — that is what makes an
       // invitation survive a misconfigured mailer.
       .catch((e: unknown) => ({ ok: false, error: String(e), url }));

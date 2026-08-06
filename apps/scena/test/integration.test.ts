@@ -29,6 +29,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { ensureSchema } from "../src/db.js";
 import { ensureBilling } from "../src/billing-store.js";
 import { STATION_DOMAIN } from "../src/auth.js";
+import { purgeTenant } from "../src/purge.js";
+import { raiseAlert } from "../src/alerts.js";
 
 /*
   THE HOST IS THE TENANCY, IN TESTS TOO.
@@ -1062,5 +1064,146 @@ describe("the mock lane", () => {
     }
     const stored = await db().prepare("SELECT value FROM app_config WHERE key = 'ai.mock'").first<{ value: string }>();
     expect(stored!.value).toBe("off");
+  });
+});
+
+/* ────────────────── Stage 6 — erasure, mail, the inbox ─────────────────── */
+
+describe("erasing a workspace clears every table its schema declares", () => {
+  it("does not leave the media library, the playlists or the ad rotations behind", async () => {
+    const { cookie, slug, door } = await newWorkspace("purge");
+    await setPlan(slug, "pro");
+    const org = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>();
+    const tenantId = org!.id;
+
+    // Give the workspace something in each of the tables the OLD hand-written
+    // list forgot. `media` and `media_assets` come from a real upload so the
+    // ledger row is real too.
+    const up = await upload(door, cookie, png(1500));
+    const { hash } = (await up.json()) as { hash: string };
+    await SELF.fetch(`${door}/api/media`, {
+      method: "POST",
+      headers: json(door, cookie),
+      body: JSON.stringify({ kind: "image", name: "poster", assetHash: hash, assetUrl: `/api/assets/${hash}`, mime: "image/png" }),
+    });
+    // Ids are namespaced by slug: this suite runs with per-test storage
+    // isolation OFF (see vitest.config.ts), so a fixed id collides on the retry.
+    for (const [table, cols, vals] of [
+      ["slide_playlists", "(id, tenant_id, name)", [`sp_${slug}`, tenantId, "Lobby"]],
+      ["widget_profiles", "(id, tenant_id, name)", [`wp_${slug}`, tenantId, "Default"]],
+      ["ad_profiles", "(id, tenant_id, name)", [`ap_${slug}`, tenantId, "House ads"]],
+      ["weather_sources", "(id, tenant_id, label)", [`ws_${slug}`, tenantId, "HQ"]],
+    ] as const) {
+      await db().prepare(`INSERT INTO ${table} ${cols} VALUES (?, ?, ?)`).bind(...vals).run();
+    }
+
+    const survivors = async () => {
+      const counts = await Promise.all(
+        ["media", "media_assets", "slide_playlists", "widget_profiles", "ad_profiles", "weather_sources"].map(async (t) => {
+          const r = await db().prepare(`SELECT COUNT(*) AS n FROM ${t} WHERE tenant_id = ?`).bind(tenantId).first<{ n: number }>();
+          return [t, r?.n ?? 0] as const;
+        }),
+      );
+      return counts.filter(([, n]) => n > 0).map(([t]) => t);
+    };
+    expect(await survivors(), "the fixture did not land").not.toEqual([]);
+
+    await purgeTenant(env as unknown as Parameters<typeof purgeTenant>[0], tenantId);
+
+    // The exact list that used to be left behind: `deleteTenantData` named seven
+    // tables while `scoped.tenantTables` declared twenty-five, and the sweep
+    // reported success either way.
+    expect(await survivors()).toEqual([]);
+  });
+
+  it("keeps bytes another workspace still references, and releases the quota anyway", async () => {
+    const a = await newWorkspace("purge-a");
+    const b = await newWorkspace("purge-b");
+    await setPlan(a.slug, "pro");
+    await setPlan(b.slug, "pro");
+    const same = png(2500);
+    const { hash } = (await (await upload(a.door, a.cookie, same)).json()) as { hash: string };
+    await upload(b.door, b.cookie, same);
+
+    const orgA = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(a.slug).first<{ id: string }>();
+    await purgeTenant(env as unknown as Parameters<typeof purgeTenant>[0], orgA!.id);
+
+    // B's slide still renders — the purge asked whether anything else pointed at
+    // the content hash before deleting the object.
+    expect((await SELF.fetch(`${b.door}/api/assets/${hash}`)).status).toBe(200);
+    const billB = (await (await SELF.fetch(`${b.door}/api/billing`, { headers: { cookie: b.cookie } })).json()) as {
+      storage: { usedBytes: number };
+    };
+    expect(billB.storage.usedBytes, "B still pays for what B references").toBe(2500);
+  });
+});
+
+describe("the inbox", () => {
+  it("is empty, personal, and answers on the workspace door", async () => {
+    const { cookie, door } = await newWorkspace("inbox");
+    const res = await SELF.fetch(`${door}/api/notifications`, { headers: { cookie } });
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { notifications: unknown[] }).toEqual({ notifications: [] });
+  });
+
+  it("refuses a signed-out reader rather than answering with somebody's mail", async () => {
+    const { door } = await newWorkspace("inbox-anon");
+    expect((await SELF.fetch(`${door}/api/notifications`)).status).toBe(401);
+  });
+
+  it("delivers a screen alert to the people the workspace belongs to", async () => {
+    // The gap this closes: an `alert_rules` row addresses a webhook URL or a
+    // bare email string, never a USER — so an operator with no rule configured
+    // learned that a screen went dark by walking past it.
+    const { cookie, slug, door } = await newWorkspace("alerted");
+    const org = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>();
+    await db()
+      .prepare("INSERT INTO screens (id, tenant_id, name, status, paired_at, last_seen) VALUES (?, ?, ?, 'online', ?, ?)")
+      .bind(`scr_${slug}`, org!.id, "Lobby panel", Date.now(), Date.now())
+      .run();
+
+    await raiseAlert(env as unknown as Parameters<typeof raiseAlert>[0], {
+      tenantId: org!.id,
+      screenId: `scr_${slug}`,
+      type: "offline",
+      message: "Screen disconnected",
+    });
+
+    const { notifications } = (await (await SELF.fetch(`${door}/api/notifications`, { headers: { cookie } })).json()) as {
+      notifications: { type: string; title: string; link: string | null }[];
+    };
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]!.type).toBe("screen_offline");
+    // Named, not an opaque id — the whole point of the join.
+    expect(notifications[0]!.title).toContain("Lobby panel");
+    expect(notifications[0]!.link).toBe("/screens");
+  });
+
+  it("marks one read, and then all", async () => {
+    const { cookie, slug, door } = await newWorkspace("inbox-read");
+    const org = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>();
+    for (const id of [`scr_a_${slug}`, `scr_b_${slug}`]) {
+      await db()
+        .prepare("INSERT INTO screens (id, tenant_id, name, status, paired_at, last_seen) VALUES (?, ?, ?, 'online', ?, ?)")
+        .bind(id, org!.id, id, Date.now(), Date.now())
+        .run();
+      await raiseAlert(env as unknown as Parameters<typeof raiseAlert>[0], {
+        tenantId: org!.id,
+        screenId: id,
+        type: "offline",
+        message: "gone",
+      });
+    }
+    const list = async () =>
+      ((await (await SELF.fetch(`${door}/api/notifications`, { headers: { cookie } })).json()) as {
+        notifications: { id: string; read: number }[];
+      }).notifications;
+
+    const before = await list();
+    expect(before).toHaveLength(2);
+    await SELF.fetch(`${door}/api/notifications/${before[0]!.id}/read`, { method: "POST", headers: json(door, cookie) });
+    expect((await list()).filter((n) => n.read).length).toBe(1);
+    await SELF.fetch(`${door}/api/notifications/read-all`, { method: "POST", headers: json(door, cookie) });
+    expect((await list()).filter((n) => n.read).length).toBe(2);
   });
 });

@@ -66,6 +66,11 @@ import { listTracks, addTrack, deleteTrack, reorderTracks } from "./music-store.
 import { listLibrary, listGenres, getLibraryTrack, countLibraryUsage, canAddLibraryTrack } from "./library-store.js";
 import { weatherConfig, weatherConfigured, callsPerDay, geocode, listSources, getSource, createSource, updateSource, deleteSource, refreshSource, readCache, refreshStale, withinOpenHours } from "./weather-store.js";
 import { storeAsset, StorageQuotaError } from "./storage.js";
+import { notifyRoutes } from "@4dl/notify";
+// Importing the delivery binding also installs the notification REGISTRY
+// (`notifications.ts` calls `configureNotify` at module scope), so this import
+// must survive even if nothing in this file calls `notify` directly.
+import { notifyCategoryAudience } from "./notify.js";
 
 /**
  * The most one upload may weigh.
@@ -109,6 +114,7 @@ export { ScreenDO } from "./screen-do.js";
 export { ChannelDO } from "./channel-do.js";
 export { QueueDO, RoomBoardDO, ScoreDO } from "./board-do.js";
 export { TenantBillingDO } from "./billing-do.js";
+export { InboxDO } from "./inbox-do.js";
 
 const app = new Hono<AppEnv>();
 
@@ -183,6 +189,15 @@ app.get("/health", (c) => c.json({ ok: true, service: "scena-api" }));
  */
 app.route("/api", domainRoutes);
 app.route("/api", domainAdminRoutes);
+/*
+  The inbox: `/api/notifications`, `/api/notifications/:id/read`,
+  `/api/notifications/read-all`, `/api/inbox/ws`.
+
+  Personal, not tenant-scoped, so the only dependency the package asks for is
+  "who is signed in". A user who belongs to two workspaces has ONE inbox — which
+  is why the DO is keyed by user and the routes never consult the host.
+*/
+app.route("/api", notifyRoutes<AppEnv>({ currentUserId: (c) => c.get("user")?.id ?? null }));
 
 registerBilling(app);
 registerContentRoutes(app);
@@ -1591,6 +1606,21 @@ app.post("/api/emergency", async (c) => {
   );
 
   await c.env.PAIRING.put(emergencyKey(tenantOf(c)), JSON.stringify({ ...payload, count: targets.length }));
+  /*
+    `force: true` — the one place in Scena that skips a person's preferences.
+
+    An emergency takeover has replaced every screen in the building with a fire
+    or evacuation message. Whoever runs those screens needs to know it happened
+    and who did it, whether or not they have muted the `screens` category. It is
+    the same reasoning that makes `emergencyOverride` true in
+    `FREE_ENTITLEMENTS` and exempts `/api/emergency` from the read-only gate: a
+    safety control is not a convenience.
+  */
+  await notifyCategoryAudience(c.env, tenantOf(c), {
+    type: "emergency_active",
+    message: `${targets.length} screen${targets.length === 1 ? "" : "s"} taken over by ${c.get("user")?.email ?? "an operator"}.`,
+    force: true,
+  }).catch(() => undefined);
   return c.json({ overrideId: payload.id, count: targets.length });
 });
 
@@ -1607,6 +1637,11 @@ app.post("/api/emergency/clear", async (c) => {
     }),
   );
   await c.env.PAIRING.delete(emergencyKey(tenantOf(c)));
+  await notifyCategoryAudience(c.env, tenantOf(c), {
+    type: "emergency_cleared",
+    message: `Normal playout resumed on ${targets.length} screen${targets.length === 1 ? "" : "s"}.`,
+    force: true,
+  }).catch(() => undefined);
   return c.json({ cleared: targets.length });
 });
 

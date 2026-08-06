@@ -15,7 +15,9 @@ import type { Env } from "./env.js";
 import { DEMO_TENANT } from "./db.js";
 import { getSubscription, updateSubscription, getPlan, listSubscriptions, tenantEntitlements } from "./billing-store.js";
 import { resolveEntitlements } from "./entitlements.js";
-import { notifyAdmin, emailShell } from "./mailer.js";
+import { emailShell, sendEmail } from "./mailer.js";
+import { notifyRole } from "./notify.js";
+import { purgeTenant } from "./purge.js";
 
 /** Stable "YYYY-MM" key so a grant applies at most once per calendar month. */
 export function periodKey(now: number): string {
@@ -77,22 +79,72 @@ export async function lifecycleSweep(env: Env, now = Date.now()): Promise<Lifecy
       if (now >= suspendAt) {
         await updateSubscription(env.DB, sub.tenant_id, { status: "suspended", delete_at: now + deleteMs });
         actions.push({ tenantId: sub.tenant_id, from: "past_due", to: "suspended" });
-        await notifyAdmin(env.DB, env.OPERATOR_EMAIL, {
-          subject: "Account suspended — screens paused",
-          html: emailShell("Account suspended", `<p>Your account is suspended for non-payment and your screens now show a holding card. Reactivate by updating your payment. Data is scheduled for deletion in ${Math.round(deleteMs / 86400000)} days.</p>`),
-        }, env.EMAIL).catch(() => undefined);
+        /*
+          THE WORKSPACE'S OWNER, not the deployment's operator.
+
+          `notifyAdmin` sends to `email.admin` or `OPERATOR_EMAIL` — one address
+          for the whole deployment — so every workspace's suspension warning went
+          to the platform operator and to nobody who could act on it. `notifyRole`
+          resolves the actual owners of THIS workspace, writes their inbox rows and
+          emails whoever has not muted the category.
+        */
+        await notifyRole(env, sub.tenant_id, "owner", {
+          type: "billing_suspended",
+          message: `Your screens are showing a holding card until payment is settled. Data is scheduled for deletion in ${Math.round(deleteMs / 86_400_000)} days.`,
+          dedupeKey: `suspended:${sub.tenant_id}`,
+        }).catch(() => undefined);
       }
     } else if (sub.status === "suspended" && sub.delete_at && now >= sub.delete_at) {
+      /*
+        ⚠️ THE RECIPIENTS ARE READ BEFORE THE PURGE, and this is the one notice
+        that CANNOT go to an inbox.
+
+        The cascade clears `member` and `notifications` along with everything
+        else, so after it runs there is no membership left to resolve an owner
+        from and no inbox left to write a row into. Reading the addresses first
+        is what makes the last message deliverable at all — and it is a
+        deliberate exception to "notify, don't email", not an oversight.
+      */
+      const owners = await ownerEmails(env.DB, sub.tenant_id);
       await deleteTenantData(env, sub.tenant_id);
       await updateSubscription(env.DB, sub.tenant_id, { status: "canceled", plan_id: "free", delete_at: null, suspend_at: null, past_due_at: null });
       actions.push({ tenantId: sub.tenant_id, from: "suspended", to: "deleted" });
-      await notifyAdmin(env.DB, env.OPERATOR_EMAIL, {
-        subject: "Account data deleted",
-        html: emailShell("Account data removed", "<p>After the suspension window elapsed, your channels, screens, and content were deleted. Your billing history is retained.</p>"),
-      }, env.EMAIL).catch(() => undefined);
+      for (const to of owners) {
+        await sendEmail(env, {
+          to,
+          subject: "Your Scena workspace data has been deleted",
+          // "Your billing history is retained" was here, and it stopped being
+          // true the moment the purge started deriving its table list:
+          // `subscriptions` and `credit_ledger` are both in
+          // `scoped.tenantTables`, so the declaration and the old hand-written
+          // list had disagreed about this all along. The declaration is what
+          // the erasure story is written against, so it wins — and the notice
+          // now says what actually happened.
+          html: emailShell(
+            "Workspace data removed",
+            "<p>After the suspension window elapsed, your screens, channels, content, media and account records were deleted. Nothing was retained.</p>",
+          ),
+          text: "After the suspension window elapsed, your Scena screens, channels, content, media and account records were deleted. Nothing was retained.",
+        }).catch(() => undefined);
+      }
     }
   }
   return actions;
+}
+
+/**
+ * The addresses of a workspace's owners.
+ *
+ * Read from `member` ⋈ `user`, which is the only place the answer lives — and
+ * the reason the deletion notice has to collect them BEFORE the cascade runs.
+ */
+async function ownerEmails(db: D1Database, tenantId: string): Promise<string[]> {
+  const rows = await db
+    .prepare('SELECT u.email AS email FROM "member" m JOIN "user" u ON u.id = m.userId WHERE m.organizationId = ? AND m.role = ?')
+    .bind(tenantId, "owner")
+    .all<{ email: string | null }>()
+    .catch(() => null);
+  return (rows?.results ?? []).map((r) => r.email).filter((e): e is string => Boolean(e));
 }
 
 function days(v: string | undefined): number {
@@ -107,21 +159,22 @@ export async function isSuspended(db: D1Database, tenantId = DEMO_TENANT): Promi
 }
 
 /**
- * Auto-deletion (§25): wipe a tenant's authoring data. Screens, content,
- * boards, feeds, schedules, and alerts are removed; billing rows (subscription,
- * ledger) are retained for the record. Destructive and irreversible.
+ * Auto-deletion (§25). Destructive and irreversible.
+ *
+ * ⚠️ THE TABLE LIST IS NO LONGER WRITTEN HERE, and that is the whole change.
+ * This function used to name seven tables plus three parent-keyed joins, while
+ * `SCENA_SCHEMA.scoped` declared twenty-five — so a deleted workspace kept its
+ * media library, playlists, widget profiles, ads, tracks, manifest history,
+ * weather sources, board users and AI history, while the sweep reported success
+ * and emailed the owner to say their content had been removed. `purgeTenant`
+ * derives the list from the same declaration `@4dl/purge`'s conformance test
+ * checks, so a table added to the schema is swept without anyone remembering.
+ *
+ * Kept as a named re-export because three call sites and a dunning ladder read
+ * better with the domain verb than with the mechanism.
  */
 export async function deleteTenantData(env: Env, tenantId: string): Promise<void> {
-  const db = env.DB;
-  // slides/device_schedule_rules/feed_items are keyed by parent id; clear by
-  // tenant join, then clear the tenant-keyed tables directly.
-  const stmts = [
-    db.prepare("DELETE FROM slides WHERE channel_id IN (SELECT id FROM channels WHERE tenant_id = ?)").bind(tenantId),
-    db.prepare("DELETE FROM device_schedule_rules WHERE screen_id IN (SELECT id FROM screens WHERE tenant_id = ?)").bind(tenantId),
-    db.prepare("DELETE FROM feed_items WHERE feed_id IN (SELECT id FROM feeds WHERE tenant_id = ?)").bind(tenantId),
-    ...["screens", "channels", "boards", "feeds", "alert_rules", "alerts", "playout_events"].map((t) => db.prepare(`DELETE FROM ${t} WHERE tenant_id = ?`).bind(tenantId)),
-  ];
-  await db.batch(stmts);
+  await purgeTenant(env, tenantId);
 }
 
 /* ------------------------------- identity -------------------------------- */

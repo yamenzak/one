@@ -112,7 +112,7 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape): Shared
      */
     async sendOtp(e, { email, otp }) {
       const res = await sendEmail(
-        (e as Env).DB,
+        e as Env,
         {
           to: email,
           subject: `${otp} is your Scena code`,
@@ -131,7 +131,7 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape): Shared
 
     async sendInvitation(e, data) {
       const res = await sendEmail(
-        (e as Env).DB,
+        e as Env,
         {
           to: data.email,
           subject: `Join ${data.organization.name} on Scena`,
