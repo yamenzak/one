@@ -251,21 +251,70 @@ Adopt `app_config` and the shared platform config store.
 *Exit:* schema-module conformance tests pass; the Google/Stripe/Turnstile keys
 resolve from the shared KV.
 
-### Stage 2 — `@4dl/auth`
-Replace `auth.ts`/`auth-context.ts`/`route-guard.ts`/`perms.ts`/`members.ts`.
-Bind Scena's four roles into the grant algebra. Adopt staff routes + seats.
-Add passkeys.
-**Deliver §4.2's token primitive here** if we take that route.
+### Stage 2 — `@4dl/auth` ✅ DONE
 
-*Exit:* sign-in works on every door; the route-gate conformance suite passes.
+Landed: the auth factory (`auth.ts`), the role registry and its DERIVED grant
+presets (`access.ts` + `perms.ts`), staff routes + seats + passkeys
+(`member-routes.ts`), and `members.ts` reduced to what survives. Better Auth's
+seven tables moved to `AUTH_SCHEMA`, which also brought `passkey`, `auth_logs`
+and `action_otps`.
+
+**Password sign-in for people is gone**, along with magic links and Google.
+Staff are invited by email. Only STATIONS hold a credential — §4.3's option (a),
+via `@4dl/auth`'s opt-in `stationCredentials` lane on the non-routable
+`@bd.scena` suffix. §4.2's token primitive was NOT built: nothing needs it once
+stations stay accounts.
+
+**Two things moved OUT of this stage, both because of a dependency:**
+
+- `auth-context.ts` and `route-guard.ts` stay Scena's own until **Stage 3**.
+  `@4dl/auth`'s session middleware and six-gate guard both read
+  `c.get("host")` — a `@4dl/tenancy` resolution — so swapping them before the
+  host model exists is not possible, and pretending otherwise would mean
+  building a fake host to satisfy an import.
+- The `routes` block in `wrangler.jsonc` collapses every door onto one hostname
+  under `wrangler dev` (CLAUDE.md documents this; Kova removed its own for the
+  same reason). Visible already — a dev invitation link points at
+  `scena.4dl.app` — and it belongs with the doors in Stage 3.
+
+*Exit met:* sign-in, org create, staff roster, seat ceiling, station credential
+and per-member grant all verified over real HTTP against a fresh D1 — see the
+integration suite below.
+
+### Stage 2b — the integration harness, pulled forward from Stage 8
+
+Not in the original plan, and it should have been. Scena arrived with 141 unit
+tests and no way to run its worker, so Stage 2 was verified by hand against
+`wrangler dev` — and that hour found **four defects that every unit test and the
+typechecker passed straight through**:
+
+| Defect | Why nothing saw it |
+|---|---|
+| the station lane also opened Better Auth's PUBLIC `sign-up/email`, so a stranger could register a password account on a routable address | `autoSignIn: false` withholds the token on the sign-up response, so the endpoint reads as though it refused |
+| `app_config.updated_at` never existed, so a FRESH deployment could not seed its catalog or save any setting | `@4dl/core` bootstraps the table first, so the app's wider `CREATE … IF NOT EXISTS` is a silent no-op — and an EXISTING database works perfectly |
+| `assets.directory` pointed at the old repo's SPA path | `wrangler dev` refuses to start on it; a deploy does not |
+| a module cycle resolved `PLATFORM_FROM_DEFAULT` to `undefined` at init | surfaces as `D1_TYPE_ERROR` from the seed, which reads as a database problem |
+
+`apps/scena/test/integration.test.ts` (15 tests, Miniflare, real D1) now covers
+all four plus the seat ceiling, the station sign-in, the bounded per-member
+grant, and the removed enumeration routes. Every remaining stage moves schema
+and routes; none of them should have to be found by hand.
 
 ### Stage 3 — `@4dl/tenancy` (the biggest gain)
 Five doors + the new `device` door (§4.1). Subdomains, custom domains, slug
 validation, the standing/host gate, maintenance.
 Wire §4.6's screen-behaviour mapping.
 
+**Carried forward from Stage 2, and blocking until this lands:**
+`auth-context.ts` and `route-guard.ts` are still Scena's own, because
+`@4dl/auth`'s session middleware and six-gate guard both read `c.get("host")`.
+They swap here, with the host resolution that makes them possible — that is the
+right order, not a slip. So does the `routes` block in `wrangler.jsonc`, which
+today collapses every door onto one hostname under `wrangler dev`.
+
 *Exit:* a tenant reachable at `<slug>.scena.4dl.app` and at their own domain; a
-suspended tenant's screens show the holding card; the player origin is exempt.
+suspended tenant's screens show the holding card; the player origin is exempt;
+`auth-context.ts` and `route-guard.ts` are `@4dl/auth`'s.
 
 ### Stage 4 — `@4dl/billing` + `@4dl/billing-rail`
 Entitlements engine with Scena's quota/feature registry. `TenantBillingDO`

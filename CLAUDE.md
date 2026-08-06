@@ -246,11 +246,12 @@ loud, which is the only kind this repo has actually had.
 - `pnpm --filter @kova/api test` — the Miniflare integration suite. **Build the
   SPA first** (`pnpm --filter @kova/app build`) — the worker's `assets` dir is
   `apps/app/dist`, and Miniflare aborts (reporting "no tests") without it. The
-  same holds for `@4dl/tessa` and `@tessa/app`.
+  same holds for `@4dl/tessa`/`@tessa/app` and `@4dl/scena`/`@scena/app`.
   ⚠️ An `assets.directory` is a filesystem path, not a package dependency, so
   nothing in the graph connects a worker's tests to its app's build — forgetting
   Tessa's is what turned the merge that added `apps/tessa-app` red. `turbo.json`
-  now declares BOTH edges by hand (`@kova/api#test`, `@4dl/tessa#test`), so
+  now declares all THREE edges by hand (`@kova/api#test`, `@4dl/tessa#test`,
+  `@4dl/scena#test`), so
   anything going through turbo — the root `pnpm test`, `pnpm turbo run test`, both
   CI workflows — builds the SPA first and CACHES it. `pnpm --filter <pkg> test`
   bypasses turbo and still does not.
@@ -258,8 +259,8 @@ loud, which is the only kind this repo has actually had.
   `Isolated storage failed` — or `Network connection lost` thrown from
   `updateStackedStorage` / `onAfterTryTask`, which is the same fault with a
   different message: Miniflare storage contention with the sibling tasks, not a
-  real failure. All three Workers-pool configs (`apps/api`, `apps/tessa`,
-  `apps/_template`) now set `retry: 1`, which absorbs it — ONE retry, so a
+  real failure. All four Workers-pool configs (`apps/api`, `apps/tessa`,
+  `apps/scena`, `apps/_template`) now set `retry: 1`, which absorbs it — ONE retry, so a
   genuine assertion failure still fails twice and turns the run red. If a
   failure survives the retry, re-run the suite on its own filter before
   believing it.

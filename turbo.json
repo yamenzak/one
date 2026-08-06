@@ -33,6 +33,15 @@
       "dependsOn": ["^build", "@tessa/app#build"],
       "outputs": ["coverage/**"]
     },
+    "@4dl/scena#test": {
+      // Scena's worker serves `apps/scena-app/dist` through an `assets`
+      // binding, and an `assets.directory` is a filesystem path, not a package
+      // dependency — turbo cannot infer this edge. Without the build, Miniflare
+      // aborts and reports "no tests", which reads as a pass. Declaring it by
+      // hand is the same fix `@kova/api` and `@4dl/tessa` needed.
+      "dependsOn": ["^build", "@scena/app#build"],
+      "outputs": ["coverage/**"]
+    },
     "e2e": {
       // The worker serves apps/app/dist, so the SPA must be built first — same
       // ordering the api integration suite needs.
