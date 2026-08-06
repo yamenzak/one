@@ -43,9 +43,16 @@
       "outputs": ["coverage/**"]
     },
     "e2e": {
-      // The worker serves apps/app/dist, so the SPA must be built first — same
-      // ordering the api integration suite needs.
-      "dependsOn": ["@kova/app#build"],
+      // Every worker serves its app's `dist` through an `assets` binding, which
+      // is a filesystem path and NOT a package dependency — turbo cannot infer
+      // it. A missing build here does not fail loudly; it serves a stale shell
+      // or none, and the suite reports "element not found".
+      //
+      // `@scena/player#build` is NOT here, deliberately: the Scena suite builds
+      // the player itself, inside its webServer command, because `VITE_API_BASE`
+      // has to be baked in at build time and has to name the port that suite
+      // owns. A turbo-built player would carry the production origin.
+      "dependsOn": ["@kova/app#build", "@tessa/app#build", "@scena/app#build"],
       "cache": false,
       // Turbo filters the environment. Playwright locates its browsers through
       // PLAYWRIGHT_BROWSERS_PATH (pre-set on CI images and sandboxes); stripped,

@@ -67,7 +67,7 @@
       "name": "Scena",
       "dir": "apps/scena",
       "spa": "@scena/app",
-      "e2e": null,
+      "e2e": "@scena/e2e",
       "deploy": true,
       "provision": { "d1": "scena", "kv": "PAIRING", "r2": "scena-media" },
       "email": { "name": "Scena" }
