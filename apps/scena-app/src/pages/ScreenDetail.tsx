@@ -362,7 +362,7 @@ function RemoteControl({ screen }: { screen: Screen }) {
         active ? "bg-primary/12 text-primary ring-1 ring-inset ring-primary/25" : "bg-muted/60 text-foreground hover:bg-muted",
       )}
     >
-      <span className="transition-transform group-hover:scale-110 [&_svg]:size-5">{icon}</span>
+      <span className="[&_svg]:size-5">{icon}</span>
       {label}
     </button>
   );

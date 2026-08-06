@@ -132,7 +132,7 @@ function ChannelCard({ channel, onOpen }: { channel: ComposedChannel; onOpen: ()
   const ids = { slide: channel.slide_playlist_id ?? null, music: channel.music_playlist_id ?? null, widget: channel.widget_profile_id ?? null, ad: channel.ad_profile_id ?? null };
   const setCount = SOURCES.filter((s) => ids[s.key]).length;
   return (
-    <Card onClick={onOpen} className="group cursor-pointer overflow-hidden p-0 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg">
+    <Card onClick={onOpen} className="group cursor-pointer overflow-hidden p-0 transition-all hover:bg-surface-2 active:scale-[0.99]">
       <DevicePreview channelId={channel.id} online className="rounded-none ring-0" />
       <div className="p-3.5">
         <div className="flex items-center gap-2">

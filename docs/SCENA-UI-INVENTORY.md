@@ -595,3 +595,83 @@ for a shared device and was left alone. The `catch(() => {})` calls on
 lists, branding) are correct as they stand: a picker that cannot load its
 options degrades to a picker with no options, and there is no page-level claim
 being made. Only loads whose failure becomes a STATEMENT were changed.
+
+
+---
+
+## 7g — the builder restyle: tokens, motion, loading. Nothing else.
+
+§4.5's bound held. The 2,708-line transform controller, marquee select,
+align/distribute, z-order and undo/redo are **untouched** — this sub-stage
+changed colours, one loading state and one error state, and added a guard.
+
+### The builder had two selection colours
+
+`TransformBox` drew its outline, rotate handle, stem and group box in a
+hardcoded `oklch(0.72 0.19 300)` repeated at six call sites. The marquee
+rectangle on the page used `border-primary bg-primary/10`. So marquee-selecting
+three widgets drew a **green** rectangle that then sprouted **violet** handles,
+and neither value had a name saying it was a decision.
+
+**And the fix is not "make them both a token."** These marks sit on top of the
+tenant's design — arbitrary content in arbitrary colours — and `var(--primary)`
+is a dark green in the light theme, i.e. a selection outline that disappears the
+moment somebody selects a dark widget. Every editor that got this right pins a
+fixed high-chroma hue for exactly this reason.
+
+So: one exported constant, one wash, both used by the transform box AND the
+marquee, with the reasoning in the header. What DID become tokens is the depth —
+the two handle shadows and the stage's `shadow-2xl ring-black/40` are
+`--shadow-sm` / `--shadow-lg` / `ring-border`, because a shadow is depth rather
+than identity.
+
+**`selection-chrome.conformance.test.ts` holds both halves of that**, and its
+first version was wrong in an instructive way: it scanned the whole builder and
+failed on three lines in `panel/Panel.tsx` — which were **right**. Those are the
+default `style.accent` a metric / pulse / score widget is created with; they end
+up in the manifest and are drawn by a TV that is not running this stylesheet.
+Coupling a widget's shipped appearance to the colour of a selection outline
+would be a worse bug than the one being fixed. The scan is scoped to the
+builder's own chrome now, with the content exemptions as an explicit list and a
+second assertion that the list has not grown to cover everything.
+
+`Panel.tsx` gains a header saying the same thing, because that file is where a
+future "tokenise the literals" sweep would do real damage: writing the string
+`var(--primary)` into a manifest makes the player draw nothing.
+
+Three mutations, all caught: the marquee reverted to `border-primary`, `SELECT`
+changed to a token, and a second copy of the hue added to a chrome file.
+
+### The loading and error states
+
+- **The canvas loaded behind a centred spinner.** It is a `Skeleton` in the
+  stage's own geometry now — the size is known before the widgets arrive, so the
+  canvas can be its own shape while it fills rather than jumping into place from
+  a one-line spinner.
+- **The failed load was a status line reading "Couldn't load this profile —
+  refresh to retry"**: an instruction to do by hand the thing a button does, on
+  a screen with unsaved-changes guards, where *refresh* is the one word you do
+  not want to be saying. The load is a `reload` callback and the failure is a
+  `LoadError` with a retry. Save stays disabled either way — saving a failed
+  load would overwrite the real stored layout with an empty one, which was
+  already handled and is why `loadError` existed at all.
+
+### The hover-lift finally went
+
+7a deleted the `hover-lift` and `animate-rise` CSS utilities and said why: a
+lift on hover is a mouse idiom in a touch surface. The inline Tailwind
+equivalent survived on three card renderers (`Screens`, `Channels`,
+`Playlists`) and a `group-hover:scale-110` on the remote-control tiles — and
+7c/7e preserved them, which is the sub-stage's own oversight. All four are the
+house press cue now: `transition-all hover:bg-surface-2 active:scale-[0.99]`,
+the same string `@4dl/ui`'s `Card interactive` uses, so a press reads on a
+finger as well as a pointer.
+
+### Explicitly NOT done, per §4.5
+
+The row grammar, the one-primary-action rule, the toolbar's density, and
+`window.confirm` on the unsaved-changes guard. That last one is a real
+inconsistency — every other confirmation in the app is `ConfirmDialog` — but
+replacing it inside a `<Link onClick>` means making navigation async, which is
+a rebuild of the leave path rather than a restyle. It is listed here so the
+next person finds it named rather than discovers it.

@@ -210,7 +210,7 @@ function DeviceCard({ screen, onClick }: { screen: Screen; onClick: () => void }
   return (
     <Card
       onClick={onClick}
-      className="group relative cursor-pointer overflow-hidden p-0 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+      className="group relative cursor-pointer overflow-hidden p-0 transition-all hover:bg-surface-2 active:scale-[0.99]"
     >
       <div className="relative">
         {/* Live, clock-computed view of what this device is showing right now. */}

@@ -504,7 +504,7 @@ function SlideCard({ slide, index, canWrite, dragging, over, onDragStart, onDrag
       onDragOver={(e) => e.preventDefault()}
       onDragEnd={onDragEnd}
       onDrop={(e) => { e.preventDefault(); onDrop(); }}
-      className={`group relative overflow-hidden py-0 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg ${dragging ? "opacity-40" : ""} ${over ? "ring-2 ring-primary" : ""}`}
+      className={`group relative overflow-hidden py-0 transition-all hover:bg-surface-2 active:scale-[0.99] ${dragging ? "opacity-40" : ""} ${over ? "ring-2 ring-primary" : ""}`}
     >
       {/* Fixed 16:9 frame — portrait media letterboxes inside it instead of distorting the card. */}
       <div className="relative aspect-video w-full overflow-hidden bg-muted">

@@ -135,7 +135,7 @@ function DayChart({ days }: { days: { day: string; plays: number }[] }) {
         <div key={d.day} className="group flex flex-1 flex-col items-center gap-1.5">
           <div className="flex w-full flex-1 items-end">
             <div
-              className="w-full rounded-t-md bg-primary/70 transition-all duration-200 group-hover:bg-primary"
+              className="w-full rounded-t-md bg-primary/70 transition-colors group-hover:bg-primary"
               style={{ height: `${Math.max(2, (d.plays / max) * 100)}%` }}
               title={`${d.plays.toLocaleString()} plays`}
             />

@@ -44,11 +44,11 @@ import { widgetIcon } from "../builder/widget-icons.js";
 import { makeWidget, fromManifestWidget, DESIGN_W, DESIGN_H, type WNode, type WType } from "../builder/types.js";
 import { useFeature } from "../entitlements.js";
 import { useHistory } from "../builder/history.js";
-import { TransformBox, GroupBox, type Phase } from "../builder/TransformBox.js";
+import { TransformBox, GroupBox, SELECT, SELECT_WASH, type Phase } from "../builder/TransformBox.js";
 import { AiLayoutDialog } from "../builder/AiLayoutDialog.js";
 import { intersects, alignPatches, distributePatches, clampPos, type AlignKind } from "../builder/geometry.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
-import { toast } from "@4dl/ui";
+import { LoadError, Skeleton, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 
 /** Accept both the flat WNode shape and the manifest rect-tuple shape. */
@@ -162,12 +162,18 @@ function Builder({ profileId }: { profileId: string }) {
   const H = designH * scale;
 
   /* ------------------------------ load ---------------------------------- */
-  useEffect(() => {
-    let live = true;
+  /*
+    Extracted from the effect so the failed state has a BUTTON. It used to set
+    a status line reading "Couldn't load this profile — refresh to retry",
+    which is an instruction to do by hand the thing a control does — and on a
+    screen with unsaved-changes guards, "refresh" is the one word you do not
+    want to be telling somebody.
+  */
+  const reload = useCallback(() => {
     setLoading(true);
-    getWidgetProfile(profileId)
+    setStatus("");
+    return getWidgetProfile(profileId)
       .then((p) => {
-        if (!live) return;
         setName(p.name || "Widget profile");
         setDesignW(p.design_w && p.design_w > 0 ? p.design_w : DESIGN_W);
         setDesignH(p.design_h && p.design_h > 0 ? p.design_h : DESIGN_H);
@@ -178,8 +184,17 @@ function Builder({ profileId }: { profileId: string }) {
       })
       // A failed load must NOT look like an empty profile — flag it so Save is
       // disabled (saving now would overwrite the real stored layout with nothing).
-      .catch(() => { if (live) { setLoadError(true); setStatus("Couldn't load this profile — refresh to retry"); } })
-      .finally(() => { if (live) setLoading(false); });
+      .catch(() => setLoadError(true))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId]);
+
+  useEffect(() => {
+    let live = true;
+    void reload();
+    // Option lists, and their failures are deliberately quiet: a picker that
+    // cannot load its options degrades to a picker with no options, and makes
+    // no claim about the profile.
     listBoards().then((v) => live && setBoards(v)).catch(() => {});
     listFeeds().then((v) => live && setFeeds(v)).catch(() => {});
     listWeatherLocations().then((v) => live && setWeather(v.locations)).catch(() => {});
@@ -579,10 +594,22 @@ function Builder({ profileId }: { profileId: string }) {
 
           {/* Canvas */}
           <div ref={wrapRef} className="relative flex min-w-0 flex-1 items-center justify-center overflow-auto bg-[radial-gradient(circle_at_1px_1px,theme(colors.border)_1px,transparent_0)] bg-[size:22px_22px] p-6">
-            {loading ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Loading…</div>
+            {loadError ? (
+              // Was a status line reading "Couldn't load this profile — refresh
+              // to retry", i.e. an instruction to do by hand the thing a button
+              // does. Save stays disabled either way: saving now would overwrite
+              // the real stored layout with an empty one.
+              <div className="w-full max-w-md">
+                <LoadError what="this profile" error="We couldn’t reach the server." onRetry={reload} />
+              </div>
+            ) : loading ? (
+              // A skeleton in the geometry actually chosen, not a spinner: the
+              // stage is a known size before the widgets arrive, so the canvas
+              // can be its own shape while it fills rather than jumping into
+              // place from a centred one-liner.
+              <Skeleton className="shrink-0 rounded-lg" style={{ width: W, height: H }} />
             ) : (
-              <div ref={(el) => { stageRef.current = el; setStageEl(el); }} className="relative shrink-0 overflow-visible rounded-lg shadow-2xl ring-1 ring-black/40" style={{ width: W, height: H }}>
+              <div ref={(el) => { stageRef.current = el; setStageEl(el); }} className="relative shrink-0 overflow-visible rounded-lg ring-1 ring-border/70" style={{ width: W, height: H, boxShadow: "var(--shadow-lg)" }}>
                 <div
                   onMouseDown={(e) => { if (e.target === e.currentTarget) onCanvasMouseDown(e); }}
                   className="absolute inset-0 overflow-hidden rounded-lg"
@@ -615,7 +642,13 @@ function Builder({ profileId }: { profileId: string }) {
                   })}
                 </div>
 
-                {marquee && <div className="pointer-events-none absolute z-[9999] rounded-sm border border-primary bg-primary/10" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }} />}
+                {/* The SAME colour the transform box uses. These were two different
+                    selection colours — a theme-following `--primary` here and a
+                    fixed violet on the handles — so marquee-selecting three
+                    widgets drew a green rectangle that then sprouted violet
+                    handles. See `TransformBox`'s header for why the fixed hue
+                    is right over arbitrary tenant content. */}
+                {marquee && <div className="pointer-events-none absolute z-[9999] rounded-sm" style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h, border: `1px solid ${SELECT}`, background: SELECT_WASH }} />}
 
                 {single && selectedNode ? (
                   <TransformBox node={selectedNode} scale={scale} cfg={snapCfg} onChange={onBox} touch={coarse} />

@@ -5,6 +5,17 @@
  * every widget, standard shape or complex. Values map straight onto the node's
  * style/config, which the shared @scena/widgets core turns into the exact look
  * the player draws.
+ *
+ * ⚠️ THE LITERAL COLOURS IN THIS FILE ARE CONTENT, NOT CHROME, and must stay
+ * literal. `"#ffffff"`, `"oklch(0.72 0.19 300)"` and the rest are the DEFAULT
+ * VALUES a widget is created with — they end up in `style.color` on a node, get
+ * compiled into the manifest, and are rendered by a TV in a lobby that has
+ * never heard of `--primary` and is not running this stylesheet. Swapping one
+ * for a token would write the literal string "var(--primary)" into the
+ * manifest, and the player would draw nothing.
+ *
+ * Stage 7g tokenised the builder's own chrome (see `TransformBox`); this file
+ * is where that sweep deliberately stops.
  */
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp, Trash2, Code2, Image as ImageIcon } from "lucide-react";

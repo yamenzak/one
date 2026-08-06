@@ -27,6 +27,32 @@ const HANDLES: { id: Handle; hx: -1 | 0 | 1; hy: -1 | 0 | 1; cursor: string }[] 
 ];
 
 const MIN = 20;
+
+/**
+ * SELECTION CHROME, AND WHY IT IS DELIBERATELY NOT A TOKEN.
+ *
+ * Every other surface in this app takes its colour from `@4dl/ui`'s tokens, and
+ * this one must not: these marks sit ON TOP OF THE TENANT'S DESIGN, which is
+ * arbitrary content in arbitrary colours — a white poster, a black scoreboard,
+ * a photo. A theme-following `var(--primary)` is a dark green in the light
+ * theme, which is a selection outline that disappears the moment somebody
+ * selects a dark widget. Editors that got this right (Figma, Sketch) all pin a
+ * fixed high-chroma hue for the same reason.
+ *
+ * What WAS wrong is that the value was a literal repeated at six call sites, so
+ * there was nothing to change and nothing saying it was a decision. It is one
+ * constant now, and the fixed white handle fill is named rather than inlined —
+ * white against a coloured outline reads on every background, which is the
+ * whole job.
+ *
+ * The SHADOWS are tokens, because a shadow is depth rather than identity and
+ * `--shadow-sm` is the depth the rest of the app uses at this size.
+ */
+export const SELECT = "oklch(0.72 0.19 300)";
+/** The same hue at 6% — a group's fill, not an outline. */
+export const SELECT_WASH = "oklch(0.72 0.19 300 / 0.06)";
+/** Fixed, for contrast against arbitrary content. See above. */
+const HANDLE_FILL = "#fff";
 const rot = (x: number, y: number, deg: number): [number, number] => {
   const r = (deg * Math.PI) / 180, c = Math.cos(r), s = Math.sin(r);
   return [x * c - y * s, x * s + y * c];
@@ -123,13 +149,13 @@ export function TransformBox({
       onPointerUp={end}
     >
       {/* selection outline + drag surface */}
-      <div onPointerDown={(e) => begin(e, "drag")} style={{ position: "absolute", inset: 0, outline: "1.5px solid oklch(0.72 0.19 300)", cursor: "move", pointerEvents: "auto", touchAction: "none" }} />
+      <div onPointerDown={(e) => begin(e, "drag")} style={{ position: "absolute", inset: 0, outline: `1.5px solid ${SELECT}`, cursor: "move", pointerEvents: "auto", touchAction: "none" }} />
       {/* rotate handle */}
       <div
         onPointerDown={(e) => begin(e, "rotate")}
-        style={{ position: "absolute", left: "50%", top: -rise, width: hb, height: hb, marginLeft: -hb / 2, borderRadius: "50%", background: "oklch(0.72 0.19 300)", border: "2px solid white", cursor: "grab", pointerEvents: "auto", touchAction: "none", boxShadow: "0 1px 3px rgba(0,0,0,.4)" }}
+        style={{ position: "absolute", left: "50%", top: -rise, width: hb, height: hb, marginLeft: -hb / 2, borderRadius: "50%", background: SELECT, border: `2px solid ${HANDLE_FILL}`, cursor: "grab", pointerEvents: "auto", touchAction: "none", boxShadow: "var(--shadow-sm)" }}
       />
-      <div style={{ position: "absolute", left: "50%", top: -rise + hb, height: rise - hb, width: 1, marginLeft: -0.5, background: "oklch(0.72 0.19 300)" }} />
+      <div style={{ position: "absolute", left: "50%", top: -rise + hb, height: rise - hb, width: 1, marginLeft: -0.5, background: SELECT }} />
       {/* resize handles */}
       {HANDLES.map((h) => {
         const cx = h.hx < 0 ? 0 : h.hx > 0 ? Wp : Wp / 2;
@@ -138,7 +164,7 @@ export function TransformBox({
           <div
             key={h.id}
             onPointerDown={(e) => begin(e, h.id)}
-            style={{ position: "absolute", left: cx - hb / 2, top: cy - hb / 2, width: hb, height: hb, borderRadius: touch ? 5 : 3, background: "white", border: "1.5px solid oklch(0.72 0.19 300)", cursor: h.cursor, pointerEvents: "auto", touchAction: "none", boxShadow: "0 1px 2px rgba(0,0,0,.35)" }}
+            style={{ position: "absolute", left: cx - hb / 2, top: cy - hb / 2, width: hb, height: hb, borderRadius: touch ? 5 : 3, background: HANDLE_FILL, border: `1.5px solid ${SELECT}`, cursor: h.cursor, pointerEvents: "auto", touchAction: "none", boxShadow: "var(--shadow-sm)" }}
           />
         );
       })}
@@ -192,7 +218,7 @@ export function GroupBox({ nodes, scale, cfg, onChange }: {
       style={{ position: "absolute", left: x0 * scale, top: y0 * scale, width: (x1 - x0) * scale, height: (y1 - y0) * scale, zIndex: 100000, pointerEvents: "none" }}
       onPointerMove={move} onPointerUp={end}
     >
-      <div onPointerDown={begin} style={{ position: "absolute", inset: 0, outline: "1.5px dashed oklch(0.72 0.19 300)", background: "oklch(0.72 0.19 300 / 0.06)", cursor: "move", pointerEvents: "auto", touchAction: "none" }} />
+      <div onPointerDown={begin} style={{ position: "absolute", inset: 0, outline: `1.5px dashed ${SELECT}`, background: SELECT_WASH, cursor: "move", pointerEvents: "auto", touchAction: "none" }} />
     </div>
   );
 }
