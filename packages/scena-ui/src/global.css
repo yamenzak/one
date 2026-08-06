@@ -1,0 +1,31 @@
+/* Scena global reset + tokens as CSS variables (mirrors tokens.ts). */
+
+:root {
+  --scena-brand: oklch(0.58 0.17 300);
+  --scena-bg: oklch(0.98 0.004 300);
+  --scena-surface: #fff;
+  --scena-border: oklch(0.93 0.005 300);
+  --scena-text: oklch(0.24 0.015 300);
+  --scena-text-muted: oklch(0.55 0.01 300);
+  --scena-font-ui: "Hanken Grotesk", system-ui, sans-serif;
+  --scena-font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; padding: 0; }
+body {
+  background: var(--scena-bg);
+  color: var(--scena-text);
+  font-family: var(--scena-font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: oklch(0.88 0.008 300); border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+@keyframes scenaPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+@keyframes scenaMarquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes scenaSpin { to { transform: rotate(360deg); } }
+
+button { font-family: inherit; }

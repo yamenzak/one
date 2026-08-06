@@ -1,0 +1,25 @@
+{
+  "name": "@scena/manifest",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "The manifest \u2014 Scena's compiled playout artifact. One Zod schema is the single source of truth; TS types are derived from it; canonical JSON + content hashing make it immutable and versionable.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@scena/timeline": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,295 @@
+/**
+ * Stripe integration (BLUEPRINT §25) — subscriptions + one-time credit packs.
+ *
+ * Everything is driven by admin-editable DB config (`app_config`): the secret
+ * key, publishable key, webhook secret, and mode all live in the database and
+ * are set from the Admin UI, not hardcoded env. The catalog (plans + packs)
+ * syncs *from D1 into Stripe* (creating products/prices on demand and storing
+ * their ids back). Checkout sessions and verified webhooks close the loop.
+ *
+ * Implemented with raw `fetch` against api.stripe.com (form-encoded) + Web
+ * Crypto for webhook signature verification — no SDK, Workers-native.
+ */
+
+import type { Env } from "./env.js";
+import { DEMO_TENANT } from "./db.js";
+import {
+  getConfig,
+  listPlans,
+  listPacks,
+  getPlan,
+  getPack,
+  setPlanStripe,
+  setPackStripe,
+  getSubscription,
+  updateSubscription,
+  type PlanRow,
+} from "./billing-store.js";
+import { grantForTenant } from "./billing-service.js";
+import { notifyAdmin, emailShell } from "./mailer.js";
+
+export interface StripeCfg {
+  mode: string; // disabled | test | live
+  secretKey: string;
+  publishableKey: string;
+  webhookSecret: string;
+}
+
+export async function stripeCfg(db: D1Database): Promise<StripeCfg> {
+  const cfg = await getConfig(db);
+  return {
+    mode: cfg["stripe.mode"] ?? "disabled",
+    secretKey: cfg["stripe.secret_key"] ?? "",
+    publishableKey: cfg["stripe.publishable_key"] ?? "",
+    webhookSecret: cfg["stripe.webhook_secret"] ?? "",
+  };
+}
+
+export function stripeEnabled(cfg: StripeCfg): boolean {
+  return cfg.mode !== "disabled" && cfg.secretKey.startsWith("sk_");
+}
+
+/** Form-encode nested params the way Stripe expects (a[b][c]=v). */
+function encode(params: Record<string, unknown>, prefix = ""): string {
+  const parts: string[] = [];
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null) continue;
+    const key = prefix ? `${prefix}[${k}]` : k;
+    if (typeof v === "object") parts.push(encode(v as Record<string, unknown>, key));
+    else parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(v))}`);
+  }
+  return parts.filter(Boolean).join("&");
+}
+
+async function stripeApi<T = unknown>(cfg: StripeCfg, path: string, method: "GET" | "POST", params?: Record<string, unknown>): Promise<T> {
+  const url = `https://api.stripe.com/v1/${path}`;
+  const init: RequestInit = {
+    method,
+    headers: { Authorization: `Bearer ${cfg.secretKey}`, "Content-Type": "application/x-www-form-urlencoded" },
+  };
+  if (method === "POST" && params) init.body = encode(params);
+  const res = await fetch(method === "GET" && params ? `${url}?${encode(params)}` : url, init);
+  const json = (await res.json()) as T & { error?: { message?: string } };
+  if (!res.ok) throw new Error(`stripe ${path}: ${json.error?.message ?? res.status}`);
+  return json;
+}
+
+/* ----------------------------- catalog sync ------------------------------ */
+
+export interface SyncSummary {
+  plans: { id: string; productId: string; priceId: string }[];
+  packs: { id: string; productId: string; priceId: string }[];
+}
+
+/**
+ * Push the D1 catalog into Stripe: create a product + recurring price per paid
+ * plan and a product + one-time price per credit pack, storing their ids back
+ * in D1. Idempotent — skips anything that already has a `stripe_price_id`.
+ */
+export async function syncCatalog(env: Env): Promise<SyncSummary> {
+  const cfg = await stripeCfg(env.DB);
+  if (!stripeEnabled(cfg)) throw new Error("stripe not configured");
+  const out: SyncSummary = { plans: [], packs: [] };
+
+  for (const p of await listPlans(env.DB)) {
+    if (p.price_cents <= 0 || p.active !== 1) continue;
+    if (p.stripe_price_id) {
+      out.plans.push({ id: p.id, productId: p.stripe_product_id ?? "", priceId: p.stripe_price_id });
+      continue;
+    }
+    const product = await stripeApi<{ id: string }>(cfg, "products", "POST", { name: `Scena ${p.name}`, metadata: { scena_plan: p.id } });
+    const price = await stripeApi<{ id: string }>(cfg, "prices", "POST", {
+      product: product.id,
+      currency: p.currency || "usd",
+      unit_amount: p.price_cents,
+      recurring: { interval: p.interval || "month" },
+      metadata: { scena_plan: p.id },
+    });
+    await setPlanStripe(env.DB, p.id, product.id, price.id);
+    out.plans.push({ id: p.id, productId: product.id, priceId: price.id });
+  }
+
+  for (const pk of await listPacks(env.DB)) {
+    if (pk.stripe_price_id) {
+      out.packs.push({ id: pk.id, productId: pk.stripe_product_id ?? "", priceId: pk.stripe_price_id });
+      continue;
+    }
+    const product = await stripeApi<{ id: string }>(cfg, "products", "POST", { name: `Scena ${pk.name}`, metadata: { scena_pack: pk.id } });
+    const price = await stripeApi<{ id: string }>(cfg, "prices", "POST", {
+      product: product.id,
+      currency: pk.currency || "usd",
+      unit_amount: pk.price_cents,
+      metadata: { scena_pack: pk.id },
+    });
+    await setPackStripe(env.DB, pk.id, product.id, price.id);
+    out.packs.push({ id: pk.id, productId: product.id, priceId: price.id });
+  }
+  return out;
+}
+
+/* ------------------------------- checkout -------------------------------- */
+
+/** Ensure the tenant has a Stripe customer id; create one lazily. */
+async function ensureCustomer(env: Env, cfg: StripeCfg, tenantId: string): Promise<string> {
+  const sub = await getSubscription(env.DB, tenantId);
+  if (sub.stripe_customer_id) return sub.stripe_customer_id;
+  const email = env.OPERATOR_EMAIL || undefined;
+  const cust = await stripeApi<{ id: string }>(cfg, "customers", "POST", { email, metadata: { scena_tenant: tenantId } });
+  await updateSubscription(env.DB, tenantId, { stripe_customer_id: cust.id });
+  return cust.id;
+}
+
+export async function subscriptionCheckout(env: Env, planId: string, urls: { success: string; cancel: string }, tenantId = DEMO_TENANT): Promise<{ url: string }> {
+  const cfg = await stripeCfg(env.DB);
+  if (!stripeEnabled(cfg)) throw new Error("stripe not configured");
+  const plan = await getPlan(env.DB, planId);
+  if (!plan?.stripe_price_id) throw new Error("plan not synced to stripe");
+  const customer = await ensureCustomer(env, cfg, tenantId);
+  const session = await stripeApi<{ url: string }>(cfg, "checkout/sessions", "POST", {
+    mode: "subscription",
+    customer,
+    success_url: urls.success,
+    cancel_url: urls.cancel,
+    line_items: { 0: { price: plan.stripe_price_id, quantity: 1 } },
+    metadata: { scena_tenant: tenantId, scena_plan: planId },
+    subscription_data: { metadata: { scena_tenant: tenantId, scena_plan: planId } },
+  });
+  return { url: session.url };
+}
+
+export async function packCheckout(env: Env, packId: string, urls: { success: string; cancel: string }, tenantId = DEMO_TENANT): Promise<{ url: string }> {
+  const cfg = await stripeCfg(env.DB);
+  if (!stripeEnabled(cfg)) throw new Error("stripe not configured");
+  const pack = await getPack(env.DB, packId);
+  if (!pack?.stripe_price_id) throw new Error("pack not synced to stripe");
+  const customer = await ensureCustomer(env, cfg, tenantId);
+  const session = await stripeApi<{ url: string }>(cfg, "checkout/sessions", "POST", {
+    mode: "payment",
+    customer,
+    success_url: urls.success,
+    cancel_url: urls.cancel,
+    line_items: { 0: { price: pack.stripe_price_id, quantity: 1 } },
+    metadata: { scena_tenant: tenantId, scena_pack: packId, scena_credits: pack.credits },
+  });
+  return { url: session.url };
+}
+
+/* ------------------------------- webhooks -------------------------------- */
+
+/** Verify a Stripe webhook signature (t=..,v1=..) with HMAC-SHA256. */
+export async function verifySignature(payload: string, sigHeader: string, secret: string): Promise<boolean> {
+  if (!sigHeader || !secret) return false;
+  const parts = Object.fromEntries(sigHeader.split(",").map((kv) => kv.split("=")));
+  const t = parts["t"];
+  const v1 = parts["v1"];
+  if (!t || !v1) return false;
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${payload}`));
+  const expected = [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return timingSafeEqual(expected, v1);
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+interface StripeEvent {
+  type: string;
+  data: { object: Record<string, unknown> };
+}
+
+/** Process a verified webhook event (§25). */
+export async function handleWebhook(env: Env, event: StripeEvent): Promise<void> {
+  const obj = event.data.object;
+  const tenantId = (metaOf(obj)["scena_tenant"] as string) || DEMO_TENANT;
+
+  switch (event.type) {
+    case "checkout.session.completed": {
+      const meta = metaOf(obj);
+      if (meta["scena_pack"]) {
+        // One-time credit pack → top up the credit authority.
+        const credits = Number(meta["scena_credits"] ?? 0);
+        if (credits > 0) {
+          const billing = env.BILLING.get(env.BILLING.idFromName(tenantId));
+          await billing.bind(tenantId);
+          await billing.topUp(credits, "pack.purchase", String(obj["id"] ?? ""));
+          await notifyAdmin(env.DB, env.OPERATOR_EMAIL, {
+            subject: `Receipt: ${credits.toLocaleString()} Scena credits`,
+            html: emailShell("Credit pack purchased", `<p>${credits.toLocaleString()} credits were added to your balance.</p>`),
+          }).catch(() => undefined);
+        }
+      } else if (meta["scena_plan"]) {
+        // Subscription created via Checkout — activate immediately (upgrade).
+        await updateSubscription(env.DB, tenantId, {
+          plan_id: String(meta["scena_plan"]),
+          status: "active",
+          comp: 0,
+          stripe_sub_id: (obj["subscription"] as string) ?? null,
+          past_due_at: null,
+          suspend_at: null,
+          delete_at: null,
+        });
+        await grantForTenant(env, tenantId);
+      }
+      break;
+    }
+    case "invoice.paid": {
+      // Recurring renewal: extend the period, clear dunning, apply any queued
+      // downgrade, and drop the monthly credit grant.
+      const periodEnd = Number((obj["lines"] as { data?: { period?: { end?: number } }[] } | undefined)?.data?.[0]?.period?.end ?? 0) * 1000 || null;
+      const sub = await getSubscription(env.DB, tenantId);
+      const nextPlan = sub.pending_plan_id ?? sub.plan_id;
+      await updateSubscription(env.DB, tenantId, {
+        plan_id: nextPlan,
+        pending_plan_id: null,
+        status: "active",
+        current_period_end: periodEnd,
+        past_due_at: null,
+        suspend_at: null,
+        delete_at: null,
+      });
+      await grantForTenant(env, tenantId);
+      break;
+    }
+    case "invoice.payment_failed": {
+      // Enter dunning: mark past_due; the lifecycle cron schedules suspend/delete.
+      await updateSubscription(env.DB, tenantId, { status: "past_due", past_due_at: Date.now() });
+      await notifyAdmin(env.DB, env.OPERATOR_EMAIL, {
+        subject: "Payment failed — action needed",
+        html: emailShell("Your payment failed", "<p>We couldn't process your latest payment. Update your card to keep your screens live — after a grace period the account is suspended.</p>"),
+      }).catch(() => undefined);
+      break;
+    }
+    case "customer.subscription.deleted": {
+      await updateSubscription(env.DB, tenantId, { status: "canceled", plan_id: "free", stripe_sub_id: null });
+      break;
+    }
+    case "customer.subscription.updated": {
+      const status = String(obj["status"] ?? "");
+      const map: Record<string, string> = { active: "active", past_due: "past_due", canceled: "canceled", unpaid: "past_due", trialing: "trialing" };
+      if (map[status]) await updateSubscription(env.DB, tenantId, { status: map[status] });
+      break;
+    }
+  }
+}
+
+function metaOf(obj: Record<string, unknown>): Record<string, unknown> {
+  return (obj["metadata"] as Record<string, unknown>) ?? {};
+}
+
+/** Exposed for the admin "test connection" button. */
+export async function stripePing(env: Env): Promise<{ ok: boolean; account?: string; error?: string }> {
+  const cfg = await stripeCfg(env.DB);
+  if (!stripeEnabled(cfg)) return { ok: false, error: "not configured" };
+  try {
+    const acct = await stripeApi<{ id: string }>(cfg, "account", "GET");
+    return { ok: true, account: acct.id };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "failed" };
+  }
+}
+
+export type { PlanRow };

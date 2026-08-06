@@ -1,0 +1,21 @@
+{
+  "name": "@scena/widgets",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure, framework-agnostic widget core \u2014 the registry of widget types plus the style/shape/text/ticker/stack math both renderers (player DOM + builder React) draw from, so a widget looks byte-identical wherever it is painted.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

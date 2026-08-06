@@ -1,0 +1,5 @@
+# Bundled slide fonts — served with CORS so the sandboxed (opaque-origin) slide
+# iframes and the dashboard editor preview can @font-face them cross-origin.
+/fonts/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=31536000, immutable

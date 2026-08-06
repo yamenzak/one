@@ -29,13 +29,35 @@ const ROOT = new URL("../../..", import.meta.url).pathname.replace(/\/$/, "");
 const PACKAGES = join(ROOT, "packages");
 const STYLES = join(ROOT, "apps/app/src/styles.css");
 
-/** Every `packages/<name>` whose `src` tree contains at least one `.tsx` file —
- *  i.e. every shared package that renders, and therefore carries class names. */
+/**
+ * Every `packages/<name>` THIS APP DEPENDS ON whose `src` tree contains a
+ * `.tsx` — i.e. every rendering package whose classes end up in Kova's bundle.
+ *
+ * The dependency filter is load-bearing and was not here originally: the rule
+ * walked every directory under `packages/`, which was the same set while Kova
+ * and Tessa shared one design system. Landing Scena added `packages/scena-ui`,
+ * a package Kova has never imported, and the guard demanded Kova's `styles.css`
+ * scan another product's components — which would bloat Kova's CSS with classes
+ * it cannot use and, worse, teach the next person that `@source` is a
+ * formality. A package Tailwind never sees because the app never imports it has
+ * nothing to leak.
+ */
 function renderingPackages(): string[] {
+  const deps = new Set(
+    Object.keys({
+      ...(JSON.parse(readFileSync(join(ROOT, "apps/app/package.json"), "utf8")) as {
+        dependencies?: Record<string, string>;
+      }).dependencies ?? {},
+    }),
+  );
   const out: string[] = [];
   for (const name of readdirSync(PACKAGES)) {
-    const src = join(PACKAGES, name, "src");
-    if (!existsSync(src)) continue;
+    const dir = join(PACKAGES, name);
+    const src = join(dir, "src");
+    const manifest = join(dir, "package.json");
+    if (!existsSync(src) || !existsSync(manifest)) continue;
+    const pkgName = (JSON.parse(readFileSync(manifest, "utf8")) as { name?: string }).name;
+    if (!pkgName || !deps.has(pkgName)) continue;
     if (hasTsx(src)) out.push(name);
   }
   return out.sort();

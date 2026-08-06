@@ -824,3 +824,62 @@ The vision suite is still dead until `google.gemini_key` is set
 (Platform admin → AI).
 
 See SPEC §13 for the phase map.
+
+## Scena — the third app, mid-migration
+
+**Scena is cloud digital-signage SaaS**, imported from its own repo at `0cff6c6`
+and being rewired onto the shared packages stage by stage.
+**[docs/SCENA-REWRITE.md](docs/SCENA-REWRITE.md) is the plan** — what is kept,
+what is rewired, the six decisions and their rationale, and the ten stages. Read
+it before touching anything under `apps/scena*` or `packages/scena-*`.
+
+**The idea the whole product rests on is one line**, and nothing in the migration
+touches it:
+
+```
+position(t) = (t − T0) mod cycleLength
+```
+
+The server never says "show slide 3 now". Playout is a pure function of a synced
+clock, which is why multi-screen sync, offline playback and live updates are one
+mechanism rather than three features. Measured cross-screen skew: 0.3 ms.
+
+```
+apps/
+  scena/        # THE worker — Hono + six DOs (Screen/Channel/Queue/RoomBoard/
+                # Score/TenantBilling); serves the dashboard SPA
+  scena-app/    # the operator dashboard (React 19 SPA)
+  scena-player/ # the SCREEN. Its own worker and its own origin — see below
+  scena-www/    # marketing
+packages/
+  scena-timeline/  # @scena/timeline — the pure clock engine. ZERO deps, byte-
+                   # identical in the compiler, the player and the tests.
+  scena-manifest/  # @scena/manifest — Zod schema + canonical JSON + SHA-256
+  scena-widgets/   # @scena/widgets — the pure widget core, shared by the
+                   # player's DOM renderer and the builder's React preview
+  scena-protocol/  # @scena/protocol — screen⇄DO + board WS message types
+  scena-brand/     # @scena/brand — mascot + marks (the player uses it)
+  scena-ui/        # ⚠️ TEMPORARY. Deleted in Stage 7, replaced by @4dl/ui.
+```
+
+**Two things must not be "helpfully" improved:**
+
+- **The player is dependency-free on purpose.** Its `package.json` lists only
+  workspace packages. It is a TV render loop plus a Service Worker and needs
+  full control of both; a well-meaning `@4dl/app-kit` import for its fetch layer
+  would put React-shaped weight on a device with 512 MB of RAM.
+- **The timeline engine stays pure** — no I/O, no DOM, no platform APIs.
+
+**The player has its OWN worker and origin, and that is the design.** A screen is
+a DEVICE: one pinned URL, Service-Worker-cached, running for months offline. It
+resolves NO tenant from its host — the tenant arrives from the pairing claim. A
+tenant subdomain would give every studio's screens a different address, so
+re-pairing would orphan the cache and custom domains would multiply certificates
+by the size of the fleet. Stage 3 adds a `device` door to `@4dl/tenancy` for
+exactly this; until then the player worker binds no D1 or R2 of its own.
+
+**Status: Stage 0 done** — landed, registered in `apps.json`, typechecking and
+testing green in this workspace with NOTHING rewired yet. Its resource ids are
+deliberately placeholders (the old account's real ids were replaced), so
+`deploy.yml` skips it until the Provision workflow runs. Stages 1–9 are the
+rewiring; the plan has the order and the reasoning.

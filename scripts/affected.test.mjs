@@ -14,6 +14,7 @@
 
 import assert from "node:assert/strict";
 import { affectedApps } from "./affected.mjs";
+import { apps } from "./apps.mjs";
 
 let failures = 0;
 const test = (name, fn) => {
@@ -27,6 +28,8 @@ const test = (name, fn) => {
 };
 
 const ids = (files) => affectedApps(files).ids.sort();
+/** Every app the registry says is deployable — see the fail-open note below. */
+const EVERY = apps.filter((a) => a.deploy !== false).map((a) => a.id).sort();
 
 console.log("affected apps");
 
@@ -69,28 +72,39 @@ test("docs alongside code still deploy the code's app", () => {
 });
 
 // ── Every path that must fail OPEN ──────────────────────────────────────────
+//
+// `EVERY` comes from the REGISTRY, not from the function under test. It was a
+// literal `["kova", "tessa", "www"]`, and adding Scena's three workers turned
+// five fail-open assertions red at once — each correct about the behaviour and
+// merely stale about the cast.
+//
+// ⚠️ The obvious repair is `const EVERY = ids(null)`, which is WRONG: it makes
+// "an unknown base deploys everything" assert `ids(null) === ids(null)`, which
+// passes for a filter that deploys nothing at all. The list has to come from a
+// source the filter does not control, so reading apps.json is the fix and
+// calling the filter twice is not.
 
 test("an unknown base deploys everything", () => {
-  assert.deepEqual(ids(null), ["kova", "tessa", "www"]);
+  assert.deepEqual(ids(null), EVERY);
 });
 
 test("a root-level file deploys everything", () => {
   for (const f of ["pnpm-lock.yaml", "apps.json", "turbo.json", "package.json", "tsconfig.json"]) {
-    assert.deepEqual(ids([f]), ["kova", "tessa", "www"], f);
+    assert.deepEqual(ids([f]), EVERY, f);
   }
 });
 
 test("a change to the scripts or the workflows deploys everything", () => {
-  assert.deepEqual(ids(["scripts/affected.mjs"]), ["kova", "tessa", "www"]);
-  assert.deepEqual(ids([".github/workflows/deploy.yml"]), ["kova", "tessa", "www"]);
+  assert.deepEqual(ids(["scripts/affected.mjs"]), EVERY);
+  assert.deepEqual(ids([".github/workflows/deploy.yml"]), EVERY);
 });
 
 test("a path under apps/ or packages/ that owns no package deploys everything", () => {
-  assert.deepEqual(ids(["packages/brand/logo.svg"]), ["kova", "tessa", "www"]);
+  assert.deepEqual(ids(["packages/brand/logo.svg"]), EVERY);
 });
 
 test("an unrecognised top-level path deploys everything", () => {
-  assert.deepEqual(ids(["Dockerfile"]), ["kova", "tessa", "www"]);
+  assert.deepEqual(ids(["Dockerfile"]), EVERY);
 });
 
 // ── The registry's own shape ────────────────────────────────────────────────

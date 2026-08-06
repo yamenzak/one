@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    // Framework-agnostic, but the DOM lib gives us the CSS property value types
+    // shared across the player (browser) and the dashboard (React DOM).
+    "lib": ["ES2022", "DOM"],
+    "types": ["vitest/globals"],
+    "noEmit": true
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

@@ -63,6 +63,45 @@
       "email": { "name": "Tessa" }
     },
     {
+      "id": "scena",
+      "name": "Scena",
+      "dir": "apps/scena",
+      "spa": "@scena/app",
+      "e2e": null,
+      "deploy": true,
+      "provision": { "d1": "scena", "kv": "PAIRING", "r2": "scena-media" },
+      "email": { "name": "Scena" }
+    },
+    {
+      "$comment": [
+        "THE PLAYER IS ITS OWN WORKER, and that is the point.",
+        "",
+        "A screen is a DEVICE: one pinned URL, Service-Worker-cached, running for",
+        "months without a network. It must not share an origin with the dashboard",
+        "— a tenant subdomain would give every studio's screens a different",
+        "address, so re-pairing would orphan the cache and custom domains would",
+        "multiply certificates by the size of the fleet. It resolves NO tenant",
+        "from its host; the tenant arrives from the pairing claim.",
+        "",
+        "`spa` is @scena/player and `deploy` is true, but it binds no D1/R2 of its",
+        "own: it is a static PWA plus a proxy to the api worker's sockets."
+      ],
+      "id": "scena-player",
+      "name": "Scena Player",
+      "dir": "apps/scena-player",
+      "spa": "@scena/player",
+      "e2e": null,
+      "deploy": true
+    },
+    {
+      "id": "scena-www",
+      "name": "Scena marketing",
+      "dir": "apps/scena-www",
+      "spa": null,
+      "e2e": null,
+      "deploy": true
+    },
+    {
       "id": "www",
       "name": "Kova marketing",
       "dir": "apps/www",

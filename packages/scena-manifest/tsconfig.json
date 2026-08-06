@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    // Isomorphic package: DOM lib supplies the Web Crypto + TextEncoder types it
+    // shares across Worker, browser, and Node runtimes.
+    "lib": ["ES2022", "DOM"],
+    "types": ["vitest/globals"],
+    "noEmit": true
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

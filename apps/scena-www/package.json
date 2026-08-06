@@ -1,0 +1,21 @@
+{
+  "name": "@scena/www",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Scena marketing site \u2014 a dependency-free static generator that emits one server-rendered, SEO-complete HTML page per locale (en/de/ar), deployed as a Cloudflare Worker with the static-assets binding.",
+  "scripts": {
+    "build": "tsx build.mjs",
+    "dev": "tsx build.mjs && cd dist && python3 -m http.server 4321",
+    "preview": "cd dist && python3 -m http.server 4321",
+    "deploy": "tsx build.mjs && wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf .turbo dist"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.42.0",
+    "tsx": "^4.19.2"
+  }
+}

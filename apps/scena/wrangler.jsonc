@@ -1,0 +1,107 @@
+{
+  // Scena edge API — Workers + Durable Objects.
+  // Slice targets `wrangler dev` (local Miniflare); KV/D1/R2 ids below are
+  // placeholders and only need real values for a remote `wrangler deploy`.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // One worker serves the operator dashboard (static assets) AND the edge API
+  // at the same origin, so the Better Auth session cookie is same-origin — no
+  // CORS/credentials juggling. The player is its own worker (its Service Worker
+  // owns the origin root for offline cold-boot, §8).
+  "name": "scena",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-07-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // Serve the built dashboard SPA from the edge; run the Worker first for the
+  // API surface so Hono handles /api/* and /health, and fall back to the SPA
+  // shell (index.html) for client-side routes. Build the dashboard before
+  // deploying: `pnpm --filter @scena/app build`.
+  "assets": {
+    "directory": "../dashboard/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/health"]
+  },
+
+  // Single-level host under 4dl.app so it's covered by the zone's *.4dl.app
+  // Universal SSL cert (deeper *.scena.4dl.app names need paid Advanced Cert).
+  // Screens + the player worker point at this origin.
+  "routes": [{ "pattern": "scena.4dl.app", "custom_domain": true }],
+
+  // Feed refresh + daypart/offline sweeps (§19, §13) run every 15 min; the
+  // daily 00:10 UTC tick drives monthly credit grants + the dunning lifecycle
+  // sweep (§25). Cron fires in production only.
+  "triggers": { "crons": ["*/15 * * * *", "10 0 * * *"] },
+
+  // Operator identity + admin allowlist (dev). Production derives the caller
+  // email from the Cloudflare Access header instead.
+  // Platform super-admin allowlist + the public origin Better Auth derives OAuth
+  // callbacks from. BETTER_AUTH_SECRET + GOOGLE_CLIENT_* are wrangler *secrets*
+  // (not here). OPERATOR_EMAIL is a legacy pre-auth fallback, retained harmlessly.
+  "vars": {
+    "OPERATOR_EMAIL": "zakhouryamen@gmail.com",
+    "ADMIN_EMAILS": "zakhouryamen@gmail.com",
+    "BETTER_AUTH_URL": "https://scena.4dl.app"
+  },
+
+  // Workers AI — HTML/TTS/image generation (§24). Local dev without a
+  // Cloudflare account falls back to the mock generator.
+  "ai": { "binding": "AI" },
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "SCREEN", "class_name": "ScreenDO" },
+      { "name": "CHANNEL", "class_name": "ChannelDO" },
+      { "name": "QUEUE", "class_name": "QueueDO" },
+      { "name": "ROOM", "class_name": "RoomBoardDO" },
+      { "name": "SCORE", "class_name": "ScoreDO" },
+      { "name": "BILLING", "class_name": "TenantBillingDO" }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["ScreenDO", "ChannelDO"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["QueueDO", "RoomBoardDO"]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["TenantBillingDO"]
+    },
+    {
+      "tag": "v4",
+      "new_sqlite_classes": ["ScoreDO"]
+    }
+  ],
+
+  "kv_namespaces": [
+    // Pairing code → ScreenDO id, and channel → current manifest version pointer.
+    { "binding": "PAIRING", "id": "0000000000000000000000000000cafe" }
+  ],
+
+  "d1_databases": [
+    // Authoring source of truth. Local `wrangler dev` simulates this; the
+    // database_id below is a placeholder only needed for a remote deploy.
+    { "binding": "DB", "database_name": "scena", "database_id": "00000000-0000-0000-0000-0000000000d1" }
+  ],
+
+  "analytics_engine_datasets": [
+    // Proof-of-play telemetry (§22). Reports query D1 locally; production also
+    // writes here for high-cardinality analytics via the SQL API.
+    { "binding": "PLAYOUT", "dataset": "scena_playout" }
+  ],
+
+  "r2_buckets": [
+    // Media + content-addressed assets (§2). Local wrangler dev simulates this.
+    { "binding": "MEDIA", "bucket_name": "scena-media" }
+  ],
+
+  // Cloudflare Email Sending (transactional: owner OTP codes, alert + billing
+  // notices). The mailer sends via env.EMAIL when email.provider = "cloudflare".
+  // Onboard the sender domain (fourdegreelabs.com) at Cloudflare → Email → Email
+  // Sending first; until then the mailer falls back to a dev mock (see mailer.ts).
+  "send_email": [{ "name": "EMAIL" }]
+}

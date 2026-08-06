@@ -1,0 +1,17 @@
+{
+  // Scena player — the screen PWA, served as a Cloudflare Worker with the
+  // static-assets binding. Assets-only (no `main`); the Service Worker + Cache
+  // Storage in dist/ give offline cold-boot. Room here later for edge logic
+  // (pairing redirect, per-screen config injection) by adding a `main` entry.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "scena-player",
+  "compatibility_date": "2025-07-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  // Single host: tv.4dl.app (short + fast to type on a TV remote). Single-level
+  // under 4dl.app → covered by *.4dl.app Universal SSL (instant TLS).
+  "routes": [{ "pattern": "tv.4dl.app", "custom_domain": true }],
+  "observability": { "enabled": true }
+}

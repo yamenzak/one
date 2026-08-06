@@ -1,0 +1,18 @@
+{
+  // Scena marketing site — served as a Cloudflare Worker with the static-assets
+  // binding. Assets-only (no `main`): the generator prewrites one HTML document
+  // per locale (dist/index.html for en, dist/de|ar/index.html for the rest), so
+  // there's no runtime rendering. 404s fall back to the English landing page.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "scena-www",
+  "account_id": "499a9adbf3076e5ff1d3027b8cd72798",
+  "compatibility_date": "2025-07-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  },
+  "routes": [
+    { "pattern": "scena.fourdegreelabs.com", "custom_domain": true }
+  ],
+  "observability": { "enabled": true }
+}

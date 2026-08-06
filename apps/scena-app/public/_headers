@@ -1,0 +1,14 @@
+# Cloudflare Workers static-assets headers.
+#
+# The app shell (index.html, served for every SPA route) must always be
+# revalidated so a new deploy is picked up on the next load — otherwise the
+# browser keeps an old index.html that references a stale JS bundle and the UI
+# looks unchanged after a release. The content-hashed bundles under /assets are
+# immutable, so they stay long-cached (fast) and safe (the hash changes on any
+# change).
+
+/*
+  Cache-Control: no-cache
+
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
