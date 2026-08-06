@@ -108,6 +108,7 @@ describe("avatar identity", () => {
     expect(avatarTags(" * It rendered `<Avatar name={n} />` — the name only.")).toEqual([]);
   });
 
+
   /** The guard only means anything if there are tags to guard. */
   it("found the app's avatars at all", () => {
     const total = walk(SRC).reduce((n, f) => n + avatarTags(readFileSync(f, "utf8")).length, 0);

@@ -43,12 +43,29 @@
  * another elsewhere. The CLIENT ROW is where the photo and the shuffle live, so
  * the client id is what the fallback follows.
  *
- * ── Staff have no photo, and that is a product fact rather than a gap ───────
+ * ── Staff DO have a photo, when they are also a client ─────────────────────
  *
- * Nothing uploads an avatar for a staff member — there is no route for it — so
- * `staffAvatar` deliberately has no `src`. It is a separate function rather than
- * an option because "did you remember to pass the photo" is exactly the question
- * this file removes.
+ * This file used to say the opposite, and the claim was true about the ROUTE
+ * (nothing uploads an avatar for a `member` row) while being false about the
+ * PERSON. Most staff at a training studio also train there — an owner who lifts,
+ * a coach who is coached — so the same human holds a `member` row and a
+ * `clients` row, and the photo has been sitting on the client row the whole
+ * time. The staff roster simply could not see it: `@4dl/auth`'s roster query
+ * joins `member` to `user`, which on a passwordless stack carries a name and an
+ * email and nothing else.
+ *
+ * The result was the fifth instance of this file's own bug, in the file written
+ * to prevent it: Business → Staff drew a robot seeded from `userId` while the
+ * app bar, two inches above, drew the same person's actual photograph. And even
+ * with no photo the two disagreed — `staffAvatar` seeded from `userId`,
+ * `meAvatar` from `avatarSeed ?? clientId`, so a staff member who reshuffled
+ * their robot got the new one everywhere except the staff list.
+ *
+ * `decorateMembers` (apps/api/src/staff-routes.ts) now attaches the client
+ * row's `avatarUrl` / `avatarSeed` / `clientId` to every roster row, and
+ * `staffAvatar` reads them with the SAME precedence as `meAvatar`. The `userId`
+ * seed survives as the last resort for genuine staff-only accounts, which is
+ * the one case where there is no client row to follow.
  */
 
 /** Exactly what `Avatar` takes. Spread it: `<Avatar {...clientAvatar(c)} />`. */
@@ -83,13 +100,31 @@ export function clientAvatar(c: ClientFace): AvatarProps {
   };
 }
 
-/** A staff member's face. No photo exists to pass — see the header. */
-export function staffAvatar(s: { name?: string | null; email?: string | null; userId?: string | null }): AvatarProps {
+/** The fields a staff row carries once `decorateMembers` has run. */
+export interface StaffFace {
+  name?: string | null;
+  email?: string | null;
+  userId?: string | null;
+  /** From the person's own client row, when they have one. */
+  clientId?: string | null;
+  avatarUrl?: string | null;
+  avatarSeed?: string | null;
+}
+
+/**
+ * A staff member's face — the same face they wear everywhere else.
+ *
+ * The precedence is `meAvatar`'s, deliberately and to the letter: photo, then
+ * shuffled seed, then the client id, then the user id. Any divergence here is a
+ * person with two faces, which is the whole thing this file exists to stop.
+ */
+export function staffAvatar(s: StaffFace): AvatarProps {
   return {
     name: s.name?.trim() || s.email || "?",
-    // The user id first: an email can be corrected, and a face that changes
-    // because someone fixed a typo is a face nobody recognises.
-    seed: s.userId ?? s.email ?? null,
+    src: s.avatarUrl ?? null,
+    // The email is never a seed: it can be corrected, and a face that changes
+    // because somebody fixed a typo is a face nobody recognises.
+    seed: s.avatarSeed ?? s.clientId ?? s.userId ?? null,
   };
 }
 

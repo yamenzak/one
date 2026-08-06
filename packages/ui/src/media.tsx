@@ -38,7 +38,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { motion } from "motion/react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "./lib/utils.js";
-import { toneSoft, type Tone } from "./primitives.js";
+import { Spinner, toneSoft, type Tone } from "./primitives.js";
 import { ChevronLeft, ChevronRight, X, ImageIcon, type LucideIcon } from "./lib/icons.js";
 
 export type ThumbRatio = "square" | "photo" | "wide";
@@ -336,4 +336,82 @@ export function PhotoGrid({ photos, className, cols = 3 }: { photos: Photo[]; cl
 /** A placeholder tile for when a media key can't render (private/expired). */
 export function PhotoFallback({ className }: { className?: string }) {
   return <Thumb radius="2xl" className={className} />;
+}
+
+/**
+ * AN UPLOAD IN FLIGHT, OVER THE THING BEING UPLOADED.
+ *
+ * Pairs with `@4dl/app-kit`'s `useUpload`, whose state this renders verbatim —
+ * a screen passes the hook's fields straight through rather than deciding what
+ * "uploading" should look like for itself.
+ *
+ * Two shapes, and which one appears is not a style choice:
+ *
+ *   a RING with a percentage when the browser can report a length, because a
+ *   photo on a slow connection needs to be visibly moving, not merely busy;
+ *   a SPINNER when it cannot (`lengthComputable: false`) — a made-up percentage
+ *   that jumps to 100 and waits is worse than an honest indeterminate.
+ *
+ * `processing` is its own phase for the same reason: between the last byte
+ * leaving and the server answering, a determinate bar has nowhere left to go
+ * and sits at 100% looking stuck. It says what it is doing instead.
+ *
+ * It covers its parent (`absolute inset-0`), so the parent must be `relative`
+ * — which every thumbnail frame in this package already is.
+ */
+export function UploadProgress({
+  phase,
+  progress,
+  onCancel,
+  className,
+}: {
+  phase: "idle" | "sending" | "processing";
+  /** 0..1, or null when this upload cannot report a length. */
+  progress: number | null;
+  /** Omit for an upload that cannot be cancelled. */
+  onCancel?: () => void;
+  className?: string;
+}) {
+  if (phase === "idle") return null;
+  const pct = progress === null ? null : Math.round(Math.min(1, Math.max(0, progress)) * 100);
+  const determinate = phase === "sending" && pct !== null;
+  // The ring is drawn as a conic sweep rather than an SVG arc: one element, no
+  // viewBox maths, and it inherits the tone tokens like everything else.
+  return (
+    <div
+      className={cn("absolute inset-0 z-10 grid place-items-center gap-1.5 bg-background/80 backdrop-blur-sm", className)}
+      role="progressbar"
+      aria-label={phase === "processing" ? "Processing upload" : "Uploading"}
+      aria-valuenow={determinate ? pct! : undefined}
+      aria-valuemin={determinate ? 0 : undefined}
+      aria-valuemax={determinate ? 100 : undefined}
+    >
+      <div className="flex flex-col items-center gap-1.5">
+        {determinate ? (
+          <div
+            className="grid size-11 place-items-center rounded-full"
+            style={{ background: `conic-gradient(var(--primary) ${pct! * 3.6}deg, var(--secondary) 0deg)` }}
+          >
+            <span className="numeral grid size-8 place-items-center rounded-full bg-background text-[0.65rem] font-semibold tabular-nums">
+              {pct}
+            </span>
+          </div>
+        ) : (
+          <Spinner className="size-6" />
+        )}
+        <span className="text-[0.65rem] font-medium text-muted-foreground">
+          {phase === "processing" ? "Processing…" : "Uploading…"}
+        </span>
+        {onCancel && phase === "sending" && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-[0.65rem] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }

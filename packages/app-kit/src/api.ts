@@ -95,6 +95,21 @@ export class OfflineError extends Error {
   }
 }
 
+/**
+ * The person cancelled the upload. NOT a failure, and it must not be reported
+ * as one — a cancel that raises "Upload failed" teaches people that the cancel
+ * button is broken.
+ */
+export class UploadAbortedError extends Error {
+  readonly aborted = true;
+  constructor() {
+    super("Upload cancelled.");
+  }
+}
+
+/** True when the upload was cancelled rather than failing. */
+export const isAborted = (e: unknown): e is UploadAbortedError => e instanceof UploadAbortedError;
+
 /** The write is safely queued: show a reassuring notice, close the sheet. */
 export const isQueued = (e: unknown): e is QueuedError => e instanceof QueuedError;
 /** The request never left the device and nothing was written. */
@@ -160,26 +175,69 @@ export async function uploadMedia(
      * API, so it is passed through rather than chosen here.
      */
     fields?: Record<string, string>;
+    /**
+     * Fractional progress, 0..1, as the bytes go up.
+     *
+     * ⚠️ This is why the whole function is `XMLHttpRequest` and not `fetch`.
+     * `fetch` has NO upload-progress event in any shipping browser — a request
+     * body as a ReadableStream is Chromium-only and needs `duplex: "half"`, so
+     * there is no portable way to observe a multipart upload with it. XHR has
+     * had `upload.onprogress` for fifteen years. A photo on a phone is the one
+     * request in this app that routinely takes long enough for a person to
+     * decide it has frozen, and a control that cannot say "37%" can only say
+     * "wait" — so the transport is chosen by what the UI has to be able to show.
+     *
+     * Not every upload can report: a request whose total is unknown fires
+     * `lengthComputable: false`, and callers get no tick rather than a fake one.
+     */
+    onProgress?: (fraction: number) => void;
+    /** Aborts the upload. The promise rejects with `UploadAbortedError`. */
+    signal?: AbortSignal;
   } = {},
 ): Promise<string> {
   const fd = new FormData();
   fd.append("file", file instanceof File ? file : new File([file], opts.filename ?? "upload"));
   fd.append("purpose", purpose);
   for (const [k, v] of Object.entries(opts.fields ?? {})) fd.append(k, v);
-  // Uploads are NOT in the Background-Sync queue (a multipart body with a Blob
-  // can't be replayed reliably), so an offline upload is a plain failure.
-  let res: Response;
-  try {
-    res = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
-  } catch {
-    throw new OfflineError("You're offline — the upload didn't go through.");
-  }
-  const data = (await res.json().catch(() => ({}))) as { key?: string; error?: string; message?: string };
-  if (!res.ok || !data.key) {
-    onUnauthorized(res.status, "/api/media/upload");
-    throw new ApiError(res.status, data.error ?? data.message ?? "Upload failed", data as Record<string, unknown>);
-  }
-  return data.key;
+
+  return new Promise<string>((resolve, reject) => {
+    if (opts.signal?.aborted) return reject(new UploadAbortedError());
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/media/upload");
+    xhr.withCredentials = true;
+
+    if (opts.onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && e.total > 0) opts.onProgress!(Math.min(1, e.loaded / e.total));
+      };
+      // The last byte leaving is not the same as the server answering, and the
+      // gap is where a large upload sits at "100%" doing nothing visible. Report
+      // the send as complete and let the caller show it as processing.
+      xhr.upload.onload = () => opts.onProgress!(1);
+    }
+
+    const onAbort = () => xhr.abort();
+    opts.signal?.addEventListener("abort", onAbort, { once: true });
+    const done = () => opts.signal?.removeEventListener("abort", onAbort);
+
+    // Uploads are NOT in the Background-Sync queue (a multipart body with a Blob
+    // can't be replayed reliably), so an offline upload is a plain failure.
+    xhr.onerror = () => { done(); reject(new OfflineError("You're offline — the upload didn't go through.")); };
+    xhr.ontimeout = () => { done(); reject(new OfflineError("The upload timed out — try again.")); };
+    xhr.onabort = () => { done(); reject(new UploadAbortedError()); };
+    xhr.onload = () => {
+      done();
+      let data: { key?: string; error?: string; message?: string } = {};
+      try { data = JSON.parse(xhr.responseText) as typeof data; } catch { /* a non-JSON body is handled below */ }
+      if (xhr.status < 200 || xhr.status >= 300 || !data.key) {
+        onUnauthorized(xhr.status, "/api/media/upload");
+        reject(new ApiError(xhr.status, data.error ?? data.message ?? "Upload failed", data as Record<string, unknown>));
+        return;
+      }
+      resolve(data.key);
+    };
+    xhr.send(fd);
+  });
 }
 
 export const api = {

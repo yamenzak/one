@@ -52,6 +52,8 @@ import {
   IconBadge,
   Page,
   Reveal,
+  Skeleton,
+  SkeletonLine,
   SkeletonList,
   Stagger,
   type LucideIcon,
@@ -172,7 +174,11 @@ export interface NotificationBellProps extends NotifShared {
 /** Surface-aware unread badge + dropdown. */
 export function NotificationBell({ coding, onOpen, onSeeAll, labels, ...feedOpts }: NotificationBellProps) {
   const l = { ...DEFAULT_LABELS, ...labels };
-  const { shown, unread, failed, markRead, markAll } = useFeed(feedOpts);
+  // `loading` was computed by `useFeed` and thrown away here, so an open
+  // dropdown said "You're all caught up" — a definite answer — while the fetch
+  // was still in flight. The inbox SCREEN used it; the bell, which is how
+  // almost everyone reads a notification, did not.
+  const { shown, unread, failed, loading, markRead, markAll } = useFeed(feedOpts);
 
   const open = (n: InboxNotification) => {
     void markRead(n.id);
@@ -204,7 +210,18 @@ export function NotificationBell({ coding, onOpen, onSeeAll, labels, ...feedOpts
           )}
         </div>
         <DropdownMenuSeparator />
-        {!feedOpts.online && shown.length === 0 ? (
+        {loading && shown.length === 0 ? (
+          // Three rows of the real geometry — a badge, two lines — so arrival is
+          // a fill rather than a re-layout (UI-LANGUAGE §7).
+          <div className="space-y-1 p-1">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex items-start gap-2.5 rounded-xl px-3 py-2.5">
+                <Skeleton className="size-8 shrink-0 rounded-lg" />
+                <div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="70%" h="text" /><SkeletonLine w="45%" h="xs" /></div>
+              </div>
+            ))}
+          </div>
+        ) : !feedOpts.online && shown.length === 0 ? (
           <div className="px-3 py-6 text-center text-sm text-muted-foreground">{l.offline}</div>
         ) : failed && shown.length === 0 ? (
           <div className="px-3 py-6 text-center text-sm text-warning">{l.failed}</div>
@@ -217,13 +234,14 @@ export function NotificationBell({ coding, onOpen, onSeeAll, labels, ...feedOpts
               <button
                 key={n.id}
                 onClick={() => open(n)}
-                className={`flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-secondary ${n.read ? "opacity-60" : ""}`}
+                className="flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-secondary"
               >
+                {/* The badge keeps its tone when read — see the inbox screen. */}
                 <IconBadge icon={icon} tone={tone} size="sm" />
-                <div className="min-w-0 flex-1">
+                <div className={`min-w-0 flex-1 ${n.read ? "opacity-65" : ""}`}>
                   <div className="truncate text-sm font-medium">{n.title}</div>
                   {n.message && <div className="truncate text-xs text-muted-foreground">{n.message}</div>}
-                  <div className="mt-0.5 text-xs text-muted-foreground">{new Date(n.created_at).toLocaleString()}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">{relativeTime(n.created_at)}</div>
                 </div>
                 {!n.read && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />}
               </button>
@@ -244,6 +262,28 @@ export function NotificationBell({ coding, onOpen, onSeeAll, labels, ...feedOpts
       </DropdownMenuContent>
     </DropdownMenu>
   );
+}
+
+/**
+ * "just now" / "4h" / "3d" — how long ago, for a dropdown row.
+ *
+ * The bell showed `toLocaleString()`: a full date AND time on every row, which
+ * is the least scannable form of the only thing anyone reads a notification
+ * timestamp for. Past a week it falls back to a date, because "23d" stops being
+ * a unit anyone converts.
+ */
+function relativeTime(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return "";
+  const secs = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (secs < 60) return "just now";
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(t).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 /** "Today" / "Yesterday" / a localized date, for day grouping. */
@@ -333,10 +373,21 @@ export function InboxScreen({ coding, onOpen, onBack, labels, ...feedOpts }: Inb
                               }
                             : undefined
                         }
-                        className={`flex items-start gap-3 transition-colors ${n.link ? "cursor-pointer hover:bg-secondary" : ""} ${n.read ? "opacity-60" : ""}`}
+                        /*
+                          READ DIMS THE WORDS, NOT THE BADGE.
+
+                          `opacity-60` on the whole card faded the IconBadge too
+                          — and the badge's tone is what makes this feed
+                          scannable by category (§4: colour is navigation). Most
+                          rows in a healthy inbox are read, so the wash was
+                          applied to the majority of them, which is precisely
+                          where the colour coding needed to survive. A faded
+                          tone also reads as disabled rather than as seen.
+                        */
+                        className={`flex items-start gap-3 transition-colors ${n.link ? "cursor-pointer hover:bg-secondary" : ""}`}
                       >
                         <IconBadge icon={coding(n.type).icon} tone={coding(n.type).tone} size="sm" />
-                        <div className="min-w-0 flex-1">
+                        <div className={`min-w-0 flex-1 ${n.read ? "opacity-65" : ""}`}>
                           <div className="font-medium">{n.title}</div>
                           {n.message && <div className="mt-0.5 text-sm text-muted-foreground">{n.message}</div>}
                           <div className="mt-1 text-xs text-muted-foreground">

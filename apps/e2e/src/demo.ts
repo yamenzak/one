@@ -31,7 +31,7 @@
 
 import type { Browser, BrowserContext } from "@playwright/test";
 import { provisionClient, provisionStudio, seedExercise, type Client, type Studio } from "./provision.js";
-import { compOntoPlan, populateClient, populateRoster, publishMealPlan, publishWorkoutPlan, seedClinical, seedCommerce, seedFoods, seedFrontDesk, seedStaff, setTargets } from "./populate.js";
+import { compOntoPlan, populateClient, populateRoster, publishMealPlan, publishWorkoutPlan, seedClinical, seedCommerce, seedFoods, seedFrontDesk, seedMedia, seedStaff, setTargets } from "./populate.js";
 
 /** The studio every image is taken in. A real-sounding name, not "Test Studio". */
 export const DEMO_STUDIO = "Northlight Strength";
@@ -129,6 +129,9 @@ export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"):
   await seedClinical(studio, client.id);
   await seedCommerce(studio, client.id);
   await seedStaff(studio);
+  // Real uploads, so the media library photographs as a library rather than as
+  // an empty state — see `seedMedia`.
+  await seedMedia(studio, client);
 
   return { studio, client, roster, planId, mealPlanId, fixedMealPlanId };
 }

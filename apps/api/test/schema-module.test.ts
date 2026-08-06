@@ -82,12 +82,18 @@ describe("the Kova schema module", () => {
     // `plan_variants.kind` (a lane belongs to one surface; NULL is a pre-split
     // lane and still applies to both) and `clients.current_meal_variant_id`
     // (the lane a client is on, per surface, backfilled from the shared one).
+    // +1 for `clients.preferences_updated_at` — WHEN the training/nutrition
+    // profile was last reviewed, which is a different question from what it
+    // says and the only one nothing could answer. Preferences stay
+    // current-state with no history (goals are the dated series); what was
+    // missing was freshness, so a coach can tell a profile confirmed this
+    // morning from one nobody has looked at in fourteen months.
     const ddl = schemaStatements(KOVA_SCHEMA);
     expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(34);
     expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(24);
     expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(6);
     expect(ddl.filter((s) => s.startsWith("DROP INDEX"))).toHaveLength(1);
-    expect(KOVA_SCHEMA.alters ?? []).toHaveLength(43);
+    expect(KOVA_SCHEMA.alters ?? []).toHaveLength(44);
   });
 
   it("names every backfill", () => {

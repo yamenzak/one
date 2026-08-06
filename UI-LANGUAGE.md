@@ -578,6 +578,13 @@ The shape every phone OS converged on, and why each half works:
   the index becomes a map you aim at from memory. A grey badge in a row of toned
   ones reads as disabled, not as neutral — every row gets a real tone.
 - **Destructive sections take their own group**, below a break, in `danger`.
+- **Every group is NAMED, or it is just a horizontal rule.** Kova's personal
+  settings had three groups and one header: "Account" on the exits, nothing on
+  the two above it — so the break above Passkeys read as a rendering accident,
+  and the one titled group made the omission look deliberate. Past seven rows a
+  flat list needs the chunking anyway (§1): the operator console reached eleven
+  sections in one unnamed column, with "Maintenance" directly under "Custom
+  domains" and nothing saying they belong to different jobs.
 - **An index nests.** A section that is itself five settings gets its own index
   rather than a longer page — same rows, same value-carrying sub-lines, one
   level down. The studio's Brand section is the case that proves it: 5,599px in
@@ -648,6 +655,28 @@ edges — so the arrival is a fill, not a re-layout.
 - **Screens do not hand-roll skeletons.** If a screen needs one the component
   did not ship, the component is unfinished — fix it there, where every other
   app gets the fix too.
+- **`[]` is not "not yet", and seeding it is a WRONG ANSWER rather than a
+  missing one.** Three surfaces did this and all three stated a falsehood
+  confidently: the passkeys card showed a "0" badge and "Add a passkey" for the
+  length of its fetch, so someone with three passkeys was told they had none;
+  the notification bell said "You're all caught up" while still loading; the
+  media library caught a failed load into `setItems([])` and rendered "No media
+  yet" to a studio with two hundred files. Hold the state as `null` until it is
+  known — the shape of "empty" and the shape of "we have not asked" are
+  different facts and only one of them can be drawn.
+- **An action that hands off to the platform still owes a busy state.** A
+  passkey sign-in opens the OS dialog and then does a server round trip and a
+  session refresh, and the button reported none of it — so what a person saw
+  after authenticating with their face was the screen they started on. The most
+  common response to a button that does nothing is to press it again.
+- **An upload shows a NUMBER when it can, and says why when it cannot.** A
+  determinate ring while bytes are moving, an honest spinner when the length is
+  unknown (`lengthComputable: false` — an invented percentage that jumps to 100
+  and waits is worse), and a distinct "processing" phase for the gap between the
+  last byte and the server's answer. The progress belongs on the THING being
+  uploaded — the face, the thumbnail — not on the button that started it, since
+  the thing is what the person is looking at. `useUpload` + `UploadProgress` are
+  the pair; a screen never re-derives this.
 
 ### Motion comes from the registry, never from a number
 

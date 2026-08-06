@@ -25,7 +25,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { ActionResult, Badge, Button, Card, ConfirmDialog, KeyRound, Trash2 } from "@4dl/ui";
+import { ActionResult, Badge, Button, Card, ConfirmDialog, KeyRound, Reveal, Skeleton, SkeletonLine, Trash2 } from "@4dl/ui";
 import { deviceLabel, enrollPasskey, listPasskeys, passkeyErrorMessage, passkeySupported, removePasskey } from "./passkey.js";
 
 export interface PasskeysCardProps {
@@ -40,14 +40,28 @@ export interface PasskeysCardProps {
 }
 
 export function PasskeysCard({ onChanged }: PasskeysCardProps) {
-  const [passkeys, setPasskeys] = useState<{ id: string; name: string | null; createdAt: string }[]>([]);
+  /*
+    `null` until the list is KNOWN, and the distinction is the whole fix.
+
+    Seeded as `[]`, this card rendered a confident "0" badge and an "Add a
+    passkey" button for the length of the round trip — so someone with three
+    passkeys was told, briefly but unambiguously, that they had none. That is
+    not a missing loading state, it is a wrong answer with a loading state's
+    excuse: the shape of `[]` and "we have not asked yet" are different facts and
+    only one of them can be drawn.
+  */
+  const [passkeys, setPasskeys] = useState<{ id: string; name: string | null; createdAt: string }[] | null>(null);
   const [enrolling, setEnrolling] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [toRemove, setToRemove] = useState<{ id: string; name: string } | null>(null);
 
   const load = useCallback(() => {
-    if (passkeySupported()) void listPasskeys().then(setPasskeys).catch(() => undefined);
+    // A device with no passkey support has nothing to fetch and nothing to wait
+    // for — resolve to empty rather than shimmering forever over a list that
+    // will never arrive.
+    if (!passkeySupported()) { setPasskeys([]); return; }
+    void listPasskeys().then(setPasskeys).catch(() => setPasskeys([]));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -97,10 +111,24 @@ export function PasskeysCard({ onChanged }: PasskeysCardProps) {
             <div className="font-medium">Passkeys</div>
             <div className="text-sm text-muted-foreground">One-tap sign-in with Face ID / fingerprint.</div>
           </div>
-          <Badge tone={passkeys.length ? "success" : "neutral"}>{passkeys.length}</Badge>
+          {passkeys !== null && <Badge tone={passkeys.length ? "success" : "neutral"}>{passkeys.length}</Badge>}
         </div>
 
-        {passkeys.map((p) => (
+        <Reveal
+          loading={passkeys === null}
+          className="space-y-3"
+          skeleton={
+            // The real row's geometry: an 8-unit glyph, two lines of text, a
+            // trailing icon button. A grey blob here would teach the eye a shape
+            // and then move everything (UI-LANGUAGE §7).
+            <div className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2.5">
+              <Skeleton className="size-8 shrink-0 rounded-lg" />
+              <div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="30%" h="xs" /></div>
+              <Skeleton className="size-9 shrink-0 rounded-xl" />
+            </div>
+          }
+        >
+        {(passkeys ?? []).map((p) => (
           <div key={p.id} className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2.5">
             <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary [&_svg]:size-4"><KeyRound /></div>
             <div className="min-w-0 flex-1">
@@ -120,11 +148,12 @@ export function PasskeysCard({ onChanged }: PasskeysCardProps) {
 
         {passkeySupported() ? (
           <Button variant="tonal" className="w-full" disabled={enrolling} onClick={() => void add()}>
-            <KeyRound /> {enrolling ? "Waiting for your device…" : passkeys.length ? "Add another passkey" : "Add a passkey"}
+            <KeyRound /> {enrolling ? "Waiting for your device…" : (passkeys ?? []).length ? "Add another passkey" : "Add a passkey"}
           </Button>
         ) : (
           <p className="text-sm text-muted-foreground">This device doesn&rsquo;t support passkeys — you&rsquo;ll keep using email codes.</p>
         )}
+        </Reveal>
 
         <ActionResult msg={msg} err={err} />
       </Card>

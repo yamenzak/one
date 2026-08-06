@@ -46,7 +46,7 @@ import { TENANCY_SCHEMA } from "@4dl/tenancy";
 
 export const KOVA_SCHEMA: SchemaModule = {
   id: "kova",
-  version: "2026-08-04a",
+  version: "2026-08-06a",
   ddl: [
 
     "CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT);",
@@ -238,6 +238,24 @@ export const KOVA_SCHEMA: SchemaModule = {
     // Client preferences (settings-managed profile: target weight, goal,
     // activity, workouts/week, meals/day, workout location, dietary).
     "ALTER TABLE clients ADD COLUMN preferences_json TEXT",
+    /*
+      WHEN the preferences last changed, which is a different question from what
+      they are — and the only one nothing could answer.
+
+      Preferences are CURRENT STATE, not an event log, and they stay that way:
+      "I train at home, four times a week, avoid dairy" is a fact about now, and
+      a coach who wants the trajectory wants the GOAL history, which
+      `client_goals` already keeps with start/end dates and targets. A second
+      timeline over the same subject would give two overlapping histories and no
+      clear reading of either.
+
+      What was genuinely missing is freshness. A client who set "avoid dairy" and
+      a four-day split fourteen months ago, and has not looked since, presents to
+      their coach exactly like one who reviewed it this morning — so the coach
+      plans around stale answers with nothing on screen suggesting they might be.
+      One timestamp fixes that; a history would not have.
+    */
+    "ALTER TABLE clients ADD COLUMN preferences_updated_at TEXT",
     // Body composition recomputed on every weight/body-fat entry.
     "ALTER TABLE measurements ADD COLUMN bmi REAL",
     "ALTER TABLE measurements ADD COLUMN bmr REAL",

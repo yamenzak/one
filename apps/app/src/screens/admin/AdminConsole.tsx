@@ -53,14 +53,15 @@ import { fmtPrice } from "../../money.js";
  * or runs, and the next app's console will name something else entirely.
  */
 const ADMIN_SECTIONS: ConsoleSection[] = [
-  { key: "tenants", label: "Studios", blurb: "Every studio, its plan, credits and standing", icon: Building2, tone: "primary", render: () => <Tenants /> },
-  { key: "plans", label: "Plans", blurb: "Price, limits and trials owners buy", icon: CreditCard, tone: "cardio", render: () => <PlansConfig /> },
+  { group: "Studios & money", key: "tenants", label: "Studios", blurb: "Every studio, its plan, credits and standing", icon: Building2, tone: "primary", render: () => <Tenants /> },
+  { group: "Studios & money", key: "plans", label: "Plans", blurb: "Price, limits and trials owners buy", icon: CreditCard, tone: "cardio", render: () => <PlansConfig /> },
   /* `@4dl/admin`'s, over `@4dl/ai`'s endpoints. Kova's two genuinely-own pieces
      ride in as slots: the live self-test (which runs THIS product's prompts
      through THIS product's parsers) and the 👍/👎 read side (which reads Kova's
      own `insight_feedback`). The lane descriptions are Kova's too — the lanes
      themselves are the package's taxonomy, what they are FOR is the product's. */
   {
+    group: "This deployment",
     key: "ai", label: "AI", blurb: "Models, pricing, markup, the self-test", icon: Wand2, tone: "nutrition",
     render: () => (
       <PlatformAiSection
@@ -85,17 +86,17 @@ const ADMIN_SECTIONS: ConsoleSection[] = [
   /* `@4dl/admin`'s. Two lanes, a mismatch alarm and a price rebuild are facts
      about Stripe, not about Kova — and Tessa, facing the same three endpoints,
      had reinvented them as a `JSON.stringify` dump and three text boxes. */
-  { key: "stripe", label: "Stripe", blurb: "Keys, webhooks, and what is synced", icon: Wallet, tone: "supplement", render: () => <PlatformStripeSection api={api} errorText={errorText} platformName="Kova" /> },
+  { group: "Studios & money", key: "stripe", label: "Stripe", blurb: "Keys, webhooks, and what is synced", icon: Wallet, tone: "supplement", render: () => <PlatformStripeSection api={api} errorText={errorText} platformName="Kova" /> },
   /* The Stripe rail's DEAD LETTER. One account serves every 4DL app, so an
      event that matched no product is the platform's problem, not this app's —
      and it means money was captured with nothing granted. The rail has parked
      these since it shipped; nothing could read one back until now. */
-  { key: "rail", label: "Unattributed payments", blurb: "Stripe events that matched no app — money in, nothing granted", icon: Wallet, tone: "danger", render: () => <PlatformRailSection api={api} errorText={errorText} /> },
-  { key: "promos", label: "Promo codes", blurb: "Platform-wide discounts on plans and packs", icon: Tag, tone: "activity", render: () => <PlatformPromos /> },
+  { group: "Studios & money", key: "rail", label: "Unattributed payments", blurb: "Stripe events that matched no app — money in, nothing granted", icon: Wallet, tone: "danger", render: () => <PlatformRailSection api={api} errorText={errorText} /> },
+  { group: "Studios & money", key: "promos", label: "Promo codes", blurb: "Platform-wide discounts on plans and packs", icon: Tag, tone: "activity", render: () => <PlatformPromos /> },
   /* `@4dl/admin`'s. `domainAdminRoutes` has been `@4dl/tenancy`'s since Stage
      10a, so every app that mounts it — the template included — had a working
      custom-domain feature and no way to configure it. */
-  { key: "domains", label: "Custom domains", blurb: "Tenant domains and their certificates", icon: Globe, tone: "sleep", render: () => <PlatformDomainsSection api={api} errorText={errorText} tenantNoun="studio" cnameExample="saas.4dl.app" /> },
+  { group: "This deployment", key: "domains", label: "Custom domains", blurb: "Tenant domains and their certificates", icon: Globe, tone: "sleep", render: () => <PlatformDomainsSection api={api} errorText={errorText} tenantNoun="studio" cnameExample="saas.4dl.app" /> },
   /* The panel is `@4dl/admin`'s: who a deployment sends mail as is the shared
      email package's subject, not Kova's. Before it existed the endpoints behind
      it had no caller at all, and a fresh deploy could not send the sign-in code
@@ -105,13 +106,13 @@ const ADMIN_SECTIONS: ConsoleSection[] = [
      questions — "what does the platform use" and "what does THIS app use
      instead". A save here reaches every product, which is why its panel is the
      only settings surface in this console that confirms first. */
-  { key: "platform", label: "Shared platform config", blurb: "Keys every 4DL app reads — set once, not once per product", icon: Globe, tone: "activity", render: () => <PlatformSharedConfigSection api={api} errorText={errorText} /> },
-  { key: "email", label: "Email delivery", blurb: "How this deployment sends mail, and what a tenant pays per send", icon: Mail, tone: "primary", render: () => <PlatformEmailSection api={api} errorText={errorText} /> },
+  { group: "This deployment", key: "platform", label: "Shared platform config", blurb: "Keys every 4DL app reads — set once, not once per product", icon: Globe, tone: "activity", render: () => <PlatformSharedConfigSection api={api} errorText={errorText} /> },
+  { group: "This deployment", key: "email", label: "Email delivery", blurb: "How this deployment sends mail, and what a tenant pays per send", icon: Mail, tone: "primary", render: () => <PlatformEmailSection api={api} errorText={errorText} /> },
   /* Also `@4dl/admin`'s: closing a deployment for a migration is not a thing
      Kova does differently from any other app on the platform. Last but one, next
      to Security, because both are switches you arrive at deliberately rather
      than surfaces you browse. */
-  { key: "maintenance", label: "Maintenance", blurb: "Put the whole platform in read-only, or close it entirely", icon: Wrench, tone: "danger", render: () => <PlatformMaintenanceSection api={api} errorText={errorText} /> },
+  { group: "Operations", key: "maintenance", label: "Maintenance", blurb: "Put the whole platform in read-only, or close it entirely", icon: Wrench, tone: "danger", render: () => <PlatformMaintenanceSection api={api} errorText={errorText} /> },
   /* The blurb used to promise "sessions, admin access" — neither of which this
      section has ever had. A table of contents that lies is worse than none. */
   /* The bot check is `@4dl/admin`'s — a secret stored with no site key locks
@@ -120,6 +121,7 @@ const ADMIN_SECTIONS: ConsoleSection[] = [
      a slot: wiping a deployment is not something a shared package should know
      how to do. */
   {
+    group: "Operations",
     key: "security", label: "Security", blurb: "The bot check on sign-in, and the platform reset", icon: ShieldCheck, tone: "danger",
     render: () => <PlatformTurnstileSection api={api} errorText={errorText} extra={<NuclearResetCard />} />,
   },

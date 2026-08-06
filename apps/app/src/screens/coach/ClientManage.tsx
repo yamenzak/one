@@ -549,8 +549,11 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
 // coach's book couldn't be reassigned, and `is_primary` (which routes body-scan /
 // PR / check-in notifications) was unreachable. This is that screen.
 
-interface AssignedCoach { userId: string; isPrimary: boolean; name: string | null; email: string | null }
-interface StaffMember { userId: string; role: string; name: string | null; email: string | null }
+/* `clientId`/`avatarUrl`/`avatarSeed` are `staffFaces`' — a coach who also
+   trains here wears the face they wear on every other screen. Both rows spread
+   whole into `staffAvatar`; picking fields is how this bug happened. */
+interface AssignedCoach { userId: string; isPrimary: boolean; name: string | null; email: string | null; clientId?: string | null; avatarUrl?: string | null; avatarSeed?: string | null }
+interface StaffMember { userId: string; role: string; name: string | null; email: string | null; clientId?: string | null; avatarUrl?: string | null; avatarSeed?: string | null }
 const coachName = (c: { name: string | null; email: string | null }): string => c.name || c.email || "Coach";
 
 function CoachesSection({ clientId }: { clientId: string }) {
@@ -651,7 +654,7 @@ function CoachesSection({ clientId }: { clientId: string }) {
                 return (
                   <Row
                     key={co.userId}
-                    leading={<Avatar {...staffAvatar({ name, email: co.email, userId: co.userId })} className="size-10" />}
+                    leading={<Avatar {...staffAvatar({ ...co, name })} className="size-10" />}
                     sub={sub}
                     trailing={
                       <span className="flex shrink-0 items-center gap-0.5">
@@ -705,7 +708,7 @@ function CoachesSection({ clientId }: { clientId: string }) {
               disabled={busy !== null}
               className="flex min-h-12 w-full items-center gap-3 rounded-xl bg-secondary px-4 py-3 text-left transition-colors hover:bg-surface-3 disabled:opacity-45"
             >
-              <Avatar {...staffAvatar({ name: coachName(m), email: m.email, userId: m.userId })} className="size-9 shrink-0" />
+              <Avatar {...staffAvatar({ ...m, name: coachName(m) })} className="size-9 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{coachName(m)}</div>
                 <div className="truncate text-sm text-muted-foreground">{personaLabel(m.role)}{m.email ? ` · ${m.email}` : ""}</div>

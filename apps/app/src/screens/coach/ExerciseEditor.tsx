@@ -13,9 +13,10 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
-import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, Thumb, toneSoft, cn, type Tone, SPRING_SNAP} from "@4dl/ui";
+import { FixedDrawer, Button, Field, Textarea, Sheet, Chip, Dumbbell, Play, X, Globe, PencilLine, ArrowLeft, ArrowRight, Search, Plus, Trash2, Check, Thumb, Spinner, toneSoft, cn, type Tone, SPRING_SNAP} from "@4dl/ui";
 import { MUSCLE_GROUPS, EQUIPMENT_TYPES } from "@kova/protocol";
-import { api, ApiError, uploadMedia } from "../../api.js";
+import { useUpload } from "@4dl/app-kit";
+import { api, ApiError } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { AiImageField } from "../../AiImageField.js";
@@ -120,7 +121,6 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
   const [image, setImage] = useState(initial?.thumb_url ?? "");
   const [image2, setImage2] = useState(initial?.thumb2_url ?? "");
   const [video, setVideo] = useState(initial?.video_url ?? "");
-  const [videoBusy, setVideoBusy] = useState(false);
   const [guideBusy, setGuideBusy] = useState(false);
   const [pairBusy, setPairBusy] = useState(false);
   const [autoBusy, setAutoBusy] = useState(false);
@@ -196,12 +196,18 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
     } catch (er) { setErr(errText(er)); } finally { setImporting(null); }
   };
 
+  /*
+    A DEMO VIDEO IS THE BIGGEST FILE THIS PRODUCT ACCEPTS, so it is the one that
+    most needs a number rather than a spinner. It used to show a hand-rolled
+    spinning border and the word "Uploading…" for however long a 40 MB clip takes
+    on gym wifi — indistinguishable, the whole time, from a hang.
+  */
+  const vid = useUpload();
   const uploadVideo = async (file: File) => {
-    setVideoBusy(true); setErr(null);
-    try {
-      const key = await uploadMedia(file, "exercise");
-      setVideo(`/api/media/${key}`);
-    } catch (e) { setErr(errText(e)); } finally { setVideoBusy(false); }
+    setErr(null);
+    const key = await vid.upload(file, "exercise", { filename: file.name });
+    if (key) setVideo(`/api/media/${key}`);
+    else if (vid.error) setErr(vid.error);
   };
 
   const save = async () => {
@@ -292,11 +298,20 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
                   <button onClick={() => setVideo("")} aria-label="Remove video" className="grid size-7 place-items-center rounded-full text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
                 </div>
               ) : (
-                <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4">
-                  {videoBusy ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Play />}
-                  {videoBusy ? "Uploading…" : "Upload demo video"}
-                  <input type="file" accept="video/mp4,video/webm" className="hidden" disabled={videoBusy} onChange={(e) => e.target.files?.[0] && void uploadVideo(e.target.files[0])} />
-                </label>
+                <div className="flex items-center gap-2">
+                  <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4">
+                    {vid.uploading ? <Spinner className="size-4" /> : <Play />}
+                    {vid.phase === "processing"
+                      ? "Processing…"
+                      : vid.uploading
+                        ? `Uploading${vid.progress === null ? "" : ` ${Math.round(vid.progress * 100)}%`}…`
+                        : "Upload demo video"}
+                    <input type="file" accept="video/mp4,video/webm" className="hidden" disabled={vid.uploading} onChange={(e) => e.target.files?.[0] && void uploadVideo(e.target.files[0])} />
+                  </label>
+                  {vid.phase === "sending" && (
+                    <button type="button" onClick={vid.cancel} className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">Cancel</button>
+                  )}
+                </div>
               )}
             </div>
 

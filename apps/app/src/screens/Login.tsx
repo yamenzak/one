@@ -35,6 +35,7 @@ import {
   KeyRound,
   Mail,
   Screen,
+  Spinner,
   TierAnchor,
   TierContent,
   motion,
@@ -72,6 +73,22 @@ export function Login() {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
+  /*
+    THE PASSKEY LANE HAS ITS OWN BUSY, and it needed one badly.
+
+    `signInWithPasskey()` hands off to the platform's own dialog (Face ID,
+    fingerprint, a security key) and then does a server round trip plus a
+    session refresh — and this button reported none of it. What a person saw
+    after authenticating with their face was the same screen they started on,
+    unchanged, for as long as the network took. The single most common thing to
+    do about a button that does nothing is press it again, which restarts a
+    ceremony that was already succeeding.
+
+    Separate from `busy` because the two lanes can be armed at once (the email
+    field runs conditional-UI autofill), and one spinner for both would disable
+    the OTP path while a passkey dialog is open.
+  */
+  const [passkeyBusy, setPasskeyBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [tsToken, setTsToken] = useState<string | null>(null);
@@ -247,24 +264,33 @@ export function Login() {
       {step === "email" && showPasskey && passkeySupported() && (
         <TierContent className="pt-2">
           <button
-            className="flex min-h-12 w-full items-center justify-center gap-2 text-caption font-medium text-muted-foreground transition-colors hover:text-foreground"
+            className="flex min-h-12 w-full items-center justify-center gap-2 text-caption font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
             // A passkey is bound to the DOMAIN it was created on (WebAuthn
             // rpID = this origin), not to your account or your studio. So
             // "no passkey on this device" is wrong and misleading on a
             // studio's custom domain: you may well have one, just registered
             // at a different address. Say what is actually true, and point at
             // the way in that always works.
+            disabled={passkeyBusy}
             onClick={async () => {
               setError(null);
+              setPasskeyBusy(true);
               try {
                 await signInWithPasskey();
+                // Stays busy through the refresh: the ceremony succeeding is not
+                // the same as being signed in, and the gap between them is the
+                // part that looked frozen.
                 await refresh();
               } catch {
                 setError(`No passkey saved for ${location.hostname}. Passkeys are tied to the address you set them up on — sign in with an email code, then add one here.`);
+              } finally {
+                setPasskeyBusy(false);
               }
             }}
           >
-            <KeyRound aria-hidden className="size-4" /> Use a passkey instead
+            {passkeyBusy
+              ? <><Spinner className="size-4" /> Waiting for your device…</>
+              : <><KeyRound aria-hidden className="size-4" /> Use a passkey instead</>}
           </button>
         </TierContent>
       )}

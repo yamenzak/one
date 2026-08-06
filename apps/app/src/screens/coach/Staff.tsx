@@ -27,7 +27,13 @@ import { useSession } from "../../session.js";
 import { useCan } from "../../FeatureLock.js";
 import { staffAvatar } from "../../registry/avatars.js";
 
-interface Member { userId: string; role: string; name: string | null; email: string | null; customGrant?: Record<string, string[]> | null }
+/* `clientId`/`avatarUrl`/`avatarSeed` come from `decorateMembers` — a staff
+   member who also trains here wears the face they wear everywhere else. */
+interface Member {
+  userId: string; role: string; name: string | null; email: string | null;
+  customGrant?: Record<string, string[]> | null;
+  clientId?: string | null; avatarUrl?: string | null; avatarSeed?: string | null;
+}
 interface Invitation { id: string; email: string; role: string; expiresAt: string }
 interface Seats { used: number; pending: number; max: number; remaining: number }
 interface StaffPayload { members: Member[]; invitations: Invitation[]; seats: Seats; canManage: boolean }

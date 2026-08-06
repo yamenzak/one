@@ -84,12 +84,13 @@ export function AdminDoor() {
  * same routes, configured well once and badly once.
  */
 const SECTIONS: ConsoleSection[] = [
-  { key: "centres", label: "Centres", blurb: "Every practice, its plan, credits and standing", icon: Building2, tone: "primary", render: () => <Centres /> },
-  { key: "stripe", label: "Stripe", blurb: "Keys, the active lane, and syncing the catalog", icon: CreditCard, tone: "soiled", render: () => <PlatformStripeSection api={api} errorText={errorText} platformName="Tessa" /> },
+  { group: "Centres & money", key: "centres", label: "Centres", blurb: "Every practice, its plan, credits and standing", icon: Building2, tone: "primary", render: () => <Centres /> },
+  { group: "Centres & money", key: "stripe", label: "Stripe", blurb: "Keys, the active lane, and syncing the catalog", icon: CreditCard, tone: "soiled", render: () => <PlatformStripeSection api={api} errorText={errorText} platformName="Tessa" /> },
   /* Without `google.gemini_key` the vision model is unreachable, so reading a
      label — the feature most likely to be why a centre bought the plan — fails
      with "unavailable" on a deployment that otherwise looks healthy. */
   {
+    group: "This deployment",
     key: "ai", label: "AI", blurb: "The Gemini key, the mock lane, and the model catalog", icon: Wand2, tone: "cycle",
     render: () => (
       <PlatformAiSection
@@ -109,19 +110,19 @@ const SECTIONS: ConsoleSection[] = [
      event that matched no product is the platform's problem, not this app's —
      and it means money was captured with nothing granted. The rail has parked
      these since it shipped; nothing could read one back until now. */
-  { key: "rail", label: "Unattributed payments", blurb: "Stripe events that matched no app — money in, nothing granted", icon: Wallet, tone: "danger", render: () => <PlatformRailSection api={api} errorText={errorText} /> },
-  { key: "domains", label: "Custom domains", blurb: "Centre domains and their certificates", icon: Globe, tone: "case", render: () => <PlatformDomainsSection api={api} errorText={errorText} tenantNoun="centre" cnameExample="saas.4dl.app" /> },
-  { key: "security", label: "Security", blurb: "The bot check on sign-in", icon: ShieldCheck, tone: "danger", render: () => <PlatformTurnstileSection api={api} errorText={errorText} /> },
+  { group: "Centres & money", key: "rail", label: "Unattributed payments", blurb: "Stripe events that matched no app — money in, nothing granted", icon: Wallet, tone: "danger", render: () => <PlatformRailSection api={api} errorText={errorText} /> },
+  { group: "This deployment", key: "domains", label: "Custom domains", blurb: "Centre domains and their certificates", icon: Globe, tone: "case", render: () => <PlatformDomainsSection api={api} errorText={errorText} tenantNoun="centre" cnameExample="saas.4dl.app" /> },
+  { group: "Operations", key: "security", label: "Security", blurb: "The bot check on sign-in", icon: ShieldCheck, tone: "danger", render: () => <PlatformTurnstileSection api={api} errorText={errorText} /> },
   /* The SHARED store: one value, read by every 4DL app. It sits beside the
      per-app panels rather than replacing them, because the two answer different
      questions — "what does the platform use" and "what does THIS app use
      instead". A save here reaches every product, which is why its panel is the
      only settings surface in this console that confirms first. */
-  { key: "platform", label: "Shared platform config", blurb: "Keys every 4DL app reads — set once, not once per product", icon: Globe, tone: "case", render: () => <PlatformSharedConfigSection api={api} errorText={errorText} /> },
+  { group: "This deployment", key: "platform", label: "Shared platform config", blurb: "Keys every 4DL app reads — set once, not once per product", icon: Globe, tone: "case", render: () => <PlatformSharedConfigSection api={api} errorText={errorText} /> },
   /* `@4dl/admin`'s own: who a deployment sends mail as is the shared email
      package's subject, not Tessa's. */
-  { key: "email", label: "Email delivery", blurb: "How this deployment sends mail", icon: Mail, tone: "primary", render: () => <PlatformEmailSection api={api} errorText={errorText} /> },
-  { key: "maintenance", label: "Maintenance", blurb: "Put the platform in read-only, or close it entirely", icon: Wrench, tone: "danger", render: () => <PlatformMaintenanceSection api={api} errorText={errorText} /> },
+  { group: "This deployment", key: "email", label: "Email delivery", blurb: "How this deployment sends mail", icon: Mail, tone: "primary", render: () => <PlatformEmailSection api={api} errorText={errorText} /> },
+  { group: "Operations", key: "maintenance", label: "Maintenance", blurb: "Put the platform in read-only, or close it entirely", icon: Wrench, tone: "danger", render: () => <PlatformMaintenanceSection api={api} errorText={errorText} /> },
 ];
 
 /**

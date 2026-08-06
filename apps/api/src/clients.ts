@@ -21,6 +21,7 @@ import { newId, nowIso } from "./ids.js";
 import { recordAudit } from "./audit.js";
 import { canonicalHost, shapeOf } from "./host-context.js";
 import { parseJson, j } from "./db.js";
+import { staffFaces } from "./staff-faces.js";
 import { type ClientPreferences, calculateBMI, calculateBMR, classifyBMI, ageFromDob, goalStaleness, profileGaps, rangeStatus, auditLabel, canAccessClient, seesWholeRoster } from "@kova/domain";
 import { tenantStandingOf } from "@4dl/tenancy";
 import { resolveStanding } from "@4dl/tenancy";
@@ -47,6 +48,8 @@ export interface ClientRow {
   blood_type: string | null;
   phone: string | null;
   preferences_json: string | null;
+  /** When the training/nutrition preferences were last reviewed. Null = never. */
+  preferences_updated_at: string | null;
   current_variant_id: string | null;
   current_meal_variant_id: string | null;
   default_lane_label: string | null;
@@ -303,6 +306,7 @@ function clientView(row: ClientRow) {
     bloodType: row.blood_type,
     phone: row.phone,
     preferences: parseJson<ClientPreferences>(row.preferences_json, {}),
+    preferencesUpdatedAt: row.preferences_updated_at ?? null,
     profileComplete: profileGaps({ gender: row.gender, dateOfBirth: row.date_of_birth, heightCm: row.height_cm, prefs: parseJson<ClientPreferences>(row.preferences_json, {}) }).length === 0,
     createdAt: row.created_at,
   };
@@ -588,9 +592,23 @@ export const clientRoutes = new Hono<AppEnv>()
       d.preferences !== undefined
         ? j({ ...parseJson<ClientPreferences>(cur.preferences_json, {}), ...d.preferences })
         : cur.preferences_json;
+    /*
+      Stamped only when the preferences ACTUALLY CHANGE, and re-stamped even when
+      somebody saves the same values.
+
+      Both halves are deliberate. A PATCH that touches only the name must not
+      make a fourteen-month-old training profile look reviewed today — that would
+      turn the freshness signal into a general "last edited anything" and it
+      would read as fresh forever. But a client who opens the page, reads it,
+      agrees with every answer and presses Save HAS reviewed it, and telling them
+      it is still a year stale would be wrong in the other direction. So: the
+      preferences being present in the body is the event, not their value
+      differing.
+    */
+    const prefsUpdatedAt = d.preferences !== undefined ? nowIso() : cur.preferences_updated_at;
     await c.env.DB.prepare(
       `UPDATE clients SET display_name = ?, email = ?, gender = ?, date_of_birth = ?, height_cm = ?, timezone = ?,
-        weight_unit = ?, length_unit = ?, volume_unit = ?, intake_json = ?, dashboard_prefs_json = ?, preferences_json = ?, onboarding_complete = ?,
+        weight_unit = ?, length_unit = ?, volume_unit = ?, intake_json = ?, dashboard_prefs_json = ?, preferences_json = ?, preferences_updated_at = ?, onboarding_complete = ?,
         blood_type = ?, phone = ?
        WHERE id = ? AND tenant_id = ?`,
     )
@@ -607,6 +625,7 @@ export const clientRoutes = new Hono<AppEnv>()
         d.intake !== undefined ? j(d.intake) : cur.intake_json,
         d.dashboardPrefs !== undefined ? j(d.dashboardPrefs) : cur.dashboard_prefs_json,
         prefsJson,
+        prefsUpdatedAt,
         d.onboardingComplete !== undefined ? (d.onboardingComplete ? 1 : 0) : cur.onboarding_complete,
         d.bloodType !== undefined ? d.bloodType : cur.blood_type,
         d.phone !== undefined ? d.phone : cur.phone,
@@ -888,12 +907,20 @@ export const clientRoutes = new Hono<AppEnv>()
     )
       .bind(access.client.id, access.client.tenant_id)
       .all<{ trainer_user_id: string; is_primary: number; name: string | null; email: string | null }>();
+    // The third payload that shows a staff face — see staff-faces.ts for why
+    // all three resolve it the same way.
+    const faces = await staffFaces(
+      c.env.DB,
+      access.client.tenant_id,
+      (rows.results ?? []).map((r) => ({ userId: r.trainer_user_id, email: r.email })),
+    );
     return c.json({
       trainers: (rows.results ?? []).map((r) => ({
         userId: r.trainer_user_id,
         isPrimary: Boolean(r.is_primary),
         name: r.name,
         email: r.email,
+        ...(faces[r.trainer_user_id] ?? {}),
       })),
     });
   })

@@ -33,6 +33,14 @@ configureApi({
  * it so the server scopes the key per client and gates reads on assignment: a
  * client, or a non-assigned trainer, cannot read another client's file by key.
  */
-export function uploadMedia(file: Blob, purpose: string, filename = "upload", clientId?: string): Promise<string> {
-  return uploadMediaKit(file, purpose, { filename, fields: clientId ? { clientId } : undefined });
+export function uploadMedia(
+  file: Blob,
+  purpose: string,
+  filename = "upload",
+  clientId?: string,
+  /** Progress + cancellation, passed straight through. `useUpload` supplies
+   *  both; a caller that does not care omits them and behaves as before. */
+  opts?: { onProgress?: (fraction: number) => void; signal?: AbortSignal },
+): Promise<string> {
+  return uploadMediaKit(file, purpose, { filename, fields: clientId ? { clientId } : undefined, ...opts });
 }

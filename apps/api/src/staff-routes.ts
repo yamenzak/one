@@ -32,6 +32,7 @@ import { checkStaffSeat } from "./auth.js";
 import { tenantEntitlements } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
 import { canonicalHost } from "./host-context.js";
+import { staffFaces } from "./staff-faces.js";
 import { sendTenantEmail, explainSendError } from "./email-provider.js";
 import { emailButton, emailShell, escapeHtml, KOVA_BRAND } from "./mailer.js";
 import { tenantBrandKit } from "./notify.js";
@@ -74,6 +75,18 @@ export const staffRoutes = sharedStaffRoutes<AppEnv>({
   catalog: (ac as unknown as { statements: Record<string, readonly string[]> }).statements,
   checkSeat: (db, tenantId, opts) => checkStaffSeat(db, tenantId, opts),
   seatCeiling: async (db, tenantId) => (await tenantEntitlements(db, tenantId)).quotas.staffSeats,
+  /**
+   * A STAFF MEMBER'S FACE IS THEIR CLIENT ROW'S FACE, when they have one.
+   *
+   * Most staff at a training studio also train there, so the same human holds a
+   * `member` row and a `clients` row — and the photo lives on the client row.
+   * `staffFaces` is shared with `/api/members` and the assigned-coach list,
+   * because fixing one of the three and not the others only moves which screen
+   * disagrees about somebody's face.
+   */
+  // Widened to the seam's `Record<string, unknown>` — `@4dl/auth` cannot know
+  // Kova's face shape, and `StaffFaceFields` has no index signature by design.
+  decorateMembers: async (db, tenantId, members) => staffFaces(db, tenantId, members),
   /**
    * The assistant seat is the OTHER half of what `frontDesk` sells. Only the
    * sessions half used to be gated, so a studio on a plan without it could still

@@ -20,6 +20,7 @@ import { z } from "zod";
 import { sanitizePermissions } from "@kova/domain";
 import { type AppEnv, requireTenant } from "./auth-context.js";
 import { j, parseJson } from "./db.js";
+import { staffFaces } from "./staff-faces.js";
 
 export const memberRoutes = new Hono<AppEnv>()
   .get("/members", async (c) => {
@@ -30,6 +31,11 @@ export const memberRoutes = new Hono<AppEnv>()
     )
       .bind(who.tenantId)
       .all<{ id: string; userId: string; role: string; permissions_json: string | null; name: string | null; email: string | null }>();
+    // The same faces the staff roster resolves. Without this the coach picker
+    // and the permissions screen drew a robot for someone whose photograph was
+    // already on screen elsewhere — see staff-faces.ts.
+    const people = (rows.results ?? []).map((r) => ({ userId: r.userId, email: r.email }));
+    const faces = await staffFaces(c.env.DB, who.tenantId, people);
     return c.json({
       members: (rows.results ?? []).map((r) => ({
         id: r.id,
@@ -38,6 +44,7 @@ export const memberRoutes = new Hono<AppEnv>()
         customGrant: r.permissions_json ? sanitizePermissions(parseJson(r.permissions_json, {})) : null,
         name: r.name,
         email: r.email,
+        ...(faces[r.userId] ?? {}),
       })),
     });
   })

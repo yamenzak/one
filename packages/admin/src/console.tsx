@@ -41,7 +41,47 @@ export interface ConsoleSection {
   icon: LucideIcon;
   /** Colour is navigation, not decoration: one tone per section, everywhere. */
   tone?: Tone;
+  /**
+   * Which named group this section sits under on the index.
+   *
+   * Optional, and the default is what every console did before: ONE flat,
+   * unnamed list. That is fine at four sections and stops being fine at eleven —
+   * Kova's console reached eleven, so "Maintenance" sat directly under "Custom
+   * domains" with nothing saying they belong to different jobs, and an operator
+   * looking for the AI panel had to read the whole list every time. §1 chunks at
+   * seven for exactly this reason.
+   *
+   * Ungrouped sections keep their order and render first, under no header, so an
+   * app that never sets this is unchanged.
+   */
+  group?: string;
   render: () => ReactNode;
+}
+
+/**
+ * Sections in declaration order, chunked under their group headers.
+ *
+ * The group's ORDER is the order its first section appears in, so a console
+ * arranges its index by arranging its list — there is no second ordering to
+ * keep in step with the first.
+ */
+function groupSections(sections: ConsoleSection[], onOpen: (key: string) => void) {
+  const order: string[] = [];
+  const byGroup = new Map<string, ConsoleSection[]>();
+  for (const s of sections) {
+    const g = s.group ?? "";
+    if (!byGroup.has(g)) { byGroup.set(g, []); order.push(g); }
+    byGroup.get(g)!.push(s);
+  }
+  return order.map((g) => ({
+    // `undefined`, not `""` — an empty string would render an empty header row
+    // and put a blank line where the design says there is no group.
+    header: g || undefined,
+    rows: byGroup.get(g)!.map((s) => ({
+      key: s.key, icon: s.icon, tone: s.tone, label: s.label, sub: s.blurb,
+      onClick: () => onOpen(s.key),
+    })),
+  }));
 }
 
 /**
@@ -87,14 +127,7 @@ export function AdminConsole({
           <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
         </div>
       </div>
-      <SettingsIndex
-        groups={[{
-          rows: sections.map((s) => ({
-            key: s.key, icon: s.icon, tone: s.tone, label: s.label, sub: s.blurb,
-            onClick: () => onOpen(s.key),
-          })),
-        }]}
-      />
+      <SettingsIndex groups={groupSections(sections, onOpen)} />
     </Page>
   );
 }

@@ -621,6 +621,39 @@ remote bindings without editing the config (this is what the E2E suite does).
 - Plan/meal bodies are JSON columns validated by `@kova/protocol` at the route.
 - Pure domain logic gets unit tests; API flows get Miniflare integration tests.
   Run tests with the `wrangler dev` server stopped (they share `.wrangler` state).
+- **A component that fetches owns its loading state, and `[]` is not "not yet".**
+  Three surfaces seeded an empty array and rendered it as fact: `PasskeysCard`
+  showed a confident "0" badge and "Add a passkey" for the length of the round
+  trip, the notification bell said "You're all caught up" while still fetching,
+  and the media library's `catch(() => setItems([]))` turned a FAILED load into
+  "No media yet". All three are the same bug — a wrong answer wearing a loading
+  state's excuse — and all three are fixed by making the state `null` until it
+  is known. UI-LANGUAGE §7 has the rule; these were the surfaces that predated it.
+- **An upload reports progress, and that is why `uploadMedia` is XHR.** `fetch`
+  has no upload-progress event in any shipping browser (a ReadableStream body is
+  Chromium-only and needs `duplex: "half"`), so the transport is chosen by what
+  the UI has to be able to show. `@4dl/app-kit`'s `useUpload` owns the lifecycle
+  — `sending` → `processing` (the gap between the last byte and the server's
+  answer, where a determinate bar would otherwise sit at 100% looking stuck) —
+  and `@4dl/ui`'s `UploadProgress` renders exactly that shape. A cancel is
+  `UploadAbortedError` and is never reported as a failure.
+- **One face per person, and the PAYLOAD has to carry it.**
+  `apps/app/src/registry/avatars.ts` makes a face impossible to assemble from
+  the wrong fields, and a conformance test keeps every `<Avatar>` spreading a
+  resolver — but neither can make an endpoint SEND the fields, which is where
+  this kept breaking. `apps/api/src/staff-faces.ts` is the one lookup, used by
+  all three staff-shaped payloads (`/api/staff` through `@4dl/auth`'s
+  `decorateMembers` seam, `/api/members`, and a client's assigned coaches);
+  `apps/api/test/staff-faces.test.ts` asserts all three, because fixing one only
+  moves which screen disagrees about somebody's face.
+- **Preferences are current state; GOALS are the history.** `clients.preferences_json`
+  is overwritten, deliberately — "I train at home, four times a week" is a fact
+  about now, and `client_goals` already keeps the dated series a coach actually
+  wants. What was missing was FRESHNESS, so `preferences_updated_at` records when
+  they were last reviewed and the editor says so, with a nudge past six months. It
+  is stamped only when `preferences` is in the body (a name change must not make a
+  year-old profile look reviewed) and re-stamped even when the values are
+  unchanged (reading it and agreeing IS a review).
 - **A write that fails says so, where it failed.** Every mutating control on a
   settings surface goes through `@4dl/ui`'s `useAction` (has a Save button) or
   `useConfirmedState` (instant — it rolls back to the pre-apply snapshot). The

@@ -168,6 +168,25 @@ export interface StaffRouteDeps<E extends StaffRouteEnv & HonoEnv> {
   /** The staff-seat ceiling, for the counters. `-1` is unlimited. */
   seatCeiling: (db: D1Database, tenantId: string) => Promise<number>;
   /**
+   * Enrich the roster rows with fields only the APP knows about.
+   *
+   * The one that forced this seam: a FACE. This package joins `member` to
+   * `user`, which on a passwordless stack carries a name and an email and
+   * nothing else — so a staff roster could only ever draw initials or a robot
+   * seeded from an id. Meanwhile the same person's photo was sitting in the
+   * app's own subject table, and the app bar was already drawing it. One human,
+   * two faces, depending on which screen you were on.
+   *
+   * Deliberately a decorator over the finished rows rather than extra columns in
+   * the query: the table the photo lives in is the app's, this package has no
+   * business naming it, and an app with no such table simply omits the hook.
+   */
+  decorateMembers?: (
+    db: D1Database,
+    tenantId: string,
+    members: { userId: string; email: string | null }[],
+  ) => Promise<Record<string, Record<string, unknown>>>;
+  /**
    * The role that is NOT a staff seat — the app's end customer.
    *
    * Required, and it is the same value `SeatConfig.customerRole` takes, because
@@ -261,8 +280,16 @@ export function staffRoutes<E extends StaffRouteEnv & HonoEnv>(deps: StaffRouteD
         pendingStaffSeats(c.env.DB, actor.tenantId, deps.customerRole),
       ]);
 
+      // The app's own fields, keyed by userId. A hook that throws must not take
+      // the whole staff screen with it — a missing photo is a worse face, not a
+      // broken roster.
+      const rows = members.results ?? [];
+      const extra: Record<string, Record<string, unknown>> = deps.decorateMembers
+        ? await deps.decorateMembers(c.env.DB, actor.tenantId, rows.map((m) => ({ userId: m.userId, email: m.email }))).catch(() => ({}))
+        : {};
+
       return c.json({
-        members: members.results ?? [],
+        members: rows.map((m) => ({ ...m, ...(extra[m.userId] ?? {}) })),
         invitations: invitations.results ?? [],
         seats: {
           used,

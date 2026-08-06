@@ -613,3 +613,58 @@ export async function seedStaff(studio: Studio): Promise<void> {
     console.warn(`[seedStaff] skipped: ${String(e).slice(0, 200)}`);
   }
 }
+
+/**
+ * A FEW REAL FILES IN THE MEDIA LIBRARY, so the screen can be photographed.
+ *
+ * The demo studio uploaded nothing, so `media-library` was a picture of an empty
+ * state — an honest photograph of a screen nobody has, and useless for reviewing
+ * the grid, the list, the facets or the detail sheet. A design review that works
+ * from screenshots (UI-LANGUAGE §16) can only review what the seed produces.
+ *
+ * These go through the REAL upload route, so they exercise the same media
+ * ledger, quota gate and per-client scoping the app does — a row inserted
+ * straight into D1 would photograph a library whose files cannot be opened.
+ *
+ * The images are generated in the browser rather than committed as fixtures:
+ * a handful of KB of solid colour is enough to render a thumbnail, and a binary
+ * fixture in the repo is a thing to maintain for no gain.
+ */
+export async function seedMedia(studio: Studio, client: Client): Promise<void> {
+  const files: { purpose: string; label: string; hue: number; forClient: boolean }[] = [
+    { purpose: "progress", label: "Week 1", hue: 210, forClient: true },
+    { purpose: "progress", label: "Week 6", hue: 190, forClient: true },
+    { purpose: "meal-snap", label: "Lunch", hue: 30, forClient: true },
+    { purpose: "food", label: "Oats", hue: 45, forClient: false },
+    { purpose: "exercise", label: "Squat", hue: 150, forClient: false },
+    { purpose: "brand", label: "Logo", hue: 265, forClient: false },
+  ];
+
+  for (const f of files) {
+    await studio.page.evaluate(
+      async ([purpose, label, hue, clientId]: [string, string, number, string | null]) => {
+        // A canvas is the smallest way to make a real PNG in a real browser.
+        const cv = document.createElement("canvas");
+        cv.width = 480;
+        cv.height = 480;
+        const ctx = cv.getContext("2d")!;
+        ctx.fillStyle = `hsl(${hue} 45% 62%)`;
+        ctx.fillRect(0, 0, 480, 480);
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.font = "600 44px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, 240, 240);
+        const blob: Blob = await new Promise((res) => cv.toBlob((b) => res(b!), "image/png"));
+
+        const fd = new FormData();
+        fd.append("file", new File([blob], `${label}.png`, { type: "image/png" }));
+        fd.append("purpose", purpose);
+        if (clientId) fd.append("clientId", clientId);
+        const r = await fetch("/api/media/upload", { method: "POST", credentials: "include", body: fd });
+        if (!r.ok) throw new Error(`media upload ${purpose} -> ${r.status} ${await r.text()}`);
+      },
+      [f.purpose, f.label, f.hue, f.forClient ? client.id : null] as [string, string, number, string | null],
+    );
+  }
+}

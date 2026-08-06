@@ -265,6 +265,38 @@ test("the coach's studio", async () => {
     await visit(page, `${base}/settings?s=brand`, page.getByText("Logos & AI coach").first());
     await shoot(page, project, "coach-settings-brand");
   });
+
+  /*
+    THE THREE SURFACES THIS PASS REBUILT, photographed because a design review
+    that reads diffs cannot see a layout.
+
+    Staff is here for the FACES specifically — a studio whose owner also trains
+    there is the case where the roster used to draw a robot while the app bar
+    two inches above drew the same person's photograph.
+  */
+  await test.step("staff", async () => {
+    await visit(page, `${base}/business`, shell);
+    await page.getByRole("tab", { name: "Staff" }).or(page.getByText("Staff", { exact: true }).first()).click();
+    await shoot(page, project, "coach-staff", { settle: 800 });
+  });
+
+  await test.step("the media library", async () => {
+    await visit(page, `${base}/media`, page.getByRole("heading", { name: "Media library" }));
+    await shoot(page, project, "media-library", { settle: 900 });
+  });
+
+  await test.step("the media library as a list", async () => {
+    await page.evaluate(() => localStorage.setItem("4dl.view.media", "list"));
+    await visit(page, `${base}/media`, page.getByRole("heading", { name: "Media library" }));
+    await shoot(page, project, "media-library-list", { settle: 900 });
+    await page.evaluate(() => localStorage.setItem("4dl.view.media", "grid"));
+  });
+
+  await test.step("personal settings", async () => {
+    await visit(page, `${base}/profile`, page.getByText("Signing in").first());
+    await shoot(page, project, "personal-settings");
+  });
+
 });
 
 test("the client's app", async () => {
@@ -298,6 +330,30 @@ test("the client's app", async () => {
     // load-bearing rather than defensive.
     await visit(page, `${base}/progress`, shell);
     await shoot(page, project, "client-progress", { settle: 1200 });
+  });
+
+  /*
+    The two settings pages this pass rebuilt, on the persona that HAS them.
+
+    They were on the coach first and failed: the demo owner has no client
+    record, so `?s=preferences` correctly renders "these appear once you're set
+    up as a client" and there is no editor to photograph. The client is both
+    where the screen works and who it is for.
+  */
+  await test.step("training & nutrition preferences", async () => {
+    await visit(page, `${base}/profile?s=preferences`, page.getByText("Primary goal").first());
+    await shoot(page, project, "personal-preferences", { settle: 700 });
+  });
+
+  await test.step("passkeys", async () => {
+    // Anchor on the card's SUBTITLE, not on the "Add a passkey" button: headless
+    // Chromium has no platform authenticator, so `passkeySupported()` is false
+    // and the card correctly renders "this device doesn't support passkeys"
+    // instead. The subtitle is there either way — and photographing the
+    // unsupported branch is worth having, since it is the one that proves the
+    // card resolved its fetch rather than shimmering forever.
+    await visit(page, `${base}/profile?s=security`, page.getByText("One-tap sign-in", { exact: false }).first());
+    await shoot(page, project, "personal-passkeys", { settle: 700 });
   });
 });
 

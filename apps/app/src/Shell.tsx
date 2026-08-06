@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useState, type CSSProperties, type ReactNod
 import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } from "react-router-dom";
 import {
   ChevronDown,
-  AppBar, Avatar, BottomTabs, NavRail, Button, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
+  AppBar, Avatar, BottomTabs, NavRail, Button, ChevronRight, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
   Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, brandMark, hasIcon, hasWordmark, markPlateClass, toneVar, type TabDef, type Tone,
 } from "@4dl/ui";
 import { resolveStanding, tenantStandingOfGate } from "@4dl/tenancy/model";
@@ -353,14 +353,48 @@ function TabLayout() {
             )}
             <NotificationBell />
             <DropdownMenu>
+              {/*
+                WHO YOU ARE, WHERE EVERY OTHER APP PUTS IT.
+
+                The trigger was a bare 36px circle. On a phone that is fine —
+                there is no room for more — but on desktop the bar had inches of
+                empty space beside it and still made you open a menu to find out
+                which account you were signed in as, which matters here more than
+                in most apps: one person can hold a client persona and a coach
+                persona, and be a member of several studios.
+
+                The name is `sm:` and up so the phone bar is untouched.
+              */}
               <DropdownMenuTrigger asChild>
-                <button className="rounded-full outline-none ring-ring focus-visible:ring-2" aria-label="Account">
+                <button
+                  className="flex items-center gap-2 rounded-full pr-0 outline-none ring-ring focus-visible:ring-2 sm:-mr-1 sm:rounded-full sm:pl-1 sm:pr-2.5 sm:transition-colors sm:hover:bg-secondary"
+                  aria-label={`Account — ${ctx!.user.name || ctx!.user.email}`}
+                >
                   {/* One face per person — `registry/avatars.ts` owns the rule. */}
                   <Avatar {...meAvatar(ctx!.user, active)} className="size-9" />
+                  <span className="hidden max-w-40 truncate text-sm font-medium sm:block">
+                    {ctx!.user.name || ctx!.user.email}
+                  </span>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuLabel>{ctx!.user.email}</DropdownMenuLabel>
+                {/*
+                  THE HEADER IS A DOOR, because it is the thing people press.
+
+                  It was a plain `DropdownMenuLabel` with the email in it — dead
+                  text at the top of a menu whose "Settings" row, four items
+                  down, is where you actually go to change any of it. Tapping
+                  your own name and having nothing happen is a small thing that
+                  happens every single time.
+                */}
+                <DropdownMenuItem onSelect={() => nav("/profile")} className="gap-2.5">
+                  <Avatar {...meAvatar(ctx!.user, active)} className="size-8 shrink-0" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{ctx!.user.name || ctx!.user.email}</span>
+                    {ctx!.user.name && <span className="block truncate text-xs text-muted-foreground">{ctx!.user.email}</span>}
+                  </span>
+                  <ChevronRight className="shrink-0 text-muted-foreground" />
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {isStaff && (
                   <>

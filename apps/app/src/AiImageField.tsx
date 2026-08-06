@@ -11,8 +11,9 @@
  */
 
 import { useState, type CSSProperties } from "react";
-import { Button, cn, Camera, ImageIcon } from "@4dl/ui";
-import { api, ApiError, uploadMedia } from "./api.js";
+import { Button, cn, Camera, ImageIcon, UploadProgress } from "@4dl/ui";
+import { useUpload } from "@4dl/app-kit";
+import { api, ApiError } from "./api.js";
 import { AiAvatar } from "./AiAvatar.js";
 
 type ImageFeature = "food-image" | "exercise-image";
@@ -32,21 +33,20 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
   /** Externally-driven "creating" state (e.g. a parent generating both frames). */
   loading?: boolean;
 }) {
-  const [uploading, setUploading] = useState(false);
+  const up = useUpload();
   const [generating, setGenerating] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const purpose = feature === "food-image" ? "food" : "exercise";
-  const busy = uploading || generating || loading;
+  const busy = up.uploading || generating || loading;
   const creating = generating || loading;
 
   const upload = async (file: File) => {
-    setUploading(true); setErr(null);
-    try {
-      const key = await uploadMedia(file, purpose);
-      onChange(`/api/media/${key}`);
-    } catch {
-      setErr("Couldn't upload that image — try again.");
-    } finally { setUploading(false); }
+    setErr(null);
+    const key = await up.upload(file, purpose, { filename: file.name });
+    if (key) onChange(`/api/media/${key}`);
+    // `useUpload` distinguishes a cancel from a failure, so a cancelled upload
+    // leaves no error behind and this line stays silent for it.
+    else if (up.error) setErr("Couldn't upload that image — try again.");
   };
 
   const generate = async () => {
@@ -70,8 +70,6 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
           <AiAvatar className="size-6 animate-pulse" />
           <span className="text-xs font-medium">Creating…</span>
         </div>
-      ) : uploading ? (
-        <span className="size-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
       ) : value ? (
         // A photo fills its frame — and an EDITOR preview must show what the app
         // will show, or the coach picks a crop they never see. See @4dl/ui
@@ -81,6 +79,7 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
         <Camera className="size-6" />
       )}
       <input type="file" accept="image/*" capture="environment" className="hidden" disabled={busy} onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
+      <UploadProgress phase={up.phase} progress={up.progress} onCancel={up.cancel} />
     </label>
   );
 

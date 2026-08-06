@@ -6,7 +6,7 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, monogramFor, renderMarkPng, markRuns, brandMark, MARK_WEIGHT, MARK_SOFT_ALPHA, MARK_TINT_ALPHA, RefreshCw, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type WordmarkStyle, type MarkPlate, type MarkRun, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
+import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, monogramFor, renderMarkPng, markRuns, brandMark, MARK_WEIGHT, MARK_SOFT_ALPHA, MARK_TINT_ALPHA, RefreshCw, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, UploadProgress, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type WordmarkStyle, type MarkPlate, type MarkRun, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
 import { personaLabel, personaTone } from "../registry/index.js";
 import { KOVA_TOKEN_GROUPS, DEFAULT_ACCENT_TOKENS, MACRO_SPEC } from "../registry/tones.js";
 
@@ -29,7 +29,7 @@ import { PreferencesEditorCard } from "./PreferencesEditor.js";
 import { INSIGHT_LABELS, mutedInsights, unmuteInsight } from "./client/InsightFeedback.js";
 import { useTheme } from "../theme.js";
 import { api, errorText, uploadMedia } from "../api.js";
-import { PasskeysCard } from "@4dl/app-kit";
+import { PasskeysCard, useUpload } from "@4dl/app-kit";
 import { usePasskey } from "../PasskeyPrompt.js";
 import { AiConfigSection } from "./AiSettings.js";
 import { SectionSplit } from "./SectionSplit.js";
@@ -294,14 +294,29 @@ function PersonalSettings({ clientId, initialTab, onBack, onSaved }: {
         </Card>
       </Stagger>
 
+      {/*
+        EVERY GROUP IS NAMED, AND THAT IS THE POINT OF GROUPING.
+
+        These two were split — one break above Passkeys — with no headers on
+        either, so the break read as a rendering accident rather than as a
+        boundary. Meanwhile `AccountExits` below carried "Account", which made
+        the omission look deliberate: one titled group and two untitled ones
+        above it. A group with no name is a horizontal rule.
+      */}
       <SettingsIndex
         groups={[
-          { rows: shown.filter((x) => x.value !== "security").map((x) => ({
+          {
+            header: "You",
+            rows: shown.filter((x) => x.value !== "security").map((x) => ({
               key: x.value, icon: x.icon, tone: x.tone, label: x.label, sub: x.blurb, onClick: () => go(x.value),
-            })) },
-          { rows: shown.filter((x) => x.value === "security").map((x) => ({
+            })),
+          },
+          {
+            header: "Signing in",
+            rows: shown.filter((x) => x.value === "security").map((x) => ({
               key: x.value, icon: x.icon, tone: x.tone, label: x.label, sub: x.blurb, onClick: () => go(x.value),
-            })) },
+            })),
+          },
         ]}
       />
 
@@ -380,6 +395,7 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
     <SettingsIndex
       groups={[
         {
+          header: "Your studio",
           rows: sections.filter((x) => x.key !== "danger").map((x) => ({
             key: x.key,
             icon: STUDIO_SECTION_ICON[x.key] ?? SettingsIcon,
@@ -390,6 +406,9 @@ function StudioSettings({ canBrand }: { canBrand: boolean }) {
           })),
         },
         {
+          // Named like every other group. It was the one below the break and it
+          // is the one where knowing what you are about to open matters most.
+          header: "Danger zone",
           rows: sections.filter((x) => x.key === "danger").map((x) => ({
             key: x.key,
             icon: Trash2,
@@ -773,11 +792,14 @@ function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBr
   const [showPasskey, setShowPasskey] = useState(initial?.showPasskey !== false);
   const act = useAction();
 
-  const upload = (file: File) =>
-    act.run("upload", async () => {
-      const key = await uploadMedia(file, "brand", file.name);
-      setBgImageUrl(`/api/media/${key}`);
-    }, "Couldn't upload that image — try again.");
+  // A hero background is a full-bleed photo, so it is a big file on a slow
+  // connection more often than not — `useUpload` puts a number on it instead of
+  // dimming the button for however long it takes.
+  const up = useUpload();
+  const upload = async (file: File) => {
+    const key = await up.upload(file, "brand", { filename: file.name });
+    if (key) setBgImageUrl(`/api/media/${key}`);
+  };
 
   const save = () =>
     act.run("save", async () => {
@@ -809,12 +831,13 @@ function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBr
         <div className="space-y-2">
           <div className="text-sm font-medium">Background image <span className="font-normal text-muted-foreground">— optional</span></div>
           <div className="flex items-center gap-3">
-            <div className="grid h-16 w-24 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
+            <div className="relative grid h-16 w-24 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
               {bgImageUrl ? <img src={bgImageUrl} alt="Background" className="size-full object-cover" /> : <ImageIcon className="size-5 text-muted-foreground" />}
+              <UploadProgress phase={up.phase} progress={up.progress} onCancel={up.cancel} />
             </div>
             <div className="flex flex-1 flex-wrap gap-2">
               <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
-                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
+                <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={up.uploading} onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
               </label>
               {bgImageUrl && <Button size="icon" variant="secondary" aria-label="Remove background" onClick={() => setBgImageUrl(null)}><Trash2 /></Button>}
             </div>
@@ -844,7 +867,7 @@ function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBr
  * Deliberately quiet and secondary. Most studios use a full-colour mark that
  * needs no second file, and a slot that shouts implies a step everyone owes.
  */
-function LightVariant({ label, url, fallback, wide, onUpload, onClear }: {
+function LightVariant({ label, url, fallback, wide, onUpload, onClear, progress }: {
   label: string;
   url: string | null;
   /** The dark mark, previewed on white when no override is set. */
@@ -852,6 +875,8 @@ function LightVariant({ label, url, fallback, wide, onUpload, onClear }: {
   wide?: boolean;
   onUpload: (f: File) => void;
   onClear: () => void;
+  /** This slot's upload overlay, supplied by the parent (it owns the uploader). */
+  progress?: ReactNode;
 }) {
   const shown = url || fallback;
   // design-tokens-exempt: sits on the literal-white plate below, where a themed
@@ -863,7 +888,8 @@ function LightVariant({ label, url, fallback, wide, onUpload, onClear }: {
           asks one question — does your mark survive a light background? — and a
           token surface would follow the theme and answer it only half the time,
           which is the failure the whole control exists to catch. */}
-      <div className={cn("grid shrink-0 place-items-center overflow-hidden rounded-lg border border-black/10 bg-white", wide ? "h-12 w-20" : "size-12")}>
+      <div className={cn("relative grid shrink-0 place-items-center overflow-hidden rounded-lg border border-black/10 bg-white", wide ? "h-12 w-20" : "size-12")}>
+        {progress}
         {shown
           ? <img src={shown} alt="" className={wide ? "max-h-10 max-w-18 object-contain" : "size-full object-cover"} />
           : emptyMark}
@@ -1452,14 +1478,21 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
   }, [clientId, reloadKey]);
   const set = (patch: Partial<ClientProfile>) => setP((c) => (c ? { ...c, ...patch } : c));
   const hFt = p?.heightCm != null ? cmToFeetInches(p.heightCm) : null;
-  const uploadAvatar = (file: File) =>
-    act.run("avatar", async () => {
-      const key = await uploadMedia(file, "avatar");
-      const url = `/api/media/${key}`;
-      await api.post(`/api/clients/${clientId}/avatar`, { avatarUrl: url });
-      set({ avatarUrl: url, avatarSeed: null });
-      onSaved();
-    }, "Couldn't upload that image — try again.");
+  /*
+    A PHOTO STRAIGHT OFF A PHONE CAMERA IS SEVERAL MEGABYTES, and this is the
+    upload most people in this product will ever do. It showed nothing at all
+    while it went — `act.run` only disables its own button, and the button is
+    not what you are looking at; the face is.
+  */
+  const avatarUp = useUpload();
+  const uploadAvatar = async (file: File) => {
+    const key = await avatarUp.upload(file, "avatar", { filename: file.name });
+    if (!key) return;
+    const url = `/api/media/${key}`;
+    await api.post(`/api/clients/${clientId}/avatar`, { avatarUrl: url });
+    set({ avatarUrl: url, avatarSeed: null });
+    onSaved();
+  };
   const save = () => {
     if (!p) return;
     return act.run("save", async () => {
@@ -1482,19 +1515,35 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
           <Skeleton className="h-11 w-full rounded-full" />
         </Card>
       }>
+        {/* Three cards, not one — the same reason as the preferences editor.
+            Who you are, what your targets are computed from, and how to reach
+            you are three subjects, and a single box around all eight controls
+            says they are one. ONE SaveBar under all of them: it is one PATCH,
+            so a split submit could leave a half-saved profile. */}
         {p && (
+      <div className="space-y-4">
       <Card className="space-y-4">
         <div className="flex items-center gap-3">
-          <Avatar {...clientAvatar({ ...p, id: clientId })} className="size-16" />
+          {/* The progress sits ON the face, which is what someone watches while
+              their photo uploads — not on the button that started it. */}
+          <div className="relative size-16 shrink-0 overflow-hidden rounded-full">
+            <Avatar {...clientAvatar({ ...p, id: clientId })} className="size-16" />
+            <UploadProgress phase={avatarUp.phase} progress={avatarUp.progress} onCancel={avatarUp.cancel} />
+          </div>
           <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Change photo
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAvatar(e.target.files[0])} />
+            <input type="file" accept="image/*" className="hidden" disabled={avatarUp.uploading} onChange={(e) => e.target.files?.[0] && void uploadAvatar(e.target.files[0])} />
           </label>
         </div>
+        {avatarUp.error && <p className="text-xs text-warning">{avatarUp.error}</p>}
         <Field label="Name" value={p.displayName} onChange={(e) => set({ displayName: e.target.value })} />
         <div>
           <Field label="Email" value={p.email ?? email} disabled />
           <p className="mt-1 px-1 text-xs text-muted-foreground">Contact your coach to change your email.</p>
         </div>
+      </Card>
+
+      <Card className="space-y-4">
+        <div className="text-sm font-semibold">Body basics <span className="font-normal text-muted-foreground">— your targets are calculated from these</span></div>
         <Field label="Date of birth" type="date" value={p.dateOfBirth ?? ""} onChange={(e) => set({ dateOfBirth: e.target.value || null })} />
         {units.height === "ft_in" ? (
           <div className="grid grid-cols-2 gap-3">
@@ -1507,13 +1556,18 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Gender</label>
           <div className="flex gap-2">{([["male", "Male"], ["female", "Female"]] as const).map(([v, l]) => <Chip key={v} selected={p.gender === v} onClick={() => set({ gender: v })}>{l}</Chip>)}</div>
-          <p className="mt-1 px-1 text-xs text-muted-foreground">Used to calculate your calorie and macro targets.</p>
         </div>
+      </Card>
+
+      <Card className="space-y-4">
+        <div className="text-sm font-semibold">Health &amp; contact</div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Blood type</label>
           <div className="flex flex-wrap gap-2">{BLOOD_TYPES.map((b) => <Chip key={b} selected={p.bloodType === b} onClick={() => set({ bloodType: p.bloodType === b ? null : b })}>{b}</Chip>)}</div>
         </div>
         <Field label="Contact number" type="tel" inputMode="tel" value={p.phone ?? ""} onChange={(e) => set({ phone: e.target.value || null })} placeholder="+1 555 000 0000" />
+      </Card>
+
         <SaveBar
           label="Save profile"
           saving={act.busy === "save"}
@@ -1522,7 +1576,7 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
           err={act.err}
           onSave={() => void save()}
         />
-      </Card>
+      </div>
         )}
       </Reveal>
       )}
@@ -1532,13 +1586,22 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
 
 /** A client's training & nutrition preferences — delegates to the shared editor
  *  (the coach edits the same fields from the client's Manage tab). */
+/*
+  NO EYEBROW, NO SECOND INTRO — the page already said both.
+
+  `SettingsPage` renders the title ("Training & nutrition") and one line of
+  description. This wrapper added an eyebrow repeating that exact title, and the
+  editor below it added a second paragraph saying the same thing in different
+  words. Three layers of chrome above the first control, two of them saying
+  what the first one said (§7: the page already has a title; one line of
+  introduction, at most).
+
+  The editor's own intro survives where it is the ONLY context — the coach's
+  Manage tab, which has no page description — so it is conditional there rather
+  than removed.
+*/
 function PreferencesSection({ clientId, onSaved }: { clientId: string; onSaved: () => void }) {
-  return (
-    <section>
-      <h3 className="mb-2 px-1 text-micro uppercase text-muted-foreground">Training &amp; nutrition</h3>
-      <PreferencesEditorCard clientId={clientId} onSaved={onSaved} />
-    </section>
-  );
+  return <section><PreferencesEditorCard clientId={clientId} onSaved={onSaved} /></section>;
 }
 
 const UNIT_ROWS: { key: string; label: string; options: { value: string; label: string }[] }[] = [
@@ -2246,15 +2309,33 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
       return "Drawn for light, dark and the home screen. Save to keep them.";
     }, "Couldn't draw the marks.");
 
-  const uploadAsset = async (file: File, setter: (url: string) => void) => {
+  /*
+    FIVE SLOTS, ONE UPLOADER, so the progress has to say WHICH.
+
+    Logo, light logo, icon, light icon and the AI face all upload the same way,
+    and a single shared "uploading" flag would light up all five frames at once.
+    `assetSlot` names the one in flight; each frame renders the overlay only for
+    itself.
+  */
+  const assetUp = useUpload();
+  const [assetSlot, setAssetSlot] = useState<string | null>(null);
+  const uploadAsset = async (file: File, setter: (url: string) => void, slot = "logo") => {
     setMsg(null);
-    // Tenant asset (no clientId) — route through uploadMedia for 401 handling +
+    setAssetSlot(slot);
+    // Tenant asset (no clientId) — route through the kit for 401 handling +
     // error surfacing instead of a bare fetch that silently no-ops.
     try {
-      const key = await uploadMedia(file, "brand", file.name);
-      setter(`/api/media/${key}`);
-    } catch { setMsg("Couldn't upload that image — try again."); }
+      const key = await assetUp.upload(file, "brand", { filename: file.name });
+      if (key) setter(`/api/media/${key}`);
+      else if (assetUp.error) setMsg("Couldn't upload that image — try again.");
+    } finally {
+      setAssetSlot(null);
+    }
   };
+  /** The overlay for one slot — nothing at all unless that slot is uploading. */
+  const slotProgress = (slot: string) => (
+    <UploadProgress phase={assetSlot === slot ? assetUp.phase : "idle"} progress={assetUp.progress} onCancel={assetUp.cancel} />
+  );
 
   const extractFromLogo = () => {
     if (!logoUrl) return;
@@ -2379,12 +2460,13 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
         <div className="space-y-2">
           <div className="text-sm font-medium">Logo <span className="font-normal text-muted-foreground">— app bar</span></div>
           <div className="flex items-center gap-3">
-            <div className="grid h-16 w-24 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
+            <div className="relative grid h-16 w-24 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
               {logoUrl ? <img src={logoUrl} alt="Logo" className="max-h-14 max-w-22 object-contain" /> : <ImageIcon className="size-5 text-muted-foreground" />}
+              {slotProgress("logo")}
             </div>
             <div className="flex flex-1 flex-wrap gap-2">
               <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
-                <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setLogoUrl)} />
+                <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setLogoUrl, "logo")} />
               </label>
               <Button size="sm" variant="secondary" disabled={!logoUrl} onClick={extractFromLogo}><Wand2 /> Theme from logo</Button>
               {logoUrl && <Button size="icon" variant="secondary" aria-label="Remove logo" onClick={() => setLogoUrl(null)}><Trash2 /></Button>}
@@ -2395,7 +2477,8 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
             url={logoUrlLight}
             fallback={logoUrl}
             wide
-            onUpload={(f) => void uploadAsset(f, setLogoUrlLight)}
+            onUpload={(f) => void uploadAsset(f, setLogoUrlLight, "logoLight")}
+            progress={slotProgress("logoLight")}
             onClear={() => setLogoUrlLight(null)}
           />
         </div>
@@ -2404,12 +2487,13 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
         <div className="space-y-2">
           <div className="text-sm font-medium">App icon <span className="font-normal text-muted-foreground">— square, nav + tab</span></div>
           <div className="flex items-center gap-3">
-            <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
+            <div className="relative grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
               {iconUrl ? <img src={iconUrl} alt="App icon" className="size-full object-cover" /> : <ImageIcon className="size-5 text-muted-foreground" />}
+              {slotProgress("icon")}
             </div>
             <div className="flex flex-1 flex-wrap gap-2">
               <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
-                <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setIconUrl)} />
+                <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setIconUrl, "icon")} />
               </label>
               {iconUrl && <Button size="sm" variant="secondary" disabled={!iconUrl} onClick={() => { const img = new Image(); img.onload = () => { const p = extractPalette(img); if (p) { generate(p.primary); setMsg("Palette generated from your icon."); } }; img.src = iconUrl; }}><Wand2 /> Theme from icon</Button>}
               {iconUrl && <Button size="icon" variant="secondary" aria-label="Remove icon" onClick={() => setIconUrl(null)}><Trash2 /></Button>}
@@ -2419,7 +2503,8 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
             label="Light-mode icon"
             url={iconUrlLight}
             fallback={iconUrl}
-            onUpload={(f) => void uploadAsset(f, setIconUrlLight)}
+            onUpload={(f) => void uploadAsset(f, setIconUrlLight, "iconLight")}
+            progress={slotProgress("iconLight")}
             onClear={() => setIconUrlLight(null)}
           />
         </div>
@@ -2429,14 +2514,15 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
         <div className="space-y-2">
           <div className="text-sm font-medium">AI coach <span className="font-normal text-muted-foreground">— its face + name across every AI surface</span></div>
           <div className="flex items-center gap-3">
-            <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border border-border/60 bg-surface-2">
+            <div className="relative grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border border-border/60 bg-surface-2">
               <img src={aiAvatarUrl ?? dicebearUrl(`${ctx?.active?.tenantSlug ?? "kova"}-ai-coach`, "bottts")} alt="AI coach" className="size-full object-cover" />
+              {slotProgress("aiAvatar")}
             </div>
             <div className="flex flex-1 flex-col gap-2">
               <input value={aiName} onChange={(e) => setAiName(e.target.value)} maxLength={40} placeholder="AI name (e.g. Nova, Coach K) — defaults to “Coach”" className="h-9 w-full rounded-full border border-border/60 bg-surface-2 px-3.5 text-sm outline-none focus:border-primary" />
               <div className="flex flex-wrap gap-2">
                 <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload avatar
-                  <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setAiAvatarUrl)} />
+                  <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setAiAvatarUrl, "aiAvatar")} />
                 </label>
                 {/* Keep pressing until one of them is right.
                     The robot is drawn deterministically from a SEED, so the
