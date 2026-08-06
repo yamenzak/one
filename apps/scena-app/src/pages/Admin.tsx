@@ -236,6 +236,13 @@ function StripeTab() {
       await setAdminConfig(cfg!);
       setPing(await stripePing());
       toast.success("Settings saved.");
+    } catch (e) {
+      // The server refuses some values outright — `ai.mock = "on"` outside
+      // development is the first. Without this catch the rejection went to the
+      // app-wide "something went wrong" toast, which tells an operator nothing
+      // about WHICH field was refused or why, and the form kept showing the
+      // value that was never stored.
+      toast.error(e instanceof Error ? e.message : "Could not save settings.");
     } finally {
       setBusy(false);
     }

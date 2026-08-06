@@ -1177,6 +1177,10 @@ export interface BillingState {
   plans: Plan[];
   packs: Pack[];
   ledger: LedgerEntry[];
+  /** Media stored against the plan's `storageMb` ceiling. `limitBytes < 0` =
+   *  unlimited. Optional so a client built against an older worker still
+   *  renders rather than crashing on a missing field. */
+  storage?: { usedBytes: number; limitBytes: number };
   stripeEnabled: boolean;
 }
 

@@ -70,6 +70,18 @@ export interface Quotas {
   /** Distinct licensed-library tracks a tenant may use at once (-1 = unlimited). */
   libraryTracks: number;
   /**
+   * Megabytes of uploaded + generated media the workspace may hold at once
+   * (-1 = unlimited). Enforced on every R2 write by `storage.ts`.
+   *
+   * New in Stage 5, and it is the first ceiling on the one resource Scena's
+   * customers consume without limit: a signage workspace uploads video. There
+   * was no quota because there was no ledger to count against — R2 has no
+   * queryable metadata, so nothing in the product could answer "how much is
+   * this workspace storing?". `media_assets` (`@4dl/storage`) is that answer,
+   * and this is the line it is measured against.
+   */
+  storageMb: number;
+  /**
    * People who can sign in to the dashboard — the OWNER INCLUDED, because the
    * label is "owner + staff". A one-seat plan is a one-person tenant by design.
    *
@@ -179,6 +191,11 @@ export const FREE_ENTITLEMENTS: Entitlements = {
     stations: 0,
     boardsPerStation: 1,
     libraryTracks: 0,
+    // 100 MB — enough for a handful of images and a short loop, not enough to
+    // park a media library on the tier nobody pays for. This is also what a
+    // SUSPENDED workspace clamps to, which is the right shape: their existing
+    // media stays served (reads are never gated), they just cannot add more.
+    storageMb: 100,
   },
   features: {
     ticker: false,

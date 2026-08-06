@@ -160,6 +160,14 @@ export const QUOTA_CATALOG: QuotaDef[] = [
   { key: "stations", label: "Stations", description: "Board station groupings." },
   { key: "boardsPerStation", label: "Boards / station", description: "Boards each station may hold." },
   { key: "libraryTracks", label: "Library tracks", description: "Distinct licensed tracks in use (-1 = unlimited)." },
+  {
+    key: "storageMb",
+    label: "Media storage",
+    description: "Megabytes of uploaded + generated media held at once (-1 = unlimited).",
+    // Shown in gigabytes above 1 GB, because "20000 MB" is a number nobody
+    // reads as an amount of video.
+    billing: (n) => (n < 0 ? "Unlimited media storage" : n >= 1000 ? `${Math.round(n / 1000)} GB of media storage` : `${n} MB of media storage`),
+  },
 ];
 
 const FEATURE_BY_KEY = new Map(FEATURE_CATALOG.map((f) => [f.key, f]));

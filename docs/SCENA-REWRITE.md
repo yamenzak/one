@@ -412,13 +412,111 @@ Mutation-tested.
   resolver, so both gates share one source — but the conformance test asserting
   every gated feature is checked at compile as well as at write is not written.
 
-### Stage 5 — `@4dl/ai` + `@4dl/storage`
-`ai.ts`/`gemini.ts` onto the shared runner (Workers AI + Gemini + the mock
-lane). Media onto `@4dl/storage`'s ledger + quota gate.
-Scena's *prompts* stay Scena's; only the metered path moves.
+### Stage 5 — `@4dl/ai` + `@4dl/storage` ✅ DONE, and narrower than planned
 
-*Exit:* every generator metered through the shared reserve→settle; media quota
-enforced.
+Landed: the mock-lane gate, the credit meter, and the whole of storage. What did
+NOT move is named at the end, with why.
+
+**The mock lane was the reason this stage existed, and it was worse than the
+note said.** Scena's `mockMode()` read `app_config["ai.mock"]` and nothing else
+— no environment check in the function or at either call site — so THREE paths
+fabricated slides, posters, voice clips and music beds on a deployed worker and
+billed the workspace at the real model's rate for them:
+
+- `ai.mock = "on"`, offered as an ordinary dropdown value on the Admin screen.
+- **A missing `AI` binding.** `!env.AI` mocked unconditionally, and `AI` is
+  optional in `env.ts` — so a deploy that dropped the binding did not fail, it
+  started answering with stubs and invoicing for them.
+- **A provider failure in `"auto"`**, which swallowed the real error and rendered
+  a mock instead — precisely when an operator most needs to see it.
+
+`shouldUseMockLane` (`@4dl/ai`) puts `ENVIRONMENT === "development"` outside all
+three. The admin write path refuses `"on"` outside development too, because a
+setting that reads as on and does nothing is how an operator comes to believe
+they turned something on.
+
+**`credits.ts` was a fork, one revision behind.** `@4dl/billing/credits.ts` IS
+Scena's file — transplanted during the platform extraction and then hardened
+against a non-finite or negative usage figure a provider might report. Scena kept
+the unhardened original. Deleting it took 106 lines and 13 duplicate tests and
+picked up the guards.
+
+**Storage had no ledger, which means it had no anything.** Every R2 write was a
+bare `MEDIA.put(hash, bytes)`, in three places, and R2 has no queryable metadata
+— so nothing in the product could answer "how much is this workspace storing?".
+The consequences were all live:
+
+- **No quota, on any tier**, and no line in the plan catalog to sell one. A
+  signage customer uploads video.
+- **No provenance.** An object carried no tenant, no purpose, no uploader — so a
+  workspace's erasure could not find its files without walking the bucket, and
+  `@4dl/purge` (Stage 6) would have had nothing to derive from.
+- **`PUT /api/assets` accepted `image/svg+xml`** and `GET /api/assets/:hash`
+  served it back same-origin. An SVG is a document that carries `<script>`:
+  stored XSS with a file picker in front of it.
+- **No size limit.** `c.req.arrayBuffer()` materialises the whole body in the
+  isolate, so a large enough upload was an OOM, not a 413.
+- **Two of the three delete paths had no reference check at all** — deleting a
+  playlist with `?media=1` removed its slides' objects outright, blanking any
+  other playlist reusing one. The third checked, but scoped to the caller's
+  tenant, and the key is the content HASH: two workspaces that uploaded the same
+  file share one object, so tidying up in one blanked a slide in the other.
+
+**The key space stays content-addressed, and `@4dl/storage` grew one field for
+it.** A hash key is load-bearing three times over — the manifest references
+assets by it, the player caches `/api/assets/<hash>` immutably for months
+offline, and `library_tracks` is a platform-wide catalog every workspace draws
+from — so tenant-prefixing the key was not available. `PutMediaInput.ledgerKey`
+qualifies the LEDGER row instead (`<tenantId>:<hash>`): one row per tenant per
+object, one copy in the bucket. The bucket deduplicates; the accounting does
+not, which is the right way round — a workspace pays for what it references, not
+for what it happened to be first to upload. `deleteMedia` gained `keepObject`
+for the same reason, with the reference question left to the app because only
+the app knows its key space.
+
+`storageMb` joins the entitlements shape, the catalog and all four plans
+(100 MB free / 2 GB Starter / 20 GB Pro / 100 GB Business), is enforced on every
+write, and ships beside the credit balance on `/api/billing` — a quota nobody
+can see is a quota that surprises you.
+
+*Exit:* 192 tests (43 integration, up from 36). Six mutations verified
+non-vacuous: the hardcoded environment, a reintroduced bare R2 write, the quota
+resolver omitted from `putMedia` (the trap `@4dl/storage`'s README names), the
+ledger key ignored, the reference check narrowed back to one tenant, and SVG
+re-allowed. `scripts/storage-chokepoint.test.mjs` joins `pnpm gate` and asserts
+both invariants structurally, which is the only way to assert the second: no
+Workers-pool test can change the binding it would need to observe.
+
+**Still outstanding, and deliberately:**
+
+- **`generate()` itself does not move, and probably never will whole.**
+  `@4dl/ai`'s runner is text-in/text-out over four tasks
+  (`text | text-small | vision | image`); Scena's is media generation over five
+  (`text`→HTML, `tts`, `image`, `music`, `layout`). Forcing five into four means
+  rewriting the runner 548 Kova tests depend on, for a shape neither product
+  wants. What genuinely was shared — the mock decision and the credit meter —
+  moved; the prompts, the providers and the task vocabulary are Scena's, exactly
+  as the original plan said.
+- **The `ai_models` CATALOG stays Scena's**, for the `BILLING_SCHEMA` reason
+  again: Scena's table has a `cf_model` column (the provider id, separate from a
+  friendly `id`) and a `sort`, where `AI_SCHEMA`'s `id` IS the provider id and it
+  carries `provider`/`is_default`. Same `CREATE TABLE IF NOT EXISTS` collision,
+  same silent outcome. Adopting it means reconciling the column shapes first, and
+  that is a data change, not a wiring one. The cost of waiting is that Scena's
+  rates are hand-maintained rather than synced from the two pricing pages.
+- **`@4dl/storage`'s `mediaRoutes` are not adopted.** They authenticate the READ,
+  and a paired screen fetches its slides with no session at all. Scena's read
+  stays public — the hash is the capability, which is the same bargain the
+  manifest URL already makes — but it now carries `nosniff`, a
+  `default-src 'none'; sandbox` CSP, and `content-disposition: attachment` for
+  anything not inline-safe, which is what makes a stored SVG or HTML body inert.
+- **Per-test storage isolation is off in Scena's suite** (`vitest.config.ts`).
+  The pool asserts every storage file ends in `.sqlite`, and an R2 bucket that
+  has been written to leaves a `-shm` sidecar — deterministically, on the second
+  test in a file that puts an object. The suite never relied on isolation
+  (every test provisions its own workspace under a unique slug), so this costs
+  nothing, but it is a pool limitation worth knowing before adding a suite that
+  does.
 
 ### Stage 6 — `@4dl/email` + `@4dl/notify` + `@4dl/purge`
 Transactional mail, the alert inbox + bell, and derived GDPR erasure.

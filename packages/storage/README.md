@@ -28,6 +28,31 @@ The trap is real — `putMedia` takes the quota too, not just `storageUsage`.
 Passing it to one and not the other silently disables enforcement on the write
 path while the usage screen still reports a limit.
 
+## `ledgerKey` — when the object key is shared
+
+`media_assets.r2_key` is UNIQUE, which is right when the key carries the tenant
+(`t/<tenant>/…`): one object, one owner, one row, and a re-put updates it.
+
+Scena's keys are the SHA-256 of the bytes, and that is load-bearing three times
+over — the compiled manifest references an asset by hash, a screen caches
+`/api/assets/<hash>` immutably for months offline, and its track library is one
+set of objects every workspace draws from. Two workspaces uploading the same
+file therefore land on the same key, and with `r2_key` as the conflict target the
+second upload REWRITES the first one's row: the original owner's bytes silently
+stop counting against their quota and start counting against a stranger's.
+
+`ledgerKey` qualifies the row instead (`<tenantId>:<hash>`), so the bucket
+deduplicates and the accounting does not. That is the right way round — a tenant
+pays for what it references, not for what it happened to be first to upload.
+
+`deleteMedia`'s `keepObject` is the other half: it tombstones the row (releasing
+the quota) while leaving the bytes for whoever else still points at them. The
+package does not answer "does anything else reference this?", because only the
+app knows its key space — the ledger is quota accounting, not a reference count.
+
+Both default to the tenant-scoped behaviour, so an app with prefixed keys never
+thinks about either.
+
 ## Subjects
 
 `media_assets.subject_id` — the individual a file belongs to, so one person's

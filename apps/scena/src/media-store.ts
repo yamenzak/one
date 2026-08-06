@@ -9,6 +9,7 @@
  * the human-facing metadata + organization layer (name, tags, dimensions).
  */
 import { ensureSchema, DEMO_TENANT } from "./db.js";
+import { releaseAsset } from "./storage.js";
 
 function rid(prefix: string): string {
   const b = crypto.getRandomValues(new Uint8Array(6));
@@ -158,4 +159,36 @@ export async function mediaByHashes(db: D1Database, tenantId: string, hashes: st
  * referenced by live slides); this only drops the catalog card. */
 export async function deleteMedia(db: D1Database, id: string): Promise<void> {
   await db.prepare("DELETE FROM media WHERE id = ?").bind(id).run();
+}
+
+/**
+ * Release a workspace's claim on some content-addressed bytes: tombstone its
+ * storage-ledger row (so the quota comes back) and delete the R2 object only if
+ * nothing anywhere still references it.
+ *
+ * ⚠️ Call this AFTER `deleteMedia`, or the row being removed counts itself as a
+ * live reference and the object is never collected.
+ *
+ * ── The reference check is CROSS-TENANT, and that is the fix ────────────────
+ *
+ * Two of the three delete paths had no check at all: deleting a playlist with
+ * `?media=1` removed every one of its slides' objects outright, so a second
+ * playlist in the SAME workspace reusing one of those images went blank. The
+ * third checked, but scoped the check to the caller's tenant — and the key is
+ * the content hash, so two workspaces that uploaded the same file share one
+ * object. Tidying up in one of them would blank a slide in the other.
+ *
+ * One query, no tenant clause, answers both. The ledger row is tombstoned
+ * either way: the caller has stopped referencing the bytes, so they stop paying
+ * for them, whether or not anybody else still is.
+ */
+export async function releaseMediaBytes(
+  env: { DB: D1Database; MEDIA: R2Bucket },
+  tenantId: string,
+  hash: string | null,
+  deletedBy?: string | null,
+): Promise<void> {
+  if (!hash) return;
+  const others = await env.DB.prepare("SELECT 1 FROM media WHERE asset_hash = ? LIMIT 1").bind(hash).first();
+  await releaseAsset(env as never, tenantId, hash, Boolean(others), deletedBy);
 }

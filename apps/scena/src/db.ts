@@ -2,6 +2,7 @@ import { schemaGate, type SchemaModule } from "@4dl/core";
 import { AUTH_SCHEMA } from "@4dl/auth";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
 import { BILLING_RAIL_SCHEMA } from "@4dl/billing-rail/schema";
+import { STORAGE_SCHEMA } from "@4dl/storage";
 import { SCENA_SCHEMA, DEMO_TENANT } from "./schema.js";
 
 export { DEMO_TENANT };
@@ -73,6 +74,14 @@ export const SCHEMA_MODULES: readonly SchemaModule[] = [
     STORE moves when its 1,000 lines of queries do.
   */
   BILLING_RAIL_SCHEMA,
+  /*
+    `media_assets` — the ledger behind every stored object.
+
+    Purely ADDITIVE: Scena had no storage table at all, so there is nothing to
+    collide with. It arrives with its `scoped` declaration, which is what lets
+    `@4dl/purge` find a workspace's files in Stage 6 without walking the bucket.
+  */
+  STORAGE_SCHEMA,
   SCENA_SCHEMA,
 ];
 

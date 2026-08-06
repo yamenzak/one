@@ -68,6 +68,32 @@ export async function storageUsage(
 export interface PutMediaInput {
   tenantId: string;
   key: string;
+  /**
+   * The ledger's identity for this object, when it differs from the R2 key.
+   *
+   * ⚠️ Only set this for a CONTENT-ADDRESSED key space, and then always.
+   *
+   * `media_assets.r2_key` is UNIQUE, which is exactly right when the key
+   * carries the tenant (`t/<tenant>/…`, which is what Kova writes): one object,
+   * one owner, one row, and a re-put updates it in place.
+   *
+   * Scena's keys are the SHA-256 of the bytes, deliberately — the manifest
+   * references an asset by hash, the player caches it immutably forever, and the
+   * public track library is one set of objects every workspace draws from. Two
+   * workspaces uploading the same file therefore land on the same key, and with
+   * `r2_key` as the conflict target the second upload would REWRITE the first
+   * one's ledger row: the original owner's bytes would silently stop counting
+   * against their quota and start counting against a stranger's.
+   *
+   * Qualifying the ledger row (`<tenantId>:<hash>`) keeps one row per tenant per
+   * object, so usage stays per-tenant while the bucket still stores one copy.
+   * The bucket is deduplicated; the accounting is not, which is the correct way
+   * round — a workspace pays for what it references, not for what it happened to
+   * be first to upload.
+   *
+   * Defaults to `key`, so an app with tenant-scoped keys never thinks about it.
+   */
+  ledgerKey?: string;
   bytes: ArrayBuffer | Uint8Array;
   contentType: string;
   /** progress | lab | avatar | brand | food | exercise | label | meal-snap | misc | ai | tts */
@@ -91,7 +117,7 @@ async function recordAsset(db: D1Database, input: PutMediaInput, sizeBytes: numb
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
        ON CONFLICT(r2_key) DO UPDATE SET size_bytes = excluded.size_bytes, content_type = excluded.content_type, purpose = excluded.purpose, subject_id = excluded.subject_id, owner_user_id = COALESCE(media_assets.owner_user_id, excluded.owner_user_id), deleted_at = NULL, deleted_by = NULL`,
     )
-    .bind(newId("mda"), input.tenantId, input.subjectId ?? null, input.ownerUserId ?? null, input.key, input.purpose, input.contentType, sizeBytes, nowIso())
+    .bind(newId("mda"), input.tenantId, input.subjectId ?? null, input.ownerUserId ?? null, input.ledgerKey ?? input.key, input.purpose, input.contentType, sizeBytes, nowIso())
     .run()
     .catch(() => undefined);
 }
@@ -128,12 +154,36 @@ export async function putMedia(
   return { key: input.key, sizeBytes };
 }
 
-/** Delete one object + tombstone its ledger row. Best-effort (never throws). */
-export async function deleteMedia(env: StorageBindings, key: string, deletedBy?: string | null): Promise<void> {
-  await env.MEDIA.delete(key).catch(() => undefined);
+/** How a delete treats the two halves — the ledger row and the bytes. */
+export interface DeleteMediaOptions {
+  /** The ledger's identity for this object, when it is not the R2 key. See
+   *  `PutMediaInput.ledgerKey`. */
+  ledgerKey?: string;
+  /**
+   * Tombstone the ledger row but LEAVE the object in the bucket.
+   *
+   * Only meaningful in a content-addressed key space, where one object can be
+   * referenced by more than one tenant. Passing `true` says "this tenant has
+   * stopped referencing these bytes" — their quota is released, and somebody
+   * else's slide keeps rendering. The caller decides, because only the app
+   * knows what references its objects; the ledger is quota accounting, not a
+   * reference count.
+   */
+  keepObject?: boolean;
+}
+
+/** Release one object: tombstone its ledger row and (unless the key is shared
+ *  and still referenced) delete the bytes. Best-effort — never throws. */
+export async function deleteMedia(
+  env: StorageBindings,
+  key: string,
+  deletedBy?: string | null,
+  opts: DeleteMediaOptions = {},
+): Promise<void> {
+  if (!opts.keepObject) await env.MEDIA.delete(key).catch(() => undefined);
   await env.DB
     .prepare("UPDATE media_assets SET deleted_at = ?, deleted_by = ? WHERE r2_key = ? AND deleted_at IS NULL")
-    .bind(nowIso(), deletedBy ?? null, key)
+    .bind(nowIso(), deletedBy ?? null, opts.ledgerKey ?? key)
     .run()
     .catch(() => undefined);
 }

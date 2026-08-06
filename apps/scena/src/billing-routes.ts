@@ -12,6 +12,8 @@
 
 import type { Context, Hono } from "hono";
 import type { Env } from "./env.js";
+import { mockModeSettable, type AiMockMode } from "@4dl/ai";
+import { storageUsage } from "./storage.js";
 import { DEMO_TENANT } from "./db.js";
 import {
   getConfig,
@@ -102,6 +104,36 @@ async function gatherUsage(env: Env, tenantId = DEMO_TENANT): Promise<Usage> {
   };
 }
 
+/**
+ * Why an operator's config write might be refused — a message, or null to store.
+ *
+ * Pure, exported and tested directly (`test/mock-lane.test.ts`) because the
+ * branch that matters is the one the integration suite structurally cannot
+ * reach: it runs with `ENVIRONMENT: "development"`, and a Workers-pool binding
+ * is fixed for the whole runtime. A guard whose production branch is never
+ * executed by anything is a guard nobody has checked.
+ *
+ * ── `ai.mock = "on"` is a DEVELOPMENT override ─────────────────────────────
+ *
+ * The generation path already refuses to mock outside development (`mayMock` in
+ * ai.ts), so storing "on" in production would be inert rather than dangerous.
+ * Refusing it anyway is the difference between a setting that does nothing and
+ * an operator who believes they turned something on: the console offered this
+ * as an ordinary dropdown value, and before the gate it did exactly what it
+ * said — fabricated slides, posters and voice clips, billed at the real model's
+ * rate and filed in the Media Library as ordinary assets.
+ *
+ * Refused with a reason rather than dropped, because a silently ignored field
+ * is how a config screen comes to lie about the state it displays.
+ */
+export function configWriteRefusal(config: Record<string, string>, isDevelopment: boolean): string | null {
+  const mode = config["ai.mock"];
+  if (mode !== undefined && !mockModeSettable(mode as AiMockMode, isDevelopment)) {
+    return "ai.mock=on is a development-only setting";
+  }
+  return null;
+}
+
 export function registerBilling(app: App): void {
   /* ------------------------------ identity ------------------------------- */
   // Public probe: returns the resolved session so the dashboard can bootstrap
@@ -146,13 +178,17 @@ export function registerBilling(app: App): void {
     // Idempotent monthly grant so the balance reflects the plan on first view.
     await grantForTenant(c.env, t).catch(() => 0);
     const sub = await getSubscription(c.env.DB, t);
-    const [plan, plans, packs, balance, ledger, ent] = await Promise.all([
+    const [plan, plans, packs, balance, ledger, ent, storage] = await Promise.all([
       getPlan(c.env.DB, sub.plan_id),
       listPlans(c.env.DB),
       listPacks(c.env.DB),
       balanceOf(c.env, t),
       listLedger(c.env.DB, t, 30),
       tenantEntitlements(c.env.DB, t),
+      // Shipped beside the balance because they are the same kind of fact: two
+      // meters the plan sets a ceiling on. A quota nobody can see is a quota
+      // that surprises you at the moment you most need the upload to work.
+      storageUsage(c.env, t),
     ]);
     const cfg = await stripeCfg(c.env);
     return c.json({
@@ -163,6 +199,7 @@ export function registerBilling(app: App): void {
       plans: plans.filter((p) => p.active === 1),
       packs,
       ledger,
+      storage,
       stripeEnabled: stripeEnabled(cfg),
     });
   });
@@ -389,6 +426,8 @@ export function registerBilling(app: App): void {
     // Ignore masked values the client echoed back unchanged.
     const clean: Record<string, string> = {};
     for (const [k, v] of Object.entries(entries)) if (!v.includes("••")) clean[k] = v;
+    const refusal = configWriteRefusal(clean, c.env.ENVIRONMENT === "development");
+    if (refusal) return c.json({ error: refusal }, 400);
     await setConfig(c.env.DB, clean);
     return c.json({ ok: true });
   });

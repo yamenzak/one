@@ -876,24 +876,44 @@ a DEVICE: one pinned URL, Service-Worker-cached, running for months offline. It
 resolves NO tenant from its host — the tenant arrives from the pairing claim. A
 tenant subdomain would give every studio's screens a different address, so
 re-pairing would orphan the cache and custom domains would multiply certificates
-by the size of the fleet. Stage 3 adds a `device` door to `@4dl/tenancy` for
-exactly this; until then the player worker binds no D1 or R2 of its own.
+by the size of the fleet. Stage 3 added the `device` door to `@4dl/tenancy` for
+exactly this (`play.` — opt-in per app, because `play` is a slug a Kova studio
+can hold today); the player worker still binds no D1 or R2 of its own.
 
-**Status: Stage 1 done.** Stage 0 landed it; Stage 1 put its schema on
-`@4dl/core`'s composed runner and its config on the SHARED platform store — so
-Scena now reads the same Google key, Stripe account and Turnstile widget as
-every other 4DL app, and `SCHEMA_MODULES` in `apps/scena/src/db.ts` is the
-migration's progress bar (one entry today; each stage moves tables out of
-`SCENA_SCHEMA` and adds its package there, in the same commit). Its resource ids are
-deliberately placeholders (the old account's real ids were replaced), so
-`deploy.yml` skips it until the Provision workflow runs. Stages 2–9 are the
-rest of the rewiring; the plan has the order and the reasoning.
+**Status: Stages 0–5 done; 6–9 remain.** `SCHEMA_MODULES` in
+`apps/scena/src/db.ts` is the migration's progress bar — five entries now
+(`AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_RAIL_SCHEMA`, `STORAGE_SCHEMA`,
+`SCENA_SCHEMA`), and the diff that removes a table from Scena's module is the
+same diff that adds its package there. Its resource ids are deliberately
+placeholders (the old account's real ids were replaced), so `deploy.yml` skips
+it until the Provision workflow runs.
 
-⚠️ **`apps/scena/test/schema-module.test.ts` reads the ORIGINAL `db.ts` out of
-git** and asserts all 100 DDL statements survived the port. It is there because
-the port silently dropped ten of them — every statement whose SQL quotes an
-identifier (`"user"`, `"member"`…), which is all seven Better Auth tables — and
-a schema missing `"user"` is not a test failure anywhere, it is sign-in
-returning 500 on a fresh database, later. **Delete that test at the end of Stage
-2**, when the auth tables move to `@4dl/auth` and the comparison stops being
-right.
+Two things are DELIBERATELY still Scena's, both for the same reason, and the
+plan names them so nobody "fixes" them casually: the billing STORE
+(`BILLING_SCHEMA`) and the `ai_models` CATALOG (`AI_SCHEMA`). Both packages'
+tables share a NAME with Scena's and differ in COLUMNS — `price_cents` +
+`currency` + `interval` against `price_usd_month`, a `cf_model` column against
+an `id` that IS the provider id. A `CREATE TABLE IF NOT EXISTS` is won by
+whichever module runs first and the loser's columns silently never exist, which
+is exactly how a fresh Stage 1 deployment ended up unable to save any setting
+(`app_config.updated_at`). Adopting either means reconciling the shapes first,
+which is a data change rather than a wiring one.
+
+⚠️ **Scena's R2 key is the CONTENT HASH, and that is not a detail to tidy.** The
+compiled manifest references an asset by hash, the player caches
+`/api/assets/<hash>` immutably for months offline, and `library_tracks` is a
+platform-wide catalog every workspace draws from — so a tenant-prefixed key
+would break all three. `@4dl/storage`'s ledger row is qualified instead
+(`PutMediaInput.ledgerKey` = `<tenantId>:<hash>`): one row per tenant per
+object, one copy in the bucket. The bucket deduplicates; the accounting does
+not. `apps/scena/src/storage.ts` is the ONE module that may touch `MEDIA`, and
+`scripts/storage-chokepoint.test.mjs` (in `pnpm gate`) fails on a bare
+`MEDIA.put` anywhere else — an object written behind the ledger is invisible to
+the quota and to erasure, forever, and nothing else would notice.
+
+That same guard asserts the AI MOCK LANE is gated on `ENVIRONMENT`, structurally,
+because no Workers-pool test can change the binding it would need to observe.
+Scena shipped three paths that fabricated output in production and billed for
+it — `ai.mock = "on"` from the console, a missing `AI` binding, and a provider
+failure falling back in `"auto"` — and all three typechecked and passed every
+test, because the suites run in development where mocking is correct.

@@ -242,6 +242,9 @@ importers:
 
   apps/scena:
     dependencies:
+      '@4dl/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@4dl/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -254,6 +257,9 @@ importers:
       '@4dl/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@4dl/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@4dl/tenancy':
         specifier: workspace:*
         version: link:../../packages/tenancy

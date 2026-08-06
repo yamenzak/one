@@ -51,6 +51,10 @@ const base = (over: Partial<Entitlements["quotas"]>, feat: Partial<Entitlements[
     stations: 0,
     boardsPerStation: 1,
     libraryTracks: 0,
+    // Megabytes of media the workspace may hold. New in Stage 5 — see
+    // entitlements.ts. Sized off what each tier's device count implies: a
+    // 15-screen Pro workspace runs real video, a free one runs a poster.
+    storageMb: 100,
     // Was its own `sync` axis. See entitlements.ts — an unknown top-level axis
     // is not merged by the engine, so leaving it there froze every plan on the
     // free tier's 60 seconds.
@@ -100,7 +104,7 @@ export const DEFAULT_PLANS: PlanSeed[] = [
     interval: "month",
     sort: 1,
     entitlements: base(
-      { pairedDevices: 3, seats: 3, channelsPerProfile: 3, slidesPerPlaylist: 30, feeds: 2, feedRefreshMinSec: 1800, scheduleRules: 5, historyVersions: 10, libraryTracks: 10 },
+      { pairedDevices: 3, seats: 3, channelsPerProfile: 3, slidesPerPlaylist: 30, feeds: 2, feedRefreshMinSec: 1800, scheduleRules: 5, historyVersions: 10, libraryTracks: 10, storageMb: 2_000 },
       { ticker: true, dayparting: true, htmlSandbox: true, aiGeneration: true, musicLibrary: true },
       250,
       30,
@@ -127,6 +131,7 @@ export const DEFAULT_PLANS: PlanSeed[] = [
         stations: 3,
         boardsPerStation: 2,
         libraryTracks: 50,
+        storageMb: 20_000,
       },
       {
         ticker: true,
@@ -169,6 +174,7 @@ export const DEFAULT_PLANS: PlanSeed[] = [
         stations: 20,
         boardsPerStation: 6,
         libraryTracks: -1,
+        storageMb: 100_000,
       },
       {
         ticker: true,

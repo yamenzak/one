@@ -49,6 +49,26 @@ export default defineWorkersConfig({
     retry: 1,
     poolOptions: {
       workers: {
+        /*
+          ⚠️ PER-TEST STORAGE ISOLATION IS OFF, and it has to be for a suite
+          that writes R2.
+
+          The pool snapshots every storage backend between tests by copying the
+          SQLite files behind them, asserting each filename ends in `.sqlite`.
+          An R2 bucket that has been WRITTEN to leaves a `-shm` sidecar next to
+          its database while the connection is open, and the assertion fails on
+          it — `Expected .sqlite, got …sqlite-shm`, thrown from the pool's own
+          start-of-test hook, deterministically, on the SECOND test in a file
+          that puts an object. It is a pool limitation, not a flake: the retry
+          reproduces it exactly.
+
+          Turning isolation off costs this suite nothing, because it never
+          relied on it. Every test provisions its own workspace under a unique
+          slug and asserts against that workspace; `beforeAll` seeds the schema
+          and the plan catalog once, deliberately shared. What isolation would
+          add is a rollback nothing here wants.
+        */
+        isolatedStorage: false,
         wrangler: { configPath: "./wrangler.jsonc" },
         miniflare: {
           compatibilityFlags: ["nodejs_compat"],

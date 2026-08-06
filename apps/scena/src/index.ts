@@ -17,7 +17,7 @@ import { type AppEnv, type AppContext, sessionMiddleware, tenantOf, owns } from 
 import { routeGuard } from "./route-guard.js";
 import { domainRoutes, domainAdminRoutes, orgCreateGuard, orgUpdateGuard } from "./domain-routes.js";
 import { maintenanceMiddleware } from "@4dl/tenancy";
-import { contentHash, parseManifest, type Manifest } from "@scena/manifest";
+import { parseManifest, type Manifest } from "@scena/manifest";
 import { demoAssetSvg, DEFAULT_WIDGETS } from "./demo.js";
 import { provisionDisplay, provisionDisplayForScreen, seedSampleDisplay } from "./provision.js";
 import { registerScreen, listScreens, getScreen, parseTags, DEMO_TENANT } from "./db.js";
@@ -65,6 +65,45 @@ import { createAd, listAds, getAd, setAdEnabled, deleteAd, enabledAdSchedules, l
 import { listTracks, addTrack, deleteTrack, reorderTracks } from "./music-store.js";
 import { listLibrary, listGenres, getLibraryTrack, countLibraryUsage, canAddLibraryTrack } from "./library-store.js";
 import { weatherConfig, weatherConfigured, callsPerDay, geocode, listSources, getSource, createSource, updateSource, deleteSource, refreshSource, readCache, refreshStale, withinOpenHours } from "./weather-store.js";
+import { storeAsset, StorageQuotaError } from "./storage.js";
+
+/**
+ * The most one upload may weigh.
+ *
+ * 100 MB, which is a long 1080p loop and comfortably more than any still. It is
+ * a MEMORY bound as much as a policy one: `c.req.arrayBuffer()` materialises the
+ * whole body in the isolate, and a Worker has 128 MB, so an unbounded upload was
+ * an out-of-memory kill rather than a refusal. The plan's `storageMb` is the
+ * cumulative ceiling; this is the per-object one, and they are different
+ * questions — a workspace with 90 GB free still may not post a 2 GB file.
+ */
+const MAX_UPLOAD_BYTES = 100 * 1024 * 1024;
+
+/**
+ * What may be uploaded. A CLOSED set, because the store-then-serve pair below is
+ * same-origin.
+ *
+ * ⚠️ `image/svg+xml` IS ABSENT AND MUST STAY ABSENT. An SVG is a document that
+ * may contain `<script>`; served from this origin and opened directly it runs
+ * with the workspace's cookies. Every other vector-ish "just a picture" format
+ * (XML, HTML, PDF) is out for the same reason. `@4dl/storage`'s own routes make
+ * the identical exclusion — see its README.
+ */
+const UPLOADABLE_MIME = new Set([
+  "image/png", "image/jpeg", "image/webp", "image/avif", "image/gif",
+  "video/mp4", "video/webm",
+  "audio/mpeg", "audio/mp4", "audio/aac", "audio/ogg", "audio/wav", "audio/x-wav", "audio/webm",
+  "font/woff2",
+]);
+
+/** Types safe to render INLINE. Anything else is served `attachment`, so a
+ *  stored SVG or HTML body cannot become a page on this origin. */
+const INLINE_SAFE_MIME = new Set([
+  "image/png", "image/jpeg", "image/webp", "image/avif", "image/gif",
+  "video/mp4", "video/webm",
+  "audio/mpeg", "audio/mp4", "audio/aac", "audio/ogg", "audio/wav", "audio/x-wav", "audio/webm",
+  "font/woff2",
+]);
 
 export { ScreenDO } from "./screen-do.js";
 export { ChannelDO } from "./channel-do.js";
@@ -503,25 +542,77 @@ app.post("/api/channels/:id/rollback", async (c) => {
 
 /* ------------------------------- media (R2, §2) --------------------------- */
 
-/** Upload a media asset; stored in R2 by content hash (immutable, dedup). */
+/**
+ * Upload a media asset; stored in R2 by content hash (immutable, dedup) and
+ * recorded against the workspace's storage ledger.
+ *
+ * ── What this route used to be ─────────────────────────────────────────────
+ *
+ * `arrayBuffer()` → `MEDIA.put(hash, bytes)`, and nothing else. Four things
+ * were missing and each one was reachable by any operator with a session:
+ *
+ *   • **No tenant.** The object carried no owner, so nothing could count it,
+ *     bill it, or find it when the workspace asked to be erased.
+ *   • **No ceiling.** Unbounded upload on every tier, including free.
+ *   • **No size limit.** `c.req.arrayBuffer()` buffers the WHOLE body into the
+ *     isolate's memory before the first line of this handler runs, so a large
+ *     enough upload was an OOM rather than a 413.
+ *   • **No content-type rule** — including `image/svg+xml`, served back
+ *     same-origin from the route below. An SVG is a document: it carries
+ *     `<script>`, and navigating to `/api/assets/<hash>` runs it on the
+ *     workspace's own origin. Stored XSS with a file picker in front of it.
+ *     `@4dl/storage`'s routes refuse SVG for this exact reason and so does this.
+ */
 app.put("/api/assets", async (c) => {
+  const declared = Number(c.req.header("content-length") ?? 0);
+  // Refuse on the DECLARED length first — cheap, and it is the only check that
+  // can happen before the body is buffered. The real check is below, on the
+  // bytes actually read, because a content-length header is a client claim.
+  if (declared > MAX_UPLOAD_BYTES) return c.json({ error: "too large", maxBytes: MAX_UPLOAD_BYTES }, 413);
+
+  const mime = (c.req.header("content-type") ?? "application/octet-stream").split(";")[0]!.trim().toLowerCase();
+  if (!UPLOADABLE_MIME.has(mime)) return c.json({ error: "unsupported media type", mime }, 415);
+
   const bytes = await c.req.arrayBuffer();
   if (bytes.byteLength === 0) return c.json({ error: "empty body" }, 400);
-  const hash = await contentHash(bytes);
-  const mime = c.req.header("content-type") ?? "application/octet-stream";
-  // Content-addressed: re-putting identical bytes under the same hash is a no-op.
-  await c.env.MEDIA.put(hash, bytes, { httpMetadata: { contentType: mime } });
-  return c.json({ hash, url: `/api/assets/${hash}`, mime, bytes: bytes.byteLength });
+  if (bytes.byteLength > MAX_UPLOAD_BYTES) return c.json({ error: "too large", maxBytes: MAX_UPLOAD_BYTES }, 413);
+
+  const tenantId = tenantOf(c);
+  try {
+    const hash = await storeAsset(c.env, bytes, mime, { tenantId, purpose: "upload", ownerUserId: c.get("user")?.id ?? null });
+    return c.json({ hash, url: `/api/assets/${hash}`, mime, bytes: bytes.byteLength });
+  } catch (err) {
+    if (err instanceof StorageQuotaError) {
+      return c.json({ error: "storage_full", usedBytes: err.usedBytes, limitBytes: err.limitBytes, incomingBytes: err.incomingBytes }, 413);
+    }
+    throw err;
+  }
 });
 
-/** Serve a content-addressed asset from R2 (immutable). */
+/**
+ * Serve a content-addressed asset from R2 (immutable).
+ *
+ * PUBLIC by construction, and it has to be: a paired screen fetches its slide
+ * images with no session at all, from a device that may have been offline for
+ * weeks. The hash IS the capability — 256 bits of content address, unguessable
+ * and unenumerable — which is the same bargain the manifest URL already makes.
+ *
+ * The response headers are the part that was missing. Anything that is not a
+ * raster or a media stream is served as an ATTACHMENT under a sandbox CSP, so a
+ * stored SVG or HTML body — the AI mock still generates SVG posters in dev, and
+ * older objects predate the upload allow-list — cannot execute on this origin.
+ */
 app.get("/api/assets/:hash", async (c) => {
   const obj = await c.env.MEDIA.get(c.req.param("hash"));
   if (!obj) return c.text("not found", 404);
+  const type = obj.httpMetadata?.contentType ?? "application/octet-stream";
   return c.body(obj.body, 200, {
-    "Content-Type": obj.httpMetadata?.contentType ?? "application/octet-stream",
+    "Content-Type": type,
     "Cache-Control": "public, max-age=31536000, immutable",
     ETag: obj.httpEtag,
+    "X-Content-Type-Options": "nosniff",
+    "Content-Security-Policy": "default-src 'none'; sandbox",
+    ...(INLINE_SAFE_MIME.has(type.split(";")[0]!.trim().toLowerCase()) ? {} : { "Content-Disposition": "attachment" }),
   });
 });
 

@@ -21,7 +21,7 @@ import { getChannel, listChannels, setChannelComposition, deleteSlide, playbackF
 import { enabledAdSchedules } from "./ad-store.js";
 import { getDeviceSchedule, addDeviceRule, deleteDeviceRule, deleteDeviceRules, setDeviceTz, countTenantScheduleRules, type RuleKind } from "./device-schedule-store.js";
 import { getScreen, setDeviceDimensions, setDeviceChannel, setDeviceChannels, listDeviceChannels, markScreenUnpaired, deleteScreen, renameScreen, parseTags } from "./db.js";
-import { createMedia, listMedia, getMedia, updateMedia, deleteMedia, mediaByHashes, type MediaKind } from "./media-store.js";
+import { createMedia, listMedia, getMedia, updateMedia, deleteMedia, mediaByHashes, releaseMediaBytes, type MediaKind } from "./media-store.js";
 import { getBranding, setBranding } from "./branding-store.js";
 import { getConfigValue, setConfig } from "./billing-store.js";
 import type { Env } from "./env.js";
@@ -132,7 +132,11 @@ export function registerContentRoutes(app: Hono<AppEnv>): void {
       const rows = await mediaByHashes(c.env.DB, tenantOf(c), hashes);
       for (const m of rows) {
         await deleteMedia(c.env.DB, m.id);
-        if (m.asset_hash) await c.env.MEDIA.delete(m.asset_hash).catch(() => undefined);
+        // Was `MEDIA.delete(asset_hash)` with NO reference check: a second
+        // playlist reusing the same image went blank. `releaseMediaBytes` keeps
+        // the object while anything still points at it, and releases the
+        // workspace's storage quota either way.
+        await releaseMediaBytes(c.env, tenantOf(c), m.asset_hash, c.get("user")?.id ?? null);
       }
     }
     await deleteSlidePlaylist(c.env.DB, p!.id);
@@ -186,12 +190,12 @@ export function registerContentRoutes(app: Hono<AppEnv>): void {
     const m = await getMedia(c.env.DB, c.req.param("id"));
     if (!owns(c, m)) return c.json({ error: "not found" }, 404);
     await deleteMedia(c.env.DB, m!.id);
-    // Hard delete: remove the R2 object too, unless another library entry still
-    // points at the same content-addressed bytes.
-    if (m!.asset_hash) {
-      const others = await c.env.DB.prepare("SELECT 1 FROM media WHERE tenant_id = ? AND asset_hash = ? LIMIT 1").bind(tenantOf(c), m!.asset_hash).first();
-      if (!others) await c.env.MEDIA.delete(m!.asset_hash).catch(() => undefined);
-    }
+    // Hard delete: remove the R2 object too, unless anything still points at
+    // the same content-addressed bytes — ANY workspace, not just this one. The
+    // key is the content hash, so two workspaces that uploaded the same file
+    // share one object, and the tenant-scoped check used to let either of them
+    // blank the other's slide.
+    await releaseMediaBytes(c.env, tenantOf(c), m!.asset_hash, c.get("user")?.id ?? null);
     return c.json({ ok: true });
   });
 
@@ -311,7 +315,11 @@ export function registerContentRoutes(app: Hono<AppEnv>): void {
       const rows = await mediaByHashes(c.env.DB, tenantOf(c), hashes);
       for (const m of rows) {
         await deleteMedia(c.env.DB, m.id);
-        if (m.asset_hash) await c.env.MEDIA.delete(m.asset_hash).catch(() => undefined);
+        // Was `MEDIA.delete(asset_hash)` with NO reference check: a second
+        // playlist reusing the same image went blank. `releaseMediaBytes` keeps
+        // the object while anything still points at it, and releases the
+        // workspace's storage quota either way.
+        await releaseMediaBytes(c.env, tenantOf(c), m.asset_hash, c.get("user")?.id ?? null);
       }
     }
     await deleteMusicPlaylist(c.env.DB, p!.id);

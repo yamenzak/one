@@ -24,6 +24,11 @@ import {
 
 const dollars = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 const num = (n: number) => n.toLocaleString();
+/** Bytes as an amount a person reads — GB past a gigabyte, MB below it. */
+const mb = (bytes: number) => {
+  const m = bytes / (1024 * 1024);
+  return m >= 1024 ? `${(m / 1024).toFixed(1)} GB` : `${m < 10 && m > 0 ? m.toFixed(1) : Math.round(m)} MB`;
+};
 
 function fmtDate(ts: number): string {
   const ms = ts < 1e12 ? ts * 1000 : ts;
@@ -59,9 +64,13 @@ export function BillingPage() {
     return <BillingSkeleton />;
   }
 
-  const { subscription: sub, plan, balance, plans, packs, ledger, entitlements } = state;
+  const { subscription: sub, plan, balance, plans, packs, ledger, entitlements, storage } = state;
   const grant = entitlements.aiCredits.monthlyGrant || 0;
   const pct = grant > 0 ? Math.min(100, Math.round((balance.balance / grant) * 100)) : 0;
+  // Media storage is the second thing the plan caps, and until Stage 5 it was
+  // capped by nothing at all. Shown beside the credit balance because a ceiling
+  // you cannot see is one that surprises you at the moment an upload matters.
+  const storagePct = storage && storage.limitBytes > 0 ? Math.min(100, Math.round((storage.usedBytes / storage.limitBytes) * 100)) : 0;
 
   // Confirm before switching — never change plan on a single card click.
   async function confirmPlan(p: Plan) {
@@ -166,6 +175,31 @@ export function BillingPage() {
               </>
             )}
             <div className="mt-3 text-xs text-muted-foreground/70">$1 = 1,000 credits · charged per model at generation time.</div>
+          </CardContent>
+        </Card>
+
+        {/* Media storage meter */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Media storage</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="font-mono text-3xl font-semibold tabular-nums">{storage ? mb(storage.usedBytes) : "—"}</div>
+            {storage && storage.limitBytes > 0 && (
+              <>
+                <div className="mt-3 mb-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full rounded-full transition-all ${storagePct >= 90 ? "bg-destructive" : "bg-primary"}`}
+                    style={{ width: `${storagePct}%` }}
+                  />
+                </div>
+                <div className="font-mono text-xs tabular-nums text-muted-foreground">
+                  {mb(storage.usedBytes)} / {mb(storage.limitBytes)} used
+                </div>
+              </>
+            )}
+            {storage && storage.limitBytes < 0 && <div className="mt-3 text-xs text-muted-foreground">Unlimited on this plan.</div>}
+            <div className="mt-3 text-xs text-muted-foreground/70">Uploads and generated assets. Deleting media from the library frees it.</div>
           </CardContent>
         </Card>
       </div>

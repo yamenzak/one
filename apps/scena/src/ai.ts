@@ -20,9 +20,17 @@ import { describeWidgets, SHARED_STYLE_NOTES, WIDGET_REGISTRY } from "@scena/wid
 const FONT_LIST = FONT_FAMILIES.join(", ");
 import { getModel, getConfigValue, type ModelRow } from "./billing-store.js";
 import { getBranding, brandBrief, brandImageHint } from "./branding-store.js";
-import { neuronsForUsage, creditsForNeurons, type Usage, type ModelRate } from "./credits.js";
+// The credit meter and the mock-lane decision are the PLATFORM's, not Scena's.
+// `credits.ts` used to sit beside this file — the same formula, the same two
+// constants, one revision behind `@4dl/billing`'s hardened copy (which is
+// Scena's own file, transplanted and then guarded against a non-finite usage
+// figure the provider might report). Importing it back deletes the fork and
+// picks up the guards.
+import { neuronsForUsage, creditsForNeurons, type Usage, type ModelRate } from "@4dl/billing/model";
+import { shouldUseMockLane } from "@4dl/ai";
 import { isGoogleGenModel, geminiGenerateText, geminiGenerateImage, geminiGenerateMusic, geminiGenerateSpeech } from "./gemini.js";
 import { createMedia } from "./media-store.js";
+import { storeAsset, StorageQuotaError } from "./storage.js";
 
 export type AiTask = "text" | "tts" | "image" | "music" | "layout";
 
@@ -66,11 +74,15 @@ export interface GenerateResult {
 
 export interface GenerateError {
   ok: false;
-  error: "unknown_model" | "insufficient_credits" | "generation_failed";
+  error: "unknown_model" | "insufficient_credits" | "storage_full" | "generation_failed";
   /** Underlying model/runtime error message, surfaced so failures are traceable. */
   detail?: string;
   available?: number;
   needed?: number;
+  /** `storage_full`: the workspace's media ceiling, so the screen can say what
+   *  to delete rather than "generation failed". Bytes, both. */
+  usedBytes?: number;
+  limitBytes?: number;
 }
 
 const rateOf = (m: ModelRow): ModelRate => ({
@@ -138,9 +150,43 @@ async function promptHash(req: GenerateRequest): Promise<string> {
   return contentHash(new TextEncoder().encode(key).buffer as ArrayBuffer);
 }
 
-async function mockMode(env: Env): Promise<"on" | "off" | "auto"> {
-  const mode = await getConfigValue(env, "ai.mock");
-  return mode === "on" || mode === "off" ? mode : "auto";
+/**
+ * Whether THIS run may use the deterministic mock generator.
+ *
+ * ⚠️ The environment is the OUTER condition, and that is the whole point.
+ *
+ * This used to be `mockMode(env)` — a bare read of `app_config["ai.mock"]` with
+ * no environment check anywhere in the function or at either of its two call
+ * sites. Three separate paths therefore fabricated output in PRODUCTION and
+ * charged the workspace credits for it:
+ *
+ *   1. `ai.mock = "on"`. A platform admin could set it from the console, and the
+ *      Admin screen offered it as an ordinary dropdown value. One click and
+ *      every slide, poster, voice clip and music bed the product generated was
+ *      a stub — billed at the real model's rate, cached under the real prompt
+ *      hash, and filed in the Media Library as an ordinary asset.
+ *   2. **No `AI` binding.** `!env.AI` mocked unconditionally. `AI` is optional in
+ *      `env.ts`, so a deploy that dropped the binding did not fail — it started
+ *      answering with stubs and invoicing for them.
+ *   3. **A provider failure in `"auto"`.** The catch below swallowed a real
+ *      Workers AI error and rendered a mock instead, which is exactly the case
+ *      where an operator most needs to see the error.
+ *
+ * `shouldUseMockLane` (`@4dl/ai`) puts `ENVIRONMENT === "development"` outside
+ * all three, so none of them can fire on a deployed worker. Inside development
+ * the behaviour is unchanged: `"on"` forces the mock, `"auto"` falls back when
+ * the real credential is missing, `"off"` surfaces the error.
+ *
+ * `canRunReal` is per-provider, not global: Gemini/Lyria run on the platform
+ * Google key and have never been mockable, so an external model passes `true`
+ * and stays on the real path even in dev.
+ */
+async function mayMock(env: Env, canRunReal: boolean): Promise<boolean> {
+  return shouldUseMockLane({
+    mockMode: await getConfigValue(env, "ai.mock"),
+    canRunReal,
+    isDevelopment: env.ENVIRONMENT === "development",
+  });
 }
 
 /**
@@ -182,18 +228,21 @@ export async function generate(env: Env, req: GenerateRequest): Promise<Generate
   const held = await billing.reserve(estimate);
   if (!held.ok) return { ok: false, error: "insufficient_credits", available: held.available, needed: held.needed };
 
-  // Run the model (or mock) and read the *actual* usage. In "auto" mode a real
-  // call that fails (e.g. local dev with no Cloudflare account) falls back to
-  // the mock generator so the meter is still exercised; "off" surfaces the error.
-  const mode = await mockMode(env);
+  // Run the model (or mock) and read the *actual* usage. In development, a real
+  // call that fails (e.g. no Cloudflare account) falls back to the mock so the
+  // meter is still exercised. On a DEPLOYED worker `mock` is false in every
+  // mode, so a failure is reported as a failure — see `mayMock`.
+  //
+  // External providers (Gemini / Lyria) run on the platform Google key
+  // regardless of the Workers AI binding, and are never mocked: `canRunReal`
+  // is true for them, so "auto" has nothing to fall back from.
+  const external = gemini;
+  const mock = await mayMock(env, external || Boolean(env.AI));
   // Brand kit → an on-brand brief prepended to the slide/HTML/layout system prompt.
   const brief = req.task === "text" || req.task === "layout" ? brandBrief(await getBranding(env.DB, tenantId)) : "";
-  // External providers (Gemini / Lyria) run regardless of the Workers AI
-  // binding and are never silently mocked.
-  const external = gemini;
   let out: RunResult;
   try {
-    if (!external && (mode === "on" || !env.AI)) out = await runMock(env, req, model);
+    if (!external && mock) out = await runMock(env, req, model);
     else {
       try {
         // Bound every real model call: a hung/slow model (some reasoning models
@@ -205,14 +254,26 @@ export async function generate(env: Env, req: GenerateRequest): Promise<Generate
       } catch (err) {
         console.error(`ai.run failed (model=${model.id} cf=${model.cf_model}): ${err instanceof Error ? err.message : String(err)}`);
         // A timeout is a genuine failure — surface it rather than masking it with
-        // a mock render. Also never silently mock an external provider.
+        // a mock render. Also never silently mock an external provider, and never
+        // mock at all outside development (`mock` is false there by construction).
         const timedOut = err instanceof Error && err.message.includes("timed out");
-        if (mode !== "auto" || external || timedOut) throw err;
+        // A full bucket is not a model failure, and re-running the prompt on the
+        // mock would only produce a second asset with nowhere to go.
+        if (!mock || external || timedOut || err instanceof StorageQuotaError) throw err;
         out = await runMock(env, req, model);
       }
     }
   } catch (err) {
+    // Either way the hold is released FIRST: whatever went wrong, the workspace
+    // did not receive the generation and must not be charged for it.
     await billing.release(held.hold);
+    if (err instanceof StorageQuotaError) {
+      // The model ran and the bytes had nowhere to go. Reported distinctly so
+      // the screen can say "you are out of media storage" — a thing the operator
+      // can act on — rather than "generation failed", which reads as our fault
+      // and invites a retry that will fail identically.
+      return { ok: false, error: "storage_full", usedBytes: err.usedBytes, limitBytes: err.limitBytes, detail: "media storage is full" };
+    }
     const detail = err instanceof Error ? err.message : String(err);
     console.error(`ai.generate failed (task=${req.task} model=${model.id} cf=${model.cf_model}): ${detail}`);
     return { ok: false, error: "generation_failed", detail };
@@ -363,18 +424,18 @@ async function runGemini(env: Env, req: GenerateRequest, model: ModelRow, brief 
     // per token, but we meter per character — the rate's 3× markup covers the
     // per-token cost even for slow delivery (see billing-seed Gemini TTS note).
     const r = await geminiGenerateSpeech(env, tenantId, model.cf_model, req.prompt, req.options?.voice ?? "");
-    const assetHash = await storeAsset(env, r.bytes, r.mime);
+    const assetHash = await storeGenerated(env, req, r.bytes, r.mime);
     return { output: "", assetHash, mime: r.mime, usage: { chars: req.prompt.length } };
   }
   if (req.task === "image") {
     const r = await geminiGenerateImage(env, tenantId, model.cf_model, req.prompt);
-    const assetHash = await storeAsset(env, r.bytes, r.mime);
+    const assetHash = await storeGenerated(env, req, r.bytes, r.mime);
     return { output: "", assetHash, mime: r.mime, usage: { images: 1 } };
   }
   if (req.task === "music") {
     const secs = musicSeconds(req.options);
     const r = await geminiGenerateMusic(env, tenantId, model.cf_model, req.prompt, secs);
-    const assetHash = await storeAsset(env, r.bytes, r.mime);
+    const assetHash = await storeGenerated(env, req, r.bytes, r.mime);
     // Lyria bills a flat per-song price, so meter a whole clip (never per-second):
     // a 5s bed and a 30s bed both cost Google the same, so both charge the same.
     // durationMs still reports the real audio length for playback.
@@ -450,14 +511,14 @@ async function runReal(env: Env, req: GenerateRequest, model: ModelRow, brief = 
   if (req.task === "tts") {
     const res = (await ai.run(model.cf_model, { text: req.prompt, speaker: req.options?.voice })) as ReadableStream | ArrayBuffer | { audio?: string };
     const bytes = await toBytes(res);
-    const assetHash = await storeAsset(env, bytes, "audio/mpeg");
+    const assetHash = await storeGenerated(env, req, bytes, "audio/mpeg");
     return { output: "", assetHash, mime: "audio/mpeg", usage: { chars: req.prompt.length } };
   }
   if (req.task === "music") {
     const secs = musicSeconds(req.options);
     const res = (await ai.run(model.cf_model, { prompt: req.prompt, duration: secs })) as ReadableStream | ArrayBuffer | { audio?: string };
     const bytes = await toBytes(res);
-    const assetHash = await storeAsset(env, bytes, "audio/mpeg");
+    const assetHash = await storeGenerated(env, req, bytes, "audio/mpeg");
     return { output: "", assetHash, mime: "audio/mpeg", usage: { audioSec: secs }, durationMs: secs * 1000 };
   }
   // image
@@ -465,7 +526,7 @@ async function runReal(env: Env, req: GenerateRequest, model: ModelRow, brief = 
   const h = req.options?.height ?? 1024;
   const res = (await ai.run(model.cf_model, { prompt: req.prompt, width: w, height: h, num_steps: req.options?.steps ?? 4 })) as { image?: string } | ReadableStream | ArrayBuffer;
   const bytes = typeof res === "object" && res !== null && "image" in res && res.image ? b64ToBytes(res.image) : await toBytes(res);
-  const assetHash = await storeAsset(env, bytes, "image/png");
+  const assetHash = await storeGenerated(env, req, bytes, "image/png");
   const tiles = Math.ceil(w / 512) * Math.ceil(h / 512) * (req.options?.steps ?? 4);
   return { output: "", assetHash, mime: "image/png", usage: { tiles } };
 }
@@ -488,17 +549,17 @@ async function runMock(env: Env, req: GenerateRequest, _model: ModelRow): Promis
   if (req.task === "tts") {
     const secs = Math.min(6, Math.max(1, req.prompt.length / 40));
     const bytes = mockWav(secs);
-    const assetHash = await storeAsset(env, bytes, "audio/wav");
+    const assetHash = await storeGenerated(env, req, bytes, "audio/wav");
     return { output: "", assetHash, mime: "audio/wav", usage: { chars: req.prompt.length }, durationMs: Math.round(secs * 1000) };
   }
   if (req.task === "music") {
     const secs = musicSeconds(req.options);
     const bytes = mockMusicWav(secs);
-    const assetHash = await storeAsset(env, bytes, "audio/wav");
+    const assetHash = await storeGenerated(env, req, bytes, "audio/wav");
     return { output: "", assetHash, mime: "audio/wav", usage: { audioSec: secs }, durationMs: secs * 1000 };
   }
   const svg = mockPosterSvg(req.prompt);
-  const assetHash = await storeAsset(env, new TextEncoder().encode(svg).buffer as ArrayBuffer, "image/svg+xml");
+  const assetHash = await storeGenerated(env, req, new TextEncoder().encode(svg).buffer as ArrayBuffer, "image/svg+xml");
   const w = req.options?.width ?? 1024;
   const h = req.options?.height ?? 1024;
   return { output: "", assetHash, mime: "image/svg+xml", usage: { tiles: Math.ceil(w / 512) * Math.ceil(h / 512) * (req.options?.steps ?? 4) } };
@@ -745,10 +806,23 @@ function mockMusicWav(seconds: number): ArrayBuffer {
   return buf;
 }
 
-async function storeAsset(env: Env, bytes: ArrayBuffer, mime: string): Promise<string> {
-  const hash = await contentHash(bytes);
-  await env.MEDIA.put(hash, bytes, { httpMetadata: { contentType: mime } });
-  return hash;
+/**
+ * Store a generated asset, content-addressed and ACCOUNTED.
+ *
+ * This was `env.MEDIA.put(hash, bytes)` — one of three bare bucket writes in the
+ * app, none of which left a trace anywhere queryable. A workspace could generate
+ * posters, voice clips and music beds until the R2 bill noticed, and nothing
+ * could tell you afterwards whose bytes they were.
+ *
+ * The quota is ENFORCED here rather than pre-checked, because the enforcement
+ * point and the failure point should be the same place. A `StorageQuotaError`
+ * propagates out of `runReal`/`runGemini`/`runMock` into `generate()`'s catch,
+ * which RELEASES the hold before answering — so a workspace that is out of room
+ * is not charged for the generation it did not receive, and gets `storage_full`
+ * rather than a generic failure it cannot act on.
+ */
+async function storeGenerated(env: Env, req: GenerateRequest, bytes: ArrayBuffer, mime: string): Promise<string> {
+  return storeAsset(env, bytes, mime, { tenantId: req.tenantId ?? DEMO_TENANT, purpose: "ai" });
 }
 
 async function toBytes(res: ReadableStream | ArrayBuffer | { audio?: string } | { image?: string }): Promise<ArrayBuffer> {

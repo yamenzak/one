@@ -856,3 +856,211 @@ describe("the routes that used to be public", () => {
     }
   });
 });
+
+/* ─────────────────────────── Stage 5 — storage ──────────────────────────── */
+
+/** A PNG's magic bytes, then filler. Content-addressed, so `size` alone makes
+ *  each call a distinct object without needing a random content type. */
+const png = (size: number): ArrayBuffer => {
+  const a = new Uint8Array(size);
+  a.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  // Vary the tail so two different sizes never collide, and two calls at the
+  // same size deliberately DO — that is what the dedup assertions exercise.
+  for (let i = 8; i < size; i++) a[i] = (size + i) % 251;
+  return a.buffer;
+};
+
+const upload = (door: string, cookie: string, bytes: ArrayBuffer, mime = "image/png") =>
+  SELF.fetch(`${door}/api/assets`, { method: "PUT", headers: { cookie, origin: door, "content-type": mime }, body: bytes });
+
+describe("every stored object is accounted for", () => {
+  it("records a ledger row, and the workspace's usage moves", async () => {
+    const { cookie, slug, door } = await newWorkspace("store");
+    await setPlan(slug, "pro");
+
+    const before = (await (await SELF.fetch(`${door}/api/billing`, { headers: { cookie } })).json()) as {
+      storage: { usedBytes: number; limitBytes: number };
+    };
+    // Pro sells 20 GB. Before Stage 5 there was no ceiling at all, on any tier.
+    expect(before.storage.limitBytes).toBe(20_000 * 1024 * 1024);
+
+    const res = await upload(door, cookie, png(4096));
+    expect(res.status).toBe(200);
+    const { hash, bytes } = (await res.json()) as { hash: string; bytes: number };
+    expect(bytes).toBe(4096);
+
+    const after = (await (await SELF.fetch(`${door}/api/billing`, { headers: { cookie } })).json()) as {
+      storage: { usedBytes: number };
+    };
+    expect(after.storage.usedBytes).toBe(before.storage.usedBytes + 4096);
+
+    // The ledger row is what makes that number possible, and it is qualified by
+    // tenant — the R2 key is the content hash, which two workspaces can share.
+    const org = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>();
+    const row = await db()
+      .prepare("SELECT tenant_id, size_bytes, purpose FROM media_assets WHERE r2_key = ?")
+      .bind(`${org!.id}:${hash}`)
+      .first<{ tenant_id: string; size_bytes: number; purpose: string }>();
+    expect(row).toBeTruthy();
+    expect(row!.tenant_id).toBe(org!.id);
+    expect(row!.size_bytes).toBe(4096);
+    expect(row!.purpose).toBe("upload");
+  });
+
+  it("charges the SAME bytes to both workspaces that reference them", async () => {
+    // The bucket deduplicates (one object, keyed by content hash). The ledger
+    // must not: each workspace pays for what it references, not for what it
+    // happened to be first to upload. Before the qualified ledger key, the
+    // second upload rewrote the first one's row — so the original owner's bytes
+    // silently stopped counting against their quota.
+    const a = await newWorkspace("dedupe-a");
+    const b = await newWorkspace("dedupe-b");
+    await setPlan(a.slug, "pro");
+    await setPlan(b.slug, "pro");
+    const same = png(2048);
+
+    const ra = await upload(a.door, a.cookie, same);
+    const rb = await upload(b.door, b.cookie, same);
+    const ha = ((await ra.json()) as { hash: string }).hash;
+    const hb = ((await rb.json()) as { hash: string }).hash;
+    expect(ha, "identical bytes must land on one key").toBe(hb);
+
+    // Matched by exact key, NOT `LIKE '%:hash'` — D1 caps a LIKE pattern at 50
+    // characters and a SHA-256 is 64, so the pattern form fails with
+    // "LIKE or GLOB pattern too complex" the moment a row exists to test it.
+    // That is the same trap `@4dl/storage`'s purge documents.
+    const ids = await Promise.all(
+      [a.slug, b.slug].map((slug) => db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>()),
+    );
+    const rows = await db()
+      .prepare("SELECT COUNT(*) AS n FROM media_assets WHERE r2_key IN (?, ?) AND deleted_at IS NULL")
+      .bind(`${ids[0]!.id}:${ha}`, `${ids[1]!.id}:${ha}`)
+      .first<{ n: number }>();
+    expect(rows!.n, "one ledger row per workspace").toBe(2);
+
+    for (const w of [a, b]) {
+      const bill = (await (await SELF.fetch(`${w.door}/api/billing`, { headers: { cookie: w.cookie } })).json()) as {
+        storage: { usedBytes: number };
+      };
+      expect(bill.storage.usedBytes).toBe(2048);
+    }
+  });
+
+  it("refuses an upload that would break the plan's ceiling", async () => {
+    // Free is 100 MB, so fill it from the ledger rather than by actually
+    // uploading 100 MB into a test isolate.
+    const { cookie, slug, door } = await newWorkspace("full");
+    const org = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>();
+    await db()
+      .prepare(
+        "INSERT INTO media_assets (id, tenant_id, r2_key, purpose, content_type, size_bytes, created_at) VALUES ('mda_fill', ?, ?, 'upload', 'video/mp4', ?, '2026-01-01T00:00:00Z')",
+      )
+      .bind(org!.id, `${org!.id}:filler`, 100 * 1024 * 1024)
+      .run();
+
+    const res = await upload(door, cookie, png(1024));
+    expect(res.status, "an upload over the ceiling must be refused").toBe(413);
+    const body = (await res.json()) as { error: string; limitBytes: number };
+    expect(body.error).toBe("storage_full");
+    expect(body.limitBytes).toBe(100 * 1024 * 1024);
+  });
+
+  it("refuses SVG outright, and serves everything under a sandbox", async () => {
+    const { cookie, slug, door } = await newWorkspace("svg");
+    await setPlan(slug, "pro");
+
+    // An SVG is a DOCUMENT: it carries <script>, and this origin serves it back.
+    // Uploading one used to be the whole of stored XSS on a workspace's domain.
+    const evil = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+    const refused = await upload(door, cookie, evil.buffer as ArrayBuffer, "image/svg+xml");
+    expect(refused.status).toBe(415);
+
+    // And what IS stored comes back inert.
+    const ok = await upload(door, cookie, png(512));
+    const { hash } = (await ok.json()) as { hash: string };
+    const served = await SELF.fetch(`${door}/api/assets/${hash}`);
+    expect(served.status).toBe(200);
+    expect(served.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(served.headers.get("content-security-policy")).toContain("sandbox");
+    // A raster still renders inline — an attachment header here would break
+    // every slide in the product.
+    expect(served.headers.get("content-disposition")).toBeNull();
+  });
+
+  it("refuses an upload larger than one object may be", async () => {
+    const { cookie, slug, door } = await newWorkspace("big");
+    await setPlan(slug, "business");
+    // Declared-length refusal, before the body is buffered — which is the only
+    // check that can happen before `arrayBuffer()` materialises it in the isolate.
+    const res = await SELF.fetch(`${door}/api/assets`, {
+      method: "PUT",
+      headers: { cookie, origin: door, "content-type": "video/mp4", "content-length": String(200 * 1024 * 1024) },
+      body: png(64),
+    });
+    expect(res.status).toBe(413);
+  });
+});
+
+describe("releasing media", () => {
+  it("gives the quota back but keeps bytes another workspace still uses", async () => {
+    const a = await newWorkspace("rel-a");
+    const b = await newWorkspace("rel-b");
+    await setPlan(a.slug, "pro");
+    await setPlan(b.slug, "pro");
+    const same = png(3072);
+    const hash = ((await (await upload(a.door, a.cookie, same)).json()) as { hash: string }).hash;
+    await upload(b.door, b.cookie, same);
+
+    // Both workspaces file it in their library, then A deletes its card.
+    const card = async (w: { door: string; cookie: string }) => {
+      const res = await SELF.fetch(`${w.door}/api/media`, {
+        method: "POST",
+        headers: json(w.door, w.cookie),
+        body: JSON.stringify({ kind: "image", name: "shared", assetHash: hash, assetUrl: `/api/assets/${hash}`, mime: "image/png" }),
+      });
+      return ((await res.json()) as { id: string }).id;
+    };
+    const idA = await card(a);
+    await card(b);
+
+    const del = await SELF.fetch(`${a.door}/api/media/${idA}`, { method: "DELETE", headers: { cookie: a.cookie, origin: a.door } });
+    expect(del.status).toBe(200);
+
+    // A's quota comes back...
+    const billA = (await (await SELF.fetch(`${a.door}/api/billing`, { headers: { cookie: a.cookie } })).json()) as {
+      storage: { usedBytes: number };
+    };
+    expect(billA.storage.usedBytes, "A stopped referencing it, so A stops paying").toBe(0);
+
+    // ...and B's slide still renders. Deleting the object because ONE workspace
+    // tidied up is what the tenant-scoped reference check used to do.
+    const served = await SELF.fetch(`${b.door}/api/assets/${hash}`);
+    expect(served.status, "B still references these bytes").toBe(200);
+  });
+});
+
+describe("the mock lane", () => {
+  /*
+    ⚠️ This suite runs with `ENVIRONMENT: "development"` and CANNOT change that
+    — bindings are fixed at runtime start, and `env` here is the runner's view,
+    not the object a request sees.
+
+    So the split is deliberate: this asserts the route READS the setting and
+    applies the shared decision (which is the wiring an integration test can
+    see), and `test/mock-lane.test.ts` asserts the decision itself in both
+    environments. Neither half is sufficient alone, which is why both exist.
+  */
+  it("accepts every mode a developer may set, and rejects a value that is not one", async () => {
+    const { cookie, door } = await newWorkspace("mock");
+    for (const mode of ["on", "auto", "off"]) {
+      const res = await SELF.fetch(`${door}/api/admin/config`, {
+        method: "PUT",
+        headers: json(door, cookie),
+        body: JSON.stringify({ config: { "ai.mock": mode } }),
+      });
+      expect(res.status, `ai.mock=${mode} in development`).toBe(200);
+    }
+    const stored = await db().prepare("SELECT value FROM app_config WHERE key = 'ai.mock'").first<{ value: string }>();
+    expect(stored!.value).toBe("off");
+  });
+});
