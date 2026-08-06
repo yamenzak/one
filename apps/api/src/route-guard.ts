@@ -179,6 +179,17 @@ export function permissionFor(method: string, path: string): Record<string, stri
   if (path === "/api/purchases" && !isGet) return null;
   if (path.startsWith("/api/purchases")) return { package: [isGet ? "read" : "update"] };
 
+  /**
+   * A per-client capability OVERRIDE is a change to what the studio sold, so it
+   * rides `package` like everything else in the catalogue. The rest of
+   * `/api/subscriptions` stays open to any member and is scoped by
+   * `requireClientAccess` in the handler — a client legitimately reads their own
+   * access — but the override lane must never be one of those: the handler
+   * refuses the client role too, because this gate is invisible to the
+   * integration suite (AGENTS.md §4) and a bound nothing can test is not a bound.
+   */
+  if (path.startsWith("/api/subscriptions/") && path.endsWith("/overrides")) return { package: ["update"] };
+
   // Billing: reads for owner surface, mutations need billing:manage.
   if (path.startsWith("/api/billing")) return isGet ? { billing: ["read"] } : { billing: ["manage"] };
 

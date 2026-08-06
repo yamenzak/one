@@ -221,16 +221,16 @@ function rosterEmail(displayName: string, i: number): string {
   return `${local}.${Math.random().toString(36).slice(2, 5)}@example.com`;
 }
 
-async function callJson<T>(page: Page, base: string, path: string, body: unknown): Promise<T> {
+async function callJson<T>(page: Page, base: string, path: string, body: unknown, method = "POST"): Promise<T> {
   await ready(page, base);
   const out = await page.evaluate(
-    async ([p, b]: [string, string]) => {
-      const res = await fetch(p, { method: "POST", headers: { "content-type": "application/json" }, body: b });
+    async ([p, b, m]: [string, string, string]) => {
+      const res = await fetch(p, { method: m, headers: { "content-type": "application/json" }, body: b });
       return { ok: res.ok, status: res.status, text: await res.text() };
     },
-    [path, JSON.stringify(body)] as [string, string],
+    [path, JSON.stringify(body), method] as [string, string, string],
   );
-  if (!out.ok) throw new Error(`POST ${base}${path} -> ${out.status} ${out.text}`);
+  if (!out.ok) throw new Error(`${method} ${base}${path} -> ${out.status} ${out.text}`);
   return JSON.parse(out.text) as T;
 }
 
@@ -547,7 +547,14 @@ export async function seedClinical(studio: Studio, clientId: string): Promise<vo
  * Gated on `commerce`, so it is best-effort like the others: a studio without it
  * hides the whole tab, which is itself a legitimate shot.
  */
-export async function seedCommerce(studio: Studio): Promise<void> {
+/**
+ * @param clientId The demo client, who is GRANTED one of these packages.
+ *
+ * Without the grant the manage screen's whole Subscription section is absent —
+ * "No access" — so every shot of it photographed a studio that had never sold
+ * anything, and the access surfaces shipped unphotographed under §16's nose.
+ */
+export async function seedCommerce(studio: Studio, clientId?: string): Promise<void> {
   const packages = [
     { name: "12-week transformation", description: "Training, food and weekly check-ins.", oneTimePriceCents: 89_000, budgets: [{ feature: "all", days: 84 }], visibility: "marketplace", oncePerCustomer: true },
     { name: "Online coaching", description: "Rolling month, cancel any time.", monthlyPriceCents: 14_900, budgets: [{ feature: "all", days: 31 }], visibility: "marketplace" },
@@ -555,8 +562,9 @@ export async function seedCommerce(studio: Studio): Promise<void> {
     { name: "Trial week", oneTimePriceCents: 0, budgets: [{ feature: "all", days: 7 }], visibility: "private" },
     { name: "Comeback comp", oneTimePriceCents: 0, budgets: [{ feature: "all", days: 30 }], visibility: "private" },
   ];
+  const created: Record<string, string> = {};
   try {
-    for (const p of packages) await callJson(studio.page, studio.base, "/api/packages", p);
+    for (const p of packages) created[p.name] = (await callJson<{ id: string }>(studio.page, studio.base, "/api/packages", p)).id;
     await callJson(studio.page, studio.base, "/api/redemption-codes", { code: "WELCOME14", daysToAdd: 14, targetFeature: "all", maxUses: 25 });
     /*
       A DEAD code beside a live one. The Packages screen folds used, expired and
@@ -568,6 +576,16 @@ export async function seedCommerce(studio: Studio): Promise<void> {
     */
     await callJson(studio.page, studio.base, "/api/redemption-codes", { code: "LAUNCH50", daysToAdd: 30, targetFeature: "all", maxUses: 1, expiresAt: dayBefore(20) });
     await callJson(studio.page, studio.base, "/api/promo-codes", { code: "SUMMER20", discountType: "percent", percentOff: 20, maxRedemptions: 50 });
+    if (clientId) {
+      const sub = await callJson<{ id: string }>(studio.page, studio.base, "/api/subscriptions/grant", { clientId, packageId: created["Online coaching"]! });
+      /*
+        ONE capability set for this client alone, so the override state is
+        photographed rather than described. The fasting timer is the honest
+        choice: it is the one capability that defaults OFF, so switching it on
+        for one person is exactly the exception the override lane exists for.
+      */
+      await callJson(studio.page, studio.base, `/api/subscriptions/${sub.id}/overrides`, { overrides: { canTrackFasting: true } }, "PATCH");
+    }
   } catch (e) {
     console.warn(`[seedCommerce] skipped: ${String(e).slice(0, 200)}`);
   }

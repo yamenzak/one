@@ -17,11 +17,18 @@ import {
   setRemainingDays,
   BUDGET_FEATURES,
   BUDGET_SCOPES,
+  CLIENT_FLAG_KEYS,
+  CLIENT_FLAG_META,
+  SELLABLE_CLIENT_FLAG_KEYS,
+  explainClientFlags,
+  parseFlagsJson,
   type Budget,
+  type ClientFlags,
 } from "@kova/domain";
 import { hasPriorPurchase, recordPackageGrant } from "@4dl/commerce";
 import { type AppEnv, requireTenant } from "./auth-context.js";
-import { gateFeature } from "./client-flags.js";
+import { gateFeature, loadClientAccessRows, LIVE_ACCESS_STATUSES } from "./client-flags.js";
+import { tenantEntitlements } from "./billing-store.js";
 import { requireClientAccess } from "./clients.js";
 import { newId, nowIso } from "./ids.js";
 import { recordAudit } from "./audit.js";
@@ -548,6 +555,182 @@ export const commerceRoutes = new Hono<AppEnv>()
         id: r.id, packageId: r.package_id, packageName: r.package_name, source: r.source,
         days: parseJson(r.days_json as string | null, []), at: r.at,
       })),
+    });
+  })
+
+  /**
+   * WHAT THIS CLIENT CAN ACTUALLY DO, and where each answer came from.
+   *
+   * The coach could see days and a package name and nothing else, so "why can't
+   * my client open their meal plan" had no answer inside the product — you had
+   * to open the package, remember what the flags meant, and then guess whether a
+   * budget or the studio's own plan was the thing in the way.
+   *
+   * Every capability, per live access row, with its source and its blocker.
+   * Resolved by `explainClientFlags` — the SAME merge `resolveClientFlags` runs,
+   * projected differently — so this screen cannot promise what the routes refuse.
+   */
+  .get("/subscriptions/capabilities", async (c) => {
+    const who = requireTenant(c)!;
+    const clientId = c.req.query("clientId");
+    if (!clientId) return c.json({ error: "clientId required" }, 400);
+    const access = await requireClientAccess(c, clientId);
+    if ("response" in access) return access.response;
+    // Staff only. `requireClientAccess` passes a CLIENT reading their own record,
+    // and this answers "which of these did your coach turn on by hand" — a
+    // question about the studio's decisions, not the client's data.
+    if (c.get("role") === "client") return c.json({ error: "forbidden" }, 403);
+
+    const [rows, entitlements] = await Promise.all([
+      loadClientAccessRows(c.env.DB, who.tenantId, access.client.id, LIVE_ACCESS_STATUSES),
+      tenantEntitlements(c.env.DB, who.tenantId),
+    ]);
+    const nowIso2 = nowIso();
+    const out = [];
+    for (const row of rows) {
+      let packageFlags = null;
+      let packageName: string | null = null;
+      if (row.package_id) {
+        const pkg = await c.env.DB.prepare("SELECT name, flags_json FROM packages WHERE id = ? AND tenant_id = ?")
+          .bind(row.package_id, who.tenantId)
+          .first<{ name: string; flags_json: string | null }>();
+        packageFlags = parseFlagsJson(pkg?.flags_json);
+        packageName = pkg?.name ?? null;
+      }
+      const overrides = parseFlagsJson(row.overrides_json) ?? {};
+      const explained = explainClientFlags({
+        packageFlags,
+        subscriptionFlags: parseFlagsJson(row.flags_json),
+        overrideFlags: overrides,
+        budgets: parseJson<Budget[]>(row.budgets_json, []),
+        entitlements,
+        nowIso: nowIso2,
+      });
+      out.push({
+        subscriptionId: row.id,
+        packageId: row.package_id,
+        packageName,
+        status: row.status,
+        daysByFeature: daysByFeature(parseJson<Budget[]>(row.budgets_json, []), BUDGET_SCOPES, nowIso2),
+        // The sellable set only: a reserved flag grants nothing, so listing it
+        // here would offer the coach a switch with nothing behind it — the same
+        // defect the package builder already had.
+        capabilities: SELLABLE_CLIENT_FLAG_KEYS.map((key) => ({
+          key,
+          label: CLIENT_FLAG_META[key].label,
+          category: CLIENT_FLAG_META[key].category,
+          ...explained[key],
+          /** Present ⇒ this row carries an explicit override for the key. */
+          override: typeof overrides[key] === "boolean" ? overrides[key]! : null,
+        })),
+      });
+    }
+    return c.json({ rows: out });
+  })
+
+  /**
+   * OVERRIDE a capability for ONE client, on ONE access row.
+   *
+   * The package is the product; this is the exception a coach makes for one
+   * person without minting a near-duplicate package to hold it. Written to
+   * `overrides_json` — a sparse diff, NOT an edit to the row's `flags_json`
+   * snapshot — so the screen can always say which capabilities came with the
+   * package and which somebody decided, and `null` genuinely means "back to
+   * whatever the package says" rather than a guess at what it used to say.
+   *
+   * ⚠️ An override CANNOT widen the two outer bounds. `explainClientFlags` runs
+   * the budget gate and the entitlement intersection AFTER this layer, so
+   * switching on a meal capability whose days have lapsed, or one the studio's
+   * own Kova plan does not carry, resolves to `false` exactly as before. The
+   * response says so rather than reporting a success the client will not see.
+   */
+  .patch("/subscriptions/:id/overrides", async (c) => {
+    const who = requireTenant(c)!;
+    /**
+     * Staff only, checked HERE and not left to the route guard.
+     *
+     * `requireClientAccess` admits a client reading their own record, so
+     * without this a client could PATCH themselves any capability their package
+     * did not include — the exact escalation the whole flag system exists to
+     * prevent. The action gate in route-guard.ts also covers it, and cannot be
+     * OBSERVED by the integration suite (AGENTS.md §4), which is why the
+     * in-handler check is the one that gets a test.
+     */
+    if (c.get("role") === "client") return c.json({ error: "forbidden" }, 403);
+
+    const parsed = z
+      .object({
+        // `null` CLEARS the override (back to the package); a boolean sets one.
+        // Keys are checked against the registry below rather than with
+        // `z.record(z.enum(...))`, which is EXHAUSTIVE — it would demand all
+        // twenty-odd flags in every request, so a one-switch toggle 400s.
+        overrides: z.record(z.string(), z.boolean().nullable()),
+        reason: z.string().max(300).optional(),
+      })
+      .safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return c.json({ error: "invalid body", issues: parsed.error.issues }, 400);
+    const unknown = Object.keys(parsed.data.overrides).filter((k) => !(CLIENT_FLAG_KEYS as string[]).includes(k));
+    if (unknown.length) return c.json({ error: "unknown capability", keys: unknown }, 400);
+
+    const row = await c.env.DB.prepare("SELECT * FROM subject_subscriptions WHERE id = ? AND tenant_id = ?")
+      .bind(c.req.param("id"), who.tenantId)
+      .first<SubRow & { overrides_json: string | null }>();
+    if (!row) return c.json({ error: "not found" }, 404);
+    // Tenant scope is not enough — the row names a client, and every
+    // client-scoped write goes through the same chokepoint.
+    const access = await requireClientAccess(c, row.subject_id);
+    if ("response" in access) return access.response;
+
+    // A RESERVED flag grants nothing anywhere in the product, so an override on
+    // one is a promise the app cannot keep. Refused rather than stored.
+    const reserved = Object.keys(parsed.data.overrides).filter((k) => CLIENT_FLAG_META[k as keyof ClientFlags].reserved);
+    if (reserved.length) return c.json({ error: "that capability isn't something the app can grant yet", keys: reserved }, 400);
+
+    const next: Partial<ClientFlags> = { ...(parseFlagsJson(row.overrides_json) ?? {}) };
+    const changed: string[] = [];
+    for (const [key, value] of Object.entries(parsed.data.overrides)) {
+      const k = key as keyof ClientFlags;
+      if (value === null) { if (k in next) { delete next[k]; changed.push(`${CLIENT_FLAG_META[k].label}: back to the package`); } }
+      else if (next[k] !== value) { next[k] = value; changed.push(`${CLIENT_FLAG_META[k].label}: ${value ? "on" : "off"}`); }
+    }
+    if (!changed.length) return c.json({ ok: true, changed: [] });
+
+    const empty = Object.keys(next).length === 0;
+    const res = await c.env.DB.prepare("UPDATE subject_subscriptions SET overrides_json = ?, updated_at = ? WHERE id = ? AND tenant_id = ?")
+      .bind(empty ? null : j(next), nowIso(), row.id, who.tenantId)
+      .run();
+    // A write that changed no row is a FAILED override, and answering 200 would
+    // leave an audit trail for something that did not happen.
+    if (!res.meta.changes) return c.json({ error: "couldn't save that change — try again" }, 409);
+
+    await recordAudit(c.env, {
+      tenantId: who.tenantId,
+      clientId: access.client.id,
+      actorUserId: who.userId,
+      action: "access.override",
+      summary: `${changed.join(", ")}${parsed.data.reason ? ` — ${parsed.data.reason}` : ""}`,
+      ref: row.id,
+    });
+
+    // Re-resolve and hand back what the client will ACTUALLY have. An override
+    // the budget gate or the studio's plan overrules must not report as granted.
+    let packageFlags = null;
+    if (row.package_id) {
+      const pkg = await c.env.DB.prepare("SELECT flags_json FROM packages WHERE id = ? AND tenant_id = ?").bind(row.package_id, who.tenantId).first<{ flags_json: string | null }>();
+      packageFlags = parseFlagsJson(pkg?.flags_json);
+    }
+    const explained = explainClientFlags({
+      packageFlags,
+      subscriptionFlags: parseFlagsJson(row.flags_json),
+      overrideFlags: next,
+      budgets: parseJson<Budget[]>(row.budgets_json, []),
+      entitlements: await tenantEntitlements(c.env.DB, who.tenantId),
+      nowIso: nowIso(),
+    });
+    return c.json({
+      ok: true,
+      changed,
+      capabilities: CLIENT_FLAG_KEYS.map((key) => ({ key, ...explained[key], override: typeof next[key] === "boolean" ? next[key]! : null })),
     });
   })
 

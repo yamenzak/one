@@ -267,6 +267,19 @@ export interface ResolveFlagsInput {
   packageFlags?: Partial<ClientFlags> | null;
   /** Subscription-level overrides (flags_json on the client subscription). */
   subscriptionFlags?: Partial<ClientFlags> | null;
+  /**
+   * PER-CLIENT overrides a staff member set by hand on this access row
+   * (`overrides_json`), on top of whatever the package sells.
+   *
+   * Its own layer rather than an edit to `subscriptionFlags`, because that column
+   * is a SNAPSHOT of the package taken at grant time — a full set, not a diff.
+   * Editing it in place would work and would destroy the only thing that makes
+   * this feature legible: which capabilities came with the package and which one
+   * person decided. Sparse here means the screen can show "from the package" vs
+   * "you turned this on", and "reset" is deleting a key rather than guessing
+   * what the package used to say.
+   */
+  overrideFlags?: Partial<ClientFlags> | null;
   /** The subscription's budgets; omit entirely for "no subscription" clients. */
   budgets?: Budget[] | null;
   /** Tenant plan entitlements — the outer bound. */
@@ -307,8 +320,65 @@ export function unionClientFlags(a: ClientFlags, b: ClientFlags): ClientFlags {
 
 /** THE resolver. Everything client-capability flows through here. */
 export function resolveClientFlags(input: ResolveFlagsInput): ClientFlags {
-  let flags = applyPartial(DEFAULT_CLIENT_FLAGS, input.packageFlags);
-  flags = applyPartial(flags, input.subscriptionFlags);
+  const out = {} as ClientFlags;
+  const explained = explainClientFlags(input);
+  for (const key of CLIENT_FLAG_KEYS) out[key] = explained[key].value;
+  return out;
+}
+
+/** Where a flag's value came from, before anything overruled it. */
+export type FlagSource = "default" | "package" | "override";
+/** What overruled it, if anything did. */
+export type FlagBlocker = "budget" | "entitlement" | "ai-master";
+
+export interface FlagExplanation {
+  /** The effective value — identical to `resolveClientFlags`'s. */
+  value: boolean;
+  /** Which layer last SET it. `override` means a staff member changed it for
+   *  this one client, which is the whole point of the override lane. */
+  source: FlagSource;
+  /** What the layers said before the gates ran. `value !== granted` means a
+   *  gate overruled a real grant, and `blockedBy` says which. */
+  granted: boolean;
+  blockedBy: FlagBlocker | null;
+}
+
+export type ClientFlagExplanation = Record<keyof ClientFlags, FlagExplanation>;
+
+/**
+ * `resolveClientFlags` with its working shown, per flag.
+ *
+ * This is the SAME merge — the resolver is a projection of it — because two
+ * implementations of "what can this client do" is exactly how a screen comes to
+ * promise something the routes refuse. It exists because the coach's answer to
+ * "why can't my client see their meal plan" needs the reason, not the boolean:
+ * the package never included it, or someone overrode it, or their meal days ran
+ * out, or the studio's own plan doesn't carry the feature. Those are four
+ * different conversations and the flag alone tells you none of them.
+ */
+export function explainClientFlags(input: ResolveFlagsInput): ClientFlagExplanation {
+  const out = {} as ClientFlagExplanation;
+  for (const key of CLIENT_FLAG_KEYS) {
+    // Layers, last one wins: defaults → package → the row's own flags →
+    // the per-client override. `applyPartial`'s rule holds at each step — only a
+    // real boolean counts, so an absent key falls through rather than reading
+    // as `false`.
+    let value = DEFAULT_CLIENT_FLAGS[key];
+    let source: FlagSource = "default";
+    if (typeof input.packageFlags?.[key] === "boolean") { value = input.packageFlags[key]!; source = "package"; }
+    // The row's snapshot is a COPY of the package's flags taken at grant time
+    // (see the grant path), so it is the package layer for anyone already
+    // holding the row — not a third opinion. It reports as `package`.
+    if (typeof input.subscriptionFlags?.[key] === "boolean") { value = input.subscriptionFlags[key]!; source = "package"; }
+    if (typeof input.overrideFlags?.[key] === "boolean") { value = input.overrideFlags[key]!; source = "override"; }
+    out[key] = { value, source, granted: value, blockedBy: null };
+  }
+
+  const block = (key: keyof ClientFlags, by: FlagBlocker) => {
+    if (!out[key].value) return; // already off; the first reason is the true one
+    out[key].value = false;
+    out[key].blockedBy = by;
+  };
 
   // Budget gating. Contract: `budgets` present (any array, incl. empty) means
   // this client HAS an access subscription, so plan flags are gated by whether a
@@ -316,10 +386,14 @@ export function resolveClientFlags(input: ResolveFlagsInput): ClientFlags {
   // revokes plan access. `null`/`undefined` means "no subscription context"
   // (e.g. a preview) and skips gating. `[]` and `null` are deliberately NOT the
   // same: one is a lapsed subscriber, the other is no subscriber.
+  //
+  // ⚠️ This runs AFTER the override layer, on purpose. An override may hand a
+  // client a capability their package did not include; it may NOT hand them one
+  // whose days have run out, and it may not widen the tenant's own plan below.
   if (input.budgets) {
     for (const key of CLIENT_FLAG_KEYS) {
       const gate = CLIENT_FLAG_META[key].budgetGate;
-      if (gate && !hasActiveBudget(input.budgets, gate, input.nowIso)) flags[key] = false;
+      if (gate && !hasActiveBudget(input.budgets, gate, input.nowIso)) block(key, "budget");
     }
   }
 
@@ -329,14 +403,14 @@ export function resolveClientFlags(input: ResolveFlagsInput): ClientFlags {
   // automatically instead of silently slipping through.
   for (const key of CLIENT_FLAG_KEYS) {
     const req = CLIENT_FLAG_META[key].requiresFeature;
-    if (req && !input.entitlements.features[req]) flags[key] = false;
+    if (req && !input.entitlements.features[req]) block(key, "entitlement");
   }
   // AI groups are bounded by the master switch: no master → no groups. This
   // makes the master both a tenant-entitlement gate and a package-level kill.
-  if (!flags.canUseAi) {
-    flags.aiMealTools = false;
-    flags.aiCoachInsights = false;
+  if (!out.canUseAi.value) {
+    block("aiMealTools", "ai-master");
+    block("aiCoachInsights", "ai-master");
   }
 
-  return flags;
+  return out;
 }

@@ -30,10 +30,16 @@ export const LIVE_ACCESS_STATUSES = ["active", "paused"] as const;
 export const REPORTED_ACCESS_STATUSES = ["active", "paused", "expired"] as const;
 
 export interface ClientAccessRow {
+  /** The row's own id — what an override is written against. */
+  id: string;
   status: string;
   package_id: string | null;
   budgets_json: string | null;
+  /** A SNAPSHOT of the package's flags, copied at grant time (see the grant
+   *  path in commerce-routes.ts). Not a diff, and not an override. */
   flags_json: string | null;
+  /** The sparse per-client override a staff member set on THIS row. */
+  overrides_json: string | null;
 }
 
 /**
@@ -59,7 +65,7 @@ export async function loadClientAccessRows(
 ): Promise<ClientAccessRow[]> {
   const ph = statuses.map(() => "?").join(",");
   const r = await db
-    .prepare(`SELECT status, package_id, budgets_json, flags_json FROM subject_subscriptions WHERE subject_id = ? AND tenant_id = ? AND status IN (${ph}) ORDER BY started_at DESC`)
+    .prepare(`SELECT id, status, package_id, budgets_json, flags_json, overrides_json FROM subject_subscriptions WHERE subject_id = ? AND tenant_id = ? AND status IN (${ph}) ORDER BY started_at DESC`)
     .bind(clientId, tenantId, ...statuses)
     .all<ClientAccessRow>();
   return r.results ?? [];
@@ -99,6 +105,7 @@ export async function resolveClientFlagsFor(db: D1Database, tenantId: string, cl
       resolveClientFlags({
         packageFlags,
         subscriptionFlags: parseFlagsJson(row.flags_json),
+        overrideFlags: parseFlagsJson(row.overrides_json),
         budgets: parseJson<Budget[]>(row.budgets_json, []),
         entitlements,
         nowIso,

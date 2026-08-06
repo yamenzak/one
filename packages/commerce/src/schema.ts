@@ -34,6 +34,8 @@ export const COMMERCE_SCHEMA: SchemaModule = {
   /**
    * ⚠️ BUMP THIS WHENEVER A STATEMENT BELOW CHANGES. Nothing detects intent.
    *
+   * `4 → 5` adds `subject_subscriptions.overrides_json` — see the ALTER.
+   *
    * `3 → 4` adds `subject_package_grants` — see its comment. Without it
    * `once_per_customer` was unenforceable on every repeat sale, because the
    * only record of "this customer got this package" was a single `package_id`
@@ -49,7 +51,7 @@ export const COMMERCE_SCHEMA: SchemaModule = {
    * the module in full, so every test and every Miniflare run had the tables and
    * was green. Only databases with history were broken — i.e. only production.
    */
-  version: "4",
+  version: "5",
   ddl: [
     "CREATE TABLE IF NOT EXISTS packages (id TEXT PRIMARY KEY, tenant_id TEXT, name TEXT, description TEXT, one_time_price_cents INTEGER, monthly_price_cents INTEGER, installment_months INTEGER, currency TEXT DEFAULT 'usd', budgets_json TEXT, addons_json TEXT, flags_json TEXT, visibility TEXT DEFAULT 'private', restricted_subject_id TEXT, once_per_customer INTEGER DEFAULT 0, stripe_product_id TEXT, stripe_price_id TEXT, stripe_monthly_price_id TEXT, active INTEGER DEFAULT 1, created_at TEXT);",
     "CREATE INDEX IF NOT EXISTS idx_packages_tenant ON packages(tenant_id, active);",
@@ -140,6 +142,21 @@ export const COMMERCE_SCHEMA: SchemaModule = {
     // Per-package because a hosted payment link is fixed-price, so one link
     // cannot serve a catalogue.
     "ALTER TABLE packages ADD COLUMN pay_link TEXT",
+    /**
+     * PER-SUBJECT capability overrides on ONE access row.
+     *
+     * `flags_json` beside it is a SNAPSHOT of the package's flags, copied whole
+     * at grant time — so editing it to give one customer one extra capability
+     * works and then nobody can tell which capabilities came with the package
+     * and which a staff member decided. This column is the sparse diff: only the
+     * keys somebody deliberately changed, so "reset to the package" is deleting
+     * a key rather than reconstructing what the package used to say.
+     *
+     * The SHAPE is the app's — this package never reads it. It is stored here
+     * because it belongs to the access row, and an app that sells no
+     * capabilities simply leaves it null.
+     */
+    "ALTER TABLE subject_subscriptions ADD COLUMN overrides_json TEXT",
   ],
   scoped: {
     tenantColumn: "tenant_id",

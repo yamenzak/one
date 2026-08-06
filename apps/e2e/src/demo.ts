@@ -127,7 +127,7 @@ export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"):
 
   await seedFrontDesk(studio, client.id);
   await seedClinical(studio, client.id);
-  await seedCommerce(studio);
+  await seedCommerce(studio, client.id);
   await seedStaff(studio);
 
   return { studio, client, roster, planId, mealPlanId, fixedMealPlanId };

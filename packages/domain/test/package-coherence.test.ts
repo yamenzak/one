@@ -16,6 +16,7 @@ import {
   packageContradictions,
   flagsGatedByScope,
   resolveClientFlags,
+  explainClientFlags,
   CLIENT_FLAG_META,
 } from "../src/clientFlags.js";
 import { BUDGET_SCOPES } from "../src/budgets.js";
@@ -139,5 +140,111 @@ describe("packageContradictions", () => {
     const before = { ...DEFAULT_CLIENT_FLAGS };
     packageContradictions(before, [{ feature: "meal" }], BUDGET_SCOPES);
     expect(before).toEqual(DEFAULT_CLIENT_FLAGS);
+  });
+});
+
+/**
+ * The OVERRIDE lane: one client, one capability, without minting a package to
+ * hold it. What matters is not that it works — it is a fourth `applyPartial`
+ * — but that it cannot reach past the two gates underneath it.
+ */
+describe("per-client overrides", () => {
+  const live = (feature: string): Budget => ({ feature, daysTotal: 30, startedAt: NOW, expiresAt: inDays(30) });
+  const lapsed = (feature: string): Budget => ({ feature, daysTotal: 30, startedAt: inDays(-60), expiresAt: inDays(-1) });
+
+  it("grants a capability the package left off", () => {
+    const e = explainClientFlags({
+      packageFlags: { canViewExerciseReport: false },
+      overrideFlags: { canViewExerciseReport: true },
+      budgets: [live("all")],
+      entitlements: ent,
+      nowIso: NOW,
+    });
+    expect(e.canViewExerciseReport.value).toBe(true);
+    expect(e.canViewExerciseReport.source).toBe("override");
+  });
+
+  it("takes one away that the package included", () => {
+    const e = explainClientFlags({
+      packageFlags: { canLogOwnFood: true },
+      overrideFlags: { canLogOwnFood: false },
+      budgets: [live("all")],
+      entitlements: ent,
+      nowIso: NOW,
+    });
+    expect(e.canLogOwnFood.value).toBe(false);
+    expect(e.canLogOwnFood.source).toBe("override");
+  });
+
+  it("CANNOT outrun a lapsed budget", () => {
+    const e = explainClientFlags({
+      packageFlags: null,
+      overrideFlags: { canAccessMealPlan: true },
+      budgets: [live("workout"), lapsed("meal")],
+      entitlements: ent,
+      nowIso: NOW,
+    });
+    expect(e.canAccessMealPlan.value).toBe(false);
+    // The grant is real and the gate is what stopped it — which is the
+    // difference between "your coach didn't include this" and "buy more days".
+    expect(e.canAccessMealPlan.granted).toBe(true);
+    expect(e.canAccessMealPlan.blockedBy).toBe("budget");
+  });
+
+  it("CANNOT outrun the studio's own Kova plan", () => {
+    const noAi = resolveEntitlements(JSON.stringify({ features: { aiSuite: false } }));
+    const e = explainClientFlags({
+      packageFlags: null,
+      overrideFlags: { canUseAi: true, aiCoachInsights: true },
+      budgets: [live("all")],
+      entitlements: noAi,
+      nowIso: NOW,
+    });
+    expect(e.canUseAi.value).toBe(false);
+    expect(e.canUseAi.blockedBy).toBe("entitlement");
+    expect(e.aiCoachInsights.value).toBe(false);
+  });
+
+  it("an AI group override still dies with the master switch", () => {
+    const e = explainClientFlags({
+      packageFlags: { canUseAi: false },
+      overrideFlags: { aiMealTools: true },
+      budgets: [live("all")],
+      entitlements: ent,
+      nowIso: NOW,
+    });
+    expect(e.aiMealTools.value).toBe(false);
+    expect(e.aiMealTools.blockedBy).toBe("ai-master");
+  });
+
+  it("reports the SOURCE so a screen can say 'from the package' or 'you changed this'", () => {
+    const e = explainClientFlags({
+      packageFlags: { canLogWater: false },
+      overrideFlags: { canTrackFasting: true },
+      budgets: [live("all")],
+      entitlements: ent,
+      nowIso: NOW,
+    });
+    expect(e.canLogWater.source).toBe("package");
+    expect(e.canTrackFasting.source).toBe("override");
+    expect(e.canLogSleep.source).toBe("default");
+  });
+
+  it("explainClientFlags and resolveClientFlags never disagree", () => {
+    // The whole point of the projection: two implementations of "what can this
+    // client do" is how a screen comes to promise what a route refuses.
+    const input = {
+      packageFlags: { canAccessMealPlan: false, canUseAi: true },
+      subscriptionFlags: { canLogOwnFood: false },
+      overrideFlags: { canViewExerciseReport: false, canTrackFasting: true },
+      budgets: [live("workout"), lapsed("meal")],
+      entitlements: ent,
+      nowIso: NOW,
+    };
+    const flags = resolveClientFlags(input);
+    const explained = explainClientFlags(input);
+    for (const key of Object.keys(flags) as (keyof typeof flags)[]) {
+      expect(explained[key].value, key).toBe(flags[key]);
+    }
   });
 });

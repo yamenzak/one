@@ -6,8 +6,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { fmtWeight, kgToDisplay, weightLabel } from "@kova/domain";
-import { Button, Card, Badge, Field, Select, Textarea, Sheet, SubCard, Chip, Collapsible, useOneOpen, Callout, Wrench, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonLine, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, NoData, Anchor, ActionCluster, CountUp, Group, Row, GroupNote, RotateCcw, History, Users, Play, Pause, ChevronRight, ActionResult, useAction as useActionBase, type Tone } from "@4dl/ui";
+import { fmtWeight, kgToDisplay, weightLabel, CLIENT_FLAG_CATEGORIES, type ClientFlags } from "@kova/domain";
+import { Button, Card, Badge, Field, Select, Textarea, Sheet, SubCard, Chip, Collapsible, useOneOpen, Callout, Wrench, Page, Stagger, IconBadge, Eyebrow, GlanceStrip, EmptyState, Reveal, SkeletonStatGrid, SkeletonList, SkeletonLine, SkeletonRow, PhotoGrid, ConfirmDialog, Avatar, Spinner, Ticket, ArrowLeftRight, FlaskConical, Pill, ClipboardList, BarChart3, BookOpen, Plus, Check, X, ImageIcon, User, Star, Archive, Trash2, AlertTriangle, NoData, Anchor, ActionCluster, CountUp, Group, Row, GroupNote, RotateCcw, History, Users, Play, Pause, ChevronRight, ActionResult, Switch, useConfirmedState, ShieldCheck, useAction as useActionBase, type Tone } from "@4dl/ui";
 import { personaLabel, personaTone } from "../../registry/index.js";
 import { api, errorText, todayLocal } from "../../api.js";
 import { FeatureLock, useCan } from "../../FeatureLock.js";
@@ -98,6 +98,7 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [grantOpen, setGrantOpen] = useState(false);
   const [fixOpen, setFixOpen] = useState(false);
+  const [capsOpen, setCapsOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [suppOpen, setSuppOpen] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
@@ -264,6 +265,18 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
                 ))}
               </div>
             )}
+            {/*
+              The package NAME is not an answer to "what does this client
+              actually get". Two clients on the same package can differ (an
+              override), and the same client can lose half of it silently (a
+              lapsed scope, a plan the studio downgraded) — so the capabilities
+              live behind a row rather than being inferred from the name above.
+            */}
+            <Group>
+              <Row icon={ShieldCheck} sub="Every capability, where it came from, and what to change for this client" onClick={() => setCapsOpen(true)}>
+                What they can do
+              </Row>
+            </Group>
           </Stagger>
         </section>
       )}
@@ -507,6 +520,7 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
       </Sheet>
 
       {fixOpen && active && <CorrectDaysSheet clientId={clientId} sub={active} onClose={() => setFixOpen(false)} onDone={() => { setFixOpen(false); void load(); }} />}
+      {capsOpen && <CapabilitiesSheet clientId={clientId} onClose={() => setCapsOpen(false)} />}
 
       {suppOpen && <PrescribeSheet clientId={clientId} onClose={() => setSuppOpen(false)} onDone={() => { setSuppOpen(false); void load(); }} />}
       {suggestOpen && <SuggestSuppSheet clientId={clientId} onClose={() => setSuggestOpen(false)} onPrescribed={load} />}
@@ -1645,5 +1659,161 @@ function CorrectDaysSheet({ clientId, sub, onClose, onDone }: {
         <ActionResult msg={act.msg} err={act.err} />
       </div>
     </Sheet>
+  );
+}
+
+// ── What this client can actually do ─────────────────────────────────────────
+
+interface Capability {
+  key: keyof ClientFlags;
+  label: string;
+  category: string;
+  /** The effective answer — what the routes will enforce. */
+  value: boolean;
+  /** Which layer last set it, before the gates ran. */
+  source: "default" | "package" | "override";
+  /** What the layers said, before the gates ran. */
+  granted: boolean;
+  blockedBy: "budget" | "entitlement" | "ai-master" | null;
+  /** Non-null ⇒ a staff member set this by hand for this one client. */
+  override: boolean | null;
+}
+interface CapabilityRow {
+  subscriptionId: string;
+  packageName: string | null;
+  status: string;
+  daysByFeature: Record<string, number>;
+  capabilities: Capability[];
+}
+
+/**
+ * Why a capability is off despite being granted. Each is a DIFFERENT fix, which
+ * is the entire reason the resolver reports a blocker instead of a boolean:
+ * one is a purchase, one is a plan upgrade, one is another switch on this
+ * screen — and none of them is "turn this on", which is what a bare dead toggle
+ * silently suggests.
+ */
+const BLOCKED_WHY: Record<string, string> = {
+  // Covers BOTH "the days ran out" and "this package never sold any" —
+  // indistinguishable to the gate, and the fix is the same either way.
+  budget: "No days left for this — top them up to switch it on",
+  entitlement: "Not in your studio's Kova plan",
+  "ai-master": "AI is off for this client — turn on “AI (all)” first",
+};
+
+function CapabilitiesSheet({ clientId, onClose }: { clientId: string; onClose: () => void }) {
+  const [rows, setRows] = useState<CapabilityRow[] | null>(null);
+  const [error, setError] = useState(false);
+  const load = useCallback(async () => {
+    setError(false);
+    try {
+      const r = await api.get<{ rows: CapabilityRow[] }>(`/api/subscriptions/capabilities?clientId=${clientId}`);
+      setRows(r.rows);
+    } catch { setError(true); }
+  }, [clientId]);
+  useEffect(() => { void load(); }, [load]);
+
+  return (
+    <Sheet open onClose={onClose} title="What they can do" size="tall">
+      <Reveal loading={rows === null && !error} className="space-y-6" skeleton={<><SkeletonLine /><SkeletonList rows={6} thumb={0} /></>}>
+        {error ? (
+          <EmptyState icon={AlertTriangle} title="Couldn't load their capabilities" description="Something went wrong reaching the server." action={<Button onClick={() => void load()}>Try again</Button>} />
+        ) : rows && rows.length === 0 ? (
+          <EmptyState icon={Ticket} title="No access yet" description="Grant a package and their capabilities appear here." />
+        ) : (
+          rows?.map((row) => <CapabilityGroup key={row.subscriptionId} row={row} onSaved={load} />)
+        )}
+      </Reveal>
+    </Sheet>
+  );
+}
+
+function CapabilityGroup({ row, onSaved }: { row: CapabilityRow; onSaved: () => Promise<void> }) {
+  // One instant control per switch (§ the save lifecycle): the optimistic value
+  // shows immediately and rolls back to the pre-toggle snapshot if the write
+  // fails. On SUCCESS the server's re-resolved answer replaces it outright —
+  // an override the budget gate or the studio's own plan overrules must show as
+  // off, and only the server knows that.
+  const caps = useConfirmedState<Capability[]>(row.capabilities, errorText);
+  useEffect(() => { caps.reset(row.capabilities); }, [row.capabilities]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const write = (key: keyof ClientFlags, next: boolean | null) =>
+    caps.commit(
+      key,
+      (cur) => cur.map((c) => (c.key === key ? { ...c, value: next ?? c.granted, override: next } : c)),
+      async () => {
+        const r = await api.patch<{ capabilities: Capability[] }>(`/api/subscriptions/${row.subscriptionId}/overrides`, { overrides: { [key]: next } });
+        // The server re-resolves through the same merge; trust it over the
+        // optimistic guess, then refresh the source labels from the list route.
+        const byKey = new Map(r.capabilities.map((c) => [c.key, c]));
+        caps.set((cur) => cur.map((c) => ({ ...c, ...byKey.get(c.key), label: c.label, category: c.category })));
+        void onSaved();
+      },
+      "Couldn't change that capability — nothing was altered.",
+    );
+
+  const overridden = caps.value.filter((c) => c.override !== null).length;
+  const on = caps.value.filter((c) => c.value).length;
+
+  return (
+    <section className="space-y-3">
+      <Eyebrow action={<Badge tone={overridden ? "cardio" : "neutral"}>{on} of {caps.value.length}</Badge>}>
+        {row.packageName ?? "Access"}
+      </Eyebrow>
+      {overridden > 0 && (
+        <p className="px-1 text-caption text-muted-foreground">
+          {overridden === 1 ? "One capability is" : `${overridden} capabilities are`} set for this client only — the package itself is unchanged.
+        </p>
+      )}
+      {caps.err && <ActionResult msg={null} err={caps.err} />}
+
+      {CLIENT_FLAG_CATEGORIES.map((cat) => {
+        const items = caps.value.filter((c) => c.category === cat.key);
+        if (!items.length) return null;
+        return (
+          <div key={cat.key} className="space-y-1.5 rounded-2xl bg-card p-3">
+            <div className="text-micro uppercase text-muted-foreground">{cat.label}</div>
+            {items.map((c) => {
+              // An entitlement the STUDIO doesn't hold cannot be overridden into
+              // existence, so the switch is dead rather than misleading. A
+              // lapsed budget is different — the capability is real and the fix
+              // is days, so the coach may still stage the toggle.
+              const locked = c.blockedBy === "entitlement";
+              return (
+                <div key={c.key} className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="truncate text-sm">{c.label}</span>
+                      {c.override !== null && <Badge tone="cardio">Set for them</Badge>}
+                    </div>
+                    {/* Only the EXCEPTIONS get a line. "From the package" under
+                        all twenty-four rows is texture, not information — and it
+                        buries the one row that actually differs. What is left is
+                        a reason to read: a blocker, or a change somebody made. */}
+                    {(c.blockedBy || c.source === "override") && (
+                      <div className="text-xs text-muted-foreground">
+                        {c.blockedBy ? BLOCKED_WHY[c.blockedBy] : "You changed this for them"}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {c.override !== null && (
+                      <button
+                        type="button"
+                        aria-label={`Reset ${c.label} to the package`}
+                        disabled={caps.busy !== null}
+                        onClick={() => void write(c.key, null)}
+                        className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 [&_svg]:size-3.5"
+                      ><RotateCcw /></button>
+                    )}
+                    <Switch checked={c.value} disabled={locked || caps.busy !== null} onCheckedChange={(v) => void write(c.key, v)} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </section>
   );
 }

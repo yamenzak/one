@@ -153,6 +153,17 @@ test("the coach's studio", async () => {
     await shoot(page, project, "coach-client-manage", { settle: 900 });
   });
 
+  // The capability sheet — the answer to "what does this client actually get",
+  // which the package name above it cannot give. The seeded client is on a
+  // workout-only package, so this photographs the interesting half: capabilities
+  // ON from the package, and meal ones OFF with the reason the coach can act on.
+  await test.step("what a client can do", async () => {
+    await visit(page, `${base}/clients/${world.client.id}/manage`, shell);
+    await page.getByText("What they can do").click();
+    await shoot(page, project, "coach-client-capabilities", { ready: page.getByText("Log own food"), settle: 600 });
+    await page.keyboard.press("Escape");
+  });
+
   // The clinical lists, which sit below the check-in review and therefore below
   // the fold at phone height. Scrolled to rather than cropped from the shot
   // above: the claim is that supplements and labs now read as one scannable

@@ -463,6 +463,24 @@ remote bindings without editing the config (this is what the E2E suite does).
     `macroBreakdown` computes from the client's own food entries, so there is
     nothing a route could withhold without breaking logging. Adding a second
     entry means editing `EXPECTED_UI_ONLY` in the guard, on purpose, in review.
+  - **Three flag layers, and only ONE of them is a diff.** Defaults → the
+    package (live) → `subject_subscriptions.flags_json` → `overrides_json`, then
+    the budget gate, then ∩ entitlements. `flags_json` is a SNAPSHOT the grant
+    path copies whole from the package, so it masks later package edits for
+    anyone already holding the row — that is existing behaviour, not a bug to
+    "fix" casually. `overrides_json` is the sparse per-client exception a coach
+    sets by hand; `null` on a key means "back to the package", which only works
+    because it is a diff. Gates run AFTER both, so an override can never widen a
+    lapsed budget or the studio's own Kova plan.
+  - **`explainClientFlags` is the resolver with its working shown**, and
+    `resolveClientFlags` is a projection of it — one merge, not two, because two
+    implementations of "what can this client do" is how a screen comes to promise
+    what a route refuses. It powers `GET /api/subscriptions/capabilities`
+    (per-flag `value`/`source`/`granted`/`blockedBy`) and the coach's "What they
+    can do" sheet. `PATCH /api/subscriptions/:id/overrides` is the write —
+    staff-only **in the handler**, because the action gate is invisible to the
+    integration suite (AGENTS.md §4) and `requireClientAccess` admits a client
+    reading their own row.
   - **Budgets and flags can contradict, and the builder says so** —
     `packageContradictions` (pure, `clientFlags.ts`). Meal days sold with both
     meal-gated flags off buy nothing and still count down; a meal flag on with no
