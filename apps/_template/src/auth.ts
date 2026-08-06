@@ -42,7 +42,7 @@ export type { SeatVerdict };
  * reading you want before you price it.
  */
 const seatConfig = (env: AuthBindings): SeatConfig => ({
-  customerRole: CUSTOMER_ROLE,
+  seatFreeRoles: [CUSTOMER_ROLE],
   quota: (tenantId, used) => withinQuota(env.DB, tenantId, "staffSeats", used),
 });
 
@@ -55,7 +55,7 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape): Shared
     ac: ac as never,
     roles,
     creatorRole: CREATOR_ROLE,
-    customerRole: CUSTOMER_ROLE,
+    seatFreeRoles: [CUSTOMER_ROLE],
     rpName: "Template",
     cookiePrefix: "template",
     seats: seatConfig,

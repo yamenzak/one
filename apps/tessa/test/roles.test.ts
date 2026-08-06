@@ -105,9 +105,9 @@ describe("a custom grant narrows and never widens", () => {
 
 describe("the seat lane", () => {
   it("has no seat-free role, so every member counts", () => {
-    // `customerRole` is used for ONE thing in @4dl/auth: `role != customerRole`
-    // in the seat count, plus the three invite/accept/promote hooks. Pointing it
-    // at a real role — it was `auditor` — makes that role free and unlimited,
+    // `seatFreeRoles` is used for ONE thing in @4dl/auth: `role NOT IN (…)` in
+    // the seat count, plus the three invite/accept/promote hooks. Putting a real
+    // role in it — `auditor` was in it — makes that role free and unlimited,
     // while access.ts claimed the opposite in prose.
     expect(ROLE_NAMES as string[]).not.toContain(CUSTOMER_ROLE);
   });

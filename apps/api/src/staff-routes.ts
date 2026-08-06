@@ -58,7 +58,7 @@ export const staffRoutes = sharedStaffRoutes<AppEnv>({
   // The one role that is not a staff seat — it has to match `auth.ts`'s
   // `customerRole`, or the count the screen shows and the count the invite
   // enforces disagree.
-  customerRole: "client",
+  seatFreeRoles: ["client"],
   roleNames: STAFF_ROLES,
   /**
    * `client` is a demotion target and NOT an invitable role. A studio moving

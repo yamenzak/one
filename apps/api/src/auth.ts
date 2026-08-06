@@ -41,7 +41,7 @@ export type { SeatVerdict };
  * So Free/Solo (`staffSeats: 1`) is a one-coach studio by design.
  */
 const seatConfig = (env: AuthBindings): SeatConfig => ({
-  customerRole: "client",
+  seatFreeRoles: ["client"],
   quota: (tenantId, used) => withinQuota(env.DB, tenantId, "staffSeats", used),
 });
 
@@ -108,7 +108,7 @@ export function createAuth(env: Env, origin?: string, shape?: HostShape): Shared
     ac: ac as never,
     roles,
     creatorRole: "owner",
-    customerRole: "client",
+    seatFreeRoles: ["client"],
     rpName: "Kova",
     cookiePrefix: "kova",
     seats: seatConfig,

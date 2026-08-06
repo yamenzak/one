@@ -75,8 +75,17 @@ export interface AuthConfig {
   roles: Record<string, unknown>;
   /** The role a tenant's creator receives. */
   creatorRole: string;
-  /** The role that is NOT a staff seat — the app's end-customer role. */
-  customerRole: string;
+  /**
+   * Every role that does NOT consume a staff seat. Plural because Scena has two
+   * (see `seats.ts`); one-element for Kova, and a no-match sentinel for an app
+   * where everyone is staff.
+   *
+   * ⚠️ It must be the SAME list `SeatConfig.seatFreeRoles` carries. The three
+   * hooks below decide whether a seat is being claimed at all, and the counter
+   * decides whether there is room — two answers to one question, and a
+   * divergence makes a role either free-and-unlimited or permanently refused.
+   */
+  seatFreeRoles: readonly string[];
   /** WebAuthn RP display name, shown in the platform passkey prompt. */
   rpName: string;
   /** Cookie name prefix. Distinct per app so two apps on one host never collide. */
@@ -230,6 +239,11 @@ export function createAuth(env: AuthBindings, origin: string | undefined, shape:
   }
 
   const seats = cfg.seats?.(env);
+  // ONE predicate for the three hooks below, so "is this role a seat?" cannot be
+  // answered differently in three places. `Set` because a hook runs per
+  // invitation and the list is tiny but re-scanned on every one.
+  const seatFree = new Set(cfg.seatFreeRoles);
+  const isSeatFree = (role: string): boolean => seatFree.has(role);
 
   return betterAuth({
     database: env.DB,
@@ -302,7 +316,7 @@ export function createAuth(env: AuthBindings, origin: string | undefined, shape:
          */
         organizationHooks: {
           beforeCreateInvitation: async ({ invitation, organization: org }) => {
-            if (invitation.role === cfg.customerRole) return; // not a staff seat
+            if (isSeatFree(invitation.role as string)) return; // not a staff seat
             const refusal = await cfg.checkInviteRole?.(env, org.id, invitation.role as string);
             if (refusal) throw new APIError("FORBIDDEN", { message: refusal, code: "FEATURE_NOT_IN_PLAN" });
             if (!seats) return;
@@ -311,7 +325,7 @@ export function createAuth(env: AuthBindings, origin: string | undefined, shape:
             if (!seat.ok) throw seatError(seat);
           },
           beforeAcceptInvitation: async ({ invitation, user, organization: org }) => {
-            if (invitation.role === cfg.customerRole || !seats) return;
+            if (isSeatFree(invitation.role as string) || !seats) return;
             // Already a member ⇒ they already occupy their seat. Counting them
             // again would refuse a legitimate re-accept — e.g. the deep link
             // firing after the app already minted the membership.
@@ -324,8 +338,8 @@ export function createAuth(env: AuthBindings, origin: string | undefined, shape:
             if (!seat.ok) throw seatError(seat);
           },
           beforeUpdateMemberRole: async ({ member, newRole, organization: org }) => {
-            // Only customer → staff claims a NEW seat.
-            if (newRole === cfg.customerRole || member.role !== cfg.customerRole || !seats) return;
+            // Only seat-free → staff claims a NEW seat.
+            if (isSeatFree(newRole as string) || !isSeatFree(member.role as string) || !seats) return;
             const seat = await checkStaffSeat(env.DB, org.id, seats);
             if (!seat.ok) throw seatError(seat);
           },

@@ -56,7 +56,7 @@ export const staffRoutes = sharedStaffRoutes<AppEnv>({
   creatorRole: CREATOR_ROLE,
   // Tessa has no customer role — `CUSTOMER_ROLE` is a sentinel nobody holds, so
   // every membership is a staff seat. See `access.ts`.
-  customerRole: CUSTOMER_ROLE,
+  seatFreeRoles: [CUSTOMER_ROLE],
   roleNames: ROLE_NAMES,
   roleCopy: ROLE_COPY,
   roleGrants: Object.fromEntries(

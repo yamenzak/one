@@ -17,6 +17,21 @@
  * `countPending` is the subtlety: a pending invitation is a RESERVED seat, so it
  * counts when creating one and must NOT count when accepting one (the invitation
  * being accepted would count itself and refuse the last seat).
+ *
+ * ── Why the seat-free set is a LIST ────────────────────────────────────────
+ *
+ * It was one string, `customerRole`, because Kova has exactly one principal that
+ * is not staff: a client. Scena has two — a board COORDINATOR and a board
+ * STATION, the accounts behind a counter's "call next" button — and they are not
+ * one role wearing two hats: a coordinator drives a whole board while a station
+ * drives one option of it, and both are provisioned per BOARD, so a clinic with
+ * eight rooms mints eight of them. Against a single-string ceiling every one of
+ * those counted as a member of staff, and a four-seat plan ran out of room
+ * before anybody was hired.
+ *
+ * So the field is plural. An app with one such role passes a one-element array
+ * and nothing changes; an app with none passes a sentinel that matches no role
+ * (Tessa does) and every member counts.
  */
 
 export interface SeatVerdict {
@@ -28,28 +43,45 @@ export interface SeatVerdict {
 }
 
 export interface SeatConfig {
-  /** The role that is NOT a staff seat — the app's end-customer role. */
-  customerRole: string;
+  /**
+   * Every role that does NOT consume a staff seat — the app's end-customers and
+   * its device-shaped principals. Empty means "every member is staff".
+   */
+  seatFreeRoles: readonly string[];
   /** The tenant's ceiling, and whether `used` is within it. */
   quota: (tenantId: string, used: number) => Promise<{ ok: boolean; max: number }>;
   /** What this app calls a staff seat, singular. Used in the copy. */
   seatNoun?: string;
 }
 
-/** Seats consumed right now: every non-customer membership. */
-export async function staffSeatsUsed(db: D1Database, tenantId: string, customerRole: string): Promise<number> {
+/**
+ * `role NOT IN (…)` with the right number of placeholders, plus the bindings.
+ *
+ * An empty list would make `NOT IN ()` a syntax error in SQLite, so it collapses
+ * to a tautology instead — which is the correct reading: no seat-free role means
+ * every membership is a seat.
+ */
+function notInSeatFree(roles: readonly string[]): { sql: string; binds: readonly string[] } {
+  if (!roles.length) return { sql: "1 = 1", binds: [] };
+  return { sql: `role NOT IN (${roles.map(() => "?").join(", ")})`, binds: roles };
+}
+
+/** Seats consumed right now: every membership whose role is not seat-free. */
+export async function staffSeatsUsed(db: D1Database, tenantId: string, seatFreeRoles: readonly string[]): Promise<number> {
+  const { sql, binds } = notInSeatFree(seatFreeRoles);
   const row = await db
-    .prepare('SELECT COUNT(*) AS n FROM "member" WHERE organizationId = ? AND role != ?')
-    .bind(tenantId, customerRole)
+    .prepare(`SELECT COUNT(*) AS n FROM "member" WHERE organizationId = ? AND ${sql}`)
+    .bind(tenantId, ...binds)
     .first<{ n: number }>();
   return row?.n ?? 0;
 }
 
-/** Seats already promised: pending, unexpired, non-customer invitations. */
-export async function pendingStaffSeats(db: D1Database, tenantId: string, customerRole: string): Promise<number> {
+/** Seats already promised: pending, unexpired invitations to a staff role. */
+export async function pendingStaffSeats(db: D1Database, tenantId: string, seatFreeRoles: readonly string[]): Promise<number> {
+  const { sql, binds } = notInSeatFree(seatFreeRoles);
   const rows = await db
-    .prepare("SELECT expiresAt FROM \"invitation\" WHERE organizationId = ? AND status = 'pending' AND role != ?")
-    .bind(tenantId, customerRole)
+    .prepare(`SELECT expiresAt FROM "invitation" WHERE organizationId = ? AND status = 'pending' AND ${sql}`)
+    .bind(tenantId, ...binds)
     .all<{ expiresAt: string | number | null }>();
   const now = Date.now();
   return (rows.results ?? []).filter((r) => {
@@ -66,8 +98,8 @@ export async function checkStaffSeat(
   opts: { countPending?: boolean } = {},
 ): Promise<SeatVerdict> {
   const noun = cfg.seatNoun ?? "staff seat";
-  const members = await staffSeatsUsed(db, tenantId, cfg.customerRole);
-  const pending = opts.countPending ? await pendingStaffSeats(db, tenantId, cfg.customerRole) : 0;
+  const members = await staffSeatsUsed(db, tenantId, cfg.seatFreeRoles);
+  const pending = opts.countPending ? await pendingStaffSeats(db, tenantId, cfg.seatFreeRoles) : 0;
   const used = members + pending;
   const { ok, max } = await cfg.quota(tenantId, used);
   const seats = `${max} ${noun}${max === 1 ? "" : "s"}`;

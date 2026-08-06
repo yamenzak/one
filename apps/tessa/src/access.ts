@@ -133,9 +133,11 @@ export type RoleName = keyof typeof roles;
  *                   must be the LEAST privileged one — failing open to
  *                   `clinical` would let an unknown member consume stock.
  *   CUSTOMER_ROLE   the role that does NOT consume a staff seat. It is the ONLY
- *                   thing `customerRole` does: all four uses in the package are
+ *                   thing `seatFreeRoles` does: all four uses in the package are
  *                   the seat lane (`seats.ts`, and the three invite/accept/
- *                   promote hooks in `better-auth.ts`).
+ *                   promote hooks in `better-auth.ts`). The field is a LIST —
+ *                   Scena has two such roles — and Tessa passes this one
+ *                   sentinel in it.
  *
  * Both were `auditor`. The fallback half was right; the seat half meant a centre
  * could invite unlimited free auditors — read-everything accounts, uncounted —

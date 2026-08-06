@@ -187,13 +187,14 @@ export interface StaffRouteDeps<E extends StaffRouteEnv & HonoEnv> {
     members: { userId: string; email: string | null }[],
   ) => Promise<Record<string, Record<string, unknown>>>;
   /**
-   * The role that is NOT a staff seat — the app's end customer.
+   * Every role that does NOT consume a staff seat — the app's end customers and
+   * its device-shaped principals.
    *
-   * Required, and it is the same value `SeatConfig.customerRole` takes, because
+   * Required, and it is the same value `SeatConfig.seatFreeRoles` takes, because
    * the two have to agree: `/staff` reports the seat count and `checkSeat`
    * enforces it, and they were counting different things. See the route.
    */
-  customerRole: string;
+  seatFreeRoles: readonly string[];
   /** Deliver the invitation. Failure is REPORTED, never rolled back — see the route. */
   sendInvite: (c: Context<E>, invite: StaffInvite) => Promise<StaffSendResult>;
   /** Invitation lifetime. Seven days: long enough to survive a holiday, short
@@ -272,12 +273,12 @@ export function staffRoutes<E extends StaffRouteEnv & HonoEnv>(deps: StaffRouteD
         `staffSeatsUsed`.
 
         The same applied to `pending`: `invitation` rows were counted whatever
-        their role, while `pendingStaffSeats` filters customers out and drops
+        their role, while `pendingStaffSeats` filters seat-free roles out and drops
         expired ones.
       */
       const [used, pending] = await Promise.all([
-        staffSeatsUsed(c.env.DB, actor.tenantId, deps.customerRole),
-        pendingStaffSeats(c.env.DB, actor.tenantId, deps.customerRole),
+        staffSeatsUsed(c.env.DB, actor.tenantId, deps.seatFreeRoles),
+        pendingStaffSeats(c.env.DB, actor.tenantId, deps.seatFreeRoles),
       ]);
 
       // The app's own fields, keyed by userId. A hook that throws must not take
