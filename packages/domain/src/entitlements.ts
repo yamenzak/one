@@ -203,9 +203,36 @@ export const snapshotDowngrade = (oldE: Entitlements, newE: Entitlements): Entit
   engine.snapshotDowngrade(oldE, newE);
 
 /** Merge grants into an existing override blob, grant-only, returning the new
- *  override JSON. Used to grandfather and to gift. */
+ *  override JSON. Used to GRANDFATHER — see `adjustEntitlements` for the
+ *  operator's own per-tenant setting, which is a different promise. */
 export const raiseOverride = (json: string | null | undefined, grants: EntitlementGrants): string =>
   engine.raiseOverride(json, grants);
+
+/**
+ * Apply the operator's ABSOLUTE per-tenant adjustments — the layer that can go
+ * DOWN. Runs after `mergeOverrides`, so an operator can take back exactly what
+ * an operator gave without eroding a grandfathered right.
+ */
+export const adjustEntitlements = (base: Entitlements, json: string | null | undefined): Entitlements =>
+  engine.adjust(base, json);
+
+/** Set one adjustment (or clear it with `null`). Returns the new blob, or null
+ *  when nothing is left — an operator who undoes every change leaves no trace
+ *  claiming this tenant is special. */
+export const setEntitlementAdjustment = (
+  json: string | null | undefined,
+  axis: "quotas" | "features" | "aiCredits",
+  key: string,
+  value: number | boolean | null,
+): string | null => engine.setAdjustment(json, axis, key, value);
+
+/** The three layers with their working shown — plan, grandfathering, adjustment
+ *  — per key. The read model the operator console needs before anyone edits. */
+export const explainEntitlements = (
+  planEnt: Entitlements,
+  overridesJson: string | null | undefined,
+  adjustmentsJson: string | null | undefined,
+) => engine.explain(planEnt, overridesJson, adjustmentsJson);
 
 /** A tenant's current resource usage, gathered for a downgrade check. */
 export interface TenantUsage {

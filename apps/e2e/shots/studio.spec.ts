@@ -18,6 +18,8 @@ import { expect, test } from "@playwright/test";
 import { buildDemoWorld, DEMO_CLIENT, DEMO_STUDIO, prepare, type DemoWorld } from "../src/demo.js";
 import { shoot, visit } from "../src/shoot.js";
 import { teardown } from "../src/provision.js";
+import { carrySessionTo } from "../src/app.js";
+import { ADMIN_URL, ROOT_DOMAIN, SETUP_URL } from "../src/env.js";
 
 let world: DemoWorld;
 let project: string;
@@ -315,5 +317,44 @@ test("the sign-in screen", async ({ browser }) => {
     await shoot(page, project, "sign-in");
   } finally {
     await context.close();
+  }
+});
+
+/**
+ * THE OPERATOR CONSOLE's per-tenant entitlements, which had never been
+ * photographed — and which shipped for months telling the operator, correctly,
+ * that a value below the plan "simply won't apply".
+ *
+ * A studio pinned BELOW its plan is the state worth a picture: it is the one
+ * the panel could not previously reach at all, and the row tag plus its undo
+ * are the whole of the fix.
+ */
+test("a studio's entitlements, in the operator console", async () => {
+  // The SIGNED-IN context, not a fresh one: the operator door needs the session
+  // carried across hosts (`compOntoPlan` does the same), and a new context has
+  // no cookies to carry.
+  const context = world.studio.context;
+  await carrySessionTo(context, SETUP_URL, `admin.${ROOT_DOMAIN}`);
+  const page = await context.newPage();
+  try {
+    await page.goto(`${ADMIN_URL}/health`);
+    // Pin two limits below the plan and switch one feature off — computed by the
+    // server, so what the shot shows is what the gates enforce.
+    const out = await page.evaluate(async ([path, body]: [string, string]) => {
+      const res = await fetch(path, { method: "PATCH", headers: { "content-type": "application/json" }, body });
+      return { ok: res.ok, status: res.status, text: await res.text() };
+    }, [`/api/admin/tenants/${world.studio.tenantId}/overrides`, JSON.stringify({
+      adjustments: { quotas: { activeClients: 40, staffSeats: 2 }, features: { supplementsLabs: false } },
+    })] as [string, string]);
+    expect(out.ok, `pinning entitlements failed: ${out.status} ${out.text}`).toBe(true);
+
+    // `?s=<key>` is the console's section param (`use-section.ts`), and the
+    // studios section's key is `tenants`.
+    await visit(page, `${ADMIN_URL}/?s=tenants`, page.getByText(DEMO_STUDIO).first());
+    await page.getByText(DEMO_STUDIO).first().click();
+    await page.getByRole("button", { name: /edit entitlements/i }).click();
+    await shoot(page, project, "admin-tenant-entitlements", { ready: page.getByText("Active clients"), settle: 600 });
+  } finally {
+    await page.close();
   }
 });

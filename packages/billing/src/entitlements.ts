@@ -24,6 +24,18 @@
  * is always safe, and a plan edit can never bite a tenant through their own
  * override blob.
  *
+ * **Adjustments are ABSOLUTE, and they are a different thing.** Overrides carry
+ * GRANDFATHERING — written by `snapshotDowngrade` when a plan is edited down, to
+ * hold existing tenants at what they were sold — and that must only ever ratchet.
+ * An operator deliberately setting one tenant's ceiling is not that, and for a
+ * long time it had nowhere else to live: both went through the same grant-only
+ * blob, so "give this studio 10 seats" could be raised forever and never lowered,
+ * granting `-1` was irreversible, and the only way back was `reset`, which threw
+ * away the grandfathering as well. Adjustments are their own sparse layer, set in
+ * both directions, cleared per key, and applied AFTER the override — so an
+ * operator can take back exactly what an operator gave without touching a right
+ * a tenant paid for.
+ *
  * **A suspended status clamps to free.** Applied once, at resolution, so every
  * gate inherits it with no per-caller bookkeeping. This is the single place
  * delinquency actually bites capability.
@@ -52,6 +64,29 @@ export interface EntitlementGrants<E extends EntitlementShape> {
   quotas?: Partial<E["quotas"]>;
   features?: Partial<E["features"]>;
   aiCredits?: { monthlyGrant: number };
+}
+
+/**
+ * An operator's ABSOLUTE per-tenant setting. Sparse: a key that is absent means
+ * "whatever the plan and the grandfathering say", which is what makes clearing
+ * one possible at all.
+ */
+export interface EntitlementAdjustments<E extends EntitlementShape> {
+  quotas?: Partial<E["quotas"]>;
+  features?: Partial<E["features"]>;
+  aiCredits?: { monthlyGrant: number };
+}
+
+/** Where an entitlement's effective value came from. */
+export type EntitlementSource = "plan" | "grandfathered" | "adjusted";
+
+/** One entitlement, with its provenance — the read model behind an operator UI
+ *  that has to say why a number is what it is before anyone edits it. */
+export interface EntitlementTrace<T> {
+  value: T;
+  /** The plan's own value, before anything was layered on. */
+  plan: T;
+  source: EntitlementSource;
 }
 
 /**
@@ -210,5 +245,115 @@ export function bindEntitlements<E extends EntitlementShape>(free: E, cfg: Entit
     return JSON.stringify({ quotas, features, aiCredits });
   }
 
-  return { free, quotaKeys, featureKeys, resolve, merge, clamp, snapshotDowngrade, raiseOverride };
+  /**
+   * Apply the operator's ABSOLUTE adjustments over an already-merged set.
+   *
+   * Runs AFTER `merge`, so it can lower something the grandfathering raised —
+   * which is the entire point, and is also why it must never run before: an
+   * operator's number is a decision about this one tenant, and grandfathering is
+   * a promise about what they bought. The decision is the later word.
+   *
+   * Sparse and type-coerced like everything else here: only a finite number sets
+   * a quota, only a real boolean sets a feature, and an absent key falls through
+   * rather than reading as 0 / false.
+   */
+  function adjust(base: E, json: string | null | undefined): E {
+    if (!json) return base;
+    let a: Partial<EntitlementShape>;
+    try {
+      a = JSON.parse(json) as Partial<EntitlementShape>;
+    } catch {
+      return base;
+    }
+    const aQuotas = (a.quotas ?? {}) as Record<string, unknown>;
+    const aFeatures = (a.features ?? {}) as Record<string, unknown>;
+    const quotas: Record<string, number> = { ...(base.quotas as Record<string, number>) };
+    for (const k of quotaKeys) {
+      const v = aQuotas[k];
+      // `-1` is unlimited and is a legitimate setting; anything below that is not
+      // a ceiling anyone meant, so it floors at 0 rather than inverting the gate.
+      if (typeof v === "number" && Number.isFinite(v)) quotas[k] = v < 0 ? -1 : Math.floor(v);
+    }
+    const features: Record<string, boolean> = { ...(base.features as Record<string, boolean>) };
+    for (const k of featureKeys) if (typeof aFeatures[k] === "boolean") features[k] = aFeatures[k] as boolean;
+    const grant = a.aiCredits?.monthlyGrant;
+    const aiCredits = {
+      monthlyGrant: typeof grant === "number" && Number.isFinite(grant) && grant >= 0 ? Math.floor(grant) : base.aiCredits.monthlyGrant,
+    };
+    return { ...base, quotas, features, aiCredits } as E;
+  }
+
+  /**
+   * SET one adjustment, or clear it with `null`. Returns the new blob as JSON,
+   * or `null` when nothing is left — so an operator who undoes every change
+   * leaves no row behind claiming the tenant is special.
+   */
+  function setAdjustment(
+    json: string | null | undefined,
+    axis: "quotas" | "features" | "aiCredits",
+    key: string,
+    value: number | boolean | null,
+  ): string | null {
+    let cur: Record<string, Record<string, unknown>> = {};
+    try {
+      if (json) cur = JSON.parse(json) as Record<string, Record<string, unknown>>;
+    } catch {
+      cur = {};
+    }
+    const bucket = { ...(cur[axis] ?? {}) };
+    if (value === null) delete bucket[key];
+    else bucket[key] = value;
+    const next: Record<string, unknown> = { ...cur };
+    if (Object.keys(bucket).length) next[axis] = bucket;
+    else delete next[axis];
+    for (const k of Object.keys(next)) if (!next[k] || !Object.keys(next[k] as object).length) delete next[k];
+    return Object.keys(next).length ? JSON.stringify(next) : null;
+  }
+
+  /**
+   * The three layers, with their working shown — the read model an operator
+   * console needs to say WHY a number is what it is before anyone edits it.
+   *
+   * `resolve → merge → adjust` produces the same values this reports; the trace
+   * is the same walk, not a second opinion.
+   */
+  function explain(planEnt: E, overridesJson: string | null | undefined, adjustmentsJson: string | null | undefined) {
+    const merged = merge(planEnt, overridesJson);
+    const final = adjust(merged, adjustmentsJson);
+    let adj: Partial<EntitlementShape> = {};
+    try {
+      if (adjustmentsJson) adj = JSON.parse(adjustmentsJson) as Partial<EntitlementShape>;
+    } catch {
+      adj = {};
+    }
+    const aQuotas = (adj.quotas ?? {}) as Record<string, unknown>;
+    const aFeatures = (adj.features ?? {}) as Record<string, unknown>;
+    const planQuotas = planEnt.quotas as Record<string, number>;
+    const planFeatures = planEnt.features as Record<string, boolean>;
+    const finalQuotas = final.quotas as Record<string, number>;
+    const finalFeatures = final.features as Record<string, boolean>;
+
+    const quotas: Record<string, EntitlementTrace<number>> = {};
+    for (const k of quotaKeys) {
+      const source: EntitlementSource = typeof aQuotas[k] === "number" ? "adjusted"
+        : finalQuotas[k] !== planQuotas[k] ? "grandfathered" : "plan";
+      quotas[k] = { value: finalQuotas[k]!, plan: planQuotas[k]!, source };
+    }
+    const features: Record<string, EntitlementTrace<boolean>> = {};
+    for (const k of featureKeys) {
+      const source: EntitlementSource = typeof aFeatures[k] === "boolean" ? "adjusted"
+        : finalFeatures[k] !== planFeatures[k] ? "grandfathered" : "plan";
+      features[k] = { value: finalFeatures[k]!, plan: planFeatures[k]!, source };
+    }
+    const grantAdjusted = typeof adj.aiCredits?.monthlyGrant === "number";
+    const aiCredits: EntitlementTrace<number> = {
+      value: final.aiCredits.monthlyGrant,
+      plan: planEnt.aiCredits.monthlyGrant,
+      source: grantAdjusted ? "adjusted"
+        : final.aiCredits.monthlyGrant !== planEnt.aiCredits.monthlyGrant ? "grandfathered" : "plan",
+    };
+    return { effective: final, quotas, features, aiCredits };
+  }
+
+  return { free, quotaKeys, featureKeys, resolve, merge, adjust, clamp, snapshotDowngrade, raiseOverride, setAdjustment, explain };
 }

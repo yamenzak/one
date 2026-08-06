@@ -24,7 +24,7 @@ import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle, Badge, Building2, Button, Callout, Card, ChevronRight, Chip, CircleCheck,
   ConfirmDialog, CreditCard, EmptyState, Eyebrow, Field, Gift, GlanceStrip, Globe, IconBadge, Info, Input, KeyRound, ThumbsUp,
-  LayoutGrid, Mail, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, Select, Sheet, ShieldCheck, Wand2,
+  LayoutGrid, Mail, Percent, Plus, Reveal, RefreshCw, RotateCcw, Search, SlidersHorizontal, SectionHeader, SegmentedControl, Select, Sheet, ShieldCheck, Wand2,
   Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, Wrench, cn, toneText, type Tone,
   ActionResult, ConfigRow, FieldGroup, LoadError, useLoad, useAction as useActionBase,
 } from "@4dl/ui";
@@ -330,7 +330,7 @@ function Tenants() {
           onGift={() => { setGift({ id: manage.id, name: manage.name }); setManageId(null); }}
         />
       )}
-      {gift && <GiftSheet tenantId={gift.id} name={gift.name} onClose={() => setGift(null)} />}
+      {gift && <TenantEntitlementSheet tenantId={gift.id} name={gift.name} onClose={() => setGift(null)} />}
     </>
   );
 }
@@ -480,10 +480,10 @@ function TenantSheet({ tenant, plans, plansError, onRetryPlans, planName, onClos
         </FieldGroup>
 
         <FieldGroup
-          title="Gifted entitlements"
-          hint="Raise this studio's limits or unlock a feature above its plan without changing the plan. Grant-only — a gift can never take something away."
+          title="Entitlements"
+          hint="Set this studio's limits and features above OR below its plan, without changing the plan itself. Each row can be put back on its own."
         >
-          <Button variant="tonal" className="min-h-12 w-full" onClick={onGift}><Gift /> Open the gift editor</Button>
+          <Button variant="tonal" className="min-h-12 w-full" onClick={onGift}><SlidersHorizontal /> Edit entitlements</Button>
         </FieldGroup>
       </div>
 
@@ -506,6 +506,20 @@ function TenantSheet({ tenant, plans, plansError, onRetryPlans, planName, onClos
 // ── Entitlements: the matrix editor shared by the plan builder and gifting ────
 
 interface Ent { quotas: Record<string, number>; features: Record<string, boolean>; aiCredits: { monthlyGrant: number } }
+/** One entitlement with its provenance — see `explainEntitlements`. */
+interface Trace<T> { value: T; plan: T; source: "plan" | "grandfathered" | "adjusted" }
+interface EntTrace {
+  effective: Ent;
+  quotas: Record<string, Trace<number>>;
+  features: Record<string, Trace<boolean>>;
+  aiCredits: Trace<number>;
+}
+/** What the operator is looking at, per key. Three sources, three fixes. */
+const SOURCE_BADGE: Record<string, { label: string; tone: "neutral" | "cardio" | "warning" }> = {
+  adjusted: { label: "Set by you", tone: "cardio" },
+  grandfathered: { label: "Grandfathered", tone: "warning" },
+  plan: { label: "", tone: "neutral" },
+};
 interface EntMeta {
   featureKeys: string[];
   quotaKeys: string[];
@@ -769,47 +783,90 @@ function PlanEditSheet({ plan, meta, onClose, onSaved }: { plan: PlanFull; meta:
   );
 }
 
-function GiftSheet({ tenantId, name, onClose }: { tenantId: string; name: string; onClose: () => void }) {
+/**
+ * ONE STUDIO'S ENTITLEMENTS, editable in both directions.
+ *
+ * This was "Gift", and it could only ever give: every write went through the
+ * grant-only override lane, so raising a limit was permanent, granting
+ * unlimited was irreversible, and the only way back was a reset that also threw
+ * away any GRANDFATHERING a plan edit had written. The panel even said so —
+ * "a value below the plan simply won't apply" — which is an accurate
+ * description of a control that does not work.
+ *
+ * Now each row says where its number came from and can be set either way:
+ *
+ *   plan           nothing has been done to it.
+ *   grandfathered  a plan edit lowered the tier and this tenant was held at what
+ *                  they bought. Machine-written, and an operator's edit sits ON
+ *                  TOP of it rather than erasing it — clearing the edit returns
+ *                  to the grandfathered value, not to the plan's.
+ *   set by you     an operator's own decision, clearable per key.
+ */
+function TenantEntitlementSheet({ tenantId, name, onClose }: { tenantId: string; name: string; onClose: () => void }) {
   const load = useCallback(
-    () => api.get<{ planId: string; effective: Ent } & EntMeta>(`/api/admin/tenants/${tenantId}/entitlements`),
+    () => api.get<{ planId: string } & EntTrace & EntMeta>(`/api/admin/tenants/${tenantId}/entitlements`),
     [tenantId],
   );
   const { data, error, loading, reload } = useAdminLoad(load, "this studio's entitlements");
   const [ent, setEnt] = useState<Ent | null>(null);
   const act = useAction();
 
-  // Seed the editable copy once the server's effective matrix lands (and again
-  // after a retry), without stomping edits in progress on a re-render.
+  // The editable copy is seeded from the server's EFFECTIVE values, so what the
+  // operator sees is what the gates enforce, and edits are diffed against it.
   useEffect(() => { if (data) setEnt(data.effective); }, [data]);
+
+  /** Every key the operator moved this session, as absolute adjustments. */
+  const pending = (): { quotas: Record<string, number>; features: Record<string, boolean>; aiCredits?: { monthlyGrant: number } } | null => {
+    if (!data || !ent) return null;
+    const quotas: Record<string, number> = {};
+    const features: Record<string, boolean> = {};
+    for (const k of data.quotaKeys) if (ent.quotas[k] !== data.effective.quotas[k]) quotas[k] = ent.quotas[k]!;
+    for (const k of data.featureKeys) if (ent.features[k] !== data.effective.features[k]) features[k] = ent.features[k]!;
+    const grant = ent.aiCredits.monthlyGrant !== data.effective.aiCredits.monthlyGrant ? { monthlyGrant: ent.aiCredits.monthlyGrant } : undefined;
+    if (!Object.keys(quotas).length && !Object.keys(features).length && !grant) return null;
+    return { quotas, features, ...(grant ? { aiCredits: grant } : {}) };
+  };
+  const dirty = !!pending();
 
   const save = () =>
     act.run("save", async () => {
-      if (!ent) return;
-      const r = await api.patch<{ effective: Ent }>(`/api/admin/tenants/${tenantId}/overrides`, { grants: ent });
-      setEnt(r.effective);
-      return "Gifts applied — raises and unlocks only.";
-    }, "Couldn't apply the gifts — nothing was changed.");
+      const adjustments = pending();
+      if (!adjustments) return "Nothing to change.";
+      await api.patch(`/api/admin/tenants/${tenantId}/overrides`, { adjustments });
+      reload();
+      return "Saved — this studio's limits are what you see.";
+    }, "Couldn't save — nothing was changed.");
+
+  /** Clear ONE key back to the plan (and to any grandfathering under it). */
+  const clearKey = (axis: "quotas" | "features" | "aiCredits", key: string) =>
+    act.run(`clear:${key}`, async () => {
+      await api.patch(`/api/admin/tenants/${tenantId}/overrides`, {
+        adjustments: axis === "aiCredits" ? { aiCredits: { monthlyGrant: null } } : { [axis]: { [key]: null } },
+      });
+      reload();
+      return "Back to the plan.";
+    }, "Couldn't clear that — nothing was changed.");
 
   const reset = () =>
     act.run("reset", async () => {
-      const r = await api.patch<{ effective: Ent }>(`/api/admin/tenants/${tenantId}/overrides`, { reset: true });
-      setEnt(r.effective);
-      return "Gifts cleared — this studio is back to exactly its plan.";
-    }, "Couldn't clear the gifts — nothing was changed.");
+      await api.patch(`/api/admin/tenants/${tenantId}/overrides`, { reset: true });
+      reload();
+      return "Cleared — this studio is back to exactly its plan.";
+    }, "Couldn't clear — nothing was changed.");
+
+  const setQuota = (k: string, v: number) => setEnt((e) => (e ? { ...e, quotas: { ...e.quotas, [k]: v } } : e));
+  const setFeature = (k: string, v: boolean) => setEnt((e) => (e ? { ...e, features: { ...e.features, [k]: v } } : e));
 
   return (
     <Sheet
       open
       onClose={onClose}
-      title={`Gift — ${name}`}
-      /* Tall: the entitlement matrix is long and loads async, so a content-sized
-         sheet grew by half a screen the moment the read came back. The submit
-         pair pins below it — otherwise it sits under the whole matrix. */
+      title={`Entitlements — ${name}`}
       size="tall"
       footer={ent && !error ? (
         <div className="flex gap-2">
-          <Button size="lg" className="flex-1" disabled={act.busy !== null} onClick={() => void save()}>
-            {act.busy === "save" ? <><Spinner className="size-4" /> Applying…</> : "Apply gifts"}
+          <Button size="lg" className="flex-1" disabled={act.busy !== null || !dirty} onClick={() => void save()}>
+            {act.busy === "save" ? <><Spinner className="size-4" /> Saving…</> : dirty ? "Save changes" : "No changes"}
           </Button>
           <Button size="lg" variant="outline" disabled={act.busy !== null} onClick={() => void reset()}>
             {act.busy === "reset" ? <><Spinner className="size-4" /> …</> : "Reset to plan"}
@@ -826,37 +883,118 @@ function GiftSheet({ tenantId, name, onClose }: { tenantId: string; name: string
           skeleton={
             <>
               <SkeletonLine w="90%" h="xs" />
-              <div className="space-y-4">
-                <div className="space-y-3">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="65%" h="xs" /></div>
-                      <Skeleton className="size-12 shrink-0 rounded-xl" />
-                      <Skeleton className="h-12 w-[4.75rem] shrink-0 rounded-xl" />
-                    </div>
-                  ))}
-                </div>
-                <div className="space-y-3">
-                  {Array.from({ length: 4 }).map((_, i) => (
-                    <div key={i} className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="40%" h="text" /><SkeletonLine w="55%" h="xs" /></div>
-                      <Skeleton className="h-6 w-11 shrink-0 rounded-full" />
-                    </div>
-                  ))}
-                </div>
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="45%" h="text" /><SkeletonLine w="65%" h="xs" /></div>
+                    <Skeleton className="size-12 shrink-0 rounded-xl" />
+                    <Skeleton className="h-12 w-[4.75rem] shrink-0 rounded-xl" />
+                  </div>
+                ))}
               </div>
-              <div className="flex gap-2"><Skeleton className="h-12 flex-1 rounded-xl" /><Skeleton className="h-12 w-32 rounded-xl" /></div>
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1 space-y-1.5"><SkeletonLine w="40%" h="text" /><SkeletonLine w="55%" h="xs" /></div>
+                    <Skeleton className="h-6 w-11 shrink-0 rounded-full" />
+                  </div>
+                ))}
+              </div>
             </>
           }
         >
           {data && ent && (
             <div className="space-y-5">
               <Callout tone="neutral" icon={Info}>
-                On the <span className="font-semibold capitalize">{data.planId}</span> plan. Gifts can only raise a limit
-                or unlock a feature — never lower or disable one. A value below the plan simply won&apos;t apply.
+                On the <span className="font-semibold capitalize">{data.planId}</span> plan. Anything you change here
+                applies to this studio only, in either direction, and each row can be put back on its own.
               </Callout>
 
-              <EntitlementFields ent={ent} meta={data} onChange={setEnt} />
+              <FieldGroup title="Limits" hint="A number caps it; ∞ makes it unlimited. Keys come from the platform, so a limit added server-side appears here on its own.">
+                <div className="space-y-3">
+                  {data.quotaKeys.map((k) => {
+                    const m = data.quotaMeta[k] ?? { label: k, hint: "New platform limit — no description yet." };
+                    const t = data.quotas[k];
+                    const v = ent.quotas[k] ?? 0;
+                    const unlimited = v < 0;
+                    return (
+                      <div key={k} className="flex items-start gap-2">
+                        <div className="min-w-0 flex-1 pt-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-sm font-medium">{m.label}{m.unit ? <span className="font-normal text-muted-foreground"> ({m.unit})</span> : null}</span>
+                            <SourceTag trace={t} busy={act.busy !== null} onClear={() => void clearKey("quotas", k)} format={(n) => (n < 0 ? "∞" : String(n))} />
+                          </div>
+                          <div className="text-xs leading-snug text-muted-foreground">{m.hint}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setQuota(k, unlimited ? 0 : -1)}
+                          aria-pressed={unlimited}
+                          aria-label={`${m.label}: unlimited`}
+                          className={cn(
+                            "grid size-12 shrink-0 place-items-center rounded-xl text-lg font-semibold transition-colors",
+                            unlimited ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground hover:bg-surface-3",
+                          )}
+                        >∞</button>
+                        <Input
+                          type="number"
+                          min={0}
+                          disabled={unlimited}
+                          aria-label={m.label}
+                          value={unlimited ? "" : v}
+                          onChange={(e) => setQuota(k, Math.max(0, Number(e.target.value) || 0))}
+                          placeholder={unlimited ? "∞" : ""}
+                          className="numeral h-12 w-[5.75rem] shrink-0 px-2.5 text-right text-sm"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </FieldGroup>
+
+              <FieldGroup title="Features" hint="Each switch is a platform capability gate. A studio's client sees a feature only where this and the client's own package both allow it.">
+                <div className="space-y-3">
+                  {data.featureKeys.map((k) => {
+                    const m = data.featureMeta[k] ?? { label: k, hint: "New platform feature — no description yet." };
+                    const t = data.features[k];
+                    return (
+                      <div key={k} className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-sm font-medium">{m.label}</span>
+                            {m.reserved && <Badge tone="warning">not built yet</Badge>}
+                            <SourceTag trace={t} busy={act.busy !== null} onClear={() => void clearKey("features", k)} format={(b) => (b ? "on" : "off")} />
+                          </div>
+                          <div className="text-xs leading-snug text-muted-foreground">{m.hint}</div>
+                        </div>
+                        <div className="grid size-12 shrink-0 place-items-center">
+                          <Switch checked={!!ent.features[k]} onCheckedChange={(v) => setFeature(k, v)} aria-label={m.label} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </FieldGroup>
+
+              <FieldGroup title="AI credits" hint="Granted fresh each month. Set to any number — this is the studio's monthly allowance, not their balance.">
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1 pt-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-sm font-medium">Monthly grant</span>
+                      <SourceTag trace={data.aiCredits} busy={act.busy !== null} onClear={() => void clearKey("aiCredits", "monthlyGrant")} format={(n) => n.toLocaleString()} />
+                    </div>
+                    <div className="text-xs leading-snug text-muted-foreground">Topped up on each billing period.</div>
+                  </div>
+                  <Input
+                    type="number"
+                    min={0}
+                    aria-label="Monthly AI credit grant"
+                    value={ent.aiCredits.monthlyGrant}
+                    onChange={(e) => setEnt((x) => (x ? { ...x, aiCredits: { monthlyGrant: Math.max(0, Number(e.target.value) || 0) } } : x))}
+                    className="numeral h-12 w-[6rem] shrink-0 px-2.5 text-right text-sm"
+                  />
+                </div>
+              </FieldGroup>
 
               <ActionResult msg={act.msg} err={act.err} />
             </div>
@@ -864,6 +1002,39 @@ function GiftSheet({ tenantId, name, onClose }: { tenantId: string; name: string
         </Reveal>
       )}
     </Sheet>
+  );
+}
+
+/**
+ * Where one entitlement's value came from, and the way back.
+ *
+ * A row whose value equals the plan's says nothing — most rows are that, and a
+ * badge on every one of them is texture rather than information. Only a value
+ * somebody or something MOVED gets a tag, and the tag carries the undo, because
+ * "how do I put this back" was the question the old panel could not answer.
+ */
+function SourceTag<T>({ trace, busy, onClear, format }: {
+  trace: Trace<T> | undefined;
+  busy: boolean;
+  onClear: () => void;
+  format: (v: T) => string;
+}) {
+  if (!trace || trace.source === "plan") return null;
+  const badge = SOURCE_BADGE[trace.source]!;
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Badge tone={badge.tone}>{badge.label}</Badge>
+      <span className="text-xs text-muted-foreground">plan: {format(trace.plan)}</span>
+      {trace.source === "adjusted" && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onClear}
+          aria-label="Put this back to the plan"
+          className="text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 [&_svg]:size-3.5"
+        ><RotateCcw /></button>
+      )}
+    </span>
   );
 }
 

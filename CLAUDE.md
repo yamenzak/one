@@ -445,6 +445,28 @@ remote bindings without editing the config (this is what the E2E suite does).
 - **Two flag systems** (don't merge): platform entitlements (tenant bought from
   Kova, `entitlements.ts`) vs per-package client flags (client bought from the
   tenant, `clientFlags.ts`). Client capability = the intersection.
+  - **The tenant rail has TWO override columns, and they want opposite rules.**
+    `subscriptions.overrides_json` is GRANDFATHERING — written by
+    `snapshotDowngrade` when a plan is edited down, to hold existing tenants at
+    what they were sold — and it must only ratchet UP.
+    `subscriptions.adjustments_json` is the OPERATOR's deliberate per-tenant
+    setting: absolute, either direction, cleared per key. They shared one blob
+    and one grant-only write path, so "give this studio 10 seats" was a one-way
+    door: `raiseOverride` merges with `max`, `raiseQuota` makes `-1` absorbing,
+    and the only way back was `reset` — which discarded the grandfathering too.
+    Resolution order is plan → merge → **adjust** → clamp, in
+    `@4dl/billing`'s `tenantEntitlements`; the clamp stays last so a suspended
+    tenant cannot be adjusted back into service.
+  - **`explainEntitlements` is that walk with its working shown** — per key:
+    value, the plan's value, and `plan | grandfathered | adjusted`. The operator
+    console renders it and only tags the rows that were MOVED, because a badge on
+    every row is texture. Same shape as `explainClientFlags` on the other rail.
+  - **Both rails have a wiring guard in `pnpm gate`, and both fail on a real
+    break** (mutation-tested): `scripts/flag-enforcement.test.mjs` for what a
+    tenant sells a client, `scripts/entitlement-enforcement.test.mjs` for what
+    Kova sells a tenant — every live entitlement named by a gate, every quota
+    counted against, and the reserved list pinned so it cannot grow to cover an
+    oversight.
   - **A capability a package SELLS must be checked by a route, and hiding a tab
     is not checking it.** The package builder auto-renders a toggle for every
     entry in `SELLABLE_CLIENT_FLAG_KEYS`, so adding a flag is one line and

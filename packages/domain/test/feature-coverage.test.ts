@@ -102,13 +102,19 @@ describe("platform-entitlement coverage", () => {
     expect([...RESERVED_FEATURES].sort()).toEqual(["chat", "integrations"]);
   });
 
-  it("frontDesk is only HALF enforced — the assistant seat has no spec", () => {
-    // SPEC §5 sells frontDesk as "Assistant role + sessions/booking", but only
-    // the sessions half is gated; promotion to `assistant` in member-routes.ts is
-    // an ungated role string. This assertion is deliberately pinned to today's
-    // reality so the gap stays visible: when the assistant gate lands (see the
-    // AUDIT FINDING comment in member-routes.ts) this expectation changes to
-    // include its new spec key, which is the point.
+  it("frontDesk is fully enforced through ONE spec, used twice", () => {
+    // SPEC §5 sells frontDesk as "Assistant role + sessions/booking". This
+    // assertion used to be titled "only HALF enforced" and pinned the gap: the
+    // sessions half was gated and promotion to `assistant` was an ungated role
+    // string. That gap is CLOSED — `@4dl/auth`'s staff routes take a `checkRole`
+    // seam and Kova binds it to `gateFeature(c, "sessions")` (staff-routes.ts),
+    // so both halves resolve through this one spec.
+    //
+    // The list stays a single key on purpose: the assistant seat reuses the
+    // sessions spec rather than minting a second record for the same
+    // entitlement, and a spec per call site is how a registry stops being a
+    // registry. `scripts/entitlement-enforcement.test.mjs` is what proves the
+    // entitlement is reached at all.
     expect(featuresForEntitlement("frontDesk")).toEqual(["sessions"]);
   });
 

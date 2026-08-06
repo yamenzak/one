@@ -69,6 +69,8 @@ export interface SubscriptionRow {
   suspend_at: string | null;
   delete_at: string | null;
   overrides_json: string | null;
+  /** The operator's absolute per-tenant setting — see the schema module. */
+  adjustments_json: string | null;
 }
 
 export interface PackRow {
@@ -249,6 +251,7 @@ export function bindBillingStore<E extends EntitlementShape>(cfg: BillingStoreCo
     suspend_at: null,
     delete_at: null,
     overrides_json: null,
+    adjustments_json: null,
   });
 
   /**
@@ -291,8 +294,14 @@ export function bindBillingStore<E extends EntitlementShape>(cfg: BillingStoreCo
     const sub = cfg.materialiseOnRead ? await ensureSubscription(db, tenantId) : await readSubscription(db, tenantId);
     const planId = sub?.plan_id ?? cfg.defaultSubscription.plan_id;
     const plan = await getPlan(db, planId);
-    const resolved = entitlements.merge(entitlements.resolve(plan?.entitlements_json), sub?.overrides_json);
-    return entitlements.clamp(resolved, sub?.status ?? cfg.defaultSubscription.status);
+    // plan → grandfathering (raise-only) → the operator's adjustment (absolute,
+    // either direction) → the suspension clamp. The order is the design: an
+    // adjustment is the later word over a grant, and the clamp is the last word
+    // over everything, so a suspended tenant cannot be adjusted back into
+    // service by a stale row.
+    const merged = entitlements.merge(entitlements.resolve(plan?.entitlements_json), sub?.overrides_json);
+    const adjusted = entitlements.adjust(merged, sub?.adjustments_json);
+    return entitlements.clamp(adjusted, sub?.status ?? cfg.defaultSubscription.status);
   }
 
   /** True when the tenant's plan (or a grant) includes `feature`. */

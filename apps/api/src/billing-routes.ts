@@ -9,6 +9,7 @@ import { emailAdminRoutes } from "@4dl/email/admin-routes";
 import { z } from "zod";
 import {
   checkDowngrade, resolveEntitlements, mergeOverrides, snapshotDowngrade, raiseOverride,
+  setEntitlementAdjustment, explainEntitlements,
   isFullyExpired, overallDaysRemaining, resolveRange, addDays,
   FEATURE_KEYS, QUOTA_KEYS, FEATURE_META, QUOTA_META, type Entitlements, type EntitlementGrants, type Budget,
 } from "@kova/domain";
@@ -415,15 +416,40 @@ export const adminRoutes = new Hono<AppEnv>()
     const sub = await getSubscription(c.env.DB, tenantId);
     const plan = await c.env.DB.prepare("SELECT entitlements_json FROM plans WHERE id = ?").bind(sub.plan_id).first<{ entitlements_json: string | null }>();
     const planEnt = resolveEntitlements(plan?.entitlements_json);
+    // `explain` walks the same three layers the gates resolve through, so the
+    // console can say WHY a number is what it is — from the plan, grandfathered
+    // by a plan edit, or set by an operator — before anyone changes it.
+    const trace = explainEntitlements(planEnt, sub.overrides_json, sub.adjustments_json);
     return c.json({
       planId: sub.plan_id,
       planEntitlements: planEnt,
-      effective: mergeOverrides(planEnt, sub.overrides_json),
+      effective: trace.effective,
+      quotas: trace.quotas, features: trace.features, aiCredits: trace.aiCredits,
       overrides: sub.overrides_json ? JSON.parse(sub.overrides_json) : {},
+      adjustments: sub.adjustments_json ? JSON.parse(sub.adjustments_json) : {},
       featureKeys: FEATURE_KEYS, quotaKeys: QUOTA_KEYS, featureMeta: FEATURE_META, quotaMeta: QUOTA_META,
     });
   })
 
+  /**
+   * PER-TENANT entitlements, both directions.
+   *
+   * Two lanes, because they are two different promises and sharing one blob is
+   * what made this unusable:
+   *
+   *   `grants`       raise-only, merged into `overrides_json`. This is the
+   *                  GRANDFATHERING lane — what `snapshotDowngrade` writes when
+   *                  a plan is edited down — and it must only ratchet, so a
+   *                  later operator cannot erode a right a tenant paid for.
+   *   `adjustments`  ABSOLUTE, written to `adjustments_json`, applied after the
+   *                  grants. `null` on a key clears it back to whatever the plan
+   *                  and the grandfathering say.
+   *
+   * Before the split there was only the first, so "give this studio 10 seats"
+   * was irreversible — `raiseOverride` merges with `max`, granting `-1` was
+   * permanent, and the only way back was `reset`, which also discarded the
+   * grandfathering. That is the complaint this route exists to answer.
+   */
   .patch("/admin/tenants/:id/overrides", async (c) => {
     if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
     const body = z
@@ -434,16 +460,63 @@ export const adminRoutes = new Hono<AppEnv>()
           features: z.record(z.string(), z.boolean()).optional(),
           aiCredits: z.object({ monthlyGrant: z.number().min(0) }).optional(),
         }).optional(),
+        /** Absolute. `null` clears one key back to the plan. */
+        adjustments: z.object({
+          quotas: z.record(z.string(), z.number().nullable()).optional(),
+          features: z.record(z.string(), z.boolean().nullable()).optional(),
+          aiCredits: z.object({ monthlyGrant: z.number().min(0).nullable() }).optional(),
+        }).optional(),
       })
       .safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid body" }, 400);
+    if (!body.success) return c.json({ error: "invalid body", issues: body.error.issues }, 400);
+
+    // Keys are checked against the registry rather than trusted: an unknown key
+    // would be stored, never read, and quietly suggest a setting that does not
+    // exist the next time somebody opened this screen.
+    const badQuota = [
+      ...Object.keys(body.data.grants?.quotas ?? {}), ...Object.keys(body.data.adjustments?.quotas ?? {}),
+    ].filter((k) => !(QUOTA_KEYS as readonly string[]).includes(k));
+    const badFeature = [
+      ...Object.keys(body.data.grants?.features ?? {}), ...Object.keys(body.data.adjustments?.features ?? {}),
+    ].filter((k) => !(FEATURE_KEYS as readonly string[]).includes(k));
+    if (badQuota.length || badFeature.length) return c.json({ error: "unknown entitlement", quotas: badQuota, features: badFeature }, 400);
+
     const tenantId = c.req.param("id");
     const sub = await getSubscription(c.env.DB, tenantId);
-    // Reset clears gifts back to the plan; otherwise grants raise/enable only.
-    const newOverride = body.data.reset ? null : raiseOverride(sub.overrides_json, (body.data.grants ?? {}) as EntitlementGrants);
-    await c.env.DB.prepare("UPDATE subscriptions SET overrides_json = ?, updated_at = ? WHERE tenant_id = ?").bind(newOverride, nowIso(), tenantId).run();
+
+    /*
+      RESET CLEARS BOTH LANES, and it has to say so.
+
+      It used to null `overrides_json` alone, which was the only way down and
+      therefore the button an operator reached for to undo a gift — taking the
+      grandfathering with it every time, silently. Now that adjustments can be
+      cleared one key at a time, reset is the deliberate "this tenant is exactly
+      their plan again" and clears the pair.
+    */
+    let overrides = sub.overrides_json;
+    let adjustments = sub.adjustments_json;
+    if (body.data.reset) {
+      overrides = null;
+      adjustments = null;
+    } else {
+      if (body.data.grants) overrides = raiseOverride(overrides, body.data.grants as EntitlementGrants);
+      for (const [k, v] of Object.entries(body.data.adjustments?.quotas ?? {})) adjustments = setEntitlementAdjustment(adjustments, "quotas", k, v);
+      for (const [k, v] of Object.entries(body.data.adjustments?.features ?? {})) adjustments = setEntitlementAdjustment(adjustments, "features", k, v);
+      const grant = body.data.adjustments?.aiCredits?.monthlyGrant;
+      if (grant !== undefined) adjustments = setEntitlementAdjustment(adjustments, "aiCredits", "monthlyGrant", grant);
+    }
+
+    await c.env.DB.prepare("UPDATE subscriptions SET overrides_json = ?, adjustments_json = ?, updated_at = ? WHERE tenant_id = ?")
+      .bind(overrides, adjustments, nowIso(), tenantId).run();
     const plan = await c.env.DB.prepare("SELECT entitlements_json FROM plans WHERE id = ?").bind(sub.plan_id).first<{ entitlements_json: string | null }>();
-    return c.json({ ok: true, effective: mergeOverrides(resolveEntitlements(plan?.entitlements_json), newOverride) });
+    const planEnt = resolveEntitlements(plan?.entitlements_json);
+    const trace = explainEntitlements(planEnt, overrides, adjustments);
+    return c.json({
+      ok: true,
+      effective: trace.effective,
+      quotas: trace.quotas, features: trace.features, aiCredits: trace.aiCredits,
+      adjustments: adjustments ? JSON.parse(adjustments) : {},
+    });
   })
 
   // Platform promo codes (Kova → tenant) — website-native discounts on a
