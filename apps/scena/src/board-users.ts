@@ -9,9 +9,21 @@
  * the normal username+password form and land on their scoped control surface.
  * When the board is deleted, its users vanish with it.
  *
- * The plaintext password is stored on the `board_users` row so the admin can hand
- * the credentials to staff (these are low-privilege, board-only accounts); the
- * verifying hash lives in `account`, exactly like any other credential login.
+ * ⚠️ THE CODE IS SHOWN ONCE AND NEVER STORED.
+ *
+ * It used to be kept in plaintext on the `board_users` row, and four routes
+ * returned it, so an admin could re-read a station's credentials at any time.
+ * The reasoning was that these are low-privilege board-only accounts — which is
+ * true and is not the point. A plaintext credential column means one D1 read
+ * hands an attacker working logins for every station in every tenant, and
+ * "low-privilege" here still means calling tickets and flipping room status on
+ * a public screen. It is also the finding that ends any security review.
+ *
+ * The distribution problem it was solving is real, and `regenerateBoardUserPassword`
+ * already solved it: issue a new code, show it once, hand it over. So creation
+ * and regeneration both RETURN the code, nothing persists it, and an admin who
+ * loses one regenerates rather than looks it up. The verifying hash lives in
+ * `account`, exactly like any other credential login.
  */
 import { hashPassword } from "better-auth/crypto";
 import type { BoardRole } from "./access.js";
@@ -21,6 +33,12 @@ import type { BoardRow } from "./board-store.js";
 /** Non-routable suffix marking an auto-provisioned board account. */
 const BOARD_DOMAIN = "@bd.scena";
 
+/**
+ * ⚠️ `password` is ALWAYS NULL on a row read back. It is typed as nullable so a
+ * caller cannot accidentally ship it, and it exists at all only because the
+ * column does. Read it and you get nothing; the code is returned by
+ * `createBoardUser` / `regenerateBoardUserPassword` and nowhere else.
+ */
 export interface BoardUserRow {
   id: string;
   tenant_id: string;
@@ -30,7 +48,7 @@ export interface BoardUserRow {
   label: string;
   user_id: string;
   username: string;
-  password: string;
+  password: null;
   created_at: number;
 }
 
@@ -89,8 +107,11 @@ export async function provisionBoardUser(
     db.prepare('INSERT INTO "user" (id, name, email, username, emailVerified, createdAt, updatedAt) VALUES (?, ?, ?, ?, 1, ?, ?)').bind(userId, opts.label, email, username, now, now),
     db.prepare('INSERT INTO "account" (id, accountId, providerId, userId, password, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)').bind(accountId, userId, "credential", userId, hash, now, now),
     db.prepare('INSERT INTO "member" (id, organizationId, userId, role, createdAt) VALUES (?, ?, ?, ?, ?)').bind(memberId, opts.orgId, userId, role, now),
-    db.prepare('INSERT INTO board_users (id, tenant_id, board_id, station_id, kind, label, user_id, username, password, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(buId, opts.orgId, opts.boardId, opts.stationId, opts.stationId ? "station" : "coordinator", opts.label, userId, username, password, Date.now()),
+    // `password` is intentionally absent from this INSERT — the column survives
+    // only so an existing row can be nulled (see the schema backfill). The code
+    // is returned to the caller and never written.
+    db.prepare('INSERT INTO board_users (id, tenant_id, board_id, station_id, kind, label, user_id, username, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(buId, opts.orgId, opts.boardId, opts.stationId, opts.stationId ? "station" : "coordinator", opts.label, userId, username, Date.now()),
   ]);
   return { userId, username, password };
 }
@@ -144,7 +165,9 @@ export async function regenerateBoardUserPassword(db: D1Database, boardId: strin
   const now = new Date().toISOString();
   await db.batch([
     db.prepare("UPDATE \"account\" SET password = ?, updatedAt = ? WHERE userId = ? AND providerId = 'credential'").bind(hash, now, row.user_id),
-    db.prepare("UPDATE board_users SET password = ? WHERE id = ?").bind(password, row.id),
+    // Nulled, not rewritten: regeneration is the one moment the code exists in
+    // the clear, and it leaves in the return value.
+    db.prepare("UPDATE board_users SET password = NULL WHERE id = ?").bind(row.id),
     db.prepare('DELETE FROM "session" WHERE userId = ?').bind(row.user_id), // force re-login
   ]);
   return password;

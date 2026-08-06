@@ -52,7 +52,7 @@ export const DEMO_TENANT = "tenant_demo";
 
 export const SCENA_SCHEMA: SchemaModule = {
   id: "scena",
-  version: "2026-08-06a",
+  version: "2026-08-06b",
   ddl: [
     "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, email TEXT, name TEXT, created_at INTEGER);",
     // Devices (screens). channel_id is the active/default channel; a device
@@ -281,6 +281,20 @@ export const SCENA_SCHEMA: SchemaModule = {
       idempotent: the `WHERE tenant_id IS NULL` guard means a re-run after a
       partial failure finishes the job rather than rewriting rows that are done.
     */
+    {
+      /*
+        A STATION'S CODE IS NOT A THING WE KEEP.
+
+        `board_users.password` held the credential in plaintext so an admin could
+        re-read it. Creation and regeneration both return it now, so nothing
+        needs the column — and a plaintext credential column means one D1 read
+        yields working logins for every station in every tenant. The column
+        stays (SQLite drops are awkward and it is harmless empty); its contents
+        do not.
+      */
+      name: "board_users.password — clear every stored plaintext credential",
+      sql: "UPDATE board_users SET password = NULL WHERE password IS NOT NULL",
+    },
     {
       name: "slides.tenant_id from its playlist",
       sql: "UPDATE slides SET tenant_id = (SELECT p.tenant_id FROM slide_playlists p WHERE p.id = slides.playlist_id) WHERE tenant_id IS NULL AND playlist_id IS NOT NULL",

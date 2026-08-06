@@ -92,6 +92,48 @@ export interface AuthConfig {
    * Return a message to refuse, or null to allow.
    */
   checkInviteRole?: (env: AuthBindings, tenantId: string, role: string) => Promise<string | null>;
+  /**
+   * OPT IN to the STATION CREDENTIAL lane. Off unless a product asks for it.
+   *
+   * ── The platform is passwordless FOR PEOPLE ────────────────────────────────
+   *
+   * Kova and Tessa are 100% passwordless and stay that way by not setting this.
+   * The invariant is about HUMANS WITH EMAIL — someone with an inbox has no
+   * business holding a password, and every product here that serves one keeps
+   * the email-code + passkey pair.
+   *
+   * A STATION is not that principal. Scena's boards are operated from a fixed
+   * device at a counter by whoever is standing there: a receptionist calling
+   * the next ticket, a nurse flipping a room to `occupied`. They have no work
+   * address, the device is shared, and the action is repeated dozens of times an
+   * hour. Emailing a code to press "Next" is a control that will be worked
+   * around within a week — taped-up shared logins are the usual shape — which is
+   * strictly worse than a scoped credential nobody pretends is a person.
+   *
+   * ── Why they are USERS and not bearer tokens ──────────────────────────────
+   *
+   * Scena moved stations FROM public tokens TO accounts deliberately, and was
+   * right to: a token in a URL is shareable, effectively unrevokable, and
+   * anonymous in an audit trail. A station account is revocable, carries a role,
+   * and names WHICH counter called a ticket.
+   *
+   * ── What this lane is NOT ─────────────────────────────────────────────────
+   *
+   * It is not a general password provider. Turning it on enables Better Auth's
+   * credential provider so a station's synthetic non-routable address can sign
+   * in; it does not add password sign-in to any human-facing door, because no
+   * human account here is ever issued a password. `stationDomain` is asserted
+   * so the distinction is checkable rather than conventional.
+   */
+  stationCredentials?: {
+    /**
+     * The non-routable suffix every station account's synthetic address carries
+     * (Scena: `@bd.scena`). Recorded so a station principal is identifiable —
+     * and so a conformance test can assert no ROUTABLE address ever holds a
+     * password.
+     */
+    stationDomain: string;
+  };
   /** Hourly ceiling on codes to one address. */
   otpMaxPerHour?: number;
   /** How long a code lives, in seconds. */
@@ -107,6 +149,36 @@ function seatError(verdict: SeatVerdict): APIError {
     used: verdict.used,
     limit: verdict.max,
   });
+}
+
+/**
+ * The credential provider's settings, as a PURE function of the config.
+ *
+ * Split out so the invariant is testable without standing a Better Auth
+ * instance up: the first version of its test built one against a fake D1, which
+ * throws "Failed to initialize database adapter" — so the test could only ever
+ * assert that construction fails, not what was decided.
+ *
+ * `minPasswordLength` is deliberately low. A station credential is a
+ * 6-character handle an admin reads aloud, scoped to one board, revocable, and
+ * attached to an address that cannot receive mail. Holding it to a human
+ * password policy only gets it written on a sticky note.
+ *
+ * `autoSignIn: false` matters more than it looks: provisioning a station must
+ * not hand the ADMIN who created it that station's session.
+ */
+export function credentialLane(cfg: Pick<AuthConfig, "stationCredentials">):
+  { enabled: boolean; minPasswordLength?: number; autoSignIn?: boolean } {
+  return cfg.stationCredentials
+    ? { enabled: true, minPasswordLength: 6, autoSignIn: false }
+    : { enabled: false };
+}
+
+/** Is this a station principal rather than a person? The non-routable suffix is
+ *  the only thing that distinguishes them, so it is asked in one place. */
+export function isStationPrincipal(email: string, cfg: Pick<AuthConfig, "stationCredentials">): boolean {
+  const d = cfg.stationCredentials?.stationDomain;
+  return Boolean(d && email.toLowerCase().endsWith(d.toLowerCase()));
 }
 
 export function createAuth(env: AuthBindings, origin: string | undefined, shape: HostShape | undefined, cfg: AuthConfig) {
@@ -165,8 +237,18 @@ export function createAuth(env: AuthBindings, origin: string | undefined, shape:
     secret,
     trustedOrigins,
 
-    // Passwordless-only: the email/password provider stays OFF.
-    emailAndPassword: { enabled: false },
+    /*
+      PASSWORDLESS FOR PEOPLE. The provider is off unless a product opts into the
+      STATION CREDENTIAL lane (`cfg.stationCredentials`) — see its doc comment
+      for why a counter device is a different principal from a human with an
+      inbox, and why it is an account rather than a bearer token.
+
+      `minPasswordLength` is deliberately low for the lane: a station credential
+      is a 6-character handle an admin reads aloud to staff, scoped to one board,
+      revocable, and never attached to an address that can receive mail. Holding
+      it to a human password policy would only push operators to write it down.
+    */
+    emailAndPassword: credentialLane(cfg),
 
     // Passkey enrollment runs behind a freshness middleware that 403s
     // SESSION_NOT_FRESH once a session is older than `freshAge` (default: one

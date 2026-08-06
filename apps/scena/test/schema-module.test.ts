@@ -57,13 +57,14 @@ describe("the Scena schema module", () => {
     //
     // Stage 1 baseline: 41 tables (including Better Auth's seven, which leave in
     // Stage 2) + 11 indexes, 53 ALTERs (48 imported + 5 tenant_id denormalisers)
-    // and 6 backfills for those five columns.
+    // and 7 backfills (six for those five columns, one clearing the stored station
+    // credentials).
     const ddl = schemaStatements(SCENA_SCHEMA);
     expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(41);
     expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(10);
     expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(1);
     expect(SCENA_SCHEMA.alters ?? []).toHaveLength(53);
-    expect(SCENA_SCHEMA.backfills ?? []).toHaveLength(6);
+    expect(SCENA_SCHEMA.backfills ?? []).toHaveLength(7);
   });
 });
 

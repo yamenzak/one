@@ -1112,7 +1112,7 @@ app.get("/api/boards/:id/users", async (c) => {
   const row = await getBoard(c.env.DB, c.req.param("id"));
   if (!owns(c, row)) return c.json({ error: "not found" }, 404);
   await syncBoardUsers(c.env.DB, tenantOf(c), row!);
-  const users = (await listBoardUsers(c.env.DB, row!.id)).map((u) => ({ id: u.id, kind: u.kind, stationId: u.station_id, label: u.label, username: u.username, password: u.password }));
+  const users = (await listBoardUsers(c.env.DB, row!.id)).map((u) => ({ id: u.id, kind: u.kind, stationId: u.station_id, label: u.label, username: u.username }));
   return c.json({ users });
 });
 
@@ -1223,7 +1223,7 @@ app.put("/api/boards/:id/counters", async (c) => {
   // Reconcile station logins to the new counter set (adds/drops as needed).
   const fresh = await getBoard(c.env.DB, boardId);
   await syncBoardUsers(c.env.DB, tenantOf(c), fresh!);
-  const users = (await listBoardUsers(c.env.DB, boardId)).map((u) => ({ id: u.id, kind: u.kind, stationId: u.station_id, label: u.label, username: u.username, password: u.password }));
+  const users = (await listBoardUsers(c.env.DB, boardId)).map((u) => ({ id: u.id, kind: u.kind, stationId: u.station_id, label: u.label, username: u.username }));
   return c.json({ counters, users });
 });
 
@@ -1242,7 +1242,7 @@ app.put("/api/boards/:id/rooms", async (c) => {
   // Reconcile station logins to the new room set (adds/drops as needed).
   const fresh = await getBoard(c.env.DB, boardId);
   await syncBoardUsers(c.env.DB, tenantOf(c), fresh!);
-  const users = (await listBoardUsers(c.env.DB, boardId)).map((u) => ({ id: u.id, kind: u.kind, stationId: u.station_id, label: u.label, username: u.username, password: u.password }));
+  const users = (await listBoardUsers(c.env.DB, boardId)).map((u) => ({ id: u.id, kind: u.kind, stationId: u.station_id, label: u.label, username: u.username }));
   return c.json({ state, users });
 });
 
@@ -1260,7 +1260,7 @@ app.put("/api/boards/:id/sides", async (c) => {
   // Reconcile station logins to the new side set.
   const fresh = await getBoard(c.env.DB, boardId);
   await syncBoardUsers(c.env.DB, tenantOf(c), fresh!);
-  const users = (await listBoardUsers(c.env.DB, boardId)).map((u) => ({ id: u.id, kind: u.kind, stationId: u.station_id, label: u.label, username: u.username, password: u.password }));
+  const users = (await listBoardUsers(c.env.DB, boardId)).map((u) => ({ id: u.id, kind: u.kind, stationId: u.station_id, label: u.label, username: u.username }));
   return c.json({ state, users });
 });
 

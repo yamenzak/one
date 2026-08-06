@@ -583,14 +583,14 @@ function CredentialRow({ u, onRegenerate }: { u: BoardUser; onRegenerate: () => 
         <div className="truncate text-sm font-medium">{u.label}{isCoordinator && <span className="ml-1.5 text-[10px] uppercase tracking-wide text-primary">controls all</span>}</div>
         <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
           <button className="hover:text-foreground" onClick={() => copy(u.username, "Username")} title="Copy username">{u.username}</button>
+          {/* The code is SHOWN ONCE, at issue. It is not stored, so there is
+              nothing to reveal here — the eye toggle promised a secret the
+              server no longer holds. Lost one? Regenerate. */}
           <span className="opacity-40">·</span>
-          <button className="hover:text-foreground" onClick={() => copy(u.password, "Password")} title="Copy password">{show ? u.password : "••••••"}</button>
+          <span className="opacity-60">code shown once</span>
         </div>
       </div>
-      <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" onClick={() => setShow((v) => !v)} title={show ? "Hide password" : "Show password"}>
-        {show ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-      </Button>
-      <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" onClick={onRegenerate} title="Regenerate password">
+      <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" onClick={onRegenerate} title="Issue a new code">
         <RefreshCw className="size-3.5" />
       </Button>
     </div>
