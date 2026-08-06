@@ -875,9 +875,12 @@ describe("AI workout draft — named exercises resolve to real ids", () => {
     const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
     await SELF.fetch(`${ADMIN}/api/admin/tenants/${ctx.active.tenantId}/plan`, { method: "POST", headers: H, body: JSON.stringify({ planId: "studio" }) });
     const { client } = (await (await SELF.fetch(`${ORIGIN}/api/clients`, { method: "POST", headers: H, body: JSON.stringify({ displayName: "PlanAI" }) })).json()) as { client: { id: string } };
-    // A draft can only pick from a library that exists, and nothing installs one
-    // implicitly any more — so this test has to do what a real studio does.
-    await SELF.fetch(`${ADMIN}/api/admin/starter-library`, { method: "POST", headers: H, body: JSON.stringify({ install: true }) });
+    // A draft can only pick from a library that exists, and Kova ships no
+    // exercises at all — so this test does what a real studio does and adds its
+    // own before asking for a draft.
+    for (const [name, muscle, kit] of [["Barbell Bench Press", "chest", "barbell"], ["Back Squat", "quads", "barbell"], ["Deadlift", "hamstrings", "barbell"], ["Pull-Up", "lats", "bodyweight"], ["Overhead Press", "shoulders", "barbell"]] as const) {
+      await SELF.fetch(`${ORIGIN}/api/exercises`, { method: "POST", headers: H, body: JSON.stringify({ name, muscleGroups: [muscle], equipment: [kit] }) });
+    }
     const r = (await (await SELF.fetch(`${ORIGIN}/api/ai/draft-plan`, { method: "POST", headers: H, body: JSON.stringify({ clientId: client.id }) })).json()) as { draft: { days: { blocks: { slots: { exerciseId: string }[] }[] }[] } };
     const slots = r.draft.days.flatMap((d) => d.blocks.flatMap((b) => b.slots));
     expect(slots.length).toBeGreaterThan(0);
@@ -4393,50 +4396,6 @@ describe("storage remaining is the owner's number", () => {
   });
 });
 
-/**
- * The platform starter library must survive a wipe.
- *
- * `purgeEverything` (the nuclear reset) runs `DELETE FROM exercises`, which takes
- * the platform seed with it. The seed is CODE, so it comes back — but only if the
- * guard asks the database rather than remembering. A module-level flag lives for
- * the life of the isolate, so a reset and the next request sharing one isolate
- * left the library permanently empty until that isolate recycled: 40 exercises or
- * 0, depending on nothing an operator could see. Empty is the worse outcome — the
- * AI plan draft whitelists library ids, so with none it has nothing to pick from.
- */
-describe("the platform exercise seed re-seeds after a wipe", () => {
-  const seedCount = async () =>
-    (await (env.DB as D1Database)
-      .prepare("SELECT COUNT(*) AS n FROM exercises WHERE source = 'seed' AND tenant_id IS NULL")
-      .first<{ n: number }>())?.n ?? 0;
-
-  it("comes back in the SAME isolate that emptied it", async () => {
-    const { seedExercises } = await import("../src/exercise-seed.js");
-    await seedExercises(env.DB as D1Database);
-    const before = await seedCount();
-    expect(before, "the seed should populate a fresh database").toBeGreaterThan(0);
-
-    // Exactly what the nuclear reset does to this table.
-    await (env.DB as D1Database).prepare("DELETE FROM exercises").run();
-    expect(await seedCount()).toBe(0);
-
-    // Same isolate, same module instance — this is the case the old flag failed.
-    await seedExercises(env.DB as D1Database);
-    expect(await seedCount(), "the library stayed empty after a wipe").toBe(before);
-  });
-
-  it("is idempotent, so the hot path does not re-write it", async () => {
-    // Each test gets its own storage stack, so seed FIRST and take the baseline
-    // from that — a baseline read before any seed is just 0.
-    const { seedExercises } = await import("../src/exercise-seed.js");
-    await seedExercises(env.DB as D1Database);
-    const seeded = await seedCount();
-    expect(seeded).toBeGreaterThan(0);
-    await seedExercises(env.DB as D1Database);
-    await seedExercises(env.DB as D1Database);
-    expect(await seedCount()).toBe(seeded);
-  });
-});
 
 /**
  * The nuclear reset must not cost you your credentials.
@@ -4498,50 +4457,6 @@ describe("a nuclear reset keeps platform configuration", () => {
   });
 });
 
-/**
- * The starter library is a choice, not a default.
- *
- * It used to install itself on the first `GET /api/exercises`, so a deployment
- * could not be empty — deleting the rows just brought them back on the next
- * request, which is why a nuclear reset appeared to "come back with premade
- * exercises". Content an operator cannot refuse is not a starter kit.
- */
-describe("the starter exercise library is opt-in", () => {
-  const seeded = async () =>
-    (await (env.DB as D1Database).prepare("SELECT COUNT(*) AS n FROM exercises WHERE source = 'seed' AND tenant_id IS NULL").first<{ n: number }>())?.n ?? 0;
-
-  it("browsing the library never installs it", async () => {
-    const res = await SELF.fetch(`${ORIGIN}/api/exercises`, { headers: auth(ownerCookie) });
-    expect(res.status).toBe(200);
-    expect(await seeded(), "reading the library installed content into it").toBe(0);
-  });
-
-  it("an admin installs and removes it explicitly", async () => {
-    const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const before = (await (await SELF.fetch(`${ADMIN}/api/admin/starter-library`, { headers: auth(ownerCookie) })).json()) as { installed: boolean; available: number };
-    expect(before.installed).toBe(false);
-    expect(before.available).toBeGreaterThan(0);
-
-    const on = (await (await SELF.fetch(`${ADMIN}/api/admin/starter-library`, { method: "POST", headers: H, body: JSON.stringify({ install: true }) })).json()) as { count: number };
-    expect(on.count).toBe(before.available);
-    expect(await seeded()).toBe(before.available);
-
-    const off = (await (await SELF.fetch(`${ADMIN}/api/admin/starter-library`, { method: "POST", headers: H, body: JSON.stringify({ install: false }) })).json()) as { installed: boolean };
-    expect(off.installed).toBe(false);
-    // …and it STAYS removed: nothing re-seeds it behind the operator's back.
-    await SELF.fetch(`${ORIGIN}/api/exercises`, { headers: auth(ownerCookie) });
-    expect(await seeded(), "the library re-seeded itself after being removed").toBe(0);
-  });
-
-  it("removing it leaves a studio's OWN exercises alone", async () => {
-    const db = env.DB as D1Database;
-    const H = { "content-type": "application/json", ...auth(ownerCookie) };
-    const ctx = (await (await SELF.fetch(`${ORIGIN}/api/context`, { headers: auth(ownerCookie) })).json()) as { active: { tenantId: string } };
-    await db.prepare("INSERT OR REPLACE INTO exercises (id, tenant_id, visibility, name, slug, source, active, created_at) VALUES ('exr_mine', ?, 'tenant', 'My Lift', 'my-lift', 'manual', 1, ?)").bind(ctx.active.tenantId, new Date().toISOString()).run();
-    await SELF.fetch(`${ADMIN}/api/admin/starter-library`, { method: "POST", headers: H, body: JSON.stringify({ install: false }) });
-    expect(await db.prepare("SELECT id FROM exercises WHERE id = 'exr_mine'").first(), "a studio's own exercise was deleted").not.toBeNull();
-  });
-});
 
 /**
  * Platform email is metered, and the studio is told the price.

@@ -24,7 +24,7 @@ import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle, Badge, Building2, Button, Callout, Card, ChevronRight, Chip, CircleCheck,
   ConfirmDialog, CreditCard, EmptyState, Eyebrow, Field, Gift, GlanceStrip, Globe, IconBadge, Info, Input, KeyRound, ThumbsUp,
-  Dumbbell, LayoutGrid, Mail, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, Select, Sheet, ShieldCheck, Wand2,
+  LayoutGrid, Mail, Percent, Plus, Reveal, RefreshCw, Search, SectionHeader, SegmentedControl, Select, Sheet, ShieldCheck, Wand2,
   Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, Wrench, cn, toneText, type Tone,
   ActionResult, ConfigRow, FieldGroup, LoadError, useLoad, useAction as useActionBase,
 } from "@4dl/ui";
@@ -96,7 +96,6 @@ const ADMIN_SECTIONS: ConsoleSection[] = [
      10a, so every app that mounts it — the template included — had a working
      custom-domain feature and no way to configure it. */
   { key: "domains", label: "Custom domains", blurb: "Tenant domains and their certificates", icon: Globe, tone: "sleep", render: () => <PlatformDomainsSection api={api} errorText={errorText} tenantNoun="studio" cnameExample="saas.4dl.app" /> },
-  { key: "content", label: "Starter content", blurb: "The exercise library a fresh deployment starts without", icon: Dumbbell, tone: "supplement", render: () => <StarterLibraryCard /> },
   /* The panel is `@4dl/admin`'s: who a deployment sends mail as is the shared
      email package's subject, not Kova's. Before it existed the endpoints behind
      it had no caller at all, and a fresh deploy could not send the sign-in code
@@ -1168,76 +1167,6 @@ function AiSelfTest({ models }: { models: AiCatalogModel[] }) {
 
 /** Platform nuclear reset — wipe every tenant + all data back to an empty
  *  install (platform config kept). OTP to the admin's email + a typed phrase. */
-/**
- * The starter exercise library, as a choice.
- *
- * It used to install itself on the first `GET /api/exercises`, which made a
- * deployment impossible to empty: deleting the 40 rows just brought them back on
- * the next request, and a nuclear reset appeared to "come back with premade
- * exercises". Content an operator did not ask for and cannot refuse is not a
- * starter kit. Now it is installed and removed here, deliberately.
- *
- * The warning about drafting is not decoration: the plan-draft prompt whitelists
- * library ids and discards anything outside them, so with an empty library the
- * feature refuses outright (409) rather than billing for a draft that cannot
- * survive validation.
- */
-function StarterLibraryCard() {
-  const load = useCallback(() => api.get<{ installed: boolean; count: number; available: number }>("/api/admin/starter-library"), []);
-  const lib = useAdminLoad(load, "the starter library");
-  const act = useAction();
-
-  const set = (install: boolean) =>
-    act.run(install ? "install" : "remove", async () => {
-      const r = await api.post<{ count: number }>("/api/admin/starter-library", { install });
-      lib.reload();
-      return install ? `Installed ${plural(r.count, "exercise")}.` : "Starter library removed — the library is now empty.";
-    }, install ? "Couldn't install the starter library." : "Couldn't remove the starter library.");
-
-  return (
-    <Card className="space-y-4">
-      <SectionHeader icon={Dumbbell} title="Starter exercise library" />
-      <p className="text-sm text-muted-foreground">
-        {plural(lib.data?.available ?? 0, "curated exercise")} on the platform lane, readable by every studio and owned by
-        none. Nothing installs it automatically — a fresh deployment starts empty.
-      </p>
-      {lib.error && !lib.data ? (
-        <LoadError what="the starter library" error={lib.error} onRetry={lib.reload} />
-      ) : (
-        <Reveal loading={lib.loading} skeleton={<Skeleton className="h-12 w-full rounded-xl" />}>
-          {lib.data && (
-            <div className="space-y-2.5 rounded-2xl bg-surface-2 p-3.5">
-              <ConfigRow
-                label="Installed"
-                ok={lib.data.installed}
-                detail={lib.data.installed
-                  ? "Every studio sees these alongside their own exercises."
-                  : "Studios see only the exercises they add themselves."}
-                okLabel={`${lib.data.count}`}
-                missingLabel="None"
-              />
-              {!lib.data.installed && (
-                <Callout tone="warning" icon={AlertTriangle}>
-                  With no exercises at all, the AI plan draft refuses — it can only pick from a library that exists.
-                </Callout>
-              )}
-              <Button
-                className="min-h-12 w-full"
-                variant={lib.data.installed ? "outline" : "default"}
-                disabled={act.busy !== null}
-                onClick={() => void set(!lib.data!.installed)}
-              >
-                {act.busy ? <><Spinner className="size-4" /> Working…</> : lib.data.installed ? <><Trash2 /> Remove the starter library</> : <><Plus /> Install {plural(lib.data.available, "exercise")}</>}
-              </Button>
-            </div>
-          )}
-        </Reveal>
-      )}
-      <ActionResult msg={act.msg} err={act.err} />
-    </Card>
-  );
-}
-
 function NuclearResetCard() {
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<"intro" | "code">("intro");

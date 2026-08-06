@@ -735,9 +735,12 @@ same-origin and unaffected.
   UI caller; the coach dashboard only shows a simpler "At risk" count.
 
 **Shipped but thinner than it sounds:**
-- The Train tab's "browsable library grid" is nearly empty in practice — the
-  platform seed ships zero exercise thumbnails, only two real categories, and no
-  favourites.
+- The Train tab's "browsable library grid" is EMPTY until a studio fills it.
+  **Kova ships no exercises at all** — the 40-row starter library and its
+  operator button were removed: content a studio did not choose is something to
+  delete, not a head start. The consequence to know about is `ai/draft-plan`,
+  which whitelists library ids and so refuses with `empty_library` (409) until
+  the studio has added some. That is the correct refusal, not a regression.
 - "Training Load vs target" doesn't reach the client in production.
 
 **Ops:** the first deploy of any app is **Actions → "Provision an app on

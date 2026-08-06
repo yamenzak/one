@@ -386,9 +386,8 @@ export async function purgeEverything(env: Env): Promise<{ tenants: number; subs
   const live = DEFAULT_PLANS.map((p) => p.id);
   await run(env.DB, `DELETE FROM plans WHERE id NOT IN (${live.map(() => "?").join(",")})`, ...live);
 
-  // The starter exercise library is platform content, not tenant data, so the
-  // blanket `DELETE FROM exercises` above already took it. It only returns if an
-  // admin installs it again — see `seedExercises`, which is no longer automatic.
+  // Kova ships NO exercises of its own, so the blanket `DELETE FROM exercises`
+  // above leaves the table genuinely empty and nothing puts anything back.
   return { tenants: orgs.length, subsCanceled, subsFailed };
 }
 

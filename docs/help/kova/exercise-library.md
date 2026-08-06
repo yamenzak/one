@@ -32,9 +32,9 @@ scan for "what can I do with a barbell" without opening anything.*
    feed the filters, so this is what makes the library browsable later.
 4. Save.
 
-Kova also ships a **starter library** an owner can install in one tap from
-Settings. It is opt-in: a studio that programs its own way should not have to
-delete two hundred movements it did not ask for.
+Every movement in your library is one you added. Kova ships none of its own —
+a studio's library is its own programming, and a list of generic movements
+nobody chose is something to delete rather than something to use.
 
 ## Find one
 
@@ -64,8 +64,9 @@ advance.
 ## Editing and archiving
 
 - **Your own movements** open straight into the editor.
-- **Starter-library movements** are shared across every studio, so editing one
-  makes **a copy that belongs to you** and edits that. Yours from then on.
+- **Shared movements** — ones your studio does not own — cannot be edited in
+  place, so editing one makes **a copy that belongs to you** and edits that.
+  Yours from then on.
 - **Archive** takes a movement out of your library and out of the pickers.
   Plans and logs that already use it keep working and keep showing the name —
   nothing you have programmed goes blank. Kova tells you how many plans and
@@ -81,12 +82,12 @@ Check the filter button for a number on it — a muscle-group or equipment filte
 may be excluding it. The list says so when that is what happened.
 
 **"Make a copy to edit" instead of "Edit".**
-That movement came from the platform's starter library and is shared. Making the
-copy is the fix; it is one tap and everything else stays the same.
+That movement is shared rather than yours — another studio in a shared library
+owns it. Making the copy is the fix; it is one tap and everything else stays the
+same.
 
 **Archive is not offered.**
-Same reason: it is not yours to archive. Starter-library movements are shared,
-so hiding one for your studio is not something a single studio can do.
+Same reason: it is not yours to archive.
 
 ## Related
 
