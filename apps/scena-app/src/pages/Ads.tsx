@@ -224,7 +224,14 @@ export function AdProfileDetailPage() {
   const [ads, setAds] = useState<Ad[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  const reload = () => getAdProfile(id).then((p) => { setProfile(p); setAds(p.ads); }).catch(() => setProfile(null)).finally(() => setLoaded(true));
+  // Same shape as the source detail: the catch wrote `null` into the state a
+  // genuinely-deleted profile writes, so "not found" and "we could not reach
+  // the server" rendered identically — and only one of them has a way back.
+  const [error, setError] = useState<string | null>(null);
+  const reload = () => {
+    setError(null);
+    return getAdProfile(id).then((p) => { setProfile(p); setAds(p.ads); }).catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setLoaded(true));
+  };
   useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [id]);
 
   usePageChrome(
@@ -258,6 +265,14 @@ export function AdProfileDetailPage() {
     void offerPublishAffected("ad", id); // rotation changed — offer to republish bound channels
   }
 
+  if (loaded && error) {
+    return (
+      <div>
+        <PageHeader title="Ad profile" back={{ label: "Ad profiles", onClick: () => navigate("/ads") }} />
+        <LoadError what="this profile" error={error} onRetry={() => void reload()} />
+      </div>
+    );
+  }
   if (loaded && !profile) {
     return (
       <div>

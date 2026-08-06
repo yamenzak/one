@@ -512,3 +512,86 @@ screen and the reason the product reads as a signage tool rather than a CMS.
 `Admin`); `GlanceStrip` is the shape for both and they are 7f/console work.
 `page-header` and `page-chrome` remain the app's own — 17 and 18 importers,
 one sweep, not per-screen work.
+
+
+---
+
+## 7f — the shared-device surfaces, and a regression 7a caused
+
+### `className="dark"` stopped meaning anything in Stage 7a
+
+The kiosk and the board-control tablet are **customer-facing surfaces on shared
+devices**: they hang in a lobby, they are read from across a room, and they are
+not somebody's dashboard to have opinions about. Both said "always dark" with
+`className="dark …"` — correct while Scena was light-first with a `.dark`
+CLASS, and inert from the moment 7a moved the palette to `@4dl/ui`'s dark-first
+tokens under a `data-theme` ATTRIBUTE.
+
+Nothing broke loudly. The class is a no-op, the pages render, and they quietly
+inherit whatever that tablet's browser — or an operator who once opened the
+dashboard on it, same origin, same `localStorage` — last chose.
+
+`useForcedDark()` replaces it: dark is the **absence** of the attribute, so the
+hook removes it and puts back exactly what it found on unmount.
+
+### The same 7a break in the brand kit, and this one was worse
+
+`brandCss` emitted `:root { …LIGHT tokens… }` and `.dark { …DARK tokens… }`.
+After 7a that means:
+
+- a tenant's **dark tokens applied nowhere at all**, and
+- their **light tokens were injected at `:root`, which IS the dark theme** —
+  so a configured brand rendered light-on-light in the app's default theme.
+
+It ships fixed: dark tokens on `:root`, light tokens on
+`:root[data-theme="light"]`, whose higher specificity is what makes it win in
+light mode even though both selectors match there.
+
+**`apps/scena-app` gains a test suite for exactly this** — its first, and the
+reason is that neither failure has a symptom a typecheck or a build can see.
+`brand-theme.test.ts` asserts the selectors (not the values — the selectors are
+the part no screenshot review catches); `theme.conformance.test.ts` reads every
+source file and fails on a `dark` class token in any `className`, and on
+`useForcedDark` losing either of its two callers.
+
+Both were **mutation-tested**, and the conformance one failed the first attempt
+in a way worth recording: its regex used `(?:^|\s)dark` as the left boundary,
+and `^` under the `m` flag is the start of a LINE — so `className="dark
+min-h-screen …"`, the exact string it exists to catch, sailed straight through.
+Found by reverting the fix and watching the test still pass. It also strips
+comments first, because `theme.tsx`'s own header quotes the offending string
+while explaining why it is wrong, and a guard that fails on the documentation
+of its own rule is a guard somebody deletes.
+
+### The kiosk's stuck button
+
+`take()` awaited `issueTicket` bare, with `setBusy(false)` **after** it — so a
+dropped request left every service tile disabled, on an unattended tablet at an
+entrance, with nobody to reload it and nothing on screen saying why. It is a
+`try/finally` with a message now.
+
+### The last of the lying-empty loads
+
+Six more `catch` clauses that answered a failure with a confident fact:
+
+- `media-picker.tsx`: `catch(() => setItems([]))` → "Your library is empty" **in
+  a picker**, where what somebody takes away is "I have no media" and what they
+  do next is upload a second copy of something they own.
+- `Feeds` detail and `Ads` detail: `catch(() => setFeed(null))` wrote into the
+  same state a genuinely-deleted record writes, so "Not found." and "we could
+  not reach the server" rendered identically — and only one of them has a way
+  back.
+- `Analytics`, `WidgetProfiles`, `Feeds` list: `String(e)` → `[object Object]`.
+
+`Analytics` polls every three seconds, so it gets the same rule as the other
+polling screens: the error only replaces the page while there is nothing to
+replace.
+
+### Deliberately NOT in this sub-stage
+
+`Station.tsx` and `Kiosk.tsx`'s large-target layout is already the right shape
+for a shared device and was left alone. The `catch(() => {})` calls on
+**option lists** (AI model pickers, the widget builder's board/feed/weather
+lists, branding) are correct as they stand: a picker that cannot load its
+options degrades to a picker with no options, and there is no page-level claim
+being made. Only loads whose failure becomes a STATEMENT were changed.

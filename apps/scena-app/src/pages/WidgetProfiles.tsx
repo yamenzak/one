@@ -42,7 +42,7 @@ export function WidgetProfilesPage() {
 
   const reload = () => {
     setError(null);
-    return listWidgetProfiles().then(setProfiles).catch((e) => setError(String(e))).finally(() => setLoading(false));
+    return listWidgetProfiles().then(setProfiles).catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setLoading(false));
   };
   useEffect(() => { reload(); }, []);
 

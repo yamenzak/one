@@ -25,7 +25,7 @@ import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { cn } from "@/lib/utils";
-import { toast } from "@4dl/ui";
+import { LoadError, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   listFeeds, getFeed, createSource, updateSource, previewSource, addFeedItem, deleteFeedItem, refreshFeed, deleteFeed,
@@ -98,7 +98,7 @@ export function FeedsPage() {
       setPerCall(wx.creditsPerCall);
       return fs;
     } catch (e) {
-      setError(String(e));
+      setError(e instanceof Error ? e.message : String(e));
       return [];
     }
   }
@@ -258,7 +258,16 @@ export function SourceDetailPage() {
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const reload = () => getFeed(id).then(setFeed).catch(() => setFeed(null)).finally(() => setLoaded(true));
+  /*
+    "Not found." was what a dropped connection said. The catch wrote `null` into
+    the same state a genuinely-deleted source writes, so the two were
+    indistinguishable — and one of them is recoverable by pressing a button.
+  */
+  const [error, setError] = useState<string | null>(null);
+  const reload = () => {
+    setError(null);
+    return getFeed(id).then(setFeed).catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setLoaded(true));
+  };
   useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [id]);
 
   async function refresh() {
@@ -291,6 +300,14 @@ export function SourceDetailPage() {
     [feed?.name, feed?.provider, busy],
   );
 
+  if (loaded && error) {
+    return (
+      <div>
+        <PageHeader title="Source" back={{ label: "Sources", onClick: () => navigate("/feeds") }} />
+        <LoadError what="this source" error={error} onRetry={() => void reload()} />
+      </div>
+    );
+  }
   if (loaded && !feed) {
     return <div><PageHeader title="Source" description="Not found." back={{ label: "Sources", onClick: () => navigate("/feeds") }} /></div>;
   }

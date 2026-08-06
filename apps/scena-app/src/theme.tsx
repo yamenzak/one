@@ -70,3 +70,30 @@ export function useTheme() {
 
   return { isDark, toggle };
 }
+
+/**
+ * FORCE THE DARK PALETTE FOR AS LONG AS THIS SCREEN IS MOUNTED.
+ *
+ * The customer-facing surfaces — the take-a-ticket kiosk, the board control
+ * tablet — are dark by design: they hang in a lobby, they are looked at from
+ * across a room, and they are not somebody's dashboard to have opinions about.
+ * Both said so with `className="dark"`, which stopped meaning anything the
+ * moment Stage 7a moved the palette from a `.dark` CLASS to a `data-theme`
+ * ATTRIBUTE on `<html>`. Nothing broke loudly: the class is inert, the pages
+ * render, and they quietly inherit whatever theme that tablet's browser (or an
+ * operator who once opened the dashboard on it — same origin, same
+ * localStorage) last chose.
+ *
+ * Dark is the ABSENCE of the attribute, because `:root` already holds the dark
+ * palette. So this removes it, and puts back exactly what it found on unmount —
+ * these pages are usually the whole session on their device, but the operator
+ * console is one route away and must not be left recoloured.
+ */
+export function useForcedDark(): void {
+  useEffect(() => {
+    const el = document.documentElement;
+    const previous = el.getAttribute("data-theme");
+    el.removeAttribute("data-theme");
+    return () => { if (previous !== null) el.setAttribute("data-theme", previous); };
+  }, []);
+}

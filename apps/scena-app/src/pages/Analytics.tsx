@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.
 import { Skeleton } from "../components/ui/skeleton.js";
 import { PageHeader } from "../components/page-header.js";
 import { StatTile } from "../components/status.js";
+import { LoadError } from "@4dl/ui";
 import { usePageChrome } from "../components/page-chrome.js";
 import { getAnalytics, analyticsCsvUrl, type AnalyticsSummary } from "../api.js";
 import { EmptyState } from "../components/empty.js";
@@ -31,7 +32,7 @@ export function AnalyticsPage() {
 
   useEffect(() => {
     let alive = true;
-    const load = () => getAnalytics().then((d) => alive && setData(d)).catch((e) => alive && setErr(String(e)));
+    const load = () => getAnalytics().then((d) => { if (alive) { setData(d); setErr(null); } }).catch((e) => alive && setErr(e instanceof Error ? e.message : String(e)));
     load();
     const t = setInterval(load, 3000);
     return () => {
@@ -57,10 +58,11 @@ export function AnalyticsPage() {
         description={data ? `${data.totalPlays.toLocaleString()} plays across ${data.activeScreens} active screen${data.activeScreens === 1 ? "" : "s"}` : "Proof-of-play telemetry from your fleet."}
       />
 
-      {err ? (
-        <Card className="border-dashed">
-          <CardContent className="py-14 text-center text-sm text-muted-foreground">Couldn't reach the API: {err}</CardContent>
-        </Card>
+      {/* This polls every three seconds, so the error only replaces the page
+          while there is nothing to replace — a working dashboard must not blink
+          to an error card because one request in nine hundred dropped. */}
+      {err && !data ? (
+        <LoadError what="analytics" error={err} onRetry={() => void getAnalytics().then((d) => { setData(d); setErr(null); }).catch(() => undefined)} />
       ) : !data ? (
         <AnalyticsSkeleton />
       ) : (

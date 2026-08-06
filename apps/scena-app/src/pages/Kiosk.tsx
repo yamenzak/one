@@ -17,6 +17,7 @@ import { Loader2, Printer, Ticket, ArrowRight, Users } from "lucide-react";
 import { Button } from "../components/ui/button.js";
 import { getBoardLive, issueTicket, type Board } from "../api.js";
 import { applyBrandTheme } from "../brand-theme.js";
+import { useForcedDark } from "../theme.js";
 import type { QueueState } from "@scena/protocol";
 
 interface Issued { prefix: string; number: number; label: string | null; ahead: number }
@@ -24,6 +25,8 @@ interface Issued { prefix: string; number: number; label: string | null; ahead: 
 const fmt = (prefix: string, n: number | null | undefined) => (n == null ? "—" : `${prefix}${String(n).padStart(3, "0")}`);
 
 export function KioskPage() {
+  // A lobby tablet is dark, whatever this browser last chose on the dashboard.
+  useForcedDark();
   const params = new URLSearchParams(window.location.search);
   const token = params.get("token") ?? "";
   const boardId = params.get("board") ?? "";
@@ -51,14 +54,23 @@ export function KioskPage() {
   async function take(categoryId?: string) {
     setBusy(true);
     setErr(null);
-    const r = await issueTicket(boardId, token, categoryId);
-    setBusy(false);
-    if (r.error || !r.ticket) setErr(r.error === "unauthorized kiosk" ? "This kiosk link is invalid." : r.error ?? "could not issue a ticket");
-    else {
+    try {
+      const r = await issueTicket(boardId, token, categoryId);
+      if (r.error || !r.ticket) { setErr(r.error === "unauthorized kiosk" ? "This kiosk link is invalid." : r.error ?? "could not issue a ticket"); return; }
       setTicket(r.ticket);
       setTimeout(() => window.print(), 250);
       // Return to the menu so the next customer can serve themselves.
       setTimeout(() => setTicket((t) => (t === r.ticket ? null : t)), 15000);
+    } catch (e) {
+      /*
+        The await was bare and `setBusy(false)` came after it, so a dropped
+        request left every service tile DISABLED — on an unattended tablet at
+        an entrance, with nobody to reload it and nothing on screen saying why.
+        The `finally` is the fix; the message is so the next person can try.
+      */
+      setErr(e instanceof Error ? e.message : "Couldn’t issue a ticket. Please try again.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -145,7 +157,7 @@ export function KioskPage() {
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="dark min-h-screen w-full bg-background text-foreground"
+      className="min-h-screen w-full bg-background text-foreground"
       style={{ background: "radial-gradient(circle at 50% 15%, color-mix(in oklch, var(--primary) 20%, var(--background)), var(--background))" }}
     >
       <div className="flex min-h-screen flex-col items-center justify-center px-5 py-10">{children}</div>

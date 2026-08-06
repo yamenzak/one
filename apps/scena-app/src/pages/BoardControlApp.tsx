@@ -32,6 +32,7 @@ import {
 } from "../api.js";
 import { signOut } from "../auth-client.js";
 import { applyBrandTheme } from "../brand-theme.js";
+import { useForcedDark } from "../theme.js";
 import type { QueueState, RoomState, ScoreState } from "@scena/protocol";
 import { QueueControls, RoomControls } from "./Station.js";
 
@@ -43,6 +44,8 @@ function counterNumber(stationId: string | null): number {
 }
 
 export function BoardControlApp({ me, onSignedOut }: { me: Me; onSignedOut: () => void }) {
+  // A counter tablet is dark, whatever this browser last chose on the dashboard.
+  useForcedDark();
   const scope = me.board!;
   const boardId = scope.boardId;
   const isStation = Boolean(scope.stationId);
@@ -250,7 +253,7 @@ function ScoreControls({
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="dark flex min-h-screen w-full flex-col bg-background text-foreground"
+      className="flex min-h-screen w-full flex-col bg-background text-foreground"
       style={{ background: "radial-gradient(circle at 50% 0%, color-mix(in oklch, var(--primary) 18%, var(--background)), var(--background))" }}
     >
       {children}

@@ -9,8 +9,22 @@
  * theme, or per-token edits. Whatever isn't set falls back to the shipped
  * default theme in index.css (so a partial theme just tweaks a few tokens).
  *
- * The result is written to a single <style id="scena-brand"> whose `:root {…}` /
- * `.dark {…}` rules win over index.css, so the light/dark toggle keeps working.
+ * The result is written to a single <style id="scena-brand"> whose rules win
+ * over index.css, so the light/dark toggle keeps working.
+ *
+ * ⚠️ THE SELECTORS FOLLOW THE PLATFORM'S DARK-FIRST TOKENS, and getting this
+ * wrong is silent. It emitted `:root { …light… }` and `.dark { …dark… }`, which
+ * was correct while Scena was light-first with a `.dark` CLASS. Stage 7a moved
+ * the palette to `@4dl/ui`'s dark-first tokens under a `data-theme` ATTRIBUTE,
+ * and nothing has carried a `.dark` class since — so a tenant's DARK tokens
+ * stopped applying entirely, and their LIGHT tokens were injected at `:root`,
+ * which is the DARK theme. A brand kit rendered light-on-light in the default
+ * theme and shipped that way, because both halves still compiled and the app
+ * still had colours; they were just the wrong ones.
+ *
+ * So: dark tokens go on `:root` (dark is the ABSENCE of the attribute), light
+ * tokens on `:root[data-theme="light"]`. The light block's higher specificity
+ * is what makes it win in light mode even though both selectors match there.
  */
 
 import { widgetTokens, widgetTokensCss, deriveTokens, THEME_TOKENS, type ThemeMaps } from "@scena/manifest";
@@ -53,12 +67,16 @@ export function isDefaultBrand(brand: BrandKit): boolean {
 export function brandCss(brand: BrandKit): string {
   const rootExtra = [`  --radius: ${clamp(brand.radius ?? 16, 0, 64)}px;`];
   if (brand.bodyFont) rootExtra.push(`  --font-sans: "${brand.bodyFont}", system-ui, sans-serif;`);
-  const root = blockFor(":root", brand.theme?.light ?? {}, rootExtra);
-  const dark = blockFor(".dark", brand.theme?.dark ?? {});
+  // The radius and font are theme-independent, so they ride the `:root` block —
+  // which now carries the DARK tokens. A kit with no dark tokens at all still
+  // gets its radius and font, because `blockFor` only bails when the whole
+  // block would be empty.
+  const dark = blockFor(":root", brand.theme?.dark ?? {}, rootExtra);
+  const root = blockFor(':root[data-theme="light"]', brand.theme?.light ?? {});
   // The widget `--w-*` tokens, derived from the same tokens, so the builder
   // canvas preview matches on-screen rendering.
   const widget = widgetTokensCss(widgetTokens({ theme: brand.theme, radius: brand.radius, bodyFont: brand.bodyFont }));
-  return [root, dark, widget].filter(Boolean).join("\n");
+  return [dark, root, widget].filter(Boolean).join("\n");
 }
 
 /** Inject (or refresh) the brand stylesheet. Default kit ⇒ remove it. */
@@ -85,6 +103,10 @@ export function clearBrandTheme(): void {
 /**
  * Parse a pasted shadcn theme (CSS with `:root { --token: … }` and
  * `.dark { … }` blocks) into token maps. Unknown tokens are ignored.
+ *
+ * The INPUT selectors stay shadcn's, deliberately: this reads themes people
+ * copy off the internet, and every one of them is written light-first with a
+ * `.dark` class. What Scena EMITS is a separate decision, made in `brandCss`.
  */
 export function parseThemeCss(css: string): ThemeMaps {
   const allow = new Set<string>(THEME_TOKENS);

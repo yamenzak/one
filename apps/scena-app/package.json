@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf .turbo dist *.tsbuildinfo"
+    "clean": "rm -rf .turbo dist *.tsbuildinfo",
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@4dl/app-kit": "workspace:*",
@@ -49,6 +50,7 @@
     "@vitejs/plugin-react": "^4.4.1",
     "typescript": "^5.9.3",
     "vite": "^6.3.4",
+    "vitest": "^3.2.4",
     "wrangler": "^4.42.0"
   }
 }

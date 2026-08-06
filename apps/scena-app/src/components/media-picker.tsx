@@ -4,11 +4,12 @@
  * raw external URL. Keeps the media library the single home for assets used
  * across the app (widgets, slides, logos). Returns the asset's URL.
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Loader2, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog.js";
 import { Button } from "./ui/button.js";
 import { listMedia, uploadToLibrary, API_BASE, type Media } from "../api.js";
+import { LoadError } from "@4dl/ui";
 
 /** Absolute URL for an asset path (library rows store "/api/assets/<hash>"). */
 export function assetSrc(url: string | null | undefined): string {
@@ -35,14 +36,20 @@ export function MediaPicker({ open, kind = "image", title, onPick, onOpenChange 
   onOpenChange: (o: boolean) => void;
 }) {
   const [items, setItems] = useState<Media[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
+  // `catch(() => setItems([]))` turned a failed load into "Nothing here yet" —
+  // in a PICKER, where the answer somebody takes away is "I have no media" and
+  // the next thing they do is upload a second copy of something they own.
+  const load = useCallback(() => {
+    setError(null);
     setItems(null);
-    listMedia(kind).then(setItems).catch(() => setItems([]));
-  }, [open, kind]);
+    return listMedia(kind).then(setItems).catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }, [kind]);
+
+  useEffect(() => { if (open) void load(); }, [open, load]);
 
   async function onUpload(file: File) {
     setUploading(true);
@@ -71,7 +78,9 @@ export function MediaPicker({ open, kind = "image", title, onPick, onOpenChange 
         <input ref={fileRef} type="file" accept={kind === "image" ? "image/*" : kind === "video" ? "video/*" : "audio/*"} className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUpload(f); e.target.value = ""; }} />
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {!items ? (
+          {error ? (
+            <LoadError what="your media" error={error} onRetry={() => void load()} />
+          ) : !items ? (
             <div className="grid place-items-center py-16 text-muted-foreground"><Loader2 className="size-5 animate-spin" /></div>
           ) : items.length === 0 ? (
             <div className="py-16 text-center text-sm text-muted-foreground">Your library is empty. Upload an asset to use it here.</div>
