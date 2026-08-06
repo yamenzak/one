@@ -3,13 +3,14 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "Playwright E2E for Scena \u2014 pair, publish, and two screens on the same frame, driven through the real app at :8789.",
+  "description": "Playwright E2E for Scena — pair, publish, and two screens on the same frame, driven through the real app at :8789.",
   "scripts": {
     "e2e": "NODE_OPTIONS=--disable-warning=ExperimentalWarning playwright test",
     "e2e:ui": "NODE_OPTIONS=--disable-warning=ExperimentalWarning playwright test --ui",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf .turbo playwright-report test-results *.tsbuildinfo",
-    "wall": "NODE_OPTIONS=--disable-warning=ExperimentalWarning playwright test --config wall.config.ts"
+    "clean": "rm -rf .turbo playwright-report test-results shots-out *.tsbuildinfo",
+    "wall": "NODE_OPTIONS=--disable-warning=ExperimentalWarning playwright test --config wall.config.ts",
+    "shots": "NODE_OPTIONS=--disable-warning=ExperimentalWarning playwright test --config shots.config.ts"
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",

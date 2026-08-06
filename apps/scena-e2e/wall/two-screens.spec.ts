@@ -25,9 +25,9 @@
  * make this a test of forms rather than of the clock.
  */
 
-import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { api, createWorkspace, newParty, uniqueEmail } from "../src/app.js";
-import { PLAYER_URL } from "../src/env.js";
+import { bootScreen } from "../src/screen.js";
 
 interface Screen {
   id: string;
@@ -41,30 +41,6 @@ interface Frame {
   index: number;
   channelId: string;
   version: number;
-}
-
-/**
- * Open a player, wait for its pairing code, and hand it back.
- *
- * Its own browser context, because the reservation lives in `localStorage` and
- * two screens sharing one would be one screen with two windows — which is not
- * what a video wall is.
- */
-async function bootScreen(context: BrowserContext): Promise<{ page: Page; code: string }> {
-  const page = await context.newPage();
-  await page.goto(PLAYER_URL);
-  // The code is persisted as soon as the DO hands one over, and reading it from
-  // storage rather than off the screen is deliberate: the pairing screen draws
-  // each character in its own animated tile, so scraping it would couple this
-  // spec to a presentation choice that has nothing to do with the clock.
-  await expect
-    .poll(async () => page.evaluate(() => JSON.parse(localStorage.getItem("scena.screen") ?? "{}")?.code ?? ""), {
-      timeout: 60_000,
-      message: "the player never reserved a screen (is the API base right?)",
-    })
-    .toMatch(/^[A-Z0-9]{4,8}$/);
-  const code = await page.evaluate(() => String(JSON.parse(localStorage.getItem("scena.screen") ?? "{}").code));
-  return { page, code };
 }
 
 /** The player's debug overlay, verbatim. */
@@ -149,22 +125,11 @@ test("two screens on one channel draw the same slide", async ({ browser }) => {
   */
   await api(dash, "POST", "/api/billing/change-plan", { planId: "starter" });
 
-  /*
-    ── two devices, each reserving its own screen ───────────────────────────
-
-    ⚠️ PLAIN CONTEXTS, NOT `newParty`. That helper adds a `cf-connecting-ip`
-    header so each signing-in PERSON spends their own OTP budget — and a screen
-    is not a person. Worse, it breaks them: the player's reservation is a
-    cross-origin POST with no custom headers, i.e. a SIMPLE request that needs
-    no preflight, and adding one header turns it into a preflighted one. The
-    worker's CORS allows `content-type` and nothing else, so the preflight is
-    refused and the player renders "offline — no cached channel yet" with no
-    request in the log that looks like a failure.
-  */
-  const deviceA = await browser.newContext();
-  const deviceB = await browser.newContext();
-  const a = await bootScreen(deviceA);
-  const b = await bootScreen(deviceB);
+  /* ── two devices, each reserving its own screen ─────────────────────────────
+     `bootScreen` owns the two traps here — a plain context rather than a
+     `newParty` one, and a context per screen. Both are explained there. */
+  const a = await bootScreen(browser);
+  const b = await bootScreen(browser);
   expect(a.code).not.toBe(b.code); // two devices, not one seen twice
 
   /* ── the operator claims both ───────────────────────────────────────────── */
@@ -249,5 +214,5 @@ test("two screens on one channel draw the same slide", async ({ browser }) => {
   if (bracket[0] === bracket[1]) expect(observed).toBe(bracket[0]); // no boundary crossed
   else expect(bracket).toContain(observed); // the window straddled a turnover
 
-  await Promise.all([owner.close(), deviceA.close(), deviceB.close()]);
+  await Promise.all([owner.close(), a.context.close(), b.context.close()]);
 });
