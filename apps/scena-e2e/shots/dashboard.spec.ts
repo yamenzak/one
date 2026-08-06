@@ -64,12 +64,27 @@ test("the operator's workspace", async () => {
     await shoot(page, project, "fleet", { settle: 800 });
   });
 
-  // Pairing is the first thing anybody does and the screen most often described
-  // in words. The dialog is opened rather than deep-linked because it is a
-  // dialog: there is no URL that means "the pair sheet is open".
+  /*
+    Pairing is the first thing anybody does and the screen most often described
+    in words. The dialog is opened rather than deep-linked because it is a
+    dialog: there is no URL that means "the pair sheet is open".
+
+    ⚠️ Below `sm` the app-shell collapses EVERY header action into one ⋮ menu,
+    so the button this clicks does not exist at the narrow viewport — the run
+    failed there with a click timeout on a control the design deliberately does
+    not render. Photographing the narrow projects without a picture of pairing
+    would have been the wrong fix; so would widening the viewport. Both
+    affordances are the product, so the step takes whichever one is on screen.
+  */
   await test.step("pairing a screen", async () => {
     await visit(page, `${base}/`, page.getByText(LOBBY_SCREEN).first());
-    await page.getByRole("button", { name: /pair a screen|pair screen/i }).first().click();
+    const direct = page.getByRole("button", { name: "Pair screen", exact: true });
+    if (await direct.isVisible()) {
+      await direct.click();
+    } else {
+      await page.getByRole("button", { name: "Page actions" }).click();
+      await page.getByRole("menuitem", { name: /pair screen/i }).click();
+    }
     await shoot(page, project, "pair-screen", { ready: page.getByRole("dialog"), settle: 400 });
     await page.keyboard.press("Escape");
   });
