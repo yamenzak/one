@@ -4,25 +4,20 @@
  * Clicking a card opens the device detail at /screens/<id>. "Devices" are the
  * renamed "Screens" of the model — same api (listScreens), new framing.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, ChevronRight, RectangleHorizontal, RectangleVertical, Search, Sparkles } from "lucide-react";
-import { Button } from "../components/ui/button.js";
-import { Card, CardContent } from "../components/ui/card.js";
+import { Plus, BellRing, ChevronRight, MonitorSpeaker, RectangleHorizontal, RectangleVertical, Sparkles, Wifi, WifiOff } from "lucide-react";
+import { Card } from "../components/ui/card.js";
 import { Badge } from "../components/ui/badge.js";
-import { Input } from "../components/ui/input.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { PageHeader } from "../components/page-header.js";
 import { DevicePreview } from "../components/device-preview.js";
 import { usePageChrome } from "../components/page-chrome.js";
-import { TagFilter } from "../components/tag-filter.js";
 import { StatusDot as SharedStatusDot } from "../components/status.js";
 import { useCan } from "../permissions.js";
 import { cn } from "@/lib/utils";
 import { listScreens, createDisplay, listAlerts, type Screen } from "../api.js";
 import { GetStarted } from "../components/get-started.js";
-import { StatTile } from "../components/status.js";
-import { toast } from "@4dl/ui";
+import { Collection, Filters, GlanceStrip, Row, toast, useCollectionView, type FacetSelection } from "@4dl/ui";
 
 /** Compact "last seen" label for offline devices. */
 function lastSeenLabel(ts?: number | null): string | null {
@@ -49,7 +44,8 @@ export function ScreensPage({ onPair }: { onPair: () => void }) {
   const [screens, setScreens] = useState<Screen[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [facets, setFacets] = useState<FacetSelection>({ tag: null, status: null });
+  const [view, setView] = useCollectionView("scena.screens", "grid");
 
   // Pair lives in the shell top bar now (collapses to ⋮ on small screens).
   const can = useCan();
@@ -77,19 +73,24 @@ export function ScreensPage({ onPair }: { onPair: () => void }) {
     [onPair, canPair, canCreate],
   );
 
+  /*
+    The fleet polls every five seconds, which makes the error handling different
+    from every other list in the app: a single failed poll must NOT replace a
+    working screen with an error page. So a failure is only shown while there is
+    nothing to show — once `screens` is populated it stays, and the next poll
+    either refreshes it or leaves it alone.
+  */
+  const load = useCallback(
+    () => listScreens().then((s) => { setScreens(s); setError(null); }).catch((e) => setError(e instanceof Error ? e.message : String(e))),
+    [],
+  );
   useEffect(() => {
     let alive = true;
-    const load = () =>
-      listScreens()
-        .then((s) => alive && setScreens(s))
-        .catch((e) => alive && setError(String(e)));
-    load();
-    const t = setInterval(load, 5000); // live-ish fleet view (§23)
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
-  }, []);
+    const tick = () => { if (alive) void load(); };
+    tick();
+    const t = setInterval(tick, 5000); // live-ish fleet view (§23)
+    return () => { alive = false; clearInterval(t); };
+  }, [load]);
 
   const online = screens?.filter((s) => s.live?.online).length ?? 0;
   const offline = (screens?.length ?? 0) - online;
@@ -105,72 +106,97 @@ export function ScreensPage({ onPair }: { onPair: () => void }) {
       .catch(() => alive && setOpenAlerts(null));
     return () => { alive = false; };
   }, []);
-  const filtered = useMemo(() => {
-    if (!screens) return screens;
+
+  /*
+    ONLINE/OFFLINE IS A FACET NOW, and it is the one this screen was missing.
+    The fleet summary said "3 offline" and the only way to find which three was
+    to read every card — on a wall of forty screens, which is the size at which
+    somebody installs digital signage.
+  */
+  const facetGroups = useMemo(() => [
+    { key: "status", label: "Status", options: [{ value: "online", label: "Online" }, { value: "offline", label: "Offline" }] },
+    { key: "tag", label: "Tag", options: allTags.map((t) => ({ value: t, label: t })) },
+  ], [allTags]);
+
+  const shown = useMemo(() => {
+    if (!screens) return null;
     const needle = q.trim().toLowerCase();
-    return screens.filter(
-      (s) =>
-        (!needle || s.name.toLowerCase().includes(needle) || (s.channel_name ?? "").toLowerCase().includes(needle)) &&
-        (activeTags.length === 0 || (s.tags ?? []).some((t) => activeTags.includes(t))),
+    return screens.filter((s) => {
+      if (facets.status === "online" && !s.live?.online) return false;
+      if (facets.status === "offline" && s.live?.online) return false;
+      if (facets.tag && !(s.tags ?? []).includes(facets.tag)) return false;
+      return !needle || s.name.toLowerCase().includes(needle) || (s.channel_name ?? "").toLowerCase().includes(needle);
+    });
+  }, [screens, q, facets]);
+
+  // A workspace with no screens at all gets the first-run panel, not a
+  // `Collection.empty` — `GetStarted` is two choice cards and a three-step
+  // explainer, which is a different thing from "nothing matched".
+  if (screens && screens.length === 0 && !error) {
+    return (
+      <div>
+        <PageHeader title="Screens" description="Your paired screens, live." />
+        <GetStarted canPair={canPair} canCreate={canCreate} creating={creating} onPair={onPair} onNewDisplay={() => void newDisplay(true)} />
+      </div>
     );
-  }, [screens, q, activeTags]);
+  }
 
   return (
     <div>
       <PageHeader
         title="Screens"
         description={screens ? `${screens.length} device${screens.length === 1 ? "" : "s"} · ${online} online` : "Your paired screens, live."}
-        actions={
-          screens && screens.length > 0 ? (
-            <>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search devices…" className="w-full pl-8 sm:w-56" />
-              </div>
-              <TagFilter allTags={allTags} active={activeTags} onChange={setActiveTags} />
-            </>
-          ) : null
-        }
       />
 
-      {/* Fleet at a glance — turns the landing into a dashboard, not just a grid. */}
-      {screens && screens.length > 0 && (
-        <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Screens" value={screens.length} />
-          <StatTile label="Online" value={online} dot="bg-success" valueClassName="text-success" />
-          <StatTile label="Offline" value={offline} dot={offline > 0 ? "bg-destructive" : undefined} valueClassName={offline > 0 ? "text-destructive" : undefined} />
-          <StatTile label="Open alerts" value={openAlerts ?? "—"} valueClassName={openAlerts ? "text-destructive" : undefined} />
-        </div>
-      )}
+      {/* Four boxed stat cards became one strip — they are a comparison, and on
+          a phone four half-empty boxes is not one. `null` while the first poll
+          is in flight, never a confident 0. */}
+      <div className="mb-5 rounded-2xl bg-card py-4">
+        <GlanceStrip
+          items={[
+            { icon: MonitorSpeaker, tone: "neutral", value: screens?.length ?? null, label: "Screens" },
+            { icon: Wifi, tone: "success", value: screens ? online : null, label: "Online" },
+            { icon: WifiOff, tone: offline > 0 ? "danger" : "neutral", value: screens ? offline : null, label: "Offline" },
+            { icon: BellRing, tone: openAlerts ? "danger" : "neutral", value: openAlerts, label: "Open alerts" },
+          ]}
+        />
+      </div>
 
-      {error ? (
-        <Card className="border-dashed">
-          <CardContent className="py-14 text-center text-sm text-muted-foreground">Couldn't reach the API: {error}</CardContent>
-        </Card>
-      ) : !screens ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <Card key={i} className="overflow-hidden p-0">
-              <Skeleton className="aspect-video rounded-none" />
-              <div className="space-y-2 p-4">
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-3 w-1/2" />
-                <Skeleton className="h-5 w-24 rounded-full" />
-              </div>
-            </Card>
-          ))}
-        </div>
-      ) : screens.length === 0 ? (
-        <GetStarted canPair={canPair} canCreate={canCreate} creating={creating} onPair={onPair} onNewDisplay={() => void newDisplay(true)} />
-      ) : filtered && filtered.length === 0 ? (
-        <div className="rounded-xl border border-dashed py-16 text-center text-sm text-muted-foreground">No devices match "{q}".</div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {(filtered ?? []).map((s) => (
-            <DeviceCard key={s.id} screen={s} onClick={() => navigate(`/screens/${s.id}`)} />
-          ))}
-        </div>
-      )}
+      <Collection
+        items={shown}
+        itemKey={(s: Screen) => s.id}
+        error={screens ? null : error}
+        onRetry={() => void load()}
+        noun="screens"
+        view={view}
+        onView={setView}
+        query={q}
+        onQuery={setQ}
+        narrowed={Boolean(facets.tag || facets.status)}
+        onClearFilters={() => setFacets({ tag: null, status: null })}
+        filter={<Filters groups={facetGroups} value={facets} onChange={setFacets} />}
+        thumb={56}
+        empty={{
+          icon: MonitorSpeaker,
+          title: "No screens yet",
+          description: "Pair a screen or create a display to get started.",
+        }}
+        renderList={(s: Screen) => (
+          <Row
+            icon={s.live?.online ? Wifi : WifiOff}
+            iconTone={s.live?.online ? "success" : "neutral"}
+            sub={[
+              s.channel_name ?? "Unassigned",
+              resolutionLabel(s),
+              s.live?.online ? "Live" : lastSeenLabel(s.live?.lastSeen) ? `last seen ${lastSeenLabel(s.live?.lastSeen)}` : "Offline",
+            ].join(" · ")}
+            onClick={() => navigate(`/screens/${s.id}`)}
+          >
+            {s.name}
+          </Row>
+        )}
+        renderGrid={(s: Screen) => <DeviceCard key={s.id} screen={s} onClick={() => navigate(`/screens/${s.id}`)} />}
+      />
     </div>
   );
 }

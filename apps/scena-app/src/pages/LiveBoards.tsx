@@ -7,23 +7,20 @@
  * per plan slots into the entitlements machinery (§25).
  */
 
-import { Fragment, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
-  Plus, MonitorPlay, Radio, Ticket, Trash2, LayoutGrid, Rows3,
+  Plus, MonitorPlay, Radio, Ticket, Trash2, LayoutGrid,
   KeyRound, RefreshCw, ShieldUser, Eye, EyeOff, Trophy,
 } from "lucide-react";
 import { ScenaMascot } from "../brand.js";
 import { Button } from "../components/ui/button.js";
-import { Card, CardContent } from "../components/ui/card.js";
 import { Input } from "../components/ui/input.js";
 import { Switch } from "../components/ui/switch.js";
-import { Badge } from "../components/ui/badge.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
-import { StatusDot } from "../components/status.js";
+import { Pill } from "../components/status.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.js";
 import { cn } from "@/lib/utils";
 import {
@@ -35,7 +32,7 @@ import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { GEMINI_TTS_VOICES } from "@scena/protocol";
 import type { QueueState, RoomState, ScoreState } from "@scena/protocol";
-import { toast } from "@4dl/ui";
+import { LoadError, SettingsIndex, SettingsPage as SectionFrame, SkeletonList, toast } from "@4dl/ui";
 
 /** The three board kinds, treated equally in the picker + empty state. */
 const BOARD_TYPES: { kind: BoardKind; label: string; hint: string; icon: typeof Ticket }[] = [
@@ -49,19 +46,36 @@ export function LiveBoardsPage() {
   const canCreate = can("board", "create");
   const canDelete = can("board", "delete");
   const [boards, setBoards] = useState<Board[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [roomOpen, setRoomOpen] = useState(false);
-  const [view, setView] = useState<"grid" | "list">(() => (localStorage.getItem("scena.boards.view") === "list" ? "list" : "grid"));
-  useEffect(() => { localStorage.setItem("scena.boards.view", view); }, [view]);
+  const [params, setParams] = useSearchParams();
+  const openId = params.get("board");
 
-  async function refresh() {
-    setBoards(await listBoards().catch(() => []));
-  }
+  const openBoard = (id: string | null) => {
+    const next = new URLSearchParams(params);
+    if (id) next.set("board", id); else next.delete("board");
+    setParams(next);
+  };
+
+  /*
+    A FAILED POLL MUST NOT UNDO THE PAGE.
+
+    This was `setBoards(await listBoards().catch(() => []))`, on a two-second
+    interval — so ONE dropped request replaced a workspace's live boards with
+    the first-run panel ("Create your first live board", mascot and all), and
+    the next tick put them back. Keeping the last-known list is the whole fix;
+    the error is only shown while there is nothing to show.
+  */
+  const refresh = useCallback(
+    () => listBoards().then((b) => { setBoards(b); setError(null); }).catch((e) => setError(e instanceof Error ? e.message : String(e))),
+    [],
+  );
   useEffect(() => {
-    refresh();
-    const t = setInterval(refresh, 2000);
+    void refresh();
+    const t = setInterval(() => void refresh(), 2000);
     return () => clearInterval(t);
-  }, []);
+  }, [refresh]);
 
   // Room boards open a template picker (blank or a starter palette); queue and
   // score boards create straight from a sensible preset.
@@ -98,6 +112,7 @@ export function LiveBoardsPage() {
     if (!ok) return;
     try {
       await deleteBoard(board.id);
+      if (openId === board.id) openBoard(null);
       await refresh();
       toast.success("Board deleted.");
     } catch (e) {
@@ -116,39 +131,52 @@ export function LiveBoardsPage() {
     [busy, canCreate],
   );
 
+  const open = boards?.find((b) => b.id === openId) ?? null;
+
+  /*
+    ONE BOARD OPEN AT A TIME, AND ITS ID IS IN THE URL.
+
+    The grid rendered `BoardBody` — the counters editor, the categories editor,
+    the announcement config, the credentials panel — for EVERY board at once.
+    Five boards was five full management surfaces stacked on one page, which is
+    the 61,541px shape `@4dl/admin` exists to prevent, and none of them could be
+    linked to. It is an index and a page per board now, over the router, so
+    "open the front desk queue" is an address.
+  */
+  if (open) {
+    return (
+      <div className="mx-auto max-w-3xl">
+        <SectionFrame
+          title={open.name}
+          description={`${open.kind} board · ${boardSummary(open)}`}
+          onBack={() => openBoard(null)}
+          action={canDelete ? (
+            <Button variant="ghost" size="icon" className="size-9 text-muted-foreground hover:text-destructive" onClick={() => removeBoard(open)} aria-label={`Delete ${open.name}`}>
+              <Trash2 className="size-4" />
+            </Button>
+          ) : undefined}
+        >
+          <div className="flex flex-col gap-4 rounded-2xl bg-card p-4">
+            <BoardBody board={open} />
+          </div>
+        </SectionFrame>
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader
         title="Live boards"
         description="Queue, room & score boards. Each issues its own logins; bind a widget to display it."
-        actions={boards && boards.length > 0 ? (
-          <div className="inline-flex rounded-md border p-0.5">
-            <Button variant={view === "grid" ? "secondary" : "ghost"} size="icon" className="size-7" title="Grid view" aria-label="Grid view" onClick={() => setView("grid")}><LayoutGrid className="size-4" /></Button>
-            <Button variant={view === "list" ? "secondary" : "ghost"} size="icon" className="size-7" title="List view" aria-label="List view" onClick={() => setView("list")}><Rows3 className="size-4" /></Button>
-          </div>
-        ) : undefined}
       />
 
-      {!boards ? (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          {[0, 1].map((i) => (
-            <Card key={i}>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex items-center gap-3">
-                  <Skeleton className="size-10 rounded-xl" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-20" />
-                  </div>
-                  <Skeleton className="h-8 w-36 rounded-md" />
-                </div>
-                <Skeleton className="h-20 w-full rounded-lg" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      {error && !boards ? (
+        <LoadError what="boards" error={error} onRetry={() => void refresh()} />
+      ) : !boards ? (
+        <SkeletonList rows={3} card thumb={40} />
       ) : boards.length === 0 ? (
-        <div className="flex flex-col items-center rounded-xl border border-dashed bg-card/40 px-6 py-14 text-center">
+        <div className="flex flex-col items-center rounded-2xl bg-card px-6 py-14 text-center">
           <ScenaMascot mood="idle" size={116} className="mb-1" />
           <h3 className="text-base font-semibold">{canCreate ? "Create your first live board" : "No live boards yet"}</h3>
           <p className="mt-1 max-w-md text-sm text-muted-foreground">Each board issues its own logins and goes live the moment you bind a widget to it.{canCreate ? " Pick a type to start." : " Ask an admin to create one."}</p>
@@ -161,9 +189,9 @@ export function LiveBoardsPage() {
                   type="button"
                   disabled={busy}
                   onClick={() => add(t.kind)}
-                  className="group flex flex-col items-center gap-2 rounded-xl border bg-card p-5 text-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md disabled:pointer-events-none disabled:opacity-60"
+                  className="group flex flex-col items-center gap-2 rounded-xl bg-surface-2 p-5 text-center transition-colors hover:bg-surface-3 disabled:pointer-events-none disabled:opacity-60"
                 >
-                  <div className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary transition-colors group-hover:bg-primary/15"><Icon className="size-5" /></div>
+                  <div className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary"><Icon className="size-5" /></div>
                   <div className="text-sm font-semibold">{t.label}</div>
                   <div className="text-xs text-muted-foreground">{t.hint}</div>
                 </button>
@@ -171,14 +199,22 @@ export function LiveBoardsPage() {
             })}
           </div>}
         </div>
-      ) : view === "list" ? (
-        <BoardsList boards={boards} onDelete={canDelete ? removeBoard : undefined} />
       ) : (
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-          {boards.map((b) => (
-            <BoardCard key={b.id} board={b} onDelete={canDelete ? () => removeBoard(b) : undefined} />
-          ))}
-        </div>
+        <SettingsIndex
+          groups={[{
+            rows: boards.map((b) => ({
+              key: b.id,
+              icon: boardIcon(b.kind),
+              tone: "primary" as const,
+              label: b.name,
+              // The current value, exactly as the settings grammar asks: what
+              // this board is doing right now, without opening it.
+              sub: `${b.kind} · ${boardSummary(b)}`,
+              trailing: <Pill tone="success">Live</Pill>,
+              onClick: () => openBoard(b.id),
+            })),
+          }]}
+        />
       )}
 
       <RoomStartDialog open={roomOpen} onOpenChange={setRoomOpen} onCreate={createRoom} />
@@ -406,98 +442,6 @@ function BoardBody({ board }: { board: Board }) {
 
       <div className="font-mono text-[11px] text-muted-foreground">bind widgets to · {board.id}</div>
     </>
-  );
-}
-
-function BoardCard({ board, onDelete }: { board: Board; onDelete?: () => void }) {
-  const Icon = boardIcon(board.kind);
-  return (
-    <Card className="hover:border-primary/40 hover:shadow-md">
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Icon className="size-5" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="truncate font-semibold">{board.name}</span>
-              <Badge variant="secondary" className="capitalize">{board.kind}</Badge>
-            </div>
-            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-success">
-              <StatusDot tone="success" ping />
-              Live
-            </div>
-          </div>
-          {onDelete && <Button variant="ghost" size="icon" className="size-9 text-muted-foreground hover:text-destructive" onClick={onDelete} title="Delete board" aria-label="Delete board">
-            <Trash2 className="size-4" />
-          </Button>}
-        </div>
-
-        <BoardBody board={board} />
-      </CardContent>
-    </Card>
-  );
-}
-
-/** Compact list view: one row per board with a live summary; a row expands to
- *  the full management surface (the same editors as the grid card). */
-function BoardsList({ boards, onDelete }: { boards: Board[]; onDelete?: (b: Board) => void }) {
-  const [openId, setOpenId] = useState<string | null>(null);
-  return (
-    <Card>
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Board</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Live now</TableHead>
-                <TableHead className="w-40 text-right" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {boards.map((b) => {
-                const Icon = boardIcon(b.kind);
-                const open = openId === b.id;
-                return (
-                  <Fragment key={b.id}>
-                    <TableRow className="cursor-pointer" onClick={() => setOpenId(open ? null : b.id)}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="size-4" /></div>
-                          <div className="min-w-0">
-                            <div className="truncate font-medium">{b.name}</div>
-                            <div className="font-mono text-[11px] text-muted-foreground">{b.id}</div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell><Badge variant="secondary" className="capitalize">{b.kind}</Badge></TableCell>
-                      <TableCell><span className="flex items-center gap-1.5 text-xs text-success"><StatusDot tone="success" ping /> Live</span></TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{boardSummary(b)}</TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => setOpenId(open ? null : b.id)}>{open ? "Close" : "Manage"}</Button>
-                          {onDelete && <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-destructive" onClick={() => onDelete(b)} title="Delete board" aria-label="Delete board"><Trash2 className="size-4" /></Button>}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {open && (
-                      <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={5} className="bg-muted/20 p-0">
-                          <div className="flex flex-col gap-4 px-4 py-4"><BoardBody board={b} /></div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </Fragment>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 

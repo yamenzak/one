@@ -433,3 +433,82 @@ phone, and Balance is the column somebody opens a ledger to read.
 should go with it in 7e — `GlanceStrip` is the shape. `page-header` and
 `page-chrome` are still the app's own; they are the largest remaining sweep
 (17 and 18 importers) and are not per-screen work, so they get their own pass.
+
+
+---
+
+## 7e — the core surfaces: Screens, ScreenDetail, Studio, LiveBoards
+
+These are the screens somebody has open all day, and between them they held
+**seven swallowed failures**. Every one produced a confident wrong answer
+rather than an error, and four of them did it on a POLL — so the wrong answer
+appeared and disappeared on a timer, which is how a fault becomes a shrug.
+
+### The seven
+
+| where | the swallow | what it rendered |
+|---|---|---|
+| `LiveBoards` | `listBoards().catch(() => [])`, every 2s | the first-run panel — mascot, "Create your first live board" — over a workspace with five |
+| `Studio` | `getScreen().catch(() => null)` | "Screen not found. It may have been removed." for a dropped connection |
+| `Studio` | `getSlidePlaylist().catch(() => [])` | "This display has no slides yet", with an Add button, over a display with twelve |
+| `Studio` | `getChannelPublishState()` **uncaught** | the whole `load` rejected, `setLoading(false)` never ran, the page sat on its skeleton forever |
+| `ScreenDetail` | `getDeviceSchedule().catch(() => ({tz:"UTC",rules:[],channels:[]}))` | three tracks saying "No dayparts yet" — on the screen that decides when a device is muted and when it sleeps |
+| `ScreenDetail` | `saveTags` optimistic, no rollback | tag chips the device does not have, silently swapped out by the next 4s poll |
+| `ScreenDetail` | `setDeviceScheduleTz(…).then(reload).then(toast)` | a rejected IANA name left in the field, nothing said, the rejection in the app-wide toast |
+
+Plus two bare `await`s with no catch at all (`deleteDeviceScheduleRule`,
+`addDeviceScheduleRule`) and one `String(e)` rendering `[object Object]`.
+
+**The polling rule that came out of it, applied on all three polling screens:**
+a failed poll is only shown while there is nothing to show. Once the list is
+populated it stays, and the next tick either refreshes it or leaves it alone.
+Replacing a working page with an error because one request in nine hundred
+dropped is worse than the stale second it prevents.
+
+### `Screens.tsx` — the fifth collection, and the facet it was missing
+
+234 → 260. Onto `Collection` with both views, and `components/tag-filter.tsx`
+is **deleted** — this was its last consumer.
+
+**Online/offline is a facet now.** The fleet summary said "3 offline" and the
+only way to find which three was to read every card — on a wall of forty
+screens, which is the size at which somebody installs digital signage.
+
+`GetStarted` stays a hard branch above `Collection` rather than becoming a
+`Collection.empty`: it is a 110-line first-run panel with two choice cards and
+a three-step explainer, which is a different thing from "nothing matched".
+The four stat cards became a `GlanceStrip`.
+
+### `LiveBoards.tsx` — an index and a page per board
+
+904 → 848, and the shape is the point. The grid rendered `BoardBody` — the
+counters editor, the categories editor, the announcement config, the
+credentials panel — for **every board at once**. Five boards was five full
+management surfaces stacked on one page: the 61,541px shape `@4dl/admin`
+exists to prevent, and none of them could be linked to.
+
+It is `SettingsIndex` + `SettingsPage` now, with the open board in the URL
+(`?board=<id>`), so "open the front desk queue" is an address and Back closes
+the board rather than leaving the screen. Each index row states what the board
+is doing right now (`queue · Now serving A017 · 4 waiting`), which is the
+current-value rule the settings grammar turns on. `BoardCard` and `BoardsList`
+— a grid card and an accordion `<Table>` rendering the same editors two
+different ways — are both gone.
+
+### `ScreenDetail.tsx` and `Studio.tsx`
+
+731 → 792 and 364 → 391; the growth is the error handling and the prose about
+why it is there. The schedule rules moved off a seven-span flex row (which put
+the days and the priority off the right edge of a phone, on a rule whose whole
+meaning is *when*) onto `Row`: the window is the title, everything qualifying
+it is the sub-line.
+
+The preview-hero layout on both is **kept unchanged**. It is Scena's best
+screen and the reason the product reads as a signage tool rather than a CMS.
+
+### Still outstanding
+
+`components/status.js`'s `StatTile` still has two callers (`Analytics`,
+`Admin`); `GlanceStrip` is the shape for both and they are 7f/console work.
+`page-header` and `page-chrome` remain the app's own — 17 and 18 importers,
+one sweep, not per-screen work.

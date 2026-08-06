@@ -37,7 +37,7 @@ import { TagEditor } from "../components/tag-editor.js";
 import { useCan } from "../permissions.js";
 import { StatusDot, dimsOf } from "./Screens.js";
 import { Pill } from "../components/status.js";
-import { toast } from "@4dl/ui";
+import { Group, LoadError, Row, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 
 const NONE = "__none__";
@@ -67,10 +67,19 @@ export function ScreenDetailPage() {
   // A device must be unpaired before it can be removed — never delete a live one.
   const assigned = screen ? (screen.live ? screen.live.state === "assigned" : screen.status !== "unpaired") : false;
 
-  const reload = () => getScreen(id).then(setScreen).catch(() => {});
+  const reload = () => getScreen(id).then(setScreen).catch(() => undefined);
   async function saveTags(tags: string[]) {
+    // The optimistic write is snapshotted and PUT BACK on a refusal. It used to
+    // toast the failure and leave the chips on screen, so the editor showed
+    // tags the device does not have — and the next four-second poll silently
+    // swapped them out again, which reads as the UI losing your typing.
+    const before = screen?.tags ?? [];
     setScreen((s) => (s ? { ...s, tags } : s));
-    await setScreenTags(id, tags).catch(() => toast.error("Could not save tags"));
+    try { await setScreenTags(id, tags); }
+    catch (e) {
+      setScreen((s) => (s ? { ...s, tags: before } : s));
+      toast.error(e instanceof Error ? e.message : "Could not save tags");
+    }
   }
   async function doUnpair() {
     setBusy(true);
@@ -97,7 +106,7 @@ export function ScreenDetailPage() {
 
   useEffect(() => {
     let alive = true;
-    const load = () => getScreen(id).then((s) => { if (alive) { setScreen(s); setError(null); } }).catch((e) => alive && setError(String(e)));
+    const load = () => getScreen(id).then((s) => { if (alive) { setScreen(s); setError(null); } }).catch((e) => alive && setError(e instanceof Error ? e.message : String(e)));
     load();
     const t = setInterval(load, 4000);
     listChannels().then((c) => alive && setChannels(c)).catch(() => {});
@@ -112,8 +121,12 @@ export function ScreenDetailPage() {
 
   return (
     <div className="space-y-5">
-      {error ? (
-        <EmptyState icon={MonitorPlay} title="Couldn't load this device" description={error} />
+      {error && !screen ? (
+        // Only while there is nothing to show: this polls every four seconds,
+        // and one failed poll must not replace a working device page with an
+        // error. `String(e)` used to render `[object Object]` here, with no
+        // retry — the message is the server's now.
+        <LoadError what="this device" error={error} onRetry={() => void reload()} />
       ) : !screen ? (
         <DetailSkeleton />
       ) : (
@@ -556,23 +569,49 @@ const TRACKS: Track[] = [
 function DeviceSchedule({ screenId, writable }: { screenId: string; writable: boolean }) {
   const canDaypart = useFeature("dayparting");
   const [data, setData] = useState<DeviceScheduleData | null>(null);
-  const reload = () => getDeviceSchedule(screenId).then(setData).catch(() => setData({ tz: "UTC", rules: [], channels: [] }));
+  /*
+    A FAILED LOAD IS NOT AN EMPTY SCHEDULE.
+
+    This caught the error and wrote `{ tz: "UTC", rules: [], channels: [] }` —
+    a fabricated answer, rendered as three tracks saying "No dayparts yet".
+    On the screen that decides when a device is muted and when it sleeps, that
+    is the app telling an operator nothing is scheduled while the schedule it
+    could not read keeps running.
+  */
+  const [error, setError] = useState<string | null>(null);
+  const reload = () => {
+    setError(null);
+    return getDeviceSchedule(screenId).then(setData).catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  };
   useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [screenId]);
 
   // Server gates every schedule-rule write on the dayparting feature, so match it
   // in the UI instead of letting saves 403 (§13/§25).
   if (!canDaypart) return <LockedFeatureCard feature="dayparting" />;
 
+  if (error && !data) return <LoadError what="the schedule" error={error} onRetry={() => void reload()} />;
   if (!data) return <div className="grid gap-4 lg:grid-cols-2"><Skeleton className="h-56 rounded-xl" /><Skeleton className="h-56 rounded-xl" /></div>;
 
   async function addRule(kind: ScheduleKind, rule: { days: number[]; startMin: number; endMin: number; channelId?: string | null; priority?: number }): Promise<boolean> {
-    const r = await addDeviceScheduleRule(screenId, { kind, ...rule });
-    if (r.error) { toast.error(r.error); return false; }
+    try {
+      const r = await addDeviceScheduleRule(screenId, { kind, ...rule });
+      if (r.error) { toast.error(r.error); return false; }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn’t add that rule — the schedule is unchanged.");
+      return false;
+    }
     await reload();
     toast.success("Schedule updated.");
     return true;
   }
-  async function removeRule(ruleId: string) { await deleteDeviceScheduleRule(screenId, ruleId); reload(); }
+  async function removeRule(ruleId: string) {
+    // Was `await deleteDeviceScheduleRule(...)` bare: a refused delete rejected
+    // into the app-wide toast and the rule stayed on screen with no explanation.
+    try { await deleteDeviceScheduleRule(screenId, ruleId); }
+    catch (e) { toast.error(e instanceof Error ? e.message : "Couldn’t delete that rule."); return; }
+    await reload();
+    toast.success("Rule deleted.");
+  }
 
   return (
     <div className="space-y-4">
@@ -586,7 +625,21 @@ function DeviceSchedule({ screenId, writable }: { screenId: string; writable: bo
         <Input
           defaultValue={data.tz}
           disabled={!writable}
-          onBlur={(e) => setDeviceScheduleTz(screenId, e.target.value.trim() || "UTC").then(reload).then(() => toast.success("Timezone updated."))}
+          aria-label="Schedule timezone"
+          // The chain used to be `.then(reload).then(toast)` with no catch: an
+          // IANA name the server rejects left the field showing it, said
+          // nothing, and rejected into the app-wide toast.
+          onBlur={(e) => {
+            const tz = e.target.value.trim() || "UTC";
+            if (tz === data.tz) return;
+            void setDeviceScheduleTz(screenId, tz)
+              .then(() => reload())
+              .then(() => toast.success("Timezone updated."))
+              .catch((err) => {
+                e.target.value = data.tz;
+                toast.error(err instanceof Error ? err.message : "That timezone wasn’t accepted.");
+              });
+          }}
           className="w-[190px] font-mono text-xs"
           placeholder="e.g. Europe/Berlin"
         />
@@ -627,23 +680,31 @@ function TrackSection({ track, rules, channels, writable, onAdd, onDelete }: {
       {rules.length === 0 ? (
         <div className="rounded-lg border border-dashed bg-card/40 px-4 py-6 text-center text-xs text-muted-foreground">No {track.noun}s yet — add one below.</div>
       ) : (
-        <div className="flex flex-col gap-1.5">
+        // Five inline spans and two badges on one line, which on a phone put the
+        // days and the priority off the right edge — of a rule whose whole
+        // meaning is WHEN. The window is the row's title and everything that
+        // qualifies it is the sub-line.
+        <Group className="bg-surface-2">
           {rules.map((r) => (
-            <div key={r.id} className="flex items-center gap-2 rounded-lg border p-2.5 text-sm">
-              <span className="font-mono tabular-nums">{fmtMin(r.startMin)}–{fmtMin(r.endMin)}</span>
-              {track.kind !== "channel" && r.endMin <= r.startMin && <Badge variant="outline" className="text-[10px] font-normal">overnight</Badge>}
-              {track.kind === "channel" && <Badge variant="secondary" className="font-normal">{r.channelName ?? "—"}</Badge>}
-              <span className="truncate text-xs text-muted-foreground">{fmtDays(r.days)}</span>
-              <div className="flex-1" />
-              {track.kind === "channel" && <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">p{r.priority}</span>}
-              {writable && (
-                <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => onDelete(r.id)} aria-label="Delete rule">
+            <Row
+              key={r.id}
+              icon={Icon}
+              sub={[
+                fmtDays(r.days),
+                track.kind === "channel" ? (r.channelName ?? "no channel") : null,
+                track.kind !== "channel" && r.endMin <= r.startMin ? "overnight" : null,
+                track.kind === "channel" ? `priority ${r.priority}` : null,
+              ].filter(Boolean).join(" · ")}
+              trailing={writable ? (
+                <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => onDelete(r.id)} aria-label={`Delete the ${fmtMin(r.startMin)}–${fmtMin(r.endMin)} rule`}>
                   <X className="size-3.5" />
                 </Button>
-              )}
-            </div>
+              ) : undefined}
+            >
+              <span className="numeral">{fmtMin(r.startMin)}–{fmtMin(r.endMin)}</span>
+            </Row>
           ))}
-        </div>
+        </Group>
       )}
 
       {writable && <AddRuleForm track={track} channels={channels} onAdd={onAdd} />}

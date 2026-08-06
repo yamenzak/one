@@ -21,7 +21,7 @@ import { DevicePreview } from "../components/device-preview.js";
 import { assetSrc } from "../components/media-picker.js";
 import { cn } from "@/lib/utils";
 import { useCan } from "../permissions.js";
-import { toast } from "@4dl/ui";
+import { LoadError, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   getScreen, getChannel, getSlidePlaylist, getMusicPlaylist,
@@ -63,35 +63,58 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
   const [tracks, setTracks] = useState<PlaylistTrack[]>([]);
   const [dirty, setDirty] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [addingMusic, setAddingMusic] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLInputElement>(null);
 
+  /*
+    EVERY FETCH ON THIS PAGE USED TO SWALLOW ITS FAILURE, and each swallow
+    produced a confident wrong answer:
+
+      `getScreen(...).catch(() => null)`        → "Screen not found. It may have
+                                                  been removed." for a dropped
+                                                  connection.
+      `getSlidePlaylist(...).catch(() => [])`   → "This display has no slides
+                                                  yet" with an Add button, over
+                                                  a display that has twelve.
+      `getChannelPublishState(...)` UNCAUGHT    → the whole `load` rejected,
+                                                  `setLoading(false)` never ran,
+                                                  and the page sat on its
+                                                  skeleton forever.
+
+    One try/finally, one `error`, and `setLoading(false)` where it cannot be
+    skipped. The only surviving `catch` is the deliberate one: a screen that is
+    still on the shared demo channel has NO display, which is a real state with
+    its own call to action.
+  */
   const load = useCallback(async () => {
-    let ch: Channel | null = null;
-    if (mode === "display") {
-      // A standalone display is a channel with composed blocks (not bound to a
-      // screen yet) — resolve it directly.
-      ch = await getChannel(displayChannelId).catch(() => null);
-      setScreen(null);
-    } else {
-      const s = await getScreen(screenId).catch(() => null);
-      setScreen(s);
-      // A screen on its own provisioned channel resolves here; one still on the
-      // shared demo channel (or unassigned) resolves to null → "set up" CTA.
-      ch = s?.channel_id ? await getChannel(s.channel_id).catch(() => null) : null;
+    setError(null);
+    try {
+      let ch: Channel | null = null;
+      if (mode === "display") {
+        // A standalone display is a channel with composed blocks (not bound to a
+        // screen yet) — resolve it directly.
+        ch = await getChannel(displayChannelId);
+        setScreen(null);
+      } else {
+        const s = await getScreen(screenId);
+        setScreen(s);
+        // A screen on its own provisioned channel resolves here; one still on the
+        // shared demo channel (or unassigned) resolves to null → "set up" CTA.
+        ch = s?.channel_id ? await getChannel(s.channel_id).catch(() => null) : null;
+      }
+      setChannel(ch);
+      setSlides(ch?.slide_playlist_id ? (await getSlidePlaylist(ch.slide_playlist_id)).slides : []);
+      setTracks(ch?.music_playlist_id ? (await getMusicPlaylist(ch.music_playlist_id)).tracks : []);
+      if (ch) setDirty((await getChannelPublishState(ch.id)).dirty);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
     }
-    setChannel(ch);
-    if (ch?.slide_playlist_id) {
-      setSlides(await getSlidePlaylist(ch.slide_playlist_id).then((p) => p.slides).catch(() => []));
-    } else setSlides([]);
-    if (ch?.music_playlist_id) {
-      setTracks(await getMusicPlaylist(ch.music_playlist_id).then((p) => p.tracks).catch(() => []));
-    } else setTracks([]);
-    if (ch) setDirty((await getChannelPublishState(ch.id)).dirty);
-    setLoading(false);
   }, [mode, screenId, displayChannelId]);
 
   useEffect(() => { void load(); }, [load]);
@@ -204,13 +227,17 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
   if (loading) {
     return <div className="space-y-5"><Skeleton className="h-9 w-64" /><div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]"><Skeleton className="aspect-video w-full rounded-xl" /><Skeleton className="h-64 w-full rounded-xl" /></div></div>;
   }
+  if (error) {
+    return <LoadError what={mode === "display" ? "this display" : "this screen"} error={error} onRetry={() => { setLoading(true); void load(); }} />;
+  }
   if (mode === "screen" && !screen) {
     return <EmptyState title="Screen not found" description="It may have been removed." />;
   }
 
   if (!channel) {
-    // Display mode: the channel id is bad/removed. Screen mode: the screen is
-    // still on the shared demo channel and has no editable display yet.
+    // Screen mode ONLY: the screen is still on the shared demo channel and has
+    // no editable display yet. In display mode a bad channel id throws and is
+    // reported above, so there is no "not found" branch to fall through to.
     if (mode === "display") return <EmptyState title="Display not found" description="It may have been removed." />;
     return (
       <div className="space-y-5">
