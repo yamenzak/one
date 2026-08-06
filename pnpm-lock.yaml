@@ -242,6 +242,9 @@ importers:
 
   apps/scena:
     dependencies:
+      '@4dl/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@scena/brand':
         specifier: workspace:*
         version: link:../../packages/scena-brand
