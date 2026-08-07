@@ -37,6 +37,15 @@ interface Props {
   /** Where "Go home" goes. The app's, because the platform has no idea what its
    *  first screen is called. */
   homePath?: string;
+  /**
+   * The app's mark, above the message.
+   *
+   * Scena kept a whole second boundary for this — 60 lines duplicating the 88
+   * here, minus the error text and minus `RefreshNote`, both of which are the
+   * reason this one is worth having. A brand is not a reason to fork a
+   * component; it is a slot.
+   */
+  art?: ReactNode;
 }
 interface State { error: Error | null; key: unknown }
 
@@ -65,11 +74,12 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="grid min-h-dvh place-items-center p-8">
           <div className="max-w-sm text-center">
+            {this.props.art}
             <div className="text-body-lg">Something went wrong</div>
             <p className="mt-1 text-body text-muted-foreground">This screen hit an unexpected error. You can try again or head back home.</p>
             {/* The reason, verbatim. See the header: a screenshot of this line is
                 a usable bug report, and a screenshot of a blank screen is not. */}
-            <p className="mt-3 select-all break-words rounded-lg bg-surface-2 px-3 py-2 text-left font-mono text-[0.7rem] leading-relaxed text-muted-foreground">
+            <p className="mt-3 select-all break-words rounded-lg bg-surface-2 px-3 py-2 text-left font-mono text-caption leading-relaxed text-muted-foreground">
               {this.state.error.message || String(this.state.error)}
             </p>
             <div className="mt-4 flex items-center justify-center gap-2">

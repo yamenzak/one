@@ -24,7 +24,6 @@ import {
 } from "lucide-react";
 import { TagEditor } from "../components/tag-editor.js";
 import { useCan } from "../permissions.js";
-import { confirmDialog } from "../components/confirm.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
 import {
   listSlidePlaylists,
@@ -51,7 +50,7 @@ import {
 import { MediaPicker } from "./MediaLibrary.js";
 import { HtmlEditorDialog, HtmlThumb } from "../components/html-editor.js";
 import { LicenseNote } from "../components/licensing.js";
-import { Badge, Button, Card, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Input, Label, LoadError, PageHeader, Row, Select, Separator, Skeleton, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
+import { Badge, Button, Card, confirm, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Input, Label, LoadError, PageHeader, Row, Select, Separator, Skeleton, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
 import { PlaylistLibrary } from "../components/playlist-library.js";
 
 const STARTER_HTML = `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;background:linear-gradient(135deg,#6366f1,#312e81);color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:8%">
@@ -253,10 +252,10 @@ export function PlaylistDetailPage() {
   }
 
   async function removeSlide(sid: string) {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: "Remove this slide?",
       description: "It will be removed from the playlist on every channel that uses it.",
-      confirmText: "Remove slide",
+      confirmLabel: "Remove slide",
       destructive: true,
     });
     if (!ok) return;

@@ -13,8 +13,7 @@
  */
 import { useEffect, useState } from "react";
 import { Loader2, LogOut, Bell, RotateCcw, Minus, Plus } from "lucide-react";
-import { Button, Card, Input } from "@4dl/ui";
-import { confirmDialog } from "../components/confirm.js";
+import { Button, Card, confirm, Input } from "@4dl/ui";
 import {
   getBoard,
   getBranding,
@@ -90,10 +89,10 @@ export function BoardControlApp({ me, onSignedOut }: { me: Me; onSignedOut: () =
   }
 
   async function resetQueue() {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: "Reset the queue?",
       description: "Clears every ticket series and the current call, starting fresh. This is what the daily rollover does automatically.",
-      confirmText: "Reset now",
+      confirmLabel: "Reset now",
       destructive: true,
     });
     if (ok) act(() => resetBoardSession(boardId));

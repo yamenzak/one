@@ -13,8 +13,7 @@
  * bit whether you say yes or no.
  */
 import { channelsUsingPlaylist, publishChannel } from "../api.js";
-import { confirmDialog } from "./confirm.js";
-import { toast } from "@4dl/ui";
+import { confirm, toast } from "@4dl/ui";
 
 export type PublishKind = "slide" | "music" | "widget" | "ad";
 
@@ -55,11 +54,11 @@ export async function offerPublishAffected(kind: PublishKind, id: string): Promi
 
   const n = channels.length;
   const names = channels.slice(0, 3).map((c) => c.name).join(", ") + (n > 3 ? `, +${n - 3} more` : "");
-  const ok = await confirmDialog({
+  const ok = await confirm({
     title: n === 1 ? "Publish this change to the live channel?" : `Publish this change to ${n} channels?`,
     description: `${names} use this ${LABEL[kind]}. Publish now so their screens update — or do it later from Channels.`,
-    confirmText: n === 1 ? "Publish" : `Publish ${n} channels`,
-    cancelText: "Not now",
+    confirmLabel: n === 1 ? "Publish" : `Publish ${n} channels`,
+    cancelLabel: "Not now",
   });
   lastAsked.set(key, Date.now()); // restart the cooldown from the decision
   if (!ok) return;

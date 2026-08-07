@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router-dom";
 import { Siren, LogOut, Sun, Moon, Scale } from "lucide-react";
 import { ScenaMascot } from "./brand.js";
-import { adminUrl } from "@4dl/app-kit";
+import { adminUrl, ErrorBoundary } from "@4dl/app-kit";
 import { useHost } from "./host.js";
 import { AdminDoor } from "./pages/AdminDoor.js";
 import { AppShell } from "./components/app-shell.js";
@@ -12,7 +12,6 @@ import { EntitlementsProvider } from "./entitlements.js";
 import { clearEmergency, getActiveEmergency, getMe, getBilling, getBranding, type ActiveEmergency, type Me, type BillingState } from "./api.js";
 import { applyBrandTheme, clearBrandTheme } from "./brand-theme.js";
 import { EmergencyModal } from "./components/EmergencyModal.js";
-import { ErrorBoundary } from "./components/ErrorBoundary.js";
 import { navForRole, canAccessKey, PAGE_META } from "./nav.js";
 import { signOut, authClient } from "./auth-client.js";
 import { useTheme } from "./theme.js";
@@ -303,7 +302,7 @@ export function App() {
           />
         )}
       >
-        <ErrorBoundary resetKey={pathname}>
+        <ErrorBoundary resetKey={pathname} homePath="/" art={<ScenaMascot mood="sad" size={104} className="mx-auto mb-2" />}>
           <div key={pathname} className="">
             <Routes>
               <Route path="/" element={<ScreensPage key={refreshKey} onPair={() => setPairOpen(true)} />} />

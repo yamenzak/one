@@ -34,11 +34,10 @@ import {
   type QueueCounter,
   type BoardUser,
 } from "../api.js";
-import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { GEMINI_TTS_VOICES } from "@scena/protocol";
 import type { QueueState, RoomState, ScoreState } from "@scena/protocol";
-import { Badge, Button, cn, Dialog, DialogContent, Input, LoadError, NoData, PageHeader, Select, SettingsIndex, SettingsPage as SectionFrame, SkeletonList, Switch, toast, usePageChrome } from "@4dl/ui";
+import { Badge, Button, cn, confirm, Dialog, DialogContent, Input, LoadError, NoData, PageHeader, Select, SettingsIndex, SettingsPage as SectionFrame, SkeletonList, Switch, toast, usePageChrome } from "@4dl/ui";
 
 /**
  * The board's kind as a WORD THAT STARTS A SENTENCE.
@@ -138,11 +137,11 @@ export function LiveBoardsPage() {
   }
 
   async function removeBoard(board: Board) {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: `Delete “${board.name}”?`,
       description:
         "This deletes the board and every login it issued (coordinator + stations). Any tablet signed in as one of them is signed out. This can't be undone.",
-      confirmText: "Delete board",
+      confirmLabel: "Delete board",
       destructive: true,
     });
     if (!ok) return;

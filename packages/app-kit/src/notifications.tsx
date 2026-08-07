@@ -152,15 +152,39 @@ function useFeed({ online, visible, surface }: Pick<NotifShared, "online" | "vis
   const shown = items.filter(inSurface);
   const unread = shown.reduce((sum, n) => sum + (n.read ? 0 : 1), 0);
 
+  /*
+    OPTIMISTIC, BUT IT ROLLS BACK.
+
+    Both of these were `patch(...)` followed by `.catch(() => undefined)`, with
+    a comment arguing that a failed mark-read is "a badge that comes back on the
+    next poll, not something worth interrupting for". The first half of that is
+    right and is why neither of these toasts. The second half was wrong about
+    what the user sees: the row went read, STAYED read for up to a poll
+    interval, and then un-read itself — so the app asserted a state the server
+    had refused, and then contradicted itself without explanation.
+
+    Reverting is the same amount of code and never claims anything false. The
+    row simply stays unread, which is the truth, and the next poll agrees with
+    it instead of correcting it. Still no interruption: a failed mark-read is
+    not worth a dialog, and it is not worth a lie either.
+  */
   const markRead = async (id: string) => {
-    // Optimistic, and best-effort on the wire: a failed mark-read is a badge
-    // that comes back on the next poll, not something worth interrupting for.
+    const before = items;
     patch((p) => p.map((n) => (n.id === id ? { ...n, read: 1 } : n)));
-    await api.post(`/api/notifications/${id}/read`).catch(() => undefined);
+    try {
+      await api.post(`/api/notifications/${id}/read`);
+    } catch {
+      patch(() => before);
+    }
   };
   const markAll = async () => {
+    const before = items;
     patch((p) => p.map((n) => (inSurface(n) ? { ...n, read: 1 } : n)));
-    await api.post("/api/notifications/read-all", surface ? { surface } : {}).catch(() => undefined);
+    try {
+      await api.post("/api/notifications/read-all", surface ? { surface } : {});
+    } catch {
+      patch(() => before);
+    }
   };
 
   return { shown, unread, failed, loading, markRead, markAll };

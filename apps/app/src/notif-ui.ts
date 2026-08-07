@@ -12,7 +12,15 @@ import {
   BookOpen, Calendar, CreditCard, AlertTriangle, Archive, Bell, Trophy, type LucideIcon, type Tone,
 } from "@4dl/ui";
 
-export interface NotifCoding { icon: LucideIcon; tone: Tone }
+/*
+  The platform's, not a copy of it. `@4dl/app-kit` declares exactly this shape
+  — `{ icon: LucideIcon; tone: Tone }` — because its bell and inbox consume it,
+  and a byte-identical second declaration is a type that stops agreeing the
+  moment either side gains a field. Re-exported under the same name so Kova's
+  registry keeps reading as Kova's.
+*/
+export type { NotifCoding } from "@4dl/app-kit";
+import type { NotifCoding } from "@4dl/app-kit";
 
 const CODING: Record<NotifType, NotifCoding> = {
   check_in: { icon: ClipboardList, tone: "activity" },

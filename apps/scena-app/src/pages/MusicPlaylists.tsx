@@ -31,12 +31,11 @@ import {
 } from "lucide-react";
 import { TagEditor } from "../components/tag-editor.js";
 import { useCan } from "../permissions.js";
-import { confirmDialog } from "../components/confirm.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
 import { TrackMetaDialog, mmss } from "../components/track-meta-dialog.js";
 import { LicenseBadge, LicenseNote } from "../components/licensing.js";
 import { MediaPicker } from "./MediaLibrary.js";
-import { Badge, Button, cn, Dialog, DialogContent, DialogFooter, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
+import { Badge, Button, cn, confirm, Dialog, DialogContent, DialogFooter, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
 import { PlaylistLibrary } from "../components/playlist-library.js";
 import {
   listMusicPlaylists,
@@ -247,10 +246,10 @@ export function MusicPlaylistDetailPage() {
   }
 
   async function removeTrack(tid: string, title: string) {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: `Remove “${title}”?`,
       description: "It leaves this playlist but stays in your Media library.",
-      confirmText: "Remove track",
+      confirmLabel: "Remove track",
       destructive: true,
     });
     if (!ok) return;

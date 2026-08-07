@@ -10,7 +10,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Play, Pause, Trash2, Megaphone, Clock, Sparkles, Bot, Upload, FolderOpen, Plus, MoreVertical, Pencil, Radio, Link2 } from "lucide-react";
 import { useCan } from "../permissions.js";
-import { confirmDialog } from "../components/confirm.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
 import {
   API_BASE,
@@ -33,7 +32,7 @@ import {
 } from "../api.js";
 import { MediaPicker } from "./MediaLibrary.js";
 import { GEMINI_VOICES, AD_STYLE_PRESETS, DEFAULT_GEMINI_VOICE, DEFAULT_AD_STYLE, composeAdSpeech } from "../voices.js";
-import { Badge, Button, Card, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, SkeletonList, StatusDot, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
+import { Badge, Button, Card, confirm, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, SkeletonList, StatusDot, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
 import { ScenaMascot } from "../brand.js";
 
 type Kind = "audio" | "video" | "command";
@@ -80,12 +79,12 @@ export function AdsPage() {
   );
 
   async function remove(p: AdProfile) {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: `Delete “${p.name}”?`,
       description: p.channelCount
         ? `${p.channelCount} channel${p.channelCount === 1 ? "" : "s"} bound to this rotation will lose it. This can't be undone.`
         : "This removes the profile and its ads. This can't be undone.",
-      confirmText: "Delete profile",
+      confirmLabel: "Delete profile",
       destructive: true,
     });
     if (!ok) return;
@@ -300,10 +299,10 @@ export function AdProfileDetailPage() {
   );
 
   async function remove() {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: `Delete “${profile?.name}”?`,
       description: "Channels bound to this rotation lose it. This can't be undone.",
-      confirmText: "Delete profile",
+      confirmLabel: "Delete profile",
       destructive: true,
     });
     if (!ok) return;
@@ -324,10 +323,10 @@ export function AdProfileDetailPage() {
   }
 
   async function remove_ad(a: Ad) {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: `Delete “${a.name}”?`,
       description: "This interrupt is removed from the rotation immediately.",
-      confirmText: "Delete ad",
+      confirmLabel: "Delete ad",
       destructive: true,
     });
     if (!ok) return;

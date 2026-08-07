@@ -261,7 +261,7 @@ function StripeConfig({ platformName }: { platformName: string }) {
                     </Badge>
                   }
                 />
-                <p className="text-[13px] text-muted-foreground" role="status" aria-live="polite">
+                <p className="text-caption text-muted-foreground" role="status" aria-live="polite">
                   {status.mode === "disabled"
                     ? "No checkout can start. Store a lane's keys below, then switch to it."
                     : status.activeLaneComplete
@@ -289,7 +289,7 @@ function StripeConfig({ platformName }: { platformName: string }) {
               {/* ── The flip: one action, and what it does ──────────────── */}
               <Card className="space-y-3">
                 <SectionHeader icon={Wallet} title="Active lane" />
-                <p className="text-[13px] text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   Switching lane changes which stored credentials every payment path uses — nothing is re-pasted. Test and
                   live products and prices are <b>separate objects</b> in Stripe, so run <b>Sync catalog</b> after a switch
                   (ids are kept per lane, so a lane you have already synced comes back with its own).
@@ -317,7 +317,7 @@ function StripeConfig({ platformName }: { platformName: string }) {
               {/* ── Per-lane credential editor ──────────────────────────── */}
               <Card className="space-y-4">
                 <SectionHeader icon={KeyRound} title="Credentials" />
-                <p className="text-[13px] text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   Each lane has its own keys and its own webhook secret. Fill in both lanes once and switching is a
                   one-click mode change. Keys are stored write-only — a blank field keeps what is saved.
                 </p>
@@ -331,7 +331,7 @@ function StripeConfig({ platformName }: { platformName: string }) {
                   lane !== editLane ? null : (
                     <div key={lane} className="space-y-3">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-[13px] font-medium">Editing the <b>{lane}</b> lane{status.mode === lane ? " (currently active)" : ""}</span>
+                        <span className="text-caption font-medium">Editing the <b>{lane}</b> lane{status.mode === lane ? " (currently active)" : ""}</span>
                         {hasAny(creds[lane]) && <Badge tone="primary">unsaved</Badge>}
                       </div>
                       <Field
@@ -351,7 +351,7 @@ function StripeConfig({ platformName }: { platformName: string }) {
                         placeholder="required for in-app payments"
                       />
                       <div className="space-y-2 rounded-2xl bg-surface-2 p-3">
-                        <div className="text-[13px] font-medium">Webhook signing secret ({lane})</div>
+                        <div className="text-caption font-medium">Webhook signing secret ({lane})</div>
                         {/*
                           ONE endpoint, and a separate secret per lane.
 
@@ -362,7 +362,7 @@ function StripeConfig({ platformName }: { platformName: string }) {
                           full; a tenant is paid on its own provider and registers
                           its own webhook there, which this console never sees.
                         */}
-                        <p className="text-[13px] text-muted-foreground">
+                        <p className="text-caption text-muted-foreground">
                           <code>/api/stripe/webhook</code> is where Stripe reports what tenants paid {platformName}. The
                           secret is per lane, so a test secret cannot verify a live event.
                         </p>
@@ -395,7 +395,7 @@ function StripeConfig({ platformName }: { platformName: string }) {
                         aria-checked={mode === m}
                         onClick={() => setMode(m)}
                         className={cn(
-                          "min-h-12 flex-1 rounded-xl px-3 text-[13px] font-medium capitalize transition-colors",
+                          "min-h-12 flex-1 rounded-xl px-3 text-caption font-medium capitalize transition-colors",
                           mode === m ? "bg-primary text-primary-foreground" : "bg-secondary",
                         )}
                       >

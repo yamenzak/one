@@ -7,10 +7,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, LayoutGrid, Pencil, Trash2, ChevronRight } from "lucide-react";
-import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { ProfileStartDialog } from "../builder/ProfileStartDialog.js";
-import { Badge, Button, Card, Dialog, DialogContent, DialogFooter, EmptyState, Input, PageHeader, Skeleton, toast, usePageChrome } from "@4dl/ui";
+import { Badge, Button, Card, confirm, Dialog, DialogContent, DialogFooter, EmptyState, Input, PageHeader, Skeleton, toast, usePageChrome } from "@4dl/ui";
 import { listWidgetProfiles, updateWidgetProfile, deleteWidgetProfile, type WidgetProfile } from "../api.js";
 import { ScenaMascot } from "../brand.js";
 
@@ -56,10 +55,10 @@ export function WidgetProfilesPage() {
   );
 
   async function remove(p: WidgetProfile) {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: `Delete “${p.name}”?`,
       description: "This removes the profile and its overlay layout. Channels referencing it will lose the overlay.",
-      confirmText: "Delete profile",
+      confirmLabel: "Delete profile",
       destructive: true,
     });
     if (!ok) return;

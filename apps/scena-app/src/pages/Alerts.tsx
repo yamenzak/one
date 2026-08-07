@@ -21,8 +21,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Plus, X, Webhook, Mail, Monitor, Wifi, WifiOff, BellRing } from "lucide-react";
-import { Badge, Button, Card, EmptyState, GlanceStrip, Group, Input, LoadError, PageHeader, Row, Section, Select, SkeletonList, toast, useAction, usePageChrome } from "@4dl/ui";
-import { confirmDialog } from "../components/confirm.js";
+import { Badge, Button, Card, confirm, EmptyState, GlanceStrip, Group, Input, LoadError, PageHeader, Row, Section, Select, SkeletonList, toast, useAction, usePageChrome } from "@4dl/ui";
 import { listAlerts, listAlertRules, addAlertRule, deleteAlertRule, listScreens, type AlertRow, type AlertRule, type Screen } from "../api.js";
 import { ScenaMascot } from "../brand.js";
 
@@ -162,10 +161,10 @@ function RuleRow({ rule, onDeleted }: { rule: AlertRule; onDeleted: () => Promis
               run(
                 "delete",
                 async () => {
-                  const ok = await confirmDialog({
+                  const ok = await confirm({
                     title: "Delete this alert rule?",
                     description: "Offline alerts will stop being delivered to this destination.",
-                    confirmText: "Delete rule",
+                    confirmLabel: "Delete rule",
                     destructive: true,
                   });
                   if (!ok) return;

@@ -20,7 +20,6 @@
  * control, not a lost one.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { confirmDialog } from "../components/confirm.js";
 import {
   Loader2,
   Music,
@@ -40,7 +39,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { FEATURE_CATALOG, QUOTA_CATALOG, FEATURE_CATEGORIES } from "@scena/manifest";
-import { Badge, Button, Card, cn, Dialog, DialogContent, DialogDescription, DialogFooter, EmptyState, Group, Input, Label, Row, SectionHeader, Select, Separator, Skeleton, StatCard, StatusDot, Switch, toast, type Tone } from "@4dl/ui";
+import { Badge, Button, Card, cn, confirm, Dialog, DialogContent, DialogDescription, DialogFooter, EmptyState, Group, Input, Label, Row, SectionHeader, Select, Separator, Skeleton, StatCard, StatusDot, Switch, toast, type Tone } from "@4dl/ui";
 import {
   getAdminConfig,
   setAdminConfig,
@@ -125,10 +124,10 @@ export function DangerTab() {
   }
 
   async function confirmWipe() {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: "Wipe everything — are you absolutely sure?",
       description: "This permanently deletes every workspace, user, screen, channel, board, and uploaded file across the whole platform. There is no undo.",
-      confirmText: "Wipe everything",
+      confirmLabel: "Wipe everything",
       destructive: true,
     });
     if (!ok) return;
@@ -892,10 +891,10 @@ export function LibraryTab() {
   const runtime = tracks.reduce((s, t) => s + t.duration_ms, 0);
 
   async function del(t: LibraryTrack) {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: `Delete “${t.title}”?`,
       description: "This removes the track from every tenant's public library.",
-      confirmText: "Delete track",
+      confirmLabel: "Delete track",
       destructive: true,
     });
     if (!ok) return;
@@ -1400,10 +1399,10 @@ export function TenantsTab() {
 
   async function life(t: AdminTenant, action: "suspend" | "reactivate" | "delete") {
     if (action === "delete") {
-      const ok = await confirmDialog({
+      const ok = await confirm({
         title: `Delete all data for ${t.tenant_id}?`,
         description: "This permanently removes all authoring data for the tenant. This is irreversible.",
-        confirmText: "Delete tenant",
+        confirmLabel: "Delete tenant",
         destructive: true,
       });
       if (!ok) return;

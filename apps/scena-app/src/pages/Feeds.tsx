@@ -10,9 +10,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, RefreshCw, X, ExternalLink, Rss, Trash2, Inbox, Globe, Sheet, Table2, MoreVertical, CloudSun } from "lucide-react";
-import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
-import { Button, Card, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Section, Select, Skeleton, SkeletonList, toast, usePageChrome } from "@4dl/ui";
+import { Button, Card, cn, confirm, Dialog, DialogContent, DialogDescription, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Section, Select, Skeleton, SkeletonList, toast, usePageChrome } from "@4dl/ui";
 import { ScenaMascot } from "../brand.js";
 import {
   listFeeds,
@@ -151,10 +150,10 @@ export function FeedsPage() {
   }
 
   async function removeSource(feed: Feed) {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: `Delete “${feed.name}”?`,
       description: "The source is removed. Widgets bound to it will stop updating.",
-      confirmText: "Delete source",
+      confirmLabel: "Delete source",
       destructive: true,
     });
     if (!ok) return;
@@ -164,10 +163,10 @@ export function FeedsPage() {
   }
 
   async function removeWeather(l: WeatherLocation) {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: `Remove ${l.label}?`,
       description: "Weather widgets bound to this location will stop updating.",
-      confirmText: "Remove location",
+      confirmLabel: "Remove location",
       destructive: true,
     });
     if (!ok) return;
@@ -344,10 +343,10 @@ export function SourceDetailPage() {
 
   async function remove() {
     if (!feed) return;
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: `Delete “${feed.name}”?`,
       description: "The source is removed. Widgets bound to it will stop updating.",
-      confirmText: "Delete source",
+      confirmLabel: "Delete source",
       destructive: true,
     });
     if (!ok) return;

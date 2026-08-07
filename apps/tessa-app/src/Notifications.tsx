@@ -81,7 +81,7 @@ export function NotificationBell() {
   );
 }
 
-export function Inbox() {
+export function InboxPage() {
   const online = useOnline();
   const nav = useNavigate();
   return (

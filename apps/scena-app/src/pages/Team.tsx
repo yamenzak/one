@@ -39,8 +39,7 @@ import {
   type Role,
 } from "../api.js";
 import { PERMISSION_CATALOG, ROLE_PRESETS } from "../permissions.js";
-import { confirmDialog } from "../components/confirm.js";
-import { Badge, Button, cn, Collection, Dialog, DialogContent, DialogDescription, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Group, Input, Label, PageHeader, Row, Section, Select, toast, usePageChrome } from "@4dl/ui";
+import { Badge, Button, cn, Collection, confirm, Dialog, DialogContent, DialogDescription, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Group, Input, Label, PageHeader, Row, Section, Select, toast, usePageChrome } from "@4dl/ui";
 
 type Grant = Record<string, string[]>;
 const cloneGrant = (g: Grant): Grant => Object.fromEntries(Object.entries(g).map(([k, v]) => [k, [...v]]));
@@ -172,10 +171,10 @@ export function TeamPage() {
   }
 
   async function cancelInvite(id: string, email: string) {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: `Cancel the invitation to ${email}?`,
       description: "The link stops working and the seat it was holding is freed.",
-      confirmText: "Cancel invitation",
+      confirmLabel: "Cancel invitation",
       destructive: true,
     });
     if (!ok) return;
@@ -189,10 +188,10 @@ export function TeamPage() {
   }
 
   async function revoke(m: TenantMember) {
-    const ok = await confirmDialog({
+    const ok = await confirm({
       title: `Remove ${m.name}?`,
       description: "Their access is removed and any active sessions end immediately.",
-      confirmText: "Remove",
+      confirmLabel: "Remove",
       destructive: true,
     });
     if (!ok) return;

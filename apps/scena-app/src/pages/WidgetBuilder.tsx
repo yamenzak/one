@@ -73,9 +73,8 @@ import { useHistory } from "../builder/history.js";
 import { TransformBox, GroupBox, SELECT, SELECT_WASH, type Phase } from "../builder/TransformBox.js";
 import { AiLayoutDialog } from "../builder/AiLayoutDialog.js";
 import { intersects, alignPatches, distributePatches, clampPos, type AlignKind } from "../builder/geometry.js";
-import { confirmDialog } from "../components/confirm.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
-import { Badge, Button, cn, EmptyState, LoadError, Separator, Sheet, Skeleton, toast, Tooltip } from "@4dl/ui";
+import { Badge, Button, cn, confirm, EmptyState, LoadError, Separator, Sheet, Skeleton, toast, Tooltip } from "@4dl/ui";
 import { SLIDE_CANVAS } from "../builder/canvas.js";
 
 /** Accept both the flat WNode shape and the manifest rect-tuple shape. */
@@ -779,11 +778,11 @@ function Builder({ profileId }: { profileId: string }) {
             aria-label="Back to widget profiles"
             onClick={async () => {
               if (dirty) {
-                const ok = await confirmDialog({
+                const ok = await confirm({
                   title: "Leave without saving?",
                   description: "This layout has changes that have not been saved. They are lost if you leave now.",
-                  confirmText: "Discard changes",
-                  cancelText: "Keep editing",
+                  confirmLabel: "Discard changes",
+                  cancelLabel: "Keep editing",
                   destructive: true,
                 });
                 if (!ok) return;

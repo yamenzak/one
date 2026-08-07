@@ -9,6 +9,7 @@ export * from "./choice.js";
 export * from "./primitives.js";
 export * from "./skeleton.js";
 export * from "./overlays.js";
+export * from "./confirm.js";
 export * from "./rings.js";
 export * from "./metrics.js";
 export * from "./charts.js";

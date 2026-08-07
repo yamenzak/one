@@ -36,7 +36,22 @@ import { join } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const APPS = join(ROOT, "apps");
-const UI_SRC = join(ROOT, "packages/ui/src");
+const PKGS = join(ROOT, "packages");
+
+/*
+  THE PLATFORM IS MORE THAN ONE PACKAGE, AND THIS ONLY SCANNED ONE.
+
+  It read `@4dl/ui` alone, so an app reimplementing something `@4dl/app-kit`
+  owns was structurally invisible. Scena kept a whole second `ErrorBoundary` —
+  same name, same job, 60 lines against the platform's 88, minus the error text
+  and minus the stale-bundle escape hatch that are the reason the platform's is
+  worth having. It sat next to a passing guard the entire time.
+
+  Both packages are BROWSER surfaces an app imports and renders, which is the
+  test. The server-side packages are excluded: sharing a name with `@4dl/auth`
+  is not a design-system failure.
+*/
+const PLATFORM_UI = ["ui", "app-kit", "admin"].map((p) => join(PKGS, p, "src"));
 
 /**
  * Files an app is still allowed to own, and why.
@@ -47,7 +62,46 @@ const UI_SRC = join(ROOT, "packages/ui/src");
  * entry here is a deliberate, reviewed exception with a reason and, if it is
  * temporary, the work that removes it.
  */
-const KNOWN = new Set([]);
+const KNOWN = new Set([
+  /*
+    ── Surfaced by widening check 2 to `@4dl/app-kit` + `@4dl/admin` ──────────
+
+    These four are NOT waived because they are fine. They are waived because
+    each needs a judgement this pass could not make honestly, and an entry with
+    a reason is the mechanism this file provides for exactly that. Each names
+    the question that closes it.
+
+    They were invisible until the platform stopped meaning one package, which
+    is the finding: `ErrorBoundary` — a real duplicate, 60 lines against the
+    platform's 88, minus the error text and the stale-bundle escape — sat next
+    to a passing guard for as long as the guard read `@4dl/ui` alone. That one
+    IS fixed; these are what else the widening found.
+  */
+
+  // Kova's inbox SCREEN vs `@4dl/app-kit`'s `Inbox`. Tessa's equivalent turned
+  // out to be a thin wrapper and was renamed. Is Kova's? If so, rename; if it
+  // is a second implementation, delete it and bind the platform's.
+  "app/src/screens/Inbox.tsx",
+
+  // Kova's console vs `@4dl/admin`'s. CLAUDE.md says the SHELL moved and the
+  // SECTIONS stayed the app's, so this is probably the section registry under
+  // the platform's name — a rename. Confirm before assuming.
+  "app/src/screens/admin/AdminConsole.tsx",
+
+  // The one that is genuinely unclear. `@4dl/app-kit` exports a `ThemeProvider`
+  // and Stage 10b's note says it moved there, yet Kova still has one reading
+  // `useSession()`. Either the extraction left a caller behind or Kova needs
+  // something the platform's does not do — and which it is decides whether this
+  // is a delete or a widening of the platform's.
+  "app/src/theme.tsx",
+
+  // Scena declares `interface HostInfo { … }` with a BODY, where Kova aliases
+  // the platform's generic (`HostInfo<TenantBranding>`) and is correctly not
+  // flagged. Scena's is a SUBSET — no `platform` field, a narrower `tenant` —
+  // so adopting the platform's means checking what `/api/host` actually sends,
+  // which is a wire question rather than a UI one.
+  "scena-app/src/host.ts",
+]);
 
 /** Every `.tsx`/`.ts` file under a directory, relative to `apps/`. */
 function walk(dir, out = []) {
@@ -72,7 +126,7 @@ function walk(dir, out = []) {
  */
 function platformExports() {
   const names = new Set();
-  for (const f of walk(UI_SRC)) {
+  for (const f of PLATFORM_UI.flatMap((d) => walk(d))) {
     if (f.endsWith("lib/icons.tsx")) continue;
     const src = readFileSync(f, "utf8");
     for (const m of src.matchAll(/^export (?:function|const|interface|type|class) ([A-Za-z0-9_]+)/gm)) names.add(m[1]);
@@ -151,10 +205,37 @@ for (const app of spaDirs) {
     const src = readFileSync(f, "utf8");
     // `type` and `interface` too: a shadowing TYPE is how Scena's `Tone` hid
     // from this check for as long as it existed.
-    for (const m of src.matchAll(/^export (?:function|const|type|interface) ([A-Z][A-Za-z0-9_]*)/gm)) {
+    for (const m of src.matchAll(/^export (?:function|const|type|interface) ([A-Z][A-Za-z0-9_]*)([^\n]*)/gm)) {
       const name = m[1];
       if (!platform.has(name) || GENERIC.has(name)) continue;
-      fail(`${rel(f)} exports \`${name}\`, which @4dl/ui already exports. Two components with one name is how a design system stops being one.`);
+      /*
+        A pure ALIAS of the platform's own type is not a second implementation —
+        it is the app narrowing a generic and re-exporting it under the name its
+        screens already use. `export type HostInfo = KitHostInfo<TenantBranding>`
+        cannot drift from the platform's, because it IS the platform's.
+
+        A declaration with a BODY can drift, and that is the whole failure: a
+        second `interface HostInfo { … }` copies today's shape and then does not
+        follow it. So the test is the brace, not the keyword.
+      */
+      if (/^\s*=\s*[A-Za-z_$][\w$.]*(?:<[^{;]*>)?\s*;?\s*$/.test(m[2])) continue;
+      /*
+        A BINDING IS NOT A FORK, AND THE IMPORT PROVES IT.
+
+        Kova's `notices.tsx` exports `MaintenanceBanner` and `PwaUpdatePrompt`
+        under the platform's own names — deliberately, so its screens import
+        notices from one place — while importing the platform's as `Kit*` and
+        rendering them with Kova's session and Kova's dunning copy. Tessa's
+        notification bell is the same shape.
+
+        That is the pattern the extraction plan asks for (the registry is
+        injected, the presentation half stays the app's), and flagging it turns
+        a correct binding into a rename. The distinguishing fact is mechanical:
+        a file that IMPORTS the name from a platform package cannot be a second
+        implementation of it, because it is rendering the first one.
+      */
+      if (new RegExp(`\\b${name}\\b[^\\n]*from "@4dl/`).test(src)) continue;
+      fail(`${rel(f)} exports \`${name}\`, which a shared UI package already exports. Two components with one name is how a design system stops being one.`);
     }
   }
 }
@@ -183,5 +264,9 @@ for (const k of KNOWN) {
 }
 
 if (!process.exitCode) {
-  console.log(`✓ ui ownership: ${scanned.length} app files, ${platform.size} platform exports, ${uiFiles} waived (${[...KNOWN].join(", ") || "none"})`);
+  // `uiFiles` counts private `components/ui/` files; `KNOWN` is the exception
+  // list. Reporting the first under the second's label printed "0 waived"
+  // beside four waived paths — a summary line contradicting itself.
+  console.log(`✓ ui ownership: ${scanned.length} app files, ${platform.size} platform exports across ${PLATFORM_UI.length} packages`);
+  console.log(`  ${uiFiles} private components/ui file(s) · ${KNOWN.size} known exception(s)${KNOWN.size ? `: ${[...KNOWN].join(", ")}` : ""}`);
 }
