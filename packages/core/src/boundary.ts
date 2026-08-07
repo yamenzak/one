@@ -165,7 +165,18 @@ export function findBoundaryViolations(opts: BoundaryOptions): BoundaryViolation
         if (trimmed.includes("*/")) inBlock = false;
         return;
       }
-      if (/^\/\*/.test(trimmed) && !trimmed.includes("*/")) {
+      /*
+        ⚠️ `{/* … *​/}` COUNTS. A JSX block comment is the same prose in a
+        different syntax, and the rule above deliberately exempts prose —
+        documentation may say which apps exist; a TYPE or a shipped string may
+        not, because that is what a consuming app is forced to adopt.
+
+        Without the `{` form, identical wording was a violation or not depending
+        on whether it sat above the JSX or inside it. That is not a rule anybody
+        can follow, and it is the kind of arbitrariness that gets a real check
+        dismissed as noise.
+      */
+      if (/^\{?\/\*/.test(trimmed) && !/\*\/\}?/.test(trimmed)) {
         inBlock = true;
         return;
       }

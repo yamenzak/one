@@ -69,6 +69,31 @@
       "cache": false,
       "passThroughEnv": ["PLAYWRIGHT_*", "CI", "E2E_SERVER_LOGS", "NODE_OPTIONS"]
     },
+    /*
+      ⚠️ SAME TRAP AS THE WORKER SUITES, one door further along.
+
+      Scena's screenshot run boots TWO workers: the dashboard (assets →
+      `apps/scena-app/dist`) and the PLAYER (assets → `apps/scena-player/dist`).
+      An `assets.directory` is a filesystem path, not a package dependency, so
+      turbo cannot infer either edge — and the generic `shots` task above names
+      only Kova's SPA.
+
+      Unbuilt, `wrangler dev` refuses to start at all and Playwright reports
+      "Process from config.webServer was not able to start", which names neither
+      the app nor the missing directory. That is what happened the first time
+      this ran after the UI work; the pictures were not stale, they did not
+      exist.
+    */
+    "@scena/e2e#shots": {
+      "dependsOn": ["@scena/app#build", "@scena/player#build"],
+      "cache": false,
+      "passThroughEnv": ["PLAYWRIGHT_*", "CI", "E2E_SERVER_LOGS", "NODE_OPTIONS"]
+    },
+    "@scena/e2e#test": {
+      "dependsOn": ["@scena/app#build", "@scena/player#build"],
+      "cache": false,
+      "passThroughEnv": ["PLAYWRIGHT_*", "CI", "E2E_SERVER_LOGS", "NODE_OPTIONS"]
+    },
     "@4dl/core#build": { "outputs": [] },
     "@4dl/tenancy#build": { "outputs": [] },
     "@4dl/auth#build": { "outputs": [] },

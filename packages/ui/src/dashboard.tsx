@@ -162,7 +162,18 @@ export function NavSidebar({ navGroups, active, onNavigate, brand, footer, colla
   return (
     <div className="flex h-full flex-col">
       {brand && <div className={cn("flex h-14 shrink-0 items-center", collapsed ? "justify-center px-0" : "px-4")}>{brand(collapsed)}</div>}
-      <ScrollArea className="min-h-0 flex-1 px-2">
+      {/*
+        `mask` is not decoration here. Without it the scroll region ends in a
+        hard horizontal cut, and a nav list longer than the viewport lands that
+        cut mid-glyph on whichever item straddles the fold — which reads as a
+        broken layout, not as "there is more below". The fade is the only thing
+        distinguishing a scrollable list from a clipped one, because the
+        scrollbar is an overlay and has faded out by the time anybody looks.
+
+        Found in a screenshot, not in review: it is invisible in the source and
+        unmissable in a picture.
+      */}
+      <ScrollArea mask className="min-h-0 flex-1 px-2">
         <nav className="flex flex-col gap-4 py-2">
           {navGroups.map((group) => (
             <div key={group.label} className="flex flex-col gap-1">

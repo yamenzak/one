@@ -49,6 +49,21 @@ export const DEMO_BOARD = "Front desk";
 
 export interface DemoWorld {
   context: BrowserContext;
+  /**
+   * Which palette this world was built in.
+   *
+   * ⚠️ The theme is per-ORIGIN, because it lives in that origin's
+   * `localStorage`. The operator console is a different door
+   * (`admin.<root>`), so it does not inherit the workspace's choice — and with
+   * nothing stored it fell back to the headless browser's
+   * `prefers-color-scheme`, which is LIGHT.
+   *
+   * The result was a photograph of the light console filed as
+   * `desktop-dark/admin-console.png`, byte-identical to the light one. That is
+   * the failure this whole suite exists to prevent, wearing a different hat:
+   * not a stale design, a stale THEME, and just as convincing.
+   */
+  theme: "light" | "dark";
   /** The operator's page, already on the workspace's own origin. */
   page: Page;
   slug: string;
@@ -174,6 +189,7 @@ export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"):
 
   return {
     context,
+    theme,
     page,
     slug,
     screens: screens.map((s) => ({ id: s.id, name: s.name, channelId: s.channel_id! })),
@@ -186,6 +202,9 @@ export async function buildDemoWorld(browser: Browser, theme: "light" | "dark"):
 export async function openOperatorConsole(world: DemoWorld): Promise<Page> {
   await carrySessionTo(world.context, workspaceUrl(world.slug), `admin.${ROOT_DOMAIN}`);
   const page = await world.context.newPage();
+  // Pin the palette on THIS origin before the console boots — see `theme` on
+  // DemoWorld for what happens when nobody does.
+  await pinTheme(page, ADMIN_URL, world.theme);
   await page.goto(ADMIN_URL);
   return page;
 }

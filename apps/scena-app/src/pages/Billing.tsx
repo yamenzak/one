@@ -23,10 +23,24 @@ import { getBilling, changePlan, buyPack, redeemPromo, type BillingState, type P
 
 const dollars = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 const num = (n: number) => n.toLocaleString();
-/** Bytes as an amount a person reads — GB past a gigabyte, MB below it. */
-const mb = (bytes: number) => {
+/**
+ * Bytes as an amount a person reads — GB past a gigabyte, MB below it.
+ *
+ * Returned SPLIT, because the anchor renders the two halves differently. As one
+ * string in `font-mono text-3xl` the separating space is a full monospace
+ * advance, so "0 MB" came out as a numeral, a visible gap, and a unit shouting
+ * at the same size as the number. §5: the unit rides the value at `0.5em`, and
+ * only the numeral is tabular.
+ */
+const bytesParts = (bytes: number): { value: string; unit: string } => {
   const m = bytes / (1024 * 1024);
-  return m >= 1024 ? `${(m / 1024).toFixed(1)} GB` : `${m < 10 && m > 0 ? m.toFixed(1) : Math.round(m)} MB`;
+  return m >= 1024
+    ? { value: (m / 1024).toFixed(1), unit: "GB" }
+    : { value: m < 10 && m > 0 ? m.toFixed(1) : String(Math.round(m)), unit: "MB" };
+};
+const mb = (bytes: number) => {
+  const { value, unit } = bytesParts(bytes);
+  return `${value} ${unit}`;
 };
 
 function fmtDate(ts: number): string {
@@ -188,7 +202,16 @@ export function BillingPage() {
         {/* Media storage meter */}
         <Card>
           <SectionHeader title="Media storage" className="mb-4" />
-          <div className="font-mono text-3xl font-semibold tabular-nums">{storage ? mb(storage.usedBytes) : "—"}</div>
+          <div className="numeral text-title-1">
+            {storage ? (
+              <>
+                {bytesParts(storage.usedBytes).value}
+                <span className="ml-1 align-baseline text-[0.5em] font-semibold text-muted-foreground">{bytesParts(storage.usedBytes).unit}</span>
+              </>
+            ) : (
+              "—"
+            )}
+          </div>
           {storage && storage.limitBytes > 0 && (
             <Meter
               className="mt-3"
