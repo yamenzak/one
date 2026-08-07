@@ -16,7 +16,7 @@
  */
 import { useEffect, useState } from "react";
 import { Receipt, Check, Sparkles, ArrowRight, Lock, Loader2 } from "lucide-react";
-import { Button, Card, cn, Dialog, DialogContent, DialogFooter, EmptyState, Group, Input, LoadError, Meter, PageHeader, Row, SectionHeader, Skeleton, toast } from "@4dl/ui";
+import { Button, Card, cn, Dialog, DialogContent, DialogFooter, EmptyState, Group, Input, LoadError, Meter, NoData, PageHeader, Row, SectionHeader, Skeleton, toast } from "@4dl/ui";
 import { LegalDialog, LegalLinks, type LegalDoc } from "../legal/content.js";
 import { FEATURE_CATALOG, QUOTA_CATALOG } from "@scena/manifest";
 import { getBilling, changePlan, buyPack, redeemPromo, type BillingState, type Plan, type Violation } from "../api.js";
@@ -209,7 +209,9 @@ export function BillingPage() {
                 <span className="ml-1 align-baseline text-[0.5em] font-semibold text-muted-foreground">{bytesParts(storage.usedBytes).unit}</span>
               </>
             ) : (
-              "—"
+              // At `title-1` an em-dash is a horizontal rule with a caption
+              // under it, which reads as broken rather than empty (§5).
+              <NoData>Not measured yet</NoData>
             )}
           </div>
           {storage && storage.limitBytes > 0 && (

@@ -29,9 +29,18 @@ type ScreenDims = { width?: number | null; height?: number | null; orientation?:
 export function dimsOf(s: Screen): ScreenDims {
   return s as Screen & ScreenDims;
 }
-export function resolutionLabel(s: Screen): string {
+/**
+ * `null` when the device has not reported its size — NOT a dash.
+ *
+ * §5: never render a dash where a number belongs. The chip that used this drew
+ * an orientation glyph beside an em-dash, and BOTH halves were fabricated:
+ * `dimsOf` falls back to landscape, so a screen that had never checked in was
+ * labelled "landscape, unknown size" with the confidence of a fact. A screen
+ * card with no size chip says the same thing and does not claim the orientation.
+ */
+export function resolutionLabel(s: Screen): string | null {
   const { width, height } = dimsOf(s);
-  return width && height ? `${width}×${height}` : "—";
+  return width && height ? `${width}×${height}` : null;
 }
 
 export function ScreensPage({ onPair }: { onPair: () => void }) {
@@ -205,11 +214,16 @@ export function ScreensPage({ onPair }: { onPair: () => void }) {
           <Row
             icon={s.live?.online ? Wifi : WifiOff}
             iconTone={s.live?.online ? "success" : "neutral"}
+            // `.filter(Boolean)` before the join: a screen that has never
+            // reported its size contributes nothing, and without this an absent
+            // segment leaves a double separator — "Unassigned ·  · Live".
             sub={[
               s.channel_name ?? "Unassigned",
               resolutionLabel(s),
               s.live?.online ? "Live" : lastSeenLabel(s.live?.lastSeen) ? `last seen ${lastSeenLabel(s.live?.lastSeen)}` : "Offline",
-            ].join(" · ")}
+            ]
+              .filter(Boolean)
+              .join(" · ")}
             onClick={() => navigate(`/screens/${s.id}`)}
           >
             {s.name}
@@ -226,6 +240,7 @@ function DeviceCard({ screen, onClick }: { screen: Screen; onClick: () => void }
   const { orientation } = dimsOf(screen);
   const portrait = orientation === "portrait";
   const seen = lastSeenLabel(screen.live?.lastSeen);
+  const resolution = resolutionLabel(screen);
   const channel = screen.channel_name;
   return (
     <Card onClick={onClick} className="group relative cursor-pointer overflow-hidden p-0 transition-all hover:bg-surface-2 active:scale-[0.99]">
@@ -249,10 +264,12 @@ function DeviceCard({ screen, onClick }: { screen: Screen; onClick: () => void }
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {channel ? <Badge className="font-normal">{channel}</Badge> : <Badge className="font-normal text-muted-foreground">Unassigned</Badge>}
-          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-caption font-medium text-muted-foreground">
-            {portrait ? <RectangleVertical className="size-3" /> : <RectangleHorizontal className="size-3" />}
-            {resolutionLabel(screen)}
-          </span>
+          {resolution && (
+            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-caption font-medium text-muted-foreground">
+              {portrait ? <RectangleVertical className="size-3" /> : <RectangleHorizontal className="size-3" />}
+              {resolution}
+            </span>
+          )}
           {!online && seen && <span className="text-caption text-muted-foreground">· {seen}</span>}
         </div>
         {(screen.tags?.length ?? 0) > 0 && (

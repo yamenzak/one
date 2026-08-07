@@ -421,7 +421,11 @@ function StatusPanel({ screen, activeChannel }: { screen: Screen; activeChannel:
       value: width && height ? `${width}×${height}${orientation ? ` · ${orientation}` : ""}` : <span className="text-muted-foreground">Not detected</span>,
       icon: <MonitorPlay />,
     },
-    { label: "Manifest", value: live?.manifestVersion ? `v${live.manifestVersion}` : "—", icon: <Layers /> },
+    // A WORD, not a dash — the two tiles above already say "Unassigned" and
+    // "Not detected", so this one was the odd row out in its own list. §5: an
+    // em-dash is the one placeholder assistive tech cannot convey, and in a
+    // stack of stat rows a column of them reads as a broken layout.
+    { label: "Manifest", value: live?.manifestVersion ? `v${live.manifestVersion}` : <span className="text-muted-foreground">Not published</span>, icon: <Layers /> },
     { label: "Last seen", value: lastSeen(live?.lastSeen ?? screen.last_seen), icon: <Clock /> },
   ];
   return (
