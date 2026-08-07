@@ -15,6 +15,7 @@ import {
   Moon,
   Sun,
   MonitorPlay,
+  MonitorSpeaker,
   Bug,
   ScanLine,
   Unplug,
@@ -58,7 +59,7 @@ import {
 import { TagEditor } from "../components/tag-editor.js";
 import { useCan } from "../permissions.js";
 import { dimsOf } from "./Screens.js";
-import { Badge, Button, cn, ConfirmDialog, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, StatusDot, Switch, Tabs, TabsContent, TabsList, TabsTrigger, toast, usePageChrome } from "@4dl/ui";
+import { Badge, Button, cn, ConfirmDialog, EmptyState, Group, Hero, Input, Label, LoadError, Row, Select, Skeleton, StatusDot, Switch, Tabs, TabsContent, TabsList, TabsTrigger, toast, usePageChrome } from "@4dl/ui";
 
 const NONE = "__none__";
 
@@ -204,19 +205,37 @@ export function ScreenDetailPage() {
         <DetailSkeleton />
       ) : (
         <>
-          <PageHeader
+          {/*
+            `Hero`, not `PageHeader` — §7's `identity` variant, and this is the
+            screen it was written for. Its own docstring names the case: "a
+            device is a `StatusDot` plus words plus a channel name", which is
+            why `status` takes a ReactNode rather than a string.
+
+            The difference is not cosmetic. `PageHeader` is the TITLE variant —
+            a list or a settings surface, where the heading names the screen. A
+            device is a THING, and a thing has a face: the mark on the left is
+            what makes two devices distinguishable at a glance in the ten
+            seconds before the status line is read. Cramming the standing into
+            `description` was the shape every record screen reached for before
+            there was a component for this one.
+          */}
+          <Hero
             back={{ label: "All devices", onClick: () => navigate("/") }}
-            title={writable ? <EditableName screen={screen} onRenamed={reload} /> : screen.name}
-            description={
-              <span className="flex items-center gap-1.5">
+            leading={
+              <span className={cn("grid size-11 place-items-center rounded-2xl", online ? "bg-success/12 text-success" : "bg-surface-2 text-muted-foreground")}>
+                <MonitorSpeaker aria-hidden className="size-5" />
+              </span>
+            }
+            status={
+              <>
                 <StatusDot tone={online ? "success" : "neutral"} ping={online} />
                 <span className={online ? "text-success" : "text-muted-foreground"}>{online ? "Online" : "Offline"}</span>
                 {activeChannel && <span className="text-muted-foreground">· playing {activeChannel}</span>}
-              </span>
+              </>
             }
-          >
-            {(writable || (screen.tags?.length ?? 0) > 0) && (
-              <div className="mt-3 flex min-w-0 items-center gap-1.5">
+            footer={
+              (writable || (screen.tags?.length ?? 0) > 0) ? (
+              <div className="flex min-w-0 items-center gap-1.5">
                 <Tag className="size-3.5 shrink-0 text-muted-foreground" />
                 {writable ? (
                   <TagEditor
@@ -235,8 +254,11 @@ export function ScreenDetailPage() {
                   </div>
                 )}
               </div>
-            )}
-          </PageHeader>
+              ) : undefined
+            }
+          >
+            {writable ? <EditableName screen={screen} onRenamed={reload} /> : screen.name}
+          </Hero>
 
           <Tabs defaultValue="overview">
             <TabsList>

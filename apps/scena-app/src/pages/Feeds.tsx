@@ -96,7 +96,7 @@ function tzOptions(): string[] {
 
 /* ================================ List view ============================== */
 
-export function FeedsPage() {
+export function FeedsPage({ pane }: { pane?: boolean } = {}) {
   const navigate = useNavigate();
   const can = useCan();
   const canCreate = can("content", "create");
@@ -179,14 +179,16 @@ export function FeedsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Sources"
-        description={
-          total
-            ? `${total} source${total === 1 ? "" : "s"} · RSS, API, Google Sheets, and weather`
-            : "Live data — RSS, a public API, a Google Sheet, or local weather — for your ticker, metric, menu, weather, and text widgets."
-        }
-      />
+      {!pane && (
+        <PageHeader
+          title="Sources"
+          description={
+            total
+              ? `${total} source${total === 1 ? "" : "s"} · RSS, API, Google Sheets, and weather`
+              : "Live data — RSS, a public API, a Google Sheet, or local weather — for your ticker, metric, menu, weather, and text widgets."
+          }
+        />
+      )}
 
       {error ? (
         // Was a dashed Card reading "Couldn't reach the API: [object Object]"

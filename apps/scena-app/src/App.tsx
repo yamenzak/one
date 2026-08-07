@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router-dom";
-import { Siren, LogOut, Sun, Moon, Scale, Layers, Music, Tv } from "lucide-react";
+import { Siren, LogOut, Sun, Moon, Scale, Layers, Music, Tv, Rss, Megaphone } from "lucide-react";
 import { ScenaMascot } from "./brand.js";
 import { adminUrl, ErrorBoundary } from "@4dl/app-kit";
 import { useHost } from "./host.js";
@@ -350,10 +350,20 @@ export function App() {
               </Route>
               <Route path="/profiles" element={<WidgetProfilesPage />} />
               <Route path="/boards" element={<LiveBoardsPage />} />
-              <Route path="/feeds" element={<FeedsPage />} />
-              <Route path="/feeds/:id" element={<SourceDetailPage />} />
-              <Route path="/ads" element={<AdsPage />} />
-              <Route path="/ads/:id" element={<AdProfileDetailPage />} />
+              <Route
+                path="/feeds"
+                element={<CollectionPane base="/feeds" list={<FeedsPage pane />} icon={Rss} title="Pick a source" description="Its fields and refresh settings open here — the list stays beside them." />}
+              >
+                <Route index element={<FeedsPage />} />
+                <Route path=":id" element={<SourceDetailPage />} />
+              </Route>
+              <Route
+                path="/ads"
+                element={<CollectionPane base="/ads" list={<AdsPage pane />} icon={Megaphone} title="Pick an ad profile" description="Its rotation and schedule open here — the list stays beside them." />}
+              >
+                <Route index element={<AdsPage />} />
+                <Route path=":id" element={<AdProfileDetailPage />} />
+              </Route>
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/alerts" element={<AlertsPageComp />} />
               <Route path="/billing" element={<BillingPage />} />

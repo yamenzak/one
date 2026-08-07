@@ -45,7 +45,7 @@ const KINDS: { id: Kind; label: string; hint: string }[] = [
 /* ================================ List view ============================== */
 
 /** Ad profiles — reusable rotations bound by channels. */
-export function AdsPage() {
+export function AdsPage({ pane }: { pane?: boolean } = {}) {
   const can = useCan();
   const canCreate = can("content", "create");
   const canWrite = can("content", "update");
@@ -99,14 +99,16 @@ export function AdsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Ad profiles"
-        description={
-          profiles
-            ? `${profiles.length} profile${profiles.length === 1 ? "" : "s"} · reusable rotations you bind to any channel`
-            : "Reusable ad rotations you can bind to any number of channels."
-        }
-      />
+      {!pane && (
+        <PageHeader
+          title="Ad profiles"
+          description={
+            profiles
+              ? `${profiles.length} profile${profiles.length === 1 ? "" : "s"} · reusable rotations you bind to any channel`
+              : "Reusable ad rotations you can bind to any number of channels."
+          }
+        />
+      )}
 
       {loadFailed && <LoadError what="ad profiles" error="We couldn’t reach the server." onRetry={reload} />}
       {!profiles ? (
