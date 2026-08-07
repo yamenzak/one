@@ -5,6 +5,7 @@
  * delete, and open in the builder.
  */
 import { useEffect, useState } from "react";
+import { LibrarySwitcher } from "../components/library-switcher.js";
 import { useNavigate } from "react-router-dom";
 import { Plus, LayoutGrid, Pencil, Trash2, ChevronRight } from "lucide-react";
 import { useCan } from "../permissions.js";
@@ -73,6 +74,7 @@ export function WidgetProfilesPage() {
 
   return (
     <div>
+      <LibrarySwitcher current="profiles" />
       <PageHeader
         title="Widget profiles"
         description={

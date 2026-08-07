@@ -52,6 +52,7 @@ import { HtmlEditorDialog, HtmlThumb } from "../components/html-editor.js";
 import { LicenseNote } from "../components/licensing.js";
 import { Badge, Button, Card, confirm, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Input, Label, LoadError, PageHeader, Row, Select, Separator, Skeleton, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
 import { PlaylistLibrary } from "../components/playlist-library.js";
+import { LibrarySwitcher } from "../components/library-switcher.js";
 
 const STARTER_HTML = `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;background:linear-gradient(135deg,#6366f1,#312e81);color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:8%">
   <div style="font-size:1.4vw;letter-spacing:.3em;text-transform:uppercase;opacity:.75">Your brand</div>
@@ -119,6 +120,7 @@ export function PlaylistsPage({ pane }: { pane?: boolean } = {}) {
   return (
     <PlaylistLibrary
       pane={pane}
+      switcher={<LibrarySwitcher current="playlists" />}
       title="Slide playlists"
       description="The visual loop a channel plays."
       noun="playlists"

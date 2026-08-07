@@ -1,0 +1,141 @@
+/**
+ * SCENA'S ACCENT TONES — one per destination.
+ *
+ * `@4dl/ui` owns the five status tones (success / warning / danger / primary /
+ * neutral) and resolves anything else by convention: tone `foo` becomes
+ * `text-foo`, `bg-foo-soft text-foo`, `bg-foo text-foo-foreground`,
+ * `var(--foo)`. Registering an accent is exactly this file plus the class
+ * literals in `registry/tones.ts` — the same two-part shape Kova uses, because
+ * the mechanism is the package's and only the colours are the product's.
+ *
+ * ── Why an app about screens needs five colours ─────────────────────────────
+ *
+ * Kova's nav tints itself per destination and the active tone bleeds into the
+ * page wash and every accent on it (`Shell.tsx`). That is a large part of why
+ * moving between its sections feels like moving between PLACES rather than
+ * swapping a body — and it is the single most portable thing about its feel.
+ * Scena had one colour, purple, for all fifteen destinations, so every screen
+ * was the same room.
+ *
+ * Five tones for five destinations. They are spaced around the wheel from
+ * Scena's own violet rather than borrowed from Kova: two products that share a
+ * design language should not share a palette, or the apps stop being
+ * distinguishable at a glance — which is the opposite of what a unified
+ * interface is for.
+ *
+ * ── Each tone carries its own `-foreground` ─────────────────────────────────
+ *
+ * The ink laid ON a filled tone. A single shared value is only right while
+ * every accent in a mode sits at a similar lightness, and these deliberately do
+ * not: `boards` is bright, `insights` is deep. Each names its own.
+ *
+ * Dark values first (`:root`), then the light overrides — the same order as
+ * `@4dl/ui`'s own tokens, so a reader can diff them.
+ */
+
+@theme inline {
+  --color-fleet: var(--fleet);
+  --color-fleet-soft: var(--fleet-soft);
+  --color-fleet-foreground: var(--fleet-foreground);
+  --color-channel: var(--channel);
+  --color-channel-soft: var(--channel-soft);
+  --color-channel-foreground: var(--channel-foreground);
+  --color-blocks: var(--blocks);
+  --color-blocks-soft: var(--blocks-soft);
+  --color-blocks-foreground: var(--blocks-foreground);
+  --color-boards: var(--boards);
+  --color-boards-soft: var(--boards-soft);
+  --color-boards-foreground: var(--boards-foreground);
+  --color-insights: var(--insights);
+  --color-insights-soft: var(--insights-soft);
+  --color-insights-foreground: var(--insights-foreground);
+}
+
+:root {
+  /* Screens — Scena's violet, the brand's own hue. The fleet is home. */
+  --fleet: oklch(0.72 0.15 292);
+  --fleet-soft: oklch(0.32 0.07 292);
+  --fleet-foreground: oklch(0.18 0.03 292);
+
+  /* Channels — cyan. What is composed and published. */
+  --channel: oklch(0.76 0.13 218);
+  --channel-soft: oklch(0.32 0.06 218);
+  --channel-foreground: oklch(0.18 0.03 218);
+
+  /* Library — amber. The reusable parts, warm against the cool destinations. */
+  --blocks: oklch(0.79 0.14 74);
+  --blocks-soft: oklch(0.33 0.06 74);
+  --blocks-foreground: oklch(0.2 0.03 74);
+
+  /* Live boards — green. Something is happening right now. */
+  --boards: oklch(0.78 0.14 152);
+  --boards-soft: oklch(0.32 0.06 152);
+  --boards-foreground: oklch(0.19 0.03 152);
+
+  /* Insights — rose. Proof of play, and what went wrong. */
+  --insights: oklch(0.74 0.14 12);
+  --insights-soft: oklch(0.32 0.07 12);
+  --insights-foreground: oklch(0.18 0.03 12);
+}
+
+/*
+  LIGHT MODE — darker fills, pale tints, near-white ink.
+
+  The `-soft` tints have to stay pale enough that the tone's own text clears
+  WCAG AA on them (§12), which is why these are not simply the dark values
+  inverted: a mid-lightness fill under mid-lightness text passes neither way.
+*/
+:root[data-theme="light"] {
+  --fleet: oklch(0.5 0.19 292);
+  --fleet-soft: oklch(0.95 0.03 292);
+  --fleet-foreground: oklch(0.99 0.01 292);
+
+  --channel: oklch(0.52 0.13 218);
+  --channel-soft: oklch(0.95 0.03 218);
+  --channel-foreground: oklch(0.99 0.01 218);
+
+  --blocks: oklch(0.55 0.13 74);
+  --blocks-soft: oklch(0.95 0.04 74);
+  --blocks-foreground: oklch(0.99 0.01 74);
+
+  --boards: oklch(0.5 0.13 152);
+  --boards-soft: oklch(0.95 0.04 152);
+  --boards-foreground: oklch(0.99 0.01 152);
+
+  --insights: oklch(0.53 0.17 12);
+  --insights-soft: oklch(0.96 0.02 12);
+  --insights-foreground: oklch(0.99 0.01 12);
+}
+
+/*
+  The theme is an ATTRIBUTE, not a class, and the default (`system`) sets no
+  attribute at all — so light also has to be reachable through
+  `prefers-color-scheme`, guarded so an explicit dark choice still wins.
+
+  This exact trap cost Scena its dark tokens once before: a `.dark` CLASS
+  selector left a tenant's dark palette applying nowhere and its light palette
+  injected into the dark theme (SCENA.md, Stage 7a).
+*/
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --fleet: oklch(0.5 0.19 292);
+    --fleet-soft: oklch(0.95 0.03 292);
+    --fleet-foreground: oklch(0.99 0.01 292);
+
+    --channel: oklch(0.52 0.13 218);
+    --channel-soft: oklch(0.95 0.03 218);
+    --channel-foreground: oklch(0.99 0.01 218);
+
+    --blocks: oklch(0.55 0.13 74);
+    --blocks-soft: oklch(0.95 0.04 74);
+    --blocks-foreground: oklch(0.99 0.01 74);
+
+    --boards: oklch(0.5 0.13 152);
+    --boards-soft: oklch(0.95 0.04 152);
+    --boards-foreground: oklch(0.99 0.01 152);
+
+    --insights: oklch(0.53 0.17 12);
+    --insights-soft: oklch(0.96 0.02 12);
+    --insights-foreground: oklch(0.99 0.01 12);
+  }
+}

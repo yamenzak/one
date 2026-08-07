@@ -19,6 +19,7 @@
  * server's own message now, and the poll keeps running underneath.
  */
 
+import { InsightsSwitcher } from "../components/insights-switcher.js";
 import { useCallback, useEffect, useState } from "react";
 import { Plus, X, Webhook, Mail, Monitor, Wifi, WifiOff, BellRing } from "lucide-react";
 import { Badge, Button, Card, confirm, EmptyState, GlanceStrip, Group, Input, LoadError, PageHeader, Row, Section, Select, SkeletonList, toast, useAction, usePageChrome } from "@4dl/ui";
@@ -59,6 +60,7 @@ export function AlertsPage() {
 
   return (
     <div>
+      <InsightsSwitcher current="alerts" />
       <PageHeader title="Alerts" description="Health monitoring and delivery" />
 
       {/*

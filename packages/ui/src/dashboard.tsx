@@ -225,7 +225,18 @@ function actionMenuRows(actions: PageAction[]): React.ReactNode[] {
   return rows;
 }
 
-function ShellActions({ actions }: { actions: PageAction[] }) {
+/**
+ * A page's own actions, inline on wide screens and collapsed into a ⋮ menu on
+ * narrow ones.
+ *
+ * EXPORTED because the chrome mechanism (`usePageChrome`) is the package's and
+ * the SHELL is the app's. Scena publishes actions from every screen and used to
+ * get them rendered by `DashboardShell`'s breadcrumb bar for free; moving that
+ * app onto the phone-first shell took the renderer away and every "Pair
+ * screen", "Publish" and "Delete" silently vanished. A mechanism with one
+ * private renderer is a mechanism that only works inside one shell.
+ */
+export function ShellActions({ actions }: { actions: PageAction[] }) {
   if (!actions.length) return null;
   const pinned = actions.filter((a) => a.overflow !== "always");
   const overflowOnly = actions.filter((a) => a.overflow === "always");

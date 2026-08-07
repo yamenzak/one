@@ -5,6 +5,7 @@
  * exports it as CSV, the artifact that makes the ad system sellable.
  */
 
+import { InsightsSwitcher } from "../components/insights-switcher.js";
 import { useEffect, useState } from "react";
 import { Download, BarChart3 } from "lucide-react";
 import { Card, EmptyState, LoadError, PageHeader, SectionHeader, Skeleton, StatCard, usePageChrome } from "@4dl/ui";
@@ -58,6 +59,7 @@ export function AnalyticsPage() {
 
   return (
     <div>
+      <InsightsSwitcher current="analytics" />
       <PageHeader
         title="Analytics"
         description={

@@ -18,6 +18,9 @@
 
 @import "tailwindcss";
 @import "@4dl/ui/tokens.css";
+/* Scena's own accents — one per destination. See the file for why an app
+   about screens needs five colours. */
+@import "./tokens.accents.css";
 
 /*
   Tailwind v4: scan every workspace package that RENDERS, for class names.

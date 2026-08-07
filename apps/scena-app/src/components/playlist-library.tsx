@@ -81,6 +81,13 @@ export interface PlaylistLibraryProps<T extends PlaylistLike> {
   row: (item: T, menu: ReactNode) => ReactNode;
 
   /**
+   * The library switcher, rendered above the list in BOTH forms. Taken as a
+   * node rather than built here: this component is shared by two of the six
+   * kinds and does not know which one it is.
+   */
+  switcher?: ReactNode;
+
+  /**
    * Rendered as a `Shape` list pane (§11.2) rather than as the whole page.
    *
    * Only the chrome changes: the title comes off, because in a two-pane the
@@ -94,7 +101,7 @@ export interface PlaylistLibraryProps<T extends PlaylistLike> {
 
 export function PlaylistLibrary<T extends PlaylistLike>({
   noun, items, error, reload, perms, create, update, remove, onCreated,
-  createLabel, createTitle, createPlaceholder, defaultName, title, description, empty, deleteDescription, searchText, row, pane,
+  createLabel, createTitle, createPlaceholder, defaultName, title, description, empty, deleteDescription, searchText, row, pane, switcher,
 }: PlaylistLibraryProps<T>) {
   const [q, setQ] = useState("");
   const [facets, setFacets] = useState<FacetSelection>({ tag: null });
@@ -146,6 +153,7 @@ export function PlaylistLibrary<T extends PlaylistLike>({
 
   return (
     <div>
+      {switcher}
       {!pane && <PageHeader title={title} description={items ? `${items.length} ${items.length === 1 ? noun.replace(/s$/, "") : noun}` : description} />}
       <Collection
         items={shown}

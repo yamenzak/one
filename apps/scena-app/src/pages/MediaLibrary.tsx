@@ -4,6 +4,7 @@
  * reference, so deleting a playlist never removes library content. Also exposes
  * <MediaPicker> — the "Pick from library" surface reused by the playlist editor.
  */
+import { LibrarySwitcher } from "../components/library-switcher.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Upload, Code2, Trash2, MoreVertical, Search, Pencil, Tag as TagIcon, ImageIcon, Check, Music, SlidersHorizontal } from "lucide-react";
 import { TagEditor } from "../components/tag-editor.js";
@@ -182,6 +183,7 @@ export function MediaLibraryPage() {
 
   return (
     <div>
+      <LibrarySwitcher current="media" />
       <input
         ref={fileInput}
         type="file"

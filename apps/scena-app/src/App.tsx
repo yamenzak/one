@@ -5,15 +5,14 @@ import { ScenaMascot } from "./brand.js";
 import { adminUrl, ErrorBoundary } from "@4dl/app-kit";
 import { useHost } from "./host.js";
 import { AdminDoor } from "./pages/AdminDoor.js";
-import { AppShell } from "./components/app-shell.js";
 import { CollectionPane } from "./components/collection-pane.js";
-import type { NavGroup } from "@4dl/ui";
+import { Shell } from "./Shell.js";
 import { RoleProvider } from "./permissions.js";
 import { EntitlementsProvider } from "./entitlements.js";
 import { clearEmergency, getActiveEmergency, getMe, getBilling, getBranding, type ActiveEmergency, type Me, type BillingState } from "./api.js";
 import { applyBrandTheme, clearBrandTheme } from "./brand-theme.js";
 import { EmergencyModal } from "./components/EmergencyModal.js";
-import { navForRole, canAccessKey, PAGE_META } from "./nav.js";
+import { canAccessKey, PAGE_META } from "./nav.js";
 import { signOut, authClient } from "./auth-client.js";
 import { useTheme } from "./theme.js";
 import { LoginScreen, OrgOnboard } from "./pages/Login.js";
@@ -54,111 +53,6 @@ function pollWhileVisible(fn: () => void, ms: number): () => void {
   return () => { clearInterval(timer); document.removeEventListener("visibilitychange", onVis); };
 }
 
-/**
- * Sidebar footer: utility icons (emergency + theme) above the plan/credits card
- * and account (§25). Collapses to an icon stack when the rail is minimized.
- */
-function SidebarFooter({
-  collapsed, billing, email, role, emergencyActive, onEmergency, onNavigateBilling, onSignOut,
-}: {
-  collapsed: boolean;
-  billing: BillingState | null;
-  email: string;
-  role: string | null;
-  emergencyActive: boolean;
-  onEmergency: () => void;
-  onNavigateBilling: () => void;
-  onSignOut: () => void;
-}) {
-  const { isDark, toggle } = useTheme();
-  const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
-  const planName = billing?.plan?.name ?? "Free plan";
-  const bal = billing?.balance?.balance ?? 0;
-  const grant = billing?.entitlements?.aiCredits?.monthlyGrant ?? 0;
-  const pct = grant > 0 ? Math.min(100, Math.round((bal / grant) * 100)) : 100;
-  const low = grant > 0 && pct <= 15;
-  const initials = (email || "SC").slice(0, 2).toUpperCase();
-
-  const emergencyBtn = (
-    <Button variant="ghost" size="icon" className={cn("size-9", emergencyActive && "text-destructive hover:text-destructive")} onClick={onEmergency} title={emergencyActive ? "Takeover active — click to clear" : "Screen takeover"} aria-label="Screen takeover">
-      <Siren className="size-[18px]" />
-    </Button>
-  );
-  const themeBtn = (
-    <Button variant="ghost" size="icon" className="size-9 text-muted-foreground" onClick={toggle} title="Toggle theme" aria-label="Toggle theme">
-      {isDark ? <Sun className="size-[18px]" /> : <Moon className="size-[18px]" />}
-    </Button>
-  );
-  const accountMenu = (side: "top" | "right") => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="grid size-9 shrink-0 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring" aria-label="Account">
-          <span className="grid size-8 place-items-center rounded-full bg-primary/15 text-caption font-bold text-primary">{initials}</span>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side={side} align="end">
-        <DropdownMenuItem onSelect={onNavigateBilling}>{planName} · {bal.toLocaleString()} cr</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setLegalDoc("terms")}><Scale className="size-4" /> Terms & privacy</DropdownMenuItem>
-        <DropdownMenuItem onSelect={onSignOut}><LogOut className="size-4" /> Sign out</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-
-  const legal = <LegalDialog doc={legalDoc} onClose={() => setLegalDoc(null)} />;
-
-  if (collapsed) {
-    return (
-      <div className="flex flex-col items-center gap-1">
-        {emergencyBtn}
-        {themeBtn}
-        {accountMenu("right")}
-        {legal}
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      {legal}
-      <div className="flex items-center gap-0.5">
-        {emergencyBtn}
-        {themeBtn}
-        {emergencyActive && <span className="ml-1 text-caption font-medium text-destructive">Takeover active</span>}
-      </div>
-      <button onClick={onNavigateBilling} className="w-full rounded-xl bg-sidebar-accent/50 p-3 text-left transition-colors hover:bg-sidebar-accent">
-        {/*
-          The balance used to appear TWICE in this 40px block — "1,000 cr" here
-          in `font-mono`, and "AI credits · 1,000 / 1,000" two lines below in the
-          sans, at the SAME size. So it bought no scanning advantage over the
-          line that already carries it with its denominator, and the same number
-          rendered in two typefaces a centimetre apart. The caption below is the
-          more informative of the two, so it is the one that stays.
-        */}
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <span className="text-caption font-semibold">{planName}</span>
-          {low && <span className="text-micro uppercase text-warning">Low</span>}
-        </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-          <div className={`h-full rounded-full transition-[width] duration-500 ${low ? "bg-warning" : "bg-primary"}`} style={{ width: `${pct}%` }} />
-        </div>
-        <div className={`mt-1.5 text-caption ${low ? "text-warning" : "text-muted-foreground"}`}>
-          {low ? "Low on AI credits · " : "AI credits · "}
-          {grant > 0 ? `${bal.toLocaleString()} / ${grant.toLocaleString()}` : bal.toLocaleString()}
-        </div>
-      </button>
-      <div className="flex items-center gap-2.5 px-1">
-        <div className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/15 text-caption font-bold text-primary">{initials}</div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-caption font-medium">{email || "Operator"}</div>
-          <div className="text-caption capitalize text-muted-foreground">{role ?? "Owner"}</div>
-        </div>
-        <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" onClick={onSignOut} title="Sign out" aria-label="Sign out">
-          <LogOut className="size-4" />
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 export function App() {
   const navigate = useNavigate();
@@ -198,7 +92,6 @@ export function App() {
 
   // Role-aware sidebar (receptionist → boards only, viewer → read-only, …),
   // with Admin appended for platform admins.
-  const navGroups = useMemo<NavGroup[]>(() => navForRole(me?.role ?? null, Boolean(me?.isAdmin), me?.features ?? null, me?.permissions ?? null), [me?.role, me?.isAdmin, me?.features, me?.permissions]);
 
   async function clearOverride() {
     await clearEmergency().catch(() => {});
@@ -269,57 +162,53 @@ export function App() {
     <RoleProvider role={me?.role ?? null} permissions={me?.permissions ?? null}>
     <EntitlementsProvider value={{ features: me?.features ?? null, quotas: me?.quotas ?? null }}>
     <PageChromeProvider>
-      <AppShell
-        navGroups={navGroups}
-        active={active}
-        onNavigate={(key) => {
-          /*
-            "Admin" is a DOOR, not a route.
-
-            It used to navigate to `/admin` inside this Shell, which rendered
-            the console and then 404'd on every call — `/api/admin/*` answers on
-            the `admin.` host and nowhere else. A full page load to the other
-            origin is the only honest destination, and it is what the console
-            actually has an address at.
-          */
-          if (key === "admin") {
-            window.location.href = adminUrl(host.rootDomain);
-            return;
-          }
-          navigate(key === "screens" ? "/" : `/${key}`);
-        }}
-        fallbackCrumb={PAGE_META[active]?.title}
-        onCrumb={(to) => navigate(to)}
-        footer={(collapsed) => (
-          <SidebarFooter
-            collapsed={collapsed}
-            billing={billing}
-            email={me?.email ?? ""}
-            role={me?.role ?? null}
-            emergencyActive={Boolean(emergency)}
-            onEmergency={() => (emergency ? clearOverride() : setEmgOpen(true))}
-            onNavigateBilling={() => navigate("/billing")}
-            onSignOut={doSignOut}
-          />
-        )}
+      <Shell
+        me={me}
+        billing={billing}
+        emergencyActive={Boolean(emergency)}
+        onEmergency={() => (emergency ? clearOverride() : setEmgOpen(true))}
+        onSignOut={doSignOut}
       >
         <ErrorBoundary resetKey={pathname} homePath="/" art={<ScenaMascot mood="sad" size={104} className="mx-auto mb-2" />}>
-          {/* `h-full` so a `Shape` (§11.2) can reach the panel's bounds through
-              this remount key. On every other page the parent is auto-height,
-              which makes `height: 100%` resolve to `auto` — a no-op.
+          {/*
+            THE CONTENT COLUMN — the same contract as Kova's `<main>`.
 
-              `@container` so a screen can size itself against the PANEL rather
-              than the window. `Shape`'s column marks itself too and, being
-              nearer, wins inside a two-pane — so one set of `@` variants is
-              correct in both arrangements and below 1100, where there is no
-              pane at all. */}
-          <div key={pathname} className="@container h-full">
+            Every screen renders inside one centred column that stops growing at
+            720px (§2). Wider viewports get MORE COLUMNS, never a wider one,
+            which is also why a card can be designed once and be correct at any
+            width. A `Shape` in one of its pane arrangements publishes
+            `data-shape` and is released from BOTH the width cap and the
+            document's height, because there the panes ARE the layout.
+
+            `--chrome-top` says how far below the viewport top this scroller
+            starts (tokens.css); a `Shape` pane resets it to 0, being its own.
+
+            `@container` so a screen sizes itself against this column rather
+            than the window — `Shape`'s column marks itself too and, being
+            nearer, wins inside a two-pane.
+          */}
+          <main
+            key={pathname}
+            className="@container column [--chrome-top:var(--app-bar-h)] has-[>[data-shape]]:h-[calc(100dvh-var(--app-bar-h))] has-[>[data-shape]]:max-w-none"
+          >
             <Routes>
               <Route path="/" element={<ScreensPage key={refreshKey} onPair={() => setPairOpen(true)} />} />
               <Route path="/screens/:id" element={<ScreenDetailPage />} />
               <Route path="/screens/:id/studio" element={<StudioPage mode="screen" />} />
               <Route path="/displays/:channelId" element={<StudioPage mode="display" />} />
               <Route path="/widgets" element={<WidgetBuilderPage />} />
+              {/*
+                THE TWO CONSOLIDATED DESTINATIONS have no page of their own —
+                they are a NAME for a set of routes. Pressing Library or
+                Insights lands on the first of its parts, and every part maps
+                back to the right tab through `OWNER` in `Shell.tsx`.
+
+                A landing page listing "here are six libraries" would be a menu
+                for a menu: the nav already named the destination, and the
+                switcher inside the list already lists the parts.
+              */}
+              <Route path="/library" element={<Navigate to="/playlists" replace />} />
+              <Route path="/insights" element={<Navigate to="/analytics" replace />} />
               {/*
                 THE THREE COLLECTIONS (§11.3). Nested rather than flat, so the
                 list and the record are one destination the shape arranges —
@@ -371,9 +260,9 @@ export function App() {
               <Route path="/team" element={<TeamPage />} />
               <Route path="*" element={<NotFound onHome={() => navigate("/")} />} />
             </Routes>
-          </div>
+          </main>
         </ErrorBoundary>
-      </AppShell>
+      </Shell>
 
       <PairModal
         open={pairOpen}

@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { LibrarySwitcher } from "../components/library-switcher.js";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, RefreshCw, X, ExternalLink, Rss, Trash2, Inbox, Globe, Sheet, Table2, MoreVertical, CloudSun } from "lucide-react";
 import { useCan } from "../permissions.js";
@@ -179,6 +180,7 @@ export function FeedsPage({ pane }: { pane?: boolean } = {}) {
 
   return (
     <div>
+      <LibrarySwitcher current="feeds" />
       {!pane && (
         <PageHeader
           title="Sources"

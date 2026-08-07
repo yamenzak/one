@@ -37,6 +37,7 @@ import { LicenseBadge, LicenseNote } from "../components/licensing.js";
 import { MediaPicker } from "./MediaLibrary.js";
 import { Badge, Button, cn, confirm, Dialog, DialogContent, DialogFooter, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
 import { PlaylistLibrary } from "../components/playlist-library.js";
+import { LibrarySwitcher } from "../components/library-switcher.js";
 import {
   listMusicPlaylists,
   createMusicPlaylist,
@@ -128,6 +129,7 @@ export function MusicPlaylistsPage({ pane }: { pane?: boolean } = {}) {
   return (
     <PlaylistLibrary
       pane={pane}
+      switcher={<LibrarySwitcher current="music" />}
       title="Music playlists"
       description="Background audio a channel plays."
       noun="playlists"
