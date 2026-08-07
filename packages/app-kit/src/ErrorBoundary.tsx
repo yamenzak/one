@@ -66,7 +66,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <div className="grid min-h-dvh place-items-center p-8">
           <div className="max-w-sm text-center">
             <div className="text-body-lg">Something went wrong</div>
-            <p className="mt-1 text-sm text-muted-foreground">This screen hit an unexpected error. You can try again or head back home.</p>
+            <p className="mt-1 text-body text-muted-foreground">This screen hit an unexpected error. You can try again or head back home.</p>
             {/* The reason, verbatim. See the header: a screenshot of this line is
                 a usable bug report, and a screenshot of a blank screen is not. */}
             <p className="mt-3 select-all break-words rounded-lg bg-surface-2 px-3 py-2 text-left font-mono text-[0.7rem] leading-relaxed text-muted-foreground">

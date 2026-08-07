@@ -120,7 +120,7 @@ export function SectionSwitcher<T extends string>({
         >
           {leading}
           <span className="min-w-0 flex-1 leading-tight">
-            <span className="block truncate text-sm font-semibold">{title}</span>
+            <span className="block truncate text-body-lg font-semibold">{title}</span>
             <span className="flex items-center gap-1 text-micro uppercase text-muted-foreground">
               {CurrentIcon && <CurrentIcon aria-hidden className="size-3 shrink-0" />}
               <span className="truncate">{current?.label}</span>

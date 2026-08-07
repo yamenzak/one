@@ -43,7 +43,7 @@ interface MetricPillProps {
  * placeholder string. `0` is a real number and is never treated as absent.
  */
 export function NoData({ children = "No data yet", className }: { children?: ReactNode; className?: string }) {
-  return <span className={cn("text-sm font-medium text-muted-foreground", className)}>{children}</span>;
+  return <span className={cn("text-caption font-medium text-muted-foreground", className)}>{children}</span>;
 }
 
 /** True when a value slot should render `NoData` rather than a numeral. */
@@ -125,9 +125,9 @@ export function GlanceStrip({ items, className }: { items: { icon: LucideIcon; t
         <div key={i} className="flex flex-1 flex-col items-center gap-1.5 px-2 text-center">
           <it.icon className="size-4 shrink-0" style={{ color: toneVar[it.tone] }} />
           {isBlank(it.value)
-            ? <NoData className="text-xs leading-none">Not yet</NoData>
-            : <span className="numeral text-2xl font-bold leading-none">{it.value}</span>}
-          <span className="text-xs font-medium leading-tight text-muted-foreground">{it.label}</span>
+            ? <NoData className="text-caption leading-none">Not yet</NoData>
+            : <span className="numeral text-title-2 leading-none">{it.value}</span>}
+          <span className="text-caption font-medium leading-tight text-muted-foreground">{it.label}</span>
         </div>
       ))}
     </div>
@@ -150,11 +150,11 @@ export function MetricPill({ icon: Icon, label, value, unit, tone = "activity", 
         <Icon style={{ color: toneVar[tone] }} />
       </span>
       <span className="relative min-w-0">
-        <span className="block truncate text-xs font-medium opacity-80">{label}</span>
+        <span className="block truncate text-caption font-medium opacity-80">{label}</span>
         {isBlank(value)
-          ? <NoData className="block text-xs opacity-80" />
+          ? <NoData className="block text-caption opacity-80" />
           : (
-            <span className="numeral block text-lg font-bold leading-tight">
+            <span className="numeral block text-title-3 leading-tight">
               {value}
               {unit && <span className="ml-0.5 text-[0.72em] font-semibold opacity-70">{unit}</span>}
             </span>
@@ -186,7 +186,7 @@ export function StatCard({ label, value, emptyText, unit, badge, chart, icon: Ic
   const Comp = onClick ? motion.button : motion.div;
   const head = (
     <div className="min-w-0">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 text-caption text-muted-foreground">
         {Icon && <Icon className="size-4 shrink-0" style={{ color: toneVar[tone] }} />}
         <span className="truncate">{label}</span>
       </div>
@@ -196,7 +196,7 @@ export function StatCard({ label, value, emptyText, unit, badge, chart, icon: Ic
         ) : (
           <>
             {value}
-            {unit && <span className="ml-1 text-base font-medium text-muted-foreground">{unit}</span>}
+            {unit && <span className="ml-1 text-[0.55em] font-medium text-muted-foreground">{unit}</span>}
           </>
         )}
       </div>
@@ -326,7 +326,7 @@ export function Meter({
   return (
     <div className={cn("min-w-0", className)}>
       {hasLine && (
-        <div className="flex items-center justify-between gap-2 text-sm">
+        <div className="flex items-center justify-between gap-2 text-caption">
           <span className="min-w-0 truncate">{label}</span>
           {valueLabel != null && <span className="numeral shrink-0 text-muted-foreground">{valueLabel}</span>}
         </div>
@@ -372,7 +372,7 @@ export function WeekDots({ days, todayIndex, tone = "activity", className, fill 
           >
             {days[i] ? <Check strokeWidth={3} /> : ""}
           </motion.span>
-          <span className={cn("text-xs leading-none", i === todayIndex ? "font-bold text-foreground" : "text-muted-foreground")}>{letter}</span>
+          <span className={cn("text-caption leading-none", i === todayIndex ? "font-bold text-foreground" : "text-muted-foreground")}>{letter}</span>
         </div>
       ))}
     </div>

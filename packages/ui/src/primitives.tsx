@@ -144,9 +144,12 @@ const buttonVariants = cva(
         destructive: "bg-destructive text-destructive-foreground hover:brightness-110",
       },
       size: {
-        sm: "h-9 rounded-lg px-3.5 text-sm [&_svg]:size-4",
-        default: "h-11 rounded-xl px-5 text-sm [&_svg]:size-[1.05rem]",
-        lg: "h-[3.25rem] rounded-2xl px-7 text-base [&_svg]:size-5",
+        // The ladder is `caption` → `body` → `body-lg`, not xs → sm → base:
+        // the three sizes are three ROLES, so a button label sits on the same
+        // scale as the text around it instead of on Tailwind's parallel one.
+        sm: "h-9 rounded-lg px-3.5 text-caption [&_svg]:size-4",
+        default: "h-11 rounded-xl px-5 text-body [&_svg]:size-[1.05rem]",
+        lg: "h-[3.25rem] rounded-2xl px-7 text-body-lg [&_svg]:size-5",
         icon: "size-11 rounded-full [&_svg]:size-[1.15rem]",
         "icon-sm": "size-9 rounded-full [&_svg]:size-4",
       },
@@ -207,7 +210,9 @@ export function SubCard({ className, ...props }: HTMLAttributes<HTMLDivElement>)
 export function Badge({ tone = "neutral", className, ...props }: HTMLAttributes<HTMLSpanElement> & { tone?: Tone }) {
   return (
     <span
-      className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold [&_svg]:size-3.5", toneSoft[tone], className)}
+      // `micro` IS the badge role (§5: "overline, badge") and it already carries
+      // 600 and +0.02em, so `font-semibold` here was the weight said twice.
+      className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-micro [&_svg]:size-3.5", toneSoft[tone], className)}
       {...props}
     />
   );
@@ -225,7 +230,7 @@ export function Chip({ selected, icon: Icon, className, children, ...props }: Ch
       type="button"
       aria-pressed={selected}
       className={cn(
-        "inline-flex h-10 items-center gap-2 rounded-full px-4 text-sm font-medium transition-all active:scale-95 [&_svg]:size-4",
+        "inline-flex h-10 items-center gap-2 rounded-full px-4 text-body font-medium transition-all active:scale-95 [&_svg]:size-4",
         selected ? "bg-primary text-primary-foreground shadow-sm" : "bg-secondary text-foreground hover:bg-surface-3",
         className,
       )}
@@ -266,6 +271,11 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
   <input
     ref={ref}
     className={cn(
+      // type-scale-exempt: 16px is a PLATFORM THRESHOLD, not a style choice —
+      // iOS Safari auto-zooms the viewport when a focused field is under 16px,
+      // and `body` is 15. The zoom is not undone on blur, so one tap on one
+      // input leaves the whole app scaled. This is the one place a size beats a
+      // role, and it applies to every text control the user can focus.
       "h-11 w-full min-w-0 appearance-none rounded-xl border border-input bg-secondary/50 px-3.5 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary/70 focus:bg-secondary disabled:opacity-50",
       "[&::-webkit-date-and-time-value]:min-h-[1.5em] [&::-webkit-date-and-time-value]:text-left",
       "[&::-webkit-calendar-picker-indicator]:opacity-60 [&::-webkit-calendar-picker-indicator]:hover:opacity-100",
@@ -280,6 +290,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
   <textarea
     ref={ref}
     className={cn(
+      // type-scale-exempt: the iOS auto-zoom threshold, same as `Input` above.
       "w-full rounded-xl border border-input bg-secondary/50 p-3.5 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary/70 focus:bg-secondary",
       className,
     )}
@@ -289,7 +300,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
 Textarea.displayName = "Textarea";
 
 export function Label({ className, ...props }: React.ComponentProps<typeof LabelPrimitive.Root>) {
-  return <LabelPrimitive.Root className={cn("text-sm font-medium text-muted-foreground", className)} {...props} />;
+  return <LabelPrimitive.Root className={cn("text-caption font-medium text-muted-foreground", className)} {...props} />;
 }
 
 interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
@@ -328,7 +339,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(({ label, labelHid
         {Icon && <Icon className="pointer-events-none absolute left-3.5 top-1/2 size-[1.1rem] -translate-y-1/2 text-muted-foreground" />}
         <Input id={fieldId} ref={ref} className={cn(Icon && "pl-10", error && "border-danger focus:border-danger")} {...props} />
       </div>
-      {error ? <p className="mt-1.5 text-xs text-danger">{error}</p> : hint ? <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p> : null}
+      {error ? <p className="mt-1.5 text-caption text-danger">{error}</p> : hint ? <p className="mt-1.5 text-caption text-muted-foreground">{hint}</p> : null}
     </div>
   );
 });
@@ -419,7 +430,7 @@ export function Callout({ tone = "neutral", icon: Icon, live, children, classNam
     <div
       role={live}
       aria-live={live === "status" ? "polite" : undefined}
-      className={cn("flex items-start gap-2 rounded-2xl p-3 text-sm leading-relaxed", toneSoft[tone], className)}
+      className={cn("flex items-start gap-2 rounded-2xl p-3 text-caption leading-relaxed", toneSoft[tone], className)}
     >
       {Icon && <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />}
       <span className="min-w-0 flex-1 break-words">{children}</span>
@@ -444,7 +455,7 @@ export function SectionHeader({ icon, tone = "primary", title, count, action, cl
     <div className={cn("flex items-center gap-2.5", className)}>
       {icon && <IconBadge icon={icon} tone={tone} size="sm" />}
       <h2 className="min-w-0 flex-1 truncate font-semibold">{title}</h2>
-      {count != null && <span className="numeral shrink-0 rounded-full bg-secondary px-2 py-0.5 text-xs font-semibold text-muted-foreground">{count}</span>}
+      {count != null && <span className="numeral shrink-0 rounded-full bg-secondary px-2 py-0.5 text-micro text-muted-foreground">{count}</span>}
       {action}
     </div>
   );

@@ -437,7 +437,7 @@ function StripeConfig({ platformName }: { platformName: string }) {
                 >
                   {busy === "resync" ? <><Spinner className="size-4" /> Rebuilding…</> : "Rebuild prices from scratch"}
                 </Button>
-                <p className="-mt-1 text-xs text-muted-foreground">
+                <p className="-mt-1 text-caption text-muted-foreground">
                   Use this when Sync reports products it can&rsquo;t find — after deleting them in Stripe, or
                   switching lanes. It recreates every plan and pack, and mints new prices.
                 </p>

@@ -245,7 +245,7 @@ export function Media({
  *  because it has to stay legible over an arbitrary photograph. */
 function MediaBadge({ children }: { children: ReactNode }) {
   return (
-    <span className="absolute left-2.5 top-2.5 z-10 rounded-full bg-black/55 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+    <span className="absolute left-2.5 top-2.5 z-10 rounded-full bg-black/55 px-2.5 py-1 text-micro text-white backdrop-blur-sm">
       {children}
     </span>
   );
@@ -282,7 +282,7 @@ export function Lightbox({ photos, index = 0, onClose }: { photos: Photo[]; inde
         <DialogPrimitive.Content className="fixed inset-0 z-[60] flex flex-col outline-none data-[state=open]:animate-[content-in_0.2s_cubic-bezier(0.22,1,0.36,1)]">
           <DialogPrimitive.Title className="sr-only">Photo viewer</DialogPrimitive.Title>
           <div className="flex items-center justify-between px-4 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white">
-            <span className="numeral rounded-full bg-white/15 px-3 py-1 text-sm font-medium">{cur + 1} / {photos.length}</span>
+            <span className="numeral rounded-full bg-white/15 px-3 py-1 text-caption font-medium">{cur + 1} / {photos.length}</span>
             <DialogPrimitive.Close className="grid size-10 place-items-center rounded-full bg-white/15 text-white transition-colors hover:bg-white/25 [&_svg]:size-5"><X /></DialogPrimitive.Close>
           </div>
           <div ref={ref} onScroll={onScroll} className="flex flex-1 snap-x snap-mandatory overflow-x-auto overscroll-contain [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -294,7 +294,7 @@ export function Lightbox({ photos, index = 0, onClose }: { photos: Photo[]; inde
           </div>
           <div className="flex items-center justify-center gap-4 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] text-white">
             {photos.length > 1 && <button onClick={() => goTo(cur - 1)} disabled={cur === 0} className="grid size-10 place-items-center rounded-full bg-white/15 transition-colors hover:bg-white/25 disabled:opacity-30 [&_svg]:size-5"><ChevronLeft /></button>}
-            {label && <span className="max-w-[60vw] truncate text-center text-sm text-white/80">{label}</span>}
+            {label && <span className="max-w-[60vw] truncate text-center text-caption text-white/80">{label}</span>}
             {photos.length > 1 && <button onClick={() => goTo(cur + 1)} disabled={cur === photos.length - 1} className="grid size-10 place-items-center rounded-full bg-white/15 transition-colors hover:bg-white/25 disabled:opacity-30 [&_svg]:size-5"><ChevronRight /></button>}
           </div>
         </DialogPrimitive.Content>
@@ -324,7 +324,7 @@ export function PhotoGrid({ photos, className, cols = 3 }: { photos: Photo[]; cl
               radius="none"
               className="transition-transform duration-300 group-hover:scale-105"
             />
-            {p.label && <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 text-xs font-medium text-white">{p.label}</span>}
+            {p.label && <span className="absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/70 to-transparent px-2 py-1.5 text-caption font-medium text-white">{p.label}</span>}
           </motion.button>
         ))}
       </div>

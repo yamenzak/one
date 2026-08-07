@@ -32,8 +32,8 @@ export function Slider({
   return (
     <div className={cn("space-y-1.5", className)}>
       <div className="flex items-baseline justify-between gap-2">
-        <label htmlFor={id} className="text-sm text-muted-foreground">{label}</label>
-        {display != null && <span className="numeral text-sm font-medium tabular-nums">{display}</span>}
+        <label htmlFor={id} className="text-caption text-muted-foreground">{label}</label>
+        {display != null && <span className="numeral text-body-lg tabular-nums">{display}</span>}
       </div>
       <input
         id={id}
@@ -54,7 +54,7 @@ export function Slider({
           "[&::-moz-range-thumb]:size-5 [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-primary",
         )}
       />
-      {hint && <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-caption leading-relaxed text-muted-foreground">{hint}</p>}
     </div>
   );
 }
@@ -125,7 +125,7 @@ export function PreviewPicker<T extends string | number>({
 }) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className="text-caption text-muted-foreground">{label}</span>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => {
           const on = o.value === value;
@@ -141,12 +141,12 @@ export function PreviewPicker<T extends string | number>({
               )}
             >
               <span className="grid h-7 place-items-center">{o.preview}</span>
-              <span className={cn("text-xs", on ? "font-semibold text-foreground" : "text-muted-foreground")}>{o.label}</span>
+              <span className={cn("text-caption", on ? "font-semibold text-foreground" : "text-muted-foreground")}>{o.label}</span>
             </button>
           );
         })}
       </div>
-      {hint && <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-caption leading-relaxed text-muted-foreground">{hint}</p>}
     </div>
   );
 }

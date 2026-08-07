@@ -85,7 +85,7 @@ export function DatePill({
           // and it sits between two round arrow buttons, so an xl here made one
           // row contain two pressable shapes. Today's original had it as xl and
           // the extraction inherited the defect; Progress's had it right.
-          "pointer-events-none flex h-11 items-center justify-center gap-1.5 rounded-full px-4 text-sm font-semibold [&_svg]:size-4",
+          "pointer-events-none flex h-11 items-center justify-center gap-1.5 rounded-full px-4 text-body font-semibold [&_svg]:size-4",
           SURFACE[surface],
         )}
       >
@@ -164,7 +164,7 @@ export function DayNav({
           <button
             type="button"
             onClick={() => onChange(resetTo)}
-            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-3"
+            className="inline-flex items-center gap-1 text-caption font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-3"
           >
             <RotateCcw />
             {resetLabel}
@@ -374,7 +374,7 @@ export function RangePicker({
             <div className="flex items-center gap-2">
               <DatePill value={from} max={to} label="Start date" display={format(from)}
                 onChange={(v) => { setFrom(v); if (v > to) setTo(v); }} />
-              <span aria-hidden className="shrink-0 text-sm text-muted-foreground">→</span>
+              <span aria-hidden className="shrink-0 text-caption text-muted-foreground">→</span>
               <DatePill value={to} min={from} max={today} label="End date" display={format(to)}
                 onChange={(v) => { setTo(v); if (v < from) setFrom(v); }} />
             </div>

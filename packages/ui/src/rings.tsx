@@ -91,7 +91,7 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
             screens use (size 116) — the inline style silently beat the `text-xs`
             class it sits next to, so the smallest, most-read text in the app was
             barely legible. */}
-        {label && <div className="text-xs font-medium text-muted-foreground" style={{ fontSize: Math.max(12, size * 0.065) }}>{label}</div>}
+        {label && <div className="text-caption font-medium text-muted-foreground" style={{ fontSize: Math.max(12, size * 0.065) }}>{label}</div>}
         <motion.div
           className={isBlank(value) ? "leading-none" : "numeral font-semibold leading-none"}
           style={isBlank(value) ? undefined : { fontSize: size * 0.2, color: tintValue ? color : undefined }}
@@ -99,7 +99,7 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: TIER_DELAY.content, duration: DUR.slow }}
         >
-          {isBlank(value) ? <NoData className="text-xs">Not yet</NoData> : value}
+          {isBlank(value) ? <NoData className="text-caption">Not yet</NoData> : value}
         </motion.div>
         {sublabel && !isBlank(value) && <div className="mt-1 text-muted-foreground" style={{ fontSize: Math.max(12, size * 0.062) }}>{sublabel}</div>}
       </div>
@@ -120,7 +120,7 @@ export function TargetRing({ current, target, unit, deltaBadge, label = "This we
     <div className="relative inline-block">
       <ProgressRing {...rest} label={label} progress={pct} value={`${Math.round(pct * 100)}%`} sublabel={`${current}${unit ? ` ${unit}` : ""} of ${target}`} />
       {deltaBadge && (
-        <span className="numeral absolute right-1 top-2 rounded-full bg-cardio-soft px-2.5 py-1 text-xs font-bold text-cardio">{deltaBadge}</span>
+        <span className="numeral absolute right-1 top-2 rounded-full bg-cardio-soft px-2.5 py-1 text-micro text-cardio">{deltaBadge}</span>
       )}
     </div>
   );

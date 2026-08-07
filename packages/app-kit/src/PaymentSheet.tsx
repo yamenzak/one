@@ -134,9 +134,9 @@ export function PaymentSheet({
         </Button>}>
       <div className="space-y-4">
         <div ref={mountRef} className="min-h-[180px]" />
-        {!ready && !error && <p className="text-sm text-muted-foreground">Loading secure payment form…</p>}
-        {error && <p className="text-sm text-danger" role="alert">{error}</p>}
-        <p className="text-xs text-muted-foreground">Payments are processed securely by Stripe.</p>
+        {!ready && !error && <p className="text-body text-muted-foreground">Loading secure payment form…</p>}
+        {error && <p className="text-body text-danger" role="alert">{error}</p>}
+        <p className="text-caption text-muted-foreground">Payments are processed securely by Stripe.</p>
       </div>
     </Sheet>
   );

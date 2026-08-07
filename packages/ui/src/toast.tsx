@@ -158,7 +158,7 @@ function Toast({ item }: { item: ToastItem }) {
       transition={{ duration: DUR.base, ease: EASE_OUT }}
       role={item.tone === "danger" ? "alert" : "status"}
       aria-live={item.tone === "danger" ? "assertive" : "polite"}
-      className="pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-2xl bg-card/95 py-2.5 pl-3.5 pr-2 text-sm shadow-lg backdrop-blur"
+      className="pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-2xl bg-card/95 py-2.5 pl-3.5 pr-2 text-body shadow-lg backdrop-blur"
     >
       <Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", TONE_CLASS[item.tone])} />
       <span className="min-w-0 flex-1 text-pretty">{item.text}</span>

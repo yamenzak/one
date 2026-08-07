@@ -199,7 +199,7 @@ export function Collection<T>({
             action={
               <button
                 onClick={() => { onQuery?.(""); onClearFilters?.(); }}
-                className="min-h-12 text-sm font-medium text-primary"
+                className="min-h-12 text-body font-medium text-primary"
               >
                 {searching && narrowed ? "Clear search and filters" : searching ? "Clear search" : "Clear filters"}
               </button>

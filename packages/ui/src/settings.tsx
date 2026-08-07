@@ -144,7 +144,7 @@ export function SettingsPage({
         <h1 className="min-w-0 flex-1 truncate text-title-2">{title}</h1>
         {action}
       </div>
-      {description && <p className="px-1 text-sm text-muted-foreground">{description}</p>}
+      {description && <p className="px-1 text-caption text-muted-foreground">{description}</p>}
       {children}
     </div>
   );

@@ -390,7 +390,7 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
               <div className="space-y-3">
                 <Card className="space-y-4">
                   <SectionHeader icon={Percent} title="Credit pricing" />
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-body text-muted-foreground">
                     Every model bills in credits at <span className="font-medium text-foreground">markup × the real provider cost</span>{" "}
                     (Cloudflare neurons; Gemini USD converted to the same unit), so the platform is always profitable. Setting the
                     markup rewrites it across the whole catalog.
@@ -455,7 +455,7 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
                         <ActionResult msg={catalog.msg} err={catalog.err} />
                         {models.error && <Callout tone="warning" icon={AlertTriangle} live="alert">{models.error} Showing the last catalog that loaded.</Callout>}
                         <DefaultModelPicker lanes={TASK_LANES} models={models.data} busy={catalog.busy} onPick={setDefaultModel} />
-                        <p className="px-1 text-xs leading-relaxed text-muted-foreground">
+                        <p className="px-1 text-caption leading-relaxed text-muted-foreground">
                           The switch decides whether a tenant can pick a model at all. Prices are what the TENANT pays:{" "}
                           <span className="numeral">~n cr</span> is a typical request of that model&apos;s lane, and the second
                           line is the exact credit rate card. Neurons and the markup that produced them follow, as the cost basis.
@@ -466,9 +466,9 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
                             of a model. */}
                         <label className="flex items-center gap-2.5 rounded-xl bg-surface-2 p-3">
                           <Switch checked={allApps} onCheckedChange={setAllApps} aria-label="Apply changes to every 4DL app" />
-                          <span className="min-w-0 flex-1 text-sm">
+                          <span className="min-w-0 flex-1 text-body">
                             <span className="font-medium">Apply to every 4DL app</span>
-                            <span className="block text-xs text-muted-foreground">
+                            <span className="block text-caption text-muted-foreground">
                               Switching a model on or off, and setting a lane default, also reaches the other products. Each
                               applies it once and keeps its own setting after that. Per-model prices are never sent.
                             </span>
@@ -478,7 +478,7 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
                         {Object.entries(grouped).map(([prov, rows]) => (
                           <Card key={prov} className="space-y-1">
                             <div className="flex items-center justify-between gap-2 pb-1">
-                              <h3 className="min-w-0 truncate text-sm font-semibold">{providerLabel(prov)}</h3>
+                              <h3 className="min-w-0 truncate text-body font-semibold">{providerLabel(prov)}</h3>
                               <Badge tone={rows.some((m) => m.enabled === 1) ? "success" : "neutral"}>
                                 {rows.filter((m) => m.enabled === 1).length} of {rows.length} on
                               </Badge>
@@ -496,7 +496,7 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
                                         like it had vanished rather than been turned off. */}
                                     <div className={cn("min-w-0 flex-1", m.enabled !== 1 && "opacity-55")}>
                                       <div className="flex flex-wrap items-center gap-1.5">
-                                        <span className="min-w-0 truncate text-sm font-medium">{m.label}</span>
+                                        <span className="min-w-0 truncate text-body font-medium">{m.label}</span>
                                         {m.enabled !== 1 && <Badge tone="neutral">off</Badge>}
                                         {/* A default that is switched off is a setting the
                                             engine ignores — it selects on `enabled = 1`. Say
@@ -515,12 +515,12 @@ function AiConfig({ lanes, extraSub, extraBelowCatalog }: Omit<AiSectionProps, "
                                           <Badge tone="warning">retires {m.retires_at}</Badge>
                                         )}
                                       </div>
-                                      <div className="numeral truncate text-xs text-foreground/80">
+                                      <div className="numeral truncate text-caption text-foreground/80">
                                         {m.task}
                                         {cost !== null && <> · <span className="font-semibold">~{nf.format(cost)} cr</span> per request</>}
                                         {rateLine && <> · {rateLine}</>}
                                       </div>
-                                      <div className="numeral truncate text-xs text-muted-foreground">{rate(m)} · {m.markup ?? "?"}×</div>
+                                      <div className="numeral truncate text-caption text-muted-foreground">{rate(m)} · {m.markup ?? "?"}×</div>
                                     </div>
                                     {busy
                                       ? <Spinner className="size-4 shrink-0" />
@@ -573,7 +573,7 @@ function SyncReportCard({ report }: { report: SyncReport }) {
   return (
     <div className="space-y-2">
       {report.providers.map((p) => (
-        <div key={p.provider} className="rounded-xl bg-surface-2 p-3 text-xs">
+        <div key={p.provider} className="rounded-xl bg-surface-2 p-3 text-caption">
           <div className="flex items-center justify-between gap-2">
             <span className="font-medium">{providerLabel(p.provider)}</span>
             <Badge tone={p.error ? "danger" : "success"}>{p.error ? "failed" : `${p.parsed} parsed`}</Badge>
@@ -654,7 +654,7 @@ function DefaultModelPicker({ lanes, models, busy, onPick }: {
   return (
     <Card className="space-y-3">
       <SectionHeader icon={CircleCheck} title="Default models" />
-      <p className="text-sm text-muted-foreground">
+      <p className="text-body text-muted-foreground">
         What answers each kind of call when a tenant hasn&apos;t chosen its own model — which is most of them. Only
         models switched on in the catalog below are offered, because those are the only ones the engine will serve.
       </p>
@@ -663,8 +663,8 @@ function DefaultModelPicker({ lanes, models, busy, onPick }: {
           <div key={lane.task} className="space-y-1">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-sm font-medium">{lane.label}</div>
-                <div className="truncate text-xs text-muted-foreground">{lane.desc}</div>
+                <div className="text-body font-medium">{lane.label}</div>
+                <div className="truncate text-caption text-muted-foreground">{lane.desc}</div>
               </div>
               {busy === `lane:${lane.task}` ? <Spinner className="size-4 shrink-0" /> : options.length ? (
                 <Select
@@ -680,7 +680,7 @@ function DefaultModelPicker({ lanes, models, busy, onPick }: {
                   })}
                 />
               ) : (
-                <span className="shrink-0 text-xs font-medium text-warning">Nothing to pick</span>
+                <span className="shrink-0 text-caption font-medium text-warning">Nothing to pick</span>
               )}
             </div>
             {/* One line per lane, and only the one that is true. Worst first: a
@@ -688,36 +688,36 @@ function DefaultModelPicker({ lanes, models, busy, onPick }: {
                 a stale pin, which outranks an unpinned but working fallback. */}
             {!options.length ? (
               fallback ? (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   Nothing here can be pinned — <b className="text-foreground">{fallback.label}</b> answers it. Every
                   Gemini model reads images, so this lane needs no default.
                 </p>
               ) : (
-                <p className="text-xs text-warning">
+                <p className="text-caption text-warning">
                   Nothing in this lane is both switched on and runnable here, so this kind of call will fail. Switch one
                   on in the catalog below.
                 </p>
               )
             ) : staleDefault ? (
-              <p className="text-xs text-warning">
+              <p className="text-caption text-warning">
                 <b className="text-foreground">{staleDefault.label}</b> is still marked as this lane&rsquo;s default but is
                 switched off, so the engine ignores it. Switch it back on below, or pin one of the models offered here.
               </p>
             ) : !pinned ? (
               fallback ? (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   Nothing pinned — <b className="text-foreground">{fallback.label}</b> answers it (every Gemini model
                   reads images). Pin one above to fix it.
                 </p>
               ) : (
-                <p className="text-xs text-warning">
+                <p className="text-caption text-warning">
                   No pinned default — the engine is falling back to{" "}
                   {current ? <b>{current.label}</b> : <>nothing, and this lane will fail</>}. Pick one to pin it.
                 </p>
               )
             ) : null}
             {off > 0 && options.length > 0 && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 {off} more in this lane {off === 1 ? "is" : "are"} not offered here — switched off, or not runnable by
                 this app. The catalog below shows which.
               </p>

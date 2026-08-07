@@ -32,7 +32,7 @@ export function OfflinePill({ online, degraded }: { online: boolean; degraded: b
       className={cn(
         // h-9 to match every other control on the app bar (its only caller) —
         // the whole trailing row is size-9, and h-8 left this one pill short.
-        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-semibold",
+        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-micro",
         "bg-warning/15 text-warning [&_svg]:size-3.5",
       )}
     >
@@ -50,7 +50,7 @@ export function OfflinePill({ online, degraded }: { online: boolean; degraded: b
  */
 export function QueuedNotice({ text, className }: { text?: string; className?: string }) {
   return (
-    <p role="status" className={cn("flex items-center gap-1.5 text-sm text-muted-foreground [&_svg]:size-4", className)}>
+    <p role="status" className={cn("flex items-center gap-1.5 text-body text-muted-foreground [&_svg]:size-4", className)}>
       <CloudOff /> {text ?? "Saved on your phone — it'll sync when you're back online."}
     </p>
   );
@@ -78,7 +78,7 @@ export function MaintenanceBanner({ state }: { state: Maintenance | null | undef
   return (
     <div
       role="status"
-      className="border-b border-warning/25 bg-warning/12 px-4 py-2.5 text-xs leading-relaxed text-warning"
+      className="border-b border-warning/25 bg-warning/12 px-4 py-2.5 text-caption leading-relaxed text-warning"
     >
       <div className="column flex items-start gap-2">
         <Wrench aria-hidden className="mt-0.5 size-3.5 shrink-0" />
@@ -220,8 +220,8 @@ export function PwaUpdatePrompt({
           <RefreshCw className={cn(applying && "animate-spin")} />
         </span>
         <div className="min-w-0 flex-1 space-y-0.5">
-          <p className="text-sm font-semibold">A new version is ready</p>
-          <p className="text-xs leading-relaxed text-muted-foreground">
+          <p className="text-body font-semibold">A new version is ready</p>
+          <p className="text-caption leading-relaxed text-muted-foreground">
             {blocking
               ? "This version can no longer talk to the server. Reload to carry on."
               : "It'll be applied next time you open the app — or reload now. Anything you haven't saved will be lost."}
@@ -235,7 +235,7 @@ export function PwaUpdatePrompt({
         {!blocking && (
           <button
             onClick={() => setSnoozedUntil(Date.now() + SNOOZE_MS)}
-            className="min-h-11 flex-1 rounded-2xl px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            className="min-h-11 flex-1 rounded-2xl px-3 text-body font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
           >
             Later
           </button>
@@ -243,7 +243,7 @@ export function PwaUpdatePrompt({
         <button
           onClick={applyUpdate}
           disabled={applying}
-          className="min-h-11 flex-1 rounded-2xl bg-primary px-3 text-sm font-semibold text-primary-foreground transition-opacity disabled:opacity-70"
+          className="min-h-11 flex-1 rounded-2xl bg-primary px-3 text-body font-semibold text-primary-foreground transition-opacity disabled:opacity-70"
         >
           {applying ? "Reloading…" : "Reload now"}
         </button>
@@ -304,7 +304,7 @@ export function UnhandledErrorToast() {
   if (!msg) return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 top-3 z-[80] flex justify-center px-4">
-      <div role="alert" className="pointer-events-auto flex items-center gap-2 rounded-full bg-card/95 py-2 pl-4 pr-2 text-sm shadow-lg backdrop-blur">
+      <div role="alert" className="pointer-events-auto flex items-center gap-2 rounded-full bg-card/95 py-2 pl-4 pr-2 text-body shadow-lg backdrop-blur">
         <span className="text-warning">{msg}</span>
         <button onClick={() => setMsg(null)} aria-label="Dismiss" className="grid size-7 place-items-center rounded-full text-muted-foreground hover:bg-secondary [&_svg]:size-3.5">
           <X />

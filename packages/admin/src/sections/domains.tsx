@@ -133,7 +133,7 @@ function DomainsConfig({ noun, cnameExample }: { noun: string; cnameExample: str
               title="Cloudflare for SaaS"
               action={<Badge tone={status.configured ? "success" : partial ? "warning" : "neutral"}>{status.configured ? "enabled" : partial ? "incomplete" : "off"}</Badge>}
             />
-            <p className="text-sm text-muted-foreground">
+            <p className="text-body text-muted-foreground">
               All three parts are needed: a zone API token with <span className="font-medium text-foreground">SSL and Certificates · Edit</span>,
               the SaaS-enabled zone id, and the CNAME target {nouns} point their domain at.
             </p>
@@ -171,7 +171,7 @@ function DomainsConfig({ noun, cnameExample }: { noun: string; cnameExample: str
             )}
 
             <FieldGroup title="One-time Cloudflare setup" hint="These steps can't be done from here — do them in the Cloudflare dashboard first.">
-              <ol className="space-y-1.5 rounded-xl bg-surface-2 p-3 text-xs leading-relaxed text-muted-foreground">
+              <ol className="space-y-1.5 rounded-xl bg-surface-2 p-3 text-caption leading-relaxed text-muted-foreground">
                 <li><span className="font-medium text-foreground">1.</span> On the serving zone → SSL/TLS → Custom Hostnames → <span className="font-medium">Enable</span>.</li>
                 <li><span className="font-medium text-foreground">2.</span> Add the Fallback Origin as an <span className="font-medium">originless</span> record on the zone apex — AAAA <code className="rounded bg-surface-3 px-1">saas</code> → <code className="rounded bg-surface-3 px-1">100::</code>, proxied — then set Fallback Origin to <code className="rounded bg-surface-3 px-1">{cnameExample}</code>. Do <span className="font-medium">not</span> CNAME it at the app: every domain gets its own worker route, and a record under the {noun} root would classify as a {noun} that does not exist.</li>
                 <li><span className="font-medium text-foreground">3.</span> Create an API token scoped to that zone with <span className="font-medium">SSL and Certificates · Edit</span> <span className="font-medium">and Workers Routes · Edit</span> — both, or adding a domain fails and rolls back.</li>

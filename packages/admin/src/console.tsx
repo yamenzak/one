@@ -124,7 +124,7 @@ export function AdminConsole({
             <ShieldCheck className="size-5 shrink-0 text-primary" aria-hidden />
             <h1 className="truncate text-title-3">{title}</h1>
           </div>
-          <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+          <p className="truncate text-caption text-muted-foreground">{subtitle}</p>
         </div>
       </div>
       <SettingsIndex groups={groupSections(sections, onOpen)} />

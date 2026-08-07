@@ -161,9 +161,9 @@ function MaintenanceForm({ api, errorText, d, reload }: AdminDeps & { d: Mainten
           value={lvl}
           onChange={(v) => { setLevel(v); setArmed(false); }}
         />
-        <p className="text-xs leading-relaxed text-muted-foreground">{CONSEQUENCE[lvl]}</p>
+        <p className="text-caption leading-relaxed text-muted-foreground">{CONSEQUENCE[lvl]}</p>
         {lvl !== "off" && (
-          <p className="text-xs leading-relaxed text-muted-foreground">
+          <p className="text-caption leading-relaxed text-muted-foreground">
             This console is never closed and a platform admin is exempt on every door, so it can always be undone from
             here. Signature-verified payment webhooks and the health check keep answering too.
           </p>
@@ -178,7 +178,7 @@ function MaintenanceForm({ api, errorText, d, reload }: AdminDeps & { d: Mainten
           onChange={(e) => setMessage(e.target.value)}
           placeholder="We're upgrading the database. Back by 14:00 UTC."
         />
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="text-caption leading-relaxed text-muted-foreground">
           Shown verbatim to everyone who arrives, above our own wording. A time is the most useful thing to put here.
         </p>
       </FieldGroup>

@@ -194,7 +194,7 @@ export function NotificationBell({ coding, onOpen, onSeeAll, labels, ...feedOpts
         >
           <Bell className="size-[1.15rem]" />
           {unread > 0 && (
-            <span className="absolute right-1.5 top-1.5 grid size-4 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+            <span className="absolute right-1.5 top-1.5 grid size-4 place-items-center rounded-full bg-primary text-micro text-primary-foreground">
               {unread > 9 ? "9+" : unread}
             </span>
           )}
@@ -204,7 +204,7 @@ export function NotificationBell({ coding, onOpen, onSeeAll, labels, ...feedOpts
         <div className="flex items-center justify-between pr-1">
           <DropdownMenuLabel>{l.title}</DropdownMenuLabel>
           {unread > 0 && (
-            <button onClick={() => void markAll()} className="text-xs font-medium text-primary hover:underline">
+            <button onClick={() => void markAll()} className="text-caption font-medium text-primary hover:underline">
               {l.markAll}
             </button>
           )}
@@ -222,11 +222,11 @@ export function NotificationBell({ coding, onOpen, onSeeAll, labels, ...feedOpts
             ))}
           </div>
         ) : !feedOpts.online && shown.length === 0 ? (
-          <div className="px-3 py-6 text-center text-sm text-muted-foreground">{l.offline}</div>
+          <div className="px-3 py-6 text-center text-body text-muted-foreground">{l.offline}</div>
         ) : failed && shown.length === 0 ? (
-          <div className="px-3 py-6 text-center text-sm text-warning">{l.failed}</div>
+          <div className="px-3 py-6 text-center text-body text-warning">{l.failed}</div>
         ) : shown.length === 0 ? (
-          <div className="px-3 py-6 text-center text-sm text-muted-foreground">{l.empty}</div>
+          <div className="px-3 py-6 text-center text-body text-muted-foreground">{l.empty}</div>
         ) : (
           shown.slice(0, 20).map((n) => {
             const { icon, tone } = coding(n.type);
@@ -239,9 +239,9 @@ export function NotificationBell({ coding, onOpen, onSeeAll, labels, ...feedOpts
                 {/* The badge keeps its tone when read — see the inbox screen. */}
                 <IconBadge icon={icon} tone={tone} size="sm" />
                 <div className={`min-w-0 flex-1 ${n.read ? "opacity-65" : ""}`}>
-                  <div className="truncate text-sm font-medium">{n.title}</div>
-                  {n.message && <div className="truncate text-xs text-muted-foreground">{n.message}</div>}
-                  <div className="mt-0.5 text-xs text-muted-foreground">{relativeTime(n.created_at)}</div>
+                  <div className="truncate text-body font-medium">{n.title}</div>
+                  {n.message && <div className="truncate text-caption text-muted-foreground">{n.message}</div>}
+                  <div className="mt-0.5 text-caption text-muted-foreground">{relativeTime(n.created_at)}</div>
                 </div>
                 {!n.read && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" />}
               </button>
@@ -253,7 +253,7 @@ export function NotificationBell({ coding, onOpen, onSeeAll, labels, ...feedOpts
             <DropdownMenuSeparator />
             <button
               onClick={onSeeAll}
-              className="w-full rounded-xl px-3 py-2 text-center text-sm font-medium text-primary hover:bg-secondary"
+              className="w-full rounded-xl px-3 py-2 text-center text-body font-medium text-primary hover:bg-secondary"
             >
               {l.seeAll}
             </button>
@@ -389,8 +389,8 @@ export function InboxScreen({ coding, onOpen, onBack, labels, ...feedOpts }: Inb
                         <IconBadge icon={coding(n.type).icon} tone={coding(n.type).tone} size="sm" />
                         <div className={`min-w-0 flex-1 ${n.read ? "opacity-65" : ""}`}>
                           <div className="font-medium">{n.title}</div>
-                          {n.message && <div className="mt-0.5 text-sm text-muted-foreground">{n.message}</div>}
-                          <div className="mt-1 text-xs text-muted-foreground">
+                          {n.message && <div className="mt-0.5 text-body text-muted-foreground">{n.message}</div>}
+                          <div className="mt-1 text-caption text-muted-foreground">
                             {new Date(n.created_at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
                           </div>
                         </div>

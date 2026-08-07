@@ -126,7 +126,7 @@ function NavButton({ item, active, collapsed, onClick }: { item: NavItem; active
       onClick={onClick}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group flex items-center rounded-lg text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+        "group flex items-center rounded-lg text-body font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         collapsed ? "mx-auto size-10 justify-center" : "w-full gap-3 px-2.5 py-2",
         active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
       )}
@@ -394,7 +394,7 @@ export function PageHeader({ title, description, back, actions, className, child
       {back && (
         <button
           onClick={back.onClick}
-          className="mb-3 inline-flex items-center gap-1.5 rounded-sm text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
+          className="mb-3 inline-flex items-center gap-1.5 rounded-sm text-caption font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <ArrowLeft className="size-4" /> {back.label ?? "Back"}
         </button>
@@ -402,7 +402,7 @@ export function PageHeader({ title, description, back, actions, className, child
       <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
           <h1 className="truncate text-title-2">{title}</h1>
-          {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+          {description ? <p className="mt-1 text-body text-muted-foreground">{description}</p> : null}
           {children}
         </div>
         {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}

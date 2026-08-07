@@ -151,7 +151,7 @@ function EmailForm({ api, errorText, d, reload }: AdminDeps & { d: EmailConfig; 
           row above had already said. */}
       <FieldGroup title="Delivery">
         <SegmentedControl options={PROVIDERS} value={p} onChange={setProvider} />
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="text-caption leading-relaxed text-muted-foreground">
           “Log only” never sends — it prints to the worker log, and the server refuses to treat it as configured
           outside development.
         </p>

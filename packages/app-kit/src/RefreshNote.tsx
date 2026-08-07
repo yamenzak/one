@@ -45,7 +45,7 @@ export function RefreshNote({
   // and a control that does nothing visible for a second reads as broken.
   const [going, setGoing] = useState(false);
   return (
-    <p className={cn("text-center text-xs leading-relaxed text-muted-foreground", className)}>
+    <p className={cn("text-center text-caption leading-relaxed text-muted-foreground", className)}>
       {label}{" "}
       <button
         type="button"

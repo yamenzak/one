@@ -328,7 +328,7 @@ function SharedConfig() {
                       SectionHeader here would be the third time the words
                       "shared platform config" appeared before a control. */}
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-body text-muted-foreground">
                       One value, read by every 4DL app. This app&apos;s own settings still win.
                     </p>
                     <Badge tone={status.wired ? "success" : "warning"}>{status.wired ? "live" : "not wired"}</Badge>
@@ -355,7 +355,7 @@ function SharedConfig() {
               {/* The one thing that surprises people, in one muted line at the
                   bottom rather than a callout above the controls. */}
               {onIndex && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   The per-app panels in this console show only what <span className="font-medium">this</span> app holds
                   of its own — a key set here and not overridden reads as unset there.
                 </p>
@@ -432,7 +432,7 @@ function GroupPage({
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">{group.hint}</p>
+      <p className="text-body text-muted-foreground">{group.hint}</p>
 
       <div className="space-y-3">
         {group.keys.map((k) => {
@@ -452,7 +452,7 @@ function GroupPage({
                 hint={e.secret && e.shared ? "Blank keeps the stored one." : undefined}
               />
               {e.overriddenHere && (
-                <div className="flex flex-wrap items-center gap-2 rounded-xl bg-warning/10 px-3 py-2 text-xs">
+                <div className="flex flex-wrap items-center gap-2 rounded-xl bg-warning/10 px-3 py-2 text-caption">
                   <Badge tone="warning">overridden here</Badge>
                   <span className="min-w-0 flex-1 text-muted-foreground">This app has its own value.</span>
                   <Button size="sm" variant="outline" disabled={act.busy !== null} onClick={() => void useShared(k)}>
@@ -480,13 +480,13 @@ function GroupPage({
       </Button>
 
       {changed.length === 0 && wired && (
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <p className="flex items-center gap-1.5 text-caption text-muted-foreground">
           <CircleCheck className="size-3 shrink-0" /> Nothing changed.
         </p>
       )}
 
       {/* Below the fields on purpose — see `Group.perApp`. */}
-      {group.perApp && <p className="text-xs text-muted-foreground">{group.perApp}</p>}
+      {group.perApp && <p className="text-caption text-muted-foreground">{group.perApp}</p>}
 
       <ActionResult msg={act.msg} err={act.err} />
 

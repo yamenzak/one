@@ -89,7 +89,7 @@ export function AreaChart({ values, tone = "activity", height = 180, target, tar
   const padX = 10, padTop = 14, padBot = 22;
   const pts = values.map((v, i) => ({ i, v })).filter((p): p is { i: number; v: number } => p.v != null);
 
-  if (pts.length < 2) return <div ref={ref} className={cn("grid place-items-center rounded-2xl bg-surface-2 text-xs text-muted-foreground", className)} style={{ height }}>Not enough data yet</div>;
+  if (pts.length < 2) return <div ref={ref} className={cn("grid place-items-center rounded-2xl bg-surface-2 text-caption text-muted-foreground", className)} style={{ height }}>Not enough data yet</div>;
 
   const tPts = targetSeries ? targetSeries.map((v, i) => ({ i, v })).filter((p): p is { i: number; v: number } => p.v != null) : [];
   const present = pts.map((p) => p.v);
@@ -176,9 +176,9 @@ export function AreaChart({ values, tone = "activity", height = 180, target, tar
         <circle cx={x(activePt.i)} cy={y(activePt.v)} r={4.5} fill="var(--card)" stroke={color} strokeWidth={2.5} />
       </svg>
       {/* readout — only while the user is scrubbing (header shows the value at rest) */}
-      <div className="pointer-events-none absolute left-0 top-0 flex items-center gap-1.5 rounded-lg bg-card/90 px-2 py-1 text-xs shadow-sm backdrop-blur-sm transition-opacity duration-150" style={{ opacity: active != null ? 1 : 0, transform: `translateX(${Math.min(Math.max(0, x(activePt.i) - 30), Math.max(0, width - 92))}px)` }}>
+      <div className="pointer-events-none absolute left-0 top-0 flex items-center gap-1.5 rounded-lg bg-card/90 px-2 py-1 text-caption shadow-sm backdrop-blur-sm transition-opacity duration-150" style={{ opacity: active != null ? 1 : 0, transform: `translateX(${Math.min(Math.max(0, x(activePt.i) - 30), Math.max(0, width - 92))}px)` }}>
         <span className="numeral font-bold" style={{ color }}>{format(activePt.v)}</span>
-        {label && <span className="text-xs text-muted-foreground">{label(activePt.i)}</span>}
+        {label && <span className="text-caption text-muted-foreground">{label(activePt.i)}</span>}
       </div>
     </div>
   );
@@ -235,8 +235,8 @@ export function BarChart({ values, labels, tone = "activity", height = 160, targ
       </svg>
       {values.length > 0 && (
         <div className="pointer-events-none absolute right-0 top-0 flex items-baseline gap-1 rounded-lg bg-card/90 px-2 py-1 shadow-sm backdrop-blur-sm transition-opacity duration-150" style={{ opacity: active != null ? 1 : 0 }}>
-          <span className="numeral text-xs font-bold" style={{ color }}>{format(values[shown]!)}</span>
-          {labels?.[shown] && <span className="text-xs text-muted-foreground">{labels[shown]}</span>}
+          <span className="numeral text-caption font-bold" style={{ color }}>{format(values[shown]!)}</span>
+          {labels?.[shown] && <span className="text-caption text-muted-foreground">{labels[shown]}</span>}
         </div>
       )}
     </div>
@@ -342,7 +342,7 @@ export function CalendarHeatmap({ days, today, tone = "activity", weeks = 16, ma
         )))}
       </svg>
       {legend && (
-        <div className="mt-1 flex items-center justify-end gap-1 text-xs text-muted-foreground">
+        <div className="mt-1 flex items-center justify-end gap-1 text-caption text-muted-foreground">
           Less
           {/* design-tokens-exempt: a 10px heatmap legend swatch. Every --radius step is wider than the swatch itself, so a token would render it a circle and destroy the scale it is illustrating. */}
           {[0, 1, 2, 3, 4].map((lv) => <span key={lv} className="inline-block size-2.5 rounded-[3px]" style={{ background: fill(lv) }} />)}
@@ -373,9 +373,9 @@ export function ChartCard({ title, icon: Icon, tone = "primary", value, unit, de
               that mix let surface-2's hue win, so the wash clashed with the icon. */}
           {Icon && <span className={cn("grid size-8 shrink-0 place-items-center rounded-xl", toneSoft[tone])}><Icon className="size-4" /></span>}
           <div>
-            <div className="text-sm font-semibold">{title}</div>
-            {value === null && <div className="mt-0.5"><NoData className="text-xs" /></div>}
-            {value != null && <div className="numeral text-xl font-bold leading-tight">{value}{unit && <span className="ml-1 text-xs font-medium text-muted-foreground">{unit}</span>}{delta && <span className="ml-2 align-middle text-xs">{delta}</span>}</div>}
+            <div className="text-body-lg font-semibold">{title}</div>
+            {value === null && <div className="mt-0.5"><NoData className="text-caption" /></div>}
+            {value != null && <div className="numeral text-title-3 leading-tight">{value}{unit && <span className="ml-1 text-[0.55em] font-medium text-muted-foreground">{unit}</span>}{delta && <span className="ml-2 align-middle text-caption">{delta}</span>}</div>}
           </div>
         </div>
         {action}

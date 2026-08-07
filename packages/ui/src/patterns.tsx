@@ -235,10 +235,10 @@ export function ConfigRow({ label, ok, detail, okLabel = "Set", missingLabel = "
         ? <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
         : <CircleAlert className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />}
       <div className="min-w-0 flex-1">
-        <div className="text-sm font-medium">{label}</div>
-        {detail && <div className="text-xs leading-snug text-muted-foreground">{detail}</div>}
+        <div className="text-body font-medium">{label}</div>
+        {detail && <div className="text-caption leading-snug text-muted-foreground">{detail}</div>}
       </div>
-      <span className={cn("shrink-0 text-xs font-semibold", ok ? "text-success" : "text-muted-foreground")}>{ok ? okLabel : missingLabel}</span>
+      <span className={cn("shrink-0 text-caption font-semibold", ok ? "text-success" : "text-muted-foreground")}>{ok ? okLabel : missingLabel}</span>
     </div>
   );
 }
@@ -307,7 +307,7 @@ export function Notice({
         <div className="min-w-0 flex-1">
           {eyebrow && <div className="text-micro uppercase" style={{ color: tint }}>{eyebrow}</div>}
           <h3 className="text-body-lg font-semibold tracking-tight" style={onClick ? undefined : { color: tint }}>{title}</h3>
-          {children && <p className="mt-0.5 text-sm text-muted-foreground">{children}</p>}
+          {children && <p className="mt-0.5 text-body text-muted-foreground">{children}</p>}
           {action && !onClick && <div className="mt-3">{action}</div>}
         </div>
         {onClick && <ChevronRight aria-hidden className="size-5 shrink-0 self-center text-muted-foreground" />}
@@ -315,7 +315,7 @@ export function Notice({
       {action && onClick && (
         <div className="relative mt-3">
           <span
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-caption font-semibold"
             style={{ color: tint, backgroundColor: `color-mix(in oklch, ${tint} 12%, transparent)` }}
           >
             {action} <ArrowRight aria-hidden className="size-3.5" />
@@ -337,7 +337,7 @@ export function Notice({
 
 /** A tab's one-line "what this is for". */
 export function TabIntro({ children }: { children: ReactNode }) {
-  return <p className="px-1 text-xs leading-relaxed text-muted-foreground">{children}</p>;
+  return <p className="px-1 text-caption leading-relaxed text-muted-foreground">{children}</p>;
 }
 
 /** A labelled group inside a card: eyebrow + optional explanation + content. */
@@ -347,7 +347,7 @@ export function FieldGroup({ title, hint, children, className }: {
   return (
     <section className={cn("space-y-2.5", className)}>
       <Eyebrow className="px-0">{title}</Eyebrow>
-      {hint && <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-caption leading-relaxed text-muted-foreground">{hint}</p>}
       {children}
     </section>
   );
@@ -382,7 +382,7 @@ export function ActionBar({ notice, error, children, className }: {
     <div className={cn("fixed inset-x-0 bottom-0 z-30 border-t border-border/40 bg-background/90 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl md:pl-24", className)}>
       <div className="column space-y-2">
         {notice}
-        {error && <p className="px-1 text-xs text-warning" role="alert">{error}</p>}
+        {error && <p className="px-1 text-caption text-warning" role="alert">{error}</p>}
         <div className="flex gap-3">{children}</div>
       </div>
     </div>

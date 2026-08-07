@@ -109,7 +109,7 @@ export function PasskeysCard({ onChanged }: PasskeysCardProps) {
         <div className="flex items-center justify-between">
           <div>
             <div className="font-medium">Passkeys</div>
-            <div className="text-sm text-muted-foreground">One-tap sign-in with Face ID / fingerprint.</div>
+            <div className="text-body text-muted-foreground">One-tap sign-in with Face ID / fingerprint.</div>
           </div>
           {passkeys !== null && <Badge tone={passkeys.length ? "success" : "neutral"}>{passkeys.length}</Badge>}
         </div>
@@ -132,8 +132,8 @@ export function PasskeysCard({ onChanged }: PasskeysCardProps) {
           <div key={p.id} className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2.5">
             <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary/15 text-primary [&_svg]:size-4"><KeyRound /></div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium">{p.name ?? "Passkey"}</div>
-              {added(p.createdAt) && <div className="text-xs text-muted-foreground">Added {added(p.createdAt)}</div>}
+              <div className="truncate text-body font-medium">{p.name ?? "Passkey"}</div>
+              {added(p.createdAt) && <div className="text-caption text-muted-foreground">Added {added(p.createdAt)}</div>}
             </div>
             <Button
               size="icon"
@@ -151,7 +151,7 @@ export function PasskeysCard({ onChanged }: PasskeysCardProps) {
             <KeyRound /> {enrolling ? "Waiting for your device…" : (passkeys ?? []).length ? "Add another passkey" : "Add a passkey"}
           </Button>
         ) : (
-          <p className="text-sm text-muted-foreground">This device doesn&rsquo;t support passkeys — you&rsquo;ll keep using email codes.</p>
+          <p className="text-body text-muted-foreground">This device doesn&rsquo;t support passkeys — you&rsquo;ll keep using email codes.</p>
         )}
         </Reveal>
 

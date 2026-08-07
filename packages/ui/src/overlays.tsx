@@ -176,7 +176,7 @@ export const DialogClose = DialogPrimitive.Close;
  * `DialogContent` already spaces the title away from the body.
  */
 export function DialogDescription({ children, className }: { children: ReactNode; className?: string }) {
-  return <DialogPrimitive.Description className={cn("-mt-2 mb-4 text-sm text-muted-foreground", className)}>{children}</DialogPrimitive.Description>;
+  return <DialogPrimitive.Description className={cn("-mt-2 mb-4 text-body text-muted-foreground", className)}>{children}</DialogPrimitive.Description>;
 }
 
 /**
@@ -253,8 +253,8 @@ export function ConfirmDialog({ open, onOpenChange, title, description, confirmL
   return (
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
       <DialogContent title={title} dismissible={!busy}>
-        {description && <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>}
-        {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
+        {description && <p className="text-body leading-relaxed text-muted-foreground">{description}</p>}
+        {error && <p role="alert" className="mt-3 text-caption text-danger">{error}</p>}
         <div className="mt-5 flex gap-3">
           <Button variant="ghost" className="flex-1" disabled={busy} onClick={() => onOpenChange(false)}>{cancelLabel}</Button>
           <Button variant={destructive ? "destructive" : "default"} className="flex-1" disabled={busy} onClick={() => void run()}>
@@ -466,7 +466,7 @@ export function TabsTrigger({ value, children, className, disabled }: { value: s
       value={value}
       disabled={disabled}
       className={cn(
-        "rounded-full px-4 py-1.5 text-sm font-medium text-muted-foreground outline-none transition-colors data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm disabled:pointer-events-none disabled:opacity-45",
+        "rounded-full px-4 py-1.5 text-caption font-medium text-muted-foreground outline-none transition-colors data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm disabled:pointer-events-none disabled:opacity-45",
         FOCUS,
         className,
       )}
@@ -542,7 +542,7 @@ export function SegmentedControl<T extends string>({ options, value, onChange, c
           ref={(el) => { btnRefs.current[o.value] = el; }}
           onClick={() => onChange(o.value)}
           className={cn(
-            "relative z-10 flex min-h-11 items-center justify-center truncate rounded-full text-sm font-medium outline-none transition-colors",
+            "relative z-10 flex min-h-11 items-center justify-center truncate rounded-full text-caption font-medium outline-none transition-colors",
             FOCUS,
             fill ? "flex-1 basis-0 px-2 text-center" : "px-4",
             value === o.value ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
@@ -603,7 +603,7 @@ export function IconTabs<T extends string>({
               // the left at 34x30, leaving dead width on the right and a target
               // under the accessibility floor (§12). Now every tab is an equal
               // share of the bar and the whole share is tappable.
-              "relative z-10 flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full px-2 text-sm font-medium outline-none transition-colors",
+              "relative z-10 flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-full px-2 text-caption font-medium outline-none transition-colors",
               FOCUS,
               on ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
             )}
@@ -680,7 +680,7 @@ export function Select<T extends string>({ value, onChange, options, placeholder
         aria-label={ariaLabel}
         className={cn(
           "inline-flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-input bg-secondary/50 outline-none transition-colors focus-visible:border-primary/70 data-[placeholder]:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60",
-          size === "sm" ? "h-9 px-3 text-sm" : "h-11 px-3.5 text-sm",
+          size === "sm" ? "h-9 px-3 text-caption" : "h-11 px-3.5 text-body",
           FOCUS,
           className,
         )}
@@ -701,7 +701,7 @@ export function Select<T extends string>({ value, onChange, options, placeholder
                 key={o.value}
                 value={o.value}
                 disabled={o.disabled}
-                className="flex cursor-pointer items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm outline-none transition-colors data-[highlighted]:bg-secondary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
+                className="flex cursor-pointer items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-body outline-none transition-colors data-[highlighted]:bg-secondary data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
               >
                 <SelectPrimitive.ItemText>{o.label}</SelectPrimitive.ItemText>
                 <SelectPrimitive.ItemIndicator>
@@ -755,7 +755,7 @@ export function Avatar({ name, src, seed, className }: { name: string; src?: str
   const initials = name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
   const imageSrc = src || (seed ? dicebearUrl(seed) : null);
   return (
-    <AvatarPrimitive.Root className={cn("grid size-10 place-items-center overflow-hidden rounded-full bg-primary/15 text-sm font-semibold text-primary", className)}>
+    <AvatarPrimitive.Root className={cn("grid size-10 place-items-center overflow-hidden rounded-full bg-primary/15 text-caption font-semibold text-primary", className)}>
       {imageSrc && <AvatarPrimitive.Image src={imageSrc} className="size-full object-cover" />}
       <AvatarPrimitive.Fallback>{initials}</AvatarPrimitive.Fallback>
     </AvatarPrimitive.Root>

@@ -110,7 +110,7 @@ function TurnstileConfig({ extra }: { extra?: ReactNode }) {
             {status && (
               <Card className="space-y-4">
                 <SectionHeader icon={ShieldCheck} title="Turnstile bot check" action={<Badge tone={badge.tone}>{badge.label}</Badge>} />
-                <p className="text-sm text-muted-foreground">
+                <p className="text-body text-muted-foreground">
                   A Cloudflare Turnstile widget guards the email-code request on every login, on every door. The{" "}
                   <span className="font-medium text-foreground">secret</span> is what switches enforcement on; the{" "}
                   <span className="font-medium text-foreground">site key</span> is what makes the widget appear. You need both.

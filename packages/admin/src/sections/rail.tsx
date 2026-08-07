@@ -141,7 +141,7 @@ function Rail() {
                 title="Unattributed payments"
                 action={<Badge tone={data.open > 0 ? "danger" : "success"}>{data.open > 0 ? `${data.open} open` : "clear"}</Badge>}
               />
-              <p className="text-sm text-muted-foreground">
+              <p className="text-body text-muted-foreground">
                 One Stripe account serves every 4DL app. An event that can&apos;t be matched to a product is held here with
                 its full payload instead of being accepted and forgotten — so a payment that granted nothing is{" "}
                 <span className="font-medium text-foreground">visible</span> rather than silent.
@@ -168,24 +168,24 @@ function Rail() {
               </div>
 
               {events.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nothing to show.</p>
+                <p className="text-body text-muted-foreground">Nothing to show.</p>
               ) : (
                 <div className="space-y-2.5">
                   {events.map((e) => (
                     <div key={e.id} className="space-y-2 rounded-xl bg-surface-2 p-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <code className="font-mono text-xs font-medium">{e.eventType}</code>
+                        <code className="font-mono text-caption font-medium">{e.eventType}</code>
                         <Badge tone={e.resolvedAt ? "neutral" : "danger"}>{e.resolvedAt ? "closed" : "open"}</Badge>
-                        <span className="ml-auto text-xs text-muted-foreground">{when(e.createdAt)}</span>
+                        <span className="ml-auto text-caption text-muted-foreground">{when(e.createdAt)}</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">{REASONS[e.reason] ?? e.reason}</p>
+                      <p className="text-caption text-muted-foreground">{REASONS[e.reason] ?? e.reason}</p>
                       {e.candidates.length > 0 && (
-                        <p className="text-xs text-muted-foreground">Claimed by: {e.candidates.join(", ")}</p>
+                        <p className="text-caption text-muted-foreground">Claimed by: {e.candidates.join(", ")}</p>
                       )}
-                      {e.eventId && <p className="font-mono text-xs text-muted-foreground">{e.eventId}</p>}
+                      {e.eventId && <p className="font-mono text-caption text-muted-foreground">{e.eventId}</p>}
 
                       {e.resolvedAt ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-caption text-muted-foreground">
                           Closed {when(e.resolvedAt)}{e.resolvedBy ? ` by ${e.resolvedBy}` : ""} — {e.resolutionNote}
                         </p>
                       ) : (
