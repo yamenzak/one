@@ -12,7 +12,7 @@ import { HtmlEditorDialog, HtmlThumb } from "../components/html-editor.js";
 import { LicenseBadge, LicenseNote } from "../components/licensing.js";
 import { TrackMetaDialog, mmss } from "../components/track-meta-dialog.js";
 import { listMedia, uploadToLibrary, updateMedia, deleteMedia, assetUrl, type Media, type MediaKind } from "../api.js";
-import { Badge, Button, Card, Collection, ConfirmDialog, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Filters, Input, Row, Skeleton, toast, type FacetSelection, useCollectionView } from "@4dl/ui";
+import { Badge, Button, Card, cn, Collection, ConfirmDialog, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Filters, Input, PageHeader, Row, Skeleton, toast, type FacetSelection, useCollectionView } from "@4dl/ui";
 
 const KINDS = [
   { key: "", label: "All" },
@@ -194,6 +194,18 @@ export function MediaLibraryPage() {
         }}
       />
 
+      {/*
+        §1: one T1 anchor, and this page had none — it opened on a two-line
+        licensing paragraph, so the first and loudest thing on a media library
+        was a legal notice. The notice keeps its place in the reading order but
+        under the title, which is the arrangement §1 describes: the screen says
+        what it is, then the chrome around it.
+      */}
+      <PageHeader
+        title="Media library"
+        description={media ? `${media.length} item${media.length === 1 ? "" : "s"}` : "Images, video and audio you can reuse anywhere."}
+      />
+
       <LicenseNote scope="media" />
 
       {/*
@@ -254,7 +266,14 @@ export function MediaLibraryPage() {
               <span className="absolute left-2 top-2 rounded bg-background/85 px-1.5 py-0.5 text-micro uppercase">
                 {m.kind === "audio" ? "music" : m.kind}
               </span>
-              <LicenseBadge source={m.source} className="absolute bottom-2 left-2" />
+              {/*
+                Above the scrim, not under it. Both sat at the tile's bottom
+                edge — the "Tap to edit" strip is `inset-x-0 bottom-0` and this
+                badge `bottom-2 left-2` — so on an editable HTML slide the pill
+                landed ON the strip and pushed its label sideways. Only HTML
+                tiles have the strip, so only they need the lift.
+              */}
+              <LicenseBadge source={m.source} className={cn("absolute left-2", m.kind === "html" && canWrite ? "bottom-9" : "bottom-2")} />
               <div className="absolute right-2 top-2">{menu(m)}</div>
             </div>
             <div className="p-2.5">

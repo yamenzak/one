@@ -128,6 +128,8 @@ export function MusicPlaylistsPage() {
   */
   return (
     <PlaylistLibrary
+      title="Music playlists"
+      description="Background audio a channel plays."
       noun="playlists"
       items={playlists}
       error={error}

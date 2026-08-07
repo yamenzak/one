@@ -120,7 +120,21 @@ export function WidgetProfilesPage() {
                   <Badge className="tabular-nums">
                     {p.design_w ?? DEFAULT_W}×{p.design_h ?? DEFAULT_H}
                   </Badge>
-                  <span className="text-caption text-muted-foreground">Reusable · shared across channels</span>
+                  {/*
+                    A FACT ABOUT THIS PROFILE, not about profiles.
+
+                    This said "Reusable · shared across channels" on every card,
+                    under a header that already says "reusable across channels"
+                    — the same claim five times on a three-profile screen, and
+                    none of the five distinguished one card from another. It is
+                    a property of the CONCEPT and belongs in the description,
+                    once. The list payload carries `created_at` and the design
+                    size and nothing else, so the date is the specific thing
+                    there is to say.
+                  */}
+                  <span className="text-caption text-muted-foreground">
+                    Created {new Date(p.created_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                  </span>
                 </div>
               </div>
               {(canWrite || canDelete) && (

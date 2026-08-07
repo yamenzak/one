@@ -62,7 +62,7 @@ export function AnalyticsPage() {
       <PageHeader
         title="Analytics"
         description={
-          data
+          data && data.totalPlays > 0
             ? `${data.totalPlays.toLocaleString()} plays across ${data.activeScreens} active screen${data.activeScreens === 1 ? "" : "s"}`
             : "Proof-of-play telemetry from your fleet."
         }
@@ -86,6 +86,28 @@ export function AnalyticsPage() {
         />
       ) : !data ? (
         <AnalyticsSkeleton />
+      ) : data.totalPlays === 0 ? (
+        /*
+          NOTHING HAS EVER PLAYED — SAY IT ONCE. §5, both halves of it.
+
+          "A zero is not the same as nothing": the four tiles read 0 · 0 · 0 ·
+          0s, and a workspace that has never played anything has not MEASURED
+          zero plays, it has no data. `/api/analytics/summary` takes no window,
+          so `totalPlays === 0` really is "never", not "not this week".
+
+          "When the container already explains the emptiness, don't say it
+          twice": under those four zeros sat three cards, and all three printed
+          the identical title AND the identical two-line description — the same
+          sentence three times on one screen, plus a header claiming "0 plays
+          across 0 active screens" above it.
+        */
+        <Card className="py-12">
+          <EmptyState
+            icon={BarChart3}
+            title="No plays recorded yet"
+            description="Once your screens start playing content, this fills in — what played, on which screen, and for how long."
+          />
+        </Card>
       ) : (
         <div className="flex flex-col gap-5">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -104,7 +126,7 @@ export function AnalyticsPage() {
             <Card>
               <SectionHeader title="Most played" className="mb-4" />
               {data.byContent.length === 0 ? (
-                <Empty />
+                <Empty what="content" />
               ) : (
                 <div className="flex flex-col">
                   {data.byContent.map((c) => (
@@ -122,7 +144,7 @@ export function AnalyticsPage() {
             <Card>
               <SectionHeader title="By screen" className="mb-4" />
               {data.byScreen.length === 0 ? (
-                <Empty />
+                <Empty what="screen" />
               ) : (
                 <div className="flex flex-col">
                   {data.byScreen.map((s) => (
@@ -144,7 +166,7 @@ export function AnalyticsPage() {
 }
 
 function DayChart({ days }: { days: { day: string; plays: number }[] }) {
-  if (days.length === 0) return <Empty />;
+  if (days.length === 0) return <Empty what="day" />;
   const max = Math.max(...days.map((d) => d.plays), 1);
   // Labels may be dates ("2026-07-04" → "07-04") or short day names ("Mon"); keep both readable.
   const label = (day: string) => (/^\d{4}-\d{2}-\d{2}/.test(day) ? day.slice(5) : day.slice(0, 3));
@@ -160,7 +182,7 @@ function DayChart({ days }: { days: { day: string; plays: number }[] }) {
               title={`${d.plays.toLocaleString()} plays`}
             />
           </div>
-          <div className="font-mono text-caption tabular-nums text-muted-foreground">{d.plays.toLocaleString()}</div>
+          <div className="numeral text-caption text-muted-foreground">{d.plays.toLocaleString()}</div>
           <div className="text-caption text-muted-foreground/70">{label(d.day)}</div>
         </div>
       ))}
@@ -184,9 +206,14 @@ function Row({ left, right, sub, bar }: { left: string; right: string; sub?: str
   );
 }
 
-const Empty = () => (
-  <EmptyState icon={BarChart3} title="No plays recorded yet" description="Once your screens start playing content, proof-of-play data will show up here." />
-);
+/*
+  The per-card empty, reachable only when the workspace HAS plays but this one
+  breakdown has none — a screen that was deleted after its plays were recorded.
+  It is deliberately one short line: the page-level empty above already tells
+  the "you have no data at all" story, and repeating it inside a card that sits
+  beside a populated one is the duplication §5 warns about.
+*/
+const Empty = ({ what }: { what: string }) => <EmptyState icon={BarChart3} title={`Nothing to show by ${what}`} />;
 
 function AnalyticsSkeleton() {
   return (

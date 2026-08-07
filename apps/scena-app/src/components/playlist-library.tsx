@@ -23,7 +23,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { MoreVertical, Pencil, Plus, Tag as TagIcon, Trash2, type LucideIcon } from "lucide-react";
-import { Button, Collection, ConfirmDialog, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Filters, Input, toast, type FacetSelection } from "@4dl/ui";
+import { Button, Collection, ConfirmDialog, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Filters, Input, PageHeader, toast, type FacetSelection } from "@4dl/ui";
 import { TagEditor } from "./tag-editor.js";
 
 /** The shape both playlist kinds share. Everything else is the caller's. */
@@ -58,6 +58,15 @@ export interface PlaylistLibraryProps<T extends PlaylistLike> {
   createPlaceholder: string;
   /** What an unnamed playlist is called — never the placeholder, which is an example. */
   defaultName: string;
+  /**
+   * The screen's T1 anchor (§1). REQUIRED, not optional: both callers rendered
+   * this component alone, so the slide- and music-playlist lists opened straight
+   * onto a search field with no title on the page at all — the only two list
+   * routes in the app without one. The count goes in the description, which is
+   * the shape `Screens` and `Channels` use.
+   */
+  title: string;
+  description: string;
   empty: { icon: LucideIcon; title: string; description: string };
   deleteDescription: string;
 
@@ -74,7 +83,7 @@ export interface PlaylistLibraryProps<T extends PlaylistLike> {
 
 export function PlaylistLibrary<T extends PlaylistLike>({
   noun, items, error, reload, perms, create, update, remove, onCreated,
-  createLabel, createTitle, createPlaceholder, defaultName, empty, deleteDescription, searchText, row,
+  createLabel, createTitle, createPlaceholder, defaultName, title, description, empty, deleteDescription, searchText, row,
 }: PlaylistLibraryProps<T>) {
   const [q, setQ] = useState("");
   const [facets, setFacets] = useState<FacetSelection>({ tag: null });
@@ -116,6 +125,7 @@ export function PlaylistLibrary<T extends PlaylistLike>({
 
   return (
     <div>
+      <PageHeader title={title} description={items ? `${items.length} ${items.length === 1 ? noun.replace(/s$/, "") : noun}` : description} />
       <Collection
         items={shown}
         itemKey={(p: T) => p.id}

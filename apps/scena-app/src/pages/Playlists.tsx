@@ -119,6 +119,8 @@ export function PlaylistsPage() {
   */
   return (
     <PlaylistLibrary
+      title="Slide playlists"
+      description="The visual loop a channel plays."
       noun="playlists"
       items={playlists}
       error={error}
