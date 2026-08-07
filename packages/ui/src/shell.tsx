@@ -10,7 +10,8 @@ import { Group, Row } from "./layout.js";
 import type { ReactNode } from "react";
 import { cn } from "./lib/utils.js";
 import { toneVar, type Tone } from "./primitives.js";
-import { ThumbsDown, ThumbsUp, type LucideIcon } from "./lib/icons.js";
+import { ChevronRight, ThumbsDown, ThumbsUp, type LucideIcon } from "./lib/icons.js";
+import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 
 export interface TabDef {
   key: string;
@@ -286,5 +287,122 @@ export function EmptyState({ icon: Icon, title, description, action }: { icon: L
       {description && <p className="mt-1.5 max-w-xs text-body text-muted-foreground">{description}</p>}
       {action && <div className="mt-6">{action}</div>}
     </motion.div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   Chrome for a WIDE navigation, and the two pieces it needs.
+
+   `NavRail` above is the 96px icon rail: right for a product with under a dozen
+   destinations that a person recognises by glyph. An operator tool with
+   fourteen destinations in five named groups cannot use it — the labels ARE the
+   navigation there, and dropping them would trade recognition for a row of
+   ambiguous icons.
+
+   So the language gains a second nav shape rather than one product growing its
+   own. Both are built from the same tokens, the same type scale and the same
+   chrome rules (§0.3: chrome recedes), which is what makes them one system —
+   not that every product navigates identically.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * A scrolling region that does not put a scrollbar in the design.
+ *
+ * The platform scrollbar is chrome at its loudest — it changes width between
+ * operating systems, it paints over content, and it appears and disappears
+ * under the pointer. This is Radix's overlay scrollbar: it sits above the
+ * content, it is the same everywhere, and it fades when nothing is moving.
+ *
+ * `mask` fades the top and bottom edges so content that continues past the
+ * fold reads as continuing, rather than as ending in a hard cut.
+ */
+export function ScrollArea({
+  children,
+  className,
+  viewportClassName,
+  mask,
+}: {
+  children: ReactNode;
+  className?: string;
+  viewportClassName?: string;
+  /** Fade the scroll edges. Off by default — it costs a mask layer. */
+  mask?: boolean;
+}) {
+  return (
+    <ScrollAreaPrimitive.Root className={cn("relative overflow-hidden", className)}>
+      <ScrollAreaPrimitive.Viewport
+        className={cn(
+          "size-full outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+          // A fade distance, not a design token — there is no spacing variable
+          // to resolve here, and naming a non-existent one silently voids the
+          // whole mask-image rather than failing.
+          mask && "[mask-image:linear-gradient(to_bottom,transparent,black_1.5rem,black_calc(100%-1.5rem),transparent)]",
+          viewportClassName,
+        )}
+      >
+        {children}
+      </ScrollAreaPrimitive.Viewport>
+      <ScrollAreaPrimitive.Scrollbar
+        orientation="vertical"
+        className="flex w-2 touch-none select-none p-0.5 transition-opacity duration-200 data-[state=hidden]:opacity-0"
+      >
+        <ScrollAreaPrimitive.Thumb className="flex-1 rounded-full bg-foreground/15" />
+      </ScrollAreaPrimitive.Scrollbar>
+      <ScrollAreaPrimitive.Corner />
+    </ScrollAreaPrimitive.Root>
+  );
+}
+
+export interface Crumb {
+  label: string;
+  /** Absent = this is where you are. The last crumb is never a link (§10). */
+  to?: string;
+}
+
+/**
+ * Where you are, and the way back.
+ *
+ * ⚠️ It is CHROME (T4), so it is quiet: caption type, muted, and the trail is
+ * thinner than the place. The current page is the only crumb at full contrast
+ * and it is not interactive — a link to the page you are on is a control that
+ * does nothing, which §7 counts as a lie.
+ *
+ * It never renders a single crumb: a trail with no journey in it is decoration.
+ */
+export function Breadcrumbs({ crumbs, onNavigate, className }: {
+  crumbs: Crumb[];
+  onNavigate?: (to: string) => void;
+  className?: string;
+}) {
+  if (crumbs.length < 2) return null;
+  return (
+    <nav aria-label="Breadcrumb" className={cn("min-w-0", className)}>
+      <ol className="flex flex-nowrap items-center gap-1.5 text-caption text-muted-foreground">
+        {crumbs.map((c, i) => {
+          const last = i === crumbs.length - 1;
+          return (
+            <li key={`${c.label}-${i}`} className="flex min-w-0 items-center gap-1.5">
+              {i > 0 && <ChevronRight aria-hidden className="size-3.5 shrink-0 opacity-50" />}
+              {last || !c.to ? (
+                // `aria-current` belongs to the page you are ON. A middle crumb
+                // with no `to` is unreachable, not current — announcing it as
+                // the current page would put two "current"s in one trail.
+                <span aria-current={last ? "page" : undefined} className={cn("truncate", last && "text-foreground")}>
+                  {c.label}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onNavigate?.(c.to!)}
+                  className="truncate rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                >
+                  {c.label}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }

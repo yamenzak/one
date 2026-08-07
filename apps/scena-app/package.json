@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Scena dashboard \u2014 Vite + React SPA (fleet, builder, billing).",
+  "description": "Scena dashboard — Vite + React SPA (fleet, builder, billing).",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -13,9 +13,10 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@4dl/app-kit": "workspace:*",
     "@4dl/admin": "workspace:*",
+    "@4dl/app-kit": "workspace:*",
     "@4dl/ui": "workspace:*",
+    "@fontsource/figtree": "^5.2.8",
     "@radix-ui/react-dialog": "^1.1.18",
     "@radix-ui/react-dropdown-menu": "^2.1.19",
     "@radix-ui/react-label": "^2.1.11",

@@ -32,6 +32,23 @@
 */
 @source "../../../packages/ui/src";
 @source "../../../packages/app-kit/src";
+@source "../../../packages/admin/src";
+
+/*
+  ── THE PLATFORM TYPEFACE ────────────────────────────────────────────────────
+  `--font-sans` in the shared tokens names Figtree, but naming a face does not
+  load it: Scena had no `@fontsource/figtree` dependency and no import, so every
+  screen rendered in the system fallback while Kova and Tessa rendered in
+  Figtree. Same tokens, same colours, a different-looking product — and nothing
+  fails, because a font-family list always resolves to *something*.
+
+  Four weights, matching the other two apps exactly. The token scale expects
+  them: 400 body, 500/600 the title tiers, 700 display.
+*/
+@import "@fontsource/figtree/400.css";
+@import "@fontsource/figtree/500.css";
+@import "@fontsource/figtree/600.css";
+@import "@fontsource/figtree/700.css";
 
 /* ── Scena's brand ─────────────────────────────────────────────────────────
    The violet. Declared AFTER the platform tokens so it overrides `--primary`
