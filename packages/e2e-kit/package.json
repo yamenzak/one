@@ -1,0 +1,18 @@
+{
+  "name": "@4dl/e2e-kit",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Shared Playwright helpers — the screenshot discipline every app's shots suite needs.",
+  "exports": { ".": "./src/index.ts" },
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@types/node": "^22.20.1",
+    "typescript": "^5.9.3"
+  }
+}

@@ -25,7 +25,7 @@
 
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { AppBar, Archive, Avatar, Badge, BottomTabs, Button, ClipboardList, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Home, RotateCcw, ScanLine, TrendingUp, type TabDef } from "@4dl/ui";
+import { AppBar, Archive, Avatar, Badge, BottomTabs, Button, NavRail, ClipboardList, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Home, RotateCcw, ScanLine, TrendingUp, type TabDef } from "@4dl/ui";
 import { useSession } from "./session.js";
 import { NotificationBell } from "./Notifications.js";
 import { useI18n, useT } from "./i18n.js";
@@ -60,7 +60,21 @@ export function Shell() {
   const name = ctx?.active?.name ?? t("app.name");
 
   return (
-    <div className="min-h-dvh pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
+    /*
+      `md:pl-24` and no bottom padding past `md` — the rail's width, and the
+      island's room given back.
+
+      Tessa had NO desktop navigation at all: `BottomTabs` is `md:hidden` inside
+      `@4dl/ui`, so from 768 up this app rendered a floating phone island and
+      then, above it, nothing. §11.4 rule 7 — "a mobile affordance does not
+      survive a wider viewport" — with the affordance being the only navigation
+      there was. Kova has swapped to the rail at `md` since it was built; this
+      is the same two lines, and the same `NavRail` from the same package.
+
+      A centre runs on a bench tablet AND on the office desktop, so this is not
+      a hypothetical width for this product.
+    */
+    <div className="min-h-dvh pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0 md:pl-24">
       <AppBar
         leading={<span className="truncate text-body-lg font-semibold">{name}</span>}
         trailing={
@@ -115,7 +129,19 @@ export function Shell() {
        * tab: a tab implies a place you go and stay, and scanning is a thing you
        * do to whatever screen you are already on.
        */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 flex justify-center">
+      {/*
+        Centred above the tab island on a phone; bottom-RIGHT once the island is
+        gone.
+
+        The position was written for the island and only for it — at ≥md the
+        island is `md:hidden`, so the first desktop photograph of this app
+        showed a green circle floating in the middle of empty space, anchored to
+        chrome that was not there. It cannot simply be hidden: scanning has to
+        be reachable from every tab, and the Scan tile on Today is only on
+        Today. Bottom-right is where a floating action sits when nothing is
+        under it.
+      */}
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-40 flex justify-center md:bottom-8 md:left-auto md:right-8 md:justify-end">
         <Button
           size="lg"
           className="pointer-events-auto size-14 rounded-full p-0 shadow-glow"
@@ -127,6 +153,15 @@ export function Shell() {
       </div>
 
       <BottomTabs tabs={TABS} active={tab} onSelect={(k) => nav(k === "today" ? "/" : `/${k}`)} />
+      {/* The SAME tab definitions — one navigation drawn twice, never two lists
+          that drift. `brand` is the centre's own initial, which is what the app
+          bar carries too. */}
+      <NavRail
+        tabs={TABS}
+        active={tab}
+        onSelect={(k) => nav(k === "today" ? "/" : `/${k}`)}
+        brand={name.charAt(0).toUpperCase()}
+      />
       {scanning && <ScanSheet onClose={() => setScanning(false)} />}
     </div>
   );

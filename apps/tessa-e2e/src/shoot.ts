@@ -1,11 +1,9 @@
 /**
- * Kova's binding to the shared screenshot discipline.
+ * Tessa's binding to the shared screenshot discipline (`@4dl/e2e-kit`).
  *
- * The stillness/settlement/honesty argument, `freeze`, and `visit` are
- * `@4dl/e2e-kit`'s — they were duplicated here and in Scena's suite and had
- * already drifted apart in four ways. What stays is the one thing that is
- * genuinely this app's: WHERE the images land. Shot ids are per-product and
- * two suites writing into one directory would collide on `settings`.
+ * The whole of it is shared — this file exists only to say WHERE the images
+ * land. Shot ids are per-product (`today`, `settings`) and two suites writing
+ * into one directory would overwrite each other.
  */
 
 import { shoot as shootTo, type ShotOptions } from "@4dl/e2e-kit";

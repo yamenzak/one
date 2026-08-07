@@ -84,6 +84,17 @@
       this ran after the UI work; the pictures were not stale, they did not
       exist.
     */
+    /*
+      Tessa's worker serves `apps/tessa-app/dist` through an `assets` binding —
+      the same unpronounceable edge as the others, and the same consequence: a
+      stale `dist` here does not fail, it photographs the PREVIOUS design under
+      the current shot ids. The generic `shots` task above names Kova's SPA only.
+    */
+    "@tessa/e2e#shots": {
+      "dependsOn": ["@tessa/app#build"],
+      "cache": false,
+      "passThroughEnv": ["PLAYWRIGHT_*", "CI", "E2E_SERVER_LOGS", "NODE_OPTIONS"]
+    },
     "@scena/e2e#shots": {
       "dependsOn": ["@scena/app#build", "@scena/player#build"],
       "cache": false,
