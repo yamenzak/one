@@ -132,7 +132,7 @@ export function NavRail({ tabs, active, onSelect, footer, brand, brandPlate, tin
           would render a stranger's initial. An absent brand renders an empty
           mark, which is honest. */}
       {brand !== undefined && (
-        <div className={cn("mb-6 grid size-11 place-items-center overflow-hidden rounded-2xl text-title-3 font-black", brandPlate ?? "bg-primary text-primary-foreground")}>{brand}</div>
+        <div className={cn("mb-6 grid size-11 place-items-center overflow-hidden rounded-2xl text-title-3 font-bold", brandPlate ?? "bg-primary text-primary-foreground")}>{brand}</div>
       )}
       <div className="flex w-full flex-1 flex-col items-center gap-1.5 px-3">
         {tabs.map((t) => {

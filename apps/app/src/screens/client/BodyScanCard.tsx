@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { Card, Button, Badge, Spinner, IconBadge, EmptyState, SegmentedControl, cn, toneVar, AreaChart, ScanLine, Camera, Percent, History, RotateCcw, ChevronRight } from "@4dl/ui";
+import { Anchor, Card, Button, Badge, Spinner, IconBadge, EmptyState, SegmentedControl, cn, toneVar, AreaChart, ScanLine, Camera, Percent, History, RotateCcw, ChevronRight } from "@4dl/ui";
 import { POSTURE_SEVERITY_TONE } from "../../registry/index.js";
 import { api } from "../../api.js";
 import { useSession } from "../../session.js";
@@ -84,7 +84,7 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
               <IconBadge icon={ScanLine} tone="sleep" size="sm" />
               <div>
                 <div className="font-semibold">Body scan</div>
-                <div className="text-xs text-muted-foreground">Camera body-fat estimate</div>
+                <div className="text-caption text-muted-foreground">Camera body-fat estimate</div>
               </div>
             </div>
             {profileReady && !blocked && (
@@ -93,11 +93,11 @@ export function BodyScanCard({ clientId }: { clientId: string }) {
           </div>
 
           {blocked ? (
-            <div className="rounded-2xl bg-surface-2 px-4 py-3 text-sm text-muted-foreground">Body scan isn't part of your current plan.</div>
+            <div className="rounded-2xl bg-surface-2 px-4 py-3 text-body text-muted-foreground">Body scan isn't part of your current plan.</div>
           ) : scans == null || loading ? (
             <div className="grid h-24 place-items-center"><Spinner /></div>
           ) : !profileReady ? (
-            <div className="rounded-2xl bg-warning-soft/40 px-4 py-3 text-sm text-warning">
+            <div className="rounded-2xl bg-warning-soft/40 px-4 py-3 text-body text-warning">
               {!hasHeight
                 ? "Add your height in your profile first — the body scan needs it to calibrate your measurements."
                 : "Add your sex, birth date and height in your profile to use the body scan."}
@@ -130,24 +130,27 @@ function ScanSummary({ scans, latest, onOpenHistory }: { scans: Scan[]; latest: 
     <div className="space-y-4">
       {/* Latest number */}
       <div className="flex items-end justify-between">
-        <div>
-          <div className="flex items-end gap-1">
-            <span className="numeral text-5xl font-bold tabular-nums tracking-tight">{latest.bodyFatPercent!.toFixed(1)}</span>
-            <Percent className="mb-1.5 size-5 text-muted-foreground" />
-          </div>
-          <div className="mt-1 flex items-center gap-2">
-            {latest.confidence && (
-              <Badge tone={CONF_TONE[latest.confidence]}>
-                <span className={cn("mr-0.5 inline-block size-2 rounded-full", latest.confidence === "high" ? "bg-success" : latest.confidence === "medium" ? "bg-warning" : "bg-danger")} />
-                {CONF_LABEL[latest.confidence]}
-              </Badge>
-            )}
-            {latest.low != null && latest.high != null && (
-              <span className="numeral text-xs text-muted-foreground">{latest.low.toFixed(1)}–{latest.high.toFixed(1)}%</span>
-            )}
-          </div>
-        </div>
-        <div className="text-right text-xs text-muted-foreground">
+        <Anchor
+          align="start"
+          unit={<Percent className="inline size-[0.7em]" />}
+          className="pb-0 pt-0"
+          below={
+            <div className="flex items-center gap-2">
+              {latest.confidence && (
+                <Badge tone={CONF_TONE[latest.confidence]}>
+                  <span className={cn("mr-0.5 inline-block size-2 rounded-full", latest.confidence === "high" ? "bg-success" : latest.confidence === "medium" ? "bg-warning" : "bg-danger")} />
+                  {CONF_LABEL[latest.confidence]}
+                </Badge>
+              )}
+              {latest.low != null && latest.high != null && (
+                <span className="numeral text-caption text-muted-foreground">{latest.low.toFixed(1)}–{latest.high.toFixed(1)}%</span>
+              )}
+            </div>
+          }
+        >
+          {latest.bodyFatPercent!.toFixed(1)}
+        </Anchor>
+        <div className="text-right text-caption text-muted-foreground">
           {new Date(`${latest.date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
           <div className="numeral">{scans.length} scan{scans.length === 1 ? "" : "s"}</div>
         </div>
@@ -155,7 +158,7 @@ function ScanSummary({ scans, latest, onOpenHistory }: { scans: Scan[]; latest: 
 
       {/* Body type + posture */}
       {(latest.somatotype || latest.posture) && (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-caption">
           {latest.somatotype && <span className="rounded-full bg-surface-2 px-2.5 py-1"><span className="text-muted-foreground">Body type · </span><span className="font-semibold">{latest.somatotype}</span></span>}
           {latest.posture && (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1">
@@ -169,7 +172,7 @@ function ScanSummary({ scans, latest, onOpenHistory }: { scans: Scan[]; latest: 
       {/* Trend */}
       {bfValues.length >= 2 && (
         <div className="rounded-2xl bg-surface-2 p-3">
-          <div className="mb-1 text-xs font-medium text-muted-foreground">Body-fat trend</div>
+          <div className="mb-1 text-caption font-medium text-muted-foreground">Body-fat trend</div>
           <AreaChart values={bfValues} tone="sleep" height={130} trend format={(v) => `${v.toFixed(1)}%`} label={(i) => new Date(`${chrono[i]?.date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })} />
         </div>
       )}
@@ -218,25 +221,25 @@ function ShapeOverTime({ scans, onOpenDetails }: { scans: Scan[]; onOpenDetails:
           options={[{ value: "shape", label: "Shape" }, { value: "3d", label: (<span className="inline-flex items-center gap-1"><RotateCcw className="size-3.5" /> 3D</span>) }]}
           value={mode} onChange={setMode}
         />
-        <button onClick={() => onOpenDetails(near.id)} className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-sleep transition-opacity active:opacity-70">
+        <button onClick={() => onOpenDetails(near.id)} className="inline-flex shrink-0 items-center gap-0.5 text-caption font-medium text-sleep transition-opacity active:opacity-70">
           Open details <ChevronRight className="size-3.5" />
         </button>
       </div>
 
       <div className="grid min-h-[220px] place-items-center">
         {mode === "3d" ? (
-          nearProfile ? <Body3D profile={nearProfile} width={200} height={220} /> : <span className="text-xs text-muted-foreground">No model for this scan</span>
+          nearProfile ? <Body3D profile={nearProfile} width={200} height={220} /> : <span className="text-caption text-muted-foreground">No model for this scan</span>
         ) : (
           <div className="flex items-end justify-center gap-6">
-            {frontPoly && <figure className="m-0"><Silhouette points={frontPoly} tone={toneVar.sleep} width={104} height={200} /><figcaption className="mt-1 text-center text-xs text-muted-foreground">Front</figcaption></figure>}
-            {hasSide && sidePoly && <figure className="m-0"><Silhouette points={sidePoly} tone={toneVar.sleep} width={88} height={200} /><figcaption className="mt-1 text-center text-xs text-muted-foreground">Side</figcaption></figure>}
+            {frontPoly && <figure className="m-0"><Silhouette points={frontPoly} tone={toneVar.sleep} width={104} height={200} /><figcaption className="mt-1 text-center text-caption text-muted-foreground">Front</figcaption></figure>}
+            {hasSide && sidePoly && <figure className="m-0"><Silhouette points={sidePoly} tone={toneVar.sleep} width={88} height={200} /><figcaption className="mt-1 text-center text-caption text-muted-foreground">Side</figcaption></figure>}
           </div>
         )}
       </div>
 
       <div className="text-center">
-        <span className="numeral text-2xl font-bold tabular-nums">{bf.toFixed(1)}</span>
-        <span className="text-sm text-muted-foreground">% · {fmtShort(near.date)}</span>
+        <span className="numeral text-title-2 font-bold tabular-nums">{bf.toFixed(1)}</span>
+        <span className="text-body text-muted-foreground">% · {fmtShort(near.date)}</span>
       </div>
       {n > 1 && (
         <input

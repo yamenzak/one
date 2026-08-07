@@ -292,13 +292,13 @@ function Tenants() {
                     <IconBadge icon={Building2} tone={t.comp ? "sleep" : "primary"} size="sm" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-semibold">{t.name}</div>
-                      <div className="truncate text-xs text-muted-foreground">/{t.slug}</div>
+                      <div className="truncate text-caption text-muted-foreground">/{t.slug}</div>
                     </div>
                     <div className="flex max-w-[7.5rem] shrink-0 flex-col items-end gap-1">
                       <Badge tone={t.comp ? "sleep" : "primary"} className="max-w-full">
                         <span className="min-w-0 truncate">{planName(t.plan_id)}{t.comp ? " · comp" : ""}</span>
                       </Badge>
-                      <span className={cn("text-xs font-medium capitalize", toneText[statusTone(t.status)])}>{statusLabel(t.status)}</span>
+                      <span className={cn("text-caption font-medium capitalize", toneText[statusTone(t.status)])}>{statusLabel(t.status)}</span>
                     </div>
                     <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                   </Card>
@@ -310,7 +310,7 @@ function Tenants() {
               {filtered.length > shown && (
                 <button
                   onClick={() => setShown((n) => n + PAGE)}
-                  className="w-full rounded-2xl border border-dashed border-border py-3 text-sm text-muted-foreground transition-colors hover:bg-surface-2"
+                  className="w-full rounded-2xl border border-dashed border-border py-3 text-body text-muted-foreground transition-colors hover:bg-surface-2"
                 >
                   Showing {shown} of {filtered.length} — show {Math.min(PAGE, filtered.length - shown)} more
                 </button>
@@ -392,21 +392,21 @@ function TenantSheet({ tenant, plans, plansError, onRetryPlans, planName, onClos
       <div className="space-y-5">
         <div className="space-y-2 rounded-2xl bg-surface-2 p-3.5">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-muted-foreground">Workspace</span>
-            <span className="min-w-0 truncate text-sm font-medium">/{tenant.slug}</span>
+            <span className="text-caption text-muted-foreground">Workspace</span>
+            <span className="min-w-0 truncate text-body font-medium">/{tenant.slug}</span>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-muted-foreground">Plan</span>
+            <span className="text-caption text-muted-foreground">Plan</span>
             <Badge tone={tenant.comp ? "sleep" : "primary"} className="max-w-[60%]"><span className="min-w-0 truncate">{planName(tenant.plan_id)}{tenant.comp ? " · comp" : ""}</span></Badge>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-xs text-muted-foreground">Subscription</span>
+            <span className="text-caption text-muted-foreground">Subscription</span>
             <Badge tone={statusTone(tenant.status)} className="capitalize">{statusLabel(tenant.status)}</Badge>
           </div>
           {since && (
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs text-muted-foreground">Created</span>
-              <span className="text-sm font-medium">{since}</span>
+              <span className="text-caption text-muted-foreground">Created</span>
+              <span className="text-body font-medium">{since}</span>
             </div>
           )}
         </div>
@@ -443,14 +443,14 @@ function TenantSheet({ tenant, plans, plansError, onRetryPlans, planName, onClos
                     )}
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold">{p.name}</div>
-                      <div className="numeral truncate text-xs text-muted-foreground">{planUsd(p.priceUsdMonth)}/mo · {plural(p.tenantCount, "studio")}</div>
+                      <div className="truncate text-body font-semibold">{p.name}</div>
+                      <div className="numeral truncate text-caption text-muted-foreground">{planUsd(p.priceUsdMonth)}/mo · {plural(p.tenantCount, "studio")}</div>
                     </div>
                     {act.busy === `comp:${p.id}`
                       ? <Spinner className="size-4 shrink-0" />
                       : current
                         ? <Badge tone="primary">current</Badge>
-                        : <span className="shrink-0 text-xs font-semibold text-primary">Comp</span>}
+                        : <span className="shrink-0 text-caption font-semibold text-primary">Comp</span>}
                   </button>
                 );
               })}
@@ -546,8 +546,8 @@ function EntitlementFields({ ent, meta, onChange }: { ent: Ent; meta: EntMeta; o
             return (
               <div key={k} className="flex items-start gap-2">
                 <div className="min-w-0 flex-1 pt-1">
-                  <div className="text-sm font-medium">{m.label}{m.unit ? <span className="font-normal text-muted-foreground"> ({m.unit})</span> : null}</div>
-                  <div className="text-xs leading-snug text-muted-foreground">{m.hint}</div>
+                  <div className="text-body font-medium">{m.label}{m.unit ? <span className="font-normal text-muted-foreground"> ({m.unit})</span> : null}</div>
+                  <div className="text-caption leading-snug text-muted-foreground">{m.hint}</div>
                 </div>
                 <button
                   type="button"
@@ -555,7 +555,7 @@ function EntitlementFields({ ent, meta, onChange }: { ent: Ent; meta: EntMeta; o
                   aria-pressed={unlimited}
                   aria-label={`${m.label}: unlimited`}
                   className={cn(
-                    "grid size-12 shrink-0 place-items-center rounded-xl text-lg font-semibold transition-colors",
+                    "grid size-12 shrink-0 place-items-center rounded-xl text-body-lg font-semibold transition-colors",
                     unlimited ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground hover:bg-surface-3",
                   )}
                 >
@@ -569,7 +569,7 @@ function EntitlementFields({ ent, meta, onChange }: { ent: Ent; meta: EntMeta; o
                   value={unlimited ? "" : v}
                   onChange={(e) => setQuota(k, Math.max(0, Number(e.target.value) || 0))}
                   placeholder={unlimited ? "∞" : ""}
-                  className="numeral h-12 w-[4.75rem] shrink-0 px-2.5 text-right text-sm"
+                  className="numeral h-12 w-[4.75rem] shrink-0 px-2.5 text-right text-body"
                 />
               </div>
             );
@@ -585,10 +585,10 @@ function EntitlementFields({ ent, meta, onChange }: { ent: Ent; meta: EntMeta; o
               <div key={k} className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-sm font-medium">{m.label}</span>
+                    <span className="text-body font-medium">{m.label}</span>
                     {m.reserved && <Badge tone="warning">not built yet</Badge>}
                   </div>
-                  <div className="text-xs leading-snug text-muted-foreground">{m.hint}</div>
+                  <div className="text-caption leading-snug text-muted-foreground">{m.hint}</div>
                 </div>
                 <div className="grid size-12 shrink-0 place-items-center">
                   <Switch checked={!!ent.features[k]} onCheckedChange={(val) => setFeature(k, val)} aria-label={m.label} />
@@ -602,8 +602,8 @@ function EntitlementFields({ ent, meta, onChange }: { ent: Ent; meta: EntMeta; o
       <FieldGroup title="AI credits" hint="Granted at the start of each billing period. The grant is a reset, not a top-up — last period's unused grant lapses.">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-medium">Monthly grant</div>
-            <div className="text-xs leading-snug text-muted-foreground">Purchased credits are separate and never lapse.</div>
+            <div className="text-body font-medium">Monthly grant</div>
+            <div className="text-caption leading-snug text-muted-foreground">Purchased credits are separate and never lapse.</div>
           </div>
           <Input
             type="number"
@@ -611,7 +611,7 @@ function EntitlementFields({ ent, meta, onChange }: { ent: Ent; meta: EntMeta; o
             aria-label="Monthly AI credit grant"
             value={ent.aiCredits.monthlyGrant}
             onChange={(e) => onChange({ ...ent, aiCredits: { monthlyGrant: Math.max(0, Number(e.target.value) || 0) } })}
-            className="numeral h-12 w-24 shrink-0 px-2.5 text-right text-sm"
+            className="numeral h-12 w-24 shrink-0 px-2.5 text-right text-body"
           />
         </div>
       </FieldGroup>
@@ -679,7 +679,7 @@ function PlansConfig() {
               {retired.length > 0 && (
                 <section className="space-y-2">
                   <Eyebrow>No longer sold · {retired.length}</Eyebrow>
-                  <p className="px-1 text-xs leading-relaxed text-muted-foreground">
+                  <p className="px-1 text-caption leading-relaxed text-muted-foreground">
                     Grandfathered: studios already on these keep them and keep working, but nobody new can pick one and
                     they can&apos;t be comped onto. Editing one still applies to the studios that are on it.
                   </p>
@@ -714,7 +714,7 @@ function PlanCard({ plan, featureKeys, onEdit }: { plan: PlanFull; featureKeys: 
             <h3 className="min-w-0 truncate font-semibold">{plan.name}</h3>
             {!plan.active && <Badge tone="neutral">not sold</Badge>}
           </div>
-          <div className="numeral text-xs text-muted-foreground">{planUsd(plan.priceUsdMonth)} / month</div>
+          <div className="numeral text-caption text-muted-foreground">{planUsd(plan.priceUsdMonth)} / month</div>
         </div>
         <Button size="sm" variant="secondary" className="min-h-12 shrink-0 rounded-xl" onClick={onEdit} aria-label={`Edit the ${plan.name} plan`}>
           <LayoutGrid /> Edit
@@ -923,10 +923,10 @@ function TenantEntitlementSheet({ tenantId, name, onClose }: { tenantId: string;
                       <div key={k} className="flex items-start gap-2">
                         <div className="min-w-0 flex-1 pt-1">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-sm font-medium">{m.label}{m.unit ? <span className="font-normal text-muted-foreground"> ({m.unit})</span> : null}</span>
+                            <span className="text-body font-medium">{m.label}{m.unit ? <span className="font-normal text-muted-foreground"> ({m.unit})</span> : null}</span>
                             <SourceTag trace={t} busy={act.busy !== null} onClear={() => void clearKey("quotas", k)} format={(n) => (n < 0 ? "∞" : String(n))} />
                           </div>
-                          <div className="text-xs leading-snug text-muted-foreground">{m.hint}</div>
+                          <div className="text-caption leading-snug text-muted-foreground">{m.hint}</div>
                         </div>
                         <button
                           type="button"
@@ -934,7 +934,7 @@ function TenantEntitlementSheet({ tenantId, name, onClose }: { tenantId: string;
                           aria-pressed={unlimited}
                           aria-label={`${m.label}: unlimited`}
                           className={cn(
-                            "grid size-12 shrink-0 place-items-center rounded-xl text-lg font-semibold transition-colors",
+                            "grid size-12 shrink-0 place-items-center rounded-xl text-body-lg font-semibold transition-colors",
                             unlimited ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground hover:bg-surface-3",
                           )}
                         >∞</button>
@@ -946,7 +946,7 @@ function TenantEntitlementSheet({ tenantId, name, onClose }: { tenantId: string;
                           value={unlimited ? "" : v}
                           onChange={(e) => setQuota(k, Math.max(0, Number(e.target.value) || 0))}
                           placeholder={unlimited ? "∞" : ""}
-                          className="numeral h-12 w-[5.75rem] shrink-0 px-2.5 text-right text-sm"
+                          className="numeral h-12 w-[5.75rem] shrink-0 px-2.5 text-right text-body"
                         />
                       </div>
                     );
@@ -963,11 +963,11 @@ function TenantEntitlementSheet({ tenantId, name, onClose }: { tenantId: string;
                       <div key={k} className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-sm font-medium">{m.label}</span>
+                            <span className="text-body font-medium">{m.label}</span>
                             {m.reserved && <Badge tone="warning">not built yet</Badge>}
                             <SourceTag trace={t} busy={act.busy !== null} onClear={() => void clearKey("features", k)} format={(b) => (b ? "on" : "off")} />
                           </div>
-                          <div className="text-xs leading-snug text-muted-foreground">{m.hint}</div>
+                          <div className="text-caption leading-snug text-muted-foreground">{m.hint}</div>
                         </div>
                         <div className="grid size-12 shrink-0 place-items-center">
                           <Switch checked={!!ent.features[k]} onCheckedChange={(v) => setFeature(k, v)} aria-label={m.label} />
@@ -982,10 +982,10 @@ function TenantEntitlementSheet({ tenantId, name, onClose }: { tenantId: string;
                 <div className="flex items-start gap-2">
                   <div className="min-w-0 flex-1 pt-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-sm font-medium">Monthly grant</span>
+                      <span className="text-body font-medium">Monthly grant</span>
                       <SourceTag trace={data.aiCredits} busy={act.busy !== null} onClear={() => void clearKey("aiCredits", "monthlyGrant")} format={(n) => n.toLocaleString()} />
                     </div>
-                    <div className="text-xs leading-snug text-muted-foreground">Topped up on each billing period.</div>
+                    <div className="text-caption leading-snug text-muted-foreground">Topped up on each billing period.</div>
                   </div>
                   <Input
                     type="number"
@@ -993,7 +993,7 @@ function TenantEntitlementSheet({ tenantId, name, onClose }: { tenantId: string;
                     aria-label="Monthly AI credit grant"
                     value={ent.aiCredits.monthlyGrant}
                     onChange={(e) => setEnt((x) => (x ? { ...x, aiCredits: { monthlyGrant: Math.max(0, Number(e.target.value) || 0) } } : x))}
-                    className="numeral h-12 w-[6rem] shrink-0 px-2.5 text-right text-sm"
+                    className="numeral h-12 w-[6rem] shrink-0 px-2.5 text-right text-body"
                   />
                 </div>
               </FieldGroup>
@@ -1026,7 +1026,7 @@ function SourceTag<T>({ trace, busy, onClear, format }: {
   return (
     <span className="inline-flex items-center gap-1">
       <Badge tone={badge.tone}>{badge.label}</Badge>
-      <span className="text-xs text-muted-foreground">plan: {format(trace.plan)}</span>
+      <span className="text-caption text-muted-foreground">plan: {format(trace.plan)}</span>
       {trace.source === "adjusted" && (
         <button
           type="button"
@@ -1056,13 +1056,13 @@ function AiFeedbackPanel() {
   return (
     <Card className="space-y-4">
       <SectionHeader icon={ThumbsUp} title="Client feedback" count={fb.data ? fb.data.totalVotes : undefined} />
-      <p className="text-sm text-muted-foreground">
+      <p className="text-body text-muted-foreground">
         The 👍/👎 clients leave under an AI insight, by type. A low helpful rate is the signal to revisit that
         feature&rsquo;s prompt or model.
       </p>
       <Reveal loading={fb.loading} skeleton={<SkeletonLine w="60%" h="text" />}>
         {fb.error ? (
-          <p className="text-sm text-warning">Couldn&rsquo;t load feedback.</p>
+          <p className="text-body text-warning">Couldn&rsquo;t load feedback.</p>
         ) : !fb.data?.types.length ? (
           <EmptyState icon={ThumbsUp} title="No votes yet" description="Nothing has been rated. The thumbs appear under coach notes on a client's screens." />
         ) : (
@@ -1070,8 +1070,8 @@ function AiFeedbackPanel() {
             {fb.data.types.map((t) => (
               <div key={t.type} className="flex items-center justify-between gap-3 py-3">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{t.type}</div>
-                  <div className="text-xs text-muted-foreground">{t.up} helpful · {t.down} not · last {new Date(t.lastAt).toLocaleDateString()}</div>
+                  <div className="truncate text-body font-medium">{t.type}</div>
+                  <div className="text-caption text-muted-foreground">{t.up} helpful · {t.down} not · last {new Date(t.lastAt).toLocaleDateString()}</div>
                 </div>
                 {t.helpfulPct != null && (
                   <Badge tone={t.helpfulPct >= 70 ? "success" : t.helpfulPct >= 40 ? "warning" : "danger"}>{t.helpfulPct}% helpful</Badge>
@@ -1214,7 +1214,7 @@ function AiSelfTest({ models }: { models: AiCatalogModel[] }) {
   return (
     <Card className="space-y-4">
       <SectionHeader icon={Play} title="Live self-test" />
-      <p className="text-sm text-muted-foreground">
+      <p className="text-body text-muted-foreground">
         Runs the product's <span className="font-medium text-foreground">real prompts</span> — a plan draft, a food parse,
         a check-in summary, an exercise auto-fill, a nutrition estimate and a vision call — through the normal metered
         path, then validates each answer with the same parser the feature uses. A 200 that comes back as prose is a{" "}
@@ -1230,7 +1230,7 @@ function AiSelfTest({ models }: { models: AiCatalogModel[] }) {
         </div>
         {scope === "model" && (
           <label className="block space-y-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Model</span>
+            <span className="text-caption font-medium text-muted-foreground">Model</span>
             <Select
               aria-label="Model"
               value={pickedModel}
@@ -1251,7 +1251,7 @@ function AiSelfTest({ models }: { models: AiCatalogModel[] }) {
         <Reveal loading={plan.loading} skeleton={<Skeleton className="h-24 w-full rounded-2xl" />}>
           {plan.data && (
             <div className="space-y-3">
-              <div className="rounded-2xl bg-surface-2 p-3 text-sm">
+              <div className="rounded-2xl bg-surface-2 p-3 text-body">
                 {runs.length === 0 ? (
                   <p className="text-muted-foreground">Nothing to run — no enabled model matches that choice.</p>
                 ) : (
@@ -1287,7 +1287,7 @@ function AiSelfTest({ models }: { models: AiCatalogModel[] }) {
       )}
 
       {running && (
-        <div role="status" aria-live="polite" className="text-xs text-muted-foreground">
+        <div role="status" aria-live="polite" className="text-caption text-muted-foreground">
           {done} of {runs.length} finished. Providers can take 20-60 seconds each — this is not stuck.
         </div>
       )}
@@ -1304,26 +1304,26 @@ function AiSelfTest({ models }: { models: AiCatalogModel[] }) {
           </div>
           {byCheck.map((g) => (
             <div key={g.label} className="space-y-1.5 rounded-2xl bg-surface-2 p-3">
-              <h4 className="text-sm font-semibold">{g.label}</h4>
+              <h4 className="text-body font-semibold">{g.label}</h4>
               {g.rows.map((r) => (
                 <div key={`${r.check}:${r.modelId}`} className="space-y-1 border-t border-border/40 pt-2 first:border-t-0 first:pt-0">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <Badge tone={CHECK_TONE[r.status]}>{CHECK_LABEL[r.status]}</Badge>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{r.modelLabel}</span>
+                    <span className="min-w-0 flex-1 truncate text-body font-medium">{r.modelLabel}</span>
                     {r.mocked && <Badge tone="warning">mock</Badge>}
                   </div>
-                  <div className="numeral text-xs text-muted-foreground">
+                  <div className="numeral text-caption text-muted-foreground">
                     {providerLabel(r.provider)} · {r.modelId} · {r.latencyMs} ms · {plural(r.credits, "credit")}
                   </div>
-                  {r.status === "pass" && r.summary && <p className="text-xs text-muted-foreground">{r.summary}</p>}
+                  {r.status === "pass" && r.summary && <p className="text-caption text-muted-foreground">{r.summary}</p>}
                   {r.failure && (
-                    <p className={cn("text-xs leading-relaxed", toneText[CHECK_TONE[r.status]])}>
+                    <p className={cn("text-caption leading-relaxed", toneText[CHECK_TONE[r.status]])}>
                       <b>{FAILURE_LABEL[r.failure] ?? r.failure}</b>{r.detail ? ` — ${r.detail}` : ""}
                     </p>
                   )}
                   {r.excerpt && (
                     <details>
-                      <summary className="min-h-6 cursor-pointer text-xs text-muted-foreground">What the model said</summary>
+                      <summary className="min-h-6 cursor-pointer text-caption text-muted-foreground">What the model said</summary>
                       <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-surface-1 p-2 text-caption leading-relaxed">{r.excerpt}</pre>
                     </details>
                   )}
@@ -1371,7 +1371,7 @@ function NuclearResetCard() {
     <>
       <Card className="space-y-3">
         <SectionHeader icon={AlertTriangle} tone="danger" title={<span className="text-danger">Nuclear reset</span>} />
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body text-muted-foreground">
           Permanently erases <span className="font-medium text-foreground">every studio</span>, all users, and all media —
           the whole platform back to empty. Plans, keys and AI config are kept. There is no undo and no backup.
         </p>
@@ -1411,7 +1411,7 @@ function NuclearResetCard() {
         {done != null ? (
           <div className="space-y-3 text-center" role="status" aria-live="polite">
             <div className="mx-auto grid size-12 place-items-center rounded-full bg-success-soft/60 text-success"><CircleCheck className="size-6" aria-hidden /></div>
-            <p className="text-sm">
+            <p className="text-body">
               Wiped <span className="font-semibold">{done}</span> studio{done === 1 ? "" : "s"} and everything in them.
               You&apos;ll be signed out — sign back in to start fresh.
             </p>
@@ -1421,12 +1421,12 @@ function NuclearResetCard() {
             <Callout tone="danger" icon={AlertTriangle}>
               This erases the entire platform: every studio, every user, every uploaded file. It cannot be undone.
             </Callout>
-            <p className="text-sm text-muted-foreground">We&apos;ll email a confirmation code to your admin address first.</p>
+            <p className="text-body text-muted-foreground">We&apos;ll email a confirmation code to your admin address first.</p>
             {err && <Callout tone="danger" icon={AlertTriangle} live="alert">{err}</Callout>}
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-body text-muted-foreground">
               Enter the 6-digit code we emailed you, then type the phrase exactly. Both must match before anything is deleted.
             </p>
             <Field label="Confirmation code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} placeholder="000000" autoFocus />
@@ -1480,7 +1480,7 @@ function PlatformPromos() {
         <div className="flex items-end justify-between gap-3">
           <div className="min-w-0">
             <h2 className="font-semibold">Platform promo codes</h2>
-            <p className="text-xs leading-relaxed text-muted-foreground">Kova → studio: a discount on a studio&apos;s credit-pack purchase.</p>
+            <p className="text-caption leading-relaxed text-muted-foreground">Kova → studio: a discount on a studio&apos;s credit-pack purchase.</p>
           </div>
           <Button size="sm" className="min-h-12 shrink-0 rounded-xl" onClick={() => setOpen(true)}><Plus /> New</Button>
         </div>
@@ -1523,7 +1523,7 @@ function PlatformPromos() {
                 {dead.length > 0 && (
                   <section className="space-y-2">
                     <Eyebrow>Deactivated · {dead.length}</Eyebrow>
-                    <p className="px-1 text-xs text-muted-foreground">Kept for the record. These are refused at checkout and can&apos;t be re-enabled from here.</p>
+                    <p className="px-1 text-caption text-muted-foreground">Kept for the record. These are refused at checkout and can&apos;t be re-enabled from here.</p>
                     {dead.map((p) => <PromoRow key={p.id} promo={p} />)}
                   </section>
                 )}
@@ -1560,7 +1560,7 @@ function PromoRow({ promo: p, busy, disabled, onDelete }: { promo: PPromo; busy?
       <IconBadge icon={Tag} tone={p.active ? "primary" : "neutral"} size="sm" />
       <div className="min-w-0 flex-1">
         <div className="numeral truncate font-semibold">{p.code}</div>
-        <div className="numeral truncate text-xs text-muted-foreground">
+        <div className="numeral truncate text-caption text-muted-foreground">
           {promoDiscount(p)} · used {p.redemption_count}{capped ? ` of ${p.max_redemptions}` : ""}
           {expires ? ` · expires ${expires}` : ""}
         </div>
@@ -1612,13 +1612,13 @@ function PlatformPromoSheet({ onClose, onSaved }: { onClose: () => void; onSaved
           {act.busy === "save" ? <><Spinner className="size-5" /> Creating…</> : "Create promo"}
         </Button>}>
       <div className="space-y-4">
-        <p className="text-xs leading-relaxed text-muted-foreground">
+        <p className="text-caption leading-relaxed text-muted-foreground">
           Applies to a studio&apos;s credit-pack purchase on the platform rail. Codes are stored upper-case and can be
           deactivated later, but never edited.
         </p>
         <Field label="Code" icon={Tag} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="LAUNCH20" />
         <div className="space-y-1.5">
-          <div className="text-sm font-medium text-muted-foreground">Discount</div>
+          <div className="text-body font-medium text-muted-foreground">Discount</div>
           <div className="flex gap-2" role="radiogroup" aria-label="Discount type">
             {(["percent", "amount"] as const).map((t) => (
               <Chip key={t} className="min-h-12" selected={discountType === t} onClick={() => setDiscountType(t)}>

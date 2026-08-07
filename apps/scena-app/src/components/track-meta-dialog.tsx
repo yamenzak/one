@@ -101,29 +101,29 @@ export function TrackMetaDialog({
           </div>
 
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Title</Label>
+            <Label className="text-caption text-muted-foreground">Title</Label>
             <Input autoFocus value={m.title} onChange={(e) => setM({ ...m, title: e.target.value })} placeholder="Track title" maxLength={200} />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Artist</Label>
+              <Label className="text-caption text-muted-foreground">Artist</Label>
               <Input value={m.artist} onChange={(e) => setM({ ...m, artist: e.target.value })} placeholder="Artist" maxLength={200} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Album</Label>
+              <Label className="text-caption text-muted-foreground">Album</Label>
               <Input value={m.album} onChange={(e) => setM({ ...m, album: e.target.value })} placeholder="Album (optional)" maxLength={200} />
             </div>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Genres</Label>
+            <Label className="text-caption text-muted-foreground">Genres</Label>
             <TagEditor tags={m.genres} onChange={(g) => setM({ ...m, genres: g })} placeholder="Add a genre…" />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Type</Label>
+            <Label className="text-caption text-muted-foreground">Type</Label>
             <div className="flex gap-1.5">
               {([["", "Unset"], ["vocal", "Vocal"], ["instrumental", "Instrumental"]] as const).map(([v, lbl]) => (
                 <button key={v} type="button" onClick={() => setM({ ...m, vocal: v })}
-                  className={`flex-1 rounded-md border px-2.5 py-2 text-xs font-medium transition-colors ${m.vocal === v ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}>
+                  className={`flex-1 rounded-md border px-2.5 py-2 text-caption font-medium transition-colors ${m.vocal === v ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}>
                   {lbl}
                 </button>
               ))}

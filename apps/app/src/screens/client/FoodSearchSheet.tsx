@@ -326,7 +326,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
           {/* Only when there IS a photo. An empty hero on a food nobody
               photographed is 200px of plate above the controls you came for. */}
           {img && <Media src={img} fallback={Utensils} tone="nutrition" ratio="wide" alt={selected.name} />}
-          <p className="px-1 text-sm text-muted-foreground">
+          <p className="px-1 text-body text-muted-foreground">
             {selected.brand ? `${selected.brand} · ` : ""}per {n.servingSize} {n.servingUnit}
           </p>
 
@@ -370,15 +370,15 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
     <div ref={resultsRef} className="max-h-80 space-y-1 overflow-y-auto">
       {localFiltered.map((f) => <FoodResult key={f.id} food={f} onPick={() => rowClick(f)} />)}
       {extFiltered.map((f, i) => <FoodResult key={`ext-${i}`} food={f} onPick={() => rowClick(f)} />)}
-      {searching && external.length === 0 && <p className="p-4 text-center text-sm text-muted-foreground">Searching…</p>}
+      {searching && external.length === 0 && <p className="p-4 text-center text-body text-muted-foreground">Searching…</p>}
       {hasQuery && q.trim().length >= 2 && !searching && localFiltered.length === 0 && extFiltered.length === 0 && (
         <div className="space-y-1">
           {/* Signpost inline creation when nothing matches. */}
           <button onClick={() => openManual({ name: q.trim() })} className="flex w-full items-center gap-3 rounded-xl px-2 py-2.5 text-left transition-colors hover:bg-secondary">
             <IconBadge icon={Plus} tone="primary" size="sm" />
-            <span className="min-w-0"><span className="block truncate font-medium">Create “{q.trim()}”</span><span className="block text-xs text-muted-foreground">Add it as a new food</span></span>
+            <span className="min-w-0"><span className="block truncate font-medium">Create “{q.trim()}”</span><span className="block text-caption text-muted-foreground">Add it as a new food</span></span>
           </button>
-          {!onPick && <p className="px-2 pt-0.5 text-xs text-muted-foreground">Or scan a barcode or snap a photo above.</p>}
+          {!onPick && <p className="px-2 pt-0.5 text-caption text-muted-foreground">Or scan a barcode or snap a photo above.</p>}
         </div>
       )}
       {extPage > 0 && extMore && (
@@ -429,9 +429,9 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
               scan / manual one tap away, and snap still passes the query as a hint. */}
           {!onPick && hasQuery && (
             <div className="flex gap-2">
-              <button onClick={() => snapInputRef.current?.click()} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><Camera /> Snap</button>
-              <button onClick={() => setScanOpen(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><Barcode /> Scan</button>
-              <button onClick={() => openManual()} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><PencilLine /> Manual</button>
+              <button onClick={() => snapInputRef.current?.click()} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-body font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><Camera /> Snap</button>
+              <button onClick={() => setScanOpen(true)} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-body font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><Barcode /> Scan</button>
+              <button onClick={() => openManual()} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-secondary py-2 text-body font-medium text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-4"><PencilLine /> Manual</button>
             </div>
           )}
           {/* The filter narrows RESULTS. On the landing there are none, so it was
@@ -444,7 +444,7 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
             />
           )}
           {snapErr != null && <AiErrorBox error={snapErr} />}
-          {aiError && <p className="text-sm text-warning">{aiError}</p>}
+          {aiError && <p className="text-body text-warning">{aiError}</p>}
           {results}
         </div>
 
@@ -458,18 +458,18 @@ export function FoodSearchSheet({ clientId, mealType, autoCamera, onClose, onLog
                 <span className="relative grid size-12 shrink-0 place-items-center rounded-2xl bg-primary-foreground/20 [&_svg]:size-6"><Camera /></span>
                 <span className="relative min-w-0 flex-1">
                   <span className="flex items-center gap-1.5 font-semibold"><AiAvatar className="size-4" /> Snap a meal</span>
-                  <span className="mt-0.5 block text-sm text-primary-foreground/80">Photo → macros in seconds</span>
+                  <span className="mt-0.5 block text-body text-primary-foreground/80">Photo → macros in seconds</span>
                 </span>
                 <ChevronRight className="relative size-5 shrink-0 opacity-80" />
               </button>
               <div className="grid grid-cols-2 gap-2.5">
                 <button onClick={() => setScanOpen(true)} className="flex items-center gap-3 rounded-2xl bg-card p-3 text-left transition-colors hover:bg-secondary">
                   <IconBadge icon={Barcode} tone="nutrition" size="sm" />
-                  <span className="min-w-0"><span className="block truncate text-sm font-medium">Scan barcode</span><span className="block truncate text-xs text-muted-foreground">Packaged food</span></span>
+                  <span className="min-w-0"><span className="block truncate text-body font-medium">Scan barcode</span><span className="block truncate text-caption text-muted-foreground">Packaged food</span></span>
                 </button>
                 <button onClick={() => openManual()} className="flex items-center gap-3 rounded-2xl bg-card p-3 text-left transition-colors hover:bg-secondary">
                   <IconBadge icon={PencilLine} tone="neutral" size="sm" />
-                  <span className="min-w-0"><span className="block truncate text-sm font-medium">Add manually</span><span className="block truncate text-xs text-muted-foreground">Custom entry</span></span>
+                  <span className="min-w-0"><span className="block truncate text-body font-medium">Add manually</span><span className="block truncate text-caption text-muted-foreground">Custom entry</span></span>
                 </button>
               </div>
             </div>
@@ -559,13 +559,13 @@ function SnapReview({ entries, note, mocked, defaultMeal, units, onCancel, onRet
             <AiAvatar className="size-8 shrink-0" />
             <div className="min-w-0">
               <div className="text-micro uppercase text-primary">AI read</div>
-              <Markdown className="mt-0.5 text-sm">{note}</Markdown>
+              <Markdown className="mt-0.5 text-body">{note}</Markdown>
             </div>
           </div>
         )}
 
         <div>
-          <div className="mb-1.5 text-sm text-muted-foreground">Meal</div>
+          <div className="mb-1.5 text-body text-muted-foreground">Meal</div>
           <div className="flex flex-wrap gap-2">{MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{mealLabel(m)}</Chip>)}</div>
         </div>
 
@@ -579,7 +579,7 @@ function SnapReview({ entries, note, mocked, defaultMeal, units, onCancel, onRet
               />
             </div>
           ))}
-          {items.length === 0 && <p className="rounded-xl bg-surface-2 p-4 text-center text-sm text-muted-foreground">Nothing left — retake the photo.</p>}
+          {items.length === 0 && <p className="rounded-xl bg-surface-2 p-4 text-center text-body text-muted-foreground">Nothing left — retake the photo.</p>}
         </div>
 
         {items.length > 0 && (

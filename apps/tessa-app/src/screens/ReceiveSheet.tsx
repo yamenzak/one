@@ -212,7 +212,7 @@ function LabelReader({ onRead }: { onRead: (l: LabelReading) => void }) {
     <Card className="space-y-2 p-3">
       <label className="flex items-center justify-between gap-3">
         <span className="min-w-0">
-          <span className="block text-sm font-medium">{t("ai.label")}</span>
+          <span className="block text-body font-medium">{t("ai.label")}</span>
           <span className="block text-caption text-muted-foreground">{t("ai.label.sub")}</span>
         </span>
         {/* `capture="environment"` opens the rear camera directly on a phone,
@@ -221,7 +221,7 @@ function LabelReader({ onRead }: { onRead: (l: LabelReading) => void }) {
           type="file"
           accept="image/*"
           capture="environment"
-          className="w-32 text-xs"
+          className="w-32 text-caption"
           disabled={act.busy !== null}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
         />

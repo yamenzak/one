@@ -133,7 +133,7 @@ function VoicePackStatus({ pack, selectedVoice, busy, note, onInstall, onRevoice
           {current
             ? <CircleCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
             : <CircleAlert className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />}
-          <div className="min-w-0 text-sm">
+          <div className="min-w-0 text-body">
             {current && <><span className="font-medium">Installed</span> — clients hear <b>{selectedVoice}</b>.</>}
             {elsewhere && <><span className="font-medium">{installed} is installed.</span> Clients hear {installed}, not {selectedVoice}, until you install it.</>}
             {!current && !elsewhere && (
@@ -150,7 +150,7 @@ function VoicePackStatus({ pack, selectedVoice, busy, note, onInstall, onRevoice
           ? <Button size="sm" variant="secondary" disabled={busy} onClick={onRevoice}>{busy ? "Re-voicing…" : "Re-voice"}</Button>
           : <Button size="sm" disabled={busy} onClick={onInstall}>{busy ? "Installing…" : elsewhere ? `Switch to ${selectedVoice}` : partial ? "Finish pack" : "Install pack"}</Button>}
       </div>
-      <p className="text-xs leading-relaxed text-muted-foreground">
+      <p className="text-caption leading-relaxed text-muted-foreground">
         {note ?? (current
           ? "Cached, so a scan costs nothing to narrate. Re-voicing bills the pack again and replaces the files in your media library."
           : "Voiced once and cached — you're billed in credits for the cue pack, not per scan. Installing replaces any pack already in your library.")}
@@ -332,7 +332,7 @@ export function AiConfigSection() {
                     property of a specific assistant. */}
                 <div className="flex items-center gap-2.5">
                   <AiAvatar className="size-9" />
-                  <div><div className="font-medium">{ai.name}&rsquo;s voice</div><div className="text-sm text-muted-foreground">The tone every personalized message is written in.</div></div>
+                  <div><div className="font-medium">{ai.name}&rsquo;s voice</div><div className="text-body text-muted-foreground">The tone every personalized message is written in.</div></div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {data.tones.map((t) => <Chip key={t} selected={(config.tone ?? "professional") === t} onClick={() => void saveHouseTone(t)}>{TONE_LABEL[t] ?? t}</Chip>)}
@@ -343,7 +343,7 @@ export function AiConfigSection() {
               <Card className="mt-2 space-y-3">
                 <div className="flex items-center gap-2.5">
                   <IconBadge icon={Camera} tone="primary" size="sm" />
-                  <div><div className="font-medium">Coach voice</div><div className="text-sm text-muted-foreground">The spoken voice for body-scan cues (“step back”, “hold still”). Tap <Play className="inline size-3 align-[-1px]" /> to preview.</div></div>
+                  <div><div className="font-medium">Coach voice</div><div className="text-body text-muted-foreground">The spoken voice for body-scan cues (“step back”, “hold still”). Tap <Play className="inline size-3 align-[-1px]" /> to preview.</div></div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {(data.voices ?? []).map((v) => {
@@ -382,7 +382,7 @@ export function AiConfigSection() {
               <Card className="mt-2 space-y-3">
                 <div className="flex items-center gap-2.5">
                   <IconBadge icon={Wallet} tone="primary" size="sm" />
-                  <div><div className="font-medium">Per-client daily cap</div><div className="text-sm text-muted-foreground">The most AI credits any one client can spend in a day. Leave blank for no limit.</div></div>
+                  <div><div className="font-medium">Per-client daily cap</div><div className="text-body text-muted-foreground">The most AI credits any one client can spend in a day. Leave blank for no limit.</div></div>
                 </div>
                 <Field
                   label="Daily credit cap"
@@ -467,7 +467,7 @@ function DefaultModels({ features, models, config, onApply }: {
     <div>
       <h3 className="mb-2 px-1 text-micro uppercase text-muted-foreground">Default models</h3>
       <Card className="space-y-3">
-        <p className="text-xs text-muted-foreground">Pick a model per category — it applies to every feature of that type at once. Fine-tune any single feature below.</p>
+        <p className="text-caption text-muted-foreground">Pick a model per category — it applies to every feature of that type at once. Fine-tune any single feature below.</p>
         {rows.map(({ g, keys, pickable, current, mixed }) => {
           const hint = costHint(pickable, g.priceTask, current);
           return (
@@ -475,7 +475,7 @@ function DefaultModels({ features, models, config, onApply }: {
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2.5">
                   <IconBadge icon={g.icon} tone={g.tone} size="sm" />
-                  <div className="min-w-0"><div className="text-sm font-medium">{g.label}</div><div className="truncate text-xs text-muted-foreground">{g.desc}</div></div>
+                  <div className="min-w-0"><div className="text-body font-medium">{g.label}</div><div className="truncate text-caption text-muted-foreground">{g.desc}</div></div>
                 </div>
                 <Select
                   aria-label={g.label}
@@ -485,7 +485,7 @@ function DefaultModels({ features, models, config, onApply }: {
                   options={modelOptions(pickable, g.priceTask, current, mixed ? "Mixed — set all…" : "Default (auto)")}
                 />
               </div>
-              {hint && <div className="numeral pl-[2.9rem] text-xs text-muted-foreground">{hint}</div>}
+              {hint && <div className="numeral pl-[2.9rem] text-caption text-muted-foreground">{hint}</div>}
             </div>
           );
         })}
@@ -499,7 +499,7 @@ function DefaultModels({ features, models, config, onApply }: {
  *  "~8 cr" is a mystery unit; with it, it is a price. */
 function CostLegend() {
   return (
-    <p className="flex items-start gap-1.5 rounded-xl bg-muted/40 p-2.5 text-xs leading-relaxed text-muted-foreground">
+    <p className="flex items-start gap-1.5 rounded-xl bg-muted/40 p-2.5 text-caption leading-relaxed text-muted-foreground">
       <Wallet className="mt-0.5 size-3.5 shrink-0" aria-hidden />
       <span>
         <b className="text-foreground">cr</b> = AI credits, the same balance your plan tops up. Figures are for a{" "}
@@ -564,10 +564,10 @@ function FeatureCard({ feat, models, cfg, tones, onSave }: {
           className="min-w-0 flex-1 text-left disabled:cursor-default"
         >
           <div className="flex items-center gap-1.5">
-            <span className="min-w-0 truncate text-sm font-medium">{feat.label}</span>
+            <span className="min-w-0 truncate text-body font-medium">{feat.label}</span>
             {enabled && <ChevronDown className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />}
           </div>
-          <div className={cn("truncate text-xs", open ? "text-muted-foreground" : "text-muted-foreground")}>
+          <div className={cn("truncate text-caption", open ? "text-muted-foreground" : "text-muted-foreground")}>
             {open ? feat.description : summary}
           </div>
         </button>
@@ -576,9 +576,9 @@ function FeatureCard({ feat, models, cfg, tones, onSave }: {
 
       {enabled && open && (
         <div className="space-y-3 border-t border-border/50 pt-3">
-          <p className="text-xs leading-relaxed text-muted-foreground">{feat.description}</p>
+          <p className="text-caption leading-relaxed text-muted-foreground">{feat.description}</p>
           <div>
-            <label className="flex items-center justify-between gap-3 text-sm">
+            <label className="flex items-center justify-between gap-3 text-body">
               <span className="text-muted-foreground">Model</span>
               <Select
                 aria-label={`Model for ${feat.label}`}
@@ -591,22 +591,22 @@ function FeatureCard({ feat, models, cfg, tones, onSave }: {
             {/* Priced in THIS feature's lane, so the number is what this feature
                 will actually cost — not a generic figure for the model. */}
             {costHint(pickable, feat.task, cfg.model ?? "") && (
-              <div className="numeral mt-1 text-right text-xs text-muted-foreground">{costHint(pickable, feat.task, cfg.model ?? "")}</div>
+              <div className="numeral mt-1 text-right text-caption text-muted-foreground">{costHint(pickable, feat.task, cfg.model ?? "")}</div>
             )}
           </div>
 
           {feat.tonable && (
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted-foreground">Tone</span>
+              <span className="text-body text-muted-foreground">Tone</span>
               <Chip selected={!cfg.tone} onClick={() => onSave({ tone: null })}>House</Chip>
               {tones.map((t) => <Chip key={t} selected={cfg.tone === t} onClick={() => onSave({ tone: t })}>{TONE_LABEL[t] ?? t}</Chip>)}
             </div>
           )}
 
           <div className="space-y-2">
-            <span className="text-sm text-muted-foreground">Extra instructions</span>
-            <p className="text-xs leading-relaxed text-muted-foreground">Added on top of the built-in instructions — the AI is told the studio also asked for this. Your notes refine the output; they don't replace how the feature works.</p>
-            <Textarea rows={3} value={draft} placeholder={exampleMod(feat.key)} onChange={(e) => setDraft(e.target.value)} className="text-xs" />
+            <span className="text-body text-muted-foreground">Extra instructions</span>
+            <p className="text-caption leading-relaxed text-muted-foreground">Added on top of the built-in instructions — the AI is told the studio also asked for this. Your notes refine the output; they don't replace how the feature works.</p>
+            <Textarea rows={3} value={draft} placeholder={exampleMod(feat.key)} onChange={(e) => setDraft(e.target.value)} className="text-caption" />
             <div className="flex items-center gap-2">
               <Button size="sm" disabled={draft === (cfg.system ?? "")} onClick={() => onSave({ system: draft.trim() || null })}>Save</Button>
               {cfg.system && <Button size="sm" variant="ghost" onClick={() => { setDraft(""); onSave({ system: null }); }}>Clear</Button>}

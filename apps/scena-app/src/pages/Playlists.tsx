@@ -166,11 +166,11 @@ function TransitionPreview({ type, className }: { type: string; className?: stri
   const enter = PREVIEW_ENTER[type] ?? { opacity: 0, transform: "none" };
   return (
     <div className={`relative overflow-hidden rounded-lg ${className ?? ""}`} style={{ aspectRatio: "16 / 9" }}>
-      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary to-primary/40 text-sm font-semibold text-white">
+      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary to-primary/40 text-body font-semibold text-white">
         A
       </div>
       <div
-        className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/80 to-primary text-sm font-semibold text-white"
+        className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary/80 to-primary text-body font-semibold text-white"
         style={{
           transformOrigin: "center",
           transition: `opacity ${ms}ms ease, transform ${ms}ms ease`,
@@ -411,7 +411,7 @@ export function PlaylistDetailPage() {
             ) : (
               <div className="flex flex-wrap gap-1">
                 {(pl?.tags ?? []).map((t) => (
-                  <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-secondary-foreground">
+                  <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-caption font-medium text-secondary-foreground">
                     {t}
                   </span>
                 ))}
@@ -485,10 +485,10 @@ export function PlaylistDetailPage() {
         {/* Settings sidebar */}
         <aside className="space-y-4 lg:sticky lg:top-2 lg:self-start">
           <div className="rounded-xl bg-card p-4 shadow-sm">
-            <h3 className="text-sm font-semibold">Playback</h3>
+            <h3 className="text-body font-semibold">Playback</h3>
             <div className="mt-3 space-y-4">
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">Default time per slide</Label>
+                <Label className="text-caption text-muted-foreground">Default time per slide</Label>
                 <div className="flex items-center gap-2">
                   <Input
                     type="number"
@@ -503,13 +503,13 @@ export function PlaylistDetailPage() {
                     onBlur={(e) => patchPlaylist({ defaultDurationMs: Math.max(500, Math.round(parseFloat(e.target.value || "6") * 1000)) })}
                     className="w-24"
                   />
-                  <span className="text-sm text-muted-foreground">seconds</span>
+                  <span className="text-body text-muted-foreground">seconds</span>
                 </div>
-                <p className="text-xs text-muted-foreground">Applied to slides that don't set their own duration.</p>
+                <p className="text-caption text-muted-foreground">Applied to slides that don't set their own duration.</p>
               </div>
               <Separator />
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Transition between slides</Label>
+                <Label className="text-caption text-muted-foreground">Transition between slides</Label>
                 <div className="grid grid-cols-3 gap-1.5">
                   {TRANSITIONS.map((t) => (
                     <button
@@ -517,14 +517,14 @@ export function PlaylistDetailPage() {
                       type="button"
                       disabled={!canWrite}
                       onClick={() => patchPlaylist({ transition: t })}
-                      className={`rounded-md border px-2 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${transition === t ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
+                      className={`rounded-md border px-2 py-1.5 text-caption font-medium transition-colors disabled:opacity-60 ${transition === t ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
                     >
                       {TRANSITION_LABELS[t]}
                     </button>
                   ))}
                 </div>
                 <TransitionPreview type={transition} className="mt-1 ring-1 ring-border" />
-                <p className="text-center text-xs text-muted-foreground">Live preview · {TRANSITION_LABELS[transition]}</p>
+                <p className="text-center text-caption text-muted-foreground">Live preview · {TRANSITION_LABELS[transition]}</p>
               </div>
             </div>
           </div>
@@ -658,7 +658,7 @@ function EditablePlaylistName({ name, onRename }: { name: string; onRename: (n: 
           }
         }}
         maxLength={80}
-        className="h-10 w-64 text-2xl! font-semibold"
+        className="h-10 w-64 text-title-2! font-semibold"
       />
     );
   }
@@ -671,7 +671,7 @@ function EditablePlaylistName({ name, onRename }: { name: string; onRename: (n: 
       className="group/n inline-flex items-center gap-2 text-left"
       title="Rename playlist"
     >
-      <span className="truncate text-title-3 md:text-2xl">{name}</span>
+      <span className="truncate text-title-3 md:text-title-2">{name}</span>
       <Pencil className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/n:opacity-70" />
     </button>
   );
@@ -699,13 +699,13 @@ function DeletePlaylistDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title={<>Delete “{name}”?</>}>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-body text-muted-foreground">
           This removes the playlist and its slides. Any channel using it loses these slides. This can't be undone.
         </p>
         <label className="flex items-center justify-between gap-3 rounded-lg border p-3">
           <span className="min-w-0">
-            <span className="block text-sm font-medium">Also delete media from the library</span>
-            <span className="block text-xs text-muted-foreground">Permanently removes these slides' images/videos from the Media library and storage.</span>
+            <span className="block text-body font-medium">Also delete media from the library</span>
+            <span className="block text-caption text-muted-foreground">Permanently removes these slides' images/videos from the Media library and storage.</span>
           </span>
           <Switch checked={alsoMedia} onCheckedChange={setAlsoMedia} />
         </label>
@@ -789,7 +789,7 @@ function SlideCard({
           </div>
         )}
 
-        <span className="absolute left-2 top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-background/85 px-1.5 text-xs font-medium tabular-nums shadow-sm">
+        <span className="absolute left-2 top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-background/85 px-1.5 text-caption font-medium tabular-nums shadow-sm">
           {index + 1}
         </span>
         {slide.type === "gif" && (
@@ -811,7 +811,7 @@ function SlideCard({
         )}
       </div>
       <Badge className="capitalize">{slide.type}</Badge>
-      <span className="flex items-center gap-2 text-xs text-muted-foreground">
+      <span className="flex items-center gap-2 text-caption text-muted-foreground">
         <span title="Media fit">{FIT_LABELS[fit]}</span>
         <span className="flex items-center gap-1">
           <Clock className="size-3" /> {slide.duration_ms ? fmtDur(slide.duration_ms) : "default"}
@@ -828,7 +828,7 @@ function Seg({ active, onClick, children }: { active: boolean; onClick: () => vo
     <button
       type="button"
       onClick={onClick}
-      className={`flex-1 rounded-md border px-2.5 py-2 text-xs font-medium ${active ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
+      className={`flex-1 rounded-md border px-2.5 py-2 text-caption font-medium ${active ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
     >
       {children}
     </button>
@@ -902,7 +902,7 @@ function SlideSettingsDialog({
         <div className="space-y-5">
           {type === "video" && (
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Video playback{mediaLen ? ` · ${fmtDur(mediaLen)} clip` : ""}</Label>
+              <Label className="text-caption text-muted-foreground">Video playback{mediaLen ? ` · ${fmtDur(mediaLen)} clip` : ""}</Label>
               <div className="flex gap-1.5">
                 <Seg active={vmode === "fixed"} onClick={() => setVmode("fixed")}>
                   Fixed length
@@ -914,11 +914,11 @@ function SlideSettingsDialog({
                   Trim
                 </Seg>
               </div>
-              {vmode === "full" && <p className="text-xs text-muted-foreground">The slide lasts exactly as long as the video, then advances.</p>}
+              {vmode === "full" && <p className="text-caption text-muted-foreground">The slide lasts exactly as long as the video, then advances.</p>}
               {vmode === "trim" &&
                 (mediaLen ? (
                   <div className="space-y-2 pt-1">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div className="flex items-center justify-between text-caption text-muted-foreground">
                       <span>Start {trim[0].toFixed(1)}s</span>
                       <span>End {trim[1].toFixed(1)}s</span>
                     </div>
@@ -940,19 +940,19 @@ function SlideSettingsDialog({
                       onChange={(e) => setTrim(([a]) => [a, Math.max(+e.target.value, a + 0.3)])}
                       className="w-full accent-primary"
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-caption text-muted-foreground">
                       Plays {(trim[1] - trim[0]).toFixed(1)}s, from {trim[0].toFixed(1)}s to {trim[1].toFixed(1)}s.
                     </p>
                   </div>
                 ) : (
-                  <p className="text-xs text-muted-foreground">Reading video length…</p>
+                  <p className="text-caption text-muted-foreground">Reading video length…</p>
                 ))}
             </div>
           )}
 
           {type === "gif" && (
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">GIF playback</Label>
+              <Label className="text-caption text-muted-foreground">GIF playback</Label>
               <div className="flex gap-1.5">
                 <Seg active={gmode === "loop"} onClick={() => setGmode("loop")}>
                   Loop
@@ -961,7 +961,7 @@ function SlideSettingsDialog({
                   Play once{mediaLen ? ` · ${fmtDur(mediaLen)}` : ""}
                 </Seg>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 {gmode === "once"
                   ? mediaLen
                     ? "Advances after one full loop of the GIF."
@@ -973,7 +973,7 @@ function SlideSettingsDialog({
 
           {showDuration && (
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Duration</Label>
+              <Label className="text-caption text-muted-foreground">Duration</Label>
               <div className="flex gap-1.5">
                 <Seg active={useDefault} onClick={() => setUseDefault(true)}>
                   Use default ({fmtDur(defaultDur)})
@@ -992,7 +992,7 @@ function SlideSettingsDialog({
                     onChange={(e) => setSecs(Math.max(0.5, parseFloat(e.target.value || "6")))}
                     className="w-24"
                   />
-                  <span className="text-sm text-muted-foreground">seconds</span>
+                  <span className="text-body text-muted-foreground">seconds</span>
                 </div>
               )}
             </div>
@@ -1000,7 +1000,7 @@ function SlideSettingsDialog({
 
           {type !== "html" && (
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Media fit</Label>
+              <Label className="text-caption text-muted-foreground">Media fit</Label>
               <div className="grid grid-cols-3 gap-1.5">
                 {FITS.map((f) => (
                   <Seg key={f} active={fit === f} onClick={() => setFit(f)}>
@@ -1008,7 +1008,7 @@ function SlideSettingsDialog({
                   </Seg>
                 ))}
               </div>
-              <p className="text-xs text-muted-foreground">Fit = whole image (letterbox) · Fill = crop to fill · Stretch = distort to fill.</p>
+              <p className="text-caption text-muted-foreground">Fit = whole image (letterbox) · Fill = crop to fill · Stretch = distort to fill.</p>
             </div>
           )}
         </div>
@@ -1103,7 +1103,7 @@ function AiImageDialog({
           />
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Aspect</Label>
+              <Label className="text-caption text-muted-foreground">Aspect</Label>
               <Select
                 value={aspect}
                 onChange={(v) => setAspect(v as Aspect)}
@@ -1113,7 +1113,7 @@ function AiImageDialog({
             </div>
             {models.length > 0 && (
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Model</Label>
+                <Label className="text-caption text-muted-foreground">Model</Label>
                 <Select
                   value={modelId || "__default"}
                   onChange={(v) => setModelId(v === "__default" ? "" : v)}
@@ -1131,12 +1131,12 @@ function AiImageDialog({
             {result ? (
               <img src={assetUrl(result.assetUrl)} alt="" className="size-full object-contain" />
             ) : (
-              <div className="p-6 text-center text-xs text-muted-foreground">{busy ? "Generating…" : "Your image will appear here."}</div>
+              <div className="p-6 text-center text-caption text-muted-foreground">{busy ? "Generating…" : "Your image will appear here."}</div>
             )}
           </div>
 
-          {err && <p className="text-sm text-destructive">{err}</p>}
-          <p className="text-xs text-muted-foreground">Uses your AI credits · applies your brand palette automatically.</p>
+          {err && <p className="text-body text-destructive">{err}</p>}
+          <p className="text-caption text-muted-foreground">Uses your AI credits · applies your brand palette automatically.</p>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>

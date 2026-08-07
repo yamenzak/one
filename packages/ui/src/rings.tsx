@@ -86,11 +86,12 @@ export function ProgressRing({ progress, size = 200, strokeWidth, tone = "activi
         className="absolute flex flex-col items-center justify-center text-center"
         style={{ inset: sw + 1 }}
       >
-        {/* Floor the ring's caption text at 12px (UI-LANGUAGE.md §5 — the type scale's floor). The pure
-            proportional size rendered the label at 7.5px on the hero ring most
-            screens use (size 116) — the inline style silently beat the `text-xs`
-            class it sits next to, so the smallest, most-read text in the app was
-            barely legible. */}
+        {/* Floor the ring's caption at 12px (UI-LANGUAGE §5 — the scale's floor).
+            The purely proportional size rendered the label at 7.5px on the hero
+            ring most screens use (size 116), and an inline style beats the class
+            beside it, so the smallest and most-read text in the app was barely
+            legible. The class is the fallback for rings big enough not to need
+            the floor; the `max` is what makes the small ones readable. */}
         {label && <div className="text-caption font-medium text-muted-foreground" style={{ fontSize: Math.max(12, size * 0.065) }}>{label}</div>}
         <motion.div
           className={isBlank(value) ? "leading-none" : "numeral font-semibold leading-none"}

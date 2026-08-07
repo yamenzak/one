@@ -157,7 +157,7 @@ function ChannelCard({ channel, onOpen }: { channel: ComposedChannel; onOpen: ()
       <DevicePreview channelId={channel.id} online className="rounded-none ring-0" />
       <div className="p-3.5">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-semibold">{channel.name}</span>
+          <span className="truncate text-body font-semibold">{channel.name}</span>
           <span className="ml-auto shrink-0 text-caption tabular-nums text-muted-foreground">
             {setCount}/{SOURCES.length}
           </span>
@@ -356,7 +356,7 @@ export function ChannelDetailPage() {
   const back = (
     <button
       onClick={() => navigate("/channels")}
-      className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+      className="mb-4 inline-flex items-center gap-1.5 text-body font-medium text-muted-foreground transition-colors hover:text-foreground"
     >
       <ArrowLeft className="size-4" /> All channels
     </button>
@@ -409,7 +409,7 @@ export function ChannelDetailPage() {
               ) : (
                 <div className="flex flex-wrap gap-1">
                   {(channel.tags ?? []).map((t) => (
-                    <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-secondary-foreground">
+                    <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-caption font-medium text-secondary-foreground">
                       {t}
                     </span>
                   ))}
@@ -464,8 +464,8 @@ export function ChannelDetailPage() {
         {/* Live preview */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Live preview</h2>
-            <span className="text-xs text-muted-foreground">Published output</span>
+            <h2 className="text-body font-semibold">Live preview</h2>
+            <span className="text-caption text-muted-foreground">Published output</span>
           </div>
           <DevicePreview channelId={channel.id} online chrome className="w-full shadow-sm" />
         </div>
@@ -539,7 +539,7 @@ function EditableChannelName({ channel, onRenamed }: { channel: ComposedChannel;
           }
         }}
         maxLength={80}
-        className="h-10 w-64 text-2xl! font-semibold"
+        className="h-10 w-64 text-title-2! font-semibold"
       />
     );
   }
@@ -552,7 +552,7 @@ function EditableChannelName({ channel, onRenamed }: { channel: ComposedChannel;
       className="group/n inline-flex items-center gap-2 text-left"
       title="Rename channel"
     >
-      <span className="truncate text-title-3 md:text-2xl">{channel.name}</span>
+      <span className="truncate text-title-3 md:text-title-2">{channel.name}</span>
       <Pencil className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/n:opacity-70" />
     </button>
   );
@@ -561,13 +561,13 @@ function EditableChannelName({ channel, onRenamed }: { channel: ComposedChannel;
 function PublishStatus({ dirty, liveVersion }: { dirty: boolean; liveVersion: number | null }) {
   if (dirty) {
     return (
-      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-warning">
+      <span className="inline-flex items-center gap-1.5 text-body font-medium text-warning">
         <span className="size-1.5 rounded-full bg-warning" /> Unpublished changes
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+    <span className="inline-flex items-center gap-1.5 text-body text-muted-foreground">
       <Check className="size-4 text-success" /> Up to date{liveVersion ? ` · v${liveVersion}` : ""}
     </span>
   );
@@ -608,7 +608,7 @@ function ComposerRow({
       </div>
       <div className="min-w-0 flex-1">
         <Label className="font-medium">{title}</Label>
-        <div className="text-xs text-muted-foreground">{description}</div>
+        <div className="text-caption text-muted-foreground">{description}</div>
       </div>
       <Select
         value={value ?? NONE}
@@ -668,7 +668,7 @@ function VersionRow({
             }}
             placeholder="Label this version…"
             maxLength={120}
-            className="h-7 text-sm"
+            className="h-7 text-body"
           />
         ) : editable ? (
           <button
@@ -679,22 +679,22 @@ function VersionRow({
             className="group/l inline-flex max-w-full items-center gap-1.5 text-left"
             title="Label this version"
           >
-            <span className="truncate text-sm font-medium">{v.note ? v.note : <span className="italic text-muted-foreground">Add a label…</span>}</span>
-            {live && <span className="shrink-0 text-xs font-semibold text-success">● Live</span>}
+            <span className="truncate text-body font-medium">{v.note ? v.note : <span className="italic text-muted-foreground">Add a label…</span>}</span>
+            {live && <span className="shrink-0 text-caption font-semibold text-success">● Live</span>}
             <Pencil className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/l:opacity-70" />
           </button>
         ) : (
           <span className="inline-flex max-w-full items-center gap-1.5">
-            <span className="truncate text-sm font-medium">{v.note || <span className="text-muted-foreground">—</span>}</span>
-            {live && <span className="shrink-0 text-xs font-semibold text-success">● Live</span>}
+            <span className="truncate text-body font-medium">{v.note || <span className="text-muted-foreground">—</span>}</span>
+            {live && <span className="shrink-0 text-caption font-semibold text-success">● Live</span>}
           </span>
         )}
-        <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+        <div className="mt-0.5 flex items-center gap-1 text-caption text-muted-foreground">
           <Clock className="size-3" /> {new Date(v.created_at).toLocaleString()} · {v.hash.slice(0, 10)}
         </div>
       </div>
       {live ? (
-        <span className="shrink-0 text-xs text-muted-foreground">current</span>
+        <span className="shrink-0 text-caption text-muted-foreground">current</span>
       ) : editable ? (
         <Button variant="outline" size="sm" disabled={busy} onClick={() => onRevert(v.version)}>
           Revert
@@ -755,7 +755,7 @@ function HistoryDialog({
             ))}
           </div>
         ) : versions.length === 0 ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">No versions yet — publish to create the first.</div>
+          <div className="py-8 text-center text-body text-muted-foreground">No versions yet — publish to create the first.</div>
         ) : (
           <div className="-mr-1 max-h-[65vh] space-y-2 overflow-y-auto pr-1">
             {versions.map((v) => (

@@ -18,7 +18,7 @@ import {
   displayToKg, kgToDisplay, lengthDisplayToCm, cmToLengthDisplay, weightLabel, lengthLabel, type UnitPrefs,
 } from "@kova/domain";
 import {
-  Button, Field, Switch, Badge, IconBadge, Spinner, cn, toneVar, useModalOverlay,
+  Anchor, Button, Field, Switch, Badge, IconBadge, Spinner, cn, toneVar, useModalOverlay,
   Camera, ScanLine, ShieldCheck, Ruler, User, Check, RotateCcw, X, AlertTriangle, ArrowRight, Percent,
   motion, stagger, popIn, CountUp, NoData,
 } from "@4dl/ui";
@@ -216,14 +216,14 @@ function Intro({ voiceReady, onStartCamera, onManual }: { voiceReady: boolean; o
       <div className="space-y-2 text-center">
         <div className="mx-auto grid size-16 place-items-center rounded-3xl bg-sleep/15"><Camera className="size-8" style={{ color: toneVar.sleep }} /></div>
         <h1 className="text-title-2">Scan your body composition</h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className="text-body leading-relaxed text-muted-foreground">
           Stand in front of your camera for three quick poses: facing forward with your arms out, facing forward with your arms down, then side-on. We estimate your body-fat percentage from your proportions and build a silhouette you can rotate in 3-D. We'll guide you by voice.
         </p>
       </div>
 
       <div className="space-y-2.5 rounded-2xl bg-success-soft/40 p-4">
         <div className="flex items-center gap-2 font-semibold text-success"><ShieldCheck className="size-5" /> Your camera never leaves this device</div>
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className="text-body leading-relaxed text-muted-foreground">
           All image processing runs privately in your browser. Your photo is never uploaded, saved, or sent to a server — not even to us.
           Only a few numbers (your measurements) are stored. You can also choose to save a de-identified outline — an anonymous silhouette,
           never a photo — to watch your shape change over time.
@@ -232,19 +232,19 @@ function Intro({ voiceReady, onStartCamera, onManual }: { voiceReady: boolean; o
 
       <div className="space-y-2.5 rounded-2xl bg-card p-4">
         <div className="flex items-center gap-2 font-semibold"><AiAvatar className="size-5" /> An honest estimate</div>
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className="text-body leading-relaxed text-muted-foreground">
           A camera estimate is accurate to about ±4%. Think of the number as a ballpark — <span className="font-medium text-foreground">the trend over time is the real story</span>. Scan under similar lighting and clothing each time for the most consistent trend.
         </p>
       </div>
 
-      <div className="space-y-2 rounded-2xl bg-card p-4 text-sm text-muted-foreground">
+      <div className="space-y-2 rounded-2xl bg-card p-4 text-body text-muted-foreground">
         <Bullet icon={User}>Wear form-fitting clothing (or none) so your outline is clear.</Bullet>
         <Bullet icon={ScanLine}>Prop your phone up about 2–3 m away at hip height, so your whole body — head to feet — fits in the frame.</Bullet>
         <Bullet icon={Ruler}>Stand tall with your feet shoulder-width apart. We'll tell you when to hold your arms out and when to relax them down.</Bullet>
       </div>
 
       {!voiceReady && (
-        <div className="flex items-start gap-2.5 rounded-2xl bg-warning-soft/40 p-4 text-sm text-warning">
+        <div className="flex items-start gap-2.5 rounded-2xl bg-warning-soft/40 p-4 text-body text-warning">
           <AiAvatar className="mt-0.5 size-5 shrink-0" />
           <p>The guided camera scan needs your studio's voice pack, which your coach hasn't set up yet. You can still enter your measurements by hand below.</p>
         </div>
@@ -253,7 +253,7 @@ function Intro({ voiceReady, onStartCamera, onManual }: { voiceReady: boolean; o
         <Button size="lg" className="w-full" disabled={!voiceReady} onClick={onStartCamera}><Camera /> Start camera scan</Button>
         <Button variant={voiceReady ? "ghost" : "default"} className="w-full" onClick={onManual}><Ruler /> Enter measurements by hand{voiceReady ? " instead" : ""}</Button>
       </div>
-      <p className="px-2 text-center text-xs text-muted-foreground">By continuing you agree to run the scan on your device. Your coach only ever sees the resulting numbers.</p>
+      <p className="px-2 text-center text-caption text-muted-foreground">By continuing you agree to run the scan on your device. Your coach only ever sees the resulting numbers.</p>
     </div>
   );
 }
@@ -398,8 +398,8 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
     return (
       <div className="mx-auto max-w-md space-y-4 px-5 py-8 text-center">
         <div className="mx-auto grid size-14 place-items-center rounded-3xl bg-warning-soft/60"><AlertTriangle className="size-7" style={{ color: toneVar.warning }} /></div>
-        <h2 className="text-lg font-semibold">{state === "denied" ? "Camera unavailable" : "On-device scan couldn't start"}</h2>
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <h2 className="text-body-lg font-semibold">{state === "denied" ? "Camera unavailable" : "On-device scan couldn't start"}</h2>
+        <p className="text-body leading-relaxed text-muted-foreground">
           {state === "denied"
             ? "We couldn't access your camera. Check the browser permission, or enter your measurements by hand."
             : "Your device couldn't load the on-device model (it may be low on memory or lack graphics support). You can enter your measurements by hand instead."}
@@ -413,8 +413,8 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
   return (
     <div className="mx-auto flex max-w-md flex-col px-4 py-2">
       <div className="mb-3 text-center">
-        <h2 className="text-lg font-semibold">{phase === "front" ? "Front · arms out" : phase === "frontShape" ? "Front · arms down" : "Side · arms down"}</h2>
-        <p className="text-xs text-muted-foreground">{phase === "front" ? "Face the camera, feet apart, arms out to your sides" : phase === "frontShape" ? "Stay facing the camera, arms relaxed straight down" : "Turn side-on, feet in frame, arms relaxed down"}</p>
+        <h2 className="text-body-lg font-semibold">{phase === "front" ? "Front · arms out" : phase === "frontShape" ? "Front · arms down" : "Side · arms down"}</h2>
+        <p className="text-caption text-muted-foreground">{phase === "front" ? "Face the camera, feet apart, arms out to your sides" : phase === "frontShape" ? "Stay facing the camera, arms relaxed straight down" : "Turn side-on, feet in frame, arms relaxed down"}</p>
       </div>
       <div className={cn("relative aspect-[3/4] w-full overflow-hidden rounded-3xl bg-black ring-2 transition-colors", ready ? "ring-success" : "ring-white/10")}>
         {/* Mirror the preview so left/right feel natural; measurements are mirror-invariant. */}
@@ -425,7 +425,7 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
         <div className={cn("pointer-events-none absolute inset-x-[22%] inset-y-[6%] rounded-full border-2 border-dashed transition-colors", ready ? "border-success/80" : "border-white/25")} />
         {state === "loading" && (
           <div className="absolute inset-0 grid place-items-center bg-black/60">
-            <div className="flex flex-col items-center gap-2 text-white/80"><Spinner /> <span className="text-sm">Starting private on-device scan…</span></div>
+            <div className="flex flex-col items-center gap-2 text-white/80"><Spinner /> <span className="text-body">Starting private on-device scan…</span></div>
           </div>
         )}
         {/* Hold-still progress ring */}
@@ -437,7 +437,7 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
         {/* Live guidance */}
         {state === "scanning" && (
           <div className="absolute inset-x-3 bottom-3">
-            <div className={cn("flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-center text-sm font-medium backdrop-blur-md", ready ? "bg-success/85 text-white" : "bg-black/65 text-white")}>
+            <div className={cn("flex items-center justify-center gap-2 rounded-2xl px-4 py-2.5 text-center text-body font-medium backdrop-blur-md", ready ? "bg-success/85 text-white" : "bg-black/65 text-white")}>
               {ready ? <Check className="size-4" /> : <ScanLine className="size-4" />}
               {align?.message ?? "Position yourself in the frame"}
             </div>
@@ -449,7 +449,7 @@ function CaptureStep({ phase, cue, onCaptured, onFallback }: {
         <Button variant="secondary" className="flex-1" disabled={state !== "scanning"} onClick={manualShoot}><Camera /> Capture now</Button>
         <Button variant="ghost" onClick={onFallback}><Ruler /> By hand</Button>
       </div>
-      <p className="mt-2 text-center text-xs text-muted-foreground">Auto-captures when you hold the pose. Nothing is recorded — only your outline is measured.</p>
+      <p className="mt-2 text-center text-caption text-muted-foreground">Auto-captures when you hold the pose. Nothing is recorded — only your outline is measured.</p>
     </div>
   );
 }
@@ -518,7 +518,7 @@ function Measuring() {
         <Spinner className="size-8" />
         <div className="space-y-1">
           <div className="font-semibold">Measuring on your device…</div>
-          <p className="text-sm text-muted-foreground">Reading your proportions and estimating body composition. Your frames are being discarded now.</p>
+          <p className="text-body text-muted-foreground">Reading your proportions and estimating body composition. Your frames are being discarded now.</p>
         </div>
       </div>
     </div>
@@ -560,16 +560,16 @@ function ManualStep({ profile, latestWeightKg, units, notice, onResult }: {
     <div className="mx-auto max-w-md space-y-4 px-5 py-4">
       <div className="space-y-1">
         <h2 className="text-title-3">Enter your measurements</h2>
-        <p className="text-sm text-muted-foreground">Use a tape measure. We'll estimate your body-fat percentage from these.</p>
+        <p className="text-body text-muted-foreground">Use a tape measure. We'll estimate your body-fat percentage from these.</p>
       </div>
-      {notice && <div className="whitespace-pre-line rounded-2xl bg-warning-soft/50 px-4 py-3 text-sm text-warning">{notice}</div>}
+      {notice && <div className="whitespace-pre-line rounded-2xl bg-warning-soft/50 px-4 py-3 text-body text-warning">{notice}</div>}
       <div className="space-y-3">
         <Field label={`Neck circumference (${ll})`} icon={Ruler} inputMode="decimal" value={f.neck ?? ""} onChange={(e) => set("neck", e.target.value)} placeholder="e.g. 38" />
         <Field label={`Waist circumference (${ll})`} icon={Ruler} inputMode="decimal" value={f.waist ?? ""} onChange={(e) => set("waist", e.target.value)} placeholder="e.g. 82" hint="Measured at the narrowest point, at the navel." />
         <Field label={`Hips circumference (${ll})${needHips ? "" : " — optional"}`} icon={Ruler} inputMode="decimal" value={f.hips ?? ""} onChange={(e) => set("hips", e.target.value)} placeholder="e.g. 98" />
         <Field label={`Weight (${wl})`} icon={User} inputMode="decimal" value={f.weight ?? ""} onChange={(e) => set("weight", e.target.value)} />
       </div>
-      {err && <p className="text-sm text-danger">{err}</p>}
+      {err && <p className="text-body text-danger">{err}</p>}
       <Button size="lg" className="w-full" onClick={submit}>See my estimate <ArrowRight /></Button>
     </div>
   );
@@ -629,11 +629,9 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
         ) : (
           <div className="grid h-[180px] w-[120px] place-items-center rounded-3xl bg-sleep/10"><User className="size-16" style={{ color: toneVar.sleep }} /></div>
         )}
-        <div className="mt-1 flex items-end gap-1">
-          <span className="numeral text-6xl font-bold tabular-nums tracking-tight">{count.toFixed(1)}</span>
-          <Percent className="mb-2 size-7 text-muted-foreground" />
-        </div>
-        <div className="text-sm text-muted-foreground">estimated body fat</div>
+        <Anchor className="mt-1 pb-0 pt-0" unit={<Percent className="inline size-[0.7em]" />} sub="estimated body fat">
+          {count.toFixed(1)}
+        </Anchor>
         <div className="mt-2 flex items-center gap-2">
           {category && <Badge tone="sleep">{CATEGORY_LABEL[category]}</Badge>}
           <Badge tone={CONFIDENCE_TONE[estimate.confidence]}>
@@ -645,28 +643,28 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
 
       {/* Confidence band */}
       <div className="rounded-2xl bg-card p-4">
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center justify-between text-body">
           <span className="text-muted-foreground">Likely range</span>
           <span className="numeral font-semibold">{estimate.low.toFixed(1)}%–{estimate.high.toFixed(1)}%</span>
         </div>
         <BandBar low={estimate.low} value={estimate.bodyFatPercent} high={estimate.high} />
-        <p className="mt-2.5 text-xs leading-relaxed text-muted-foreground">
+        <p className="mt-2.5 text-caption leading-relaxed text-muted-foreground">
           A camera estimate is a ballpark (±~4%). Your <span className="font-medium text-foreground">trend</span> across scans is what matters — not any single number.
         </p>
       </div>
 
       {/* How we got here */}
       <details className="rounded-2xl bg-card p-4">
-        <summary className="cursor-pointer select-none text-sm font-semibold">How we got here</summary>
+        <summary className="cursor-pointer select-none text-body font-semibold">How we got here</summary>
         <div className="mt-3 space-y-2">
           {estimate.methods.map((m) => (
-            <div key={m.method} className="flex items-center gap-3 text-sm">
+            <div key={m.method} className="flex items-center gap-3 text-body">
               <span className="w-24 shrink-0 capitalize text-muted-foreground">{METHOD_LABEL[m.method]}</span>
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full" style={{ width: `${Math.round(m.weight * 100)}%`, backgroundColor: toneVar.sleep }} /></div>
               <span className="numeral w-12 text-right font-medium">{m.value.toFixed(1)}%</span>
             </div>
           ))}
-          <p className="pt-1 text-xs text-muted-foreground">We blend several independent formulas; how much they agree sets the confidence band.</p>
+          <p className="pt-1 text-caption text-muted-foreground">We blend several independent formulas; how much they agree sets the confidence band.</p>
         </div>
       </details>
 
@@ -696,22 +694,22 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
             <div className="grid grid-cols-2 gap-2">
               {soma && (
                 <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-center">
-                  <div className="text-xs font-medium text-muted-foreground">Body type</div>
-                  <div className="mt-0.5 text-sm font-bold">{soma.label}</div>
+                  <div className="text-caption font-medium text-muted-foreground">Body type</div>
+                  <div className="mt-0.5 text-body font-bold">{soma.label}</div>
                 </div>
               )}
               {post && (
                 <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-center">
-                  <div className="text-xs font-medium text-muted-foreground">Posture</div>
+                  <div className="text-caption font-medium text-muted-foreground">Posture</div>
                   <div className="mt-0.5 flex items-center justify-center gap-1.5">
                     <Badge tone={postTone}>{post.severity[0]!.toUpperCase() + post.severity.slice(1)}</Badge>
-                    <span className="numeral text-xs text-muted-foreground">{post.craniovertebralAngleDeg.toFixed(0)}°</span>
+                    <span className="numeral text-caption text-muted-foreground">{post.craniovertebralAngleDeg.toFixed(0)}°</span>
                   </div>
                 </div>
               )}
             </div>
             {post && post.severity !== "good" && (
-              <p className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted-foreground">{POSTURE_GUIDANCE[post.severity]}</p>
+              <p className="rounded-xl bg-surface-2 px-3 py-2 text-caption text-muted-foreground">{POSTURE_GUIDANCE[post.severity]}</p>
             )}
           </div>
         );
@@ -730,15 +728,15 @@ function ResultStep({ clientId, result, profile, units, onSaved, onRetry }: {
         <Field label={`Weight (${wl})`} inputMode="decimal" value={weight} onChange={(e) => setWeight(e.target.value.replace(/[^\d.]/g, ""))} />
         <label className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-sm font-medium">Save my silhouette outline</div>
-            <div className="text-xs text-muted-foreground">A de-identified outline (no photo) so you can watch your shape change. You can turn this off any time.</div>
+            <div className="text-body font-medium">Save my silhouette outline</div>
+            <div className="text-caption text-muted-foreground">A de-identified outline (no photo) so you can watch your shape change. You can turn this off any time.</div>
           </div>
           <Switch checked={storeSilhouette} onCheckedChange={setStoreSilhouette} disabled={!hasContour} aria-label="Save de-identified silhouette outline" />
         </label>
-        {!hasContour && <p className="text-xs text-muted-foreground">No outline was captured for this entry.</p>}
+        {!hasContour && <p className="text-caption text-muted-foreground">No outline was captured for this entry.</p>}
       </div>
 
-      {err && <p className="text-sm text-danger">{err}</p>}
+      {err && <p className="text-body text-danger">{err}</p>}
       <div className="flex gap-2">
         <Button variant="secondary" onClick={onRetry} disabled={busy}><RotateCcw /> Redo</Button>
         <Button className="flex-1" size="lg" onClick={() => void save()} disabled={busy}>{busy ? <><Spinner /> Saving…</> : <><Check /> Save scan</>}</Button>
@@ -764,10 +762,10 @@ function BandBar({ low, value, high }: { low: number; value: number; high: numbe
 function MeasBox({ label, cm, units }: { label: string; cm: number | null | undefined; units: UnitPrefs }) {
   return (
     <div className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="text-caption font-medium text-muted-foreground">{label}</div>
       {cm == null
-        ? <NoData className="mt-0.5 block text-xs">Not measured</NoData>
-        : <div className="numeral mt-0.5 text-sm font-bold">{Math.round(cmToLengthDisplay(cm, units))}<span className="ml-0.5 text-xs text-muted-foreground">{lengthLabel(units)}</span></div>}
+        ? <NoData className="mt-0.5 block text-caption">Not measured</NoData>
+        : <div className="numeral mt-0.5 text-body font-bold">{Math.round(cmToLengthDisplay(cm, units))}<span className="ml-0.5 text-caption text-muted-foreground">{lengthLabel(units)}</span></div>}
     </div>
   );
 }
@@ -775,8 +773,8 @@ function MeasBox({ label, cm, units }: { label: string; cm: number | null | unde
 function CompBox({ label, value, unit }: { label: string; value: number; unit: string }) {
   return (
     <motion.div variants={popIn} className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
-      <div className="numeral mt-0.5 text-sm font-bold"><CountUp value={value} decimals={1} /><span className="ml-0.5 text-xs text-muted-foreground">{unit}</span></div>
+      <div className="text-caption font-medium text-muted-foreground">{label}</div>
+      <div className="numeral mt-0.5 text-body font-bold"><CountUp value={value} decimals={1} /><span className="ml-0.5 text-caption text-muted-foreground">{unit}</span></div>
     </motion.div>
   );
 }

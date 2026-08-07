@@ -215,7 +215,7 @@ export function Train({ clientId }: { clientId: string }) {
                   <h2 className="mt-0.5 text-title-3">{published.name}</h2>
                   {(() => {
                     const n = published.body.days.filter((d) => !d.isRestDay).length;
-                    return <p className="mt-1 text-sm text-muted-foreground">{n} training day{n === 1 ? "" : "s"}</p>;
+                    return <p className="mt-1 text-body text-muted-foreground">{n} training day{n === 1 ? "" : "s"}</p>;
                   })()}
                 </div>
                 <div className="grid size-12 place-items-center rounded-full bg-activity-soft text-activity [&_svg]:size-5"><Play /></div>
@@ -267,7 +267,7 @@ export function Train({ clientId }: { clientId: string }) {
         <section className="space-y-2">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-micro uppercase text-muted-foreground">Recent</h3>
-            {canActivities && <button onClick={() => setActivityOpen(true)} className="inline-flex items-center gap-1 text-sm font-medium text-primary [&_svg]:size-4"><Plus /> Log activity</button>}
+            {canActivities && <button onClick={() => setActivityOpen(true)} className="inline-flex items-center gap-1 text-body font-medium text-primary [&_svg]:size-4"><Plus /> Log activity</button>}
           </div>
           <Stagger className="space-y-1.5">
             {recent.map((r) => (
@@ -275,12 +275,12 @@ export function Train({ clientId }: { clientId: string }) {
                 <IconBadge icon={r.icon} tone={r.tone} size="sm" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium">{r.title}</div>
-                  <div className="truncate text-xs text-muted-foreground">{new Date(`${r.date}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {r.sub}</div>
+                  <div className="truncate text-caption text-muted-foreground">{new Date(`${r.date}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} · {r.sub}</div>
                 </div>
                 {/* An all-caps "LOAD" stacked under a bare number shouts a word most
                     clients have never met. The value carries its own quiet unit
                     instead, like every other number in the app (§5). */}
-                {r.load > 0 && <div className="numeral shrink-0 text-right font-semibold text-activity">{r.load}<span className="ml-0.5 text-xs font-medium text-muted-foreground">load</span></div>}
+                {r.load > 0 && <div className="numeral shrink-0 text-right font-semibold text-activity">{r.load}<span className="ml-0.5 text-caption font-medium text-muted-foreground">load</span></div>}
               </Card>
             ))}
           </Stagger>
@@ -301,10 +301,10 @@ export function Train({ clientId }: { clientId: string }) {
                     {day.imageUrl ? <img src={day.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className={`absolute inset-0 ${day.isRestDay ? "bg-gradient-to-br from-sleep/20 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2"}`} />}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
                     {!day.imageUrl && <div className="absolute inset-0 grid place-items-center text-white/35 [&_svg]:size-8">{day.isRestDay ? <Moon /> : <Dumbbell />}</div>}
-                    {day.isRestDay && <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-xs font-semibold text-sleep">Rest</span>}
+                    {day.isRestDay && <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-micro text-sleep">Rest</span>}
                     <div className="absolute inset-x-0 bottom-0 p-3">
                       <div className="truncate font-semibold text-white">{day.name || `Day ${i + 1}`}</div>
-                      <div className="truncate text-xs text-white/75">{day.isRestDay ? "Rest day" : `${exercises} exercise${exercises === 1 ? "" : "s"} · ${sets} sets`}</div>
+                      <div className="truncate text-caption text-white/75">{day.isRestDay ? "Rest day" : `${exercises} exercise${exercises === 1 ? "" : "s"} · ${sets} sets`}</div>
                     </div>
                   </div>
                 </button>
@@ -383,7 +383,7 @@ function LibraryGrid() {
               </div>
             )}
             {filtered.length === 0 ? (
-              <Card className="text-center text-sm text-muted-foreground">No exercises match.</Card>
+              <Card className="text-center text-body text-muted-foreground">No exercises match.</Card>
             ) : (
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
                 {filtered.map((e) => (
@@ -394,8 +394,8 @@ function LibraryGrid() {
                           thumbnail in the app. */}
                       <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={0} radius="xl" />
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-medium">{e.name}</div>
-                        <div className="truncate text-xs text-muted-foreground">{metaText(e) || "Exercise"}</div>
+                        <div className="truncate text-body font-medium">{e.name}</div>
+                        <div className="truncate text-caption text-muted-foreground">{metaText(e) || "Exercise"}</div>
                       </div>
                     </Card>
                   </button>

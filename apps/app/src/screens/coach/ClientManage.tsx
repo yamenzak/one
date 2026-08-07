@@ -201,7 +201,7 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
       {partial && (
         <Card className="flex items-start gap-3 border border-warning/25 bg-warning-soft/50">
           <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
-          <div className="min-w-0 flex-1"><div className="text-sm font-semibold">Some sections didn't load</div><p className="text-sm text-muted-foreground">Part of this client's record couldn't be reached, so what's below may be incomplete.</p></div>
+          <div className="min-w-0 flex-1"><div className="text-body font-semibold">Some sections didn't load</div><p className="text-body text-muted-foreground">Part of this client's record couldn't be reached, so what's below may be incomplete.</p></div>
           <Button size="sm" variant="secondary" onClick={() => void load()}>Retry</Button>
         </Card>
       )}
@@ -246,7 +246,7 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
 
       {active && (
         <section className="space-y-2">
-          <Eyebrow action={isOwner ? <button onClick={() => setFixOpen(true)} className="inline-flex items-center gap-1 text-xs font-semibold text-primary [&_svg]:size-3.5"><Wrench /> Correct days</button> : undefined}>Subscription</Eyebrow>
+          <Eyebrow action={isOwner ? <button onClick={() => setFixOpen(true)} className="inline-flex items-center gap-1 text-caption font-semibold text-primary [&_svg]:size-3.5"><Wrench /> Correct days</button> : undefined}>Subscription</Eyebrow>
           <Stagger>
             <GlanceStrip items={[
               { icon: Check, tone: "activity", value: "Active", label: "Status" },
@@ -332,7 +332,7 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
         */}
         <Stagger>
         {supps.length === 0 ? (
-          <Card><p className="text-sm text-muted-foreground">No supplements prescribed.</p></Card>
+          <Card><p className="text-body text-muted-foreground">No supplements prescribed.</p></Card>
         ) : (
           <Group>
             {supps.map((s) => {
@@ -413,7 +413,7 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
         */}
         <Stagger>
         {labs.length === 0 ? (
-          <Card><p className="text-sm text-muted-foreground">No lab tests.</p></Card>
+          <Card><p className="text-body text-muted-foreground">No lab tests.</p></Card>
         ) : (
           <Group>
             {labs.map((l) => {
@@ -513,7 +513,7 @@ export function ClientManage({ clientId, clientName, archived = false, onClientC
             rather than hiding the button and leaving the coach guessing. */}
         <FeatureLock feature="commerce">
         <div className="space-y-2">
-          {packages.length === 0 && <p className="text-sm text-muted-foreground">No packages yet — create one in the Business tab.</p>}
+          {packages.length === 0 && <p className="text-body text-muted-foreground">No packages yet — create one in the Business tab.</p>}
           {packages.map((p) => <button key={p.id} onClick={() => void grant(p.id)} className="flex w-full items-center justify-between rounded-xl bg-secondary px-4 py-3 text-left transition-colors hover:bg-surface-3"><span>{p.name}</span><span className="text-primary">Grant</span></button>)}
         </div>
         </FeatureLock>
@@ -620,7 +620,7 @@ function CoachesSection({ clientId }: { clientId: string }) {
       {loadErr && !coaches ? (
         <Card className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
-          <div className="min-w-0 flex-1"><div className="text-sm font-semibold">Couldn't load coaches</div><p className="text-sm text-muted-foreground">We couldn't reach the server for this client's coach assignments.</p></div>
+          <div className="min-w-0 flex-1"><div className="text-body font-semibold">Couldn't load coaches</div><p className="text-body text-muted-foreground">We couldn't reach the server for this client's coach assignments.</p></div>
           <Button size="sm" variant="secondary" onClick={() => void load()}>Retry</Button>
         </Card>
       ) : (
@@ -632,7 +632,7 @@ function CoachesSection({ clientId }: { clientId: string }) {
            paragraph sitting on top of it. */
         <>
           {coaches.length === 0 ? (
-            <Card><p className="text-sm text-warning" role="status">No coach is assigned — nobody but an owner can see this client.</p></Card>
+            <Card><p className="text-body text-warning" role="status">No coach is assigned — nobody but an owner can see this client.</p></Card>
           ) : (
             /*
               ONE LINE OF NAME, ONE LINE OF FACT, TWO ICON BUTTONS.
@@ -689,8 +689,8 @@ function CoachesSection({ clientId }: { clientId: string }) {
             </Group>
           )}
           <GroupNote>Only assigned coaches see this client on their roster. The primary coach receives their notifications.</GroupNote>
-          {staffErr && <p className="pt-2 text-sm text-muted-foreground">Your staff list didn't load, so assigning is unavailable right now. <button onClick={() => void load()} className="font-medium text-primary underline">Retry</button></p>}
-          {err && <p className="pt-2 text-sm text-warning" role="alert">{err}</p>}
+          {staffErr && <p className="pt-2 text-body text-muted-foreground">Your staff list didn't load, so assigning is unavailable right now. <button onClick={() => void load()} className="font-medium text-primary underline">Retry</button></p>}
+          {err && <p className="pt-2 text-body text-warning" role="alert">{err}</p>}
         </>
         )}
       </Reveal>
@@ -700,7 +700,7 @@ function CoachesSection({ clientId }: { clientId: string }) {
       <Sheet open={addOpen} onClose={() => setAddOpen(false)} title="Assign a coach">
         <div className="space-y-2">
           {addable.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{staff.length === 0 ? "No staff yet — invite a coach from the Staff screen first." : "Every staff member is already assigned to this client."}</p>
+            <p className="text-body text-muted-foreground">{staff.length === 0 ? "No staff yet — invite a coach from the Staff screen first." : "Every staff member is already assigned to this client."}</p>
           ) : addable.map((m) => (
             <button
               key={m.userId}
@@ -711,12 +711,12 @@ function CoachesSection({ clientId }: { clientId: string }) {
               <Avatar {...staffAvatar({ ...m, name: coachName(m) })} className="size-9 shrink-0" />
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{coachName(m)}</div>
-                <div className="truncate text-sm text-muted-foreground">{personaLabel(m.role)}{m.email ? ` · ${m.email}` : ""}</div>
+                <div className="truncate text-body text-muted-foreground">{personaLabel(m.role)}{m.email ? ` · ${m.email}` : ""}</div>
               </div>
-              <span className="shrink-0 text-sm font-medium text-primary">{busy === m.userId ? "Assigning…" : "Assign"}</span>
+              <span className="shrink-0 text-body font-medium text-primary">{busy === m.userId ? "Assigning…" : "Assign"}</span>
             </button>
           ))}
-          {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+          {err && <p className="text-body text-warning" role="alert">{err}</p>}
         </div>
       </Sheet>
 
@@ -801,16 +801,16 @@ function OffboardRequestSection({ clientId, clientName }: { clientId: string; cl
           {pending ? (
             <>
               <div className="flex items-center gap-2 font-medium"><Archive className="size-4 text-warning" /> Waiting on the owner</div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-body text-muted-foreground">
                 You asked to <span className="font-medium text-foreground">{pending.kind}</span> {who}. Nothing has happened to
                 the record — the owner decides, and you&rsquo;ll get a notification either way.
               </p>
-              <SubCard className="text-sm text-muted-foreground">&ldquo;{pending.reason}&rdquo;</SubCard>
+              <SubCard className="text-body text-muted-foreground">&ldquo;{pending.reason}&rdquo;</SubCard>
             </>
           ) : (
             <>
               <div className="flex items-center gap-2 font-medium"><Archive className="size-4 text-muted-foreground" /> Ask to remove {who}</div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-body text-muted-foreground">
                 Only the studio owner can archive or delete a client. Send them the request and the reason; they approve or decline it.
               </p>
               <div className="flex flex-wrap gap-2">
@@ -821,9 +821,9 @@ function OffboardRequestSection({ clientId, clientName }: { clientId: string; cl
               <Button variant="outline" className="w-full" disabled={busy || !reason.trim()} onClick={() => void submit()}>
                 {busy ? "Sending…" : "Send request"}
               </Button>
-              {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+              {err && <p className="text-body text-warning" role="alert">{err}</p>}
               {mine?.some((r) => r.status !== "pending") && (
-                <SubCard className="space-y-1 text-xs text-muted-foreground">
+                <SubCard className="space-y-1 text-caption text-muted-foreground">
                   {mine.filter((r) => r.status !== "pending").slice(0, 3).map((r) => (
                     <div key={r.id}>
                       <span className="font-medium text-foreground">{r.status === "approved" ? "Approved" : "Declined"}</span> · {r.kind}
@@ -875,8 +875,8 @@ function OffboardRequestQueue({ clientId, onDecided }: { clientId: string; onDec
       <Stagger>
         <Card className="space-y-3 border border-warning/40">
           <div className="flex items-center gap-2 font-medium"><AlertTriangle className="size-4 text-warning" /> {req.requestedBy} asked to {req.kind} this client</div>
-          <SubCard className="text-sm text-muted-foreground">&ldquo;{req.reason}&rdquo;</SubCard>
-          <p className="text-sm text-muted-foreground">
+          <SubCard className="text-body text-muted-foreground">&ldquo;{req.reason}&rdquo;</SubCard>
+          <p className="text-body text-muted-foreground">
             {req.kind === "delete"
               ? "Approving erases the record and everything on it — logs, photos, lab files. There's no undo, and it frees a seat on your plan."
               : "Approving takes them off the roster and keeps the data. They can still read their own history. It does not free a seat."}
@@ -886,7 +886,7 @@ function OffboardRequestQueue({ clientId, onDecided }: { clientId: string; onDec
             <Button variant="outline" className="flex-1" disabled={busy} onClick={() => void decide(false)}>Decline</Button>
             <Button className="flex-1" disabled={busy} onClick={() => void decide(true)}>{busy ? "…" : `Approve ${req.kind}`}</Button>
           </div>
-          {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+          {err && <p className="text-body text-warning" role="alert">{err}</p>}
         </Card>
       </Stagger>
     </section>
@@ -1033,13 +1033,13 @@ function DeleteClientSheet({ clientId, clientName, onClose, onDone }: { clientId
           <div className="flex items-start gap-3">
             <IconBadge icon={Check} tone="success" />
             <div className="min-w-0">
-              <p className="text-sm"><span className="font-medium">{done.deleted.displayName}</span> and everything on their record have been erased.</p>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="text-body"><span className="font-medium">{done.deleted.displayName}</span> and everything on their record have been erased.</p>
+              <p className="mt-1 text-body text-muted-foreground">
                 {done.storage.objectsRemoved > 0
                   ? `${done.storage.objectsRemoved} file${done.storage.objectsRemoved === 1 ? "" : "s"} removed, ${done.storage.mbFreed} MB of storage reclaimed.`
                   : "No stored files were attached, so storage is unchanged."}
               </p>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 text-body text-muted-foreground">
                 {done.activeClients.max < 0
                   ? `Your roster is now ${done.activeClients.used}. Your plan has no client limit.`
                   : `Your roster is now ${done.activeClients.used} of ${done.activeClients.max} — that seat is free.`}
@@ -1049,7 +1049,7 @@ function DeleteClientSheet({ clientId, clientName, onClose, onDone }: { clientId
         </div>
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-body text-muted-foreground">
             This erases their logs, measurements, check-ins, progress photos, uploaded lab files, plans and history. It cannot be recovered by you or by us.
           </p>
           <Field
@@ -1062,7 +1062,7 @@ function DeleteClientSheet({ clientId, clientName, onClose, onDone }: { clientId
             spellCheck={false}
             hint="Case doesn't matter."
           />
-          {err && <p className="text-sm text-danger" role="alert">{err}</p>}
+          {err && <p className="text-body text-danger" role="alert">{err}</p>}
         </div>
       )}
     </Sheet>
@@ -1110,9 +1110,9 @@ function ActivityLog({ clientId }: { clientId: string }) {
                 <div key={it.id} className="flex items-start gap-2.5 rounded-lg px-1 py-1.5">
                   <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm"><span className="font-medium">{it.actor ?? "A coach"}</span> {it.label}{it.summary ? <span className="text-muted-foreground"> · {it.summary}</span> : null}</div>
+                    <div className="text-body"><span className="font-medium">{it.actor ?? "A coach"}</span> {it.label}{it.summary ? <span className="text-muted-foreground"> · {it.summary}</span> : null}</div>
                   </div>
-                  <span className="shrink-0 text-xs text-muted-foreground">{timeAgo(it.at)}</span>
+                  <span className="shrink-0 text-caption text-muted-foreground">{timeAgo(it.at)}</span>
                 </div>
               );
             })}
@@ -1135,12 +1135,12 @@ function SwapResolver({ swap, exercises, onResolve }: { swap: Swap; exercises: E
   const filtered = exercises.filter((e) => e.id !== swap.current_exercise_id && e.name.toLowerCase().includes(q.toLowerCase())).slice(0, 20);
   return (
     <div className="space-y-2.5 rounded-xl bg-surface-2 p-3">
-      <div className="text-sm">Swap <span className="font-semibold">{current?.name ?? "an exercise"}</span>{typeof swap.day_index === "number" ? <span className="text-muted-foreground"> · Day {swap.day_index + 1}</span> : null}</div>
-      {swap.reason && <div className="text-xs italic text-muted-foreground">“{swap.reason}”</div>}
+      <div className="text-body">Swap <span className="font-semibold">{current?.name ?? "an exercise"}</span>{typeof swap.day_index === "number" ? <span className="text-muted-foreground"> · Day {swap.day_index + 1}</span> : null}</div>
+      {swap.reason && <div className="text-caption italic text-muted-foreground">“{swap.reason}”</div>}
       {choice ? (
         <SubCard className="py-2">
           <ExerciseRow ex={choice} thumbSize={34} trailing={
-            <button onClick={() => { setChoice(null); setPicking(true); }} className="shrink-0 text-xs font-medium text-primary">Change</button>
+            <button onClick={() => { setChoice(null); setPicking(true); }} className="shrink-0 text-caption font-medium text-primary">Change</button>
           } />
         </SubCard>
       ) : picking ? (
@@ -1238,30 +1238,30 @@ function CheckInReview({ clientId, checkIns, onFeedback }: { clientId: string; c
         <SubCard className="space-y-2"><SkeletonLine w="100%" /><SkeletonLine w="70%" /></SubCard>
       )}
       {summary && (
-        <SubCard className="space-y-2 text-sm">
+        <SubCard className="space-y-2 text-body">
           <div className="flex items-start gap-2.5"><AiAvatar className="size-7" /><Markdown className="min-w-0 flex-1">{summary}</Markdown></div>
           <InsightFeedback insightType="checkin-reply" insightRef={clientId} />
         </SubCard>
       )}
-      {checkIns.length === 0 ? <p className="text-sm text-muted-foreground">No check-ins yet.</p> : checkIns.slice(0, 5).map((c) => {
+      {checkIns.length === 0 ? <p className="text-body text-muted-foreground">No check-ins yet.</p> : checkIns.slice(0, 5).map((c) => {
         const photos = checkInPhotos(c.photos_json);
         const meta = [c.mood != null ? `mood ${c.mood}/5` : null, c.energy != null ? `energy ${c.energy}/5` : null, c.sleep_hours ? `${c.sleep_hours}h sleep` : null, c.steps_count ? `${c.steps_count.toLocaleString()} steps` : null].filter(Boolean).join(" · ");
         return (
           <SubCard key={c.id} id={`mng-ci-${c.id}`} className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between text-body">
               <span className="font-medium">{new Date(`${c.date_local}T00:00:00`).toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })}</span>
-              {c.weight_kg && <span className="numeral text-xs font-medium text-muted-foreground">{fmtWeight(c.weight_kg, units)}</span>}
+              {c.weight_kg && <span className="numeral text-caption font-medium text-muted-foreground">{fmtWeight(c.weight_kg, units)}</span>}
             </div>
-            {meta && <div className="text-xs text-muted-foreground">{meta}</div>}
+            {meta && <div className="text-caption text-muted-foreground">{meta}</div>}
             {photos.length > 0 && <PhotoGrid photos={photos} cols={4} />}
-            {c.notes && <p className="text-sm text-muted-foreground">“{c.notes}”</p>}
-            {c.trainer_feedback ? <div className="flex items-start gap-1.5 rounded-lg bg-primary/10 px-3 py-2 text-xs text-primary"><Check className="mt-0.5 size-3.5 shrink-0" /><span>You replied: {c.trainer_feedback}</span></div> : (
+            {c.notes && <p className="text-body text-muted-foreground">“{c.notes}”</p>}
+            {c.trainer_feedback ? <div className="flex items-start gap-1.5 rounded-lg bg-primary/10 px-3 py-2 text-caption text-primary"><Check className="mt-0.5 size-3.5 shrink-0" /><span>You replied: {c.trainer_feedback}</span></div> : (
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2">
-                  <input value={draft[c.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [c.id]: e.target.value }))} placeholder="Reply…" className="flex-1 rounded-lg bg-surface-3 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
+                  <input value={draft[c.id] ?? ""} onChange={(e) => setDraft((d) => ({ ...d, [c.id]: e.target.value }))} placeholder="Reply…" className="flex-1 rounded-lg bg-surface-3 px-3 py-2 text-body outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
                   <Button size="sm" disabled={!draft[c.id]?.trim() || sending === c.id} onClick={() => void send(c.id)}>{sending === c.id ? "Sending…" : "Send"}</Button>
                 </div>
-                {sendErr[c.id] && <p className="text-sm text-warning" role="alert">{sendErr[c.id]}</p>}
+                {sendErr[c.id] && <p className="text-body text-warning" role="alert">{sendErr[c.id]}</p>}
               </div>
             )}
           </SubCard>
@@ -1291,7 +1291,7 @@ function PrescribeSheet({ clientId, onClose, onDone }: { clientId: string; onClo
         <Field label="Name" icon={Pill} value={name} onChange={(e) => setName(e.target.value)} placeholder="Creatine monohydrate" />
         <Field label="Dose" value={dose} onChange={(e) => setDose(e.target.value)} placeholder="5 g" />
         <div className="flex flex-wrap gap-2">{["protein", "creatine", "vitamin", "omega3", "pre_workout", "other"].map((k) => <Chip key={k} selected={kind === k} onClick={() => setKind(k)}>{k.replace("_", " ")}</Chip>)}</div>
-        <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Schedule</label><div className="flex flex-wrap gap-2">{["morning", "pre_workout", "post_workout", "evening", "bedtime"].map((s) => <Chip key={s} selected={slots.includes(s)} onClick={() => toggle(s)}>{s.replace("_", " ")}</Chip>)}</div></div>
+        <div><label className="mb-1.5 block text-body font-medium text-muted-foreground">Schedule</label><div className="flex flex-wrap gap-2">{["morning", "pre_workout", "post_workout", "evening", "bedtime"].map((s) => <Chip key={s} selected={slots.includes(s)} onClick={() => toggle(s)}>{s.replace("_", " ")}</Chip>)}</div></div>
       </div>
     </Sheet>
   );
@@ -1326,23 +1326,23 @@ function SuggestSuppSheet({ clientId, onClose, onPrescribed }: { clientId: strin
   return (
     <Sheet open onClose={onClose} title="Suggested supplements" size="tall">
       <div className="space-y-3">
-        <div className="flex items-center gap-2.5 rounded-xl bg-primary/10 p-2.5"><AiAvatar className="size-8" /><p className="text-xs text-muted-foreground">Evidence-based ideas from this client's reviewed labs, goal and current stack. Review before prescribing.</p></div>
+        <div className="flex items-center gap-2.5 rounded-xl bg-primary/10 p-2.5"><AiAvatar className="size-8" /><p className="text-caption text-muted-foreground">Evidence-based ideas from this client's reviewed labs, goal and current stack. Review before prescribing.</p></div>
         {error ? <AiErrorBox error={error} /> : (
           <Reveal loading={!recos} className="space-y-3" skeleton={<SkeletonList rows={3} />}>
-            {recos && (recos.length === 0 ? <p className="text-sm text-muted-foreground">No suggestions right now.</p> : recos.map((r, i) => (
+            {recos && (recos.length === 0 ? <p className="text-body text-muted-foreground">No suggestions right now.</p> : recos.map((r, i) => (
               <SubCard key={i} className="space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0"><span className="font-medium">{r.name}</span>{r.dose && <span className="ml-2 text-xs text-muted-foreground">{r.dose}</span>}</div>
+                  <div className="min-w-0"><span className="font-medium">{r.name}</span>{r.dose && <span className="ml-2 text-caption text-muted-foreground">{r.dose}</span>}</div>
                   {added.has(r.name) ? <Badge tone="success">Added</Badge> : <Button size="sm" disabled={prescribing !== null} onClick={() => void prescribe(r)}>{prescribing === r.name ? "Adding…" : "Prescribe"}</Button>}
                 </div>
-                <p className="text-xs text-muted-foreground">{r.rationale}</p>
-                {prescribeErr && prescribeErr.name === r.name && <p className="text-sm text-warning" role="alert">{prescribeErr.text}</p>}
+                <p className="text-caption text-muted-foreground">{r.rationale}</p>
+                {prescribeErr && prescribeErr.name === r.name && <p className="text-body text-warning" role="alert">{prescribeErr.text}</p>}
                 {r.linkedMarker && <Badge tone="cardio">{r.linkedMarker}</Badge>}
               </SubCard>
             )))}
           </Reveal>
         )}
-        {note && <SubCard className="flex items-start gap-2 text-xs text-muted-foreground"><AiAvatar className="mt-0.5 size-4 shrink-0" /><Markdown className="min-w-0 flex-1">{note}</Markdown></SubCard>}
+        {note && <SubCard className="flex items-start gap-2 text-caption text-muted-foreground"><AiAvatar className="mt-0.5 size-4 shrink-0" /><Markdown className="min-w-0 flex-1">{note}</Markdown></SubCard>}
         {/* Rate the SET of suggestions, once, rather than each row — the useful
             signal is whether this feature's output was worth reading. */}
         {recos && recos.length > 0 && <InsightFeedback insightType="supplement-reco" insightRef={clientId} />}
@@ -1367,7 +1367,7 @@ function RequestLabSheet({ clientId, onClose, onDone }: { clientId: string; onCl
       <div className="space-y-4">
         <div className="flex flex-wrap gap-2">{LAB_TYPES.map((t) => <Chip key={t} selected={type === t} onClick={() => setType(t)}>{t.replace("_", " ")}</Chip>)}</div>
         {type === "custom" && <Field label="Custom name" value={customType} onChange={(e) => setCustomType(e.target.value)} />}
-        <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Instructions</label><Textarea rows={3} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Fasted, morning draw…" /></div>
+        <div><label className="mb-1.5 block text-body font-medium text-muted-foreground">Instructions</label><Textarea rows={3} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Fasted, morning draw…" /></div>
       </div>
     </Sheet>
   );
@@ -1407,22 +1407,22 @@ function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; 
       <div className="space-y-4">
         {fileUrl && (
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-muted-foreground">Uploaded result</label>
+            <label className="block text-body font-medium text-muted-foreground">Uploaded result</label>
             {isLabImage(lab.file_key!) ? (
               <PhotoGrid photos={[{ url: fileUrl, label: lab.display_name }]} cols={2} />
             ) : (
-              <a href={fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3 transition-colors hover:bg-surface-3"><IconBadge icon={ImageIcon} tone="cardio" size="sm" /><span className="text-sm font-medium">Open uploaded file</span></a>
+              <a href={fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3 transition-colors hover:bg-surface-3"><IconBadge icon={ImageIcon} tone="cardio" size="sm" /><span className="text-body font-medium">Open uploaded file</span></a>
             )}
           </div>
         )}
-        {lab.client_notes && <SubCard className="text-sm text-muted-foreground">Client note: {lab.client_notes}</SubCard>}
+        {lab.client_notes && <SubCard className="text-body text-muted-foreground">Client note: {lab.client_notes}</SubCard>}
         {/* `/api/ai/lab-extract` is gated on aiSuite. */}
         {fileUrl && canAi && <Button size="sm" variant="tonal" className="w-full" disabled={extracting} onClick={() => void autofill()}><AiAvatar className="size-5" /> {extracting ? "Reading report…" : "Auto-fill from report"}</Button>}
         {extractErr ? <AiErrorBox error={extractErr} /> : null}
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-muted-foreground">Values</label>
+          <label className="block text-body font-medium text-muted-foreground">Values</label>
           {values.map((v, i) => (
-            <div key={v._id} className="flex items-center gap-1.5 text-sm">
+            <div key={v._id} className="flex items-center gap-1.5 text-body">
               <input value={v.marker} onChange={(e) => setRow(i, { marker: e.target.value })} placeholder="Marker" className="min-w-0 flex-1 rounded-lg bg-surface-3 px-2.5 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
               <input value={v.value} onChange={(e) => setRow(i, { value: e.target.value })} placeholder="Value" className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
               <input value={v.unit} onChange={(e) => setRow(i, { unit: e.target.value })} placeholder="unit" className="w-14 rounded-lg bg-surface-3 px-2 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
@@ -1435,9 +1435,9 @@ function ReviewLabSheet({ clientId, lab, onClose, onDone }: { clientId: string; 
               />
             </div>
           ))}
-          <button onClick={() => setValues((v) => [...v, { _id: rowId(), marker: "", value: "", unit: "", flag: "normal" }])} className="text-xs font-medium text-primary">+ Row</button>
+          <button onClick={() => setValues((v) => [...v, { _id: rowId(), marker: "", value: "", unit: "", flag: "normal" }])} className="text-caption font-medium text-primary">+ Row</button>
         </div>
-        <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Feedback</label><Textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="What this means and next steps…" /></div>
+        <div><label className="mb-1.5 block text-body font-medium text-muted-foreground">Feedback</label><Textarea rows={3} value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="What this means and next steps…" /></div>
       </div>
     </Sheet>
   );
@@ -1497,8 +1497,8 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
           </div>
           {report.prs.length > 0 && (
             <Card className="space-y-1.5">
-              <h3 className="text-sm font-semibold">Top lifts (est. 1RM)</h3>
-              {report.prs.slice(0, 8).map((p) => <div key={p.exerciseId} className="flex items-center justify-between text-sm"><span className="truncate text-muted-foreground">{exNames.get(p.exerciseId) ?? "Exercise"}</span><span className="numeral font-medium">{Math.round(kgToDisplay(p.e1rm, units))} {weightLabel(units)}</span></div>)}
+              <h3 className="text-body font-semibold">Top lifts (est. 1RM)</h3>
+              {report.prs.slice(0, 8).map((p) => <div key={p.exerciseId} className="flex items-center justify-between text-body"><span className="truncate text-muted-foreground">{exNames.get(p.exerciseId) ?? "Exercise"}</span><span className="numeral font-medium">{Math.round(kgToDisplay(p.e1rm, units))} {weightLabel(units)}</span></div>)}
             </Card>
           )}
         </div>
@@ -1512,8 +1512,8 @@ function ReportSheet({ clientId, onClose }: { clientId: string; onClose: () => v
 function Metric({ label, value }: { label: string; value: string | number | null }) {
   return (
     <div className="rounded-xl bg-secondary p-3">
-      {value == null ? <NoData className="block text-xs">Not yet</NoData> : <div className="numeral text-lg font-semibold">{value}</div>}
-      <div className="text-xs text-muted-foreground">{label}</div>
+      {value == null ? <NoData className="block text-caption">Not yet</NoData> : <div className="numeral text-body-lg font-semibold">{value}</div>}
+      <div className="text-caption text-muted-foreground">{label}</div>
     </div>
   );
 }
@@ -1600,7 +1600,7 @@ function CorrectDaysSheet({ clientId, sub, onClose, onDone }: {
           {history === null ? (
             <SkeletonList rows={2} />
           ) : history.length === 0 ? (
-            <p className="px-1 text-sm text-muted-foreground">Nothing recorded. Grants made before this ledger existed aren't listed — which is part of why the numbers may be wrong.</p>
+            <p className="px-1 text-body text-muted-foreground">Nothing recorded. Grants made before this ledger existed aren't listed — which is part of why the numbers may be wrong.</p>
           ) : (
             <div className="space-y-1.5">
               {history.map((g) => (
@@ -1611,12 +1611,12 @@ function CorrectDaysSheet({ clientId, sub, onClose, onDone }: {
                   onToggle={() => open.toggle(g.id)}
                   summary={
                     <span className="flex items-center gap-2">
-                      <span className="min-w-0 flex-1 truncate text-sm font-medium">{g.packageName ?? "A removed package"}</span>
+                      <span className="min-w-0 flex-1 truncate text-body font-medium">{g.packageName ?? "A removed package"}</span>
                       <Badge tone="neutral">{g.source}</Badge>
                     </span>
                   }
                 >
-                  <div className="space-y-1 text-xs text-muted-foreground">
+                  <div className="space-y-1 text-caption text-muted-foreground">
                     <div>{new Date(g.at).toLocaleString()}</div>
                     <div>{g.days.length === 0 ? "No days" : g.days.map((d) => `${d.days} × ${d.feature}`).join(" · ")}</div>
                   </div>
@@ -1648,7 +1648,7 @@ function CorrectDaysSheet({ clientId, sub, onClose, onDone }: {
               className="flex-1"
             />
           </div>
-          <p className="px-1 text-xs text-muted-foreground">
+          <p className="px-1 text-caption text-muted-foreground">
             Whatever is there now is replaced — days already used stay in the record. Their next purchase queues on top of this.
           </p>
         </div>
@@ -1786,7 +1786,7 @@ function CapabilityGroup({ row, onSaved }: { row: CapabilityRow; onSaved: () => 
                 <div key={c.key} className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="truncate text-sm">{c.label}</span>
+                      <span className="truncate text-body">{c.label}</span>
                       {c.override !== null && <Badge tone="cardio">Set for them</Badge>}
                     </div>
                     {/* Only the EXCEPTIONS get a line. "From the package" under
@@ -1794,7 +1794,7 @@ function CapabilityGroup({ row, onSaved }: { row: CapabilityRow; onSaved: () => 
                         buries the one row that actually differs. What is left is
                         a reason to read: a blocker, or a change somebody made. */}
                     {(c.blockedBy || c.source === "override") && (
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-caption text-muted-foreground">
                         {c.blockedBy ? BLOCKED_WHY[c.blockedBy] : "You changed this for them"}
                       </div>
                     )}

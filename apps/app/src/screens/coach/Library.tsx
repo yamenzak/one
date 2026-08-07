@@ -163,8 +163,8 @@ function Exercises() {
             <button onClick={() => open(e)} className="block w-full text-left transition-opacity active:opacity-80">
               <ExerciseThumb thumb={e.thumb_url} thumb2={e.thumb2_url} size={0} radius="none" />
               <div className="px-3 pb-3 pt-2">
-                <div className="truncate text-sm font-semibold">{e.name}</div>
-                <div className="truncate text-xs text-muted-foreground">{metaText(e) || "—"}</div>
+                <div className="truncate text-body font-semibold">{e.name}</div>
+                <div className="truncate text-caption text-muted-foreground">{metaText(e) || "—"}</div>
               </div>
             </button>
             {/* Over the image, where a tile's actions go — not a strip under it
@@ -217,7 +217,7 @@ function AlternativesSheet({ exercise, onClose }: { exercise: ExerciseInfo; onCl
   return (
     <Sheet open onClose={onClose} title={`Alternatives · ${exercise.name}`} size="tall">
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">A bound alternative is one the client can swap to on their own, mid-session, with no approval. Binding works both ways.</p>
+        <p className="text-body text-muted-foreground">A bound alternative is one the client can swap to on their own, mid-session, with no approval. Binding works both ways.</p>
         <Reveal loading={!alts} skeleton={<SkeletonList card rows={3} thumb={36} />}>
           {alts && (alts.length === 0 ? (
             <EmptyState icon={ArrowLeftRight} title="Nothing bound yet" description="Add a movement that trains the same thing with what else the gym has." />
@@ -359,7 +359,7 @@ function Foods() {
   const macros = (f: FoodRow) => (
     <>
       <span className="numeral font-semibold text-calories">{fmtEnergy(f.calories, units)}</span>
-      {f.protein_g != null && <MacroInline proteinG={f.protein_g} carbsG={f.carbs_g ?? 0} fatG={f.fat_g ?? 0} className="text-xs" />}
+      {f.protein_g != null && <MacroInline proteinG={f.protein_g} carbsG={f.carbs_g ?? 0} fatG={f.fat_g ?? 0} className="text-caption" />}
     </>
   );
   const menu = (f: FoodRow) => (
@@ -412,9 +412,9 @@ function Foods() {
             <button onClick={() => setEditor({ id: f.id })} className="block w-full text-left transition-opacity active:opacity-80">
               <FoodThumb src={f.image_url} size={0} radius="none" />
               <div className="px-3 pb-3 pt-2">
-                <div className="truncate text-sm font-semibold">{f.name}</div>
-                {f.brand && <div className="truncate text-xs text-muted-foreground">{f.brand}</div>}
-                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">{macros(f)}</div>
+                <div className="truncate text-body font-semibold">{f.name}</div>
+                {f.brand && <div className="truncate text-caption text-muted-foreground">{f.brand}</div>}
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-caption text-muted-foreground">{macros(f)}</div>
               </div>
             </button>
             <div className="absolute right-1 top-1 rounded-full bg-background/70 backdrop-blur-sm">{menu(f)}</div>
@@ -530,7 +530,7 @@ function Templates() {
       {useFor && (
         <Sheet open onClose={() => !busy && setUseFor(null)} title={`Use “${useFor.name}”`}>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Creates a {kind} plan for the client and opens the builder, so you can review it before publishing.</p>
+            <p className="text-body text-muted-foreground">Creates a {kind} plan for the client and opens the builder, so you can review it before publishing.</p>
             {clients.length === 0 ? (
               <EmptyState icon={Users} title="No clients yet" description="Add someone to your roster first." />
             ) : (
@@ -682,9 +682,9 @@ function ArticleEditor({ id, clients, onClose, onSaved }: { id?: string; clients
         <div className="space-y-4">
           {!id && canAi && (
             <div className="space-y-2 rounded-2xl bg-primary/10 p-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-primary"><AiAvatar className="size-6" /> Draft with AI</div>
+              <div className="flex items-center gap-2 text-body font-medium text-primary"><AiAvatar className="size-6" /> Draft with AI</div>
               <div className="flex gap-2">
-                <input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Topic — e.g. Sleep for muscle growth" className="min-w-0 flex-1 rounded-lg bg-surface-2 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
+                <input value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="Topic — e.g. Sleep for muscle growth" className="min-w-0 flex-1 rounded-lg bg-surface-2 px-3 py-2 text-body outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
                 <Button size="sm" disabled={aiBusy || aiTopic.trim().length < 3} onClick={() => void draftAi()}>{aiBusy ? "Writing…" : "Draft"}</Button>
               </div>
             </div>
@@ -700,19 +700,19 @@ function ArticleEditor({ id, clients, onClose, onSaved }: { id?: string; clients
             {coverUrl && <img src={coverUrl} alt="Cover" className="h-32 w-full rounded-xl object-cover" />}
             {canAi && <Button size="sm" variant="secondary" className="w-full" disabled={coverBusy || (!title && !aiTopic)} onClick={() => void genCover()}><AiAvatar className="size-5" /> {coverBusy ? "Generating…" : coverUrl ? "Regenerate cover" : "Generate cover image"}</Button>}
           </div>
-          <div><label className="mb-1.5 block text-sm font-medium text-muted-foreground">Body (markdown — supports tables)</label><Textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} /></div>
+          <div><label className="mb-1.5 block text-body font-medium text-muted-foreground">Body (markdown — supports tables)</label><Textarea rows={8} value={body} onChange={(e) => setBody(e.target.value)} /></div>
           <div className="space-y-1.5">
-            <div className="text-xs text-muted-foreground">Who sees it</div>
+            <div className="text-caption text-muted-foreground">Who sees it</div>
             <div className="flex flex-wrap gap-2">{(["clients", "public", "assigned"] as const).map((a) => <Chip key={a} selected={audience === a} onClick={() => setAudience(a)}>{AUDIENCE_LABEL[a]}</Chip>)}</div>
           </div>
           {audience === "assigned" && (
             <div className="space-y-1.5">
-              <div className="text-xs text-muted-foreground">Shared only with {assigned.length ? `${assigned.length} client${assigned.length === 1 ? "" : "s"}` : "…pick clients"}</div>
+              <div className="text-caption text-muted-foreground">Shared only with {assigned.length ? `${assigned.length} client${assigned.length === 1 ? "" : "s"}` : "…pick clients"}</div>
               <div className="max-h-40 space-y-1 overflow-y-auto rounded-xl border border-border/50 p-1.5">
-                {clients.length === 0 ? <p className="p-2 text-center text-xs text-muted-foreground">No clients yet.</p> : clients.map((cl) => (
-                  <button key={cl.id} onClick={() => toggleClient(cl.id)} className={cn("flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm transition-colors", assigned.includes(cl.id) ? "bg-primary/10 text-primary" : "hover:bg-surface-2")}>
+                {clients.length === 0 ? <p className="p-2 text-center text-caption text-muted-foreground">No clients yet.</p> : clients.map((cl) => (
+                  <button key={cl.id} onClick={() => toggleClient(cl.id)} className={cn("flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-body transition-colors", assigned.includes(cl.id) ? "bg-primary/10 text-primary" : "hover:bg-surface-2")}>
                     <span className="truncate">{cl.displayName}</span>
-                    {assigned.includes(cl.id) && <span className="text-xs">✓</span>}
+                    {assigned.includes(cl.id) && <span className="text-caption">✓</span>}
                   </button>
                 ))}
               </div>

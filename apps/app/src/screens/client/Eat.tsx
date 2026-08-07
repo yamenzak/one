@@ -200,7 +200,7 @@ export function Eat({ clientId }: { clientId: string }) {
                 <div className="min-w-0">
                   <div className="text-micro uppercase text-nutrition">Your meal plan</div>
                   <h2 className="mt-0.5 truncate text-title-3">{mealPlan.name}</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">{mealPlan.meals} meal{mealPlan.meals === 1 ? "" : "s"} · {mealPlan.options} options to choose from</p>
+                  <p className="mt-1 text-body text-muted-foreground">{mealPlan.meals} meal{mealPlan.meals === 1 ? "" : "s"} · {mealPlan.options} options to choose from</p>
                 </div>
                 <div className="grid size-12 shrink-0 place-items-center rounded-full bg-nutrition-soft text-nutrition [&_svg]:size-6"><Utensils /></div>
               </div>
@@ -220,7 +220,7 @@ export function Eat({ clientId }: { clientId: string }) {
       {/* One-tap write feedback (quick-add / water) — sits above both so a queued
           or failed tap is never a silent no-op the user retries blindly. */}
       {queuedMsg && <QueuedNotice />}
-      {logErr && <p role="alert" className="text-sm text-warning">{logErr}</p>}
+      {logErr && <p role="alert" className="text-body text-warning">{logErr}</p>}
 
       {/* Today — intake, hydration + protein at a glance */}
       <section className="space-y-2">
@@ -284,10 +284,10 @@ export function Eat({ clientId }: { clientId: string }) {
               tone="hydration"
               label="Water"
               progress={waterMl / waterTarget}
-              value={<>{fmtVolume(waterMl, units)}<span className="text-xs font-medium text-muted-foreground"> / {fmtVolume(waterTarget, units)}</span></>}
+              value={<>{fmtVolume(waterMl, units)}<span className="text-caption font-medium text-muted-foreground"> / {fmtVolume(waterTarget, units)}</span></>}
             />
             <div className="flex gap-1.5">
-              {waterPresets.map((v) => <button key={v} onClick={() => void addWater(v)} className={`flex-1 rounded-lg py-2 text-xs font-semibold transition-transform active:scale-95 ${toneSoft.hydration}`}>+{v}</button>)}
+              {waterPresets.map((v) => <button key={v} onClick={() => void addWater(v)} className={`flex-1 rounded-lg py-2 text-caption font-semibold transition-transform active:scale-95 ${toneSoft.hydration}`}>+{v}</button>)}
             </div>
           </div>
         </Stagger>
@@ -320,8 +320,8 @@ export function Eat({ clientId }: { clientId: string }) {
                     </span>
                   </div>
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium leading-tight">{normFood(r).name}</div>
-                    <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                    <div className="truncate text-body font-medium leading-tight">{normFood(r).name}</div>
+                    <div className="mt-0.5 flex items-center gap-1 text-caption text-muted-foreground">
                       <span className="numeral shrink-0 font-semibold text-calories">{fmtEnergy(r.calories, units)}</span>
                       {r.quantity ? <span className="truncate">· {Math.round(r.quantity)} {r.unit ?? "g"}</span> : null}
                     </div>
@@ -336,7 +336,7 @@ export function Eat({ clientId }: { clientId: string }) {
       {/* Today's meals */}
       <section className="space-y-2">
         {/* Every entry point into food writing follows `foodLogging`. */}
-        <Eyebrow action={canFood && entries.length > 0 ? <button onClick={() => openLog()} className="inline-flex items-center gap-1 text-sm font-medium normal-case tracking-normal text-primary [&_svg]:size-4"><Plus /> Log</button> : undefined}>Today's meals</Eyebrow>
+        <Eyebrow action={canFood && entries.length > 0 ? <button onClick={() => openLog()} className="inline-flex items-center gap-1 text-body font-medium normal-case tracking-normal text-primary [&_svg]:size-4"><Plus /> Log</button> : undefined}>Today's meals</Eyebrow>
         {entries.length === 0 ? (
           <EmptyState icon={Utensils} title="Nothing logged today" description={canFood ? "Log your first meal — search, barcode, snap a photo, or your plan." : "Nothing here yet — your coach logs your meals for you."} action={canFood ? <Button onClick={() => openLog()}><Plus /> Log food</Button> : undefined} />
         ) : (
@@ -352,7 +352,7 @@ export function Eat({ clientId }: { clientId: string }) {
                     {/* A "total" of one thing is not a total — it is the same
                         number printed twice, 20px apart. Shown only when there
                         is actually something to add up. */}
-                    {list.length > 1 && <span className="numeral text-sm font-semibold text-calories">{fmtEnergy(mealCal, units)}</span>}
+                    {list.length > 1 && <span className="numeral text-body font-semibold text-calories">{fmtEnergy(mealCal, units)}</span>}
                   </div>
                   <div className="divide-y divide-border/40">
                     {list.map((e) => (
@@ -367,7 +367,7 @@ export function Eat({ clientId }: { clientId: string }) {
                       />
                     ))}
                   </div>
-                  {canFood && <button onClick={() => openLog(meal)} className="pt-0.5 text-xs font-semibold text-primary">+ Add to {meta.label.toLowerCase()}</button>}
+                  {canFood && <button onClick={() => openLog(meal)} className="pt-0.5 text-caption font-semibold text-primary">+ Add to {meta.label.toLowerCase()}</button>}
                 </Card>
               );
             })}
@@ -435,19 +435,19 @@ function WeekStrip({ week }: { week: Week }) {
         </div>
         <div className="mt-1.5 flex gap-1.5">
           {days.map((d, i) => (
-            <span key={d.date} className={`flex-1 text-center text-xs ${i === days.length - 1 ? "font-bold text-foreground" : "text-muted-foreground"}`}>{DOW[new Date(`${d.date}T00:00:00Z`).getUTCDay()]}</span>
+            <span key={d.date} className={`flex-1 text-center text-caption ${i === days.length - 1 ? "font-bold text-foreground" : "text-muted-foreground"}`}>{DOW[new Date(`${d.date}T00:00:00Z`).getUTCDay()]}</span>
           ))}
         </div>
       </div>
       <div className="flex items-center justify-around border-t border-border/50 pt-3 text-center">
         <div>
-          <div className="numeral text-lg font-bold leading-none">{onTarget}<span className="text-sm font-medium text-muted-foreground">/7</span></div>
-          <div className="mt-1 text-xs text-muted-foreground">{ct ? "on target" : "days logged"}</div>
+          <div className="numeral text-body-lg font-bold leading-none">{onTarget}<span className="text-body font-medium text-muted-foreground">/7</span></div>
+          <div className="mt-1 text-caption text-muted-foreground">{ct ? "on target" : "days logged"}</div>
         </div>
         <div className="h-8 w-px bg-border/50" />
         <div>
-          <div className="numeral text-lg font-bold leading-none text-protein">{avgProtein}<span className="text-sm font-medium text-muted-foreground"> g</span></div>
-          <div className="mt-1 text-xs text-muted-foreground">avg protein{pt ? ` / ${pt}` : ""}</div>
+          <div className="numeral text-body-lg font-bold leading-none text-protein">{avgProtein}<span className="text-body font-medium text-muted-foreground"> g</span></div>
+          <div className="mt-1 text-caption text-muted-foreground">avg protein{pt ? ` / ${pt}` : ""}</div>
         </div>
       </div>
     </Card>
@@ -507,7 +507,7 @@ function EditEntrySheet({ entry, clientId, units, onClose, onSaved }: { entry: E
           <div className="grid grid-cols-4 gap-2 flex-1">
             {([["calories", entry.calories], ["protein", entry.protein_g], ["carbs", entry.carbs_g], ["fat", entry.fat_g]] as const).map(([m, v]) => {
               const M = METRICS[m];
-              return <div key={m} className={`flex flex-col items-center gap-0.5 rounded-lg py-1.5 ${toneSoft[M.tone]}`}><M.icon className="size-3.5" /><span className="numeral text-sm font-semibold leading-none">{m === "calories" ? kcalToDisplay(s(v), units).toLocaleString() : s(v)}</span></div>;
+              return <div key={m} className={`flex flex-col items-center gap-0.5 rounded-lg py-1.5 ${toneSoft[M.tone]}`}><M.icon className="size-3.5" /><span className="numeral text-body font-semibold leading-none">{m === "calories" ? kcalToDisplay(s(v), units).toLocaleString() : s(v)}</span></div>;
             })}
           </div>
         </div>
@@ -515,11 +515,11 @@ function EditEntrySheet({ entry, clientId, units, onClose, onSaved }: { entry: E
         {scalable && <Field label={`Quantity (${entry.unit ?? "g"})`} inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1"))} />}
 
         <div>
-          <div className="mb-1.5 text-sm text-muted-foreground">Meal</div>
+          <div className="mb-1.5 text-body text-muted-foreground">Meal</div>
           <div className="flex flex-wrap gap-2">{EDIT_MEALS.map((m) => <Chip key={m} selected={meal === m} onClick={() => setMeal(m)}>{metaFor(m).label}</Chip>)}</div>
         </div>
 
-        {err && <p role="alert" className="text-sm text-warning">{err}</p>}
+        {err && <p role="alert" className="text-body text-warning">{err}</p>}
 
       </div>
 

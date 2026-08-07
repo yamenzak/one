@@ -43,7 +43,7 @@ function PillarBar({ pillar }: { pillar: WellnessPillar }) {
     <div className="flex items-center gap-2.5">
       <IconBadge icon={meta.icon} tone={meta.tone} size="sm" />
       <div className="min-w-0 flex-1">
-        <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+        <div className="mb-1 flex items-center justify-between gap-2 text-caption">
           <span className="truncate font-medium">{pillar.label}</span>
           <span className="numeral shrink-0 font-semibold text-muted-foreground">{pct}</span>
         </div>

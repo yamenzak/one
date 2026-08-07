@@ -28,7 +28,7 @@ export type LegalDoc = "terms" | "privacy";
 /* ------------------------------- primitives ------------------------------- */
 
 function H({ children }: { children: React.ReactNode }) {
-  return <h3 className="mb-1.5 mt-6 text-sm font-semibold text-foreground first:mt-0">{children}</h3>;
+  return <h3 className="mb-1.5 mt-6 text-body font-semibold text-foreground first:mt-0">{children}</h3>;
 }
 function P({ children }: { children: React.ReactNode }) {
   return <p className="mb-3 text-caption leading-relaxed text-muted-foreground">{children}</p>;
@@ -190,7 +190,7 @@ export function LegalDialog({ doc, onClose }: { doc: LegalDoc | null; onClose: (
   useEffect(() => { if (doc) setActive(doc); }, [doc]);
   const Tab = ({ id, label }: { id: LegalDoc; label: string }) => (
     <button type="button" onClick={() => setActive(id)}
-      className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${active === id ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60"}`}>
+      className={`rounded-md px-2.5 py-1 text-caption font-medium transition-colors ${active === id ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted/60"}`}>
       {label}
     </button>
   );

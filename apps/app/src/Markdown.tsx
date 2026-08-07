@@ -56,7 +56,7 @@ export function Markdown({ children, className }: { children: string; className?
     const items = list.items.map((it, idx) => (
       <li key={idx} className="flex gap-2.5">
         {ordered
-          ? <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">{idx + 1}</span>
+          ? <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-caption font-semibold text-primary">{idx + 1}</span>
           : <span className="mt-[0.6em] size-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden />}
         <span className="min-w-0 flex-1 leading-7">{renderInline(it, `li${key}-${idx}`)}</span>
       </li>
@@ -127,7 +127,7 @@ export function Markdown({ children, className }: { children: string; className?
           </h2>,
         );
       } else {
-        blocks.push(<h3 key={key++} className="mb-1.5 mt-5 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{content}</h3>);
+        blocks.push(<h3 key={key++} className="mb-1.5 mt-5 text-caption font-semibold uppercase tracking-[0.08em] text-muted-foreground">{content}</h3>);
       }
       continue;
     }

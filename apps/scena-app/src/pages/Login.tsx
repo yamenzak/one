@@ -40,10 +40,10 @@ function Shell({ children }: { children: React.ReactNode }) {
         <div className="w-full max-w-md">
           <div className="mb-7 flex flex-col items-center gap-2">
             <ScenaMascot mood="idle" size={92} />
-            <div className="text-2xl font-extrabold tracking-tight">Scena</div>
+            <div className="text-title-2 font-bold tracking-tight">Scena</div>
           </div>
           <div className="rounded-3xl border bg-card/80 p-8 shadow-xl shadow-primary/5 backdrop-blur-sm">{children}</div>
-          <p className="mt-6 text-center text-xs text-muted-foreground">Digital signage & live boards, beautifully simple.</p>
+          <p className="mt-6 text-center text-caption text-muted-foreground">Digital signage & live boards, beautifully simple.</p>
           <p className="mt-2 text-center text-caption leading-relaxed text-muted-foreground">
             By continuing, you agree to our <LegalLinks onOpen={setDoc} />.
           </p>
@@ -56,7 +56,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 function ErrLine({ children }: { children: React.ReactNode }) {
-  return <div className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{children}</div>;
+  return <div className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-body text-destructive">{children}</div>;
 }
 
 type View = "email" | "station" | "create";
@@ -110,8 +110,8 @@ function StationSignIn({ onDone, onBack }: { onDone: () => void; onBack: () => v
 
   return (
     <form onSubmit={submit}>
-      <h1 className="text-lg font-semibold">Sign in this station</h1>
-      <p className="mb-4 mt-1 text-sm text-muted-foreground">
+      <h1 className="text-body-lg font-semibold">Sign in this station</h1>
+      <p className="mb-4 mt-1 text-body text-muted-foreground">
         Use the handle and code from the Live Boards screen. Ask an owner to regenerate one if you've lost it.
       </p>
       <div className="mb-3">
@@ -126,7 +126,7 @@ function StationSignIn({ onDone, onBack }: { onDone: () => void; onBack: () => v
       <Button type="submit" disabled={busy || !handle.trim() || !code} className="mt-4 w-full">
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
       </Button>
-      <button type="button" onClick={onBack} className="mt-4 flex w-full items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+      <button type="button" onClick={onBack} className="mt-4 flex w-full items-center justify-center gap-1.5 text-body text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-3.5" /> I'm a person, not a station
       </button>
     </form>
@@ -175,13 +175,13 @@ function EmailSignIn({ onDone, onStation, onCreate }: { onDone: () => void; onSt
   if (step === "otp") {
     return (
       <form onSubmit={verify}>
-        <h1 className="text-lg font-semibold">Enter your code</h1>
-        <p className="mb-4 mt-1 text-sm text-muted-foreground">We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span>.</p>
+        <h1 className="text-body-lg font-semibold">Enter your code</h1>
+        <p className="mb-4 mt-1 text-body text-muted-foreground">We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span>.</p>
         <Label htmlFor="otp">Verification code</Label>
-        <Input id="otp" value={otp} onChange={(ev) => setOtp(ev.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" inputMode="numeric" autoComplete="one-time-code" autoFocus className="mt-1.5 text-center text-lg tracking-[0.4em]" />
+        <Input id="otp" value={otp} onChange={(ev) => setOtp(ev.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" inputMode="numeric" autoComplete="one-time-code" autoFocus className="mt-1.5 text-center text-body-lg tracking-[0.4em]" />
         {err && <ErrLine>{err}</ErrLine>}
         <Button type="submit" disabled={busy || otp.length < 6} className="mt-4 w-full">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & sign in"}</Button>
-        <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
+        <div className="mt-3 flex items-center justify-between text-body text-muted-foreground">
           <button type="button" className="hover:text-foreground" onClick={() => { setStep("email"); setOtp(""); setErr(null); }}>← Change email</button>
           <button type="button" className="hover:text-foreground" onClick={() => sendCode()} disabled={busy}>Resend code</button>
         </div>
@@ -191,16 +191,16 @@ function EmailSignIn({ onDone, onStation, onCreate }: { onDone: () => void; onSt
 
   return (
     <form onSubmit={sendCode}>
-      <h1 className="text-lg font-semibold">Sign in to Scena</h1>
-      <p className="mb-4 mt-1 text-sm text-muted-foreground">We'll email you a one-time code — there's no password to remember.</p>
+      <h1 className="text-body-lg font-semibold">Sign in to Scena</h1>
+      <p className="mb-4 mt-1 text-body text-muted-foreground">We'll email you a one-time code — there's no password to remember.</p>
       <Label htmlFor="email">Email</Label>
       <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="email" autoFocus required className="mt-1.5" />
       {err && <ErrLine>{err}</ErrLine>}
       <Button type="submit" disabled={busy} className="mt-4 w-full">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (<><Mail className="mr-2 h-4 w-4" /> Email me a code</>)}</Button>
-      <button type="button" onClick={onStation} className="mt-4 flex w-full items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+      <button type="button" onClick={onStation} className="mt-4 flex w-full items-center justify-center gap-1.5 text-body text-muted-foreground hover:text-foreground">
         <MonitorSmartphone className="size-3.5" /> Sign in a station instead
       </button>
-      <div className="mt-5 border-t pt-4 text-center text-sm text-muted-foreground">
+      <div className="mt-5 border-t pt-4 text-center text-body text-muted-foreground">
         New to Scena?{" "}
         <button type="button" onClick={onCreate} className="font-medium text-primary hover:underline">Create a workspace</button>
       </div>
@@ -259,13 +259,13 @@ function CreateWorkspace({ onDone, onBack }: { onDone: () => void; onBack: () =>
   if (step === "otp") {
     return (
       <form onSubmit={verify}>
-        <h1 className="text-lg font-semibold">Enter your code</h1>
-        <p className="mb-4 mt-1 text-sm text-muted-foreground">We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span> to set up <span className="font-medium text-foreground">{workspace}</span>.</p>
+        <h1 className="text-body-lg font-semibold">Enter your code</h1>
+        <p className="mb-4 mt-1 text-body text-muted-foreground">We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span> to set up <span className="font-medium text-foreground">{workspace}</span>.</p>
         <Label htmlFor="cw-otp">Verification code</Label>
-        <Input id="cw-otp" value={otp} onChange={(ev) => setOtp(ev.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" inputMode="numeric" autoComplete="one-time-code" autoFocus className="mt-1.5 text-center text-lg tracking-[0.4em]" />
+        <Input id="cw-otp" value={otp} onChange={(ev) => setOtp(ev.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" inputMode="numeric" autoComplete="one-time-code" autoFocus className="mt-1.5 text-center text-body-lg tracking-[0.4em]" />
         {err && <ErrLine>{err}</ErrLine>}
         <Button type="submit" disabled={busy || otp.length < 6} className="mt-4 w-full">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & create workspace"}</Button>
-        <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
+        <div className="mt-3 flex items-center justify-between text-body text-muted-foreground">
           <button type="button" className="hover:text-foreground" onClick={() => { setStep("form"); setOtp(""); setErr(null); }}>← Back</button>
           <button type="button" className="hover:text-foreground" onClick={() => sendCode()} disabled={busy}>Resend code</button>
         </div>
@@ -275,13 +275,13 @@ function CreateWorkspace({ onDone, onBack }: { onDone: () => void; onBack: () =>
 
   return (
     <form onSubmit={sendCode}>
-      <h1 className="text-lg font-semibold">Create your workspace</h1>
-      <p className="mb-4 mt-1 text-sm text-muted-foreground">Screens, channels, boards, staff, and billing all live under it. You'll sign in with an email code — no password to manage.</p>
+      <h1 className="text-body-lg font-semibold">Create your workspace</h1>
+      <p className="mb-4 mt-1 text-body text-muted-foreground">Screens, channels, boards, staff, and billing all live under it. You'll sign in with an email code — no password to manage.</p>
       <div className="mb-3"><Label htmlFor="cw-ws">Workspace name</Label><Input id="cw-ws" value={workspace} onChange={(e) => setWorkspace(e.target.value)} placeholder="Acme Clinic" autoFocus required className="mt-1.5" /></div>
       <div><Label htmlFor="cw-email">Your email</Label><Input id="cw-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="email" required className="mt-1.5" /></div>
       {err && <ErrLine>{err}</ErrLine>}
       <Button type="submit" disabled={busy} className="mt-4 w-full">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (<><Mail className="mr-2 h-4 w-4" /> Email me a code</>)}</Button>
-      <button type="button" onClick={onBack} className="mt-4 flex w-full items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+      <button type="button" onClick={onBack} className="mt-4 flex w-full items-center justify-center gap-1.5 text-body text-muted-foreground hover:text-foreground">
         <ArrowLeft className="size-3.5" /> Back to sign in
       </button>
     </form>
@@ -317,12 +317,12 @@ export function OrgOnboard({ onDone, onSignOut }: { onDone: () => void; onSignOu
   return (
     <Shell>
       <form onSubmit={create}>
-        <h1 className="text-lg font-semibold">Name your workspace</h1>
-        <p className="mb-4 mt-1 text-sm text-muted-foreground">Screens, channels, boards, staff, and billing all live under it.</p>
+        <h1 className="text-body-lg font-semibold">Name your workspace</h1>
+        <p className="mb-4 mt-1 text-body text-muted-foreground">Screens, channels, boards, staff, and billing all live under it.</p>
         <div className="mb-1"><Label htmlFor="org">Organization name</Label><Input id="org" value={name} onChange={(e) => setName(e.target.value)} placeholder="Acme Clinic" autoFocus className="mt-1.5" required /></div>
         {err && <ErrLine>{err}</ErrLine>}
         <Button type="submit" disabled={busy} className="mt-4 w-full">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create workspace"}</Button>
-        <button type="button" onClick={onSignOut} className="mt-4 block w-full text-center text-xs text-muted-foreground hover:text-foreground">Sign out</button>
+        <button type="button" onClick={onSignOut} className="mt-4 block w-full text-center text-caption text-muted-foreground hover:text-foreground">Sign out</button>
       </form>
     </Shell>
   );

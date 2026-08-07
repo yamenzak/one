@@ -153,14 +153,14 @@ export function Sessions() {
               <Button size="lg" className="w-full" disabled={clients.length === 0} onClick={() => setScheduleOpen(true)}><Plus /> Book a session</Button>
             </Stagger>
 
-            {msg && <p role="status" aria-live="polite" className="text-sm text-danger">{msg}</p>}
+            {msg && <p role="status" aria-live="polite" className="text-body text-danger">{msg}</p>}
             {upcoming.length === 0 ? (
               /* NOT an EmptyState. The anchor two lines up already says "Nothing
                  booked" and the action is the button between them, so a 350px
                  illustrated block could only repeat both — which it did, title
                  for title. What's left is the one thing neither says: what a
                  booking costs the client, and when. */
-              <p className="px-6 pb-2 text-center text-sm text-muted-foreground">
+              <p className="px-6 pb-2 text-center text-body text-muted-foreground">
                 {clients.length === 0
                   ? "Add a client first, then book them in from here."
                   : "Marking a session complete — or a no-show — uses one of that client's prepaid sessions."}
@@ -173,17 +173,17 @@ export function Sessions() {
                       <Avatar {...clientFace(s.client_id)} className="size-10" />
                       <div className="min-w-0 flex-1">
                         <div className="truncate font-semibold">{clientName(s.client_id)}</div>
-                        <div className="truncate text-sm text-muted-foreground">{typeLabel(s.addon_type_id)}</div>
+                        <div className="truncate text-body text-muted-foreground">{typeLabel(s.addon_type_id)}</div>
                       </div>
                       {/* No "Scheduled" badge here: everything in this list is
                           scheduled, so the badge said nothing and took the room
                           a long client name needed. */}
                     </div>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-3 text-caption text-muted-foreground">
                       <span className="inline-flex items-center gap-1 [&_svg]:size-3.5"><Calendar />{new Date(s.scheduled_at).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</span>
                       <span className="inline-flex items-center gap-1 [&_svg]:size-3.5"><Clock />{s.duration_minutes} min</span>
                     </div>
-                    {s.notes && <p className="text-sm text-muted-foreground">{s.notes}</p>}
+                    {s.notes && <p className="text-body text-muted-foreground">{s.notes}</p>}
                     <div className="flex flex-wrap gap-2 border-t border-border/40 pt-3">
                       <Button size="sm" variant="tonal" disabled={busyId === s.id} onClick={() => void transition(s.id, "completed")}><CheckCheck /> Complete</Button>
                       <Button size="sm" variant="secondary" disabled={busyId === s.id} onClick={() => void transition(s.id, "no_show")}><X /> No-show</Button>
@@ -204,7 +204,7 @@ export function Sessions() {
                         <Avatar {...clientFace(s.client_id)} className="size-9 opacity-70" />
                         <div className="min-w-0 flex-1">
                           <div className="truncate font-medium">{clientName(s.client_id)}</div>
-                          <div className="truncate text-xs text-muted-foreground">
+                          <div className="truncate text-caption text-muted-foreground">
                             {typeLabel(s.addon_type_id)} · {new Date(s.scheduled_at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                           </div>
                         </div>
@@ -213,7 +213,7 @@ export function Sessions() {
                       {(s.status === "completed" || s.status === "no_show") && (
                         <div className="flex flex-wrap items-center gap-2 border-t border-border/40 pt-2.5">
                           <Button size="sm" variant="ghost" disabled={busyId === s.id} onClick={() => void transition(s.id, "scheduled")}><RotateCcw /> Reopen</Button>
-                          <span className="text-xs text-muted-foreground">Gives the client their session back.</span>
+                          <span className="text-caption text-muted-foreground">Gives the client their session back.</span>
                         </div>
                       )}
                     </Card>
@@ -289,17 +289,17 @@ function ScheduleSheet({ clients, types, onClose, onSaved }: { clients: ClientSu
   return (
     <Sheet open onClose={onClose} title="Book a session" footer={<Button size="lg" className="w-full" disabled={!clientId || !addOnTypeId || !when || busy} onClick={() => void save()}>{busy ? "Booking…" : "Book session"}</Button>}>
       <div className="space-y-4">
-        <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Client</span><Select aria-label="Client" value={clientId} onChange={setClientId} options={[{ value: "", label: "Choose a client…" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
-        <div className="space-y-1.5"><span className="text-sm text-muted-foreground">What for</span><Select aria-label="What for" value={addOnTypeId} onChange={setAddOnTypeId} options={types.map((t) => ({ value: t.id, label: `${t.label} · ${t.duration_minutes} min` }))} /></div>
+        <div className="space-y-1.5"><span className="text-body text-muted-foreground">Client</span><Select aria-label="Client" value={clientId} onChange={setClientId} options={[{ value: "", label: "Choose a client…" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
+        <div className="space-y-1.5"><span className="text-body text-muted-foreground">What for</span><Select aria-label="What for" value={addOnTypeId} onChange={setAddOnTypeId} options={types.map((t) => ({ value: t.id, label: `${t.label} · ${t.duration_minutes} min` }))} /></div>
         <label className="block space-y-1.5">
-          <span className="text-sm text-muted-foreground">When</span>
-          <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="w-full rounded-xl bg-surface-3 px-3 py-2.5 text-sm outline-none ring-ring focus-visible:ring-2" />
+          <span className="text-body text-muted-foreground">When</span>
+          <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="w-full rounded-xl bg-surface-3 px-3 py-2.5 text-body outline-none ring-ring focus-visible:ring-2" />
         </label>
         <Field label="Notes (optional)" icon={User} value={notes} onChange={(e) => setNotes(e.target.value)} />
-        {err && <p role="status" aria-live="polite" className="text-sm text-danger">{err}</p>}
+        {err && <p role="status" aria-live="polite" className="text-body text-danger">{err}</p>}
         {/* What the button is about to cost the client, said before it's spent —
             not after, in an error. */}
-        <p className="text-xs text-muted-foreground">Booking holds the slot. It only uses one of their prepaid sessions when you mark it complete or a no-show.</p>
+        <p className="text-caption text-muted-foreground">Booking holds the slot. It only uses one of their prepaid sessions when you mark it complete or a no-show.</p>
       </div>
     </Sheet>
   );
@@ -328,7 +328,7 @@ function AddOnTypeSheet({ onClose, onSaved }: { onClose: () => void; onSaved: ()
         <Field label="Name" icon={Ticket} value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Nutrition consultation" hint="What you'd call it to a client." />
         <Field label="How long" icon={Clock} value={duration} inputMode="numeric" onChange={(e) => setDuration(e.target.value.replace(/\D/g, ""))} hint="In minutes." />
         <Field label="Price on its own (optional)" icon={CreditCard} value={price} inputMode="decimal" onChange={(e) => setPrice(e.target.value)} hint="USD. What one costs when it isn't already in a package — set it and your team can still book a client who's used theirs up." />
-        {err && <p role="status" aria-live="polite" className="text-sm text-danger">{err}</p>}
+        {err && <p role="status" aria-live="polite" className="text-body text-danger">{err}</p>}
       </div>
     </Sheet>
   );

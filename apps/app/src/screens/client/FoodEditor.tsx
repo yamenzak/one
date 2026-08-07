@@ -246,7 +246,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                 {webMode && (
                   <div className="space-y-2 rounded-2xl border border-border/50 p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5"><Search /> <span className="truncate">Results for “{f.name.trim() || "…"}” from Open Food Facts…</span></div>
+                      <div className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground [&_svg]:size-3.5"><Search /> <span className="truncate">Results for “{f.name.trim() || "…"}” from Open Food Facts…</span></div>
                       <button onClick={() => setScanOpen(true)} aria-label="Scan barcode" className="grid size-9 shrink-0 place-items-center rounded-full bg-secondary text-foreground hover:bg-surface-3 [&_svg]:size-[1.1rem]"><Barcode /></button>
                     </div>
                     {webResults && webResults.length > 0 && (
@@ -257,8 +257,8 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                       />
                     )}
                     <div className="max-h-64 space-y-1 overflow-y-auto">
-                      {f.name.trim().length < 2 && <p className="p-3 text-center text-sm text-muted-foreground">Type a food name above to search, or scan a barcode.</p>}
-                      {webBusy && <p className="p-3 text-center text-sm text-muted-foreground">Searching…</p>}
+                      {f.name.trim().length < 2 && <p className="p-3 text-center text-body text-muted-foreground">Type a food name above to search, or scan a barcode.</p>}
+                      {webBusy && <p className="p-3 text-center text-body text-muted-foreground">Searching…</p>}
                       {webResults?.filter((h) => foodFilter === "all" || (foodFilter === "branded" ? !!h.brand : !h.brand)).map((hit, i) => (
                         <div key={i} className="rounded-xl px-2 py-2 transition-colors hover:bg-secondary">
                           <FoodRow
@@ -270,16 +270,16 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                           />
                         </div>
                       ))}
-                      {webResults && webResults.length === 0 && !webBusy && <p className="p-3 text-center text-sm text-muted-foreground">No results — try Scan label or Manual.</p>}
-                      {webResults && webResults.length > 0 && !webResults.some((h) => foodFilter === "all" || (foodFilter === "branded" ? !!h.brand : !h.brand)) && <p className="p-3 text-center text-sm text-muted-foreground">No {foodFilter} foods here — try “All”.</p>}
+                      {webResults && webResults.length === 0 && !webBusy && <p className="p-3 text-center text-body text-muted-foreground">No results — try Scan label or Manual.</p>}
+                      {webResults && webResults.length > 0 && !webResults.some((h) => foodFilter === "all" || (foodFilter === "branded" ? !!h.brand : !h.brand)) && <p className="p-3 text-center text-body text-muted-foreground">No {foodFilter} foods here — try “All”.</p>}
                     </div>
                   </div>
                 )}
-                {err && <p className="text-sm text-warning">{err}</p>}
+                {err && <p className="text-body text-warning">{err}</p>}
               </div>
             ) : (
               <div className="space-y-6">
-                {!foodId && <button onClick={() => setStep("choose")} className="-mb-1 inline-flex items-center gap-1 text-sm text-muted-foreground [&_svg]:size-4"><ArrowLeft /> Back</button>}
+                {!foodId && <button onClick={() => setStep("choose")} className="-mb-1 inline-flex items-center gap-1 text-body text-muted-foreground [&_svg]:size-4"><ArrowLeft /> Back</button>}
 
                 {/* Simulated output must never read as a real label read. */}
                 <MockedNotice mocked={aiMocked} what="These macros" />
@@ -289,7 +289,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                   <Field label="Name" icon={Utensils} value={f.name} onChange={(e) => set("name", e.target.value)} />
                   <AiImageField value={f.image} onChange={(url) => set("image", url)} feature="food-image" subject={f.name} canAi={!!isStaff && aiSuite} label="Photo" />
                   {aiMealTools && (
-                    <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary/15 px-3.5 text-sm font-medium text-primary transition-colors hover:bg-primary/25 [&_svg]:size-4">
+                    <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-primary/15 px-3.5 text-body font-medium text-primary transition-colors hover:bg-primary/25 [&_svg]:size-4">
                       <ScanLine /> Scan nutrition label
                       <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => e.target.files?.[0] && void scanLabel(e.target.files[0])} />
                     </label>
@@ -316,7 +316,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                       const M = METRICS[metric];
                       return (
                         <label key={k} className={cn("flex flex-col gap-1.5 rounded-2xl p-2.5", toneSoft[M.tone])}>
-                          <span className="flex items-center gap-1 text-xs font-semibold leading-none [&_svg]:size-3"><M.icon /> <span className="truncate">{label}</span></span>
+                          <span className="flex items-center gap-1 text-caption font-semibold leading-none [&_svg]:size-3"><M.icon /> <span className="truncate">{label}</span></span>
                           <span className="flex items-baseline gap-0.5 rounded-lg bg-background/70 px-1.5 py-1.5">
                             {/* Named explicitly: without this the accessible name is
                                 the whole wrapping label's concatenated text
@@ -325,14 +325,14 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                                 another — abbreviations that don't read as words.
                                 The unit belongs in the name, not just beside it. */}
                             <input aria-label={`${metric.charAt(0).toUpperCase()}${metric.slice(1)} (${unit})`} inputMode="decimal" value={f[k]} onChange={(e) => set(k, dec(e.target.value))} placeholder="0" className="w-full min-w-0 bg-transparent text-center text-body font-bold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/70 placeholder:font-medium placeholder:text-muted-foreground/50" />
-                            <span className="shrink-0 text-xs font-medium text-muted-foreground">{unit}</span>
+                            <span className="shrink-0 text-caption font-medium text-muted-foreground">{unit}</span>
                           </span>
                         </label>
                       );
                     })}
                   </div>
 
-                  <button type="button" onClick={() => setShowMicros((v) => !v)} className="flex w-full items-center justify-between rounded-xl py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+                  <button type="button" onClick={() => setShowMicros((v) => !v)} className="flex w-full items-center justify-between rounded-xl py-1 text-body font-medium text-muted-foreground transition-colors hover:text-foreground">
                     More nutrients <ChevronDown className={cn("size-4 transition-transform", showMicros && "rotate-180")} />
                   </button>
                   {showMicros && (
@@ -354,7 +354,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                     </div>
                   </div>
                 )}
-                {err && <p className="text-sm text-warning">{err}</p>}
+                {err && <p className="text-body text-warning">{err}</p>}
               </div>
             )}
           </StepFade>

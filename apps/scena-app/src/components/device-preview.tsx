@@ -104,7 +104,7 @@ export function DevicePreview({ channelId, online = true, chrome = false, classN
       {/* Offline veil — the frame is what it *should* show; dim it when dark. */}
       {channelId && !online && (
         <div className="absolute inset-0 grid place-items-center bg-black/70 text-white/60 backdrop-grayscale">
-          <div className="flex items-center gap-1.5 text-xs font-medium">
+          <div className="flex items-center gap-1.5 text-caption font-medium">
             <MonitorOff className="size-4" /> Offline
           </div>
         </div>

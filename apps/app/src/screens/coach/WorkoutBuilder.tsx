@@ -167,8 +167,8 @@ function DayCoverRow({ dayName, value, onChange }: { dayName: string; value?: st
           ? <img src={value} alt="" className="size-11 shrink-0 rounded-xl object-cover" />
           : <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-dashed border-border text-muted-foreground [&_svg]:size-4"><ImageIcon /></div>}
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium">Day cover</div>
-          <div className="truncate text-xs text-muted-foreground">{value ? "Shown to the client on this day" : "Optional — rendered in your accent colour"}</div>
+          <div className="text-body font-medium">Day cover</div>
+          <div className="truncate text-caption text-muted-foreground">{value ? "Shown to the client on this day" : "Optional — rendered in your accent colour"}</div>
         </div>
         {canAi && (
           <Button size="sm" variant={value ? "ghost" : "tonal"} disabled={busy} onClick={() => setPickOpen(true)}>
@@ -177,16 +177,16 @@ function DayCoverRow({ dayName, value, onChange }: { dayName: string; value?: st
         )}
         {value && <button onClick={() => onChange(null)} aria-label="Remove cover" className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger [&_svg]:size-4"><Trash2 /></button>}
       </div>
-      {err && <p className="text-xs text-warning">{err}</p>}
+      {err && <p className="text-caption text-warning">{err}</p>}
       {pickOpen && (
         <Sheet open onClose={() => setPickOpen(false)} title="Cover style">
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Rendered in your brand accent colour. Pick a look for &ldquo;{dayName.trim() || "this day"}&rdquo;.</p>
+            <p className="text-body text-muted-foreground">Rendered in your brand accent colour. Pick a look for &ldquo;{dayName.trim() || "this day"}&rdquo;.</p>
             <div className="grid grid-cols-2 gap-2">
               {DAY_STYLES.map((s) => (
                 <button key={s.key} onClick={() => void gen(s)} className="rounded-2xl border border-border/60 bg-card p-3 text-left transition-colors hover:bg-surface-2">
-                  <div className="text-sm font-semibold">{s.label}</div>
-                  <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{s.hint}</div>
+                  <div className="text-body font-semibold">{s.label}</div>
+                  <div className="mt-0.5 line-clamp-2 text-caption text-muted-foreground">{s.hint}</div>
                 </button>
               ))}
             </div>
@@ -299,17 +299,17 @@ function PlanHealthCard({ days, lib }: { days: WorkoutDay[]; lib: ExLib }) {
         <div className="space-y-1.5">
           {top.map((mv) => (
             <div key={mv.muscle} className="flex items-center gap-2.5">
-              <span className="w-20 shrink-0 truncate text-xs font-medium">{pretty(mv.muscle)}</span>
+              <span className="w-20 shrink-0 truncate text-caption font-medium">{pretty(mv.muscle)}</span>
               <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-surface-3">
                 <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.max(6, (mv.sets / max) * 100)}%`, backgroundColor: toneVar[muscleTone(mv.muscle)] }} />
               </div>
-              <span className="numeral w-5 shrink-0 text-right text-xs font-semibold tabular-nums">{mv.sets}</span>
+              <span className="numeral w-5 shrink-0 text-right text-caption font-semibold tabular-nums">{mv.sets}</span>
             </div>
           ))}
         </div>
       </Disclosure>
       {h.missingMajors.length > 0 && (
-        <div className="flex items-center gap-1.5 rounded-xl bg-warning-soft px-3 py-2 text-xs text-warning [&_svg]:size-3.5">
+        <div className="flex items-center gap-1.5 rounded-xl bg-warning-soft px-3 py-2 text-caption text-warning [&_svg]:size-3.5">
           <AlertTriangle /> No {h.missingMajors.slice(0, 3).join(" · no ")} volume
         </div>
       )}
@@ -349,7 +349,7 @@ function DayRail({ days, lib, active, onSelect, onAdd }: {
                 : <div className={cn("absolute inset-0", d.isRestDay ? "bg-gradient-to-br from-sleep/25 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2")} />}
               <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/15 to-transparent" />
               <div className="absolute inset-x-0 bottom-0 p-2">
-                <div className="truncate text-xs font-semibold text-white">{d.name || `Day ${i + 1}`}</div>
+                <div className="truncate text-caption font-semibold text-white">{d.name || `Day ${i + 1}`}</div>
                 {/* White, not `--tone-foreground`: that token is the ink for a
                     TONE-COLOURED surface and is dark on a light-primary theme,
                     which made this invisible over the scrim. */}
@@ -361,7 +361,7 @@ function DayRail({ days, lib, active, onSelect, onAdd }: {
       })}
       {onAdd && (
         <RailItem>
-          <button onClick={onAdd} className="grid h-[4.5rem] w-24 place-items-center rounded-2xl border border-dashed border-border text-xs font-medium text-muted-foreground transition-colors hover:bg-surface-2">
+          <button onClick={onAdd} className="grid h-[4.5rem] w-24 place-items-center rounded-2xl border border-dashed border-border text-caption font-medium text-muted-foreground transition-colors hover:bg-surface-2">
             <span className="flex flex-col items-center gap-1 [&_svg]:size-4"><Plus /> Day</span>
           </button>
         </RailItem>
@@ -601,7 +601,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
               </Button>
             </div>
             {!day.isRestDay && summary && (
-              <p className="px-1 text-xs text-muted-foreground">
+              <p className="px-1 text-caption text-muted-foreground">
                 {summary.exercises === 0
                   ? "No exercises yet — add a block below."
                   : `${summary.exercises} exercise${summary.exercises === 1 ? "" : "s"} · ${summary.sets} working set${summary.sets === 1 ? "" : "s"}${summary.topMuscle ? ` · mostly ${pretty(summary.topMuscle).toLowerCase()}` : ""}`}
@@ -645,8 +645,8 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                     ? <ExerciseThumb thumb={first && exOf(first.exerciseId)?.thumb_url} thumb2={first && exOf(first.exerciseId)?.thumb2_url} size={34} />
                     : <IconBadge icon={Layers} tone="activity" size="sm" />}
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">{title}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{sub}</span>
+                    <span className="block truncate text-body font-semibold">{title}</span>
+                    <span className="block truncate text-caption text-muted-foreground">{sub}</span>
                   </span>
                 </span>
               }
@@ -700,11 +700,11 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                       answer "what shape are these sets", and both are set once
                       per exercise before any row is touched. */}
                   <div className="flex items-center gap-2">
-                    <Select value={slot.measurementMode} onChange={(v) => { const nm = v as MeasurementMode; setSlot((sl) => { sl.measurementMode = nm; sl.sets.forEach((s) => normalizeSetForMode(s, nm)); }); }} options={MEASURE_MODES} aria-label="Measured in" className="h-9 w-32 shrink-0 text-xs" />
+                    <Select value={slot.measurementMode} onChange={(v) => { const nm = v as MeasurementMode; setSlot((sl) => { sl.measurementMode = nm; sl.sets.forEach((s) => normalizeSetForMode(s, nm)); }); }} options={MEASURE_MODES} aria-label="Measured in" className="h-9 w-32 shrink-0 text-caption" />
                     <Rail bleed="none" className="pb-0">
                       {SET_PRESETS.map((p) => (
                         <RailItem key={p.label}>
-                          <Chip className="h-9 px-3 text-xs" onClick={() => setSlot((sl) => { sl.sets = setsFromPreset(p, sl.measurementMode); })}>{p.label}</Chip>
+                          <Chip className="h-9 px-3 text-caption" onClick={() => setSlot((sl) => { sl.sets = setsFromPreset(p, sl.measurementMode); })}>{p.label}</Chip>
                         </RailItem>
                       ))}
                     </Rail>
@@ -718,7 +718,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                         onApplyToAll={slot.sets.length > 1 ? () => applyToAll(setIdx) : undefined}
                         onRemove={() => setSlot((sl) => sl.sets.splice(setIdx, 1))} />
                     ))}
-                    <button onClick={() => setSlot((sl) => sl.sets.push(emptySetFor(sl.measurementMode)))} className="inline-flex items-center gap-1 px-1 text-xs font-semibold text-activity [&_svg]:size-3.5"><Plus /> Set</button>
+                    <button onClick={() => setSlot((sl) => sl.sets.push(emptySetFor(sl.measurementMode)))} className="inline-flex items-center gap-1 px-1 text-caption font-semibold text-activity [&_svg]:size-3.5"><Plus /> Set</button>
                   </div>
                 </SubCard>
                 );
@@ -730,7 +730,7 @@ export function WorkoutBuilder({ planId, onBack }: { planId: string; onBack: () 
                 button therefore ADDS A BLOCK here and ADDS A SLOT on a superset,
                 circuit or HIIT — where several is the entire point.
               */}
-              <button onClick={() => setPicker({ blockIdx, mode: solo && block.slots.length > 0 ? "new-block" : "slot" })} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-secondary py-2.5 text-sm text-muted-foreground [&_svg]:size-4">
+              <button onClick={() => setPicker({ blockIdx, mode: solo && block.slots.length > 0 ? "new-block" : "slot" })} className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-secondary py-2.5 text-body text-muted-foreground [&_svg]:size-4">
                 <Plus /> {solo && block.slots.length > 0 ? "Add another exercise" : "Add exercise"}
               </button>
             </div>
@@ -801,7 +801,7 @@ function CopyWeekSheet({ dayCount, onClose, onCopy }: { dayCount: number; onClos
   return (
     <Sheet open onClose={onClose} title="Copy week" footer={<Button size="lg" className="w-full" onClick={() => onCopy(label.trim(), Number(reps), Number(load))}><Copy /> Copy {dayCount} {dayCount === 1 ? "day" : "days"}</Button>}>
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">Duplicates all {dayCount} {dayCount === 1 ? "day" : "days"} as a new week. A progression is added to every set that has that value — leave at 0 to copy as-is.</p>
+        <p className="text-body text-muted-foreground">Duplicates all {dayCount} {dayCount === 1 ? "day" : "days"} as a new week. A progression is added to every set that has that value — leave at 0 to copy as-is.</p>
         <Field label="Week label (added to each day name)" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Week 2" />
         <div className="space-y-1.5">
           <Eyebrow>Reps per set</Eyebrow>
@@ -834,7 +834,7 @@ function SetRow({ set, index, mode, onPatch, onApplyToAll, onRemove }: { set: Wo
   const [open, setOpen] = useState(false);
   const wm = WEIGHT_MODES.find((m) => m.value === set.weightMode);
   const num = (v: string) => (v ? Number(v) : null);
-  const cell = cn(CELL, "h-10 px-2.5 text-center text-sm");
+  const cell = cn(CELL, "h-10 px-2.5 text-center text-body");
   return (
     <div className={cn("rounded-xl p-2 transition-colors", set.setType === "warmup" ? "bg-surface-3/25" : "bg-surface-3/40")}>
       <div className="flex items-center gap-1.5">
@@ -842,7 +842,7 @@ function SetRow({ set, index, mode, onPatch, onApplyToAll, onRemove }: { set: Wo
         {/* The index doubles as the set's TYPE: a warm-up and a working set look
             identical in a column of boxes, and which is which changes what every
             other number means. */}
-        <span className={cn("w-4 shrink-0 text-center text-xs font-semibold", set.setType === "warmup" ? "text-muted-foreground/60" : set.setType === "amrap" ? "text-activity" : "text-muted-foreground")}>
+        <span className={cn("w-4 shrink-0 text-center text-caption font-semibold", set.setType === "warmup" ? "text-muted-foreground/60" : set.setType === "amrap" ? "text-activity" : "text-muted-foreground")}>
           {set.setType === "warmup" ? "w" : set.setType === "amrap" ? "∞" : index + 1}
         </span>
         {(mode === "reps" || mode === "reps_in_time") && (
@@ -957,9 +957,9 @@ function AiDraftSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: stri
   return (
     <Sheet open onClose={onClose} title="AI Plan Draft" footer={<Button size="lg" className="w-full" disabled={busy} onClick={() => void run()}>{busy ? "Drafting…" : "Generate draft"}</Button>}>
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">Generate a starting draft from this client's full profile — their goal, body, training history and limitations. Every exercise comes from your library; you'll review and edit before publishing.</p>
+        <p className="text-body text-muted-foreground">Generate a starting draft from this client's full profile — their goal, body, training history and limitations. Every exercise comes from your library; you'll review and edit before publishing.</p>
         <Field label="Instructions (optional)" icon={PencilLine} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. 4-day upper/lower, dumbbells only" />
-        {dropped ? <div className="rounded-xl border border-border/60 bg-surface-2 p-3 text-xs text-muted-foreground">Draft applied. {dropped.length} suggested exercise{dropped.length === 1 ? "" : "s"} weren't in your library and {dropped.length === 1 ? "was" : "were"} skipped: {dropped.join(", ")}. Add {dropped.length === 1 ? "it" : "them"} to your library to include next time.</div> : null}
+        {dropped ? <div className="rounded-xl border border-border/60 bg-surface-2 p-3 text-caption text-muted-foreground">Draft applied. {dropped.length} suggested exercise{dropped.length === 1 ? "" : "s"} weren't in your library and {dropped.length === 1 ? "was" : "were"} skipped: {dropped.join(", ")}. Add {dropped.length === 1 ? "it" : "them"} to your library to include next time.</div> : null}
         {err ? <AiErrorBox error={err} /> : null}
       </div>
     </Sheet>

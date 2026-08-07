@@ -147,9 +147,9 @@ export function HtmlEditorDialog({ open, initialHtml, title, mode = "edit", surf
           {/* Left — code / AI chat (+ preview tab on mobile) */}
           <div className="flex h-[58vh] flex-col overflow-hidden rounded-lg border md:h-[60vh]">
             <div className="flex items-center gap-1 border-b p-1.5">
-              <button type="button" onClick={() => setTab("code")} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium ${tab === "code" ? "bg-muted" : "text-muted-foreground hover:bg-muted/60"}`}><Code2 className="size-3.5" /> Code</button>
-              <button type="button" onClick={() => setTab("chat")} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium ${tab === "chat" ? "bg-muted" : "text-muted-foreground hover:bg-muted/60"}`}><Sparkles className="size-3.5" /> AI chat</button>
-              <button type="button" onClick={() => setTab("preview")} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium md:hidden ${tab === "preview" ? "bg-muted" : "text-muted-foreground hover:bg-muted/60"}`}><Eye className="size-3.5" /> Preview</button>
+              <button type="button" onClick={() => setTab("code")} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-caption font-medium ${tab === "code" ? "bg-muted" : "text-muted-foreground hover:bg-muted/60"}`}><Code2 className="size-3.5" /> Code</button>
+              <button type="button" onClick={() => setTab("chat")} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-caption font-medium ${tab === "chat" ? "bg-muted" : "text-muted-foreground hover:bg-muted/60"}`}><Sparkles className="size-3.5" /> AI chat</button>
+              <button type="button" onClick={() => setTab("preview")} className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-caption font-medium md:hidden ${tab === "preview" ? "bg-muted" : "text-muted-foreground hover:bg-muted/60"}`}><Eye className="size-3.5" /> Preview</button>
             </div>
 
             {tab === "preview" ? (
@@ -159,12 +159,12 @@ export function HtmlEditorDialog({ open, initialHtml, title, mode = "edit", surf
             ) : tab === "code" ? (
               <Textarea value={html} onChange={(e) => setHtml(e.target.value)} spellCheck={false}
                 placeholder={`<div style='width:100%;height:100%;...'>Your ${noun}</div>`}
-                className="flex-1 resize-none rounded-none border-0 font-mono text-xs leading-relaxed focus-visible:ring-0" />
+                className="flex-1 resize-none rounded-none border-0 font-mono text-caption leading-relaxed focus-visible:ring-0" />
             ) : (
               <div className="flex flex-1 flex-col overflow-hidden">
                 {models.length > 0 && (
                   <div className="border-b p-2">
-                    <Select value={modelId || "__default"} onChange={(v) => setModelId(v === "__default" ? "" : v)} className="h-8 text-xs" options={[
+                    <Select value={modelId || "__default"} onChange={(v) => setModelId(v === "__default" ? "" : v)} className="h-8 text-caption" options={[
                       { value: "__default", label: "Default model" },
                       ...models.map((m) => ({ value: m.id, label: m.label })),
                     ]} />
@@ -172,7 +172,7 @@ export function HtmlEditorDialog({ open, initialHtml, title, mode = "edit", surf
                 )}
                 <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-3">
                   {messages.length === 0 && (
-                    <div className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+                    <div className="rounded-lg bg-muted/50 p-3 text-caption text-muted-foreground">
                       {surface === "widget"
                         ? (creating
                           ? "Describe the widget to create — e.g. “a glassy stat card showing today's footfall with a big number and a label”. The AI designs it to fit this widget's box using your brand kit, then you can ask for tweaks."
@@ -183,14 +183,14 @@ export function HtmlEditorDialog({ open, initialHtml, title, mode = "edit", surf
                     </div>
                   )}
                   {messages.map((m, i) => (
-                    <div key={i} className={`max-w-[85%] rounded-lg px-3 py-2 text-xs ${m.role === "user" ? "ml-auto bg-primary text-primary-foreground" : "bg-muted"}`}>{m.text}</div>
+                    <div key={i} className={`max-w-[85%] rounded-lg px-3 py-2 text-caption ${m.role === "user" ? "ml-auto bg-primary text-primary-foreground" : "bg-muted"}`}>{m.text}</div>
                   ))}
-                  {aiBusy && <div className="w-fit rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">Thinking…</div>}
+                  {aiBusy && <div className="w-fit rounded-lg bg-muted px-3 py-2 text-caption text-muted-foreground">Thinking…</div>}
                 </div>
                 <div className="flex items-end gap-2 border-t p-2">
                   <Textarea value={input} onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
-                    placeholder={creating ? `Describe the ${noun} to create…` : "Describe a change…"} className="max-h-24 min-h-9 flex-1 resize-none text-xs" />
+                    placeholder={creating ? `Describe the ${noun} to create…` : "Describe a change…"} className="max-h-24 min-h-9 flex-1 resize-none text-caption" />
                   <Button size="icon" className="size-9 shrink-0" disabled={aiBusy || !input.trim()} onClick={sendChat}><Send className="size-4" /></Button>
                 </div>
               </div>
@@ -199,7 +199,7 @@ export function HtmlEditorDialog({ open, initialHtml, title, mode = "edit", surf
 
           {/* Right — live preview (desktop; on mobile it's the Preview tab) */}
           <div className="hidden h-[60vh] flex-col overflow-hidden rounded-lg border md:flex">
-            <div className="flex items-center gap-1.5 border-b px-3 py-2 text-xs text-muted-foreground"><Eye className="size-3.5" /> Live preview{surface === "widget" && width && height ? <span className="ml-auto font-mono">{width}×{height}</span> : null}</div>
+            <div className="flex items-center gap-1.5 border-b px-3 py-2 text-caption text-muted-foreground"><Eye className="size-3.5" /> Live preview{surface === "widget" && width && height ? <span className="ml-auto font-mono">{width}×{height}</span> : null}</div>
             <div className="flex flex-1 items-center justify-center bg-black p-3">
               <HtmlThumb html={html} interactive designW={pw} designH={ph} className="w-full rounded-md shadow-lg ring-1 ring-white/10" />
             </div>

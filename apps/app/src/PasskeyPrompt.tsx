@@ -72,9 +72,9 @@ export function PasskeyProvider({ children }: { children: ReactNode }) {
           <div className="space-y-5">
             <div className="flex items-center gap-3">
               <div className="grid size-12 shrink-0 place-items-center rounded-2xl bg-primary/15 text-primary shadow-glow [&_svg]:size-6"><ShieldCheck /></div>
-              <p className="text-sm text-muted-foreground">Add a passkey and sign in with just your face, fingerprint, or device PIN — no codes to wait for. It's more secure, and it stays on this device.</p>
+              <p className="text-body text-muted-foreground">Add a passkey and sign in with just your face, fingerprint, or device PIN — no codes to wait for. It's more secure, and it stays on this device.</p>
             </div>
-            <ul className="space-y-2 text-sm">
+            <ul className="space-y-2 text-body">
               <li className="flex items-center gap-2.5"><Hand className="size-4 shrink-0 text-primary" /> One tap, every time — no emailed code</li>
               <li className="flex items-center gap-2.5"><KeyRound className="size-4 shrink-0 text-primary" /> Phishing-proof; nothing to remember or leak</li>
             </ul>
@@ -84,8 +84,8 @@ export function PasskeyProvider({ children }: { children: ReactNode }) {
               </Button>
               <Button variant="ghost" className="w-full" onClick={close}>Maybe later</Button>
             </div>
-            {msg && <p className="text-sm text-muted-foreground">{msg}</p>}
-            <p className="text-center text-xs text-muted-foreground">You can always add one later in Settings → Security.</p>
+            {msg && <p className="text-body text-muted-foreground">{msg}</p>}
+            <p className="text-center text-caption text-muted-foreground">You can always add one later in Settings → Security.</p>
           </div>
         </DialogContent>
       </Dialog>

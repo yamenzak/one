@@ -79,7 +79,7 @@ export function WidgetCarousel<D>({ catalog, items, defaults, data, onCustomize 
 
   if (pages.length === 0) {
     return (
-      <button onClick={onCustomize} className="flex h-32 w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border text-sm text-muted-foreground transition-colors hover:bg-secondary [&_svg]:size-4">
+      <button onClick={onCustomize} className="flex h-32 w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border text-body text-muted-foreground transition-colors hover:bg-secondary [&_svg]:size-4">
         <LayoutGrid /> Add widgets
       </button>
     );
@@ -255,7 +255,7 @@ export function WidgetBuilder<D>({ catalog, items, defaults, data, onClose, onSa
           <div className="sticky bottom-0 space-y-2 rounded-2xl bg-surface-2 p-3">
             <div className="flex items-center gap-2">
               <IconBadge icon={selDef.icon} tone={selDef.tone} size="sm" />
-              <span className="flex-1 truncate text-sm font-semibold">{selDef.title}</span>
+              <span className="flex-1 truncate text-body font-semibold">{selDef.title}</span>
               <button onClick={() => remove(selItem.id)} aria-label={`Remove ${selDef.title}`} className="grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:text-danger [&_svg]:size-4"><X /></button>
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -305,7 +305,7 @@ export function WidgetBuilder<D>({ catalog, items, defaults, data, onClose, onSa
                 <button key={w.id} onClick={() => addTo(picking, w.id)} className="flex w-full items-center gap-3 rounded-xl bg-surface-2 p-3 text-left transition-colors hover:bg-surface-3">
                   <IconBadge icon={w.icon} tone={w.tone} size="sm" />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{w.title}</span>
+                    <span className="block truncate text-body font-medium">{w.title}</span>
                     <span className="block truncate text-caption text-muted-foreground">{w.blurb}</span>
                   </span>
                   <Plus className="size-4 shrink-0 text-muted-foreground" />

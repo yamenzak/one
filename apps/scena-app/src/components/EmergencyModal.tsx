@@ -78,14 +78,14 @@ export function EmergencyModal({
             <HeaderIcon className="size-5.5" />
           </div>
           <div className="flex-1">
-            <div className="text-lg font-extrabold tracking-tight">Screen takeover</div>
-            <div className="text-xs opacity-90">Takes over every connected screen until you clear it.</div>
+            <div className="text-body-lg font-bold tracking-tight">Screen takeover</div>
+            <div className="text-caption opacity-90">Takes over every connected screen until you clear it.</div>
           </div>
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto p-6">
           {active && (
-            <div className="mb-5 rounded-lg border bg-muted/50 px-3.5 py-3 text-sm">
+            <div className="mb-5 rounded-lg border bg-muted/50 px-3.5 py-3 text-body">
               Active on <b>{active.count}</b> screen{active.count === 1 ? "" : "s"}: “{active.title}”.
             </div>
           )}
@@ -118,7 +118,7 @@ export function EmergencyModal({
                 type="button"
                 onClick={() => setTone(t)}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-caption font-medium transition-colors",
                   tone === t ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted",
                 )}
               >
@@ -132,19 +132,19 @@ export function EmergencyModal({
           <div className="mb-5 overflow-hidden rounded-xl ring-1 ring-border">
             <div className="flex aspect-[16/6] flex-col items-center justify-center gap-1 px-6 text-center text-white" style={{ background: ui.gradient }}>
               <HeaderIcon className="mb-1 size-6 opacity-95" />
-              <div className="text-base font-extrabold leading-tight">{title || "Headline"}</div>
+              <div className="text-body-lg font-bold leading-tight">{title || "Headline"}</div>
               {body && <div className="text-caption font-medium opacity-90">{body}</div>}
             </div>
           </div>
 
-          <div className="mb-5 flex gap-2.5 rounded-lg bg-warning/10 px-3.5 py-3 text-xs text-warning">
+          <div className="mb-5 flex gap-2.5 rounded-lg bg-warning/10 px-3.5 py-3 text-caption text-warning">
             <Info className="mt-0.5 size-4 shrink-0" />
             <span>
               Only reaches <b>connected</b> screens. Offline screens keep playing cached content — this is not a substitute for life-safety systems.
             </span>
           </div>
 
-          {error && <div className="mb-3.5 text-sm text-destructive">{error}</div>}
+          {error && <div className="mb-3.5 text-body text-destructive">{error}</div>}
 
           <div className="flex justify-end gap-2">
             <Button variant="ghost" onClick={close}>
@@ -172,7 +172,7 @@ function PresetChip({ preset, active, onClick }: { preset: OverridePreset; activ
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption font-medium transition-colors",
         active ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted",
       )}
     >

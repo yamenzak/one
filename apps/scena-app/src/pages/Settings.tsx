@@ -222,20 +222,20 @@ export function WorkspaceSettingsPage() {
         <SectionFrame title="Playback" onBack={back}>
           <Card>
             <div className="mb-4">
-              <h3 className="text-base font-semibold leading-none flex items-center gap-2 text-sm">
+              <h3 className="text-title-3 flex items-center gap-2">
                 <MonitorPlay className="size-4 text-muted-foreground" />
                 Multi-screen sync
                 <FeatureLockBadge feature="multiScreenSync" className="ml-1" />
               </h3>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 When two or more screens play the same channel, sync keeps them frame-aligned so a video wall reads as one picture. A single screen always
                 free-runs on its own — this only affects channels shared by several screens.
               </p>
             </div>
             <label className={`flex items-center justify-between gap-4 rounded-lg border px-3.5 py-3 ${canSync ? "cursor-pointer" : "opacity-60"}`}>
               <div className="min-w-0">
-                <div className="text-sm font-medium">Keep screens in sync</div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-body font-medium">Keep screens in sync</div>
+                <div className="text-caption text-muted-foreground">
                   {canSync
                     ? "Frame-align screens sharing a channel. Republish channels to apply."
                     : "Your plan doesn’t include multi-screen sync — screens free-run. Upgrade to enable."}
@@ -298,7 +298,7 @@ export function WorkspaceSettingsPage() {
             {!emailLoaded ? (
               <Skeleton className="h-9 w-full" />
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-body text-muted-foreground">
                 {email ? (
                   <>
                     You sign in with a one-time code emailed to <span className="font-medium text-foreground">{email}</span>, or with a passkey. There is no
@@ -488,7 +488,7 @@ function BrandIdentity({ brand, canManage }: { brand: BrandKit; canManage: boole
     <Card>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs text-muted-foreground">Brand name</Label>
+          <Label className="text-caption text-muted-foreground">Brand name</Label>
           <Input
             value={b.brandName}
             disabled={!canManage}
@@ -498,7 +498,7 @@ function BrandIdentity({ brand, canManage }: { brand: BrandKit; canManage: boole
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs text-muted-foreground">Corner radius · {b.radius}px</Label>
+          <Label className="text-caption text-muted-foreground">Corner radius · {b.radius}px</Label>
           <input
             type="range"
             min={0}
@@ -513,7 +513,7 @@ function BrandIdentity({ brand, canManage }: { brand: BrandKit; canManage: boole
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs text-muted-foreground">Heading font</Label>
+          <Label className="text-caption text-muted-foreground">Heading font</Label>
           <Select
             value={b.headingFont}
             onChange={(v) => update({ headingFont: v })}
@@ -523,7 +523,7 @@ function BrandIdentity({ brand, canManage }: { brand: BrandKit; canManage: boole
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs text-muted-foreground">Body font · drives all UI text</Label>
+          <Label className="text-caption text-muted-foreground">Body font · drives all UI text</Label>
           <Select
             value={b.bodyFont}
             onChange={(v) => update({ bodyFont: v })}
@@ -580,7 +580,7 @@ function BrandPalette({ brand }: { brand: BrandKit }) {
   return (
     <Card>
       <div className="mb-4">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-caption text-muted-foreground">
           Generate a coherent shadcn palette from a brand colour, or paste one you already have. Either way it previews across the whole workspace immediately
           and is <b>not saved until you press Save</b> — leaving Settings puts the last saved kit back.
         </p>
@@ -601,7 +601,7 @@ function BrandPalette({ brand }: { brand: BrandKit }) {
         <ColorField label="Brand colour" value={genColor} onChange={setGenColor} />
         <ColorField label="Accent" value={genAccent} onChange={setGenAccent} />
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs text-muted-foreground">Neutral tint</Label>
+          <Label className="text-caption text-muted-foreground">Neutral tint</Label>
           <Select value={genNeutral} onChange={setGenNeutral} className="w-full" options={[...NEUTRAL_TINTS.map((n) => ({ value: n.id, label: n.label }))]} />
         </div>
         <div className="flex items-end">
@@ -613,7 +613,7 @@ function BrandPalette({ brand }: { brand: BrandKit }) {
 
       <Separator />
       <div className="flex flex-col gap-1.5">
-        <Label className="text-xs text-muted-foreground">Paste a shadcn theme</Label>
+        <Label className="text-caption text-muted-foreground">Paste a shadcn theme</Label>
         <Textarea
           value={pasted}
           onChange={(e) => setPasted(e.target.value)}
@@ -677,7 +677,7 @@ function BrandAssets({ brand }: { brand: BrandKit }) {
   return (
     <Card>
       <div className="mb-4">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-caption text-muted-foreground">
           Your logo and any variants (dark, light, mark, wordmark…). They are saved to the media library and available to the <b>Company logo</b> widget and the
           AI generators. Unlike the palette, these save as soon as you add or remove one.
         </p>
@@ -693,7 +693,7 @@ function BrandAssets({ brand }: { brand: BrandKit }) {
                 value={l.label}
                 onChange={(e) => setB({ ...b, logos: (b.logos ?? []).map((x) => (x.id === l.id ? { ...x, label: e.target.value } : x)) })}
                 onBlur={() => saveLogos(b.logos)}
-                className="h-8 flex-1 text-sm"
+                className="h-8 flex-1 text-body"
                 maxLength={40}
                 placeholder="Variant name"
               />
@@ -710,7 +710,7 @@ function BrandAssets({ brand }: { brand: BrandKit }) {
           ))}
         </div>
       )}
-      <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed py-3 text-sm text-muted-foreground transition-colors hover:bg-accent">
+      <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed py-3 text-body text-muted-foreground transition-colors hover:bg-accent">
         {uploading ? (
           <>
             <Loader2 className="size-4 animate-spin" /> Uploading…
@@ -742,7 +742,7 @@ function BrandTokens({ brand }: { brand: BrandKit }) {
   return (
     <Card>
       <div className="mb-4">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-caption text-muted-foreground">
           The single source of truth. Set any token; blank fields fall back to the shipped default. Accepts any CSS colour (hex, <code>oklch()</code>,{" "}
           <code>hsl()</code>).
         </p>
@@ -776,7 +776,7 @@ function BrandTokens({ brand }: { brand: BrandKit }) {
 function ColorField({ label, value, disabled, onChange }: { label: string; value: string; disabled?: boolean; onChange: (v: string) => void }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Label className="text-caption text-muted-foreground">{label}</Label>
       <div className="flex items-center gap-2 rounded-lg border p-1.5">
         <input
           type="color"
@@ -790,7 +790,7 @@ function ColorField({ label, value, disabled, onChange }: { label: string; value
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full bg-transparent font-mono text-xs uppercase outline-none"
+          className="w-full bg-transparent font-mono text-caption uppercase outline-none"
           maxLength={7}
           aria-label={`${label} hex`}
         />

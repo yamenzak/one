@@ -333,11 +333,28 @@ overline.** Never a weight above 700.
 | `caption` | 13 / 1.35 | 0 | 400 | row secondary, helper |
 | `micro` | 11 / 1.2 | +0.02em | 600 | overline, badge |
 
-**Enforced by a lint.** `apps/app/src/type-scale.conformance.test.ts` reads the
-source and fails on any hand-rolled spelling of a role that already exists — the
-scale is worth nothing if a screen can quietly opt out. Escape with a
-`type-scale-exempt: <why>` comment; the reason is mandatory, because the point is
-that the decision is argued in the diff rather than assumed.
+**Never Tailwind's own size ladder.** `text-sm` is 14 where `body` is 15,
+`text-xs` is 12 where `caption` is 13, and neither carries the role's
+line-height, tracking or weight — so `text-sm font-semibold` is a different
+size, a different rhythm, and a weight hardcoded by hand. Use
+xs→`caption`, sm→`body`, base/lg→`body-lg`, xl→`title-3`, 2xl→`title-2`,
+3xl→`title-1`, 4xl and up→`display`.
+
+`text-base` has the one real defence and it is not aesthetic: 16px is the
+threshold below which iOS Safari zooms the viewport on a focused field and does
+not zoom back out. `@4dl/ui`'s `Input` and `Textarea` keep it under a stated
+exemption; anything else claiming it writes the reason down too.
+
+**Enforced by a lint** — `type-scale` in `@4dl/ui/conformance`, which every app
+runs. It fails on a role spelled as a composite (`text-2xl font-bold
+tracking-tight`), as an arbitrary value (`text-[11px]`), or as a Tailwind size —
+the scale is worth nothing if a screen can quietly opt out, and the third form is
+how everybody actually did. Escape with a `type-scale-exempt: <why>` comment
+within three lines; the reason is mandatory, because the point is that the
+decision is argued in the diff rather than assumed. A whole SURFACE that sits
+outside the scale — a lobby kiosk, a scoreboard read across a room — takes a
+per-file waiver in the app's harness instead, which relaxes the size ladder and
+the heavy weights and leaves every other rule firing.
 
 **Numerals:** `tabular-nums` and `−0.02em` on every number, always. A number
 that reflows as it ticks is a bug.

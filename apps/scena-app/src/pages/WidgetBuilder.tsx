@@ -659,7 +659,7 @@ function Builder({ profileId }: { profileId: string }) {
           <ChevronDown className={cn("ml-auto size-4 transition-transform", layersOpen ? "" : "-rotate-90")} />
         </button>
         {!layersOpen ? null : nodes.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No widgets yet — pick one from the palette.</p>
+          <p className="text-body text-muted-foreground">No widgets yet — pick one from the palette.</p>
         ) : (
           <div className="flex max-h-56 flex-col gap-0.5 overflow-y-auto">
             {[...nodes]
@@ -672,7 +672,7 @@ function Builder({ profileId }: { profileId: string }) {
                     key={n.id}
                     onMouseDown={(e) => selectOne(n.id, e.shiftKey)}
                     className={cn(
-                      "group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm",
+                      "group flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-body",
                       active ? "bg-primary/10 text-primary" : "hover:bg-accent",
                     )}
                   >
@@ -724,7 +724,7 @@ function Builder({ profileId }: { profileId: string }) {
           <MultiPanel count={selIds.length} onAlign={alignSel} onDistribute={distributeSel} onDuplicate={duplicateSel} onDelete={removeSel} />
         ) : selectedNode ? (
           <>
-            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold">
+            <div className="mb-2 flex items-center gap-1.5 text-caption font-semibold">
               <span className="flex text-primary [&_svg]:size-4">{widgetIcon(widgetDef(selectedNode.type)?.icon ?? "rect")}</span>
               {widgetDef(selectedNode.type)?.label ?? "Widget"}
             </div>
@@ -749,7 +749,7 @@ function Builder({ profileId }: { profileId: string }) {
             </div>
           </>
         ) : (
-          <p className="text-sm text-muted-foreground">Select a widget to edit its properties, or drag on the canvas to marquee-select.</p>
+          <p className="text-body text-muted-foreground">Select a widget to edit its properties, or drag on the canvas to marquee-select.</p>
         )}
       </div>
     </>
@@ -794,7 +794,7 @@ function Builder({ profileId }: { profileId: string }) {
             <ArrowLeft />
           </Button>
           <div className="mr-1 min-w-0">
-            <div className="truncate text-sm font-semibold leading-tight">{name}</div>
+            <div className="truncate text-body font-semibold leading-tight">{name}</div>
             <div className="flex items-center gap-1.5 text-caption text-muted-foreground">
               <span className="tabular-nums">
                 {designW}×{designH}
@@ -816,7 +816,7 @@ function Builder({ profileId }: { profileId: string }) {
               <TB icon={<ZoomOut />} label="Zoom out" onClick={() => zoomBy(1 / 1.2)} />
               <button
                 onClick={fit}
-                className="w-11 rounded-md py-1 text-center text-xs font-medium tabular-nums text-muted-foreground hover:bg-accent"
+                className="w-11 rounded-md py-1 text-center text-caption font-medium tabular-nums text-muted-foreground hover:bg-accent"
                 title="Zoom to fit"
               >
                 {Math.round(scale * 100)}%
@@ -848,7 +848,7 @@ function Builder({ profileId }: { profileId: string }) {
           <TB icon={<ZoomOut />} label="Zoom out" onClick={() => zoomBy(1 / 1.2)} />
           <button
             onClick={fit}
-            className="w-11 shrink-0 rounded-md py-1 text-center text-xs font-medium tabular-nums text-muted-foreground hover:bg-accent"
+            className="w-11 shrink-0 rounded-md py-1 text-center text-caption font-medium tabular-nums text-muted-foreground hover:bg-accent"
             title="Zoom to fit"
           >
             {Math.round(scale * 100)}%
@@ -1054,7 +1054,7 @@ function Builder({ profileId }: { profileId: string }) {
                           )}
                         >
                           <span className="text-muted-foreground">{widgetIcon(w.icon)}</span>
-                          <span className="text-xs font-medium leading-tight">{w.label}</span>
+                          <span className="text-caption font-medium leading-tight">{w.label}</span>
                           {!usable && <Lock className="absolute right-1.5 top-1.5 size-3 text-muted-foreground" />}
                         </button>
                       );
@@ -1129,7 +1129,7 @@ function MultiPanel({
   return (
     <div>
       <SectionLabel icon={<MousePointer2 />} title={`${count} selected`} />
-      <div className="mb-2 text-xs font-medium text-muted-foreground">Align</div>
+      <div className="mb-2 text-caption font-medium text-muted-foreground">Align</div>
       <div className="mb-3 flex flex-wrap gap-1">
         <A k="left" icon={<AlignHorizontalJustifyStart />} label="Align left" />
         <A k="hcenter" icon={<AlignHorizontalJustifyCenter />} label="Align center" />
@@ -1138,7 +1138,7 @@ function MultiPanel({
         <A k="vcenter" icon={<AlignVerticalJustifyCenter />} label="Align middle" />
         <A k="bottom" icon={<AlignVerticalJustifyEnd />} label="Align bottom" />
       </div>
-      <div className="mb-2 text-xs font-medium text-muted-foreground">Distribute</div>
+      <div className="mb-2 text-caption font-medium text-muted-foreground">Distribute</div>
       <div className="mb-3 flex gap-1">
         <Button variant="outline" size="icon" className="size-8" title="Distribute horizontally" onClick={() => onDistribute("h")}>
           <AlignHorizontalSpaceAround className="size-4" />

@@ -63,8 +63,8 @@ function ZoneTrack({ elapsedHours }: { elapsedHours: number }) {
         return (
           <div key={z.label} style={{ flexGrow: z.vis }} className="min-w-0">
             <Meter size="md" tone={z.tone} value={frac} />
-            <div className={cn("mt-1.5 truncate text-center text-xs font-semibold leading-tight", current ? "text-foreground" : "text-muted-foreground/60")}>{z.label}</div>
-            <div className="numeral text-center text-xs leading-tight text-muted-foreground/50" aria-hidden="true">{z.start}h</div>
+            <div className={cn("mt-1.5 truncate text-center text-caption font-semibold leading-tight", current ? "text-foreground" : "text-muted-foreground/60")}>{z.label}</div>
+            <div className="numeral text-center text-caption leading-tight text-muted-foreground/50" aria-hidden="true">{z.start}h</div>
           </div>
         );
       })}
@@ -273,7 +273,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
 
       {/* Write feedback for the tap-logging controls — one spot, always visible. */}
       {logQueued && <QueuedNotice />}
-      {logErr && <p role="alert" className="text-sm text-warning">{logErr}</p>}
+      {logErr && <p role="alert" className="text-body text-warning">{logErr}</p>}
 
       {loadError && !today ? (
         <EmptyState icon={AlertTriangle} title="Couldn't load your wellness" description="Something went wrong loading your day. Check your connection and try again." action={<Button onClick={retry}>Try again</Button>} />
@@ -378,7 +378,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
           <div className="pointer-events-none absolute -right-8 -top-8 size-24 rounded-full bg-hydration/10 blur-2xl" />
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-2.5"><IconBadge icon={Droplet} tone="hydration" size="sm" /><h2 className="font-semibold">Hydration</h2></div>
-            <span className="numeral text-sm font-semibold text-hydration">{fmtVolume(today.waterMl, units)}<span className="text-muted-foreground"> / {fmtVolume(waterTarget, units)}</span></span>
+            <span className="numeral text-body font-semibold text-hydration">{fmtVolume(today.waterMl, units)}<span className="text-muted-foreground"> / {fmtVolume(waterTarget, units)}</span></span>
           </div>
           <div className="relative mt-3 h-2 w-full overflow-hidden rounded-full bg-surface-2"><div className="h-full rounded-full bg-hydration transition-all duration-500" style={{ width: `${waterPct * 100}%` }} /></div>
           <div className="relative mt-3 flex flex-wrap gap-2">
@@ -398,13 +398,16 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
             {fast?.activeFast ? <Badge tone={zone.tone}>{zone.label}</Badge> : <Badge tone="neutral">Not fasting</Badge>}
           </div>
           {/* Don't let a failed read pass "Not fasting" off as the truth. */}
-          {failed.has("fast") && <p className="relative text-sm text-warning">Couldn't load your fasting status — this may not be up to date.</p>}
+          {failed.has("fast") && <p className="relative text-body text-warning">Couldn't load your fasting status — this may not be up to date.</p>}
 
           {fast?.activeFast ? (
             <>
               <div className="relative text-center">
-                <div className="numeral text-5xl font-bold tracking-tight tabular-nums">{clock}</div>
-                <div className="mt-1 text-xs text-muted-foreground">{nextZone(fastHours) ? <>In <span className="font-medium text-foreground">{zone.label}</span> · {hoursToNext(fastHours)} to {nextZone(fastHours)!.label}</> : <>Deep in <span className="font-medium text-foreground">{zone.label}</span></>}</div>
+                {/* primitive-exempt: the fasting clock is the anchor of its CARD,
+                    not of the Wellness screen — the screen's `Anchor` is the
+                    wellness score above it, and §1 allows exactly one. */}
+                <div className="numeral text-display font-bold tracking-tight tabular-nums">{clock}</div>
+                <div className="mt-1 text-caption text-muted-foreground">{nextZone(fastHours) ? <>In <span className="font-medium text-foreground">{zone.label}</span> · {hoursToNext(fastHours)} to {nextZone(fastHours)!.label}</> : <>Deep in <span className="font-medium text-foreground">{zone.label}</span></>}</div>
               </div>
               <ZoneTrack elapsedHours={fastHours} />
               <Button className="relative w-full" variant="outline" onClick={() => void toggleFast()}>End fast</Button>
@@ -417,7 +420,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
                 <div className="space-y-1.5 border-t border-border/50 pt-3">
                   <div className="text-micro uppercase text-muted-foreground">Recent fasts</div>
                   {fast!.recentFasts.slice(0, 3).map((r, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs text-muted-foreground">
+                    <div key={i} className="flex items-center justify-between text-caption text-muted-foreground">
                       <span className="numeral">{Math.floor(r.duration_minutes / 60)}h {r.duration_minutes % 60}m</span>
                       {zoneReached(r.duration_minutes / 60) ? <Badge tone={zoneReached(r.duration_minutes / 60)!.tone}>{zoneReached(r.duration_minutes / 60)!.label}</Badge> : null}
                     </div>
@@ -449,13 +452,13 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
               <div className="flex items-center gap-4">
                 <PostureFigure side={side} cvaDeg={latest.cvaDeg} trunkTiltDeg={latest.trunkTiltDeg} severity={latest.severity} width={92} height={190} />
                 <div className="min-w-0 flex-1 space-y-2">
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-caption text-muted-foreground">
                     {latest.severity !== "good" && <AlertTriangle className="mr-1 inline size-3.5 -translate-y-px text-warning" />}
                     {POSTURE_GUIDANCE[latest.severity]}
                   </p>
-                  <p className="text-xs text-muted-foreground">The line traces hip → shoulder → head; the dashed plumb is upright. A more forward head is a lower neck angle.</p>
+                  <p className="text-caption text-muted-foreground">The line traces hip → shoulder → head; the dashed plumb is upright. A more forward head is a lower neck angle.</p>
                   {trend.length >= 2 && (
-                    <div><div className="mb-1 text-xs font-medium text-muted-foreground">Neck angle trend</div><Sparkline values={trend} tone="activity" /></div>
+                    <div><div className="mb-1 text-caption font-medium text-muted-foreground">Neck angle trend</div><Sparkline values={trend} tone="activity" /></div>
                   )}
                 </div>
               </div>
@@ -517,7 +520,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
                     <IconBadge icon={ClipboardList} tone="nutrition" size="sm" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{new Date(`${c.date_local}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
-                      <div className="truncate text-xs text-muted-foreground">{bits || "logged"}{photos > 0 ? ` · ${photos} photo${photos === 1 ? "" : "s"}` : ""}</div>
+                      <div className="truncate text-caption text-muted-foreground">{bits || "logged"}{photos > 0 ? ` · ${photos} photo${photos === 1 ? "" : "s"}` : ""}</div>
                     </div>
                     {c.trainer_feedback && <Badge tone="primary">Reply</Badge>}
                     <ChevronRight className="size-5 shrink-0 text-muted-foreground" />
@@ -576,7 +579,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
                 <div key={s.id} className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2.5">
                     <IconBadge icon={Calendar} tone="activity" size="sm" />
-                    <div className="min-w-0"><div className="truncate text-sm">{new Date(s.scheduled_at).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div><div className="text-xs text-muted-foreground">{s.duration_minutes} min</div></div>
+                    <div className="min-w-0"><div className="truncate text-body">{new Date(s.scheduled_at).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div><div className="text-caption text-muted-foreground">{s.duration_minutes} min</div></div>
                   </div>
                   <Badge tone={s.status === "completed" ? "success" : s.status === "scheduled" ? "activity" : s.status === "no_show" ? "danger" : "neutral"}>{s.status.replace("_", " ")}</Badge>
                 </div>
@@ -604,7 +607,7 @@ export function Wellness({ clientId, onBack }: { clientId: string; onBack?: () =
  *  empty section that reads to the client as "you have none". */
 function SectionNote({ text, onRetry }: { text: string; onRetry: () => void }) {
   return (
-    <Card className="flex items-center justify-between gap-3 py-3 text-sm text-muted-foreground">
+    <Card className="flex items-center justify-between gap-3 py-3 text-body text-muted-foreground">
       <span className="min-w-0">{text}</span>
       <Button size="sm" variant="secondary" className="shrink-0" onClick={onRetry}>Retry</Button>
     </Card>
@@ -646,7 +649,7 @@ function LabRow({ lab, clientId, onOpen, onUploaded }: { lab: LabFull; clientId:
       <Thumb src={thumb} fallback={FlaskConical} tone="lab" size={40} radius="xl" />
       <button onClick={onOpen} className="min-w-0 flex-1 text-left">
         <div className="truncate font-medium">{lab.display_name}</div>
-        <div className="truncate text-xs text-muted-foreground">{sub}</div>
+        <div className="truncate text-caption text-muted-foreground">{sub}</div>
       </button>
       {canUpload ? (
         <>
@@ -657,7 +660,7 @@ function LabRow({ lab, clientId, onOpen, onUploaded }: { lab: LabFull; clientId:
         <Badge tone={lab.status === "reviewed" && flagged ? "danger" : st.tone}>{lab.status === "reviewed" && flagged ? `${flagged} flagged` : st.label}</Badge>
       )}
     </Card>
-    {err && <p className="mt-1 px-1 text-xs text-warning">{err}</p>}
+    {err && <p className="mt-1 px-1 text-caption text-warning">{err}</p>}
     </div>
   );
 }

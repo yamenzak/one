@@ -271,11 +271,10 @@ export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputE
   <input
     ref={ref}
     className={cn(
-      // type-scale-exempt: 16px is a PLATFORM THRESHOLD, not a style choice —
       // iOS Safari auto-zooms the viewport when a focused field is under 16px,
       // and `body` is 15. The zoom is not undone on blur, so one tap on one
-      // input leaves the whole app scaled. This is the one place a size beats a
-      // role, and it applies to every text control the user can focus.
+      // input leaves the whole app scaled — the one place a size beats a role.
+      // type-scale-exempt: 16px is a PLATFORM THRESHOLD, not a style choice.
       "h-11 w-full min-w-0 appearance-none rounded-xl border border-input bg-secondary/50 px-3.5 text-base text-foreground outline-none transition-colors placeholder:text-muted-foreground/60 focus:border-primary/70 focus:bg-secondary disabled:opacity-50",
       "[&::-webkit-date-and-time-value]:min-h-[1.5em] [&::-webkit-date-and-time-value]:text-left",
       "[&::-webkit-calendar-picker-indicator]:opacity-60 [&::-webkit-calendar-picker-indicator]:hover:opacity-100",

@@ -174,7 +174,7 @@ export function InstallAppCard() {
         }
       >
         <div className="space-y-4 pb-2">
-          <p className="text-sm text-muted-foreground">{studio} runs from your home screen with its own icon — {g.intro}</p>
+          <p className="text-body text-muted-foreground">{studio} runs from your home screen with its own icon — {g.intro}</p>
           <div className="space-y-2.5">
             {g.steps.map((s, i) => (
               /* Icon only — no trailing numeral. The three glyphs DIFFER (a
@@ -185,7 +185,7 @@ export function InstallAppCard() {
                  as far from it as the card allows. */
               <Card key={i} className="flex items-center gap-3 py-3">
                 <IconBadge icon={s.icon} tone="primary" size="sm" />
-                <span className="min-w-0 flex-1 text-sm">{s.text}</span>
+                <span className="min-w-0 flex-1 text-body">{s.text}</span>
               </Card>
             ))}
           </div>

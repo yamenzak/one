@@ -240,10 +240,10 @@ function AiSection({ initial, allowed, onBack }: { initial: AiSettings; allowed:
     <SettingsPage title={t("settings.ai")} description={t("settings.ai.intro")} onBack={onBack}>
       {!allowed && (
         <Card className="space-y-2 p-4">
-          <p className="text-sm text-muted-foreground">{t("settings.ai.lockedBody")}</p>
+          <p className="text-body text-muted-foreground">{t("settings.ai.lockedBody")}</p>
         </Card>
       )}
-      {cfg.err && <p className="px-1 text-sm text-danger">{cfg.err}</p>}
+      {cfg.err && <p className="px-1 text-body text-danger">{cfg.err}</p>}
       <Group>
         {/* The catalog comes from the SERVER, so a feature added later appears
             here without this file changing — and cannot silently go missing. */}
@@ -299,7 +299,7 @@ function PlanSection({ onBack }: { onBack: () => void }) {
 
   return (
     <SettingsPage title={t("settings.plan")} onBack={onBack}>
-      {err && <p className="px-1 text-sm text-danger">{err}</p>}
+      {err && <p className="px-1 text-body text-danger">{err}</p>}
 
       <Card className="space-y-1 p-4">
         <div className="flex items-center justify-between">
@@ -307,7 +307,7 @@ function PlanSection({ onBack }: { onBack: () => void }) {
           <Badge tone={data.subscription?.status === "active" ? "success" : "warning"}>{data.subscription?.status ?? "—"}</Badge>
         </div>
         {data.balance && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-body text-muted-foreground">
             {t("settings.plan.credits", { n: data.balance.available })}
           </p>
         )}
@@ -317,7 +317,7 @@ function PlanSection({ onBack }: { onBack: () => void }) {
           integration suite — and showing a dead buy button there is worse than
           showing none. */}
       {!data.payable ? (
-        <Card className="p-4"><p className="text-sm text-muted-foreground">{t("settings.plan.noRail")}</p></Card>
+        <Card className="p-4"><p className="text-body text-muted-foreground">{t("settings.plan.noRail")}</p></Card>
       ) : (
         <>
           <Group>

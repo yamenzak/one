@@ -56,7 +56,7 @@ export function AssistantsSheet({ onClose }: { onClose: () => void }) {
           </div>
 
           {!data.allowed && <Callout tone="warning" icon={Wand2}>{t("settings.ai.lockedBody")}</Callout>}
-          {act.err && <p className="px-1 text-sm text-danger">{act.err}</p>}
+          {act.err && <p className="px-1 text-body text-danger">{act.err}</p>}
 
           {/* ── What to order ───────────────────────────────────────────── */}
           <Card className="space-y-3 p-4">
@@ -79,7 +79,7 @@ export function AssistantsSheet({ onClose }: { onClose: () => void }) {
             >
               {act.busy === "reorder" ? t("ai.working") : t("ai.run")}
             </Button>
-            {briefing && <pre className="whitespace-pre-wrap rounded-lg bg-surface-2 p-3 text-sm">{briefing}</pre>}
+            {briefing && <pre className="whitespace-pre-wrap rounded-lg bg-surface-2 p-3 text-body">{briefing}</pre>}
           </Card>
 
           {/* ── Summarise a document ────────────────────────────────────── */}
@@ -89,7 +89,7 @@ export function AssistantsSheet({ onClose }: { onClose: () => void }) {
               <p className="text-caption text-muted-foreground">{t("ai.document.sub")}</p>
             </div>
             <textarea
-              className="min-h-32 w-full rounded-lg border border-border bg-surface-2 p-3 text-sm"
+              className="min-h-32 w-full rounded-lg border border-border bg-surface-2 p-3 text-body"
               placeholder={t("ai.document.placeholder")}
               value={doc}
               onChange={(e) => setDoc(e.target.value)}
@@ -109,7 +109,7 @@ export function AssistantsSheet({ onClose }: { onClose: () => void }) {
             >
               {act.busy === "doc" ? t("ai.working") : t("ai.run")}
             </Button>
-            {summary && <pre className="whitespace-pre-wrap rounded-lg bg-surface-2 p-3 text-sm">{summary}</pre>}
+            {summary && <pre className="whitespace-pre-wrap rounded-lg bg-surface-2 p-3 text-body">{summary}</pre>}
           </Card>
 
           <p className="px-1 text-caption text-muted-foreground">{t("ai.disclaimer")}</p>

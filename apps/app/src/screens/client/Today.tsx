@@ -396,13 +396,13 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
                       <div className="min-w-0 flex-1">
                         <div className="text-micro uppercase" style={{ color: tint }}>{notice.eyebrow}</div>
                         <h3 className="mt-0.5 text-body-lg">{notice.title}</h3>
-                        <p className="mt-0.5 text-sm text-muted-foreground">{notice.body}</p>
+                        <p className="mt-0.5 text-body text-muted-foreground">{notice.body}</p>
                       </div>
                       {tappable && <ChevronRight className="size-5 shrink-0 self-center text-muted-foreground" />}
                     </div>
                     {tappable && (
                       <div className="relative mt-3">
-                        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold" style={{ color: tint, backgroundColor: `color-mix(in oklch, ${tint} 12%, transparent)` }}>{notice.cta} <ArrowRight className="size-3.5" /></span>
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-micro" style={{ color: tint, backgroundColor: `color-mix(in oklch, ${tint} 12%, transparent)` }}>{notice.cta} <ArrowRight className="size-3.5" /></span>
                       </div>
                     )}
                   </Card>
@@ -461,8 +461,8 @@ export function Today({ clientId, onStart, onOpen }: { clientId: string; onStart
                   */}
                   {!ownView && (
                     <div data-profile-gaps className="flex flex-wrap gap-1.5 px-4 pb-3.5">
-                      {data.profile.gaps.slice(0, 6).map((g) => <span key={g} className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium">{GAP_LABELS[g] ?? g}</span>)}
-                      {data.profile.gaps.length > 6 && <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">+{data.profile.gaps.length - 6} more</span>}
+                      {data.profile.gaps.slice(0, 6).map((g) => <span key={g} className="rounded-full bg-secondary px-2.5 py-1 text-caption font-medium">{GAP_LABELS[g] ?? g}</span>)}
+                      {data.profile.gaps.length > 6 && <span className="rounded-full bg-secondary px-2.5 py-1 text-caption font-medium text-muted-foreground">+{data.profile.gaps.length - 6} more</span>}
                     </div>
                   )}
                   {needsPasskey && (
@@ -618,7 +618,7 @@ function ExploreRail({ clientId, onOpen }: { clientId: string; onOpen: () => voi
     <Stagger className="space-y-2">
       <button onClick={onOpen} className="flex w-full items-center justify-between px-1">
         <h3 className="text-micro uppercase text-muted-foreground">Explore</h3>
-        <span className="inline-flex items-center gap-0.5 text-sm font-medium text-primary [&_svg]:size-4">See all <ChevronRight /></span>
+        <span className="inline-flex items-center gap-0.5 text-body font-medium text-primary [&_svg]:size-4">See all <ChevronRight /></span>
       </button>
       <Rail snap gap="md">
         {items.map((r) => {
@@ -630,7 +630,7 @@ function ExploreRail({ clientId, onOpen }: { clientId: string; onOpen: () => voi
                 <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-3">
                   {r.category && <div className="mb-0.5 text-micro uppercase text-white/80">{r.category}</div>}
-                  <div className="line-clamp-2 text-sm font-semibold leading-snug text-white">{r.title}</div>
+                  <div className="line-clamp-2 text-body font-semibold leading-snug text-white">{r.title}</div>
                 </div>
               </div>
             </button>

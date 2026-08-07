@@ -122,8 +122,8 @@ export function AlertsPage() {
         <Section title="Alert rules">
           <Card>
             <div className="mb-4">
-              <h3 className="text-base font-semibold leading-none text-sm">Where alerts go</h3>
-              <p className="text-xs text-muted-foreground">Beyond this dashboard. Offline alerts always appear here.</p>
+              <h3 className="text-title-3">Where alerts go</h3>
+              <p className="text-caption text-muted-foreground">Beyond this dashboard. Offline alerts always appear here.</p>
             </div>
             {rules === null ? (
               <SkeletonList rows={2} />
@@ -231,7 +231,7 @@ function RuleForm({ onAdd }: { onAdd: () => Promise<void> }) {
           value={target}
           onChange={(e) => setTarget(e.target.value)}
           placeholder={channel === "email" ? "alerts@company.com" : "https://webhook…"}
-          className="h-8 flex-1 font-mono text-xs"
+          className="h-8 flex-1 font-mono text-caption"
           aria-label={channel === "email" ? "Email address" : "Webhook URL"}
         />
         <Button variant="outline" size="sm" type="submit" disabled={!target.trim() || busy === "add"}>

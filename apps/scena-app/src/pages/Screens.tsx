@@ -259,7 +259,7 @@ function DeviceCard({ screen, onClick }: { screen: Screen; onClick: () => void }
       </div>
       <div className="p-3.5">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-semibold">{screen.name}</span>
+          <span className="truncate text-body font-semibold">{screen.name}</span>
           <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-foreground" />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">

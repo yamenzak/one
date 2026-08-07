@@ -41,8 +41,8 @@ export class ErrorBoundary extends React.Component<Props, State> {
         <div className="grid min-h-[60vh] place-items-center p-6">
           <div className="max-w-md text-center">
             <ScenaMascot mood="sad" size={104} className="mx-auto mb-2" />
-            <h2 className="text-lg font-semibold">This page hit a snag</h2>
-            <p className="mt-1.5 text-sm text-muted-foreground">
+            <h2 className="text-body-lg font-semibold">This page hit a snag</h2>
+            <p className="mt-1.5 text-body text-muted-foreground">
               Something went wrong rendering this view. The rest of Scena is still running — try again or head back to your fleet.
             </p>
             <div className="mt-5 flex justify-center gap-2">

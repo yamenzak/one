@@ -60,9 +60,9 @@ export function BarcodeScanner({ onDetected, onClose }: { onDetected: (code: str
             <div className="pointer-events-none absolute inset-6 rounded-xl border-2 border-white/30" />
           </div>
         )}
-        {status === "scanning" && <p className="text-center text-sm text-muted-foreground">Point the camera at a product barcode.</p>}
-        {status === "starting" && <p className="text-center text-sm text-muted-foreground">Starting camera…</p>}
-        {status === "denied" && <p className="text-center text-sm text-warning">Camera unavailable — enter the digits below instead.</p>}
+        {status === "scanning" && <p className="text-center text-body text-muted-foreground">Point the camera at a product barcode.</p>}
+        {status === "starting" && <p className="text-center text-body text-muted-foreground">Starting camera…</p>}
+        {status === "denied" && <p className="text-center text-body text-warning">Camera unavailable — enter the digits below instead.</p>}
 
         <div className="space-y-2">
           <Field label="Or enter the digits" icon={Barcode} inputMode="numeric" value={manual} onChange={(e) => setManual(e.target.value)} placeholder="0123456789012" />

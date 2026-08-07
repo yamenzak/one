@@ -131,7 +131,7 @@ export function BuilderFooter({ status, readOnly, life }: { status: string; read
     <ActionBar
       error={err}
       notice={readOnly ? (
-        <div className="flex items-start gap-2 rounded-xl bg-warning-soft px-3 py-2 text-xs text-warning [&_svg]:mt-px [&_svg]:size-3.5 [&_svg]:shrink-0">
+        <div className="flex items-start gap-2 rounded-xl bg-warning-soft px-3 py-2 text-caption text-warning [&_svg]:mt-px [&_svg]:size-3.5 [&_svg]:shrink-0">
           <History /> <span>This plan is {status} — read-only. Roll it back to a draft to edit, or make it active again.</span>
         </div>
       ) : undefined}
@@ -204,7 +204,7 @@ export function TemplatePickerSheet<B>({ kind, tone, countOf, onClose, onPick }:
   }, [kind]);
   return (
     <Sheet open onClose={onClose} title="Start from a template" size="tall">
-      <p className="mb-3 text-sm text-muted-foreground">Loads a saved template into this draft, replacing what's here now.</p>
+      <p className="mb-3 text-body text-muted-foreground">Loads a saved template into this draft, replacing what's here now.</p>
       {templates === null ? (
         <div className="space-y-2">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 rounded-xl" />)}</div>
       ) : templates.length === 0 ? (
@@ -215,8 +215,8 @@ export function TemplatePickerSheet<B>({ kind, tone, countOf, onClose, onPick }:
             <button key={t.id} onClick={() => onPick(t.body, t.name)} className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-card p-3 text-left transition-colors hover:bg-surface-2">
               <IconBadge icon={LayoutGrid} tone={tone} size="sm" />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold">{t.name}</div>
-                <div className="truncate text-xs text-muted-foreground">{countOf(t.body)}{t.description ? ` · ${t.description}` : ""}</div>
+                <div className="truncate text-body font-semibold">{t.name}</div>
+                <div className="truncate text-caption text-muted-foreground">{countOf(t.body)}{t.description ? ` · ${t.description}` : ""}</div>
               </div>
               <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
             </button>
@@ -261,10 +261,10 @@ export function SaveTemplateSheet({ kind, body, defaultName, stripNote, onClose 
         <EmptyState icon={Save} title="Saved to your library" description={stripNote} action={<Button onClick={onClose}>Done</Button>} />
       ) : (
         <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">Copies this plan's structure into something you can start from again. {stripNote}</p>
+          <p className="text-body text-muted-foreground">Copies this plan's structure into something you can start from again. {stripNote}</p>
           <Field label="Template name" value={name} onChange={(e) => setName(e.target.value)} />
-          <label className="flex items-center justify-between rounded-xl bg-secondary px-4 py-3 text-sm"><span>Share with the whole team</span><Switch checked={shared} onCheckedChange={setShared} /></label>
-          {err && <p className="text-xs text-warning" role="alert">{err}</p>}
+          <label className="flex items-center justify-between rounded-xl bg-secondary px-4 py-3 text-body"><span>Share with the whole team</span><Switch checked={shared} onCheckedChange={setShared} /></label>
+          {err && <p className="text-caption text-warning" role="alert">{err}</p>}
         </div>
       )}
     </Sheet>

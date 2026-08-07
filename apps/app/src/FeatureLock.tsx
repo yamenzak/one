@@ -57,12 +57,12 @@ export function FeatureLock({
       <IconBadge icon={Lock} tone="warning" size="lg" />
       <div>
         <div className="font-semibold">{meta.label} isn&apos;t in your plan</div>
-        {meta.hint && <p className="mx-auto mt-1 max-w-xs text-sm text-muted-foreground">{meta.hint}</p>}
+        {meta.hint && <p className="mx-auto mt-1 max-w-xs text-body text-muted-foreground">{meta.hint}</p>}
       </div>
       {isOwner ? (
         <Button onClick={() => nav("/business")}>See plans</Button>
       ) : (
-        <p className="text-sm text-muted-foreground">Ask your studio owner to upgrade to unlock this.</p>
+        <p className="text-body text-muted-foreground">Ask your studio owner to upgrade to unlock this.</p>
       )}
     </Card>
   );

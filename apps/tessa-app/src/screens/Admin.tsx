@@ -54,7 +54,7 @@ export function AdminDoor() {
       <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-4 px-6 py-12">
         <Card className="space-y-3 p-6 text-center">
           <h1 className="text-body-lg">Not an operator account</h1>
-          <p className="text-sm leading-relaxed text-muted-foreground">
+          <p className="text-body leading-relaxed text-muted-foreground">
             You&rsquo;re signed in, but this address is the platform console. Your practice is at its own address.
           </p>
           <Button variant="secondary" className="w-full" onClick={() => void signOut()}>
@@ -194,8 +194,8 @@ function Centres() {
 
   return (
     <div className="space-y-3">
-      {msg && <p className="px-1 text-sm text-success">{msg}</p>}
-      {err && <p className="px-1 text-sm text-danger">{err}</p>}
+      {msg && <p className="px-1 text-body text-success">{msg}</p>}
+      {err && <p className="px-1 text-body text-danger">{err}</p>}
       <Group>
         {data.tenants.map((t) => (
           <Row

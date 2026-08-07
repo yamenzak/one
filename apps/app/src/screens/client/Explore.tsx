@@ -49,7 +49,7 @@ export function Explore({ clientId, onBack }: { clientId: string; onBack: () => 
         <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
         <div className="min-w-0">
           <h1 className="text-title-2">Explore</h1>
-          <p className="text-sm text-muted-foreground">Guides &amp; recipes from your coach</p>
+          <p className="text-body text-muted-foreground">Guides &amp; recipes from your coach</p>
         </div>
       </div>
 
@@ -104,12 +104,12 @@ function FeaturedCard({ r, onOpen }: { r: Resource; onOpen: () => void }) {
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
       <div className="absolute left-4 top-4"><span className="rounded-full bg-white/15 px-2.5 py-1 text-micro uppercase text-white backdrop-blur-md">Featured</span></div>
       <div className="absolute inset-x-0 bottom-0 p-5">
-        <div className="mb-2 flex items-center gap-2 text-xs font-medium text-white/85">
+        <div className="mb-2 flex items-center gap-2 text-caption font-medium text-white/85">
           {r.category && <span className="rounded-full bg-primary px-2 py-0.5 font-semibold text-primary-foreground">{r.category}</span>}
           <span className="inline-flex items-center gap-1 [&_svg]:size-3.5"><Clock /> {readMin(r)} min</span>
         </div>
-        <h2 className="text-xl font-bold leading-tight tracking-tight text-white">{r.title}</h2>
-        {r.summary && <p className="mt-1 line-clamp-2 text-sm text-white/75">{r.summary}</p>}
+        <h2 className="text-title-3 font-bold leading-tight tracking-tight text-white">{r.title}</h2>
+        {r.summary && <p className="mt-1 line-clamp-2 text-body text-white/75">{r.summary}</p>}
       </div>
     </motion.button>
   );
@@ -125,14 +125,14 @@ function ArticleCard({ r, onOpen }: { r: Resource; onOpen: () => void }) {
           {r.coverUrl ? <img src={r.coverUrl} alt="" className="size-full object-cover" /> : <div className="grid size-full place-items-center bg-gradient-to-br from-primary/15 to-surface-3 text-primary [&_svg]:size-6"><Icon /></div>}
         </div>
         <div className="min-w-0 flex-1 py-0.5">
-          <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="mb-1 flex items-center gap-2 text-caption text-muted-foreground">
             {r.category ? <Badge tone="activity">{r.category}</Badge> : <span className="capitalize">{r.type}</span>}
             <span className="inline-flex items-center gap-1 [&_svg]:size-3"><Clock /> {readMin(r)} min</span>
           </div>
           <h3 className="line-clamp-2 font-semibold leading-snug">{r.title}</h3>
-          {r.summary && <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{r.summary}</p>}
+          {r.summary && <p className="mt-1 line-clamp-2 text-body text-muted-foreground">{r.summary}</p>}
           {(r.topics ?? []).length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1">{(r.topics ?? []).slice(0, 3).map((t) => <span key={t} className="rounded-full bg-surface-2 px-2 py-0.5 text-xs text-muted-foreground">#{t}</span>)}</div>
+            <div className="mt-1.5 flex flex-wrap gap-1">{(r.topics ?? []).slice(0, 3).map((t) => <span key={t} className="rounded-full bg-surface-2 px-2 py-0.5 text-caption text-muted-foreground">#{t}</span>)}</div>
           )}
         </div>
       </Card>
@@ -161,12 +161,12 @@ function Reader({ r, onBack }: { r: Resource; onBack: () => void }) {
       >
         <div className="flex flex-wrap items-center gap-2">
           {r.category && <Badge tone="activity">{r.category}</Badge>}
-          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground [&_svg]:size-3.5"><Clock /> {readMin(r)} min read</span>
+          <span className="inline-flex items-center gap-1 text-caption text-muted-foreground [&_svg]:size-3.5"><Clock /> {readMin(r)} min read</span>
         </div>
         <h1 className="text-title-2 font-bold leading-tight tracking-tight">{r.title}</h1>
-        {r.summary && <p className="text-base leading-relaxed text-muted-foreground">{r.summary}</p>}
+        {r.summary && <p className="text-body-lg leading-relaxed text-muted-foreground">{r.summary}</p>}
         {(r.topics ?? []).length > 0 && (
-          <div className="flex flex-wrap gap-1.5">{(r.topics ?? []).map((t) => <span key={t} className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs text-muted-foreground">#{t}</span>)}</div>
+          <div className="flex flex-wrap gap-1.5">{(r.topics ?? []).map((t) => <span key={t} className="rounded-full bg-surface-2 px-2.5 py-0.5 text-caption text-muted-foreground">#{t}</span>)}</div>
         )}
         <div className="h-px bg-gradient-to-r from-border to-transparent" />
         {r.bodyMd ? <Markdown className="text-body text-foreground/90">{r.bodyMd}</Markdown> : <p className="text-body leading-relaxed text-foreground/90">{r.summary}</p>}

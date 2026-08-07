@@ -54,7 +54,7 @@ export function Pill({ tone = "muted", solid = false, children, className }: { t
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-caption font-medium whitespace-nowrap",
         (solid ? PILL_SOLID : PILL_SOFT)[tone],
         className,
       )}
@@ -84,7 +84,7 @@ export function StatTile({
         {dot}
         {label}
       </div>
-      <div className={cn("mt-1.5 font-mono text-2xl font-semibold tabular-nums", valueClassName)}>{value}</div>
+      <div className={cn("mt-1.5 font-mono text-title-2 font-semibold tabular-nums", valueClassName)}>{value}</div>
     </Card>
   );
 }

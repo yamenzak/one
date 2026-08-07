@@ -158,7 +158,7 @@ export function AiLayoutDialog({
           placeholder={
             mode === "improve" ? "What should change? e.g. “add a QR to the bottom-right and make the headline bigger”" : "Describe the layout to design…"
           }
-          className="min-h-24 resize-none text-sm"
+          className="min-h-24 resize-none text-body"
         />
 
         <div className="flex flex-wrap gap-1.5">
@@ -180,13 +180,13 @@ export function AiLayoutDialog({
             <Select
               value={modelId || "__default"}
               onChange={(v) => setModelId(v === "__default" ? "" : v)}
-              className="h-8 flex-1 text-xs"
+              className="h-8 flex-1 text-caption"
               options={[{ value: "__default", label: "Default model" }, ...models.map((m) => ({ value: m.id, label: m.label }))]}
             />
           </div>
         )}
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-body text-destructive">{error}</p>}
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-caption text-muted-foreground">Uses AI credits · follows your brand · one undo reverses it.</p>
@@ -222,7 +222,7 @@ function ModeCard({ active, onClick, icon, title, desc }: { active: boolean; onC
         active ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-accent",
       )}
     >
-      <span className={cn("flex items-center gap-1.5 text-sm font-medium", active ? "text-primary" : "")}>
+      <span className={cn("flex items-center gap-1.5 text-body font-medium", active ? "text-primary" : "")}>
         {icon} {title}
       </span>
       <span className="text-caption leading-snug text-muted-foreground">{desc}</span>

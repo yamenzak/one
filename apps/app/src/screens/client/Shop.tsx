@@ -110,7 +110,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
   const cta = (p: Pkg): ReactNode => {
     if (p.monthly_price_cents) return <Button size="lg" className="mt-4 w-full" disabled={buying} onClick={() => void buy(p.id)}>Subscribe</Button>;
     if (p.one_time_price_cents) return <Button size="lg" className="mt-4 w-full" disabled={buying} onClick={() => void buy(p.id)}>Buy now</Button>;
-    return <p className="mt-3 text-center text-xs text-muted-foreground">Ask your coach to add this to your account.</p>;
+    return <p className="mt-3 text-center text-caption text-muted-foreground">Ask your coach to add this to your account.</p>;
   };
 
   const memberships = (packages ?? []).filter(isRecurring);
@@ -177,7 +177,7 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
           <div className="pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-primary/15 blur-3xl" />
           <div className="relative flex items-start gap-3">
             <IconBadge icon={Ticket} tone="primary" size="sm" />
-            <div className="min-w-0 text-sm"><div className="font-medium">{canCommerce ? "Choose a plan to get started" : "Let's get your access set up"}</div><div className="text-muted-foreground">{canCommerce ? "Your access is inactive. Pick a package below or enter a code — or ask your coach to set you up." : "Your access is inactive. Enter an access code below, or ask your coach to set you up."}</div></div>
+            <div className="min-w-0 text-body"><div className="font-medium">{canCommerce ? "Choose a plan to get started" : "Let's get your access set up"}</div><div className="text-muted-foreground">{canCommerce ? "Your access is inactive. Pick a package below or enter a code — or ask your coach to set you up." : "Your access is inactive. Enter an access code below, or ask your coach to set you up."}</div></div>
           </div>
         </Card>
       )}
@@ -191,15 +191,15 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
       }>
         {packages && (
         <>
-      {msg && <Card className="border border-primary/20 bg-primary/5 text-sm text-foreground/85">{msg}</Card>}
+      {msg && <Card className="border border-primary/20 bg-primary/5 text-body text-foreground/85">{msg}</Card>}
 
       {canCommerce && (sub ? (
         <div className="space-y-2">
           <Card className="space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <span className="text-sm text-muted-foreground">Current access</span>
-                {sub.autoRenew && <div className="text-xs font-medium text-primary">Auto-renews monthly</div>}
+                <span className="text-body text-muted-foreground">Current access</span>
+                {sub.autoRenew && <div className="text-caption font-medium text-primary">Auto-renews monthly</div>}
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Badge tone={sub.daysRemaining <= 7 ? "warning" : "success"}>{sub.daysRemaining} days left</Badge>
@@ -211,11 +211,11 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
             )}
           </Card>
           {!sub.autoRenew && (
-            <p className="px-1 text-xs text-muted-foreground">Extending <span className="font-medium text-foreground">stacks</span> on top of your current {sub.daysRemaining} days — nothing is wasted.</p>
+            <p className="px-1 text-caption text-muted-foreground">Extending <span className="font-medium text-foreground">stacks</span> on top of your current {sub.daysRemaining} days — nothing is wasted.</p>
           )}
         </div>
       ) : (
-        !locked && <p className="px-1 text-xs text-muted-foreground">Pick a package below to unlock your plan. Buy again anytime to extend — access stacks, it never resets.</p>
+        !locked && <p className="px-1 text-caption text-muted-foreground">Pick a package below to unlock your plan. Buy again anytime to extend — access stacks, it never resets.</p>
       ))}
 
       <PlanIncludes hasPlan={!!sub && sub.daysRemaining > 0} />
@@ -246,13 +246,13 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
       {!canCommerce ? (
         <EmptyState icon={Store} title="Your coach isn't selling plans online" description="This studio doesn't take payments here. Your coach sets up your access for you — or enter an access code below if you have one." />
       ) : packages.length === 0 && !sub && (
-        <Card className="text-center text-sm text-muted-foreground">No packages are available to buy right now. Enter a code below, or ask your coach to set you up.</Card>
+        <Card className="text-center text-body text-muted-foreground">No packages are available to buy right now. Enter a code below, or ask your coach to set you up.</Card>
       )}
 
       {/* Access codes live in their own sheet — kept out of the storefront flow
           so they don't get confused with checkout discount codes. */}
       <div className="pt-1 text-center">
-        <button onClick={() => setRedeemOpen(true)} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-4"><Ticket /> Have an access code? Redeem it</button>
+        <button onClick={() => setRedeemOpen(true)} className="inline-flex items-center gap-1.5 text-body font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-4"><Ticket /> Have an access code? Redeem it</button>
       </div>
         </>
         )}
@@ -277,9 +277,9 @@ export function Shop({ clientId, onBack, locked }: { clientId: string; onBack?: 
       {redeemOpen && (
         <Sheet open onClose={() => { setRedeemOpen(false); setRedeemMsg(null); }} title="Redeem an access code" footer={<Button size="lg" className="w-full" disabled={code.length < 4 || busy} onClick={() => void redeem()}>{busy ? "Redeeming…" : "Redeem"}</Button>}>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Have an access code from your coach? Enter it to add days to your plan. This is different from a checkout discount code.</p>
+            <p className="text-body text-muted-foreground">Have an access code from your coach? Enter it to add days to your plan. This is different from a checkout discount code.</p>
             <Field label="Access code" icon={Ticket} value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="WELCOME7" />
-            {redeemMsg && <p className="text-sm text-muted-foreground">{redeemMsg}</p>}
+            {redeemMsg && <p className="text-body text-muted-foreground">{redeemMsg}</p>}
           </div>
         </Sheet>
       )}
@@ -313,12 +313,12 @@ function PackageCard({ p, tone, cta, hasActive }: { p: Pkg; tone: (typeof CARD_T
         <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0">
             <span className="grid size-9 place-items-center rounded-xl [&_svg]:size-[1.1rem]" style={{ backgroundColor: `color-mix(in oklch, ${tv} 18%, transparent)`, color: tv }}><Store /></span>
-            <h3 className="mt-2.5 text-lg font-bold tracking-tight">{p.name}</h3>
-            {p.description && <p className="mt-0.5 text-sm text-muted-foreground">{p.description}</p>}
+            <h3 className="mt-2.5 text-body-lg font-bold tracking-tight">{p.name}</h3>
+            {p.description && <p className="mt-0.5 text-body text-muted-foreground">{p.description}</p>}
           </div>
           <div className="shrink-0 text-right">
-            <div className="numeral text-2xl font-extrabold leading-none" style={{ color: tv }}>{price.big}</div>
-            {price.cadence && <div className="mt-1 text-xs font-medium text-muted-foreground">{price.cadence}</div>}
+            <div className="numeral text-title-2 font-bold leading-none" style={{ color: tv }}>{price.big}</div>
+            {price.cadence && <div className="mt-1 text-caption font-medium text-muted-foreground">{price.cadence}</div>}
           </div>
         </div>
       </div>
@@ -326,14 +326,14 @@ function PackageCard({ p, tone, cta, hasActive }: { p: Pkg; tone: (typeof CARD_T
         {includes.length > 0 && (
           <ul className="space-y-2">
             {includes.map((f, i) => (
-              <li key={i} className="flex items-center gap-2.5 text-sm">
+              <li key={i} className="flex items-center gap-2.5 text-body">
                 <span className="grid size-5 shrink-0 place-items-center rounded-full [&_svg]:size-3" style={{ backgroundColor: `color-mix(in oklch, ${tv} 16%, transparent)`, color: tv }}><Check strokeWidth={3} /></span>
                 {f}
               </li>
             ))}
           </ul>
         )}
-        {note && <p className="mt-3 text-xs text-muted-foreground">{note}</p>}
+        {note && <p className="mt-3 text-caption text-muted-foreground">{note}</p>}
         {cta}
       </div>
     </Card>
@@ -361,17 +361,17 @@ function PlanIncludes({ hasPlan }: { hasPlan: boolean }) {
       {/* With no active plan these are still real capabilities — the studio's
           defaults — but calling them "your plan" under an anchor that just said
           "Nothing active" contradicts it on the same screen. */}
-      <Eyebrow action={<span className="text-xs font-medium text-muted-foreground">{included.length}</span>}>
+      <Eyebrow action={<span className="text-caption font-medium text-muted-foreground">{included.length}</span>}>
         {hasPlan ? "What your plan includes" : "What you can do now"}
       </Eyebrow>
       <div className="flex flex-wrap gap-1.5 px-1">
         {shown.map((k) => (
-          <span key={k} className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success [&_svg]:size-3">
+          <span key={k} className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-caption font-medium text-success [&_svg]:size-3">
             <Check strokeWidth={3} />{CLIENT_FLAG_META[k].label}
           </span>
         ))}
         {(hidden > 0 || expanded) && (
-          <button onClick={() => setExpanded((v) => !v)} className="inline-flex items-center rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <button onClick={() => setExpanded((v) => !v)} className="inline-flex items-center rounded-full bg-secondary px-2.5 py-1 text-caption font-medium text-muted-foreground transition-colors hover:text-foreground">
             {expanded ? "Show less" : `+${hidden} more`}
           </button>
         )}

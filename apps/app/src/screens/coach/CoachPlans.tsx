@@ -182,7 +182,7 @@ export function CoachPlans({ clientId }: { clientId: string }) {
         <div className="space-y-4">
           <Field label="Plan name" icon={kind === "workout" ? Dumbbell : Utensils} value={name} onChange={(e) => setName(e.target.value)} placeholder={kind === "workout" ? "Push Pull Legs" : "Cutting Plan"} />
           {liveLanes.length > 0 && <p className="text-caption text-muted-foreground">Lands in the <span className="font-medium text-foreground">{laneName}</span> lane.</p>}
-          {createErr && <p className="text-sm text-warning" role="alert">{createErr}</p>}
+          {createErr && <p className="text-body text-warning" role="alert">{createErr}</p>}
         </div>
       </Sheet>
 

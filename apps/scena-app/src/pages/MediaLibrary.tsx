@@ -258,8 +258,8 @@ export function MediaLibraryPage() {
               <div className="absolute right-2 top-2">{menu(m)}</div>
             </div>
             <div className="p-2.5">
-              <div className="truncate text-sm font-medium">{m.name}</div>
-              <div className="mt-0.5 truncate text-xs text-muted-foreground">{meta(m)}</div>
+              <div className="truncate text-body font-medium">{m.name}</div>
+              <div className="mt-0.5 truncate text-caption text-muted-foreground">{meta(m)}</div>
               {(m.tags?.length ?? 0) > 0 && (
                 <div className="mt-1.5 flex flex-wrap gap-1">
                   {m.tags!.slice(0, 3).map((t) => (
@@ -492,7 +492,7 @@ export function MediaPicker({
                 key={k.key}
                 type="button"
                 onClick={() => setKind(k.key)}
-                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${kind === k.key ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
+                className={`rounded-full border px-2.5 py-1 text-caption font-medium ${kind === k.key ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
               >
                 {k.label}
               </button>
@@ -506,7 +506,7 @@ export function MediaPicker({
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <div className="py-12 text-center text-sm text-muted-foreground">
+            <div className="py-12 text-center text-body text-muted-foreground">
               {audioOnly ? "No audio yet. Upload music or generate a track." : "No media found. Upload some in the Media library."}
             </div>
           ) : (

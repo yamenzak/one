@@ -90,7 +90,7 @@ function MiniStat({ icon: Icon, tone, label, value, sub }: { icon: LucideIcon; t
       <span className="grid size-8 shrink-0 place-items-center rounded-lg [&_svg]:size-4" style={{ background: `color-mix(in oklch, ${toneVar[tone]} 15%, transparent)`, color: toneVar[tone] }}><Icon /></span>
       <div className="min-w-0 flex-1">
         <div className="text-micro uppercase text-muted-foreground">{label}</div>
-        <div className="truncate text-sm font-semibold tabular-nums">{value}{sub ? <span className="ml-0.5 text-xs font-normal text-muted-foreground">{sub}</span> : null}</div>
+        <div className="truncate text-body font-semibold tabular-nums">{value}{sub ? <span className="ml-0.5 text-caption font-normal text-muted-foreground">{sub}</span> : null}</div>
       </div>
     </div>
   );
@@ -156,8 +156,8 @@ function Detail({ d, Icon, units }: { d: LogDetail; Icon: LucideIcon; units: Uni
             <div className="mb-4 flex items-center gap-3">
               <IconBadge icon={Icon} tone={tone} size="sm" />
               <div className="min-w-0 flex-1">
-                <div className="text-base font-semibold leading-tight">{d.title}</div>
-                <div className="text-xs text-muted-foreground">{dayLabel(d.date)}{d.subtitle ? ` · ${d.subtitle}` : ""}</div>
+                <div className="text-body-lg font-semibold leading-tight">{d.title}</div>
+                <div className="text-caption text-muted-foreground">{dayLabel(d.date)}{d.subtitle ? ` · ${d.subtitle}` : ""}</div>
               </div>
             </div>
             <div className="flex items-center gap-5">
@@ -165,7 +165,11 @@ function Detail({ d, Icon, units }: { d: LogDetail; Icon: LucideIcon; units: Uni
                 <ProgressRing size={116} strokeWidth={11} tone={tone} progress={ringPct} value={fmtUnit(d.hero.value, d.hero.unit, units).replace(/\s.*/, "")} label={d.hero.label} sublabel={target ? `of ${fmtUnit(target, d.hero.unit, units)}` : undefined} softTrack tintValue />
               ) : d.hero ? (
                 <div className="shrink-0">
-                  <div className="numeral text-5xl font-black leading-none tracking-tight" style={{ color: toneVar[tone] }}>{fmtUnit(d.hero.value, d.hero.unit, units)}</div>
+                  {/* The FALLBACK for the ProgressRing above — same slot, same flex
+                      row, beside a column of MiniStats.
+                      primitive-exempt: `Anchor` owns its own vertical rhythm, so
+                      dropping one into this row would move the ring it replaces. */}
+                  <div className="numeral text-display font-bold leading-none tracking-tight" style={{ color: toneVar[tone] }}>{fmtUnit(d.hero.value, d.hero.unit, units)}</div>
                   <div className="mt-1 text-micro uppercase text-muted-foreground">{d.hero.label}</div>
                 </div>
               ) : null}
@@ -222,8 +226,8 @@ function Detail({ d, Icon, units }: { d: LogDetail; Icon: LucideIcon; units: Uni
                 <div key={i} className="flex items-center gap-3 py-2.5">
                   <span className="size-1.5 shrink-0 rounded-full" style={{ background: toneVar[tone] }} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{it.title}</div>
-                    {it.sub && <div className="truncate text-xs text-muted-foreground">{it.sub}</div>}
+                    <div className="truncate text-body font-medium">{it.title}</div>
+                    {it.sub && <div className="truncate text-caption text-muted-foreground">{it.sub}</div>}
                   </div>
                 </div>
               ))}
@@ -237,7 +241,7 @@ function Detail({ d, Icon, units }: { d: LogDetail; Icon: LucideIcon; units: Uni
         <Stagger>
           <Card className="divide-y divide-border/50">
             {d.rows.map((r, i) => (
-              <div key={i} className="flex items-center justify-between gap-3 py-2.5 text-sm first:pt-0 last:pb-0">
+              <div key={i} className="flex items-center justify-between gap-3 py-2.5 text-body first:pt-0 last:pb-0">
                 <span className="text-muted-foreground">{r.label}</span>
                 <span className="font-semibold tabular-nums">{r.value}</span>
               </div>
@@ -250,7 +254,7 @@ function Detail({ d, Icon, units }: { d: LogDetail; Icon: LucideIcon; units: Uni
         <Stagger>
           <Card>
             <SectionHeader title="Notes" />
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground/85">{d.note}</p>
+            <p className="mt-2 whitespace-pre-wrap text-body leading-relaxed text-foreground/85">{d.note}</p>
           </Card>
         </Stagger>
       )}

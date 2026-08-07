@@ -125,14 +125,14 @@ export function AcceptInvite() {
             {accepting || !done ? (
               <>
                 <Spinner className="mx-auto" />
-                <p className="text-sm text-muted-foreground">Setting up your access…</p>
+                <p className="text-body text-muted-foreground">Setting up your access…</p>
               </>
             ) : (
               <>
                 <div className="mx-auto grid size-14 place-items-center rounded-full bg-success-soft text-success [&_svg]:size-7"><Check /></div>
                 <div>
                   <h2 className="text-title-3">You're in</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Your invitation to {brandName} is accepted.</p>
+                  <p className="mt-1 text-body text-muted-foreground">Your invitation to {brandName} is accepted.</p>
                 </div>
                 <Button size="lg" className="w-full" onClick={() => window.location.assign("/")}>
                   Go to {brandName} <ArrowRight />
@@ -154,9 +154,9 @@ export function AcceptInvite() {
         {logoUrl ? (
           <img src={logoUrl} alt={brandName} className="mx-auto mb-5 h-16 w-auto max-w-[70%] object-contain" />
         ) : (
-          <div className="mx-auto mb-5 grid size-16 place-items-center rounded-3xl bg-primary text-2xl font-black text-primary-foreground shadow-glow">{brandName.charAt(0).toUpperCase()}</div>
+          <div className="mx-auto mb-5 grid size-16 place-items-center rounded-3xl bg-primary text-title-2 font-bold text-primary-foreground shadow-glow">{brandName.charAt(0).toUpperCase()}</div>
         )}
-        <h1 className="text-3xl font-bold tracking-tight">You're invited</h1>
+        <h1 className="text-title-1 font-bold tracking-tight">You're invited</h1>
         <p className="mt-2 text-muted-foreground">Join the {brandName} team — sign in with the email your invite was sent to.</p>
       </motion.div>
 
@@ -166,31 +166,31 @@ export function AcceptInvite() {
             <>
               <div>
                 <h2 className="text-title-3">Continue with email</h2>
-                <p className="mt-1 text-sm text-muted-foreground">We'll email you a 6-digit code — no password to create.</p>
+                <p className="mt-1 text-body text-muted-foreground">We'll email you a 6-digit code — no password to create.</p>
               </div>
               <Field label="Email" icon={Mail} type="email" autoComplete="email" value={email} placeholder="you@example.com" onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && email.includes("@") && cooldown === 0 && (!needsTurnstile || tsToken) && void sendCode()} />
               {needsTurnstile && turnstile!.siteKey && <Turnstile siteKey={turnstile!.siteKey} onToken={setTsToken} />}
               <Button size="lg" className="w-full" disabled={!email.includes("@") || busy || cooldown > 0 || (needsTurnstile && !tsToken)} onClick={() => void sendCode()}>
                 {busy ? "Sending…" : cooldown > 0 ? `Resend in ${cooldown}s` : "Continue with email"} {!busy && cooldown === 0 && <ArrowRight />}
               </Button>
-              <p className="text-center text-xs text-muted-foreground">Use the same email address that received the invitation.</p>
+              <p className="text-center text-caption text-muted-foreground">Use the same email address that received the invitation.</p>
             </>
           ) : (
             <>
               <h2 className="text-title-3">Enter your code</h2>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-body text-muted-foreground">
                 Sent to <span className="font-medium text-foreground">{email}</span>. Expires in 10 min.
               </p>
-              <Field ref={otpRef} label="6-digit code" icon={KeyRound} inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} className="[&_input]:text-center [&_input]:text-lg [&_input]:tracking-[0.5em]" onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => e.key === "Enter" && otp.length === 6 && void verify()} />
+              <Field ref={otpRef} label="6-digit code" icon={KeyRound} inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={otp} className="[&_input]:text-center [&_input]:text-body-lg [&_input]:tracking-[0.5em]" onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))} onKeyDown={(e) => e.key === "Enter" && otp.length === 6 && void verify()} />
               <Button size="lg" className="w-full" disabled={otp.length !== 6 || busy} onClick={() => void verify()}>
                 {busy ? "Checking…" : "Accept invitation"}
               </Button>
-              <button className="w-full text-sm text-muted-foreground transition-colors hover:text-foreground" onClick={() => (setStep("email"), setOtp(""))}>
+              <button className="w-full text-body text-muted-foreground transition-colors hover:text-foreground" onClick={() => (setStep("email"), setOtp(""))}>
                 Use a different email
               </button>
             </>
           )}
-          {error && <p className="text-sm text-danger">{error}</p>}
+          {error && <p className="text-body text-danger">{error}</p>}
         </Card>
       </motion.div>
     </div>

@@ -231,7 +231,7 @@ const STRUCTURED = /^\s*(#{1,6}\s|[-*+]\s|\d+[.)]\s)/m;
 
 export function ExerciseSteps({ md }: { md?: string | null }) {
   const text = (md ?? "").trim();
-  if (!text) return <p className="px-1 text-sm text-muted-foreground">No written instructions yet — ask your coach for cues.</p>;
+  if (!text) return <p className="px-1 text-body text-muted-foreground">No written instructions yet — ask your coach for cues.</p>;
   if (STRUCTURED.test(text)) return <Markdown className="text-body leading-relaxed text-foreground/90">{text}</Markdown>;
   const steps = text.split(/\n\s*\n/).map((s) => s.trim().replace(/\s*\n\s*/g, " ")).filter(Boolean);
   if (steps.length < 2) return <p className="px-1 text-body leading-relaxed text-foreground/90">{steps[0] ?? text}</p>;
@@ -239,7 +239,7 @@ export function ExerciseSteps({ md }: { md?: string | null }) {
     <ol className="space-y-3">
       {steps.map((s, i) => (
         <li key={i} className="flex gap-3">
-          <span className="numeral mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-activity-soft text-xs font-bold text-activity">{i + 1}</span>
+          <span className="numeral mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-activity-soft text-caption font-bold text-activity">{i + 1}</span>
           <span className="min-w-0 flex-1 text-body leading-relaxed text-foreground/90">{s}</span>
         </li>
       ))}
@@ -323,7 +323,7 @@ export function ExerciseRow({
           afford to lose is not a close call.
         */}
         {(m || sub != null) && (
-          <div className="flex min-w-0 items-baseline gap-1 text-sm text-muted-foreground">
+          <div className="flex min-w-0 items-baseline gap-1 text-body text-muted-foreground">
             {m && <span className="min-w-0 truncate">{m}</span>}
             {m && sub != null && <span className="shrink-0 text-muted-foreground/50">·</span>}
             {sub != null && <span className="shrink-0">{sub}</span>}

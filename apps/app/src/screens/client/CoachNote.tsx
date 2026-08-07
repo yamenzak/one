@@ -38,7 +38,7 @@ export function CoachNote({ clientId, surface }: { clientId: string; surface: Su
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow, ease: [0.22, 1, 0.36, 1] }} className="flex items-start gap-3 px-1">
       <AiAvatar className="mt-0.5 size-8 shrink-0" />
       <div className="min-w-0 flex-1">
-        <div className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">{ai.name}</div>
+        <div className="text-caption font-semibold uppercase tracking-[0.08em] text-primary">{ai.name}</div>
         <Markdown className="mt-1 text-body text-foreground/85">{msg}</Markdown>
         <InsightFeedback className="mt-2" insightType={INSIGHT_TYPE} insightRef={`${surface}:${clientId}`} onMute={() => setMuted(true)} />
       </div>

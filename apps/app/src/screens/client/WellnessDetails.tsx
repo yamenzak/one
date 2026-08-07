@@ -46,7 +46,7 @@ function CoachFeedback({ title, body, at }: { title: string; body: string; at?: 
     <div className="relative overflow-hidden rounded-2xl bg-primary/10 p-4">
       <div className="pointer-events-none absolute -right-6 -top-6 size-24 rounded-full bg-primary/10 blur-2xl" />
       <div className="relative flex items-center gap-2 text-micro uppercase text-primary [&_svg]:size-3.5"><HeartPulse /> {title}{at ? <span className="ml-auto font-normal text-muted-foreground">{new Date(at).toLocaleDateString()}</span> : null}</div>
-      <p className="relative mt-2 text-sm leading-relaxed">{body}</p>
+      <p className="relative mt-2 text-body leading-relaxed">{body}</p>
     </div>
   );
 }
@@ -65,7 +65,7 @@ function Rating({ kind, value }: { kind: "mood" | "energy" | "stress"; value: nu
     <div className="flex items-center gap-3 rounded-xl bg-surface-2 px-3 py-2.5">
       <IconBadge icon={m.icon} tone={tone} size="sm" />
       <div className="min-w-0 flex-1">
-        <div className="text-xs font-medium text-muted-foreground">{m.label}</div>
+        <div className="text-caption font-medium text-muted-foreground">{m.label}</div>
         <div className="mt-1 flex gap-1">
           {[1, 2, 3, 4, 5].map((n) => (
             <span key={n} className={cn("h-1.5 flex-1 rounded-full", n > filled && "bg-surface-3")} style={n <= filled ? { backgroundColor: toneVar[tone] } : undefined} />
@@ -74,7 +74,7 @@ function Rating({ kind, value }: { kind: "mood" | "energy" | "stress"; value: nu
       </div>
       {/* The word, not "4/5" — a number out of five says nothing about which
           direction is the good one. */}
-      <span className="shrink-0 text-sm font-semibold">{scaleWord(kind, value)}</span>
+      <span className="shrink-0 text-body font-semibold">{scaleWord(kind, value)}</span>
     </div>
   );
 }
@@ -84,8 +84,8 @@ function Stat({ icon: Icon, label, value, tone }: { icon: LucideIcon; label: str
     <div className="flex items-center gap-2.5 rounded-xl bg-surface-2 px-3 py-2.5">
       <IconBadge icon={Icon} tone={tone} size="sm" />
       <div className="min-w-0">
-        <div className="text-xs font-medium text-muted-foreground">{label}</div>
-        <div className="numeral truncate text-sm font-semibold">{value}</div>
+        <div className="text-caption font-medium text-muted-foreground">{label}</div>
+        <div className="numeral truncate text-body font-semibold">{value}</div>
       </div>
     </div>
   );
@@ -136,14 +136,14 @@ export function CheckInDetailSheet({ checkIn, onClose }: { checkIn: CheckInFull;
         {checkIn.notes && (
           <SubCard className="space-y-1">
             <div className="flex items-center gap-1.5 text-micro uppercase text-muted-foreground"><ClipboardList className="size-3.5" /> Your note</div>
-            <p className="text-sm">{checkIn.notes}</p>
+            <p className="text-body">{checkIn.notes}</p>
           </SubCard>
         )}
 
         {checkIn.trainer_feedback ? (
           <CoachFeedback title="Coach feedback" body={checkIn.trainer_feedback} at={checkIn.feedback_at} />
         ) : (
-          <SubCard className="text-sm text-muted-foreground">Your coach hasn't replied yet — you'll get a notification when they do.</SubCard>
+          <SubCard className="text-body text-muted-foreground">Your coach hasn't replied yet — you'll get a notification when they do.</SubCard>
         )}
       </div>
     </Sheet>
@@ -176,14 +176,14 @@ export function LabDetailSheet({ lab, onClose }: { lab: LabFull; onClose: () => 
         {lab.instructions && (
           <SubCard className="space-y-1">
             <div className="flex items-center gap-1.5 text-micro uppercase text-muted-foreground"><FlaskConical className="size-3.5" /> Instructions</div>
-            <p className="text-sm text-muted-foreground">{lab.instructions}</p>
+            <p className="text-body text-muted-foreground">{lab.instructions}</p>
           </SubCard>
         )}
         {lab.due_by && lab.status !== "reviewed" && (
           /* `due_by` is a date-only column, so a bare `new Date(d)` parses as UTC
              midnight and every timezone west of UTC renders the day BEFORE the
              one the coach set. Pin it to local midnight, like prettyDate above. */
-          <div className="flex items-center gap-2 text-sm text-muted-foreground [&_svg]:size-4"><Calendar /> Due {new Date(`${lab.due_by}T00:00:00`).toLocaleDateString()}</div>
+          <div className="flex items-center gap-2 text-body text-muted-foreground [&_svg]:size-4"><Calendar /> Due {new Date(`${lab.due_by}T00:00:00`).toLocaleDateString()}</div>
         )}
 
         {fileUrl && (
@@ -194,7 +194,7 @@ export function LabDetailSheet({ lab, onClose }: { lab: LabFull; onClose: () => 
             ) : (
               <a href={fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3 transition-colors hover:bg-surface-3">
                 <IconBadge icon={ImageIcon} tone="lab" size="sm" />
-                <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">View uploaded file</div><div className="text-xs text-muted-foreground">Opens in a new tab</div></div>
+                <div className="min-w-0 flex-1"><div className="truncate text-body font-medium">View uploaded file</div><div className="text-caption text-muted-foreground">Opens in a new tab</div></div>
               </a>
             )}
           </div>
@@ -203,7 +203,7 @@ export function LabDetailSheet({ lab, onClose }: { lab: LabFull; onClose: () => 
         {lab.client_notes && (
           <SubCard className="space-y-1">
             <div className="text-micro uppercase text-muted-foreground">Your note</div>
-            <p className="text-sm">{lab.client_notes}</p>
+            <p className="text-body">{lab.client_notes}</p>
           </SubCard>
         )}
 
@@ -213,9 +213,9 @@ export function LabDetailSheet({ lab, onClose }: { lab: LabFull; onClose: () => 
             <div className="overflow-hidden rounded-2xl bg-surface-2">
               {lab.values.map((v, i) => (
                 <div key={i} className={cn("flex items-center justify-between gap-3 px-3.5 py-2.5", i > 0 && "border-t border-border/50")}>
-                  <span className="min-w-0 truncate text-sm font-medium">{v.marker}</span>
+                  <span className="min-w-0 truncate text-body font-medium">{v.marker}</span>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="numeral text-sm font-semibold">{v.value}{v.unit ? <span className="ml-0.5 text-xs font-normal text-muted-foreground">{v.unit}</span> : null}</span>
+                    <span className="numeral text-body font-semibold">{v.value}{v.unit ? <span className="ml-0.5 text-caption font-normal text-muted-foreground">{v.unit}</span> : null}</span>
                     {v.flag && v.flag !== "normal" && <Badge tone={FLAG_TONE[v.flag] ?? "sleep"}>{v.flag}</Badge>}
                   </div>
                 </div>
@@ -227,7 +227,7 @@ export function LabDetailSheet({ lab, onClose }: { lab: LabFull; onClose: () => 
         {lab.trainer_feedback ? (
           <CoachFeedback title="Coach read" body={lab.trainer_feedback} at={lab.reviewed_at} />
         ) : lab.status !== "reviewed" ? (
-          <SubCard className="text-sm text-muted-foreground">{lab.status === "uploaded" ? "Your coach is reviewing this — feedback is on the way." : "Upload your result to get your coach's read."}</SubCard>
+          <SubCard className="text-body text-muted-foreground">{lab.status === "uploaded" ? "Your coach is reviewing this — feedback is on the way." : "Upload your result to get your coach's read."}</SubCard>
         ) : null}
       </div>
     </Sheet>

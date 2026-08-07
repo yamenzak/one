@@ -216,7 +216,7 @@ export function Clients() {
       {freeing && (
         <Card className="space-y-2.5 border border-primary/25" role="status" aria-live="polite">
           <div className="flex items-center gap-2 font-medium"><Users className="size-4 text-primary" /> Freeing seats for a smaller plan</div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-body text-muted-foreground">
             {stillNeeded > 0
               ? `Free ${stillNeeded} more client seat${stillNeeded === 1 ? "" : "s"} and the plan change goes through. Archiving keeps everything on the record; deleting (on a client's Manage tab) also reclaims their storage.`
               : "That's enough seats — head back to Business to finish the plan change."}
@@ -225,7 +225,7 @@ export function Clients() {
             <Button size="sm" variant={stillNeeded > 0 ? "secondary" : "default"} onClick={() => nav("/business")}>Back to Business</Button>
             <Button size="sm" variant="ghost" onClick={() => setParams((p) => { p.delete("free"); return p; }, { replace: true })}>Not now</Button>
           </div>
-          {archiveErr && <p className="text-sm text-warning" role="alert">{archiveErr}</p>}
+          {archiveErr && <p className="text-body text-warning" role="alert">{archiveErr}</p>}
         </Card>
       )}
 
@@ -316,7 +316,7 @@ export function Clients() {
                 and RESERVED so a one-line name does not float its badge up to a
                 different height than its neighbour's — which is the thing that
                 makes a grid of people look untidy rather than the names. */}
-            <span className="line-clamp-2 min-h-[2.5em] min-w-0 text-sm font-medium leading-tight">{c.displayName}</span>
+            <span className="line-clamp-2 min-h-[2.5em] min-w-0 text-body font-medium leading-tight">{c.displayName}</span>
             <ClientStatus client={c} att={att} />
           </button>
         )}
@@ -432,13 +432,13 @@ function InviteSheet({ invite, onClose }: { invite: Invite; onClose: () => void 
           <div className="min-w-0">
             {invite.delivery.sent ? (
               <>
-                <p className="text-sm">We emailed a branded sign-in link to <span className="font-medium text-foreground">{invite.email}</span>.</p>
-                <p className="mt-1 text-sm text-muted-foreground">Share this link in the gym too — they open it and sign in with a one-time code, no password.</p>
+                <p className="text-body">We emailed a branded sign-in link to <span className="font-medium text-foreground">{invite.email}</span>.</p>
+                <p className="mt-1 text-body text-muted-foreground">Share this link in the gym too — they open it and sign in with a one-time code, no password.</p>
               </>
             ) : (
               <>
-                <p className="text-sm"><span className="font-medium text-foreground">The invite email didn't go out.</span> {invite.delivery.reason}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="text-body"><span className="font-medium text-foreground">The invite email didn't go out.</span> {invite.delivery.reason}</p>
+                <p className="mt-1 text-body text-muted-foreground">
                   The client was still created — send them the link below and they can sign in with it right away.
                 </p>
               </>
@@ -447,7 +447,7 @@ function InviteSheet({ invite, onClose }: { invite: Invite; onClose: () => void 
         </div>
         <div className="space-y-2 rounded-2xl bg-card p-3">
           <div className="text-micro uppercase text-muted-foreground">{invite.delivery.sent ? "Invite link" : "Invite link — send this to them"}</div>
-          <div className="break-all rounded-xl bg-surface-3 px-3 py-2.5 font-mono text-xs">{invite.url}</div>
+          <div className="break-all rounded-xl bg-surface-3 px-3 py-2.5 font-mono text-caption">{invite.url}</div>
           <div className="flex gap-2">
             <Button size="sm" variant="tonal" className="flex-1" onClick={() => void copy()}>{copied ? <><Check /> Copied</> : <><Copy /> Copy link</>}</Button>
             <Button size="sm" variant="secondary" className="flex-1" onClick={() => window.open(invite.url, "_blank", "noopener")}><ExternalLink /> Open</Button>

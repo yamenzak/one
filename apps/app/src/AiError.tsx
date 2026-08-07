@@ -25,11 +25,11 @@ export function AiErrorBox({ error, className }: { error: unknown; className?: s
   const copy = async () => { try { await navigator.clipboard.writeText(full); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch { /* clipboard unavailable */ } };
   return (
     <div className={cn("space-y-2 rounded-2xl bg-danger-soft p-3 text-danger", className)}>
-      <div className="flex items-start gap-2 text-sm font-medium [&_svg]:size-4">
+      <div className="flex items-start gap-2 text-body font-medium [&_svg]:size-4">
         <CircleAlert className="mt-0.5 shrink-0" />
         <span className="min-w-0 flex-1 break-words">{message}</span>
       </div>
-      {raw && <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-foreground/10 p-2 text-xs leading-snug">{raw}</pre>}
+      {raw && <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg bg-foreground/10 p-2 text-caption leading-snug">{raw}</pre>}
       <Button size="sm" variant="secondary" onClick={() => void copy()}>{copied ? <Check /> : <Copy />} {copied ? "Copied" : "Copy error"}</Button>
     </div>
   );
@@ -52,7 +52,7 @@ export function AiErrorBox({ error, className }: { error: unknown; className?: s
 export function MockedNotice({ mocked, what, className }: { mocked: boolean | null | undefined; what?: string; className?: string }) {
   if (!mocked) return null;
   return (
-    <div role="status" aria-live="polite" className={cn("flex items-start gap-2 rounded-2xl bg-warning-soft p-3 text-sm font-medium text-warning [&_svg]:size-4", className)}>
+    <div role="status" aria-live="polite" className={cn("flex items-start gap-2 rounded-2xl bg-warning-soft p-3 text-body font-medium text-warning [&_svg]:size-4", className)}>
       <CircleAlert className="mt-0.5 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1 break-words">
         Simulated output — not real data.

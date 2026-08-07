@@ -414,7 +414,7 @@ function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
                 separator ended up stranded at the end of the first line, pointing
                 at nothing.
               */}
-              <div className="space-y-0.5 px-1 text-xs text-muted-foreground">
+              <div className="space-y-0.5 px-1 text-caption text-muted-foreground">
                 <div><span className="numeral font-medium text-foreground">{billing.balance.purchased.toLocaleString()}</span> bought — these never expire</div>
                 <div><span className="numeral font-medium text-foreground">{billing.balance.granted.toLocaleString()}</span> from your plan — resets each month</div>
               </div>
@@ -567,7 +567,7 @@ function Overview({ onOpenPayments }: { onOpenPayments: () => void }) {
       </Reveal>
       )}
 
-      {flash && <p className="text-center text-sm text-muted-foreground" role="status">{flash}</p>}
+      {flash && <p className="text-center text-body text-muted-foreground" role="status">{flash}</p>}
       {downgrade && (
         <DowngradeSheet
           planId={downgrade}
@@ -701,7 +701,7 @@ function DowngradeSheet({ planId, onClose, onDone, onCheckout, onPortal }: {
         <Reveal loading={!report} skeleton={<SkeletonList rows={3} />}>
           {report && (
             <div className="space-y-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 text-body text-muted-foreground">
                 <span>{report.currentPlanName}</span>
                 <ArrowRight className="size-4" />
                 <span className="font-medium text-foreground">{report.planName}</span>
@@ -711,24 +711,24 @@ function DowngradeSheet({ planId, onClose, onDone, onCheckout, onPortal }: {
               {report.clean ? (
                 <SubCard className="flex items-start gap-2.5">
                   <IconBadge icon={CheckCheck} tone="success" size="sm" />
-                  <p className="text-sm">Everything fits on {report.planName}. Nothing to tidy up first.</p>
+                  <p className="text-body">Everything fits on {report.planName}. Nothing to tidy up first.</p>
                 </SubCard>
               ) : (
                 <>
                   {hard.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-body text-muted-foreground">
                         {hard.length === 1 ? "One thing" : `${hard.length} things`} to sort out before you can switch:
                       </p>
                       {hard.map((b) => (
                         <SubCard key={b.key} className="space-y-2">
                           <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-sm font-medium">{b.label}</span>
-                            <span className="numeral shrink-0 text-xs text-muted-foreground">
+                            <span className="text-body font-medium">{b.label}</span>
+                            <span className="numeral shrink-0 text-caption text-muted-foreground">
                               {b.current.toLocaleString()}{b.unit ? ` ${b.unit}` : ""} · {report.planName} includes {fmtCeiling(b)}
                             </span>
                           </div>
-                          <p className="text-sm text-muted-foreground">{b.message}</p>
+                          <p className="text-body text-muted-foreground">{b.message}</p>
                           {b.action && (
                             <Button
                               size="sm"
@@ -742,16 +742,16 @@ function DowngradeSheet({ planId, onClose, onDone, onCheckout, onPortal }: {
                   )}
                   {soft.length > 0 && (
                     <div className="space-y-2">
-                      <p className="text-sm text-muted-foreground">Worth knowing — {hard.length > 0 ? "these don't" : "this doesn't"} block the switch:</p>
+                      <p className="text-body text-muted-foreground">Worth knowing — {hard.length > 0 ? "these don't" : "this doesn't"} block the switch:</p>
                       {soft.map((b) => (
                         <SubCard key={b.key} className="space-y-2">
                           <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-sm font-medium">{b.label}</span>
-                            <span className="numeral shrink-0 text-xs text-muted-foreground">
+                            <span className="text-body font-medium">{b.label}</span>
+                            <span className="numeral shrink-0 text-caption text-muted-foreground">
                               {b.current.toLocaleString()}{b.unit ? ` ${b.unit}` : ""} · includes {fmtCeiling(b)}
                             </span>
                           </div>
-                          <p className="text-sm text-muted-foreground">{b.message}</p>
+                          <p className="text-body text-muted-foreground">{b.message}</p>
                           {b.action && <Button size="sm" variant="secondary" onClick={() => nav(b.action!.href)}>{b.action.label} <ArrowRight /></Button>}
                         </SubCard>
                       ))}
@@ -760,14 +760,14 @@ function DowngradeSheet({ planId, onClose, onDone, onCheckout, onPortal }: {
                 </>
               )}
 
-              {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+              {err && <p className="text-body text-warning" role="alert">{err}</p>}
 
               <div className="space-y-2">
                 <Button size="lg" variant="secondary" className="w-full" disabled={checking || submitting} onClick={() => void check()}>
                   {checking ? <><Spinner /> Re-checking…</> : "Re-check"}
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 Nothing on your account changes until you switch, and we check again the moment you do.
               </p>
             </div>
@@ -851,7 +851,7 @@ function PlanFeatures({ ent }: { ent: Entitlements }) {
               sub="Included in your plan"
               /* "1 seats" was shipping. A unit that never agrees with its number
                  is the kind of thing nobody reports and everybody notices. */
-              value={<>{fmtQuota(ent.quotas[k])}{unit && <span className="ml-1 text-xs font-medium text-muted-foreground">{unit}</span>}</>}
+              value={<>{fmtQuota(ent.quotas[k])}{unit && <span className="ml-1 text-caption font-medium text-muted-foreground">{unit}</span>}</>}
             >
               {label}
             </Row>

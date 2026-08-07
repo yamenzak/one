@@ -59,7 +59,7 @@ function PermissionGrid({ value, onChange }: { value: Grant; onChange: (g: Grant
     <div className="max-h-[42vh] space-y-2 overflow-y-auto rounded-lg border p-2">
       {PERMISSION_CATALOG.map((r) => (
         <div key={r.resource} className="rounded-md px-1.5 py-1">
-          <div className="mb-1 text-xs font-semibold">{r.label}</div>
+          <div className="mb-1 text-caption font-semibold">{r.label}</div>
           <div className="flex flex-wrap gap-1.5">
             {r.actions.map((a) => {
               const on = value[r.resource]?.includes(a);
@@ -88,7 +88,7 @@ function PermissionGrid({ value, onChange }: { value: Grant; onChange: (g: Grant
 function PresetRow({ onPick }: { onPick: (role: Role) => void }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="text-xs text-muted-foreground">Start from:</span>
+      <span className="text-caption text-muted-foreground">Start from:</span>
       {(["owner", "operator", "receptionist", "viewer"] as Role[]).map((r) => (
         <button key={r} type="button" onClick={() => onPick(r)} className="rounded-md border px-2 py-0.5 text-caption font-medium capitalize hover:bg-accent">
           {r}
@@ -394,7 +394,7 @@ function EditAccessDialog({ member, onClose, onSaved }: { member: TenantMember |
           does not carry is not an error and is not applied — it simply resolves
           to nothing. Saying so beats an owner discovering it by testing.
         */}
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-caption text-muted-foreground">
           Narrows what the role already allows. Anything ticked here that their role doesn't include is ignored — change the role to grant more.
         </p>
         <DialogFooter>
@@ -469,14 +469,14 @@ function InviteDialog({ open, onClose, roles, onSent }: { open: boolean; onClose
                 : "The email could not be delivered, so pass this link on yourself. It works once, and expires in seven days."}
             </DialogDescription>
             {!sent.emailed && (
-              <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
+              <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-body">
                 <MailWarning className="mt-0.5 size-4 shrink-0 text-warning" />
                 {/* The server's own words — it is the side that knows why. */}
                 <span>{sent.emailError ?? "The email could not be sent."} The invitation itself is fine.</span>
               </div>
             )}
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3">
-              <code className="min-w-0 flex-1 truncate font-mono text-xs">{sent.url}</code>
+              <code className="min-w-0 flex-1 truncate font-mono text-caption">{sent.url}</code>
               <Button
                 size="sm"
                 variant="outline"
@@ -528,9 +528,9 @@ function InviteDialog({ open, onClose, roles, onSent }: { open: boolean; onClose
                   id="inv-role"
                   options={[...roles.map((r) => ({ value: r, label: <span className="capitalize">{r}</span> }))]}
                 />
-                <p className="mt-1.5 text-xs text-muted-foreground">You can narrow what they can do once they've accepted.</p>
+                <p className="mt-1.5 text-caption text-muted-foreground">You can narrow what they can do once they've accepted.</p>
               </div>
-              {err && <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</div>}
+              {err && <div className="rounded-md bg-destructive/10 px-3 py-2 text-body text-destructive">{err}</div>}
             </div>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={onClose}>

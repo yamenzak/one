@@ -121,10 +121,10 @@ export function FoodRow({
       <FoodThumb src={image} size={thumbSize} />
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium">{name}</div>
-        <div className="flex min-w-0 items-center gap-2 truncate text-sm text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-2 truncate text-body text-muted-foreground">
           {subtitle != null && <span className="shrink-0">{subtitle}</span>}
           {energyInline && <span className="numeral shrink-0 font-semibold text-calories">{fmtEnergy(calories!, units)}</span>}
-          {showMacros && <MacroInline proteinG={proteinG ?? 0} carbsG={carbsG ?? 0} fatG={fatG ?? 0} className="min-w-0 text-xs" />}
+          {showMacros && <MacroInline proteinG={proteinG ?? 0} carbsG={carbsG ?? 0} fatG={fatG ?? 0} className="min-w-0 text-caption" />}
         </div>
       </div>
     </>
@@ -137,7 +137,7 @@ export function FoodRow({
         <div className="flex min-w-0 flex-1 items-center gap-3">{Body}</div>
       )}
       {energy && calories != null && !energyInline && (
-        <div className="numeral shrink-0 text-sm font-semibold text-calories">{fmtEnergy(calories, units)}</div>
+        <div className="numeral shrink-0 text-body font-semibold text-calories">{fmtEnergy(calories, units)}</div>
       )}
       {trailing}
     </div>

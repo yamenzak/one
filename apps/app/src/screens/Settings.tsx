@@ -108,11 +108,11 @@ function LoadError({ label, error, onRetry }: { label: string; error?: string | 
       <div className="flex min-w-0 items-start gap-2.5">
         <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
         <div className="min-w-0">
-          <p className="text-sm">Couldn't load {label}.</p>
+          <p className="text-body">Couldn't load {label}.</p>
           {/* The server's reason, when there is one. "Check your connection" is a
               guess, and it is the wrong guess for a 403 or a 500 — an owner who
               cannot see the real reason cannot tell you what broke. */}
-          <p className="text-xs leading-snug text-muted-foreground">{error || "Check your connection and try again."}</p>
+          <p className="text-caption leading-snug text-muted-foreground">{error || "Check your connection and try again."}</p>
         </div>
       </div>
       <Button size="sm" variant="secondary" className="shrink-0" onClick={onRetry}>Try again</Button>
@@ -161,7 +161,7 @@ export function Settings({ onBack, view = "studio" }: { onBack: () => void; view
     if (view === "studio") {
       return isOwner
         ? <StudioSettings canBrand={!!canBrand} />
-        : <Stagger><Card className="text-sm text-muted-foreground">Studio settings are available to studio owners.</Card></Stagger>;
+        : <Stagger><Card className="text-body text-muted-foreground">Studio settings are available to studio owners.</Card></Stagger>;
     }
     const initial = AS_SECTION[view];
     return <PersonalSettings clientId={clientId} initialTab={(initial || undefined) as never} onBack={onBack} onSaved={() => void refresh()} />;
@@ -252,7 +252,7 @@ function PersonalSettings({ clientId, initialTab, onBack, onSaved }: {
       blurb: "Your goal, how you train, what to avoid", intro: "What your coach builds your plans and targets around. Keep it current.",
       body: () => (clientId
         ? <><PreferencesSection clientId={clientId} onSaved={onSaved} /><MutedInsightsSection /></>
-        : <Stagger><Card className="text-sm text-muted-foreground">These appear here once you&apos;re set up as a client.</Card></Stagger>),
+        : <Stagger><Card className="text-body text-muted-foreground">These appear here once you&apos;re set up as a client.</Card></Stagger>),
     },
     { value: "notifications", label: "Notifications", icon: Bell, tone: "activity", show: true, blurb: "What you hear about, and where", intro: "Pick a channel per kind of update. Nothing here emails anyone else.", body: () => <NotificationsSection /> },
     { value: "units", label: "Units", icon: Scale, tone: "sleep", show: true, blurb: "Metric or imperial", intro: "Mix and match freely — these apply everywhere you see a number, for you only.", body: () => <UnitsSection /> },
@@ -288,7 +288,7 @@ function PersonalSettings({ clientId, initialTab, onBack, onSaved }: {
           <Avatar {...meAvatar(ctx?.user ?? {}, ctx?.active)} className="size-12" />
           <div className="min-w-0 flex-1">
             <div className="truncate font-semibold">{ctx?.user.name || ctx?.user.email}</div>
-            {ctx?.user.name && <div className="truncate text-sm text-muted-foreground">{ctx.user.email}</div>}
+            {ctx?.user.name && <div className="truncate text-body text-muted-foreground">{ctx.user.email}</div>}
           </div>
           <Badge tone={personaTone(role)}>{personaLabel(role)}</Badge>
         </Card>
@@ -506,7 +506,7 @@ function LapseSection() {
               </span>
               <span className="min-w-0 flex-1 space-y-0.5">
                 <span className="flex items-center gap-2">
-                  <span className="text-sm font-semibold">{meta.label}</span>
+                  <span className="text-body font-semibold">{meta.label}</span>
                   {meta.destructive && <Badge tone="danger">Can't be undone</Badge>}
                 </span>
                 <span className="block text-caption text-muted-foreground">{meta.effect}</span>
@@ -642,7 +642,7 @@ function CloseStudioSection() {
       {status?.closing ? (
         <Card className="space-y-2.5">
           <div className="flex items-center gap-2 font-medium text-danger"><AlertTriangle className="size-4" /> Studio scheduled for deletion</div>
-          <p className="text-sm text-muted-foreground">Billing is canceled. Your studio and all its data will be permanently erased on <span className="font-medium text-foreground">{fmt(status.deleteAt)}</span>. You can still undo this before then.</p>
+          <p className="text-body text-muted-foreground">Billing is canceled. Your studio and all its data will be permanently erased on <span className="font-medium text-foreground">{fmt(status.deleteAt)}</span>. You can still undo this before then.</p>
           <Button variant="secondary" className="w-full" disabled={busy} onClick={() => void keepStudio()}>{busy ? <><Spinner /> …</> : "Keep my studio"}</Button>
           {/* `err` was only ever rendered inside the confirmation sheet, so a
               failed cancel out here had nowhere to appear. */}
@@ -651,7 +651,7 @@ function CloseStudioSection() {
       ) : (
         <Card className="space-y-2.5">
           <div className="flex items-center gap-2 font-medium text-danger"><AlertTriangle className="size-4" /> Close this studio</div>
-          <p className="text-sm text-muted-foreground">Cancels your Kova subscription, then permanently deletes the studio and everything in it — every client, plan, log and file — after a 7-day grace period. This can't be undone once the grace period passes.</p>
+          <p className="text-body text-muted-foreground">Cancels your Kova subscription, then permanently deletes the studio and everything in it — every client, plan, log and file — after a 7-day grace period. This can't be undone once the grace period passes.</p>
           <Button variant="outline" className="w-full border-danger/40 text-danger" onClick={() => { setStage("intro"); setCode(""); setErr(null); setOpen(true); }}><Trash2 /> Close my studio…</Button>
         </Card>
       )}
@@ -670,12 +670,12 @@ function CloseStudioSection() {
       >
         {stage === "intro" ? (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">This cancels billing immediately and schedules your studio for permanent deletion in 7 days. We'll email you a confirmation code first.</p>
+            <p className="text-body text-muted-foreground">This cancels billing immediately and schedules your studio for permanent deletion in 7 days. We'll email you a confirmation code first.</p>
             <ActionResult msg={null} err={err} />
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Enter the 6-digit code we emailed you to schedule the closure.</p>
+            <p className="text-body text-muted-foreground">Enter the 6-digit code we emailed you to schedule the closure.</p>
             <Field label="Confirmation code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} placeholder="000000" autoFocus />
             <ActionResult msg={null} err={err} />
           </div>
@@ -724,14 +724,14 @@ function SignInSettings({ canBrand, branding, slug, onSaved }: { canBrand: boole
           value: !canBrand ? "In the branding add-on" : customised ? `${customised} of 3 customised` : "Kova's default copy",
           render: () => canBrand
             ? <LoginCustomizeSection initial={login} logoUrl={previewLogo} onSaved={onSaved} />
-            : <p className="px-1 text-sm text-muted-foreground">Your own copy, a hero image and a branded domain are part of the branding add-on.</p>,
+            : <p className="px-1 text-body text-muted-foreground">Your own copy, a hero image and a branded domain are part of the branding add-on.</p>,
         },
         {
           key: "domain", label: "Your own domain", icon: Globe, tone: "sleep",
           value: !canBrand ? "In the branding add-on" : "Point a domain you own at your studio",
           render: () => canBrand
             ? <DomainSection />
-            : <p className="px-1 text-sm text-muted-foreground">Using your own domain is part of the branding add-on.</p>,
+            : <p className="px-1 text-body text-muted-foreground">Using your own domain is part of the branding add-on.</p>,
         },
       ]}
     />
@@ -762,16 +762,16 @@ function LoginLinkCard({ slug }: { slug: string | null }) {
   return (
     <section>
       <Card className="space-y-3">
-        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><LogIn /></div><div><div className="font-medium">Your sign-in link</div><div className="text-sm text-muted-foreground">Share this with clients — it opens a sign-in screen wearing your brand.</div></div></div>
+        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><LogIn /></div><div><div className="font-medium">Your sign-in link</div><div className="text-body text-muted-foreground">Share this with clients — it opens a sign-in screen wearing your brand.</div></div></div>
         <div className="flex items-center gap-2 rounded-xl bg-surface-2 p-2 pl-3.5">
           <Globe className="size-4 shrink-0 text-muted-foreground" />
-          <code className="min-w-0 flex-1 truncate font-mono text-sm">{pretty}</code>
+          <code className="min-w-0 flex-1 truncate font-mono text-body">{pretty}</code>
           <Button size="sm" variant={copied ? "tonal" : "secondary"} onClick={copy}>{copied ? <><Check /> Copied</> : <><Copy /> Copy</>}</Button>
           <Button size="icon" variant="secondary" aria-label="Open login link" onClick={() => window.open(link, "_blank")}><ExternalLink /></Button>
         </div>
         {canonical && !canonical.startsWith(`${slug ?? ""}.`)
-          ? <p className="text-xs text-muted-foreground">Served on your live domain <span className="font-medium text-foreground">{canonical}</span>.</p>
-          : <p className="text-xs text-muted-foreground">Your studio&rsquo;s own address, live from the moment you created it. Connect a custom domain below for a link on a domain you own.</p>}
+          ? <p className="text-caption text-muted-foreground">Served on your live domain <span className="font-medium text-foreground">{canonical}</span>.</p>
+          : <p className="text-caption text-muted-foreground">Your studio&rsquo;s own address, live from the moment you created it. Connect a custom domain below for a link on a domain you own.</p>}
       </Card>
     </section>
   );
@@ -818,7 +818,7 @@ function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBr
   return (
     <section>
       <Card className="space-y-5">
-        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Make it yours</div><div className="text-sm text-muted-foreground">Your words and your image on the screen clients land on.</div></div></div>
+        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Palette /></div><div><div className="font-medium">Make it yours</div><div className="text-body text-muted-foreground">Your words and your image on the screen clients land on.</div></div></div>
 
         {/* Live preview — mirrors the app's current theme (the tenant's brand). */}
         <LoginPreview brandName={brandName} logoUrl={logoUrl} tagline={tagline} headline={headline} subtext={subtext} bgImageUrl={bgImageUrl} showPasskey={showPasskey} />
@@ -829,20 +829,20 @@ function LoginCustomizeSection({ initial, logoUrl, onSaved }: { initial: LoginBr
 
         {/* Hero background image */}
         <div className="space-y-2">
-          <div className="text-sm font-medium">Background image <span className="font-normal text-muted-foreground">— optional</span></div>
+          <div className="text-body font-medium">Background image <span className="font-normal text-muted-foreground">— optional</span></div>
           <div className="flex items-center gap-3">
             <div className="relative grid h-16 w-24 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
               {bgImageUrl ? <img src={bgImageUrl} alt="Background" className="size-full object-cover" /> : <ImageIcon className="size-5 text-muted-foreground" />}
               <UploadProgress phase={up.phase} progress={up.progress} onCancel={up.cancel} />
             </div>
             <div className="flex flex-1 flex-wrap gap-2">
-              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
+              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-body font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
                 <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={up.uploading} onChange={(e) => e.target.files?.[0] && void upload(e.target.files[0])} />
               </label>
               {bgImageUrl && <Button size="icon" variant="secondary" aria-label="Remove background" onClick={() => setBgImageUrl(null)}><Trash2 /></Button>}
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">Sits behind a soft scrim so your copy stays readable in light and dark.</p>
+          <p className="text-caption text-muted-foreground">Sits behind a soft scrim so your copy stays readable in light and dark.</p>
         </div>
 
         <ToggleRow icon={KeyRound} title="Passkey shortcut" desc="Show the one-tap “Sign in with a passkey” option." checked={showPasskey} onChange={setShowPasskey} />
@@ -895,13 +895,13 @@ function LightVariant({ label, url, fallback, wide, onUpload, onClear, progress 
           : emptyMark}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-xs font-medium">{label}</div>
-        <div className="text-xs text-muted-foreground">
+        <div className="text-caption font-medium">{label}</div>
+        <div className="text-caption text-muted-foreground">
           {url ? "Used on light backgrounds." : "Optional — the mark above is used otherwise."}
         </div>
       </div>
       <div className="flex shrink-0 gap-1.5">
-        <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3 text-xs font-medium transition-colors hover:bg-surface-3 [&_svg]:size-3.5">
+        <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3 text-caption font-medium transition-colors hover:bg-surface-3 [&_svg]:size-3.5">
           <Upload /> {url ? "Replace" : "Add"}
           <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
         </label>
@@ -922,17 +922,17 @@ function LoginPreview({ brandName, logoUrl, tagline, headline, subtext, bgImageU
       {bgImageUrl && <><div className="pointer-events-none absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${bgImageUrl})` }} /><div className="pointer-events-none absolute inset-0 bg-background/80 backdrop-blur-sm" /></>}
       <div className="pointer-events-none absolute -top-16 left-1/2 size-40 -translate-x-1/2 rounded-full bg-primary/25 blur-[60px]" />
       <div className="relative mx-auto max-w-[15rem] space-y-4 text-center">
-        {logoUrl ? <img src={logoUrl} alt={brandName} className="mx-auto h-9 w-auto max-w-[60%] object-contain" /> : <div className="mx-auto grid size-10 place-items-center rounded-2xl bg-primary text-lg font-black text-primary-foreground">{brandName.charAt(0).toUpperCase()}</div>}
+        {logoUrl ? <img src={logoUrl} alt={brandName} className="mx-auto h-9 w-auto max-w-[60%] object-contain" /> : <div className="mx-auto grid size-10 place-items-center rounded-2xl bg-primary text-body-lg font-bold text-primary-foreground">{brandName.charAt(0).toUpperCase()}</div>}
         <div>
-          <div className="text-lg font-bold tracking-tight">{brandName}</div>
-          <div className="mt-0.5 text-xs text-muted-foreground">{head}</div>
-          {sub && <div className="text-xs text-muted-foreground/80">{sub}</div>}
+          <div className="text-body-lg font-bold tracking-tight">{brandName}</div>
+          <div className="mt-0.5 text-caption text-muted-foreground">{head}</div>
+          {sub && <div className="text-caption text-muted-foreground/80">{sub}</div>}
         </div>
         <div className="space-y-2.5 rounded-2xl border border-border/60 bg-card p-3.5 text-left shadow-sm">
-          <div className="text-xs font-medium text-primary">{tag}</div>
-          <div className="flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-2 text-xs text-muted-foreground"><Mail className="size-3.5" /> you@example.com</div>
-          <div className="flex items-center justify-center gap-1.5 rounded-full bg-primary py-2 text-xs font-semibold text-primary-foreground">Email me a code <ArrowRight className="size-3" /></div>
-          {showPasskey && <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground"><KeyRound className="size-3" /> Sign in with a passkey</div>}
+          <div className="text-caption font-medium text-primary">{tag}</div>
+          <div className="flex items-center gap-2 rounded-lg bg-surface-2 px-2.5 py-2 text-caption text-muted-foreground"><Mail className="size-3.5" /> you@example.com</div>
+          <div className="flex items-center justify-center gap-1.5 rounded-full bg-primary py-2 text-caption font-semibold text-primary-foreground">Email me a code <ArrowRight className="size-3" /></div>
+          {showPasskey && <div className="flex items-center justify-center gap-1.5 text-caption font-medium text-muted-foreground"><KeyRound className="size-3" /> Sign in with a passkey</div>}
         </div>
       </div>
     </div>
@@ -974,8 +974,8 @@ function MutedInsightsSection() {
           {muted.map((t) => (
             <div key={t} className="flex items-center justify-between gap-3 p-4">
               <div className="min-w-0">
-                <div className="text-sm font-medium">{INSIGHT_LABELS[t] ?? t}</div>
-                <div className="text-xs text-muted-foreground">Hidden on this device only — your other devices still show them.</div>
+                <div className="text-body font-medium">{INSIGHT_LABELS[t] ?? t}</div>
+                <div className="text-caption text-muted-foreground">Hidden on this device only — your other devices still show them.</div>
               </div>
               <Button size="sm" variant="secondary" onClick={() => unmute(t)}>Turn back on</Button>
             </div>
@@ -997,7 +997,7 @@ function ToggleRow({ icon: Icon, title, desc, checked, onChange }: { icon: Lucid
     <div className="flex items-center justify-between gap-3 p-4">
       <div className="flex min-w-0 items-center gap-3.5">
         <Icon className="size-[1.2rem] shrink-0 text-muted-foreground" />
-        <div className="min-w-0"><div className="text-sm font-medium">{title}</div><div className="text-xs text-muted-foreground">{desc}</div></div>
+        <div className="min-w-0"><div className="text-body font-medium">{title}</div><div className="text-caption text-muted-foreground">{desc}</div></div>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} />
     </div>
@@ -1030,7 +1030,7 @@ function NotificationsSection() {
           ? [0, 1, 2, 3].map((i) => <div key={i} className="p-4"><SkeletonLine w="8rem" h="text" /></div>)
           : data.categories.map((cat) => (
               <div key={cat.key} className="flex items-center justify-between gap-3 p-4">
-                <div className="min-w-0"><div className="text-sm font-medium">{cat.label}</div><div className="text-xs text-muted-foreground">{cat.blurb}</div></div>
+                <div className="min-w-0"><div className="text-body font-medium">{cat.label}</div><div className="text-caption text-muted-foreground">{cat.blurb}</div></div>
                 <div className="flex shrink-0 items-center gap-6">
                   {cat.key === "digest" ? <span className="w-9" /> : <Switch checked={data.prefs[cat.key]?.inbox ?? false} onCheckedChange={(v) => void toggle(cat.key, "inbox", v)} />}
                   <Switch checked={data.prefs[cat.key]?.email ?? false} onCheckedChange={(v) => void toggle(cat.key, "email", v)} />
@@ -1076,10 +1076,10 @@ function EmailTemplatesSection() {
   return (
     <section className="space-y-3">
       <Card className="space-y-2">
-        <div className="text-sm font-medium">Signature</div>
-        <p className="text-xs text-muted-foreground">Appended to the footer of every email your studio sends.</p>
+        <div className="text-body font-medium">Signature</div>
+        <p className="text-caption text-muted-foreground">Appended to the footer of every email your studio sends.</p>
         <Textarea rows={2} value={signature} onChange={(e) => setSignature(e.target.value)} placeholder="Team YourStudio · reply to this email anytime" />
-        {sigErr && <p className="text-sm text-warning">{sigErr}</p>}
+        {sigErr && <p className="text-body text-warning">{sigErr}</p>}
         <div className="flex justify-end"><Button size="sm" onClick={() => void saveSig()}>{sigSaved ? "Saved" : "Save signature"}</Button></div>
       </Card>
 
@@ -1121,23 +1121,23 @@ function EmailTemplateRow({ tpl, open, onToggle, onSaved }: { tpl: EmailTemplate
   return (
     <Card className="p-0">
       <button onClick={onToggle} className="flex w-full items-center justify-between gap-3 p-4 text-left">
-        <div className="min-w-0"><div className="truncate text-sm font-medium capitalize">{tpl.label}</div><div className="truncate text-xs text-muted-foreground">{tpl.subject}</div></div>
+        <div className="min-w-0"><div className="truncate text-body font-medium capitalize">{tpl.label}</div><div className="truncate text-caption text-muted-foreground">{tpl.subject}</div></div>
         <div className="flex shrink-0 items-center gap-2">{tpl.customized && <Badge tone="primary">Custom</Badge>}{!tpl.enabled && <Badge tone="neutral">Email off</Badge>}</div>
       </button>
       {open && (
         <div className="space-y-3 border-t border-border/50 p-4">
           <Field label="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
           <div className="space-y-1">
-            <span className="text-xs font-medium text-muted-foreground">Body (HTML)</span>
-            <Textarea rows={4} value={body} onChange={(e) => setBody(e.target.value)} className="font-mono text-xs" />
+            <span className="text-caption font-medium text-muted-foreground">Body (HTML)</span>
+            <Textarea rows={4} value={body} onChange={(e) => setBody(e.target.value)} className="font-mono text-caption" />
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-muted-foreground">Variables:</span>
+            <span className="text-caption text-muted-foreground">Variables:</span>
             {tpl.vars.map((v) => <Chip key={v} onClick={() => setBody((b) => `${b}{{${v}}}`)}>{`{{${v}}}`}</Chip>)}
           </div>
           <ActionResult msg={act.msg} err={act.err} />
           <div className="flex items-center justify-between gap-3">
-            <label className="flex items-center gap-2 text-sm"><Switch checked={enabled} onCheckedChange={setEnabled} /> Send this email</label>
+            <label className="flex items-center gap-2 text-body"><Switch checked={enabled} onCheckedChange={setEnabled} /> Send this email</label>
             <div className="flex gap-2">
               {tpl.customized && <Button size="sm" variant="ghost" disabled={busy} onClick={() => void reset()}>{act.busy === "reset" ? "Resetting…" : "Reset"}</Button>}
               <Button size="sm" disabled={busy || !dirty} onClick={() => void save()}>{act.busy === "save" ? "Saving…" : "Save"}</Button>
@@ -1172,7 +1172,7 @@ function NotificationPolicySection() {
     <section>
       {error && !data ? <LoadError label="your email policy" error={typeof error === "string" ? error : null} onRetry={() => void load()} /> : (
       <Card className="p-0">
-        <p className="px-4 pt-4 text-sm text-muted-foreground">Choose which notifications may be emailed — separately for your clients and your staff. Turning one off keeps it in the in-app inbox but never emails it; people still tune their own preferences within what you allow here.</p>
+        <p className="px-4 pt-4 text-body text-muted-foreground">Choose which notifications may be emailed — separately for your clients and your staff. Turning one off keeps it in the in-app inbox but never emails it; people still tune their own preferences within what you allow here.</p>
         <div className="mt-2 flex items-center justify-end gap-6 px-4 pb-1 text-micro uppercase text-muted-foreground">
           <span className="w-10 text-center">Clients</span><span className="w-10 text-center">Staff</span>
         </div>
@@ -1181,7 +1181,7 @@ function NotificationPolicySection() {
             ? [0, 1, 2].map((i) => <div key={i} className="p-4"><SkeletonLine w="8rem" h="text" /></div>)
             : data.notifCategories.map((cat) => (
                 <div key={cat.key} className="flex items-center justify-between gap-3 p-4">
-                  <div className="min-w-0"><div className="text-sm font-medium">{cat.label}</div><div className="text-xs text-muted-foreground">{cat.blurb}</div></div>
+                  <div className="min-w-0"><div className="text-body font-medium">{cat.label}</div><div className="text-caption text-muted-foreground">{cat.blurb}</div></div>
                   <div className="flex shrink-0 items-center gap-6">
                     <div className="grid w-10 place-items-center">{cat.roles.includes("client") ? <Switch checked={data.notifPolicy.client[cat.key] ?? true} onCheckedChange={(v) => void toggle("client", cat.key, v)} /> : <span className="text-muted-foreground/40">—</span>}</div>
                     <div className="grid w-10 place-items-center">{isStaff(cat.roles) ? <Switch checked={data.notifPolicy.staff[cat.key] ?? true} onCheckedChange={(v) => void toggle("staff", cat.key, v)} /> : <span className="text-muted-foreground/40">—</span>}</div>
@@ -1313,7 +1313,7 @@ function EmailSection() {
         />
         {provider === "platform" && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-body text-muted-foreground">
               Sends from <span className="font-medium text-foreground">{cfg.emailPlatformFrom.replace(/.*<|>.*/g, "")}</span> — no setup, no account to
               verify. Metered against your studio credits.
             </p>
@@ -1343,10 +1343,10 @@ function EmailSection() {
             </div>
           </div>
         )}
-        {provider === "off" && <p className="text-sm text-muted-foreground">Email is off — members still get in-app notifications. Login codes always send.</p>}
+        {provider === "off" && <p className="text-body text-muted-foreground">Email is off — members still get in-app notifications. Login codes always send.</p>}
         {provider === "brevo" && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Send through your own Brevo account — your sender, your bill, no credits.</p>
+            <p className="text-body text-muted-foreground">Send through your own Brevo account — your sender, your bill, no credits.</p>
             <Field label="Sender email" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} placeholder="coach@yourstudio.com" />
             <Field label="Sender name" value={senderName} onChange={(e) => setSenderName(e.target.value)} placeholder="Your Studio" />
             <Field label={cfg.email.brevoKeySet ? "Brevo API key (set — leave blank to keep)" : "Brevo API key"} value={brevoKey} onChange={(e) => setBrevoKey(e.target.value)} type="password" placeholder="xkeysib-…" />
@@ -1435,17 +1435,17 @@ function DeleteAccountSection() {
       >
         {stage === "intro" ? (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">We'll email a confirmation code to <span className="font-medium text-foreground">{ctx?.user.email}</span>. Entering it permanently erases your account and all your data. There's no undo.</p>
+            <p className="text-body text-muted-foreground">We'll email a confirmation code to <span className="font-medium text-foreground">{ctx?.user.email}</span>. Entering it permanently erases your account and all your data. There's no undo.</p>
             <ActionResult msg={null} err={err} />
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Enter the 6-digit code we emailed you, then confirm. This erases everything.</p>
+            <p className="text-body text-muted-foreground">Enter the 6-digit code we emailed you, then confirm. This erases everything.</p>
             <Field label="Confirmation code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} placeholder="000000" autoFocus />
             <ActionResult msg={null} err={err} />
             {/* Stays in the body: it is an escape from the step, not the step's
                 action, and the footer holds exactly one thing to press. */}
-            <button className="w-full text-center text-xs text-muted-foreground hover:underline" onClick={() => void sendCode()} disabled={busy}>Resend code</button>
+            <button className="w-full text-center text-caption text-muted-foreground hover:underline" onClick={() => void sendCode()} disabled={busy}>Resend code</button>
           </div>
         )}
       </Sheet>
@@ -1530,20 +1530,20 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
             <Avatar {...clientAvatar({ ...p, id: clientId })} className="size-16" />
             <UploadProgress phase={avatarUp.phase} progress={avatarUp.progress} onCancel={avatarUp.cancel} />
           </div>
-          <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Change photo
+          <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-body font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Change photo
             <input type="file" accept="image/*" className="hidden" disabled={avatarUp.uploading} onChange={(e) => e.target.files?.[0] && void uploadAvatar(e.target.files[0])} />
           </label>
         </div>
-        {avatarUp.error && <p className="text-xs text-warning">{avatarUp.error}</p>}
+        {avatarUp.error && <p className="text-caption text-warning">{avatarUp.error}</p>}
         <Field label="Name" value={p.displayName} onChange={(e) => set({ displayName: e.target.value })} />
         <div>
           <Field label="Email" value={p.email ?? email} disabled />
-          <p className="mt-1 px-1 text-xs text-muted-foreground">Contact your coach to change your email.</p>
+          <p className="mt-1 px-1 text-caption text-muted-foreground">Contact your coach to change your email.</p>
         </div>
       </Card>
 
       <Card className="space-y-4">
-        <div className="text-sm font-semibold">Body basics <span className="font-normal text-muted-foreground">— your targets are calculated from these</span></div>
+        <div className="text-body font-semibold">Body basics <span className="font-normal text-muted-foreground">— your targets are calculated from these</span></div>
         <Field label="Date of birth" type="date" value={p.dateOfBirth ?? ""} onChange={(e) => set({ dateOfBirth: e.target.value || null })} />
         {units.height === "ft_in" ? (
           <div className="grid grid-cols-2 gap-3">
@@ -1554,15 +1554,15 @@ function ClientProfileSection({ clientId, email, onSaved }: { clientId: string; 
           <Field label="Height (cm)" inputMode="numeric" value={p.heightCm != null ? String(Math.round(p.heightCm)) : ""} onChange={(e) => set({ heightCm: Number(e.target.value.replace(/[^\d.]/g, "")) || null })} />
         )}
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Gender</label>
+          <label className="mb-1.5 block text-body font-medium text-muted-foreground">Gender</label>
           <div className="flex gap-2">{([["male", "Male"], ["female", "Female"]] as const).map(([v, l]) => <Chip key={v} selected={p.gender === v} onClick={() => set({ gender: v })}>{l}</Chip>)}</div>
         </div>
       </Card>
 
       <Card className="space-y-4">
-        <div className="text-sm font-semibold">Health &amp; contact</div>
+        <div className="text-body font-semibold">Health &amp; contact</div>
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Blood type</label>
+          <label className="mb-1.5 block text-body font-medium text-muted-foreground">Blood type</label>
           <div className="flex flex-wrap gap-2">{BLOOD_TYPES.map((b) => <Chip key={b} selected={p.bloodType === b} onClick={() => set({ bloodType: p.bloodType === b ? null : b })}>{b}</Chip>)}</div>
         </div>
         <Field label="Contact number" type="tel" inputMode="tel" value={p.phone ?? ""} onChange={(e) => set({ phone: e.target.value || null })} placeholder="+1 555 000 0000" />
@@ -1628,7 +1628,7 @@ function UnitsSection() {
       <Card className="space-y-3">
         {UNIT_ROWS.map((r) => (
           <div key={r.key} className="flex items-center justify-between gap-3">
-            <span className="text-sm">{r.label}</span>
+            <span className="text-body">{r.label}</span>
             <SegmentedControl options={r.options} value={units[r.key]!} onChange={(v) => void set({ [r.key]: v })} className={busy ? "pointer-events-none opacity-70" : ""} />
           </div>
         ))}
@@ -1721,8 +1721,8 @@ function MarketplaceSection() {
               />
             </div>
           </Stagger>
-          {saveErr && <p role="status" aria-live="polite" className="text-sm text-danger">{saveErr}</p>}
-          <p className="px-1 text-xs text-muted-foreground">
+          {saveErr && <p role="status" aria-live="polite" className="text-body text-danger">{saveErr}</p>}
+          <p className="px-1 text-caption text-muted-foreground">
             Packages you mark <span className="font-medium text-foreground">In client Shop</span> appear in every client&rsquo;s Shop tab. A shareable public page isn&rsquo;t built yet — your studio&rsquo;s address is a branded sign-in page for now.
           </p>
         </div>
@@ -1772,7 +1772,7 @@ function CopyField({ label, value }: { label: string; value: string }) {
     <div className="min-w-0">
       <div className="text-micro uppercaser text-muted-foreground">{label}</div>
       <button onClick={copy} className="flex w-full items-center gap-1.5 text-left" title="Copy">
-        <code className="min-w-0 flex-1 truncate font-mono text-xs">{value}</code>
+        <code className="min-w-0 flex-1 truncate font-mono text-caption">{value}</code>
         {copied ? <Check className="size-3 shrink-0 text-success" /> : <Copy className="size-3 shrink-0 text-muted-foreground" />}
       </button>
     </div>
@@ -1800,14 +1800,14 @@ function DnsRecord({ type, name, value, hint }: { type: string; name: string; va
   return (
     <div className="rounded-xl bg-surface-3 p-3">
       <div className="mb-2 flex items-center gap-2">
-        <span className="rounded-md bg-primary/15 px-1.5 py-0.5 font-mono text-xs font-bold text-primary">{type}</span>
-        <span className="text-xs text-muted-foreground">{hint}</span>
+        <span className="rounded-md bg-primary/15 px-1.5 py-0.5 font-mono text-micro text-primary">{type}</span>
+        <span className="text-caption text-muted-foreground">{hint}</span>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <CopyField label="Name / Host" value={name} />
         <CopyField label={type === "CNAME" ? "Target" : "Value"} value={value} />
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="mt-2 text-caption text-muted-foreground">
         Most providers add your domain to the Host field for you. If yours does, enter only the part{" "}
         <span className="font-medium text-foreground">before</span> your domain name — not the whole thing.
       </p>
@@ -1871,14 +1871,14 @@ function DomainSection() {
       }>
         {domains && (
       <Card className="space-y-4">
-        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Globe /></div><div><div className="font-medium">Your own domain</div><div className="text-sm text-muted-foreground">Run the app on your domain — e.g. train.yourgym.com.</div></div></div>
+        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Globe /></div><div><div className="font-medium">Your own domain</div><div className="text-body text-muted-foreground">Run the app on your domain — e.g. train.yourgym.com.</div></div></div>
 
         {domains.map((d) => {
           const isApex = d.hostname.split(".").length <= 2;
           return (
           <div key={d.hostname} className="space-y-3 rounded-xl bg-surface-2 p-3">
             <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0"><div className="truncate font-medium">{d.hostname}</div><div className="text-xs text-muted-foreground">{d.status === "active" ? "Secured and serving." : d.status === "error" ? "We couldn't verify the records — double-check them below." : "Waiting for your DNS records."}</div></div>
+              <div className="min-w-0"><div className="truncate font-medium">{d.hostname}</div><div className="text-caption text-muted-foreground">{d.status === "active" ? "Secured and serving." : d.status === "error" ? "We couldn't verify the records — double-check them below." : "Waiting for your DNS records."}</div></div>
               <Badge tone={tone(d.status)}>{label(d.status)}</Badge>
             </div>
             {d.status !== "active" && (
@@ -1903,10 +1903,10 @@ function DomainSection() {
                   <div className="flex gap-2.5 rounded-xl bg-warning/10 p-3" role="status">
                     <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
                     <div className="min-w-0 space-y-1">
-                      <div className="text-sm font-medium text-warning">
+                      <div className="text-body font-medium text-warning">
                         {dns[d.hostname]!.code === "double-suffix" ? "The record is in the wrong place" : "We couldn't find the record"}
                       </div>
-                      <p className="text-xs text-muted-foreground">{dns[d.hostname]!.message}</p>
+                      <p className="text-caption text-muted-foreground">{dns[d.hostname]!.message}</p>
                       {dns[d.hostname]!.hostShouldBe && (
                         <div className="pt-1"><CopyField label="Host should be" value={dns[d.hostname]!.hostShouldBe!} /></div>
                       )}
@@ -1921,8 +1921,8 @@ function DomainSection() {
                     <div className="flex gap-2.5 rounded-xl bg-warning/10 p-3" role="status">
                       <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
                       <div className="min-w-0 space-y-1">
-                        <div className="text-sm font-medium text-warning">Cloudflare is refusing the certificate</div>
-                        {shown.map((e) => <p key={e} className="text-xs text-muted-foreground">{e}</p>)}
+                        <div className="text-body font-medium text-warning">Cloudflare is refusing the certificate</div>
+                        {shown.map((e) => <p key={e} className="text-caption text-muted-foreground">{e}</p>)}
                       </div>
                     </div>
                   );
@@ -1930,9 +1930,9 @@ function DomainSection() {
 
                 {/* Step 1 — add the records. */}
                 <div className="flex gap-2.5">
-                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">1</span>
+                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-caption font-bold text-primary">1</span>
                   <div className="min-w-0 space-y-2">
-                    <p className="text-sm">In your domain&rsquo;s DNS settings (GoDaddy, Namecheap, Cloudflare…), add {(d.txts?.length ?? (d.txt ? 1 : 0)) > 0 ? "these records" : "this record"}:</p>
+                    <p className="text-body">In your domain&rsquo;s DNS settings (GoDaddy, Namecheap, Cloudflare…), add {(d.txts?.length ?? (d.txt ? 1 : 0)) > 0 ? "these records" : "this record"}:</p>
                     {d.cname.target && <DnsRecord type="CNAME" name={d.cname.name} value={d.cname.target} hint="Routes your domain to the app" />}
                     {d.caa && (
                       <DnsRecord
@@ -1953,13 +1953,13 @@ function DomainSection() {
                           : "Proves you own it (for the SSL certificate)"}
                       />
                     ))}
-                    {isApex && <p className="text-xs text-warning">Tip: use a subdomain like <span className="font-mono">app.{d.hostname}</span> — most providers can't point a root domain with a CNAME.</p>}
+                    {isApex && <p className="text-caption text-warning">Tip: use a subdomain like <span className="font-mono">app.{d.hostname}</span> — most providers can't point a root domain with a CNAME.</p>}
                   </div>
                 </div>
                 {/* Step 2 — verify. */}
                 <div className="flex gap-2.5">
-                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">2</span>
-                  <p className="text-sm">Save at your provider, then tap <span className="font-medium">Check now</span>. DNS can take a few minutes (up to an hour); the SSL certificate then issues automatically.</p>
+                  <span className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-primary/15 text-caption font-bold text-primary">2</span>
+                  <p className="text-body">Save at your provider, then tap <span className="font-medium">Check now</span>. DNS can take a few minutes (up to an hour); the SSL certificate then issues automatically.</p>
                 </div>
               </div>
             )}
@@ -1979,12 +1979,12 @@ function DomainSection() {
             onChange={(e) => setHostname(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && hostname.includes(".") && void add()}
             placeholder="train.yourgym.com"
-            className="w-full rounded-lg bg-surface-2 px-3 py-2 text-sm outline-none ring-ring focus:ring-2"
+            className="w-full rounded-lg bg-surface-2 px-3 py-2 text-body outline-none ring-ring focus:ring-2"
           />
           <Button size="sm" disabled={busy || !hostname.includes(".")} onClick={() => void add()}><Plus /> Add</Button>
         </div>
         <ActionResult msg={null} err={err} />
-        <p className="text-xs text-muted-foreground">Use a subdomain you own, like <span className="font-mono">app.yourgym.com</span> — we'll show the exact DNS records to add. You'll sign in with a passkey again on the new domain (each keeps its own secure sign-in).</p>
+        <p className="text-caption text-muted-foreground">Use a subdomain you own, like <span className="font-mono">app.yourgym.com</span> — we'll show the exact DNS records to add. You'll sign in with a passkey again on the new domain (each keeps its own secure sign-in).</p>
       </Card>
         )}
       </Reveal>
@@ -2068,7 +2068,7 @@ function IntegrationsSection() {
       }>
         {providers && (
       <Card className="space-y-4">
-        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Plug /></div><div><div className="font-medium">Data providers</div><div className="text-sm text-muted-foreground">Turn on sources so builders pull ready-made foods & exercises.</div></div></div>
+        <div className="flex items-center gap-2.5"><div className="grid size-9 place-items-center rounded-xl bg-primary/15 text-primary [&_svg]:size-4"><Plug /></div><div><div className="font-medium">Data providers</div><div className="text-body text-muted-foreground">Turn on sources so builders pull ready-made foods & exercises.</div></div></div>
         {groups.map((g) => (
           <div key={g.key} className="space-y-2">
             <div className="text-micro uppercaser text-muted-foreground">{g.label}</div>
@@ -2079,8 +2079,8 @@ function IntegrationsSection() {
                 <div key={p.id} className="rounded-xl bg-surface-2 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 text-sm font-medium">{p.label}{!p.keyless && (s?.ready ? <Badge tone="success">connected</Badge> : <Badge tone="neutral">key needed</Badge>)}</div>
-                      <div className="truncate text-xs text-muted-foreground">{p.blurb}</div>
+                      <div className="flex items-center gap-2 text-body font-medium">{p.label}{!p.keyless && (s?.ready ? <Badge tone="success">connected</Badge> : <Badge tone="neutral">key needed</Badge>)}</div>
+                      <div className="truncate text-caption text-muted-foreground">{p.blurb}</div>
                     </div>
                     <Switch checked={!!s?.enabled} onCheckedChange={(v) => { if (v && !p.keyless && !s?.ready) { setOpen(p.id); void patch(p.id, { enabled: true }); } else void patch(p.id, { enabled: v }); }} />
                   </div>
@@ -2093,7 +2093,7 @@ function IntegrationsSection() {
                           placeholder={s?.[`${k.field}Set`] ? `${k.label} — saved (leave blank to keep)` : k.label}
                           value={drafts[`${p.id}.${k.field}`] ?? ""}
                           onChange={(e) => setDrafts((d) => ({ ...d, [`${p.id}.${k.field}`]: e.target.value }))}
-                          className="w-full rounded-lg bg-surface-3 px-3 py-2 font-mono text-xs outline-none ring-ring focus:ring-2"
+                          className="w-full rounded-lg bg-surface-3 px-3 py-2 font-mono text-caption outline-none ring-ring focus:ring-2"
                         />
                       ))}
                       <Button size="sm" onClick={() => void saveKeys(p)}>Save keys</Button>
@@ -2393,7 +2393,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
           were generated from different settings is not a brand.
         */}
         <div className="space-y-3 rounded-xl border border-dashed border-border/70 p-3">
-          <div className="text-sm font-medium">No logo yet? <span className="font-normal text-muted-foreground">Draw one from your name</span></div>
+          <div className="text-body font-medium">No logo yet? <span className="font-normal text-muted-foreground">Draw one from your name</span></div>
 
           <SegmentedControl
             value={drawing}
@@ -2458,14 +2458,14 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
 
         {/* Logo (wide wordmark, shown in the app bar) */}
         <div className="space-y-2">
-          <div className="text-sm font-medium">Logo <span className="font-normal text-muted-foreground">— app bar</span></div>
+          <div className="text-body font-medium">Logo <span className="font-normal text-muted-foreground">— app bar</span></div>
           <div className="flex items-center gap-3">
             <div className="relative grid h-16 w-24 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
               {logoUrl ? <img src={logoUrl} alt="Logo" className="max-h-14 max-w-22 object-contain" /> : <ImageIcon className="size-5 text-muted-foreground" />}
               {slotProgress("logo")}
             </div>
             <div className="flex flex-1 flex-wrap gap-2">
-              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
+              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-body font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
                 <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setLogoUrl, "logo")} />
               </label>
               <Button size="sm" variant="secondary" disabled={!logoUrl} onClick={extractFromLogo}><Wand2 /> Theme from logo</Button>
@@ -2485,14 +2485,14 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
 
         {/* App icon (square mark, shown in the nav rail + browser tab) */}
         <div className="space-y-2">
-          <div className="text-sm font-medium">App icon <span className="font-normal text-muted-foreground">— square, nav + tab</span></div>
+          <div className="text-body font-medium">App icon <span className="font-normal text-muted-foreground">— square, nav + tab</span></div>
           <div className="flex items-center gap-3">
             <div className="relative grid size-16 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/60 bg-surface-2">
               {iconUrl ? <img src={iconUrl} alt="App icon" className="size-full object-cover" /> : <ImageIcon className="size-5 text-muted-foreground" />}
               {slotProgress("icon")}
             </div>
             <div className="flex flex-1 flex-wrap gap-2">
-              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
+              <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-body font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
                 <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setIconUrl, "icon")} />
               </label>
               {iconUrl && <Button size="sm" variant="secondary" disabled={!iconUrl} onClick={() => { const img = new Image(); img.onload = () => { const p = extractPalette(img); if (p) { generate(p.primary); setMsg("Palette generated from your icon."); } }; img.src = iconUrl; }}><Wand2 /> Theme from icon</Button>}
@@ -2512,16 +2512,16 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
         {/* AI identity — the avatar + name shown on every AI surface (bottts /
             "Coach" fallbacks). This is the face clients see instead of a sparkle. */}
         <div className="space-y-2">
-          <div className="text-sm font-medium">AI coach <span className="font-normal text-muted-foreground">— its face + name across every AI surface</span></div>
+          <div className="text-body font-medium">AI coach <span className="font-normal text-muted-foreground">— its face + name across every AI surface</span></div>
           <div className="flex items-center gap-3">
             <div className="relative grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border border-border/60 bg-surface-2">
               <img src={aiAvatarUrl ?? dicebearUrl(`${ctx?.active?.tenantSlug ?? "kova"}-ai-coach`, "bottts")} alt="AI coach" className="size-full object-cover" />
               {slotProgress("aiAvatar")}
             </div>
             <div className="flex flex-1 flex-col gap-2">
-              <input value={aiName} onChange={(e) => setAiName(e.target.value)} maxLength={40} placeholder="AI name (e.g. Nova, Coach K) — defaults to “Coach”" className="h-9 w-full rounded-full border border-border/60 bg-surface-2 px-3.5 text-sm outline-none focus:border-primary" />
+              <input value={aiName} onChange={(e) => setAiName(e.target.value)} maxLength={40} placeholder="AI name (e.g. Nova, Coach K) — defaults to “Coach”" className="h-9 w-full rounded-full border border-border/60 bg-surface-2 px-3.5 text-body outline-none focus:border-primary" />
               <div className="flex flex-wrap gap-2">
-                <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload avatar
+                <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-body font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload avatar
                   <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setAiAvatarUrl, "aiAvatar")} />
                 </label>
                 {/* Keep pressing until one of them is right.
@@ -2538,7 +2538,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
               </div>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">Shuffle draws a different robot each press — stop when one fits, then save.</p>
+          <p className="text-caption text-muted-foreground">Shuffle draws a different robot each press — stop when one fits, then save.</p>
         </div>
 
   </>);
@@ -2547,8 +2547,8 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
         {/* Brand color — presets + wheel, each generates the full palette */}
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Brand color</span>
-            <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="text-body font-medium">Brand color</span>
+            <label className="inline-flex cursor-pointer items-center gap-1.5 text-caption text-muted-foreground">
               Custom
               <ColorSwatch size="sm" value={seedHex} onChange={(hex) => generate(hex)} label="Custom brand colour" />
             </label>
@@ -2559,7 +2559,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
               return (
                 <button key={p.id} onClick={() => generate(p.primary)} className={`relative flex flex-col items-center gap-2 rounded-xl border p-3 transition-all active:scale-95 ${on ? "border-primary" : "border-border/60"}`}>
                   <span className="size-7 rounded-full" style={{ background: p.primary }} />
-                  <span className="text-xs">{p.label}</span>
+                  <span className="text-caption">{p.label}</span>
                   {on && <Check className="absolute right-1.5 top-1.5 size-3.5 text-primary" strokeWidth={3} />}
                 </button>
               );
@@ -2569,7 +2569,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
 
         {/* Neutral tint */}
         <div className="space-y-1.5">
-          <span className="text-sm text-muted-foreground">Surface tint</span>
+          <span className="text-body text-muted-foreground">Surface tint</span>
           <div className="flex gap-2">{NEUTRALS.map((n) => <Chip key={n.id} selected={neutral === n.id} onClick={() => generate(seed, n.id)}>{n.label}</Chip>)}</div>
         </div>
   </>);
@@ -2588,11 +2588,11 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
             surface in the app moves together — enforced by the design-token
             lint, which refuses a hard-coded box-shadow anywhere. */}
         <div className="space-y-1.5">
-          <span className="text-sm text-muted-foreground">Elevation</span>
+          <span className="text-body text-muted-foreground">Elevation</span>
           <div className="flex flex-wrap gap-2">
             {SHADOW_PRESETS.map((p) => <Chip key={p.id} selected={shadow === p.id} onClick={() => setShadow(p.id)}>{p.label}</Chip>)}
           </div>
-          <p className="text-xs text-muted-foreground">{SHADOW_PRESETS.find((p) => p.id === shadow)?.hint}</p>
+          <p className="text-caption text-muted-foreground">{SHADOW_PRESETS.find((p) => p.id === shadow)?.hint}</p>
         </div>
 
         {/* Border WEIGHT. 0 genuinely removes every hairline in the app — the
@@ -2621,9 +2621,9 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
         {/* Hairline colour — pointless while borders are off, so it hides. */}
         {borderWidth > 0 && (
         <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between text-body">
             <span className="text-muted-foreground">Border colour</span>
-            {borderColor && <button onClick={() => setBorderColor("")} className="text-xs font-medium text-primary">Reset to default</button>}
+            {borderColor && <button onClick={() => setBorderColor("")} className="text-caption font-medium text-primary">Reset to default</button>}
           </div>
           <div className="flex items-center gap-2">
             <ColorSwatch value={borderColor} onChange={setBorderColor} label="Border colour" />
@@ -2631,10 +2631,10 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
               value={borderColor}
               onChange={(e) => setBorderColor(e.target.value)}
               placeholder="Default (tuned per light / dark)"
-              className="min-w-0 flex-1 font-mono text-xs"
+              className="min-w-0 flex-1 font-mono text-caption"
             />
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             Leave blank unless you need a specific hairline — the default is tuned separately for light and dark, and one
             colour has to serve both. Fine-tune per mode below.
           </p>
@@ -2651,13 +2651,13 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
             phone happened to have it stored. They describe how the STUDIO looks,
             so they belong to branding. */}
         <div className="space-y-1.5">
-          <span className="text-sm text-muted-foreground">Section colour</span>
+          <span className="text-body text-muted-foreground">Section colour</span>
           <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
             <ToggleRow icon={Palette} title="Colorful tab bar" desc="Tint the active tab by section — Train green, Eat amber, and so on." checked={tintedNav} onChange={setTintedNav} />
             <div className="border-t border-border/50" />
             <ToggleRow icon={Waves} title="Ambient page colour" desc="Wash each page's hero in its section's colour, fading into the background." checked={ambient} onChange={setAmbient} />
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             {tintedNav || ambient
               ? "Applies to everyone in the studio — clients and staff alike."
               : "Off: every section wears the brand colour instead of its own."}
@@ -2668,18 +2668,18 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
 
   const advancedBlock = (<>
         {/* Advanced */}
-        <button onClick={() => setAdvanced((a) => !a)} className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground">
+        <button onClick={() => setAdvanced((a) => !a)} className="flex w-full items-center justify-between text-body font-medium text-muted-foreground">
           <span>Fine-tune tokens</span>
           <ChevronDown className={`size-4 transition-transform ${advanced ? "rotate-180" : ""}`} />
         </button>
         {advanced && (
           <div className="space-y-4">
-            <p className="text-xs text-muted-foreground">Every token, light and dark, side by side. A blank field falls back to the shipped default (shown as the placeholder). Type any CSS color — hex, <code className="rounded bg-surface-2 px-1">oklch()</code>, or <code className="rounded bg-surface-2 px-1">hsl()</code> — or use the swatch.</p>
+            <p className="text-caption text-muted-foreground">Every token, light and dark, side by side. A blank field falls back to the shipped default (shown as the placeholder). Type any CSS color — hex, <code className="rounded bg-surface-2 px-1">oklch()</code>, or <code className="rounded bg-surface-2 px-1">hsl()</code> — or use the swatch.</p>
             <TokenGrid tokens={tokens} onSet={setToken} />
             <div className="space-y-2">
-              <div className="text-sm font-medium">Paste a theme</div>
-              <p className="text-xs text-muted-foreground">Drop in any CSS token set (<code className="rounded bg-surface-2 px-1">:root</code> for light, <code className="rounded bg-surface-2 px-1">.dark</code> for dark). Every token maps straight through — the whole app re-skins.</p>
-              <Textarea rows={4} value={themeCss} onChange={(e) => setThemeCss(e.target.value)} placeholder={":root { --primary: oklch(0.6 0.2 250); --background: oklch(1 0 0); ... }\n.dark { --primary: ...; --background: ...; ... }"} className="font-mono text-xs" />
+              <div className="text-body font-medium">Paste a theme</div>
+              <p className="text-caption text-muted-foreground">Drop in any CSS token set (<code className="rounded bg-surface-2 px-1">:root</code> for light, <code className="rounded bg-surface-2 px-1">.dark</code> for dark). Every token maps straight through — the whole app re-skins.</p>
+              <Textarea rows={4} value={themeCss} onChange={(e) => setThemeCss(e.target.value)} placeholder={":root { --primary: oklch(0.6 0.2 250); --background: oklch(1 0 0); ... }\n.dark { --primary: ...; --background: ...; ... }"} className="font-mono text-caption" />
               <div className="flex gap-2">
                 <Button size="sm" variant="secondary" disabled={!themeCss.trim()} onClick={applyThemeCss}>Apply theme</Button>
                 <Button size="sm" variant="ghost" onClick={() => generate(seed)}>Regenerate</Button>
@@ -2909,13 +2909,13 @@ function CharCounts({ name, style, onChange, accentable }: {
 /** How many characters, from one end. A stepper rather than a number field: the
  *  useful range is nought to about three and typing is the slower way to get there. */
 function CharCount({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (n: number) => void }) {
-  const step = "grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-sm transition-colors hover:bg-surface-3 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring/70";
+  const step = "grid size-8 shrink-0 place-items-center rounded-full bg-secondary text-body transition-colors hover:bg-surface-3 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring/70";
   return (
     <div className="flex items-center justify-between gap-1.5 rounded-xl border border-border/60 py-1.5 pl-2.5 pr-1.5">
-      <span className="min-w-0 truncate text-xs text-muted-foreground">{label}</span>
+      <span className="min-w-0 truncate text-caption text-muted-foreground">{label}</span>
       <span className="flex shrink-0 items-center gap-1">
         <button type="button" className={step} aria-label={`${label}: one fewer`} disabled={value <= 0} onClick={() => onChange(value - 1)}>−</button>
-        <span className="w-4 text-center text-sm tabular-nums">{value}</span>
+        <span className="w-4 text-center text-body tabular-nums">{value}</span>
         <button type="button" className={step} aria-label={`${label}: one more`} disabled={value >= max} onClick={() => onChange(value + 1)}>+</button>
       </span>
     </div>
@@ -2931,13 +2931,13 @@ function TokenGrid({ tokens, onSet }: { tokens: BrandTokens; onSet: (mode: "ligh
           <div className="mb-1.5 text-micro uppercaser text-muted-foreground">{g.label}</div>
           <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1">
             <span />
-            <span className="w-[5.5rem] text-center text-xs uppercase tracking-wider text-muted-foreground">Light</span>
-            <span className="w-[5.5rem] text-center text-xs uppercase tracking-wider text-muted-foreground">Dark</span>
+            <span className="w-[5.5rem] text-center text-micro uppercase  text-muted-foreground">Light</span>
+            <span className="w-[5.5rem] text-center text-micro uppercase  text-muted-foreground">Dark</span>
             {g.tokens.map((name) => {
               const key = `--${name}`;
               return (
                 <Fragment key={name}>
-                  <code className="truncate text-xs text-muted-foreground">{name}</code>
+                  <code className="truncate text-caption text-muted-foreground">{name}</code>
                   <TokenCell mode="light" tokenKey={key} value={tokens.light?.[key] ?? ""} def={ALL_DEFAULT_TOKENS.light[key] ?? ""} onSet={onSet} />
                   <TokenCell mode="dark" tokenKey={key} value={tokens.dark?.[key] ?? ""} def={ALL_DEFAULT_TOKENS.dark[key] ?? ""} onSet={onSet} />
                 </Fragment>
@@ -2960,7 +2960,7 @@ function TokenCell({ mode, tokenKey, value, def, onSet }: { mode: "light" | "dar
         value={value}
         placeholder={def.replace(/oklch\(|\)/g, "")}
         onChange={(e) => onSet(mode, tokenKey, e.target.value)}
-        className="w-full bg-transparent font-mono text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/70 placeholder:text-muted-foreground/40"
+        className="w-full bg-transparent font-mono text-caption outline-none focus-visible:ring-2 focus-visible:ring-ring/70 placeholder:text-muted-foreground/40"
       />
     </div>
   );

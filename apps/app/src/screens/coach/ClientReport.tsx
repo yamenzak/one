@@ -166,15 +166,15 @@ export function ClientReport({ clientId }: { clientId: string }) {
             <div className="space-y-2"><SkeletonLine w="100%" /><SkeletonLine w="92%" /><SkeletonLine w="60%" /></div>
           ) : summary ? (
             <div className="space-y-2">
-              <div className="flex items-start gap-3"><AiAvatar className="mt-0.5 size-8 shrink-0" /><Markdown className="min-w-0 flex-1 text-sm text-foreground/85">{summary}</Markdown></div>
+              <div className="flex items-start gap-3"><AiAvatar className="mt-0.5 size-8 shrink-0" /><Markdown className="min-w-0 flex-1 text-body text-foreground/85">{summary}</Markdown></div>
               {/* No `onMute` on a coach surface: this is the tab's own content
                   and there is nowhere for it to go — only a rating. */}
               <InsightFeedback insightType="client-summary" insightRef={clientId} />
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No read yet. Refresh to get the current phase, adherence, trajectory and the single most important thing to address next.</p>
+            <p className="text-body text-muted-foreground">No read yet. Refresh to get the current phase, adherence, trajectory and the single most important thing to address next.</p>
           )}
-          {summaryErr && <p role="status" aria-live="polite" className="text-sm text-warning">{summaryErr}</p>}
+          {summaryErr && <p role="status" aria-live="polite" className="text-body text-warning">{summaryErr}</p>}
         </Card>
       </Stagger>
       )}
@@ -253,7 +253,7 @@ export function ClientReport({ clientId }: { clientId: string }) {
 
           {report.prs.length > 0 && (
             <section className="space-y-2">
-              <Eyebrow action={<span className="text-xs font-medium text-muted-foreground">est. 1RM</span>}>Personal records</Eyebrow>
+              <Eyebrow action={<span className="text-caption font-medium text-muted-foreground">est. 1RM</span>}>Personal records</Eyebrow>
               <Stagger>
               <Card className="space-y-3">
                 <div className="space-y-3">
@@ -262,7 +262,7 @@ export function ClientReport({ clientId }: { clientId: string }) {
                       <ExerciseRow
                         ex={exMap.get(p.exerciseId)} name="Exercise" thumbSize={40}
                         sub={<>{Math.round(kgToDisplay(p.weight, units))} {weightLabel(units)} × {p.reps}</>}
-                        trailing={<span className="numeral shrink-0 font-semibold">{Math.round(kgToDisplay(p.e1rm, units))} <span className="text-xs font-medium text-muted-foreground">{weightLabel(units)}</span></span>}
+                        trailing={<span className="numeral shrink-0 font-semibold">{Math.round(kgToDisplay(p.e1rm, units))} <span className="text-caption font-medium text-muted-foreground">{weightLabel(units)}</span></span>}
                       />
                       {/* Bare — the `ExerciseRow` above already labels it, and
                           the indent clears its 40px thumbnail. */}

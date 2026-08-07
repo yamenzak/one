@@ -355,8 +355,8 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
         {/* Live preview */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Live preview</h2>
-            <span className="text-xs text-muted-foreground">Computed from the synced clock</span>
+            <h2 className="text-body font-semibold">Live preview</h2>
+            <span className="text-caption text-muted-foreground">Computed from the synced clock</span>
           </div>
           <DevicePreview channelId={channel.id} online={online} chrome className="w-full shadow-sm" />
         </div>
@@ -366,15 +366,15 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
           {/* Slides */}
           <section className="rounded-xl border p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm font-semibold">
+              <div className="flex items-center gap-2 text-body font-semibold">
                 <LayoutGrid className="size-4 text-primary" /> Slides <span className="text-muted-foreground">· {slides.length}</span>
               </div>
               {writable && (
                 <div className="flex gap-1.5">
-                  <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => fileRef.current?.click()} disabled={busy}>
+                  <Button variant="outline" size="sm" className="h-7 gap-1.5 text-caption" onClick={() => fileRef.current?.click()} disabled={busy}>
                     <ImagePlus className="size-3.5" /> Add
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={loadSample} disabled={busy}>
+                  <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-caption" onClick={loadSample} disabled={busy}>
                     <Sparkles className="size-3.5" /> Sample
                   </Button>
                 </div>
@@ -443,7 +443,7 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
 
             <button
               onClick={() => navigate(`/playlists/${slidePlaylistId}`)}
-              className="mt-3 flex w-full items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+              className="mt-3 flex w-full items-center justify-center gap-1.5 text-caption font-medium text-muted-foreground hover:text-foreground"
             >
               Open full slide editor (HTML · AI · timing) <ExternalLink className="size-3" />
             </button>
@@ -452,11 +452,11 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
           {/* Music */}
           <section className="rounded-xl border p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm font-semibold">
+              <div className="flex items-center gap-2 text-body font-semibold">
                 <Music className="size-4 text-primary" /> Music <span className="text-muted-foreground">· {tracks.length}</span>
               </div>
               {writable && musicPlaylistId && (
-                <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => audioRef.current?.click()} disabled={addingMusic}>
+                <Button variant="outline" size="sm" className="h-7 gap-1.5 text-caption" onClick={() => audioRef.current?.click()} disabled={addingMusic}>
                   <Plus className="size-3.5" /> {addingMusic ? "Adding…" : "Add"}
                 </Button>
               )}
@@ -490,7 +490,7 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
             {musicPlaylistId && (
               <button
                 onClick={() => navigate(`/music/${musicPlaylistId}`)}
-                className="mt-3 flex w-full items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                className="mt-3 flex w-full items-center justify-center gap-1.5 text-caption font-medium text-muted-foreground hover:text-foreground"
               >
                 Open full music editor (library · reorder · metadata) <ExternalLink className="size-3" />
               </button>
@@ -503,11 +503,11 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
               <LayoutGrid />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold">Widgets</div>
-              <div className="text-xs text-muted-foreground">Clock, text, weather, tickers, boards…</div>
+              <div className="text-body font-semibold">Widgets</div>
+              <div className="text-caption text-muted-foreground">Clock, text, weather, tickers, boards…</div>
             </div>
             {channel.widget_profile_id && (
-              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => navigate(`/widgets?profile=${channel.widget_profile_id}`)}>
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-caption" onClick={() => navigate(`/widgets?profile=${channel.widget_profile_id}`)}>
                 Open builder <ExternalLink className="size-3" />
               </Button>
             )}

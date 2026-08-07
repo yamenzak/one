@@ -35,8 +35,8 @@ export function GetStarted({
       {/* Hero */}
       <div className="flex flex-col items-center px-6 pb-8 pt-6 text-center">
         <ScenaMascot mood="happy" size={132} className="mb-2" />
-        <h2 className="text-2xl font-extrabold tracking-tight">Welcome to Scena</h2>
-        <p className="mt-2 max-w-md text-sm text-muted-foreground">
+        <h2 className="text-title-2 font-bold tracking-tight">Welcome to Scena</h2>
+        <p className="mt-2 max-w-md text-body text-muted-foreground">
           Get a screen showing beautiful, clock-synced content in about a minute. Pick how you'd like to start.
         </p>
       </div>
@@ -70,8 +70,8 @@ export function GetStarted({
                 </span>
                 <span className="text-caption font-semibold text-muted-foreground">Step {i + 1}</span>
               </div>
-              <div className="text-sm font-semibold">{s.title}</div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{s.body}</p>
+              <div className="text-body font-semibold">{s.title}</div>
+              <p className="mt-1 text-caption leading-relaxed text-muted-foreground">{s.body}</p>
               {i < STEPS.length - 1 && <ArrowRight className="absolute -right-2.5 top-1/2 hidden size-4 -translate-y-1/2 text-muted-foreground/40 sm:block" />}
             </div>
           ))}
@@ -104,7 +104,7 @@ function ChoiceCard({
       >
         {icon}
       </div>
-      <div className="text-base font-bold">{title}</div>
+      <div className="text-body-lg font-bold">{title}</div>
       <p className="mt-1.5 flex-1 text-caption leading-relaxed text-muted-foreground">{body}</p>
       {cta && (
         <Button className="mt-4 w-full" variant={accent ? "default" : "outline"} onClick={cta.onClick} disabled={cta.disabled}>

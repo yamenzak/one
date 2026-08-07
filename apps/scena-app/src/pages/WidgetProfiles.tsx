@@ -120,7 +120,7 @@ export function WidgetProfilesPage() {
                   <Badge className="tabular-nums">
                     {p.design_w ?? DEFAULT_W}×{p.design_h ?? DEFAULT_H}
                   </Badge>
-                  <span className="text-xs text-muted-foreground">Reusable · shared across channels</span>
+                  <span className="text-caption text-muted-foreground">Reusable · shared across channels</span>
                 </div>
               </div>
               {(canWrite || canDelete) && (

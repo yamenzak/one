@@ -82,9 +82,9 @@ function HeroChoice({ icon: Icon, tone, title, subtitle, badge, active, busy, di
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
           <span className="text-body font-semibold leading-tight text-foreground">{title}</span>
-          {badge && <span className="rounded-full bg-primary/15 px-1.5 py-px text-xs font-bold uppercase leading-none tracking-wide text-primary">{badge}</span>}
+          {badge && <span className="rounded-full bg-primary/15 px-1.5 py-px text-micro font-bold uppercase leading-none  text-primary">{badge}</span>}
         </span>
-        <span className="mt-1 block text-xs leading-snug text-muted-foreground">{subtitle}</span>
+        <span className="mt-1 block text-caption leading-snug text-muted-foreground">{subtitle}</span>
       </span>
       {active
         ? <span className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-primary-foreground [&_svg]:size-3"><Check strokeWidth={3} /></span>
@@ -256,26 +256,26 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
 
             {webMode && canWeb && (
               <div className="space-y-2 rounded-2xl border border-border/50 p-3">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground [&_svg]:size-3.5"><Search /> Results for “{name.trim() || "…"}” from wger, free-exercise-db…</div>
+                <div className="flex items-center gap-1.5 text-caption text-muted-foreground [&_svg]:size-3.5"><Search /> Results for “{name.trim() || "…"}” from wger, free-exercise-db…</div>
                 <div className="max-h-72 space-y-1 overflow-y-auto">
-                  {name.trim().length < 2 && <p className="p-3 text-center text-sm text-muted-foreground">Type an exercise name above to search.</p>}
-                  {webBusy && <p className="p-3 text-center text-sm text-muted-foreground">Searching…</p>}
+                  {name.trim().length < 2 && <p className="p-3 text-center text-body text-muted-foreground">Type an exercise name above to search.</p>}
+                  {webBusy && <p className="p-3 text-center text-body text-muted-foreground">Searching…</p>}
                   {webResults?.map((e) => (
                     <button key={e.sourceId} disabled={!!importing} onClick={() => void pickWeb(e)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-secondary disabled:opacity-60">
                       <Thumb src={e.imageUrl} fallback={Dumbbell} size={40} />
-                      <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{e.name}</div><div className="truncate text-xs text-muted-foreground">{[e.muscleGroups.join(", "), e.source].filter(Boolean).join(" · ")}</div></div>
+                      <div className="min-w-0 flex-1"><div className="truncate text-body font-medium">{e.name}</div><div className="truncate text-caption text-muted-foreground">{[e.muscleGroups.join(", "), e.source].filter(Boolean).join(" · ")}</div></div>
                       {importing === e.sourceId ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Plus className="size-4 shrink-0 text-primary" />}
                     </button>
                   ))}
-                  {webResults && webResults.length === 0 && !webBusy && <p className="p-3 text-center text-sm text-muted-foreground">No results — try another term or use AI/Manual.</p>}
+                  {webResults && webResults.length === 0 && !webBusy && <p className="p-3 text-center text-body text-muted-foreground">No results — try another term or use AI/Manual.</p>}
                 </div>
               </div>
             )}
-            {err && <p className="text-sm text-warning">{err}</p>}
+            {err && <p className="text-body text-warning">{err}</p>}
           </div>
         ) : (
           <div className="space-y-6">
-            {startAtChoose && <button onClick={() => setStep("choose")} className="-mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground [&_svg]:size-4"><ArrowLeft /> Back</button>}
+            {startAtChoose && <button onClick={() => setStep("choose")} className="-mb-2 inline-flex items-center gap-1 text-body text-muted-foreground [&_svg]:size-4"><ArrowLeft /> Back</button>}
             <Field label="Name" icon={Dumbbell} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Barbell Back Squat" />
 
             {/* Demo — the animated start/end frames, plus an optional video. The
@@ -292,14 +292,14 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
                 </Button>
               )}
               {video ? (
-                <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-sm">
+                <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-2 text-body">
                   <Play className="size-4 shrink-0 text-primary" />
                   <span className="min-w-0 flex-1 truncate text-muted-foreground">Demo video attached</span>
                   <button onClick={() => setVideo("")} aria-label="Remove video" className="grid size-7 place-items-center rounded-full text-muted-foreground hover:text-danger [&_svg]:size-4"><X /></button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-sm font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4">
+                  <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-body font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4">
                     {vid.uploading ? <Spinner className="size-4" /> : <Play />}
                     {vid.phase === "processing"
                       ? "Processing…"
@@ -309,7 +309,7 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
                     <input type="file" accept="video/mp4,video/webm" className="hidden" disabled={vid.uploading} onChange={(e) => e.target.files?.[0] && void uploadVideo(e.target.files[0])} />
                   </label>
                   {vid.phase === "sending" && (
-                    <button type="button" onClick={vid.cancel} className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">Cancel</button>
+                    <button type="button" onClick={vid.cancel} className="text-caption font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">Cancel</button>
                   )}
                 </div>
               )}
@@ -318,13 +318,13 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
             {/* Classification — muscles, equipment, and the movement tags. */}
             <div className="space-y-3">
               <SectionLabel>Muscles & equipment</SectionLabel>
-              <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Primary muscles</div><ChipStrip options={MUSCLE_GROUPS} selected={muscles} onChange={setMuscles} /></div>
-              <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Secondary muscles</div><ChipStrip options={MUSCLE_GROUPS} selected={secondary} onChange={setSecondary} /></div>
-              <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Equipment</div><ChipStrip options={EQUIPMENT_TYPES} selected={equipment} onChange={setEquipment} /></div>
+              <div className="space-y-1.5"><div className="text-caption text-muted-foreground">Primary muscles</div><ChipStrip options={MUSCLE_GROUPS} selected={muscles} onChange={setMuscles} /></div>
+              <div className="space-y-1.5"><div className="text-caption text-muted-foreground">Secondary muscles</div><ChipStrip options={MUSCLE_GROUPS} selected={secondary} onChange={setSecondary} /></div>
+              <div className="space-y-1.5"><div className="text-caption text-muted-foreground">Equipment</div><ChipStrip options={EQUIPMENT_TYPES} selected={equipment} onChange={setEquipment} /></div>
               <div className="grid grid-cols-3 gap-3 pt-0.5">
-                <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Difficulty</div><div className="flex flex-wrap gap-1.5">{DIFFICULTIES.map((d) => <Chip key={d} selected={difficulty === d} onClick={() => setDifficulty(difficulty === d ? null : d)}>{d.slice(0, 4)}</Chip>)}</div></div>
-                <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Force</div><div className="flex flex-wrap gap-1.5">{FORCES.map((x) => <Chip key={x} selected={force === x} onClick={() => setForce(force === x ? null : x)}>{x}</Chip>)}</div></div>
-                <div className="space-y-1.5"><div className="text-xs text-muted-foreground">Mechanic</div><div className="flex flex-wrap gap-1.5">{MECHANICS.map((x) => <Chip key={x} selected={mechanic === x} onClick={() => setMechanic(mechanic === x ? null : x)}>{x.slice(0, 4)}</Chip>)}</div></div>
+                <div className="space-y-1.5"><div className="text-caption text-muted-foreground">Difficulty</div><div className="flex flex-wrap gap-1.5">{DIFFICULTIES.map((d) => <Chip key={d} selected={difficulty === d} onClick={() => setDifficulty(difficulty === d ? null : d)}>{d.slice(0, 4)}</Chip>)}</div></div>
+                <div className="space-y-1.5"><div className="text-caption text-muted-foreground">Force</div><div className="flex flex-wrap gap-1.5">{FORCES.map((x) => <Chip key={x} selected={force === x} onClick={() => setForce(force === x ? null : x)}>{x}</Chip>)}</div></div>
+                <div className="space-y-1.5"><div className="text-caption text-muted-foreground">Mechanic</div><div className="flex flex-wrap gap-1.5">{MECHANICS.map((x) => <Chip key={x} selected={mechanic === x} onClick={() => setMechanic(mechanic === x ? null : x)}>{x.slice(0, 4)}</Chip>)}</div></div>
               </div>
             </div>
 
@@ -337,8 +337,8 @@ export function ExerciseEditor({ exerciseId, initial, planMode = false, onClose,
               <Textarea rows={5} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Setup, steps, coaching cues… or generate with AI." />
             </div>
 
-            {editId && <button onClick={() => setAltOpen(true)} className="inline-flex items-center gap-1.5 text-sm font-medium text-primary [&_svg]:size-4"><ArrowLeft className="rotate-180" /> Manage alternatives</button>}
-            {err && <p className="text-sm text-warning">{err}</p>}
+            {editId && <button onClick={() => setAltOpen(true)} className="inline-flex items-center gap-1.5 text-body font-medium text-primary [&_svg]:size-4"><ArrowLeft className="rotate-180" /> Manage alternatives</button>}
+            {err && <p className="text-body text-warning">{err}</p>}
           </div>
         )}
         </StepFade>
@@ -382,8 +382,8 @@ function AlternativesSheet({ exerciseId, exerciseName, onClose }: { exerciseId: 
   return (
     <Sheet open onClose={onClose} title={`Alternatives · ${exerciseName}`}>
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">Bound alternatives let clients swap instantly — no approval. Binding is two-way.</p>
-        {alts === null ? null : alts.length === 0 ? <p className="text-sm text-muted-foreground">No alternatives yet.</p> : (
+        <p className="text-body text-muted-foreground">Bound alternatives let clients swap instantly — no approval. Binding is two-way.</p>
+        {alts === null ? null : alts.length === 0 ? <p className="text-body text-muted-foreground">No alternatives yet.</p> : (
           <div className="space-y-1">{alts.map((a) => (
             <div key={a.id} className="rounded-xl bg-surface-2 px-2.5 py-2">
               <ExerciseRow ex={a} thumbSize={36} trailing={

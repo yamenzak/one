@@ -85,7 +85,7 @@ export function Credits({ onBack }: { onBack: () => void }) {
         <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-title-3">Credit activity</h1>
-          <p className="truncate text-xs text-muted-foreground">Every credit this studio has spent and gained</p>
+          <p className="truncate text-caption text-muted-foreground">Every credit this studio has spent and gained</p>
         </div>
       </div>
 
@@ -139,7 +139,7 @@ export function Credits({ onBack }: { onBack: () => void }) {
                     height={140}
                     format={(v) => `${n(Math.round(v))} cr`}
                   />
-                  <p className="text-xs text-muted-foreground">{shortDate(data.window.start)} – {shortDate(data.window.end)}</p>
+                  <p className="text-caption text-muted-foreground">{shortDate(data.window.start)} – {shortDate(data.window.end)}</p>
                 </ChartCard>
 
                 {data.byReason.length > 0 && (
@@ -202,10 +202,10 @@ export function Credits({ onBack }: { onBack: () => void }) {
                   })}
                 </Group>
                 {rows.length === 0 && (
-                  <p className="px-1 text-xs text-muted-foreground">Nothing of that kind in this window.</p>
+                  <p className="px-1 text-caption text-muted-foreground">Nothing of that kind in this window.</p>
                 )}
                 {data.truncated && (
-                  <p className="px-1 text-xs text-muted-foreground">
+                  <p className="px-1 text-caption text-muted-foreground">
                     Showing the most recent 300 movements. The totals and the chart above cover the whole window.
                   </p>
                 )}

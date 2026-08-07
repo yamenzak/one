@@ -303,7 +303,7 @@ export function MealBuilder({ planId, onBack }: { planId: string; onBack: () => 
               <RailItem key={t}>
                 <Chip selected={t === type} onClick={() => setActiveType(t)} className="capitalize">
                   {typeLabel(t)}
-                  <span className={cn("numeral ml-1.5 text-xs", t === type ? "opacity-70" : n > 0 ? "text-nutrition" : "text-muted-foreground/50")}>{n}</span>
+                  <span className={cn("numeral ml-1.5 text-caption", t === type ? "opacity-70" : n > 0 ? "text-nutrition" : "text-muted-foreground/50")}>{n}</span>
                 </Chip>
               </RailItem>
             );
@@ -440,13 +440,13 @@ function OptionCard({ opt, ordinal, targets, foods, mode, nameOf, imageOf, open,
           <FoodThumb src={opt.imageUrl ?? opt.foods.map((mf) => imageOf(mf.foodId)).find(Boolean) ?? null} size={34} />
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1.5">
-              <span className="min-w-0 truncate text-sm font-semibold">{label}</span>
+              <span className="min-w-0 truncate text-body font-semibold">{label}</span>
               {opt.isFree && <Badge tone="nutrition">Free</Badge>}
             </span>
             <span className="mt-0.5 flex min-w-0 items-center gap-2">
-              <span className={cn("numeral shrink-0 text-xs font-semibold", over ? "text-warning" : "text-calories")}>{fmtEnergy(t.calories, units)}</span>
-              {!opt.isFree && <MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} className="shrink-0 text-xs" />}
-              {!opt.isFree && <span className="truncate text-xs text-muted-foreground">{opt.foods.length === 0 ? "no foods yet" : opt.foods.map((mf) => nameOf(mf.foodId)).join(", ")}</span>}
+              <span className={cn("numeral shrink-0 text-caption font-semibold", over ? "text-warning" : "text-calories")}>{fmtEnergy(t.calories, units)}</span>
+              {!opt.isFree && <MacroInline proteinG={t.proteinG} carbsG={t.carbsG} fatG={t.fatG} className="shrink-0 text-caption" />}
+              {!opt.isFree && <span className="truncate text-caption text-muted-foreground">{opt.foods.length === 0 ? "no foods yet" : opt.foods.map((mf) => nameOf(mf.foodId)).join(", ")}</span>}
             </span>
           </span>
         </span>
@@ -474,7 +474,7 @@ function OptionCard({ opt, ordinal, targets, foods, mode, nameOf, imageOf, open,
           onClick={() => onPatch((o) => { o.isFree = !o.isFree; if (o.isFree) o.foods = []; })}
           aria-pressed={opt.isFree}
           className={cn(
-            "mb-1.5 shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors",
+            "mb-1.5 shrink-0 rounded-full px-3 py-1 text-caption font-medium transition-colors",
             opt.isFree ? "bg-nutrition-soft text-nutrition" : "border border-dashed border-border text-muted-foreground hover:text-foreground",
           )}
         >
@@ -498,7 +498,7 @@ function OptionCard({ opt, ordinal, targets, foods, mode, nameOf, imageOf, open,
               onRemove={() => onPatch((o) => o.foods.splice(fi, 1))}
             />
           ))}
-          <button onClick={onAddFood} className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-xs font-medium text-nutrition transition-colors hover:bg-surface-2 [&_svg]:size-4"><Plus /> Add food</button>
+          <button onClick={onAddFood} className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-caption font-medium text-nutrition transition-colors hover:bg-surface-2 [&_svg]:size-4"><Plus /> Add food</button>
           {opt.foods.length === 0 && <p className="px-1 text-center text-caption text-muted-foreground">Search your library — or create a new food from the search if it isn't there yet.</p>}
           {opt.foods.length > 0 && <MealImage mealName={opt.mealName} foodNames={opt.foods.map((mf) => nameOf(mf.foodId))} value={opt.imageUrl} onChange={(url) => onPatch((o) => (o.imageUrl = url))} />}
         </div>
@@ -583,8 +583,8 @@ function PlanHealth({ allTypes, byType, foods, targets, mode }: {
         ) : (
           <div className="flex shrink-0 flex-col items-center justify-center gap-1 rounded-2xl bg-surface-2 px-5 py-4 text-center">
             <Flame className="size-5" style={{ color: toneVar.calories }} />
-            <span className="numeral text-2xl font-bold leading-none">{fmtEnergy(total.calories, units, false)}</span>
-            <span className="text-xs font-medium text-muted-foreground">{mode === "fixed" ? "The day" : "Sample day"}</span>
+            <span className="numeral text-title-2 font-bold leading-none">{fmtEnergy(total.calories, units, false)}</span>
+            <span className="text-caption font-medium text-muted-foreground">{mode === "fixed" ? "The day" : "Sample day"}</span>
           </div>
         )}
         {deltaLabel && <Badge tone={deltaTone}>{deltaLabel}</Badge>}
@@ -604,7 +604,7 @@ function PlanHealth({ allTypes, byType, foods, targets, mode }: {
       <Disclosure label={mode === "fixed" ? "Per meal" : "Per-meal range"}>
         <div className="space-y-1.5">
         {ranges.map((r) => (
-          <div key={r.type} className="flex items-center justify-between gap-2 text-sm">
+          <div key={r.type} className="flex items-center justify-between gap-2 text-body">
             <span className="flex items-center gap-1.5 capitalize text-muted-foreground [&_svg]:size-3.5">
               <Flame style={{ color: toneVar.calories }} /> {typeLabel(r.type)}
             </span>
@@ -637,14 +637,14 @@ function FoodPortionRow({ mf, name, image, food, onQty, onRemove }: { mf: MealFo
       <div className="flex items-center gap-3">
         <FoodThumb src={image} size={34} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium leading-tight">{name}</div>
+          <div className="truncate text-body font-medium leading-tight">{name}</div>
           {scaled ? (
             <MacroInline proteinG={scaled.proteinG} carbsG={scaled.carbsG} fatG={scaled.fatG} className="mt-0.5 text-caption" />
           ) : (
             <div className="mt-0.5 text-caption text-muted-foreground">Macros update after saving</div>
           )}
         </div>
-        {scaled && <div className="numeral shrink-0 text-sm font-semibold text-calories">{fmtEnergy(scaled.calories, units)}</div>}
+        {scaled && <div className="numeral shrink-0 text-body font-semibold text-calories">{fmtEnergy(scaled.calories, units)}</div>}
         <button onClick={onRemove} aria-label={`Remove ${name}`} className="grid size-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-surface-3 hover:text-danger [&_svg]:size-3.5"><X /></button>
       </div>
       <div className="flex items-center gap-2">
@@ -652,15 +652,15 @@ function FoodPortionRow({ mf, name, image, food, onQty, onRemove }: { mf: MealFo
           <Input
             type="number" inputMode="decimal" aria-label={`Amount in ${mf.unit}`}
             value={mf.quantity} onChange={(e) => onQty(Number(e.target.value))}
-            className="h-9 w-[5.5rem] pr-7 text-sm"
+            className="h-9 w-[5.5rem] pr-7 text-body"
           />
-          <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-xs text-muted-foreground">{mf.unit}</span>
+          <span className="pointer-events-none absolute inset-y-0 right-2.5 flex items-center text-caption text-muted-foreground">{mf.unit}</span>
         </div>
         {serving > 0 && (
           <Rail bleed="none" className="pb-0">
             {SERVING_PRESETS.map((mult) => {
               const q = servingsToQuantity(serving, mult);
-              return <RailItem key={mult}><Chip selected={Math.abs(mf.quantity - q) < 0.05} onClick={() => onQty(q)} className="h-9 px-3 text-xs">{mult}×</Chip></RailItem>;
+              return <RailItem key={mult}><Chip selected={Math.abs(mf.quantity - q) < 0.05} onClick={() => onQty(q)} className="h-9 px-3 text-caption">{mult}×</Chip></RailItem>;
             })}
           </Rail>
         )}
@@ -693,7 +693,7 @@ function MealImage({ mealName, foodNames, value, onChange }: { mealName: string;
         <img src={value} alt="" className="h-24 w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
         <div className="absolute right-2 top-2 flex gap-1.5">
-          {canAi && <button onClick={() => void gen()} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><AiAvatar className="size-3.5" /> {busy ? "…" : "Redo"}</button>}
+          {canAi && <button onClick={() => void gen()} disabled={busy} className="inline-flex items-center gap-1 rounded-full bg-black/50 px-2.5 py-1 text-caption font-medium text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><AiAvatar className="size-3.5" /> {busy ? "…" : "Redo"}</button>}
           <button onClick={() => onChange(null)} aria-label="Remove photo" className="grid size-7 place-items-center rounded-full bg-black/50 text-white backdrop-blur-md transition-colors hover:bg-black/70 [&_svg]:size-3.5"><X /></button>
         </div>
       </div>
@@ -702,10 +702,10 @@ function MealImage({ mealName, foodNames, value, onChange }: { mealName: string;
   if (!canAi) return null;
   return (
     <>
-      <button onClick={() => void gen()} disabled={busy} className="flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border text-xs text-muted-foreground transition-colors hover:bg-surface-2 disabled:opacity-50 [&_svg]:size-3.5">
+      <button onClick={() => void gen()} disabled={busy} className="flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-border text-caption text-muted-foreground transition-colors hover:bg-surface-2 disabled:opacity-50 [&_svg]:size-3.5">
         {busy ? <><span className="size-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" /> Plating…</> : <><AiAvatar className="size-3.5" /> Generate a plated photo</>}
       </button>
-      {err && <p className="text-xs text-warning">{err}</p>}
+      {err && <p className="text-caption text-warning">{err}</p>}
     </>
   );
 }
@@ -719,9 +719,9 @@ function AiMealSheet({ onClose, onRun }: { onClose: () => void; onRun: (i: strin
   return (
     <Sheet open onClose={onClose} title="AI meal draft" footer={<Button size="lg" className="w-full" disabled={busy} onClick={() => void run()}>{busy ? "Drafting…" : "Generate options"}</Button>}>
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground">Drafts meal options from this client's targets, body and dietary preferences — every food comes from your library. You'll review before publishing.</p>
+        <p className="text-body text-muted-foreground">Drafts meal options from this client's targets, body and dietary preferences — every food comes from your library. You'll review before publishing.</p>
         <Field label="Instructions (optional)" icon={PencilLine} value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="e.g. high-protein, no dairy, 4 meals" />
-        {dropped ? <div className="rounded-xl border border-border/60 bg-surface-2 p-3 text-xs text-muted-foreground">Options added. {dropped.length} suggested food{dropped.length === 1 ? "" : "s"} weren't in your library and {dropped.length === 1 ? "was" : "were"} skipped: {dropped.join(", ")}. Add {dropped.length === 1 ? "it" : "them"} to your library to include next time.</div> : null}
+        {dropped ? <div className="rounded-xl border border-border/60 bg-surface-2 p-3 text-caption text-muted-foreground">Options added. {dropped.length} suggested food{dropped.length === 1 ? "" : "s"} weren't in your library and {dropped.length === 1 ? "was" : "were"} skipped: {dropped.join(", ")}. Add {dropped.length === 1 ? "it" : "them"} to your library to include next time.</div> : null}
         {err ? <AiErrorBox error={err} /> : null}
       </div>
     </Sheet>

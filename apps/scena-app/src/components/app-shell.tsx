@@ -24,7 +24,7 @@ function Wordmark({ collapsed }: { collapsed: boolean }) {
   return (
     <div className="flex items-center gap-2 overflow-hidden">
       <ScenaIcon size={28} className="shrink-0" />
-      {!collapsed && <span className="truncate text-lg font-bold tracking-tight">Scena</span>}
+      {!collapsed && <span className="truncate text-body-lg font-bold tracking-tight">Scena</span>}
     </div>
   );
 }

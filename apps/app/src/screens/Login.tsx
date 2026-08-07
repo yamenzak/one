@@ -185,7 +185,7 @@ export function Login() {
         {logoUrl ? (
           <img src={logoUrl} alt={wordmark ? "" : brandName} className="h-14 w-auto max-w-[70%] object-contain" />
         ) : (
-          <span aria-hidden className="grid size-14 place-items-center rounded-xl bg-primary text-title-2 font-black text-primary-foreground shadow-glow">
+          <span aria-hidden className="grid size-14 place-items-center rounded-xl bg-primary text-title-2 font-bold text-primary-foreground shadow-glow">
             {brandName.charAt(0).toUpperCase()}
           </span>
         )}

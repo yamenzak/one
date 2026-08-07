@@ -251,7 +251,7 @@ export function Packages() {
                     );
                   })}
                 </Group>
-                <p className="px-1 text-xs text-muted-foreground">{note}</p>
+                <p className="px-1 text-caption text-muted-foreground">{note}</p>
               </section>
             );
           })}
@@ -261,7 +261,7 @@ export function Packages() {
       {archived.length > 0 && (
         <>
           <Eyebrow className="pt-2" action={<Badge tone="neutral">{archived.length}</Badge>}>Archived</Eyebrow>
-          <p className="px-1 text-xs text-muted-foreground">Off sale and hidden from every client&rsquo;s Shop. Clients who already bought one keep the days they paid for.</p>
+          <p className="px-1 text-caption text-muted-foreground">Off sale and hidden from every client&rsquo;s Shop. Clients who already bought one keep the days they paid for.</p>
           <Group>
             {archived.map((p) => (
               <Row
@@ -294,7 +294,7 @@ export function Packages() {
         redeemed, and everything else folds away behind a count.
       */}
       <Eyebrow className="pt-2" action={<Button size="sm" onClick={() => setCodeOpen(true)}><Plus /> Code</Button>}>Redemption codes</Eyebrow>
-      {codes.length === 0 ? <p className="px-1 text-xs text-muted-foreground">One-off access codes you can hand to a client to redeem.</p> : (
+      {codes.length === 0 ? <p className="px-1 text-caption text-muted-foreground">One-off access codes you can hand to a client to redeem.</p> : (
         <>
           {liveCodes.length > 0 ? (
             <Group>
@@ -310,7 +310,7 @@ export function Packages() {
               ))}
             </Group>
           ) : (
-            <p className="px-1 text-xs text-muted-foreground">Every code has been used. Make another to hand out.</p>
+            <p className="px-1 text-caption text-muted-foreground">Every code has been used. Make another to hand out.</p>
           )}
           {spentCodes.length > 0 && (
             <Disclosure label={`Used & expired (${spentCodes.length})`}>
@@ -326,14 +326,14 @@ export function Packages() {
                   </Row>
                 ))}
               </Group>
-              <p className="px-1 pt-2 text-xs text-muted-foreground">Kept as a record of who redeemed what — and so the same code can never be issued twice.</p>
+              <p className="px-1 pt-2 text-caption text-muted-foreground">Kept as a record of who redeemed what — and so the same code can never be issued twice.</p>
             </Disclosure>
           )}
         </>
       )}
 
       <Eyebrow className="pt-2" action={<Button size="sm" onClick={() => setPromoOpen(true)}><Plus /> Promo</Button>}>Promo codes</Eyebrow>
-      {promos.length === 0 ? <p className="px-1 text-xs text-muted-foreground">Discount codes applied at checkout.</p> : (
+      {promos.length === 0 ? <p className="px-1 text-caption text-muted-foreground">Discount codes applied at checkout.</p> : (
         <Group>
           {promos.map((p) => (
             <Row
@@ -514,10 +514,10 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
           {busy ? (editing ? "Saving…" : "Creating…") : editing ? "Save changes" : "Create package"}
         </Button>}>
       <div className="space-y-4">
-        {editing && <p className="text-sm text-muted-foreground">Changes apply to the Shop right away. Clients who already bought this package keep the access they paid for — editing never touches a live subscription.</p>}
+        {editing && <p className="text-body text-muted-foreground">Changes apply to the Shop right away. Clients who already bought this package keep the access they paid for — editing never touches a live subscription.</p>}
         <Field label="Name" icon={CreditCard} value={name} onChange={(e) => setName(e.target.value)} />
         <div>
-          <span className="mb-1.5 block text-sm font-medium text-muted-foreground">Description</span>
+          <span className="mb-1.5 block text-body font-medium text-muted-foreground">Description</span>
           <Textarea rows={2} maxLength={2000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="One line clients see on the Shop card." />
         </div>
         <div className="flex gap-2">{(["one_time", "monthly"] as const).map((m) => <Chip key={m} selected={priceMode === m} onClick={() => setPriceMode(m)}>{m.replace("_", " ")}</Chip>)}</div>
@@ -543,16 +543,16 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
         />
 
         <div className="space-y-2">
-          <div className="flex items-center justify-between"><span className="text-sm text-muted-foreground">Feature budgets</span><button type="button" onClick={() => setBudgets((b) => [...b, { feature: "workout", days: 30 }])} className="text-xs font-medium text-primary">+ Budget</button></div>
+          <div className="flex items-center justify-between"><span className="text-body text-muted-foreground">Feature budgets</span><button type="button" onClick={() => setBudgets((b) => [...b, { feature: "workout", days: 30 }])} className="text-caption font-medium text-primary">+ Budget</button></div>
           {budgets.map((b, i) => (
             <div key={i} className="flex items-center gap-2">
               <div className="flex gap-1">{BUDGET_FEATURES.map((f) => <Chip key={f} selected={b.feature === f} onClick={() => setBudget(i, { feature: f })}>{f}</Chip>)}</div>
-              <input type="number" min={1} value={b.days} onChange={(e) => setBudget(i, { days: Number(e.target.value) })} aria-label="Budget days" className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
-              <span className="text-xs text-muted-foreground">days</span>
+              <input type="number" min={1} value={b.days} onChange={(e) => setBudget(i, { days: Number(e.target.value) })} aria-label="Budget days" className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 text-body outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
+              <span className="text-caption text-muted-foreground">days</span>
               {budgets.length > 1 && <button type="button" onClick={() => setBudgets((x) => x.filter((_, idx) => idx !== i))} aria-label="Remove budget" className="text-muted-foreground hover:text-danger [&_svg]:size-3.5"><X /></button>}
             </div>
           ))}
-          {badDays && <p className="text-xs text-danger">Every budget needs at least 1 day.</p>}
+          {badDays && <p className="text-caption text-danger">Every budget needs at least 1 day.</p>}
         </div>
 
         {addOnTypes.length > 0 && (
@@ -561,13 +561,13 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
               {/* Same vocabulary as the Sessions screen: "session type", "prepaid
                   sessions". "Add-on units" is the billing model's word, not the
                   coach's. */}
-              <span className="text-sm text-muted-foreground">Sessions included</span>
-              <p className="text-xs text-muted-foreground/80">How many of each the client gets. Used up when you mark a session complete or a no-show.</p>
+              <span className="text-body text-muted-foreground">Sessions included</span>
+              <p className="text-caption text-muted-foreground/80">How many of each the client gets. Used up when you mark a session complete or a no-show.</p>
             </div>
             {addOnTypes.map((t) => (
               <div key={t.id} className="flex items-center justify-between gap-2">
-                <div className="min-w-0"><div className="text-sm">{t.label}</div><div className="text-xs text-muted-foreground">{t.duration_minutes} min</div></div>
-                <input type="number" min={0} value={addOns[t.id] ?? 0} onChange={(e) => setAddOns((p) => ({ ...p, [t.id]: Math.max(0, Number(e.target.value)) }))} className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70" aria-label={`${t.label} sessions included`} />
+                <div className="min-w-0"><div className="text-body">{t.label}</div><div className="text-caption text-muted-foreground">{t.duration_minutes} min</div></div>
+                <input type="number" min={0} value={addOns[t.id] ?? 0} onChange={(e) => setAddOns((p) => ({ ...p, [t.id]: Math.max(0, Number(e.target.value)) }))} className="w-16 rounded-lg bg-surface-3 px-2 py-1.5 text-body outline-none focus-visible:ring-2 focus-visible:ring-ring/70" aria-label={`${t.label} sessions included`} />
               </div>
             ))}
           </div>
@@ -575,8 +575,8 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
 
         <div className="space-y-3">
           <div>
-            <span className="text-sm text-muted-foreground">Client capabilities</span>
-            <p className="text-xs text-muted-foreground/80">What this package includes. Plan access also follows the budgets above — a workout-only budget already hides the meal plan.</p>
+            <span className="text-body text-muted-foreground">Client capabilities</span>
+            <p className="text-caption text-muted-foreground/80">What this package includes. Plan access also follows the budgets above — a workout-only budget already hides the meal plan.</p>
           </div>
           {CLIENT_FLAG_CATEGORIES.map((cat) => {
             // `SELLABLE_CLIENT_FLAG_KEYS` drops the `reserved` flags — ones the
@@ -595,7 +595,7 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
                   const checked = flags[k] ?? DEFAULT_CLIENT_FLAGS[k];
                   return (
                     <div key={k} className="flex items-center justify-between gap-3">
-                      <div className="min-w-0"><div className="text-sm">{m.label}</div><div className="text-xs text-muted-foreground">{m.hint}</div></div>
+                      <div className="min-w-0"><div className="text-body">{m.label}</div><div className="text-caption text-muted-foreground">{m.hint}</div></div>
                       <Switch checked={checked} onCheckedChange={(v) => setFlags((p) => ({ ...p, [k]: v }))} />
                     </div>
                   );
@@ -615,11 +615,11 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
           ))}
         </div>
 
-        <div className="flex items-center justify-between"><span className="text-sm">Once per customer</span><Switch checked={oncePerCustomer} onCheckedChange={setOncePerCustomer} /></div>
+        <div className="flex items-center justify-between"><span className="text-body">Once per customer</span><Switch checked={oncePerCustomer} onCheckedChange={setOncePerCustomer} /></div>
         <div className="space-y-2">
-          <span className="text-sm text-muted-foreground">Visibility</span>
+          <span className="text-body text-muted-foreground">Visibility</span>
           <div className="flex flex-wrap gap-2">{([["marketplace", "Client Shop"], ["private", "Grant only"], ["client_specific", "One client"]] as const).map(([v, label]) => <Chip key={v} selected={visibility === v} onClick={() => setVisibility(v)}>{label}</Chip>)}</div>
-          <p className="text-xs text-muted-foreground/80">
+          <p className="text-caption text-muted-foreground/80">
             {visibility === "marketplace" ? "Listed in every client's Shop tab, where they can buy it themselves."
               : visibility === "private" ? "Never listed. You assign it from a client's Plans & access."
               : "Listed in one client's Shop only, and only they can buy it."}
@@ -628,7 +628,7 @@ function PackageSheet({ pkg, clients, onClose, onSaved }: { pkg?: Pkg | null; cl
             <Select aria-label="Client" value={restrictedClientId} onChange={setRestrictedClientId} options={[{ value: "", label: "Choose a client…" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} />
           )}
         </div>
-        {error && <p role="status" aria-live="polite" className="text-sm text-danger">{error}</p>}
+        {error && <p role="status" aria-live="polite" className="text-body text-danger">{error}</p>}
       </div>
     </Sheet>
   );
@@ -674,9 +674,9 @@ function PromoSheet({ packages, clients, onClose, onSaved }: { packages: Pkg[]; 
         <div className="flex gap-2">{(["percent", "amount"] as const).map((t) => <Chip key={t} selected={discountType === t} onClick={() => setDiscountType(t)}>{t === "percent" ? "% off" : "$ off"}</Chip>)}</div>
         <Field label={discountType === "percent" ? "Percent off" : "Amount off (USD)"} value={value} inputMode="decimal" onChange={(e) => setValue(e.target.value)} error={valueError ?? undefined} />
         <Field label="Max redemptions (blank = unlimited)" value={maxRedemptions} inputMode="numeric" onChange={(e) => setMaxRedemptions(e.target.value.replace(/\D/g, ""))} />
-        <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Limit to a package (optional)</span><Select aria-label="Package" value={restrictedPackageId} onChange={setRestrictedPackageId} options={[{ value: "", label: "Any package" }, ...packages.map((p) => ({ value: p.id, label: p.name }))]} /></div>
-        <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Limit to a client (optional)</span><Select aria-label="Client" value={restrictedClientId} onChange={setRestrictedClientId} options={[{ value: "", label: "Any client" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
-        {error && <p role="status" aria-live="polite" className="text-sm text-danger">{error}</p>}
+        <div className="space-y-1.5"><span className="text-body text-muted-foreground">Limit to a package (optional)</span><Select aria-label="Package" value={restrictedPackageId} onChange={setRestrictedPackageId} options={[{ value: "", label: "Any package" }, ...packages.map((p) => ({ value: p.id, label: p.name }))]} /></div>
+        <div className="space-y-1.5"><span className="text-body text-muted-foreground">Limit to a client (optional)</span><Select aria-label="Client" value={restrictedClientId} onChange={setRestrictedClientId} options={[{ value: "", label: "Any client" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
+        {error && <p role="status" aria-live="polite" className="text-body text-danger">{error}</p>}
       </div>
     </Sheet>
   );
@@ -709,9 +709,9 @@ function CodeSheet({ packages, clients, onClose, onSaved }: { packages: Pkg[]; c
         <Field label="Days to add" value={days} inputMode="numeric" onChange={(e) => setDays(e.target.value.replace(/\D/g, ""))} error={daysError ?? undefined} />
         <div className="flex gap-2">{BUDGET_FEATURES.map((f) => <Chip key={f} selected={feature === f} onClick={() => setFeature(f)}>{f}</Chip>)}</div>
         <Field label="Max uses" value={maxUses} inputMode="numeric" onChange={(e) => setMaxUses(e.target.value.replace(/\D/g, ""))} />
-        <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Only for holders of a package (optional)</span><Select aria-label="Package" value={restrictedPackageId} onChange={setRestrictedPackageId} options={[{ value: "", label: "Any package" }, ...packages.map((p) => ({ value: p.id, label: p.name }))]} /></div>
-        <div className="space-y-1.5"><span className="text-sm text-muted-foreground">Only for one client (optional)</span><Select aria-label="Client" value={restrictedClientId} onChange={setRestrictedClientId} options={[{ value: "", label: "Any client" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
-        {error && <p role="status" aria-live="polite" className="text-sm text-danger">{error}</p>}
+        <div className="space-y-1.5"><span className="text-body text-muted-foreground">Only for holders of a package (optional)</span><Select aria-label="Package" value={restrictedPackageId} onChange={setRestrictedPackageId} options={[{ value: "", label: "Any package" }, ...packages.map((p) => ({ value: p.id, label: p.name }))]} /></div>
+        <div className="space-y-1.5"><span className="text-body text-muted-foreground">Only for one client (optional)</span><Select aria-label="Client" value={restrictedClientId} onChange={setRestrictedClientId} options={[{ value: "", label: "Any client" }, ...clients.map((c) => ({ value: c.id, label: c.displayName }))]} /></div>
+        {error && <p role="status" aria-live="polite" className="text-body text-danger">{error}</p>}
       </div>
     </Sheet>
   );

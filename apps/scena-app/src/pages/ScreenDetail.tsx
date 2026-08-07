@@ -229,7 +229,7 @@ export function ScreenDetailPage() {
                 ) : (
                   <div className="flex flex-wrap gap-1">
                     {(screen.tags ?? []).map((t) => (
-                      <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-secondary-foreground">
+                      <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-caption font-medium text-secondary-foreground">
                         {t}
                       </span>
                     ))}
@@ -255,13 +255,13 @@ export function ScreenDetailPage() {
                 <div className="space-y-6 lg:col-span-2">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
-                      <h2 className="text-sm font-semibold">Live preview</h2>
+                      <h2 className="text-body font-semibold">Live preview</h2>
                       {writable ? (
-                        <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={() => navigate(`/screens/${id}/studio`)}>
+                        <Button size="sm" className="h-7 gap-1.5 text-caption" onClick={() => navigate(`/screens/${id}/studio`)}>
                           <Sparkles className="size-3.5" /> Open studio
                         </Button>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Computed from the synced clock — no stream</span>
+                        <span className="text-caption text-muted-foreground">Computed from the synced clock — no stream</span>
                       )}
                     </div>
                     <DevicePreview channelId={screen.channel_id} online={online} chrome className="w-full shadow-sm" />
@@ -371,7 +371,7 @@ function EditableName({ screen, onRenamed }: { screen: Screen; onRenamed: () => 
           }
         }}
         maxLength={80}
-        className="h-10 w-64 !text-2xl font-semibold"
+        className="h-10 w-64 !text-title-2 font-semibold"
       />
     );
   }
@@ -385,7 +385,7 @@ function EditableName({ screen, onRenamed }: { screen: Screen; onRenamed: () => 
       className="group/name inline-flex items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
       title="Rename device"
     >
-      <span className="truncate text-title-3 md:text-2xl">{screen.name}</span>
+      <span className="truncate text-title-3 md:text-title-2">{screen.name}</span>
       <Pencil className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/name:opacity-70" />
     </button>
   );
@@ -397,7 +397,7 @@ function Panel({ title, icon, action, children }: { title: string; icon?: React.
   return (
     <section className="rounded-xl bg-card shadow-sm">
       <div className="flex items-center justify-between px-4 pb-1.5 pt-3.5">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">
+        <h3 className="flex items-center gap-2 text-body font-semibold">
           {icon}
           {title}
         </h3>
@@ -432,7 +432,7 @@ function StatusPanel({ screen, activeChannel }: { screen: Screen; activeChannel:
     <Panel title="Status" icon={<StatusDot online={online} />} action={<Pill tone={online ? "success" : "muted"}>{online ? "Online" : "Offline"}</Pill>}>
       <dl className="space-y-2.5">
         {stats.map((s) => (
-          <div key={s.label} className="flex items-center gap-2.5 text-sm">
+          <div key={s.label} className="flex items-center gap-2.5 text-body">
             <span className="grid size-7 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground [&_svg]:size-3.5">{s.icon}</span>
             <dt className="text-muted-foreground">{s.label}</dt>
             <dd className="ml-auto min-w-0 truncate font-medium">{s.value}</dd>
@@ -465,7 +465,7 @@ function RemoteControl({ screen }: { screen: Screen }) {
       disabled={!online}
       onClick={onClick}
       className={cn(
-        "group flex flex-col items-center justify-center gap-1.5 rounded-xl py-3.5 text-xs font-medium transition-all disabled:opacity-40",
+        "group flex flex-col items-center justify-center gap-1.5 rounded-xl py-3.5 text-caption font-medium transition-all disabled:opacity-40",
         active ? "bg-primary/12 text-primary ring-1 ring-inset ring-primary/25" : "bg-muted/60 text-foreground hover:bg-muted",
       )}
     >
@@ -496,7 +496,7 @@ function RemoteControl({ screen }: { screen: Screen }) {
           onClick={() => cmd(debug ? "debug.off" : "debug.on", debug ? "Debug overlay off" : "Debug overlay on")}
         />
       </div>
-      {!online && <p className="mt-2.5 text-xs text-warning">Offline — commands apply on reconnect.</p>}
+      {!online && <p className="mt-2.5 text-caption text-warning">Offline — commands apply on reconnect.</p>}
     </Panel>
   );
 }
@@ -550,7 +550,7 @@ function DisplayPanel({ screen }: { screen: Screen }) {
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 gap-1.5 text-xs"
+          className="h-7 gap-1.5 text-caption"
           onClick={autoDetect}
           disabled={!detected}
           title={detected ? "Use the resolution the device reported" : "The device reports its resolution when it connects"}
@@ -560,7 +560,7 @@ function DisplayPanel({ screen }: { screen: Screen }) {
       }
     >
       <div className="space-y-3">
-        <div className="text-xs text-muted-foreground">
+        <div className="text-caption text-muted-foreground">
           {detected ? (
             <>
               Device reports <span className="font-medium text-foreground">{detected}</span>.
@@ -571,14 +571,14 @@ function DisplayPanel({ screen }: { screen: Screen }) {
         </div>
         <div className="flex items-end gap-2">
           <div className="flex-1 space-y-1">
-            <label className="text-xs text-muted-foreground" htmlFor="dw">
+            <label className="text-caption text-muted-foreground" htmlFor="dw">
               Width
             </label>
             <Input id="dw" type="number" min={1} value={w} onChange={(e) => setW(e.target.value)} placeholder="1920" />
           </div>
           <span className="pb-2.5 text-muted-foreground">×</span>
           <div className="flex-1 space-y-1">
-            <label className="text-xs text-muted-foreground" htmlFor="dh">
+            <label className="text-caption text-muted-foreground" htmlFor="dh">
               Height
             </label>
             <Input id="dh" type="number" min={1} value={h} onChange={(e) => setH(e.target.value)} placeholder="1080" />
@@ -645,12 +645,12 @@ function ChannelSection({ screen, channels, writable }: { screen: Screen; channe
   return (
     <section className="space-y-4">
       <div className="space-y-1">
-        <h2 className="text-sm font-semibold">Channel</h2>
-        <p className="text-xs text-muted-foreground">Pick the active channel; a schedule or manual switch chooses from the carried set.</p>
+        <h2 className="text-body font-semibold">Channel</h2>
+        <p className="text-caption text-muted-foreground">Pick the active channel; a schedule or manual switch chooses from the carried set.</p>
       </div>
 
       <div className="max-w-sm space-y-1.5">
-        <label className="text-xs text-muted-foreground">Active channel</label>
+        <label className="text-caption text-muted-foreground">Active channel</label>
         <Select
           value={active}
           disabled={!writable}
@@ -662,9 +662,9 @@ function ChannelSection({ screen, channels, writable }: { screen: Screen; channe
       </div>
 
       <div className="space-y-2">
-        <label className="text-xs text-muted-foreground">Carried channels</label>
+        <label className="text-caption text-muted-foreground">Carried channels</label>
         {channels.length === 0 ? (
-          <div className="rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+          <div className="rounded-lg border border-dashed px-4 py-8 text-center text-body text-muted-foreground">
             No channels yet — create one on the Channels page.
           </div>
         ) : (
@@ -681,7 +681,7 @@ function ChannelSection({ screen, channels, writable }: { screen: Screen; channe
                 >
                   <div className="flex min-w-0 items-center gap-2">
                     <MonitorPlay className={cn("size-4 shrink-0", on ? "text-primary" : "text-muted-foreground")} />
-                    <span className="truncate text-sm font-medium">{c.name}</span>
+                    <span className="truncate text-body font-medium">{c.name}</span>
                     {active === c.id && <Badge className="font-normal">Active</Badge>}
                   </div>
                   <Switch checked={on} disabled={busy || !writable} onCheckedChange={(v) => toggleCarried(c.id, v)} />
@@ -815,8 +815,8 @@ function DeviceSchedule({ screenId, writable }: { screenId: string; writable: bo
       <div className="flex flex-wrap items-center gap-2.5 rounded-xl border bg-card p-3.5 shadow-sm">
         <Clock className="size-4 text-muted-foreground" />
         <div>
-          <div className="text-sm font-medium">Timezone</div>
-          <div className="text-xs text-muted-foreground">Windows are evaluated in this device's local time.</div>
+          <div className="text-body font-medium">Timezone</div>
+          <div className="text-caption text-muted-foreground">Windows are evaluated in this device's local time.</div>
         </div>
         <div className="flex-1" />
         <Input
@@ -837,7 +837,7 @@ function DeviceSchedule({ screenId, writable }: { screenId: string; writable: bo
                 toast.error(err instanceof Error ? err.message : "That timezone wasn’t accepted.");
               });
           }}
-          className="w-[190px] font-mono text-xs"
+          className="w-[190px] font-mono text-caption"
           placeholder="e.g. Europe/Berlin"
         />
       </div>
@@ -879,12 +879,12 @@ function TrackSection({
         <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="size-4" />
         </div>
-        <h3 className="text-sm font-semibold">{track.label}</h3>
+        <h3 className="text-body font-semibold">{track.label}</h3>
       </div>
-      <p className="mb-3 text-xs text-muted-foreground">{track.hint}</p>
+      <p className="mb-3 text-caption text-muted-foreground">{track.hint}</p>
 
       {rules.length === 0 ? (
-        <div className="rounded-lg border border-dashed bg-card/40 px-4 py-6 text-center text-xs text-muted-foreground">
+        <div className="rounded-lg border border-dashed bg-card/40 px-4 py-6 text-center text-caption text-muted-foreground">
           No {track.noun}s yet — add one below.
         </div>
       ) : (
@@ -973,7 +973,7 @@ function AddRuleForm({
 
   if (noChannels) {
     return (
-      <div className="mt-3 rounded-lg border border-dashed p-3 text-center text-xs text-muted-foreground">Create a channel first to schedule one here.</div>
+      <div className="mt-3 rounded-lg border border-dashed p-3 text-center text-caption text-muted-foreground">Create a channel first to schedule one here.</div>
     );
   }
 
@@ -998,11 +998,11 @@ function AddRuleForm({
       <div className="flex flex-wrap items-end gap-2.5">
         <div className="flex flex-col gap-1">
           <Label className="text-caption text-muted-foreground">From</Label>
-          <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="w-28 font-mono text-xs" />
+          <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="w-28 font-mono text-caption" />
         </div>
         <div className="flex flex-col gap-1">
           <Label className="text-caption text-muted-foreground">To</Label>
-          <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="w-28 font-mono text-xs" />
+          <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="w-28 font-mono text-caption" />
         </div>
         {track.kind === "channel" && (
           <div className="flex min-w-[140px] flex-1 flex-col gap-1">
@@ -1010,7 +1010,7 @@ function AddRuleForm({
             <Select
               value={channelId}
               onChange={setChannelId}
-              className="h-8 text-xs"
+              className="h-8 text-caption"
               placeholder="Channel"
               options={[...channels.map((c) => ({ value: c.id, label: c.name }))]}
             />
@@ -1019,7 +1019,7 @@ function AddRuleForm({
         {track.kind === "channel" && (
           <div className="flex w-20 flex-col gap-1">
             <Label className="text-caption text-muted-foreground">Priority</Label>
-            <Input type="number" value={priority} onChange={(e) => setPriority(e.target.value)} className="h-8 font-mono text-xs" min={1} />
+            <Input type="number" value={priority} onChange={(e) => setPriority(e.target.value)} className="h-8 font-mono text-caption" min={1} />
           </div>
         )}
         <Button size="sm" disabled={busy} onClick={submit}>

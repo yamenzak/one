@@ -67,8 +67,8 @@ export function StaffSection({ onBack }: { onBack: () => void }) {
 
   return (
     <SettingsPage title={t("staff.title")} description={t("staff.intro")} onBack={onBack}>
-      {act.msg && <p className="px-1 text-sm text-success">{act.msg}</p>}
-      {act.err && <p className="px-1 text-sm text-danger">{act.err}</p>}
+      {act.msg && <p className="px-1 text-body text-success">{act.msg}</p>}
+      {act.err && <p className="px-1 text-body text-danger">{act.err}</p>}
 
       {/* Seats, stated with the pending ones counted — the server counts them
           when it decides, so the screen must count them when it promises. */}

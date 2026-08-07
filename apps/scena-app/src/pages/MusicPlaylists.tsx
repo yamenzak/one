@@ -374,7 +374,7 @@ export function MusicPlaylistDetailPage() {
             ) : (
               <div className="flex flex-wrap gap-1">
                 {(pl?.tags ?? []).map((t) => (
-                  <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-secondary-foreground">
+                  <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-caption font-medium text-secondary-foreground">
                     {t}
                   </span>
                 ))}
@@ -441,19 +441,19 @@ export function MusicPlaylistDetailPage() {
         {/* Summary sidebar */}
         <aside className="space-y-4 lg:sticky lg:top-2 lg:self-start">
           <div className="rounded-xl bg-card p-4 shadow-sm">
-            <h3 className="text-sm font-semibold">Playback</h3>
+            <h3 className="text-body font-semibold">Playback</h3>
             <label className="mt-3 flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-sm">
+              <span className="flex items-center gap-2 text-body">
                 <Shuffle className="size-4 text-muted-foreground" /> Shuffle
               </span>
               <Switch checked={!!pl?.shuffle} disabled={!canWrite} onCheckedChange={(v) => patch({ shuffle: v })} />
             </label>
-            <p className="mt-1.5 text-xs text-muted-foreground">Deterministic per cycle — every screen shuffles identically.</p>
+            <p className="mt-1.5 text-caption text-muted-foreground">Deterministic per cycle — every screen shuffles identically.</p>
           </div>
 
           <div className="rounded-xl bg-card p-4 shadow-sm">
-            <h3 className="text-sm font-semibold">In this playlist</h3>
-            <dl className="mt-3 space-y-2 text-sm">
+            <h3 className="text-body font-semibold">In this playlist</h3>
+            <dl className="mt-3 space-y-2 text-body">
               <div className="flex items-center justify-between">
                 <dt className="text-muted-foreground">Tracks</dt>
                 <dd className="font-medium tabular-nums">{tracks.length}</dd>
@@ -471,7 +471,7 @@ export function MusicPlaylistDetailPage() {
             </dl>
             {genres.length > 0 && (
               <div className="mt-3">
-                <div className="mb-1.5 text-xs text-muted-foreground">Genres</div>
+                <div className="mb-1.5 text-caption text-muted-foreground">Genres</div>
                 <div className="flex flex-wrap gap-1">
                   {genres.map((g) => (
                     <Badge key={g} className="font-normal">
@@ -630,7 +630,7 @@ function EditablePlaylistName({ name, onRename }: { name: string; onRename: (n: 
           }
         }}
         maxLength={80}
-        className="h-10 w-64 text-2xl! font-semibold"
+        className="h-10 w-64 text-title-2! font-semibold"
       />
     );
   }
@@ -643,7 +643,7 @@ function EditablePlaylistName({ name, onRename }: { name: string; onRename: (n: 
       className="group/n inline-flex items-center gap-2 text-left"
       title="Rename playlist"
     >
-      <span className="truncate text-title-3 md:text-2xl">{name}</span>
+      <span className="truncate text-title-3 md:text-title-2">{name}</span>
       <Pencil className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/n:opacity-70" />
     </button>
   );
@@ -770,11 +770,11 @@ function DeletePlaylistDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title={<>Delete “{name}”?</>}>
-        <p className="text-sm text-muted-foreground">This removes the playlist. Any channel using it loses this music. This can't be undone.</p>
+        <p className="text-body text-muted-foreground">This removes the playlist. Any channel using it loses this music. This can't be undone.</p>
         <label className="flex items-center justify-between gap-3 rounded-lg border p-3">
           <span className="min-w-0">
-            <span className="block text-sm font-medium">Also delete tracks from the library</span>
-            <span className="block text-xs text-muted-foreground">Permanently removes these tracks' audio from the Media library and storage.</span>
+            <span className="block text-body font-medium">Also delete tracks from the library</span>
+            <span className="block text-caption text-muted-foreground">Permanently removes these tracks' audio from the Media library and storage.</span>
           </span>
           <Switch checked={alsoMedia} onCheckedChange={setAlsoMedia} />
         </label>
@@ -878,14 +878,14 @@ function AiMusicDialog({
           />
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Length</Label>
+              <Label className="text-caption text-muted-foreground">Length</Label>
               <div className="flex gap-1.5">
                 {MUSIC_LENGTHS.map((l) => (
                   <button
                     key={l.secs}
                     type="button"
                     onClick={() => setSecs(l.secs)}
-                    className={`flex-1 rounded-md border px-2 py-1.5 text-xs font-medium ${secs === l.secs ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
+                    className={`flex-1 rounded-md border px-2 py-1.5 text-caption font-medium ${secs === l.secs ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
                   >
                     {l.label}
                   </button>
@@ -894,7 +894,7 @@ function AiMusicDialog({
             </div>
             {models.length > 0 && (
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Model</Label>
+                <Label className="text-caption text-muted-foreground">Model</Label>
                 <Select
                   value={modelId || "__default"}
                   onChange={(v) => setModelId(v === "__default" ? "" : v)}
@@ -910,8 +910,8 @@ function AiMusicDialog({
               <audio controls src={assetUrl(result.assetUrl)} className="w-full" />
             </div>
           )}
-          {err && <p className="text-sm text-destructive">{err}</p>}
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {err && <p className="text-body text-destructive">{err}</p>}
+          <p className="flex items-center gap-1.5 text-caption text-muted-foreground">
             <ShieldCheck className="size-3.5" /> Uses your AI credits · generated music is licensed to you.
           </p>
         </div>
@@ -1018,7 +1018,7 @@ function PublicLibraryDialog({
           />
         ) : (
           <>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-caption text-muted-foreground">
               Licensed for your commercial use.{" "}
               {data.limit >= 0 ? `Using ${data.used}/${data.limit} library tracks.` : `Using ${data.used} library tracks (unlimited).`}
             </p>
@@ -1032,7 +1032,7 @@ function PublicLibraryDialog({
                   <button
                     type="button"
                     onClick={() => setGenre("")}
-                    className={`rounded-full border px-2.5 py-1 text-xs font-medium ${genre === "" ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
+                    className={`rounded-full border px-2.5 py-1 text-caption font-medium ${genre === "" ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
                   >
                     All
                   </button>
@@ -1041,7 +1041,7 @@ function PublicLibraryDialog({
                       key={g.genre}
                       type="button"
                       onClick={() => setGenre(g.genre)}
-                      className={`rounded-full border px-2.5 py-1 text-xs font-medium ${genre === g.genre ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
+                      className={`rounded-full border px-2.5 py-1 text-caption font-medium ${genre === g.genre ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
                     >
                       {g.genre}
                     </button>
@@ -1051,7 +1051,7 @@ function PublicLibraryDialog({
             </div>
             <div className="max-h-[52vh] space-y-1.5 overflow-y-auto">
               {tracks.length === 0 ? (
-                <div className="py-10 text-center text-sm text-muted-foreground">No tracks found.</div>
+                <div className="py-10 text-center text-body text-muted-foreground">No tracks found.</div>
               ) : (
                 tracks.map((t) => {
                   const on = sel.has(t.id);
@@ -1066,10 +1066,10 @@ function PublicLibraryDialog({
                         {t.art_url ? <img src={assetUrl(t.art_url)} alt="" className="size-full object-cover" /> : <Music className="size-4" />}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{t.title}</div>
-                        <div className="truncate text-xs text-muted-foreground">{[t.artist || "Unknown", t.genre, t.vocal].filter(Boolean).join(" · ")}</div>
+                        <div className="truncate text-body font-medium">{t.title}</div>
+                        <div className="truncate text-caption text-muted-foreground">{[t.artist || "Unknown", t.genre, t.vocal].filter(Boolean).join(" · ")}</div>
                       </div>
-                      <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{mmss(t.duration_ms)}</span>
+                      <span className="shrink-0 font-mono text-caption tabular-nums text-muted-foreground">{mmss(t.duration_ms)}</span>
                     </button>
                   );
                 })

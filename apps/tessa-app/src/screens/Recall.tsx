@@ -182,7 +182,7 @@ function ReportDrafter({ cycleId }: { cycleId: string }) {
       </Button>
       {report && (
         <>
-          <pre className="whitespace-pre-wrap rounded-lg bg-surface-2 p-3 text-sm">{report}</pre>
+          <pre className="whitespace-pre-wrap rounded-lg bg-surface-2 p-3 text-body">{report}</pre>
           <p className="text-caption text-warning">{t("ai.recall.unsigned")}</p>
           <Button
             variant="secondary"

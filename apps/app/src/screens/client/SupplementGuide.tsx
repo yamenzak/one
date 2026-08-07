@@ -49,13 +49,13 @@ export function SupplementGuide({ clientId }: { clientId: string }) {
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: DUR.slow, ease: [0.22, 1, 0.36, 1] }} className="flex items-start gap-3">
           <AiAvatar className="mt-0.5 size-8 shrink-0" />
           <div className="min-w-0 flex-1">
-            <div className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Supplement tips</div>
+            <div className="text-caption font-semibold uppercase tracking-[0.08em] text-primary">Supplement tips</div>
             <Markdown className="mt-1 text-body text-foreground/85">{guide}</Markdown>
-            <p className="mt-1.5 text-xs text-muted-foreground">General info — ask your coach before starting, stopping, or changing anything.</p>
+            <p className="mt-1.5 text-caption text-muted-foreground">General info — ask your coach before starting, stopping, or changing anything.</p>
           </div>
         </motion.div>
       )}
-      {err && <p className="mt-1 text-sm text-danger">{err}</p>}
+      {err && <p className="mt-1 text-body text-danger">{err}</p>}
     </div>
   );
 }

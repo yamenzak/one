@@ -91,6 +91,30 @@ const SLIDE_CSS = [
   "apps/scena-app/src/builder/canvas.ts",
 ];
 
+/**
+ * SURFACES READ AT THREE METRES — waived for `type-scale`, and nothing else.
+ *
+ * The scale runs 11–56px because it describes text on a device somebody is
+ * holding or sitting at. These three are not that. A take-a-ticket kiosk is a
+ * tablet across a lobby; the counter station shows the number being called to
+ * whoever is next in the queue; the scoreboard control is operated at arm's
+ * length while its own display hangs on a wall. `display` (56) is the largest
+ * role the language has and it is not large enough for a called ticket number —
+ * `Station.tsx` sets that at `7xl`, which is 72, and shrinking it to fit a role
+ * would make the product worse at the one job it has.
+ *
+ * A waiver rather than 20 inline exemptions, for the reason `SLIDE_CSS` gives
+ * below: the justification is identical on every line, and a reason repeated 20
+ * times stops being read. It is narrowed to ONE rule — the colour, radius and
+ * elevation rules still apply here, and `MEDIA_OVERLAYS` already carries the
+ * separate, narrower white/black relaxation these files need.
+ */
+const FAR_VIEWING = [
+  "apps/scena-app/src/pages/Kiosk.tsx",
+  "apps/scena-app/src/pages/Station.tsx",
+  "apps/scena-app/src/pages/BoardControlApp.tsx",
+];
+
 describe("Scena's UI conformance (UI-LANGUAGE.md)", () => {
   it("obeys every rule the design system publishes", () => {
     const v = uiConformance({
@@ -102,7 +126,7 @@ describe("Scena's UI conformance (UI-LANGUAGE.md)", () => {
         "apps/scena-app/src/ui-conformance.test.ts",
         ...SLIDE_CSS,
       ],
-      waive: { "design-tokens": MEDIA_OVERLAYS },
+      waive: { "design-tokens": MEDIA_OVERLAYS, "type-scale": FAR_VIEWING },
     });
     expect(v, v.length ? `\n${v.length} violation(s):\n\n${formatUiViolations(v)}\n` : "").toEqual([]);
   });

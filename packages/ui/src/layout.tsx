@@ -162,8 +162,10 @@ export function Anchor({
   eyebrow,
   children,
   word,
+  unit,
   sub,
   below,
+  align = "center",
   className,
   ...props
 }: Omit<HTMLMotionProps<"div">, "children"> & {
@@ -178,16 +180,55 @@ export function Anchor({
    * (a dash where a number belongs). Takes precedence over `children`.
    */
   word?: ReactNode;
+  /**
+   * A symbol on the value's baseline — `%`, `kg`, a glyph.
+   *
+   * §5: "units are subordinate — render the unit at ~55% of the value's size".
+   * `em` rather than a role, so it stays 55% of whatever the value is; a fixed
+   * size would only suit one of `display` and `title-1`. A ReactNode because
+   * three screens set it with a `<Percent>` icon rather than the character.
+   */
+  unit?: ReactNode;
   /** A quiet line under the value. The SECOND fact — never the value restated. */
   sub?: ReactNode;
   /** A pill or small control directly beneath — the Revolut "Accounts" slot. */
   below?: ReactNode;
+  /**
+   * `start` when the anchor shares its row with something else — a chevron, a
+   * trend, a second column — and centring it would leave it visibly off the
+   * card's axis. The screen still has exactly one.
+   */
+  align?: "center" | "start";
   className?: string;
 }) {
+  /*
+    `unit` and `align` exist because THREE screens hand-rolled this element
+    rather than use it, and both times for a reason the component could have
+    met: a body-fat readout is `48.2` with a `%` on its baseline, sitting at the
+    left edge of a card whose right edge holds a trend. `Anchor` could express
+    neither, so `BodyScanCard`, `BodyScanHistory` and `BodyScanFlow` each wrote
+    `<span className="numeral text-display font-bold tabular-nums tracking-tight">`
+    — which is the role said four times, three of the four redundant, and it
+    silently opted all three screens out of the §7 lint that watches this exact
+    class name. Same lesson as the header above: a primitive is only worth
+    having while it is the path of least resistance.
+  */
+  const start = align === "start";
   return (
-    <motion.div variants={anchorIn} className={cn("flex flex-col items-center gap-1 pb-1 pt-2 text-center", className)} {...props}>
+    <motion.div
+      variants={anchorIn}
+      className={cn("flex flex-col gap-1 pb-1 pt-2", start ? "items-start text-left" : "items-center text-center", className)}
+      {...props}
+    >
       {eyebrow && <p className="text-caption text-muted-foreground">{eyebrow}</p>}
-      {word != null ? <p className="text-title-1">{word}</p> : <p className="numeral text-display">{children}</p>}
+      {word != null ? (
+        <p className="text-title-1">{word}</p>
+      ) : (
+        <p className="numeral text-display">
+          {children}
+          {unit != null && <span className="ml-1 align-baseline text-[0.55em] font-medium text-muted-foreground">{unit}</span>}
+        </p>
+      )}
       {sub && <p className="text-caption text-muted-foreground">{sub}</p>}
       {below && <div className="pt-2">{below}</div>}
     </motion.div>

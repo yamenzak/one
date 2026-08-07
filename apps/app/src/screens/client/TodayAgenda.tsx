@@ -56,8 +56,8 @@ export function CheckRow({ icon: Icon, tone, label, sub, done, actionable, onCli
       <CheckBox done={done} />
       <IconBadge icon={Icon} tone={tone} size="sm" />
       <div className="min-w-0 flex-1">
-        <div className={cn("truncate text-sm font-medium transition-colors", done && "text-muted-foreground line-through")}>{label}</div>
-        {sub && <div className="truncate text-xs text-muted-foreground">{sub}</div>}
+        <div className={cn("truncate text-body font-medium transition-colors", done && "text-muted-foreground line-through")}>{label}</div>
+        {sub && <div className="truncate text-caption text-muted-foreground">{sub}</div>}
       </div>
       {!done && actionable && <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" />}
     </motion.button>
@@ -156,7 +156,7 @@ export function TodayAgenda({ clientId, date, bundle, agenda, onChanged, onNavig
         {/* Just the count. A "Complete" pill here and "All done for today" in
             the banner 8px below were the same sentence twice, and the pill was
             the one that dropped the useful part — how many. */}
-        <span className={cn("numeral text-xs font-semibold", allDone ? "text-success" : "text-muted-foreground")}>
+        <span className={cn("numeral text-caption font-semibold", allDone ? "text-success" : "text-muted-foreground")}>
           {doneCount}/{items.length}
         </span>
       </div>
@@ -173,7 +173,7 @@ export function TodayAgenda({ clientId, date, bundle, agenda, onChanged, onNavig
         )}
       </AnimatePresence>
       {suppQueued && <QueuedNotice className="px-1" />}
-      {suppErr && <p role="alert" className="px-1 text-sm text-warning">{suppErr}</p>}
+      {suppErr && <p role="alert" className="px-1 text-body text-warning">{suppErr}</p>}
     </section>
   );
 }
@@ -217,8 +217,8 @@ function CompletionBanner({ count, expanded, onToggle }: { count: number; expand
           </motion.span>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold">All done for today</div>
-          <div className="text-xs text-muted-foreground">{expanded ? "Tap to hide the list" : "Tap to see what you finished"}</div>
+          <div className="text-body font-semibold">All done for today</div>
+          <div className="text-caption text-muted-foreground">{expanded ? "Tap to hide the list" : "Tap to see what you finished"}</div>
         </div>
         <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")} />
       </div>

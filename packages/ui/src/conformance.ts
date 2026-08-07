@@ -167,7 +167,40 @@ export const UI_RULES: UiRule[] = [
     section: "UI-LANGUAGE §5",
     ext: /\.(tsx?|css)$/,
     window: 3,
-    check: banned([
+    /**
+     * THE FAR-VIEWING RELAXATION — Tailwind's size ladder and the heavy weights,
+     * and nothing else.
+     *
+     * The scale runs 11–56px because it describes text somebody is holding or
+     * sitting at. A lobby kiosk, a counter station and a scoreboard are read
+     * across a room: `display` is the largest role the language has and it is
+     * not large enough for a called ticket number.
+     *
+     * Narrow by construction, exactly like `design-tokens`' overlay waiver. On a
+     * waived file a COMPOSITE spelling (`text-2xl font-bold tracking-tight`) and
+     * an ARBITRARY size (`text-[10px]`) still fire, because neither is made
+     * defensible by viewing distance — 10px on a kiosk is wrong at any range.
+     */
+    waivedPattern: /(?<![-\w])text-(?:xs|sm|base|lg|xl|[2-9]xl)\b(?!-)|\bfont-(?:extrabold|black)\b/,
+    /*
+      A COMMENT ABOUT `text-xs` IS NOT A `text-xs`, and this rule is the one that
+      has to say so. Its patterns are now bare class names — `text-sm`, `text-lg`
+      — short enough to appear in ordinary prose, which is exactly the reason the
+      `primitive` rule below already skips comment lines. `rings.tsx` explains in
+      a comment that an inline `fontSize` "silently beat the `text-xs`", and
+      telling its author to replace a size they had already removed is the
+      fastest way to teach somebody that a lint is noise.
+
+      Only whole-line comments — a trailing `// …` on a real class string still
+      counts, so nothing hides by appending one.
+
+      ⚠️ It sees the LINE, not the block: a continuation line inside a multi-line
+      JSX comment starts with prose and is indistinguishable from code here,
+      because `check` is per-line by design across all seven rules. Prose that
+      has to name a banned class on a middle line takes an inline
+      `type-scale-exempt:` — which is the mechanism working, not a gap in it.
+    */
+    check: (line) => (/^\s*(\*|\/\/|\/\*)/.test(line) ? null : banned([
       { re: /text-2xl\s+font-bold\s+tracking-tight/, use: "text-title-2" },
       { re: /text-xl\s+font-semibold\s+tracking-tight/, use: "text-title-3" },
       { re: /text-lg\s+font-semibold\s+tracking-tight/, use: "text-body-lg" },
@@ -200,7 +233,42 @@ export const UI_RULES: UiRule[] = [
         re: /\btext-\[[\d.]+(?:px|rem)\]/,
         use: "a role from the scale — display / title-1..3 / body-lg / body / caption / micro. 11px is `micro`, 13px is `caption`, and there is nothing below caption for running text (§12)",
       },
-    ]),
+      /*
+        TAILWIND'S OWN SIZE SCALE — the third way out, and by far the widest.
+
+        The two rules above catch a role spelled as a COMPOSITE and a size
+        spelled as an ARBITRARY. Neither sees `text-sm`, and `text-sm` is what
+        everybody actually writes: there were 1,526 of these in this repo when
+        the rule was added, 906 of them in the app the others are modelled on,
+        and 87 inside `@4dl/ui` itself — so the design system shipped two
+        dialects and every app inherited both.
+
+        They are not near-misses that happen to look fine. A role carries its
+        line-height, tracking AND weight (`--text-title-2--font-weight: 600`),
+        which is the whole reason `text-title-2` is "the complete instruction".
+        `text-sm font-semibold` is 14/1.25/inherited with the weight restated by
+        hand — a different SIZE, a different RHYTHM, and a hardcoded weight that
+        no longer moves when the scale does.
+
+        The map below is nearest-role, and the two exact matches (`xl`→title-3
+        at 20, `2xl`→title-2 at 24) are why it lands as cleanly as it does.
+
+        ⚠️ `text-base` is the one with a real defence, and it is NOT a style
+        argument: 16px is the threshold below which iOS Safari zooms the viewport
+        on focus and does not zoom back out. `Input` and `Textarea` in this
+        package keep it under a stated exemption. Anything else claiming it
+        should have to write the reason down too.
+      */
+      {
+        re: /(?<![-\w])text-(?:xs|sm|base|lg|xl|[2-9]xl)\b(?!-)/,
+        use:
+          "a role from the scale, not Tailwind's parallel one — xs→caption, sm→body, base/lg→body-lg, xl→title-3, 2xl→title-2, 3xl→title-1, 4xl+→display. " +
+          "A role carries line-height, tracking and weight, so `text-body-lg` replaces `text-sm font-medium` whole",
+      },
+      // §5: "Never a weight above 700." `display` and `title-1` ARE 700, so
+      // anything heavier is not emphasis, it is a fourth weight nobody chose.
+      { re: /\bfont-(?:extrabold|black)\b/, use: "font-bold — §5 caps the scale at 700, and the top two roles already are 700" },
+    ])(line)),
     samples: {
       bad: [
         'className="text-2xl font-bold tracking-tight"',
@@ -212,8 +280,25 @@ export const UI_RULES: UiRule[] = [
         'className="text-[11px] text-muted-foreground"',
         'className="text-[10px] uppercase"',
         'className="text-[0.95rem]"',
+        'className="text-sm text-muted-foreground"',
+        'className="truncate text-xs"',
+        'className="text-base"',
+        'className="text-5xl tabular-nums"',
+        'className="text-2xl font-extrabold"',
+        'className="font-black"',
       ],
-      good: ['className="text-title-2"', 'className="text-micro uppercase"', 'className="text-body-lg"', 'className="text-caption"'],
+      good: [
+        'className="text-title-2"',
+        'className="text-micro uppercase"',
+        'className="text-body-lg"',
+        'className="text-caption"',
+        'className="text-display font-bold"',
+        // Not a text SIZE: the same three letters appear in width, container and
+        // shadow utilities, and firing on those would make the rule noise.
+        'className="max-w-sm"',
+        'className="w-full max-w-lg shadow-xs"',
+        'className="text-[0.55em]"',
+      ],
     },
   },
 
@@ -374,6 +459,31 @@ export function uiConformance(opts: UiConformanceOptions): UiViolation[] {
   const exempt = new Set(opts.exemptFiles ?? []);
   const skip = new Set(opts.skip ?? []);
   const out: UiViolation[] = [];
+
+  /*
+    A WAIVER THAT CANNOT RELAX ANYTHING IS A CONFIGURATION BUG, AND IT USED TO
+    BE SILENT.
+
+    `waive` only removes a rule's `waivedPattern` before checking, so naming a
+    rule that has no `waivedPattern` does exactly nothing — the app reads as
+    having relaxed something, the rule keeps firing, and the reason the author
+    wrote down is never tested against anything. Scena did this: it waived
+    `type-scale` on its three far-viewing surfaces, and the waiver was a no-op.
+
+    Throwing is right rather than harsh. This is the same failure class as every
+    other guard in this repo — a check that quietly does not run — and the fix
+    is one of two lines: give the rule a `waivedPattern`, or use `exemptFiles`.
+  */
+  for (const id of Object.keys(opts.waive ?? {})) {
+    const rule = UI_RULES.find((r) => r.id === id);
+    if (!rule) throw new Error(`waive names an unknown rule: "${id}"`);
+    if (!rule.waivedPattern) {
+      throw new Error(
+        `waive["${id}"] cannot relax anything: rule "${id}" has no waivedPattern, so the waiver is a no-op. ` +
+          `Give the rule a waivedPattern, or move those files to exemptFiles if no rule has anything true to say about them.`,
+      );
+    }
+  }
 
   for (const rule of UI_RULES) {
     if (skip.has(rule.id)) continue;

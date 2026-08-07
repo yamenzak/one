@@ -43,7 +43,7 @@ export function AcceptInvite() {
       <Screen center width="narrow">
         <Card className="mb-4 space-y-2 p-6 text-center">
           <h1 className="text-title-2">{t("invite.title")}</h1>
-          <p className="text-sm text-muted-foreground">{t("invite.signInBody")}</p>
+          <p className="text-body text-muted-foreground">{t("invite.signInBody")}</p>
         </Card>
         <Login />
       </Screen>
@@ -54,8 +54,8 @@ export function AcceptInvite() {
     <Screen center width="narrow">
       <Card className="space-y-4 p-6 text-center">
         <h1 className="text-title-2">{t("invite.title")}</h1>
-        <p className="text-sm leading-relaxed text-muted-foreground">{t("invite.body")}</p>
-        {error && <p className="text-sm text-danger">{error}</p>}
+        <p className="text-body leading-relaxed text-muted-foreground">{t("invite.body")}</p>
+        {error && <p className="text-body text-danger">{error}</p>}
         <Button
           className="w-full"
           disabled={busy}

@@ -467,14 +467,14 @@ function ManualItems({ feed, onReload }: { feed: Feed; onReload: () => Promise<v
 function ItemList({ feed, onDelete }: { feed: Feed; onDelete?: (itemId: string) => void }) {
   const items = feed.items ?? [];
   if (items.length === 0)
-    return <div className="rounded-lg border border-dashed bg-card/40 px-4 py-10 text-center text-sm text-muted-foreground">No items yet.</div>;
+    return <div className="rounded-lg border border-dashed bg-card/40 px-4 py-10 text-center text-body text-muted-foreground">No items yet.</div>;
   return (
     <div className="divide-y rounded-lg border">
       {items.map((it) => (
         <div key={it.id} className="group flex items-center gap-2.5 px-3 py-2.5">
-          <span className="min-w-0 flex-1 truncate text-sm">{it.title}</span>
+          <span className="min-w-0 flex-1 truncate text-body">{it.title}</span>
           {it.link && (
-            <a href={it.link} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-primary hover:underline">
+            <a href={it.link} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-caption text-primary hover:underline">
               <ExternalLink className="size-3" /> link
             </a>
           )}
@@ -595,14 +595,14 @@ function TabularDetail({ feed, onReload }: { feed: Feed; onReload: () => Promise
 function DatasetTable({ dataset }: { dataset: SourceDataset }) {
   if (dataset.columns.length === 0)
     return (
-      <div className="rounded-lg border border-dashed bg-card/40 px-4 py-10 text-center text-sm text-muted-foreground">
+      <div className="rounded-lg border border-dashed bg-card/40 px-4 py-10 text-center text-body text-muted-foreground">
         No data yet — check the URL/mapping and refresh.
       </div>
     );
   const rows = dataset.rows.slice(0, 12);
   return (
     <div className="max-h-72 overflow-auto rounded-lg border">
-      <table className="w-full text-xs">
+      <table className="w-full text-caption">
         <thead className="sticky top-0 bg-muted/80 backdrop-blur">
           <tr>
             {dataset.columns.map((c, i) => (
@@ -661,7 +661,7 @@ function SourceConfigFields({
       <div className="space-y-3">
         <div className="space-y-1.5">
           <Label>RSS URL</Label>
-          <Input value={cfg.url} onChange={(e) => set("url")(e.target.value)} className="font-mono text-xs" placeholder="https://…/feed.xml" />
+          <Input value={cfg.url} onChange={(e) => set("url")(e.target.value)} className="font-mono text-caption" placeholder="https://…/feed.xml" />
         </div>
         <div className="space-y-1.5">
           <Label>
@@ -673,7 +673,7 @@ function SourceConfigFields({
             max={100}
             value={cfg.count}
             onChange={(e) => set("count")(e.target.value)}
-            className="w-32 text-xs tabular-nums"
+            className="w-32 text-caption tabular-nums"
             placeholder="30"
           />
           <p className="text-caption text-muted-foreground">How many recent headlines to keep. Default 30.</p>
@@ -686,13 +686,13 @@ function SourceConfigFields({
       <div className="space-y-3">
         <div className="space-y-1.5">
           <Label>Endpoint URL</Label>
-          <Input value={cfg.url} onChange={(e) => set("url")(e.target.value)} className="font-mono text-xs" placeholder="https://api.example.com/stats" />
+          <Input value={cfg.url} onChange={(e) => set("url")(e.target.value)} className="font-mono text-caption" placeholder="https://api.example.com/stats" />
         </div>
         <div className="space-y-1.5">
           <Label>
             Data path <span className="font-normal text-muted-foreground">(optional)</span>
           </Label>
-          <Input value={cfg.path} onChange={(e) => set("path")(e.target.value)} className="font-mono text-xs" placeholder="data.items" />
+          <Input value={cfg.path} onChange={(e) => set("path")(e.target.value)} className="font-mono text-caption" placeholder="data.items" />
           <p className="text-caption text-muted-foreground">
             Dot/bracket path to the array or object to tabulate, e.g. <code>results[0].rows</code>. Leave blank for the whole response.
           </p>
@@ -708,7 +708,7 @@ function SourceConfigFields({
         <Input
           value={cfg.sheetId}
           onChange={(e) => set("sheetId")(e.target.value)}
-          className="font-mono text-xs"
+          className="font-mono text-caption"
           placeholder="https://docs.google.com/spreadsheets/d/…"
         />
         <p className="text-caption text-muted-foreground">The sheet must be shared as “Anyone with the link”. The first row is used as column headers.</p>
@@ -717,7 +717,7 @@ function SourceConfigFields({
         <Label>
           Tab gid <span className="font-normal text-muted-foreground">(optional)</span>
         </Label>
-        <Input value={cfg.gid} onChange={(e) => set("gid")(e.target.value)} className="font-mono text-xs w-32" placeholder="0" />
+        <Input value={cfg.gid} onChange={(e) => set("gid")(e.target.value)} className="font-mono text-caption w-32" placeholder="0" />
       </div>
     </div>
   );
@@ -731,7 +731,7 @@ function FrequencySelect({ value, onChange }: { value: number; onChange: (v: num
       onChange={(v) => {
         if (v !== "custom") onChange(Number(v));
       }}
-      className="h-9 w-44 text-sm"
+      className="h-9 w-44 text-body"
       options={[
         ...FREQUENCIES.map((f) => ({ value: String(f.sec), label: f.label })),
         // A CONDITIONAL entry, not a mapped one: spreading `cond && obj`
@@ -757,7 +757,7 @@ function HourSelect({ value, onChange }: { value: number; onChange: (h: number) 
     <Select
       value={String(value)}
       onChange={(v) => onChange(Number(v))}
-      className="h-9 text-sm"
+      className="h-9 text-body"
       options={[...Array.from({ length: 25 }, (_, h) => ({ value: String(h), label: <>{String(h).padStart(2, "0")}:00</> }))]}
     />
   );
@@ -782,7 +782,7 @@ function WeatherWindowFields({ w, setW, perCall }: { w: WeatherWindow; setW: (u:
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label>Timezone</Label>
-          <Input list="tz-list" value={w.tz} onChange={(e) => setW({ tz: e.target.value })} className="text-xs" placeholder="Europe/Amsterdam" />
+          <Input list="tz-list" value={w.tz} onChange={(e) => setW({ tz: e.target.value })} className="text-caption" placeholder="Europe/Amsterdam" />
           <datalist id="tz-list">
             {tzOptions().map((z) => (
               <option key={z} value={z} />
@@ -794,7 +794,7 @@ function WeatherWindowFields({ w, setW, perCall }: { w: WeatherWindow; setW: (u:
           <Select
             value={w.units}
             onChange={(v) => setW({ units: v })}
-            className="h-9 text-sm"
+            className="h-9 text-body"
             options={[
               { value: "metric", label: "Metric (°C)" },
               { value: "imperial", label: "Imperial (°F)" },
@@ -929,10 +929,10 @@ function NewSourceDialog({
                       provider === p ? "border-primary/50 bg-primary/5" : "hover:bg-muted",
                     )}
                   >
-                    <span className="flex items-center gap-1.5 text-sm font-medium">
+                    <span className="flex items-center gap-1.5 text-body font-medium">
                       <Icon className="size-3.5" /> {meta.label}
                     </span>
-                    <span className="text-xs text-muted-foreground">{meta.blurb}</span>
+                    <span className="text-caption text-muted-foreground">{meta.blurb}</span>
                   </button>
                 );
               })}
@@ -965,12 +965,12 @@ function NewSourceDialog({
                 {isTabular(provider as SourceProvider) && (
                   <div className="rounded-lg border border-dashed p-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium">Fetch &amp; preview</span>
+                      <span className="text-caption font-medium">Fetch &amp; preview</span>
                       <Button type="button" variant="outline" size="sm" disabled={!configReady || testing} onClick={test}>
                         <RefreshCw className={cn("size-3.5", testing && "animate-spin")} /> {testing ? "Fetching…" : "Fetch"}
                       </Button>
                     </div>
-                    {previewErr && <p className="mt-2 text-xs text-destructive">{previewErr}</p>}
+                    {previewErr && <p className="mt-2 text-caption text-destructive">{previewErr}</p>}
                     {preview && (
                       <div className="mt-2">
                         <DatasetTable dataset={preview} />

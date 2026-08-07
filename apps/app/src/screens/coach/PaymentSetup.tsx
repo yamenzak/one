@@ -73,9 +73,9 @@ function CopyRow({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="space-y-1.5">
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="text-caption font-medium text-muted-foreground">{label}</div>
       <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/40 px-3 py-2">
-        <code className="min-w-0 flex-1 truncate font-mono text-xs">{value}</code>
+        <code className="min-w-0 flex-1 truncate font-mono text-caption">{value}</code>
         <Button
           size="sm"
           variant="ghost"
@@ -135,7 +135,7 @@ export function PaymentSetup({ isOwner }: { isOwner: boolean }) {
             </div>
             <div className="min-w-0">
               <div className="font-semibold tracking-tight">Your clients pay you directly</div>
-              <p className="text-sm text-muted-foreground">Straight into your own account, in your own name.</p>
+              <p className="text-body text-muted-foreground">Straight into your own account, in your own name.</p>
             </div>
           </div>
           {/* ONE SENTENCE (§10). This was a 55-word paragraph making the full
@@ -143,7 +143,7 @@ export function PaymentSetup({ isOwner }: { isOwner: boolean }) {
               is why the setup below is yours. All true, and all of it read as a
               wall above the only control on the screen. The promise is the two
               lines above; the reasoning is a Help Center article. */}
-          <p className="text-sm leading-relaxed text-muted-foreground">
+          <p className="text-body leading-relaxed text-muted-foreground">
             We never hold your money and never take a cut — which is why the setup below is yours to do.
           </p>
         </Card>
@@ -186,7 +186,7 @@ export function PaymentSetup({ isOwner }: { isOwner: boolean }) {
           and unable to sell — they can sell right now. */}
       {choice === "manual" && (
         <Stagger>
-          <Card className="space-y-2 text-sm text-muted-foreground">
+          <Card className="space-y-2 text-body text-muted-foreground">
             <div className="font-semibold text-foreground">Nothing to set up</div>
             <p className="leading-relaxed">
               When a client buys a package it appears in <strong className="text-foreground">Pending payments</strong>.
@@ -200,13 +200,13 @@ export function PaymentSetup({ isOwner }: { isOwner: boolean }) {
       {isStripeLink && (
         <section className="space-y-3">
           <SectionHeader title="Set it up" />
-          <p className="-mt-1 text-sm text-muted-foreground">Five minutes, once. You&rsquo;ll be moving between Stripe and this page.</p>
+          <p className="-mt-1 text-body text-muted-foreground">Five minutes, once. You&rsquo;ll be moving between Stripe and this page.</p>
 
           {(selected?.setupSteps ?? []).map((step, i) => (
             <Stagger key={i}>
               <Card className="flex gap-3 py-3">
-                <div className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/12 text-xs font-bold text-primary">{i + 1}</div>
-                <p className="flex-1 text-sm leading-relaxed">{step}</p>
+                <div className="grid size-6 shrink-0 place-items-center rounded-full bg-primary/12 text-caption font-bold text-primary">{i + 1}</div>
+                <p className="flex-1 text-body leading-relaxed">{step}</p>
               </Card>
             </Stagger>
           ))}
@@ -224,7 +224,7 @@ export function PaymentSetup({ isOwner }: { isOwner: boolean }) {
                 placeholder="https://buy.stripe.com/…"
                 disabled={!isOwner}
               />
-              <p className="-mt-2 text-xs text-muted-foreground">
+              <p className="-mt-2 text-caption text-muted-foreground">
                 Each package can have its own link — set those on the package itself. This one is the fallback.
               </p>
 
@@ -235,7 +235,7 @@ export function PaymentSetup({ isOwner }: { isOwner: boolean }) {
                 placeholder="whsec_…"
                 disabled={!isOwner}
               />
-              <p className="-mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+              <p className="-mt-2 flex items-start gap-1.5 text-caption text-muted-foreground">
                 <Lock aria-hidden className="mt-0.5 size-3 shrink-0" />
                 {/* Worth saying out loud: a trainer who has been told "never share
                     your Stripe keys" is right, and needs to know this is not that. */}
@@ -250,7 +250,7 @@ export function PaymentSetup({ isOwner }: { isOwner: boolean }) {
                 href="https://dashboard.stripe.com/webhooks"
                 target="_blank"
                 rel="noreferrer noopener"
-                className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary underline underline-offset-4"
+                className="inline-flex items-center gap-1.5 text-body font-semibold text-primary underline underline-offset-4"
               >
                 Open Stripe webhooks <ExternalLink aria-hidden className="size-3.5" />
               </a>

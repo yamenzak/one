@@ -89,7 +89,7 @@ export function InsightFeedback({
 
   if (vote !== null) {
     return (
-      <div className={cn("flex items-center gap-2 text-xs text-muted-foreground", className)} role="status" aria-live="polite">
+      <div className={cn("flex items-center gap-2 text-caption text-muted-foreground", className)} role="status" aria-live="polite">
         <Check className="size-3.5 text-success" /> Thanks for the feedback.
         {onMute && (
           <button onClick={mute} className="font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline">
@@ -102,7 +102,7 @@ export function InsightFeedback({
 
   return (
     <div className={cn("flex items-center gap-1", className)}>
-      <span className="mr-1 text-xs text-muted-foreground/70">Helpful?</span>
+      <span className="mr-1 text-caption text-muted-foreground/70">Helpful?</span>
       <button
         onClick={() => send(1)}
         aria-label="Helpful"

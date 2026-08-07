@@ -168,7 +168,7 @@ function BootSplash() {
           >
             {logo
               ? <img src={logo} alt="" className={square ? "size-full object-cover" : "size-full object-contain p-2"} />
-              : initial && <span className="text-title-1 font-black">{initial}</span>}
+              : initial && <span className="text-title-1 font-bold">{initial}</span>}
           </motion.div>
         </div>
         {wordmark

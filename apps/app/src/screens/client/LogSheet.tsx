@@ -39,7 +39,7 @@ const MOOD_ICONS = [Angry, Frown, Meh, Smile, Laugh];
 /*
   ONE TITLE, IN THE HEADER.
 
-  Each form used to open with its own `<h2 className="text-lg font-semibold">`
+  Each form used to open with its own `<h2 className="text-body-lg font-semibold">`
   while the Sheet's real title slot was passed `undefined` — a heading rendered
   twice over at two sizes, one of them invisible to the accessibility tree. It
   became visible once the sheet header was pinned: the `<h2>` scrolled away
@@ -79,9 +79,9 @@ function Rating({ label, scale, value, onChange }: { label: string; scale: Scale
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <span className="text-sm text-muted-foreground">{label}</span>
+        <span className="text-body text-muted-foreground">{label}</span>
         {/* The answer in words, so what you tapped is never a guess. */}
-        {value != null && <span className="text-sm font-medium">{s.words[value - 1]}</span>}
+        {value != null && <span className="text-body font-medium">{s.words[value - 1]}</span>}
       </div>
       <div className="flex gap-2" role="radiogroup" aria-label={label}>
         {icons.map((Face, i) => (
@@ -368,10 +368,10 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
                 profileReady ? (
                   <div className="space-y-2">
                     <Button className="w-full" onClick={open}><Camera /> Scan with camera</Button>
-                    <div className="text-center text-xs text-muted-foreground">Or enter your measurements manually</div>
+                    <div className="text-center text-caption text-muted-foreground">Or enter your measurements manually</div>
                   </div>
                 ) : loading ? null : (
-                  <p className="text-xs text-muted-foreground">Add your sex, birth date and height in your profile to scan with the camera.</p>
+                  <p className="text-caption text-muted-foreground">Add your sex, birth date and height in your profile to scan with the camera.</p>
                 )
               }
             </BodyScanLauncher>
@@ -390,11 +390,11 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
             <div className="rounded-2xl border border-border/60 bg-surface-2 p-2">
               <div className="mb-2 flex items-center gap-2 px-1">
                 <IconBadge icon={activityIcon(activityKey)} tone="cardio" size="sm" />
-                <span className="flex-1 text-sm font-semibold">{activityLabel}</span>
+                <span className="flex-1 text-body font-semibold">{activityLabel}</span>
               </div>
               <div className="relative mb-2">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <input value={actSearch} onChange={(e) => setActSearch(e.target.value)} aria-label="Search sports & workouts" placeholder="Search sports & workouts…" className="h-9 w-full rounded-full bg-background pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
+                <input value={actSearch} onChange={(e) => setActSearch(e.target.value)} aria-label="Search sports & workouts" placeholder="Search sports & workouts…" className="h-9 w-full rounded-full bg-background pl-8 pr-3 text-body outline-none focus-visible:ring-2 focus-visible:ring-ring/70" />
               </div>
               {/*
                 NO GLYPH ON THE CHIPS.
@@ -426,7 +426,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
                         {items.map((a) => {
                           const on = activityKey === a.key;
                           return (
-                            <button key={a.key} aria-pressed={on} onClick={() => setActivityKey(a.key)} style={on ? { background: toneVar.cardio, color: "var(--cardio-foreground)" } : undefined} className={cn("rounded-full px-3 py-1.5 text-sm transition-colors", !on && "bg-background hover:bg-surface-3")}>
+                            <button key={a.key} aria-pressed={on} onClick={() => setActivityKey(a.key)} style={on ? { background: toneVar.cardio, color: "var(--cardio-foreground)" } : undefined} className={cn("rounded-full px-3 py-1.5 text-body transition-colors", !on && "bg-background hover:bg-surface-3")}>
                               {a.label}
                             </button>
                           );
@@ -437,7 +437,7 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
                 })}
                 {/* A search that matches nothing must say so. */}
                 {actSearch.trim() && !ACTIVITIES.some((a) => a.label.toLowerCase().includes(actSearch.trim().toLowerCase())) && (
-                  <p className="px-1 py-3 text-center text-sm text-muted-foreground">Nothing matches “{actSearch.trim()}”. Pick <span className="font-medium text-foreground">Other</span> and name it yourself.</p>
+                  <p className="px-1 py-3 text-center text-body text-muted-foreground">Nothing matches “{actSearch.trim()}”. Pick <span className="font-medium text-foreground">Other</span> and name it yourself.</p>
                 )}
                 <div className="h-4" aria-hidden="true" />
               </div>
@@ -452,9 +452,9 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
               <Field label="Avg HR (optional)" icon={HeartPulse} inputMode="numeric" value={f.hr ?? ""} onChange={(e) => set("hr", e.target.value.replace(/\D/g, ""))} />
               <Field label={`Energy (${energyLabel(units)}, optional)`} icon={Flame} inputMode="numeric" value={f.kcal ?? ""} onChange={(e) => set("kcal", e.target.value.replace(/\D/g, ""))} />
             </div>
-            <p className="text-xs text-muted-foreground">Enter what your watch, Whoop, Apple Health or Fitbit shows. No numbers? Ask {ai.name} to estimate them from your body &amp; training.</p>
+            <p className="text-caption text-muted-foreground">Enter what your watch, Whoop, Apple Health or Fitbit shows. No numbers? Ask {ai.name} to estimate them from your body &amp; training.</p>
             <Button variant="tonal" size="sm" disabled={aiBusy} onClick={() => void askAi()}><AiAvatar className="size-5" /> {aiBusy ? "Estimating…" : `Ask ${ai.name} to estimate`}</Button>
-            {aiNote && <p className="rounded-xl px-3 py-2 text-xs" style={{ background: `color-mix(in oklch, ${toneVar.cardio} 12%, transparent)`, color: toneVar.cardio }}>{aiNote}</p>}
+            {aiNote && <p className="rounded-xl px-3 py-2 text-caption" style={{ background: `color-mix(in oklch, ${toneVar.cardio} 12%, transparent)`, color: toneVar.cardio }}>{aiNote}</p>}
             <Textarea rows={2} placeholder="Notes (optional)…" value={f.actNotes ?? ""} onChange={(e) => set("actNotes", e.target.value)} />
           </>)}
           {kind === "sleep" && (<>
@@ -498,22 +498,22 @@ export function LogSheet({ open, onClose, clientId, onLogged, initialKind }: { o
             <Textarea rows={2} placeholder="Notes for your coach…" value={f.notes ?? ""} onChange={(e) => set("notes", e.target.value)} />
             {ciPhotos && (
             <div>
-              <div className="mb-2 flex items-center justify-between text-sm text-muted-foreground"><span>Progress photos</span></div>
+              <div className="mb-2 flex items-center justify-between text-body text-muted-foreground"><span>Progress photos</span></div>
               <div className="flex flex-wrap gap-2">
                 {photos.map((p, i) => (
-                  <div key={i} className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs">
+                  <div key={i} className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-caption">
                     Photo {i + 1}
                     <Switch checked={p.consentToFeature} onCheckedChange={(v) => setPhotos((arr) => arr.map((x, j) => (j === i ? { ...x, consentToFeature: v } : x)))} />
                   </div>
                 ))}
-                <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3 text-xs [&_svg]:size-3.5"><Camera /> Add<input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadPhoto(e.target.files[0])} /></label>
+                <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3 text-caption [&_svg]:size-3.5"><Camera /> Add<input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadPhoto(e.target.files[0])} /></label>
               </div>
-              {photoErr && <p className="mt-1.5 text-xs text-warning">{photoErr}</p>}
-              {photos.length > 0 && <p className="mt-1.5 text-xs text-muted-foreground">Photos are private. Toggle to allow featuring as a before/after.</p>}
+              {photoErr && <p className="mt-1.5 text-caption text-warning">{photoErr}</p>}
+              {photos.length > 0 && <p className="mt-1.5 text-caption text-muted-foreground">Photos are private. Toggle to allow featuring as a before/after.</p>}
             </div>
             )}
           </>)}
-          {err && <p className="text-sm text-warning" role="alert">{err}</p>}
+          {err && <p className="text-body text-warning" role="alert">{err}</p>}
           {queued && <QueuedNotice />}
         </div>
       )}

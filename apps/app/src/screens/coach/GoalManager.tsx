@@ -117,8 +117,8 @@ function TargetGrid({ targets, units }: { targets: Record<string, number> | null
         const v = targets?.[key];
         return (
           <div key={metric} className="rounded-xl bg-secondary p-3">
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><m.icon className="size-3.5" style={{ color: toneVar[m.tone] }} /> {m.label}</div>
-            <div className={v == null ? "mt-0.5" : "numeral mt-0.5 text-xl font-semibold"}>{v == null ? <NoData className="text-xs">Not set</NoData> : fmtTarget(key, v, units)}</div>
+            <div className="flex items-center gap-1.5 text-caption text-muted-foreground"><m.icon className="size-3.5" style={{ color: toneVar[m.tone] }} /> {m.label}</div>
+            <div className={v == null ? "mt-0.5" : "numeral mt-0.5 text-title-3 font-semibold"}>{v == null ? <NoData className="text-caption">Not set</NoData> : fmtTarget(key, v, units)}</div>
           </div>
         );
       })}
@@ -322,7 +322,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
    *  `GlanceStrip`). */
   const series = useMemo(() => phases.filter((p) => typeof p.goal.targets?.[compare] === "number"), [phases, compare]);
   const compareMetric = METRICS[metricOf(compare)];
-  const selRow = "mb-1.5 block text-sm font-medium text-muted-foreground";
+  const selRow = "mb-1.5 block text-body font-medium text-muted-foreground";
 
   return (
     <Page className="column space-y-4 p-4 pb-28">
@@ -381,7 +381,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
                   </span>
                 )}
               </div>
-              {active.notes && <p className="rounded-xl bg-secondary p-3 text-sm text-muted-foreground">{active.notes}</p>}
+              {active.notes && <p className="rounded-xl bg-secondary p-3 text-body text-muted-foreground">{active.notes}</p>}
             </Card>
           ) : (
             <EmptyState
@@ -401,7 +401,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
           <Eyebrow action={metrics.measuredAt ? <Badge tone="neutral">{fmtShort(metrics.measuredAt)}</Badge> : undefined}>Body snapshot</Eyebrow>
           <Stagger>
             <GlanceStrip items={[
-              { icon: Scale, tone: "cardio", value: metrics.weightKg != null ? <>{kgToDisplay(metrics.weightKg, units)}<span className="ml-1 text-xs font-medium text-muted-foreground">{weightLabel(units)}</span></> : null, label: <>Weight<StatusChip status={metrics.weightStatus} /></> },
+              { icon: Scale, tone: "cardio", value: metrics.weightKg != null ? <>{kgToDisplay(metrics.weightKg, units)}<span className="ml-1 text-caption font-medium text-muted-foreground">{weightLabel(units)}</span></> : null, label: <>Weight<StatusChip status={metrics.weightStatus} /></> },
               { icon: Activity, tone: "activity", value: metrics.bmi ?? null, label: metrics.bmiCategory ? BMI_CATEGORY_LABELS[metrics.bmiCategory] : "BMI" },
               { icon: Flame, tone: "calories", value: metrics.bmr ?? null, label: metrics.bmr != null ? "BMR · kcal/day" : "BMR" },
               { icon: Target, tone: "sleep", value: metrics.bodyFatPercent != null ? `${metrics.bodyFatPercent}%` : null, label: "Body fat" },
@@ -464,7 +464,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
                     icon={p.goal.status === "active" ? Target : History}
                     onClick={() => setOpenPhase(p)}
                     sub={p.end ? `${fmtShort(p.start)} → ${fmtShort(p.end)} · ${p.days} days` : `Since ${fmtShort(p.start)} · day ${p.days + 1}`}
-                    value={typeof v === "number" ? fmtTarget(compare, v, units) : <NoData className="text-sm">Not set</NoData>}
+                    value={typeof v === "number" ? fmtTarget(compare, v, units) : <NoData className="text-body">Not set</NoData>}
                     valueSub={typeof v === "number" && typeof prevV === "number"
                       ? <Delta value={v - prevV} format={(d) => fmtTarget(compare, d, units)} zeroLabel="Same" />
                       : undefined}
@@ -498,7 +498,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
               Weekly training load {openPhase.goal.targets?.weeklyTrainingLoad ?? openPhase.goal.weeklyLoadTarget ?? DEFAULT_WEEKLY_LOAD_TARGET}
               {openPhase.goal.created_by_name ? ` · set by ${openPhase.goal.created_by_name}` : ""}
             </div>
-            {openPhase.goal.notes && <p className="rounded-xl bg-secondary p-3 text-sm text-muted-foreground">{openPhase.goal.notes}</p>}
+            {openPhase.goal.notes && <p className="rounded-xl bg-secondary p-3 text-body text-muted-foreground">{openPhase.goal.notes}</p>}
           </div>
         )}
       </Sheet>
@@ -546,7 +546,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
 
           {/* Targets — autofilled from the calc, editable for a tweak. */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">Targets{bodyReady ? " (tweak if needed)" : ""}</label>
+            <label className="text-body font-medium text-muted-foreground">Targets{bodyReady ? " (tweak if needed)" : ""}</label>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               {TARGET_FIELDS.map(({ key, metric }) => {
                 const m = METRICS[metric];
@@ -556,7 +556,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
           </div>
 
           {active?.targets && newCals != null && calDelta != null && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary p-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-secondary p-3 text-body">
               <span className="text-muted-foreground">Calories</span>
               <span className="flex items-center gap-2">
                 <span className="numeral font-semibold">{fmtEnergy(newCals, units)}</span>
@@ -574,7 +574,7 @@ export function GoalManager({ clientId }: { clientId: string }) {
           {/* Optional healthy weight band — suggested from the target weight, so
               nothing to type. Drives the client's In-range / off-track chip. */}
           <div className="rounded-xl bg-secondary/40 p-3">
-            <button type="button" className="flex min-h-11 w-full items-center justify-between text-sm font-medium" onClick={() => setRangeOpen((o) => !o)} aria-expanded={rangeOpen}>
+            <button type="button" className="flex min-h-11 w-full items-center justify-between text-body font-medium" onClick={() => setRangeOpen((o) => !o)} aria-expanded={rangeOpen}>
               <span>Healthy weight range <span className="text-muted-foreground">(optional)</span></span>
               <span className="text-muted-foreground">{rangeOpen ? "−" : "+"}</span>
             </button>

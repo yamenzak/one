@@ -54,8 +54,8 @@ export function LockedFeatureCard({ feature, className }: { feature: string; cla
       <div className="grid size-11 place-items-center rounded-full bg-muted">
         <Lock className="size-5 text-muted-foreground" />
       </div>
-      <div className="text-base font-semibold">{meta.label}</div>
-      {meta.description && <p className="text-sm text-muted-foreground">{meta.description}</p>}
+      <div className="text-body-lg font-semibold">{meta.label}</div>
+      {meta.description && <p className="text-body text-muted-foreground">{meta.description}</p>}
       <Button asChild size="sm" className="mt-1">
         <Link to="/billing">Upgrade plan</Link>
       </Button>

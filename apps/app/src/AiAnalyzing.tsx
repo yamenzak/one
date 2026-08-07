@@ -41,7 +41,7 @@ export function AiAnalyzing({ label, sub }: { label: string; sub?: string }) {
       </div>
 
       <div className="text-center" role="status" aria-live="polite">
-        <div className="flex items-center justify-center gap-1 text-base font-semibold">
+        <div className="flex items-center justify-center gap-1 text-body-lg font-semibold">
           {label}
           <span className="inline-flex">
             {[0, 1, 2].map((i) => (
@@ -49,7 +49,7 @@ export function AiAnalyzing({ label, sub }: { label: string; sub?: string }) {
             ))}
           </span>
         </div>
-        {sub && <p className="mt-1 text-sm text-muted-foreground">{sub}</p>}
+        {sub && <p className="mt-1 text-body text-muted-foreground">{sub}</p>}
       </div>
 
       {/* Shimmering placeholder rows — hints that a result is on its way. */}

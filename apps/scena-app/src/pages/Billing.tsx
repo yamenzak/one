@@ -27,7 +27,7 @@ const num = (n: number) => n.toLocaleString();
  * Bytes as an amount a person reads — GB past a gigabyte, MB below it.
  *
  * Returned SPLIT, because the anchor renders the two halves differently. As one
- * string in `font-mono text-3xl` the separating space is a full monospace
+ * string in `font-mono text-title-1` the separating space is a full monospace
  * advance, so "0 MB" came out as a numeral, a visible gap, and a unit shouting
  * at the same size as the number. §5: the unit rides the value at `0.5em`, and
  * only the numeral is tabular.
@@ -158,25 +158,25 @@ export function BillingPage() {
         <Card className="flex flex-col">
           <SectionHeader title="Current plan" className="mb-4" />
           <div className="flex items-baseline gap-2.5">
-            <span className="text-2xl font-semibold tracking-tight">{plan?.name ?? sub.plan_id}</span>
-            <span className="font-mono text-sm tabular-nums text-muted-foreground">
+            <span className="text-title-2 font-semibold tracking-tight">{plan?.name ?? sub.plan_id}</span>
+            <span className="font-mono text-body tabular-nums text-muted-foreground">
               {plan ? (plan.price_cents === 0 ? "Free" : `${dollars(plan.price_cents)}/${plan.interval}`) : ""}
             </span>
           </div>
-          <div className="grid grid-cols-3 gap-4 border-t pt-4 text-sm">
+          <div className="grid grid-cols-3 gap-4 border-t pt-4 text-body">
             <div>
-              <div className="text-xs text-muted-foreground">Status</div>
+              <div className="text-caption text-muted-foreground">Status</div>
               <div className={cn("mt-1 flex items-center gap-1.5 font-medium capitalize", statusText)}>
                 <span className={cn("size-2 shrink-0 rounded-full", statusDot)} />
                 {status}
               </div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">Monthly grant</div>
+              <div className="text-caption text-muted-foreground">Monthly grant</div>
               <div className="mt-1 font-mono font-medium tabular-nums">{grant ? num(grant) : "—"}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">Renews</div>
+              <div className="text-caption text-muted-foreground">Renews</div>
               <div className="mt-1 font-mono font-medium tabular-nums">{sub.current_period_end ? fmtDate(sub.current_period_end) : "—"}</div>
             </div>
           </div>
@@ -185,7 +185,7 @@ export function BillingPage() {
         {/* AI credit balance meter */}
         <Card>
           <SectionHeader title="AI credit balance" className="mb-4" />
-          <div className="numeral text-3xl font-semibold">{num(balance.balance)}</div>
+          <div className="numeral text-title-1 font-semibold">{num(balance.balance)}</div>
           {grant > 0 && (
             <Meter
               className="mt-3"
@@ -196,7 +196,7 @@ export function BillingPage() {
               valueLabel={`${num(balance.balance)} / ${num(grant)} grant · ${num(balance.available)} available`}
             />
           )}
-          <div className="mt-3 text-xs text-muted-foreground/70">$1 = 1,000 credits · charged per model at generation time.</div>
+          <div className="mt-3 text-caption text-muted-foreground/70">$1 = 1,000 credits · charged per model at generation time.</div>
         </Card>
 
         {/* Media storage meter */}
@@ -226,16 +226,16 @@ export function BillingPage() {
               valueLabel={`${mb(storage.usedBytes)} / ${mb(storage.limitBytes)} used`}
             />
           )}
-          {storage && storage.limitBytes < 0 && <div className="mt-3 text-xs text-muted-foreground">Unlimited on this plan.</div>}
-          <div className="mt-3 text-xs text-muted-foreground/70">Uploads and generated assets. Deleting media from the library frees it.</div>
+          {storage && storage.limitBytes < 0 && <div className="mt-3 text-caption text-muted-foreground">Unlimited on this plan.</div>}
+          <div className="mt-3 text-caption text-muted-foreground/70">Uploads and generated assets. Deleting media from the library frees it.</div>
         </Card>
       </div>
 
       {/* Plans — a marketplace of what each tier unlocks */}
       <div>
         <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="text-base font-semibold">Plans</h2>
-          <p className="text-xs text-muted-foreground">Pick the tier that fits — upgrade or downgrade any time.</p>
+          <h2 className="text-body-lg font-semibold">Plans</h2>
+          <p className="text-caption text-muted-foreground">Pick the tier that fits — upgrade or downgrade any time.</p>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {plans.map((p) => {
@@ -251,10 +251,10 @@ export function BillingPage() {
                 {current && (
                   <span className="absolute right-4 top-4 rounded-full bg-primary/10 px-2 py-0.5 text-caption font-semibold text-primary">Current</span>
                 )}
-                <div className="text-sm font-semibold">{p.name}</div>
+                <div className="text-body font-semibold">{p.name}</div>
                 <div className="mt-1.5 flex items-baseline gap-1">
                   <span className="text-title-2">{p.price_cents === 0 ? "Free" : dollars(p.price_cents)}</span>
-                  {p.price_cents > 0 && <span className="text-xs text-muted-foreground">/{p.interval}</span>}
+                  {p.price_cents > 0 && <span className="text-caption text-muted-foreground">/{p.interval}</span>}
                 </div>
                 <div className="mt-1 flex items-center gap-1 text-caption font-medium text-primary">
                   <Sparkles className="size-3" /> {planGrantN(p) > 0 ? `${planGrant(p)} AI credits / mo` : "No AI credits"}
@@ -289,13 +289,13 @@ export function BillingPage() {
       <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
         <Card>
           <div className="mb-4 pb-3">
-            <h3 className="text-base font-semibold leading-none text-base">Credit packs</h3>
-            <p className="text-xs text-muted-foreground">One-time top-ups. Purchased credits never expire.</p>
+            <h3 className="text-title-3">Credit packs</h3>
+            <p className="text-caption text-muted-foreground">One-time top-ups. Purchased credits never expire.</p>
           </div>
           {packs.map((pk) => (
             <div key={pk.id} className="flex flex-col items-center rounded-xl border p-4 text-center">
-              <div className="font-mono text-xl font-semibold tabular-nums">{num(pk.credits)}</div>
-              <div className="mb-3 text-xs text-muted-foreground">credits</div>
+              <div className="font-mono text-title-3 font-semibold tabular-nums">{num(pk.credits)}</div>
+              <div className="mb-3 text-caption text-muted-foreground">credits</div>
               <Button variant="outline" size="sm" className="w-full" disabled={busy === pk.id} onClick={() => purchase(pk.id)}>
                 {dollars(pk.price_cents)}
               </Button>
@@ -311,7 +311,7 @@ export function BillingPage() {
               Redeem
             </Button>
           </div>
-          {promoMsg && <div className={cn("mt-2 text-xs", promoMsg.ok ? "text-success" : "text-destructive")}>{promoMsg.text}</div>}
+          {promoMsg && <div className={cn("mt-2 text-caption", promoMsg.ok ? "text-success" : "text-destructive")}>{promoMsg.text}</div>}
         </Card>
       </div>
 
@@ -424,7 +424,7 @@ function PlanChangeDialog({
       <DialogContent title={`${dir === "up" ? "Upgrade to" : "Switch to"} ${target.name}`} className="sm:max-w-md">
         <div className="flex items-baseline gap-1.5">
           <span className="text-title-2">{paid ? dollars(target.price_cents) : "Free"}</span>
-          {paid && <span className="text-sm text-muted-foreground">/{target.interval}</span>}
+          {paid && <span className="text-body text-muted-foreground">/{target.interval}</span>}
         </div>
         <ul className="space-y-1.5">
           {feats.map((f) => (
@@ -513,10 +513,10 @@ function DowngradeModal({ planName, violations, onClose }: { planName: string; v
       }}
     >
       <DialogContent title={<>Can’t downgrade to {planName} yet</>}>
-        <p className="text-sm text-muted-foreground">You’re still using more than {planName} allows. Resolve these, then try again:</p>
+        <p className="text-body text-muted-foreground">You’re still using more than {planName} allows. Resolve these, then try again:</p>
         <div className="flex flex-col gap-2">
           {violations.map((v, i) => (
-            <div key={i} className="flex items-start gap-2.5 rounded-lg border px-3 py-2 text-sm">
+            <div key={i} className="flex items-start gap-2.5 rounded-lg border px-3 py-2 text-body">
               <span className="font-bold text-warning">•</span>
               <span>{violationText(v)}</span>
             </div>

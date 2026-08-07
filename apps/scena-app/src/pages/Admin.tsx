@@ -158,7 +158,7 @@ export function DangerTab() {
         }
         className="mb-4"
       />
-      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-muted-foreground">
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-body text-muted-foreground">
         Permanently deletes <b className="text-foreground">everything</b> — all workspaces, users, screens, channels, boards, credentials, and uploaded media —
         and resets this deployment to a fresh install. The plan catalog is re-seeded so it stays usable.{" "}
         <b className="text-foreground">This cannot be undone.</b>
@@ -170,7 +170,7 @@ export function DangerTab() {
         </Button>
       ) : (
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-body text-muted-foreground">
             We emailed a 6-digit code to <span className="font-medium text-foreground">{sentTo}</span>. Enter it and type the phrase to confirm.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -207,7 +207,7 @@ export function DangerTab() {
             >
               Cancel
             </Button>
-            <button type="button" className="text-xs text-muted-foreground hover:text-foreground" disabled={busy} onClick={requestCode}>
+            <button type="button" className="text-caption text-muted-foreground hover:text-foreground" disabled={busy} onClick={requestCode}>
               Resend code
             </button>
           </div>
@@ -266,7 +266,7 @@ export function StripeTab() {
         placeholder={placeholder}
         className={cn((key.includes("key") || key.includes("secret")) && "font-mono")}
       />
-      {helper ? <span className="text-xs text-muted-foreground">{helper}</span> : null}
+      {helper ? <span className="text-caption text-muted-foreground">{helper}</span> : null}
     </div>
   );
 
@@ -274,8 +274,8 @@ export function StripeTab() {
     <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.1fr_1fr]">
       <Card>
         <div className="mb-4">
-          <h3 className="text-base font-semibold leading-none text-base">Stripe credentials</h3>
-          <p className="text-sm text-muted-foreground">Keys are stored server-side and never shipped to the browser or screens.</p>
+          <h3 className="text-title-3">Stripe credentials</h3>
+          <p className="text-body text-muted-foreground">Keys are stored server-side and never shipped to the browser or screens.</p>
         </div>
         <div className="flex flex-col gap-1.5">
           <Label>Mode</Label>
@@ -311,8 +311,8 @@ export function StripeTab() {
 
       <Card>
         <div className="mb-4">
-          <h3 className="text-base font-semibold leading-none text-base">Billing policy</h3>
-          <p className="text-sm text-muted-foreground">Dunning windows, AI margin, transactional email, and platform provider keys.</p>
+          <h3 className="text-title-3">Billing policy</h3>
+          <p className="text-body text-muted-foreground">Dunning windows, AI margin, transactional email, and platform provider keys.</p>
         </div>
         {field("billing.grace_days", "Grace days (past-due → suspend)")}
         {field("billing.delete_days", "Delete days (suspend → auto-delete)")}
@@ -345,7 +345,7 @@ export function StripeTab() {
               { value: "mock", label: "Mock (development only)" },
             ]}
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             Mock logs the message instead of sending it, including sign-in codes — outside development it refuses rather than reporting a delivery that never
             happened.
           </p>
@@ -450,8 +450,8 @@ export function PlansTab() {
   return (
     <Card>
       <div className="mb-4">
-        <h3 className="text-base font-semibold leading-none text-base">Plans &amp; entitlements</h3>
-        <p className="text-sm text-muted-foreground">
+        <h3 className="text-title-3">Plans &amp; entitlements</h3>
+        <p className="text-body text-muted-foreground">
           Edit price/grant inline and click away to save. <b>Configure</b> opens the full entitlements editor — changes apply to{" "}
           <b>every current and future tenant</b> on the plan (per-tenant overrides in the Tenants tab still win).
         </p>
@@ -643,7 +643,7 @@ function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose
                 <SectionLabel>Quotas</SectionLabel>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {PLAN_QUOTAS.map((x) => (
-                    <label key={x.key} className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
+                    <label key={x.key} className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-body text-muted-foreground">
                       <span className="flex-1">{x.label}</span>
                       <Input
                         value={String(ent.quotas[x.key] ?? 0)}
@@ -662,7 +662,7 @@ function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose
                     <div className="text-micro text-muted-foreground/70 uppercase">{g.cat}</div>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {g.items.map((x) => (
-                        <label key={x.key} title={x.description} className="flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm">
+                        <label key={x.key} title={x.description} className="flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-body">
                           <span className="flex-1 text-muted-foreground">
                             {x.label}
                             {x.safety && (
@@ -679,7 +679,7 @@ function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose
                 ))}
               </div>
 
-              <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
+              <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-body text-muted-foreground">
                 <span className="flex-1">Monthly AI credit grant</span>
                 <Input
                   value={String(ent.aiCredits.monthlyGrant ?? 0)}
@@ -766,8 +766,8 @@ export function ModelsTab() {
       <div className="mb-4 gap-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 className="text-base font-semibold leading-none text-base">AI model catalog &amp; pricing</h3>
-            <p className="text-sm text-muted-foreground">
+            <h3 className="text-title-3">AI model catalog &amp; pricing</h3>
+            <p className="text-body text-muted-foreground">
               Unit rates set the cost basis; Markup × sets the margin (3× ≈ 67%). Advanced models run on the platform key, metered at the provider's list price.
               Sync refreshes the live model catalog when the platform key is set.
             </p>
@@ -785,7 +785,7 @@ export function ModelsTab() {
               </Button>
             ))}
           </div>
-          <span className="ml-auto text-sm text-muted-foreground tabular-nums">
+          <span className="ml-auto text-body text-muted-foreground tabular-nums">
             {filtered?.length ?? 0} shown · {enabled}/{models.length} enabled
           </span>
         </div>
@@ -798,7 +798,7 @@ export function ModelsTab() {
             ))}
           </Group>
         ) : (
-          <p className="py-10 text-center text-sm text-muted-foreground">No models match your search.</p>
+          <p className="py-10 text-center text-body text-muted-foreground">No models match your search.</p>
         )}
       </div>
     </Card>
@@ -916,8 +916,8 @@ export function LibraryTab() {
         <div className="mb-4 gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 className="text-base font-semibold leading-none text-base">Public library</h3>
-              <p className="text-sm text-muted-foreground">Licensed tracks available to every tenant whose plan includes the Music library.</p>
+              <h3 className="text-title-3">Public library</h3>
+              <p className="text-body text-muted-foreground">Licensed tracks available to every tenant whose plan includes the Music library.</p>
             </div>
             <div className="flex items-center gap-2">
               {tracks.length > 0 && <SearchBox value={q} onChange={setQ} placeholder="Search tracks…" className="w-full sm:w-56" />}
@@ -940,7 +940,7 @@ export function LibraryTab() {
             className="border-0 bg-transparent py-8"
           />
         ) : visible.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">No tracks match your search.</div>
+          <div className="py-10 text-center text-body text-muted-foreground">No tracks match your search.</div>
         ) : (
           <Group>
             {visible.map((t, i) => (
@@ -1202,10 +1202,10 @@ export function PromosTab() {
         <div className="mb-4 gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 className="text-base font-semibold leading-none text-base">
-                Promo codes <span className="ml-1 text-sm font-normal text-muted-foreground tabular-nums">{promos.length}</span>
+              <h3 className="text-title-3">
+                Promo codes <span className="ml-1 text-body font-normal text-muted-foreground tabular-nums">{promos.length}</span>
               </h3>
-              <p className="text-sm text-muted-foreground">Gift credits or a comped plan to a tenant.</p>
+              <p className="text-body text-muted-foreground">Gift credits or a comped plan to a tenant.</p>
             </div>
             <Button onClick={() => setDialogOpen(true)}>
               <Plus className="size-4" /> New code
@@ -1441,8 +1441,8 @@ export function TenantsTab() {
         <div className="mb-4 gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 className="text-base font-semibold leading-none text-base">Tenants</h3>
-              <p className="text-sm text-muted-foreground">Adjust credits, entitlement overrides, and lifecycle.</p>
+              <h3 className="text-title-3">Tenants</h3>
+              <p className="text-body text-muted-foreground">Adjust credits, entitlement overrides, and lifecycle.</p>
             </div>
             <Button variant="outline" onClick={sweep}>
               <RefreshCw className="size-4" /> Run lifecycle sweep
@@ -1453,7 +1453,7 @@ export function TenantsTab() {
         {tenants.length === 0 ? (
           <EmptyState icon={Users} title="No tenants yet" description="Tenants appear here once workspaces sign up." className="border-0 bg-transparent py-8" />
         ) : visible && visible.length === 0 ? (
-          <div className="py-10 text-center text-sm text-muted-foreground">No tenants match your search.</div>
+          <div className="py-10 text-center text-body text-muted-foreground">No tenants match your search.</div>
         ) : (
           <Group>
             {(visible ?? []).map((t, i) => {
@@ -1645,7 +1645,7 @@ function OverridesModal({ tenantId, onClose }: { tenantId: string; onClose: () =
                 <SectionLabel>Quotas</SectionLabel>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {OVR_QUOTAS.map((x) => (
-                    <label key={x.key} className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
+                    <label key={x.key} className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-body text-muted-foreground">
                       <span className="flex-1">{x.label}</span>
                       <Input
                         value={q[x.key] ?? ""}
@@ -1661,7 +1661,7 @@ function OverridesModal({ tenantId, onClose }: { tenantId: string; onClose: () =
                 <SectionLabel>Features</SectionLabel>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   {OVR_FEATURES.map((x) => (
-                    <label key={x.key} className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
+                    <label key={x.key} className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-body text-muted-foreground">
                       <span className="flex-1">{x.label}</span>
                       <Select
                         value={f[x.key] ?? "inherit"}
@@ -1677,7 +1677,7 @@ function OverridesModal({ tenantId, onClose }: { tenantId: string; onClose: () =
                   ))}
                 </div>
               </div>
-              <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
+              <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-body text-muted-foreground">
                 <span className="flex-1">Monthly AI credit grant</span>
                 <Input
                   value={grant}

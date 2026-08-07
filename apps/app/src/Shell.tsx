@@ -327,7 +327,7 @@ function TabLayout() {
               />
             )}
             {!barWordmark && (
-              <span className="flex h-9 items-center truncate text-base font-semibold tracking-tight">{active.tenantName}</span>
+              <span className="flex h-9 items-center truncate text-body-lg font-semibold tracking-tight">{active.tenantName}</span>
             )}
             {isStaff && (
               <span className="hidden h-9 items-center rounded-full bg-secondary px-2.5 text-micro uppercase text-muted-foreground sm:inline-flex">
@@ -372,7 +372,7 @@ function TabLayout() {
                 >
                   {/* One face per person — `registry/avatars.ts` owns the rule. */}
                   <Avatar {...meAvatar(ctx!.user, active)} className="size-9" />
-                  <span className="hidden max-w-40 truncate text-sm font-medium sm:block">
+                  <span className="hidden max-w-40 truncate text-body font-medium sm:block">
                     {ctx!.user.name || ctx!.user.email}
                   </span>
                 </button>
@@ -391,7 +391,7 @@ function TabLayout() {
                   <Avatar {...meAvatar(ctx!.user, active)} className="size-8 shrink-0" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{ctx!.user.name || ctx!.user.email}</span>
-                    {ctx!.user.name && <span className="block truncate text-xs text-muted-foreground">{ctx!.user.email}</span>}
+                    {ctx!.user.name && <span className="block truncate text-caption text-muted-foreground">{ctx!.user.email}</span>}
                   </span>
                   <ChevronRight className="shrink-0 text-muted-foreground" />
                 </DropdownMenuItem>
@@ -455,7 +455,7 @@ function TabLayout() {
           server refuses correctly and the person has no idea why. Directly under
           the bar, above every screen, so it cannot be missed or scrolled past. */}
       {clientSurface && ctx!.clientAccess?.archived && (
-        <div role="status" className="border-b border-border/40 bg-warning/10 px-4 py-2.5 text-center text-sm text-warning">
+        <div role="status" className="border-b border-border/40 bg-warning/10 px-4 py-2.5 text-center text-body text-warning">
           <span className="font-medium">Your history is read-only.</span>{" "}
           {active.tenantName} has closed your place here — everything you logged is still yours to look back on.
         </div>

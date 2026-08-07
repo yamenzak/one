@@ -277,11 +277,11 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                 ? (groups.length === 1 ? "meal a day · set by your coach" : "meals a day · set by your coach")
                 : `${groups.length === 1 ? "meal a day" : "meals a day"} · ${active?.body.mealOptions?.length ?? 0} option${(active?.body.mealOptions?.length ?? 0) === 1 ? "" : "s"}`}
               below={isPast ? (
-                <button onClick={() => pickPlan(null)} className="inline-flex items-center gap-1 rounded-full bg-nutrition-soft px-3 py-1 text-xs font-semibold text-nutrition [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
+                <button onClick={() => pickPlan(null)} className="inline-flex items-center gap-1 rounded-full bg-nutrition-soft px-3 py-1 text-micro text-nutrition [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
               ) : (targets?.targetCalories || targets?.targetProteinG) ? (
                 <div className="flex flex-wrap justify-center gap-2">
-                  {targets?.targetCalories ? <span className="rounded-full bg-calories-soft px-2.5 py-1 text-xs font-semibold text-calories">{fmtEnergy(targets.targetCalories, units)} / day</span> : null}
-                  {targets?.targetProteinG ? <span className="rounded-full bg-protein-soft px-2.5 py-1 text-xs font-semibold text-protein">{targets.targetProteinG} g protein</span> : null}
+                  {targets?.targetCalories ? <span className="rounded-full bg-calories-soft px-2.5 py-1 text-micro text-calories">{fmtEnergy(targets.targetCalories, units)} / day</span> : null}
+                  {targets?.targetProteinG ? <span className="rounded-full bg-protein-soft px-2.5 py-1 text-micro text-protein">{targets.targetProteinG} g protein</span> : null}
                 </div>
               ) : undefined}
             >
@@ -293,7 +293,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
             {view === "plan" ? (
               groups.length === 0 ? <EmptyState icon={Utensils} title="No options yet" /> : (
                 <div className="space-y-6">
-                  <p className="-mt-1 px-1 text-sm text-muted-foreground">{
+                  <p className="-mt-1 px-1 text-body text-muted-foreground">{
                     isPast || !canLogFood ? "Browse the meals and recipes in your plan."
                     : fixed ? <>This is your day as your coach wrote it. Tap <span className="font-medium text-foreground">Log</span> on each meal when you eat it.</>
                     : <>Pick one option per meal each day, then tap <span className="font-medium text-foreground">Log</span> when you eat it.</>
@@ -305,7 +305,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                         <div className="flex items-center gap-2 px-1">
                           <span className="grid size-7 place-items-center rounded-xl bg-nutrition-soft text-nutrition [&_svg]:size-4"><meta.icon /></span>
                           <span className="font-semibold">{meta.label}</span>
-                          {!fixed && <span className="text-xs text-muted-foreground">{opts.length} option{opts.length === 1 ? "" : "s"}</span>}
+                          {!fixed && <span className="text-caption text-muted-foreground">{opts.length} option{opts.length === 1 ? "" : "s"}</span>}
                         </div>
                         {/*
                           A FIXED plan is not a carousel. A horizontal rail of
@@ -337,14 +337,14 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
               )
             ) : (
               <div className="space-y-4">
-                <p className="-mt-1 px-1 text-sm text-muted-foreground">How many days will you eat each option this week? We'll total up your shopping list.</p>
+                <p className="-mt-1 px-1 text-body text-muted-foreground">How many days will you eat each option this week? We'll total up your shopping list.</p>
                 {(active?.body.mealOptions ?? []).map((opt, index) => (
                   opt.isFree ? null : (
                     <div key={index} className="flex items-center gap-3 rounded-2xl bg-card px-3 py-2.5">
                       <FoodThumb src={opt.foods.map((mf) => foods.get(mf.foodId)?.image_url).find(Boolean)} size={38} />
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-medium">{opt.mealName || `Option ${index + 1}`}</div>
-                        <div className="text-xs text-muted-foreground">{metaFor(opt.mealType).label}</div>
+                        <div className="truncate text-body font-medium">{opt.mealName || `Option ${index + 1}`}</div>
+                        <div className="text-caption text-muted-foreground">{metaFor(opt.mealType).label}</div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button size="icon-sm" variant="secondary" disabled={(counts[index] ?? 0) === 0} onClick={() => bump(index, -1)} aria-label="Fewer days"><Minus /></Button>
@@ -357,18 +357,18 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
                 {weekTotals.days > 0 && (
                   <Card className="flex items-center justify-around py-3 text-center">
-                    <div><div className="numeral text-lg font-bold leading-none">{weekTotals.days}</div><div className="mt-1 text-xs text-muted-foreground">meals</div></div>
+                    <div><div className="numeral text-body-lg font-bold leading-none">{weekTotals.days}</div><div className="mt-1 text-caption text-muted-foreground">meals</div></div>
                     <div className="h-8 w-px bg-border/50" />
-                    <div><div className="numeral text-lg font-bold leading-none text-calories">{fmtEnergy(Math.round(weekTotals.cal), units)}</div><div className="mt-1 text-xs text-muted-foreground">total</div></div>
+                    <div><div className="numeral text-body-lg font-bold leading-none text-calories">{fmtEnergy(Math.round(weekTotals.cal), units)}</div><div className="mt-1 text-caption text-muted-foreground">total</div></div>
                     <div className="h-8 w-px bg-border/50" />
-                    <div><div className="numeral text-lg font-bold leading-none text-protein">{Math.round(weekTotals.pro)} g</div><div className="mt-1 text-xs text-muted-foreground">protein</div></div>
+                    <div><div className="numeral text-body-lg font-bold leading-none text-protein">{Math.round(weekTotals.pro)} g</div><div className="mt-1 text-caption text-muted-foreground">protein</div></div>
                   </Card>
                 )}
 
                 <div className="flex items-center justify-between px-1 pt-1">
                   <div className="text-micro uppercase text-muted-foreground">Shopping list</div>
                   <div className="flex items-center gap-2">
-                    {(weekTotals.days > 0 || checked.size > 0) && <button onClick={() => setConfirmReset(true)} className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-3.5"><RotateCcw /> Start over</button>}
+                    {(weekTotals.days > 0 || checked.size > 0) && <button onClick={() => setConfirmReset(true)} className="inline-flex items-center gap-1 text-caption font-medium text-muted-foreground transition-colors hover:text-foreground [&_svg]:size-3.5"><RotateCcw /> Start over</button>}
                     {grocery.length > 0 && <Badge tone="nutrition">{grocery.filter((g) => !checked.has(g.id)).length} to buy</Badge>}
                   </div>
                 </div>
@@ -382,7 +382,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                         <button key={g.id} onClick={() => setChecked((s) => { const n = new Set(s); n.has(g.id) ? n.delete(g.id) : n.add(g.id); return n; })} className="flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition-colors hover:bg-surface-2">
                           <span className={cn("grid size-5 shrink-0 place-items-center rounded-full border transition-colors [&_svg]:size-3", done ? "border-nutrition bg-nutrition text-nutrition-foreground" : "border-border")}>{done && <Check strokeWidth={3} />}</span>
                           <FoodThumb src={g.img} size={32} />
-                          <span className={cn("min-w-0 flex-1 truncate text-sm transition-colors", done && "text-muted-foreground line-through")}>{g.name}</span>
+                          <span className={cn("min-w-0 flex-1 truncate text-body transition-colors", done && "text-muted-foreground line-through")}>{g.name}</span>
                           <Badge tone="neutral">{Math.round(g.qty)} {g.unit}</Badge>
                         </button>
                       );
@@ -411,14 +411,14 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
             {plan && (
               <button onClick={() => pickPlan(null)} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-2", !isPast && "bg-nutrition-soft/40")}>
                 <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-nutrition-soft text-nutrition [&_svg]:size-4"><Utensils /></span>
-                <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{plan.name}</div><div className="text-xs text-muted-foreground">Current plan</div></div>
+                <div className="min-w-0 flex-1"><div className="truncate text-body font-medium">{plan.name}</div><div className="text-caption text-muted-foreground">Current plan</div></div>
                 {!isPast && <Check className="size-4 shrink-0 text-nutrition" strokeWidth={3} />}
               </button>
             )}
             {pastPlans.map((p) => (
               <button key={p.id} onClick={() => pickPlan(p.id)} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-2", viewId === p.id && "bg-surface-2")}>
                 <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted-foreground [&_svg]:size-4"><History /></span>
-                <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{p.name}</div><div className="text-xs text-muted-foreground">{p.publishedAt ? `Until ${new Date(p.publishedAt).toLocaleDateString()}` : "Superseded"}</div></div>
+                <div className="min-w-0 flex-1"><div className="truncate text-body font-medium">{p.name}</div><div className="text-caption text-muted-foreground">{p.publishedAt ? `Until ${new Date(p.publishedAt).toLocaleDateString()}` : "Superseded"}</div></div>
                 {viewId === p.id && <Check className="size-4 shrink-0 text-foreground" strokeWidth={3} />}
               </button>
             ))}
@@ -456,7 +456,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
       />
 
       {logErr && (
-        <div role="alert" className="fixed inset-x-0 bottom-24 z-[60] mx-auto flex w-fit items-center gap-2 rounded-full bg-card px-5 py-3 text-sm font-semibold text-foreground shadow-lg ring-1 ring-border">
+        <div role="alert" className="fixed inset-x-0 bottom-24 z-[60] mx-auto flex w-fit items-center gap-2 rounded-full bg-card px-5 py-3 text-body font-semibold text-foreground shadow-lg ring-1 ring-border">
           Couldn't log — check your connection
         </div>
       )}
@@ -478,22 +478,22 @@ function OptionPhotoCard({ opt, index, units, image, totals, logged, logging, on
         <button onClick={onOpen} className="relative block h-36 w-full text-left transition-opacity active:opacity-90">
           {image ? <img src={image} alt="" className="absolute inset-0 size-full object-cover" /> : <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-nutrition/20 to-surface-2 text-nutrition/50 [&_svg]:size-9"><Utensils /></div>}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-          {logged ? <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-nutrition px-2 py-0.5 text-xs font-semibold text-nutrition-foreground [&_svg]:size-2.5"><Check strokeWidth={3} /> Logged</span> : opt.isFree ? <span className="absolute right-2 top-2 rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur-md">Free</span> : null}
+          {logged ? <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 rounded-full bg-nutrition px-2 py-0.5 text-micro text-nutrition-foreground [&_svg]:size-2.5"><Check strokeWidth={3} /> Logged</span> : opt.isFree ? <span className="absolute right-2 top-2 rounded-full bg-white/20 px-2 py-0.5 text-micro text-white backdrop-blur-md">Free</span> : null}
           <div className="absolute inset-x-0 bottom-0 p-3">
             <div className="truncate font-semibold text-white">{opt.mealName || (opt.isFree ? "Free meal" : `Option ${index + 1}`)}</div>
             {opt.isFree ? (
-              <div className="numeral truncate text-xs text-white/85">{opt.freeMealMaxCalories != null ? `≤ ${fmtEnergy(opt.freeMealMaxCalories, units)}` : "No cap"}</div>
+              <div className="numeral truncate text-caption text-white/85">{opt.freeMealMaxCalories != null ? `≤ ${fmtEnergy(opt.freeMealMaxCalories, units)}` : "No cap"}</div>
             ) : (
               <div className="mt-0.5 flex items-center gap-2">
-                <span className="numeral shrink-0 text-xs font-semibold text-white">{fmtEnergy(totals.calories, units)}</span>
-                <MacroInline proteinG={totals.proteinG} carbsG={totals.carbsG} fatG={totals.fatG} className="shrink-0 text-xs drop-shadow" />
+                <span className="numeral shrink-0 text-caption font-semibold text-white">{fmtEnergy(totals.calories, units)}</span>
+                <MacroInline proteinG={totals.proteinG} carbsG={totals.carbsG} fatG={totals.fatG} className="shrink-0 text-caption drop-shadow" />
               </div>
             )}
           </div>
         </button>
         {!opt.isFree && <div className={cn("px-2.5 pt-2.5", readOnly && "pb-2.5")}><MacroSplitBar proteinG={totals.proteinG} carbsG={totals.carbsG} fatG={totals.fatG} /></div>}
         {readOnly ? (
-          <button onClick={onOpen} className="w-full px-2.5 py-2 text-center text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">View details</button>
+          <button onClick={onOpen} className="w-full px-2.5 py-2 text-center text-caption font-medium text-muted-foreground transition-colors hover:text-foreground">View details</button>
         ) : (
           <div className="p-2.5">
             <Button size="sm" className="w-full" variant={logged ? "secondary" : opt.isFree ? "tonal" : "default"} disabled={logging} onClick={onLog}>{logging ? "…" : logged ? "Log again" : "Log this"}</Button>
@@ -531,7 +531,7 @@ function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, l
             was losing the plate to a 16:9 crop (@4dl/ui media.tsx). */}
         {image && <Media src={image} fallback={Utensils} tone="nutrition" ratio="wide" alt={opt.mealName ?? "Meal"} />}
         {opt.isFree ? (
-          <p className="text-sm text-muted-foreground">A free meal up to {opt.freeMealMaxCalories != null ? fmtEnergy(opt.freeMealMaxCalories, units) : "your cap"} — eat what you like within it.</p>
+          <p className="text-body text-muted-foreground">A free meal up to {opt.freeMealMaxCalories != null ? fmtEnergy(opt.freeMealMaxCalories, units) : "your cap"} — eat what you like within it.</p>
         ) : (
           <>
             <div className="space-y-2.5">
@@ -563,7 +563,7 @@ function OptionDetailSheet({ opt, index, units, foods, foodMap, image, logged, l
             {opt.notes && (
               <div className="space-y-2.5">
                 <Eyebrow>From your coach</Eyebrow>
-                <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-sm text-muted-foreground">{opt.notes}</p>
+                <p className="rounded-xl bg-surface-2 px-3 py-2.5 text-body text-muted-foreground">{opt.notes}</p>
               </div>
             )}
             {aiMealTools && opt.foods.length > 0 && (

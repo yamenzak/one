@@ -51,10 +51,10 @@ export function ClientPrefsStrip({ clientId, prefs: given, focus, className }: {
       <div className="mb-2 flex items-center gap-1.5 text-micro uppercase text-muted-foreground"><Target className="size-3.5" /> Client prefers</div>
       <div className="flex flex-wrap gap-1.5">
         {chips.map((ch, i) => (
-          <span key={i} className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium [&_svg]:size-3">{ch.icon && <ch.icon />}{ch.label}</span>
+          <span key={i} className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-caption font-medium [&_svg]:size-3">{ch.icon && <ch.icon />}{ch.label}</span>
         ))}
       </div>
-      {prefs.limitations && <p className="mt-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">Limitations · </span>{prefs.limitations}</p>}
+      {prefs.limitations && <p className="mt-2 text-caption text-muted-foreground"><span className="font-medium text-foreground">Limitations · </span>{prefs.limitations}</p>}
     </Card>
   );
 }

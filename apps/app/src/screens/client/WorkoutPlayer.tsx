@@ -214,7 +214,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
           eyebrow={<span className={isPast ? undefined : "text-activity"}>{isPast ? "Past plan" : active?.name}</span>}
           sub={`${trainingDays === 1 ? "training day" : "training days"}${active?.publishedAt ? ` · from ${new Date(active.publishedAt).toLocaleDateString()}` : ""}`}
           below={isPast ? (
-            <button onClick={() => pickPlan(null)} className="inline-flex items-center gap-1 rounded-full bg-activity-soft px-3 py-1 text-xs font-semibold text-activity [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
+            <button onClick={() => pickPlan(null)} className="inline-flex items-center gap-1 rounded-full bg-activity-soft px-3 py-1 text-micro text-activity [&_svg]:size-3.5"><ArrowLeft /> Back to current plan</button>
           ) : undefined}
         >
           <CountUp value={trainingDays} />
@@ -235,13 +235,13 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                   {day.imageUrl ? <img src={day.imageUrl} alt="" className="absolute inset-0 size-full object-cover" /> : <div className={`absolute inset-0 ${day.isRestDay ? "bg-gradient-to-br from-sleep/20 to-surface-2" : "bg-gradient-to-br from-primary/25 via-primary/5 to-surface-2"}`} />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent" />
                   {!day.imageUrl && <div className="absolute inset-0 grid place-items-center text-white/35 [&_svg]:size-9">{day.isRestDay ? <Moon /> : <Dumbbell />}</div>}
-                  {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-xs font-semibold text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-activity px-2 py-0.5 text-xs font-semibold text-activity-foreground">Recommended</span> : null}
+                  {day.isRestDay ? <span className="absolute right-2 top-2 rounded-full bg-sleep-soft px-2 py-0.5 text-micro text-sleep">Rest</span> : rec ? <span className="absolute right-2 top-2 rounded-full bg-activity px-2 py-0.5 text-micro text-activity-foreground">Recommended</span> : null}
                   <div className="absolute inset-x-0 bottom-0 p-3">
                     {/* Two lines, not an ellipsis. A day name is short and the
                         tile is 4:5 — "Upper A — push fo…" was losing the half
                         that says what the day IS. */}
                     <div className="line-clamp-2 font-semibold leading-tight text-white">{day.name || `Day ${i + 1}`}</div>
-                    <div className="truncate text-xs text-white/75">{day.isRestDay ? "Rest day" : `${exercises} exercise${exercises === 1 ? "" : "s"} · ${sets} sets`}</div>
+                    <div className="truncate text-caption text-white/75">{day.isRestDay ? "Rest day" : `${exercises} exercise${exercises === 1 ? "" : "s"} · ${sets} sets`}</div>
                   </div>
                 </div>
               </motion.button>
@@ -256,14 +256,14 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
               {plan && (
                 <button onClick={() => pickPlan(null)} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-2", !isPast && "bg-activity-soft/40")}>
                   <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-activity-soft text-activity [&_svg]:size-4"><Dumbbell /></span>
-                  <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{plan.name}</div><div className="text-xs text-muted-foreground">Current plan</div></div>
+                  <div className="min-w-0 flex-1"><div className="truncate text-body font-medium">{plan.name}</div><div className="text-caption text-muted-foreground">Current plan</div></div>
                   {!isPast && <Check className="size-4 shrink-0 text-activity" strokeWidth={3} />}
                 </button>
               )}
               {pastPlans.map((p) => (
                 <button key={p.id} onClick={() => pickPlan(p.id)} className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-surface-2", viewId === p.id && "bg-surface-2")}>
                   <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-muted-foreground [&_svg]:size-4"><History /></span>
-                  <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{p.name}</div><div className="text-xs text-muted-foreground">{p.publishedAt ? `Until ${new Date(p.publishedAt).toLocaleDateString()}` : "Superseded"}</div></div>
+                  <div className="min-w-0 flex-1"><div className="truncate text-body font-medium">{p.name}</div><div className="text-caption text-muted-foreground">{p.publishedAt ? `Until ${new Date(p.publishedAt).toLocaleDateString()}` : "Superseded"}</div></div>
                   {viewId === p.id && <Check className="size-4 shrink-0 text-foreground" strokeWidth={3} />}
                 </button>
               ))}
@@ -349,11 +349,11 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   return (
     <PlanShell onEscape={() => setDayIndex(null)}>
       <HeaderBar title={day.name || `Day ${dayIndex + 1}`} subtitle={`${loggedSets} of ${totalSets} set${totalSets === 1 ? "" : "s"} logged`} onBack={() => setDayIndex(null)}
-        right={<span><ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={40} strokeWidth={5} tone="activity" value={<span className="text-xs font-semibold">{loggedSets}</span>} /></span>} />
+        right={<span><ProgressRing progress={totalSets ? loggedSets / totalSets : 0} size={40} strokeWidth={5} tone="activity" value={<span className="text-caption font-semibold">{loggedSets}</span>} /></span>} />
 
       {loadWarning && (
         <div role="status" className="column flex items-center justify-between gap-3 px-4 pt-3">
-          <p className="min-w-0 text-sm text-warning">{loadWarning}</p>
+          <p className="min-w-0 text-body text-warning">{loadWarning}</p>
           <Button size="sm" variant="secondary" className="shrink-0" onClick={() => setReloadKey((k) => k + 1)}>Retry</Button>
         </div>
       )}
@@ -370,7 +370,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
             <li key={i} className="flex gap-3">
               {/* Timeline rail — numbered node + connector down to the next step. */}
               <div className="flex flex-col items-center">
-                <div className={cn("z-10 grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ring-4 ring-background transition-colors [&_svg]:size-4", done ? "bg-activity text-activity-foreground" : "bg-surface-3 text-muted-foreground")}>
+                <div className={cn("z-10 grid size-8 shrink-0 place-items-center rounded-full text-caption font-bold ring-4 ring-background transition-colors [&_svg]:size-4", done ? "bg-activity text-activity-foreground" : "bg-surface-3 text-muted-foreground")}>
                   {done ? <Check strokeWidth={3} /> : i + 1}
                 </div>
                 {!last && <div className="w-px flex-1 bg-border/60" />}
@@ -388,7 +388,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                       <ExerciseThumb thumb={ex?.thumb_url} thumb2={ex?.thumb2_url} size={60} className="rounded-xl" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1 font-semibold"><span className="truncate">{ex?.name ?? "Exercise"}</span><Info className="size-3.5 shrink-0 text-muted-foreground" /></div>
-                        {metaText(ex) && <div className="truncate text-xs text-muted-foreground">{metaText(ex)}</div>}
+                        {metaText(ex) && <div className="truncate text-caption text-muted-foreground">{metaText(ex)}</div>}
                       </div>
                     </button>
                     {/* Prescription — one dot per set with its target beneath, a tappable
@@ -399,14 +399,14 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                           <Fragment key={k}>
                             <div className="flex flex-col items-center gap-1">
                               <span className={cn("size-2.5 rounded-full transition-colors", setDotClass(set, k < logged))} />
-                              <span className="text-xs font-semibold leading-none tabular-nums text-muted-foreground">{setMeasureShort(set, mode)}</span>
+                              <span className="text-caption font-semibold leading-none tabular-nums text-muted-foreground">{setMeasureShort(set, mode)}</span>
                             </div>
                             {k < step.slot.sets.length - 1 && <RestTimer seconds={set.restAfterSec ?? 60} />}
                           </Fragment>
                         ))}
                       </div>
-                      {mods.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{mods.map((m) => <span key={m} className="rounded bg-surface-2 px-1.5 py-0.5 text-xs font-medium text-muted-foreground">{m}</span>)}</div>}
-                      {step.slot.slotNotes && <p className="mt-2 text-xs italic leading-snug text-muted-foreground">“{step.slot.slotNotes}”</p>}
+                      {mods.length > 0 && <div className="mt-2 flex flex-wrap gap-1">{mods.map((m) => <span key={m} className="rounded bg-surface-2 px-1.5 py-0.5 text-caption font-medium text-muted-foreground">{m}</span>)}</div>}
+                      {step.slot.slotNotes && <p className="mt-2 text-caption italic leading-snug text-muted-foreground">“{step.slot.slotNotes}”</p>}
                     </div>
                     <div className="mt-2 flex items-center gap-2 border-t border-border/50 p-2">
                       {canSwap && <Button size="icon-sm" variant="ghost" onClick={() => setSwapSlot({ blockIndex: step.blockIndex, slotIndex: step.slotIndex, exerciseId: step.slot.exerciseId })} aria-label="Swap"><ArrowLeftRight /></Button>}
@@ -416,8 +416,8 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                   ); })() : (
                   // Grouped block — superset/circuit/HIIT, logged one round at a time.
                   <div className="overflow-hidden rounded-2xl bg-card ring-1 ring-inset ring-border/50">
-                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 pt-3"><Badge tone="activity">{blockLabel(step.block.type)}</Badge><span className="text-xs text-muted-foreground">{roundsDone}/{rounds} rounds</span>{step.block.restBetweenRoundsSec ? <span className="text-xs text-muted-foreground">· {fmtClock(step.block.restBetweenRoundsSec)} between</span> : null}</div>
-                    {step.block.blockNotes && <p className="px-3 pt-1 text-xs italic leading-snug text-muted-foreground">“{step.block.blockNotes}”</p>}
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 pt-3"><Badge tone="activity">{blockLabel(step.block.type)}</Badge><span className="text-caption text-muted-foreground">{roundsDone}/{rounds} rounds</span>{step.block.restBetweenRoundsSec ? <span className="text-caption text-muted-foreground">· {fmtClock(step.block.restBetweenRoundsSec)} between</span> : null}</div>
+                    {step.block.blockNotes && <p className="px-3 pt-1 text-caption italic leading-snug text-muted-foreground">“{step.block.blockNotes}”</p>}
                     <div className="space-y-1.5 p-3">
                       {step.block.slots.map((slot, slotIndex) => (
                         <div key={slotIndex} className="rounded-xl bg-surface-2 p-2">
@@ -436,7 +436,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
                     <span className="h-px w-4 bg-border/60" />
                     <RestTimer seconds={single ? stepRestSeconds(step.block, step.slot) : stepRestSeconds(step.block)} label
                       autoStart={restSignals.get(single ? `${step.blockIndex}:${step.slotIndex}` : `g:${step.blockIndex}`)} />
-                    <span className="text-xs text-muted-foreground">before next</span>
+                    <span className="text-caption text-muted-foreground">before next</span>
                   </div>
                 )}
               </motion.div>
@@ -513,10 +513,10 @@ function DayPreviewSheet({ day, index, exercises, onClose }: { day: WorkoutDay; 
   return (
     <Sheet open onClose={onClose} title={day.name || `Day ${index + 1}`}>
       <div className="space-y-4">
-        <div className="text-sm text-muted-foreground">{day.blocks.reduce((n, b) => n + b.slots.length, 0)} exercise{day.blocks.reduce((n, b) => n + b.slots.length, 0) === 1 ? "" : "s"} · {total} sets</div>
+        <div className="text-body text-muted-foreground">{day.blocks.reduce((n, b) => n + b.slots.length, 0)} exercise{day.blocks.reduce((n, b) => n + b.slots.length, 0) === 1 ? "" : "s"} · {total} sets</div>
         {day.blocks.map((block, bi) => (
           <div key={bi} className="space-y-2">
-            <div className="flex items-center gap-2"><Badge tone="activity">{blockLabel(block.type)}</Badge>{block.type !== "single" && <span className="text-xs text-muted-foreground">{block.rounds ?? 1} rounds</span>}</div>
+            <div className="flex items-center gap-2"><Badge tone="activity">{blockLabel(block.type)}</Badge>{block.type !== "single" && <span className="text-caption text-muted-foreground">{block.rounds ?? 1} rounds</span>}</div>
             {block.slots.map((slot, si) => {
               const ex = exercises.get(slot.exerciseId);
               return (
@@ -568,11 +568,11 @@ function ExerciseDetailSheet({ ex, slot, onClose }: { ex?: ExerciseInfo; slot: E
       <SubCard className="space-y-1.5">
         {slot.sets.map((s, i) => (
           <div key={i}>
-            <div className="text-sm">{setLine(s, i)}</div>
-            {s.notes && <div className="text-xs italic text-muted-foreground">{s.notes}</div>}
+            <div className="text-body">{setLine(s, i)}</div>
+            {s.notes && <div className="text-caption italic text-muted-foreground">{s.notes}</div>}
           </div>
         ))}
-        {slot.slotNotes && <p className="border-t border-border/50 pt-1.5 text-xs italic text-muted-foreground">Coach: {slot.slotNotes}</p>}
+        {slot.slotNotes && <p className="border-t border-border/50 pt-1.5 text-caption italic text-muted-foreground">Coach: {slot.slotNotes}</p>}
       </SubCard>
     </div>
   );
@@ -664,16 +664,16 @@ function SetLogDrawer({ slot, exerciseId, exerciseName, logged, fetchLast, onClo
         {completed.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {completed.map((s) => (
-              <button key={s.setIndex} onClick={() => edit(s)} className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${s.setIndex === setIndex ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:bg-surface-3"}`}>
+              <button key={s.setIndex} onClick={() => edit(s)} className={`rounded-full px-2.5 py-1 text-caption font-medium transition-colors ${s.setIndex === setIndex ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:bg-surface-3"}`}>
                 {loggedLabel(s, units)}
               </button>
             ))}
           </div>
         )}
         <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0 text-sm text-muted-foreground">{editing ? `Editing set ${setIndex + 1}` : `Set ${setIndex + 1} of ${slot.sets.length}`}{target ? ` · target ${target}` : ""}</div>
+          <div className="min-w-0 text-body text-muted-foreground">{editing ? `Editing set ${setIndex + 1}` : `Set ${setIndex + 1} of ${slot.sets.length}`}{target ? ` · target ${target}` : ""}</div>
           {(last || target) && (
-            <button type="button" onClick={repeatLast} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-3.5">
+            <button type="button" onClick={repeatLast} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-micro text-foreground transition-colors hover:bg-surface-3 [&_svg]:size-3.5">
               <RotateCcw />{last ? "Repeat last" : "Use target"}
             </button>
           )}
@@ -681,7 +681,7 @@ function SetLogDrawer({ slot, exerciseId, exerciseName, logged, fetchLast, onClo
         {last && (
           <div className="rounded-xl bg-surface-2 px-3 py-2">
             <div className="text-micro uppercase text-muted-foreground">Last time · {relativeDate(last.date)}</div>
-            <div className="truncate text-sm font-medium tabular-nums">{summarizeLast(last.sets, units)}</div>
+            <div className="truncate text-body font-medium tabular-nums">{summarizeLast(last.sets, units)}</div>
           </div>
         )}
         <div className="grid grid-cols-2 gap-3">
@@ -691,10 +691,10 @@ function SetLogDrawer({ slot, exerciseId, exerciseName, logged, fetchLast, onClo
         </div>
         {showWeight && <WeightInput value={weight} onChange={setWeight} units={units} />}
         <div>
-          <div className="mb-2 text-sm text-muted-foreground">How did it feel?</div>
+          <div className="mb-2 text-body text-muted-foreground">How did it feel?</div>
           <div className="flex gap-2">
             {(["easy", "perfect", "hard"] as const).map((e) => (
-              <button key={e} onClick={() => setEffort(effort === e ? null : e)} className={`flex-1 rounded-xl py-3 text-sm font-medium capitalize transition-all active:scale-95 ${effort === e ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground"}`}>{e}</button>
+              <button key={e} onClick={() => setEffort(effort === e ? null : e)} className={`flex-1 rounded-xl py-3 text-body font-medium capitalize transition-all active:scale-95 ${effort === e ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground"}`}>{e}</button>
             ))}
           </div>
         </div>
@@ -772,7 +772,7 @@ function RoundLogDrawer({ block, roundIndex, exercises, fetchLast, onClose, onSa
   return (
     <Sheet open onClose={onClose} title={`Round ${roundIndex + 1} of ${rounds}`} footer={<Button size="lg" className="w-full" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Complete round"}</Button>}>
       <div className="space-y-3">
-        <div className="text-sm text-muted-foreground">Log one set of each — then rest and come back for the next round.</div>
+        <div className="text-body text-muted-foreground">Log one set of each — then rest and come back for the next round.</div>
         {block.slots.map((slot, si) => {
           const mode = slot.measurementMode;
           const prescribed = slot.sets[Math.min(roundIndex, slot.sets.length - 1)];
@@ -782,10 +782,10 @@ function RoundLogDrawer({ block, roundIndex, exercises, fetchLast, onClose, onSa
           return (
             <SubCard key={si} className="space-y-2">
               <ExerciseRow ex={exercises.get(slot.exerciseId)} meta={false} thumbSize={36}
-                trailing={target ? <span className="shrink-0 text-xs text-muted-foreground">target {target}</span> : null} />
+                trailing={target ? <span className="shrink-0 text-caption text-muted-foreground">target {target}</span> : null} />
               {lasts[si] && (
                 <button type="button" onClick={() => repeat(si, slot)} className="flex w-full items-center justify-between gap-2 rounded-lg bg-surface-2 px-2.5 py-1.5 text-left transition-colors hover:bg-surface-3 [&_svg]:size-3.5">
-                  <span className="min-w-0 truncate text-xs"><span className="font-semibold text-foreground">Last · {relativeDate(lasts[si]!.date)}</span> <span className="tabular-nums text-muted-foreground">{summarizeLast(lasts[si]!.sets, units)}</span></span>
+                  <span className="min-w-0 truncate text-caption"><span className="font-semibold text-foreground">Last · {relativeDate(lasts[si]!.date)}</span> <span className="tabular-nums text-muted-foreground">{summarizeLast(lasts[si]!.sets, units)}</span></span>
                   <RotateCcw className="shrink-0 text-muted-foreground" />
                 </button>
               )}
@@ -855,7 +855,7 @@ function SwapDrawer({ clientId, planId, dayIndex, coords, currentName, onClose, 
               </div>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">No instant alternatives set for this exercise.</p>
+            <p className="text-body text-muted-foreground">No instant alternatives set for this exercise.</p>
           ))}
         </Reveal>
 
@@ -864,7 +864,7 @@ function SwapDrawer({ clientId, planId, dayIndex, coords, currentName, onClose, 
           <Field label="Why swap? (optional)" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. shoulder pain, no cable machine" />
           <Button variant="outline" className="mt-3 w-full" disabled={busy} onClick={() => void request()}>Request a swap — coach will choose</Button>
         </div>
-        {err && <p role="alert" className="text-sm text-warning">{err}</p>}
+        {err && <p role="alert" className="text-body text-warning">{err}</p>}
       </div>
     </Sheet>
   );
@@ -970,7 +970,7 @@ function WeightInput({ value, onChange, units, label }: { value: string; onChang
         <Input inputMode="decimal" className="flex-1 text-center tabular-nums" value={value} onChange={(e) => onChange(setDec(e.target.value))} />
         <Button type="button" size="icon-sm" variant="secondary" onClick={() => bump(step)} aria-label={`Plus ${step} ${weightLabel(units)}`}><Plus /></Button>
       </div>
-      {showPlates && <p className="mt-1.5 text-xs text-muted-foreground">{plateLine(plates)}</p>}
+      {showPlates && <p className="mt-1.5 text-caption text-muted-foreground">{plateLine(plates)}</p>}
     </div>
   );
 }
@@ -1090,11 +1090,14 @@ function RestTimer({ seconds, label, className, autoStart }: { seconds: number; 
         // rather than staying a 10px pill. Only the running step expands, and it
         // collapses again a beat after "Go!", so the timeline layout is unchanged
         // except for the one row that's actively resting.
-        counting ? "gap-2 rounded-2xl px-3.5 py-2 [&_svg]:size-5" : "gap-1 rounded-full px-2 py-0.5 text-xs [&_svg]:size-3",
+        counting ? "gap-2 rounded-2xl px-3.5 py-2 [&_svg]:size-5" : "gap-1 rounded-full px-2 py-0.5 text-caption [&_svg]:size-3",
         done ? "bg-activity text-activity-foreground" : running ? "bg-cardio text-cardio-foreground" : "bg-surface-3 text-muted-foreground hover:bg-surface-2", className)}>
       <Timer />
       {counting
-        ? <span className="numeral text-4xl font-bold leading-none tracking-tight">{done ? "Go!" : fmtClock(left!)}</span>
+        // primitive-exempt: this numeral is inside a <button> — the rest timer
+        // IS the control. `Anchor` is a motion.div with entrance variants, and
+        // nesting it in a button would animate on every tick.
+        ? <span className="numeral text-display font-bold leading-none tracking-tight">{done ? "Go!" : fmtClock(left!)}</span>
         : `${label ? "Rest " : ""}${fmtClock(seconds)}`}
     </button>
   );

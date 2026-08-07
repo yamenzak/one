@@ -70,7 +70,7 @@ function ScenePreview({ nodes, designW = DESIGN_W, designH = DESIGN_H }: { nodes
       style={{ aspectRatio: `${designW} / ${designH}` }}
     >
       {nodes.length === 0 ? (
-        <div className="absolute inset-0 flex items-center justify-center text-xs text-white/60">Empty scene</div>
+        <div className="absolute inset-0 flex items-center justify-center text-caption text-white/60">Empty scene</div>
       ) : scale > 0 ? (
         <div className="absolute left-0 top-0 origin-top-left" style={{ width: designW, height: designH, transform: `scale(${scale})` }}>
           {[...nodes]
@@ -114,7 +114,7 @@ function TemplateCard({ template, selected, onSelect }: { template: Template; se
       <div className="flex items-start gap-2 p-3">
         {template.accent && <span className="mt-1 size-2.5 shrink-0 rounded-full" style={{ background: template.accent }} />}
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold">{template.name}</div>
+          <div className="truncate text-body font-semibold">{template.name}</div>
           <div className="mt-0.5 line-clamp-2 text-caption leading-snug text-muted-foreground">{template.description}</div>
         </div>
       </div>
@@ -321,8 +321,8 @@ export function ProfileStartDialog({
                 <div className="mx-auto mb-3 grid size-11 place-items-center rounded-full bg-primary/10 text-primary">
                   <Sparkles className="size-5" />
                 </div>
-                <div className="text-sm font-semibold">AI layout design isn’t in your plan</div>
-                <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
+                <div className="text-body font-semibold">AI layout design isn’t in your plan</div>
+                <p className="mx-auto mt-1 max-w-sm text-caption text-muted-foreground">
                   Upgrade to describe a scene in words and have it composed out of real widgets. You can still start from a template or a blank canvas.
                 </p>
               </div>
@@ -330,7 +330,7 @@ export function ProfileStartDialog({
               <>
                 <div className="space-y-3 px-5 py-5">
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-muted-foreground">Describe the scene</label>
+                    <label className="text-caption font-medium text-muted-foreground">Describe the scene</label>
                     <Textarea
                       autoFocus
                       rows={4}
@@ -354,13 +354,13 @@ export function ProfileStartDialog({
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">
+                      <label className="text-caption font-medium text-muted-foreground">
                         Name <span className="font-normal">(optional)</span>
                       </label>
                       <Input placeholder="AI layout" value={name} onChange={(e) => setName(e.target.value)} />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-muted-foreground">Model</label>
+                      <label className="text-caption font-medium text-muted-foreground">Model</label>
                       <Select
                         value={aiModelId || (aiModels[0]?.id ?? "")}
                         onChange={setAiModelId}
@@ -369,10 +369,10 @@ export function ProfileStartDialog({
                       />
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-caption text-muted-foreground">
                     The model composes a {DEFAULT_W}×{DEFAULT_H} scene from real widgets, then opens it in the builder to refine.
                   </p>
-                  {aiErr && <div className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{aiErr}</div>}
+                  {aiErr && <div className="rounded-md bg-destructive/10 px-3 py-2 text-caption text-destructive">{aiErr}</div>}
                 </div>
                 <div className="flex items-center justify-end gap-2 border-t px-5 py-3">
                   <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -398,7 +398,7 @@ export function ProfileStartDialog({
           <TabsContent value="blank" className="data-[state=inactive]:hidden">
             <div className="space-y-3 px-5 py-5">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Name</label>
+                <label className="text-caption font-medium text-muted-foreground">Name</label>
                 <Input
                   autoFocus
                   placeholder="e.g. Lobby overlay"
@@ -409,15 +409,15 @@ export function ProfileStartDialog({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Design width</label>
+                  <label className="text-caption font-medium text-muted-foreground">Design width</label>
                   <Input type="number" inputMode="numeric" placeholder={String(DEFAULT_W)} value={w} onChange={(e) => setW(e.target.value)} />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-muted-foreground">Design height</label>
+                  <label className="text-caption font-medium text-muted-foreground">Design height</label>
                   <Input type="number" inputMode="numeric" placeholder={String(DEFAULT_H)} value={h} onChange={(e) => setH(e.target.value)} />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 Defaults to {DEFAULT_W}×{DEFAULT_H} if left blank.
               </p>
             </div>
@@ -435,11 +435,11 @@ export function ProfileStartDialog({
           <TabsContent value="duplicate" className="data-[state=inactive]:hidden">
             <div className="space-y-3 px-5 py-5">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">Copy from</label>
+                <label className="text-caption font-medium text-muted-foreground">Copy from</label>
                 <Select value={srcId} onChange={setSrcId} placeholder="Pick a profile" options={[...profiles.map((p) => ({ value: p.id, label: p.name }))]} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground">New name</label>
+                <label className="text-caption font-medium text-muted-foreground">New name</label>
                 <Input
                   placeholder="Copy name"
                   value={name}
@@ -447,7 +447,7 @@ export function ProfileStartDialog({
                   onKeyDown={(e) => e.key === "Enter" && createDuplicate()}
                 />
               </div>
-              <p className="text-xs text-muted-foreground">Copies the layout and canvas size; the original is untouched.</p>
+              <p className="text-caption text-muted-foreground">Copies the layout and canvas size; the original is untouched.</p>
             </div>
             <div className="flex items-center justify-end gap-2 border-t px-5 py-3">
               <Button variant="ghost" onClick={() => onOpenChange(false)}>

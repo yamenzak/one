@@ -89,9 +89,9 @@ export function Panel(props: Props) {
   return (
     <Tabs value={noContent && tab === "content" ? "style" : tab} onValueChange={setTab}>
       <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="content" disabled={noContent} className="text-xs">Content</TabsTrigger>
-        <TabsTrigger value="style" className="text-xs">Style</TabsTrigger>
-        <TabsTrigger value="layout" className="text-xs">Layout</TabsTrigger>
+        <TabsTrigger value="content" disabled={noContent} className="text-caption">Content</TabsTrigger>
+        <TabsTrigger value="style" className="text-caption">Style</TabsTrigger>
+        <TabsTrigger value="layout" className="text-caption">Layout</TabsTrigger>
       </TabsList>
 
       <TabsContent value="content" className="mt-1">{!noContent && <ContentTab {...props} />}</TabsContent>
@@ -165,7 +165,7 @@ function LogoContent({ node, logos, onConfig }: { node: WNode; logos: BrandLogo[
                   <span className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-[repeating-conic-gradient(#0000_0deg_90deg,#8884_90deg_180deg)] bg-[length:12px_12px]">
                     <img src={l.url} alt={l.label} className="max-h-9 max-w-9 object-contain" />
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{l.label}</span>
+                  <span className="min-w-0 flex-1 truncate text-body font-medium">{l.label}</span>
                   {active && <span className="text-caption font-semibold text-primary">Selected</span>}
                 </button>
               );
@@ -418,7 +418,7 @@ function SourceColumnField({ feedId, value, onChange, hint }: { feedId: string; 
 
 /** A datetime-local input styled to match the panel. */
 function DateTimeField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  return <input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} className="h-8 w-full rounded-md border border-input bg-transparent px-2.5 text-xs shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />;
+  return <input type="datetime-local" value={value} onChange={(e) => onChange(e.target.value)} className="h-8 w-full rounded-md border border-input bg-transparent px-2.5 text-caption shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />;
 }
 
 /** Repeatable label · note · value rows for the menu widget. */
@@ -502,7 +502,7 @@ function StackItemEditor({ index, total, item, parent, boards, feeds, weather, l
   return (
     <div className="overflow-hidden rounded-lg border">
       <div className="flex items-center gap-0.5 bg-muted/40 px-1.5 py-1">
-        <button type="button" onClick={() => setOpen((o) => !o)} className="flex flex-1 items-center gap-1.5 text-xs font-medium">
+        <button type="button" onClick={() => setOpen((o) => !o)} className="flex flex-1 items-center gap-1.5 text-caption font-medium">
           <ChevronDown className={cnRotate(!open)} />
           Slide {index + 1}
           <span className="text-caption font-normal text-muted-foreground">· {widgetDef(item.widget.type)?.label ?? item.widget.type}</span>

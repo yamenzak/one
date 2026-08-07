@@ -52,7 +52,7 @@ function StudioMark({ persona, className }: { persona: PersonaRef; className?: s
     : undefined;
   return (
     <span
-      className={cn("grid size-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-primary/15 text-base font-bold text-primary", className)}
+      className={cn("grid size-11 shrink-0 place-items-center overflow-hidden rounded-2xl bg-primary/15 text-body-lg font-bold text-primary", className)}
       style={tint}
       aria-hidden
     >
@@ -129,13 +129,13 @@ export function StudioSwitcher() {
         aria-label={`Studio: ${active.tenantName}. Switch studio`}
         className="flex h-9 min-w-0 items-center gap-1 rounded-full px-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
       >
-        {currentPersona ? <StudioMark persona={currentPersona} className="size-6 rounded-lg text-xs" /> : <Store className="size-4" />}
+        {currentPersona ? <StudioMark persona={currentPersona} className="size-6 rounded-lg text-caption" /> : <Store className="size-4" />}
         <ChevronsUpDown className="size-3.5 shrink-0" />
       </button>
 
       <Sheet open={open} onClose={() => setOpen(false)} title="Your studios">
         <div className="space-y-1">
-          <p className="px-1 pb-2 text-sm text-muted-foreground">
+          <p className="px-1 pb-2 text-body text-muted-foreground">
             One account, {personas.length} studios. Switching changes whose data you&rsquo;re working in — your role and what
             you can do change with it.
           </p>
@@ -148,7 +148,7 @@ export function StudioSwitcher() {
               onPick={() => void pick(p.tenantId)}
             />
           ))}
-          {error && <p role="alert" className="px-1 pt-2 text-sm text-warning">{error}</p>}
+          {error && <p role="alert" className="px-1 pt-2 text-body text-warning">{error}</p>}
         </div>
       </Sheet>
     </>
@@ -171,8 +171,8 @@ export function StudioListCard() {
   if ((ctx?.personas.length ?? 0) < 2) return null;
   return (
     <Card className="space-y-2">
-      <div className="text-sm font-medium">Your other studios</div>
-      <p className="text-sm text-muted-foreground">
+      <div className="text-body font-medium">Your other studios</div>
+      <p className="text-body text-muted-foreground">
         This studio needs an active plan. Your access elsewhere is unaffected — switch to another studio to keep training.
       </p>
       <StudioList />

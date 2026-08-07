@@ -98,7 +98,7 @@ export function StudioPausedBanner() {
        measure; §5 caps prose at ~68. */
     <div
       role="status"
-      className="border-b border-warning/25 bg-warning/12 px-4 py-2.5 text-xs leading-relaxed text-warning"
+      className="border-b border-warning/25 bg-warning/12 px-4 py-2.5 text-caption leading-relaxed text-warning"
     >
       <div className="column flex items-start gap-2">
       <Lock aria-hidden className="mt-0.5 size-3.5 shrink-0" />

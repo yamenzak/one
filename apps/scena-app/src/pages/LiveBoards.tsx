@@ -39,7 +39,7 @@ import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { GEMINI_TTS_VOICES } from "@scena/protocol";
 import type { QueueState, RoomState, ScoreState } from "@scena/protocol";
-import { Button, cn, Dialog, DialogContent, Input, LoadError, PageHeader, Select, SettingsIndex, SettingsPage as SectionFrame, SkeletonList, Switch, toast, usePageChrome } from "@4dl/ui";
+import { Button, cn, Dialog, DialogContent, Input, LoadError, NoData, PageHeader, Select, SettingsIndex, SettingsPage as SectionFrame, SkeletonList, Switch, toast, usePageChrome } from "@4dl/ui";
 
 /** The three board kinds, treated equally in the picker + empty state. */
 const BOARD_TYPES: { kind: BoardKind; label: string; hint: string; icon: typeof Ticket }[] = [
@@ -219,8 +219,8 @@ export function LiveBoardsPage() {
       ) : boards.length === 0 ? (
         <div className="flex flex-col items-center rounded-2xl bg-card px-6 py-14 text-center">
           <ScenaMascot mood="idle" size={116} className="mb-1" />
-          <h3 className="text-base font-semibold">{canCreate ? "Create your first live board" : "No live boards yet"}</h3>
-          <p className="mt-1 max-w-md text-sm text-muted-foreground">
+          <h3 className="text-body-lg font-semibold">{canCreate ? "Create your first live board" : "No live boards yet"}</h3>
+          <p className="mt-1 max-w-md text-body text-muted-foreground">
             Each board issues its own logins and goes live the moment you bind a widget to it.
             {canCreate ? " Pick a type to start." : " Ask an admin to create one."}
           </p>
@@ -239,8 +239,8 @@ export function LiveBoardsPage() {
                     <div className="grid size-11 place-items-center rounded-xl bg-primary/10 text-primary">
                       <Icon className="size-5" />
                     </div>
-                    <div className="text-sm font-semibold">{t.label}</div>
-                    <div className="text-xs text-muted-foreground">{t.hint}</div>
+                    <div className="text-body font-semibold">{t.label}</div>
+                    <div className="text-caption text-muted-foreground">{t.hint}</div>
                   </button>
                 );
               })}
@@ -357,7 +357,7 @@ function ChimeToggle({ boardId, what }: { boardId: string; what: string }) {
   return (
     <div className="flex flex-col gap-2 border-t pt-4">
       <div className="text-micro text-muted-foreground uppercase">Sound</div>
-      <label className="flex cursor-pointer items-center gap-2 text-xs font-normal text-muted-foreground">
+      <label className="flex cursor-pointer items-center gap-2 text-caption font-normal text-muted-foreground">
         <Switch checked={on ?? false} onCheckedChange={toggle} disabled={on === null} />
         Play a chime on screens when {what}
       </label>
@@ -413,7 +413,7 @@ function ScoreManager({ boardId, state, onSaved }: { boardId: string; state: Sco
   return (
     <div className="flex flex-col gap-2 border-t pt-4">
       <div className="text-micro text-muted-foreground uppercase">Competitors</div>
-      <div className="text-xs text-muted-foreground">Each side gets its own station sign-in to adjust just its score.</div>
+      <div className="text-caption text-muted-foreground">Each side gets its own station sign-in to adjust just its score.</div>
       <Input
         value={title}
         onChange={(e) => {
@@ -519,7 +519,7 @@ function RoomStartDialog({
               )}
             >
               <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold">{t.name}</div>
+                <div className="text-body font-semibold">{t.name}</div>
                 <div className="text-caption text-muted-foreground">{t.rooms.length ? `${t.rooms.length} rooms` : "empty"}</div>
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -611,17 +611,17 @@ function BoardBody({ board }: { board: Board }) {
 }
 
 function ScorePreview({ state }: { state: ScoreState | null }) {
-  if (!state) return <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">No sides configured yet.</div>;
+  if (!state) return <div className="rounded-lg border bg-muted/30 px-4 py-3 text-body text-muted-foreground">No sides configured yet.</div>;
   return (
     <div className="rounded-lg border bg-muted/30 px-4 py-3">
-      {state.period && <div className="mb-1 text-center font-mono text-xs text-muted-foreground">{state.period}</div>}
+      {state.period && <div className="mb-1 text-center font-mono text-caption text-muted-foreground">{state.period}</div>}
       <div className="flex items-center justify-center gap-4">
         {state.sides.map((s, i) => (
           <div key={s.id} className="flex items-center gap-4">
-            {i > 0 && <span className="text-lg text-muted-foreground">–</span>}
+            {i > 0 && <span className="text-body-lg text-muted-foreground">–</span>}
             <div className="text-center">
               <div className="text-micro text-muted-foreground uppercase">{s.short || s.name}</div>
-              <div className="font-mono text-3xl font-black tabular-nums text-primary">{s.score}</div>
+              <div className="font-mono text-title-1 font-bold tabular-nums text-primary">{s.score}</div>
             </div>
           </div>
         ))}
@@ -671,9 +671,9 @@ function BoardCredentials({ boardId, refreshKey = 0 }: { boardId: string; refres
       </button>
       {open &&
         (users == null ? (
-          <div className="text-xs text-muted-foreground">Loading…</div>
+          <div className="text-caption text-muted-foreground">Loading…</div>
         ) : users.length === 0 ? (
-          <div className="text-xs text-muted-foreground">No logins yet.</div>
+          <div className="text-caption text-muted-foreground">No logins yet.</div>
         ) : (
           <div className="flex flex-col divide-y rounded-lg border">
             {users.map((u) => (
@@ -707,11 +707,11 @@ function CredentialRow({ u, onRegenerate }: { u: BoardUser; onRegenerate: () => 
         {isCoordinator ? <ShieldUser className="size-4" /> : <MonitorPlay className="size-3.5" />}
       </div>
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">
+        <div className="truncate text-body font-medium">
           {u.label}
           {isCoordinator && <span className="ml-1.5 text-micro text-primary uppercase">controls all</span>}
         </div>
-        <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 font-mono text-caption text-muted-foreground">
           <button className="hover:text-foreground" onClick={() => copy(u.username, "Username")} title="Copy username">
             {u.username}
           </button>
@@ -768,12 +768,12 @@ function CounterManager({ boardId, initial, onSaved }: { boardId: string; initia
   return (
     <div className="flex flex-col gap-2 border-t pt-4">
       <div className="text-micro text-muted-foreground uppercase">Counters / desks</div>
-      <div className="text-xs text-muted-foreground">Each counter is called to by number (“proceed to counter 3”) and gets its own station sign-in.</div>
+      <div className="text-caption text-muted-foreground">Each counter is called to by number (“proceed to counter 3”) and gets its own station sign-in.</div>
       {counters.map((cnt, i) => {
         const n = numOf(cnt.id, i + 1);
         return (
           <div key={cnt.id} className="flex items-center gap-2">
-            <span className="grid size-8 shrink-0 place-items-center rounded-md bg-primary/10 font-mono text-sm font-semibold text-primary">{n}</span>
+            <span className="grid size-8 shrink-0 place-items-center rounded-md bg-primary/10 font-mono text-body font-semibold text-primary">{n}</span>
             <Input value={cnt.name} onChange={(e) => rename(i, e.target.value)} placeholder={`Counter ${n}`} className="h-8 flex-1" />
             <Button
               variant="ghost"
@@ -838,7 +838,7 @@ function CategoryManager({ boardId, initial }: { boardId: string; initial: Queue
         </Button>
       </div>
       {cats.length === 0 && (
-        <div className="text-xs text-muted-foreground">One default series. Add categories to split into services (each its own ticket prefix).</div>
+        <div className="text-caption text-muted-foreground">One default series. Add categories to split into services (each its own ticket prefix).</div>
       )}
       {cats.map((cat, i) => (
         <div key={cat.id} className="flex items-center gap-2">
@@ -937,7 +937,7 @@ function AnnouncePanel({ boardId }: { boardId: string }) {
             onChange={(e) => setA({ ...a, config: { ...a.config, template: e.target.value } })}
             onBlur={(e) => save({ template: e.target.value })}
             placeholder="Ticket {ticket}, please proceed to counter {counter}."
-            className="font-mono text-xs"
+            className="font-mono text-caption"
           />
           <div className="text-caption text-muted-foreground">
             Write it in the chosen language. {"{ticket}"} and {"{counter}"} are read as natural whole numbers (e.g. “A forty-two”).
@@ -981,7 +981,7 @@ function AnnouncePanel({ boardId }: { boardId: string }) {
             <Button variant="outline" size="sm" onClick={preview} disabled={previewing}>
               {previewing ? "Generating…" : "▶ Preview"}
             </Button>
-            {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
+            {msg && <span className="text-caption text-muted-foreground">{msg}</span>}
           </div>
           <div className="rounded-md bg-muted/50 px-2.5 py-2 text-caption leading-relaxed text-muted-foreground">
             Announcements are generated by <b className="text-foreground">Gemini native TTS</b>, an external service — the text you enter is sent to Google.
@@ -989,33 +989,36 @@ function AnnouncePanel({ boardId }: { boardId: string }) {
           </div>
         </>
       )}
-      {c.mode === "chime" && <div className="text-xs text-muted-foreground">A ding plays on each call — no number is read out.</div>}
-      {c.mode === "silent" && <div className="text-xs text-muted-foreground">On-screen only — the number flashes with no sound.</div>}
+      {c.mode === "chime" && <div className="text-caption text-muted-foreground">A ding plays on each call — no number is read out.</div>}
+      {c.mode === "silent" && <div className="text-caption text-muted-foreground">On-screen only — the number flashes with no sound.</div>}
     </div>
   );
 }
 
 function QueuePreview({ state }: { state: QueueState | null }) {
-  const num = state && state.serving !== null ? `${state.prefix}${String(state.serving).padStart(3, "0")}` : "—";
+  // `null`, not "—": at 34px an em-dash is a horizontal rule with a caption
+  // under it (§5), and a queue that has not called anyone yet is the state this
+  // panel exists to show.
+  const num = state && state.serving !== null ? `${state.prefix}${String(state.serving).padStart(3, "0")}` : null;
   const waiting = (state?.series ?? []).reduce((n, s) => n + s.waiting, 0);
   return (
     <div className="flex items-end gap-5 rounded-lg border bg-muted/30 px-4 py-3">
       <div>
-        <div className="text-xs text-muted-foreground">Now serving</div>
-        <div className="font-mono text-4xl font-bold tabular-nums text-primary">{num}</div>
+        <div className="text-caption text-muted-foreground">Now serving</div>
+        <div className="font-mono text-title-1 tabular-nums text-primary">{num ?? <NoData>Nobody yet</NoData>}</div>
       </div>
-      {state?.counter != null && <div className="pb-1 text-sm text-muted-foreground">Counter {state.counter}</div>}
+      {state?.counter != null && <div className="pb-1 text-body text-muted-foreground">Counter {state.counter}</div>}
       <div className="flex-1" />
       <div className="pb-1 text-right">
-        <div className="text-xs text-muted-foreground">Waiting</div>
-        <div className="font-mono text-2xl font-semibold tabular-nums">{waiting}</div>
+        <div className="text-caption text-muted-foreground">Waiting</div>
+        <div className="font-mono text-title-2 font-semibold tabular-nums">{waiting}</div>
       </div>
     </div>
   );
 }
 
 function RoomPreview({ state }: { state: RoomState | null }) {
-  if (!state) return <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">No rooms configured yet.</div>;
+  if (!state) return <div className="rounded-lg border bg-muted/30 px-4 py-3 text-body text-muted-foreground">No rooms configured yet.</div>;
   // Room status colors are data-driven (each status carries its own color); fall
   // back to a neutral theme surface when a status has no color set.
   const statusOf = (id: string) => state.statuses.find((s) => s.id === id);
@@ -1029,7 +1032,7 @@ function RoomPreview({ state }: { state: RoomState | null }) {
             style={st?.color ? { background: st.color } : undefined}
             className={cn("rounded-lg px-2 py-2.5", st?.color ? "text-black" : "bg-muted text-foreground")}
           >
-            <div className="text-sm font-extrabold">{r.name}</div>
+            <div className="text-body font-bold">{r.name}</div>
             <div className="text-caption opacity-80">{st?.label ?? r.status}</div>
           </div>
         );
@@ -1113,7 +1116,7 @@ function RoomManager({ boardId, state, onSaved }: { boardId: string; state: Room
     <div className="flex flex-col gap-3 border-t pt-4">
       <div className="flex flex-col gap-2">
         <div className="text-micro text-muted-foreground uppercase">Statuses</div>
-        <div className="text-xs text-muted-foreground">The states a room can be in — label + colour are yours. Staff flip a room between these.</div>
+        <div className="text-caption text-muted-foreground">The states a room can be in — label + colour are yours. Staff flip a room between these.</div>
         {statuses.map((s, i) => (
           <div key={s.id} className="flex items-center gap-2">
             <label
@@ -1150,7 +1153,7 @@ function RoomManager({ boardId, state, onSaved }: { boardId: string; state: Room
 
       <div className="flex flex-col gap-2">
         <div className="text-micro text-muted-foreground uppercase">Rooms</div>
-        <div className="text-xs text-muted-foreground">Each room is controlled from its own station sign-in (see Board logins).</div>
+        <div className="text-caption text-muted-foreground">Each room is controlled from its own station sign-in (see Board logins).</div>
         {rooms.map((r, i) => (
           <div key={r.id} className="flex items-center gap-2">
             <Input value={r.name} onChange={(e) => editRoom(i, { name: e.target.value })} placeholder={`Room ${i + 1}`} className="h-8 flex-1" />

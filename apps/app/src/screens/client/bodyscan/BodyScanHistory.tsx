@@ -9,7 +9,7 @@
 import { useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { cmToLengthDisplay, lengthLabel, kgToDisplay, weightLabel, bodyComposition, type UnitPrefs } from "@kova/domain";
-import { Button, Badge, IconBadge, SegmentedControl, AreaChart, cn, toneVar, useModalOverlay, ScanLine, X, Percent, RotateCcw, User, motion, stagger, popIn, CountUp, NoData } from "@4dl/ui";
+import { Anchor, Button, Badge, IconBadge, SegmentedControl, AreaChart, cn, toneVar, useModalOverlay, ScanLine, X, Percent, RotateCcw, User, motion, stagger, popIn, CountUp, NoData } from "@4dl/ui";
 import { POSTURE_SEVERITY_TONE } from "../../../registry/index.js";
 import { Silhouette } from "./Silhouette.js";
 import { Body3D } from "./Body3D.js";
@@ -94,20 +94,19 @@ export function BodyScanHistory({ scans, units, initialId, onClose }: { scans: H
               ) : (
                 <div className="flex flex-col items-center gap-2 text-muted-foreground">
                   <User className="size-16" />
-                  <span className="text-xs">No silhouette saved for this scan</span>
+                  <span className="text-caption">No silhouette saved for this scan</span>
                 </div>
               )}
             </div>
             {activeView === "3d" && (
-              <p className="text-center text-xs text-muted-foreground">Drag to rotate · a proportional model from your measurements</p>
+              <p className="text-center text-caption text-muted-foreground">Drag to rotate · a proportional model from your measurements</p>
             )}
 
             <div className="mt-3 flex items-end justify-between">
               <div>
-                <div className="flex items-end gap-1">
-                  <span className="numeral text-5xl font-bold tabular-nums tracking-tight">{scan.bodyFatPercent!.toFixed(1)}</span>
-                  <Percent className="mb-1.5 size-5 text-muted-foreground" />
-                </div>
+                <Anchor align="start" className="pb-0 pt-0" unit={<Percent className="inline size-[0.7em]" />}>
+                  {scan.bodyFatPercent!.toFixed(1)}
+                </Anchor>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   {scan.confidence && (
                     <Badge tone={CONF_TONE[scan.confidence]}>
@@ -116,11 +115,11 @@ export function BodyScanHistory({ scans, units, initialId, onClose }: { scans: H
                     </Badge>
                   )}
                   {scan.low != null && scan.high != null && (
-                    <span className="numeral text-xs text-muted-foreground">{scan.low.toFixed(1)}–{scan.high.toFixed(1)}%</span>
+                    <span className="numeral text-caption text-muted-foreground">{scan.low.toFixed(1)}–{scan.high.toFixed(1)}%</span>
                   )}
                 </div>
               </div>
-              <div className="text-right text-xs text-muted-foreground">
+              <div className="text-right text-caption text-muted-foreground">
                 {fmtDate(scan.date)}
                 {scan.weightKg != null && <div className="numeral">{kgToDisplay(scan.weightKg, units).toFixed(1)} {weightLabel(units)}</div>}
               </div>
@@ -146,16 +145,16 @@ export function BodyScanHistory({ scans, units, initialId, onClose }: { scans: H
             <div className="grid grid-cols-2 gap-2">
               {scan.somatotype && (
                 <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-center">
-                  <div className="text-xs font-medium text-muted-foreground">Body type</div>
-                  <div className="mt-0.5 text-sm font-bold">{scan.somatotype}</div>
+                  <div className="text-caption font-medium text-muted-foreground">Body type</div>
+                  <div className="mt-0.5 text-body font-bold">{scan.somatotype}</div>
                 </div>
               )}
               {scan.posture && (
                 <div className="rounded-xl bg-surface-2 px-3 py-2.5 text-center">
-                  <div className="text-xs font-medium text-muted-foreground">Posture</div>
+                  <div className="text-caption font-medium text-muted-foreground">Posture</div>
                   <div className="mt-0.5 flex items-center justify-center gap-1.5">
                     <Badge tone={POSTURE_TONE[scan.posture.severity]}>{cap(scan.posture.severity)}</Badge>
-                    {scan.posture.cvaDeg != null && <span className="numeral text-xs text-muted-foreground">{scan.posture.cvaDeg.toFixed(0)}°</span>}
+                    {scan.posture.cvaDeg != null && <span className="numeral text-caption text-muted-foreground">{scan.posture.cvaDeg.toFixed(0)}°</span>}
                   </div>
                 </div>
               )}
@@ -173,7 +172,7 @@ export function BodyScanHistory({ scans, units, initialId, onClose }: { scans: H
           {/* Trend */}
           {chrono.length >= 2 && (
             <div className="rounded-2xl bg-card p-3">
-              <div className="mb-1 text-xs font-medium text-muted-foreground">Body-fat trend</div>
+              <div className="mb-1 text-caption font-medium text-muted-foreground">Body-fat trend</div>
               <AreaChart values={chrono.map((s) => s.bodyFatPercent!)} tone="sleep" height={120} trend format={(v) => `${v.toFixed(1)}%`} label={(i) => new Date(`${chrono[i]?.date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })} />
             </div>
           )}
@@ -197,11 +196,11 @@ export function BodyScanHistory({ scans, units, initialId, onClose }: { scans: H
                       {thumbPts ? <Silhouette points={thumbPts} tone={toneVar.sleep} width={30} height={44} /> : <User className="size-5 text-muted-foreground" />}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium">{fmtDate(s.date)}</div>
-                      <div className="text-xs text-muted-foreground">{s.circumferences.waistCm != null ? `waist ${Math.round(cmToLengthDisplay(s.circumferences.waistCm, units))} ${lengthLabel(units)}` : "—"}</div>
+                      <div className="text-body font-medium">{fmtDate(s.date)}</div>
+                      <div className="text-caption text-muted-foreground">{s.circumferences.waistCm != null ? `waist ${Math.round(cmToLengthDisplay(s.circumferences.waistCm, units))} ${lengthLabel(units)}` : "—"}</div>
                     </div>
                     <div className="text-right">
-                      <div className="numeral text-lg font-bold tabular-nums">{s.bodyFatPercent!.toFixed(1)}<span className="text-xs text-muted-foreground">%</span></div>
+                      <div className="numeral text-body-lg font-bold tabular-nums">{s.bodyFatPercent!.toFixed(1)}<span className="text-caption text-muted-foreground">%</span></div>
                       {s.confidence && <span className={cn("inline-block size-2 rounded-full", s.confidence === "high" ? "bg-success" : s.confidence === "medium" ? "bg-warning" : "bg-danger")} />}
                     </div>
                   </button>
@@ -219,10 +218,10 @@ export function BodyScanHistory({ scans, units, initialId, onClose }: { scans: H
 function Meas({ label, cm, units }: { label: string; cm: number | null; units: UnitPrefs }) {
   return (
     <div className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="text-caption font-medium text-muted-foreground">{label}</div>
       {cm == null
-        ? <NoData className="mt-0.5 block text-xs">Not measured</NoData>
-        : <div className="numeral mt-0.5 text-sm font-bold">{Math.round(cmToLengthDisplay(cm, units))}<span className="ml-0.5 text-xs text-muted-foreground">{lengthLabel(units)}</span></div>}
+        ? <NoData className="mt-0.5 block text-caption">Not measured</NoData>
+        : <div className="numeral mt-0.5 text-body font-bold">{Math.round(cmToLengthDisplay(cm, units))}<span className="ml-0.5 text-caption text-muted-foreground">{lengthLabel(units)}</span></div>}
     </div>
   );
 }
@@ -230,8 +229,8 @@ function Meas({ label, cm, units }: { label: string; cm: number | null; units: U
 function Stat({ label, value, unit }: { label: string; value: number; unit: string }) {
   return (
     <motion.div variants={popIn} className="rounded-xl bg-surface-2 px-2 py-2.5 text-center">
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
-      <div className="numeral mt-0.5 text-sm font-bold"><CountUp value={value} decimals={1} /><span className="ml-0.5 text-xs text-muted-foreground">{unit}</span></div>
+      <div className="text-caption font-medium text-muted-foreground">{label}</div>
+      <div className="numeral mt-0.5 text-body font-bold"><CountUp value={value} decimals={1} /><span className="ml-0.5 text-caption text-muted-foreground">{unit}</span></div>
     </motion.div>
   );
 }

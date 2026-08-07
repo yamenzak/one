@@ -138,7 +138,7 @@ export function PreferencesEditorCard({ clientId, includeProfile = false, onSave
             chrome above the first control (§7). */}
         <div className="flex flex-wrap items-center justify-between gap-2 px-1">
           {includeProfile
-            ? <p className="min-w-0 flex-1 text-sm text-muted-foreground">The profile targets, workouts and meals are built from. Editable on the client&apos;s behalf.</p>
+            ? <p className="min-w-0 flex-1 text-body text-muted-foreground">The profile targets, workouts and meals are built from. Editable on the client&apos;s behalf.</p>
             : <span className="min-w-0 flex-1" />}
           {fresh && (
             <Badge tone={fresh.stale ? "warning" : "neutral"}>
@@ -156,9 +156,9 @@ export function PreferencesEditorCard({ clientId, includeProfile = false, onSave
 
         {includeProfile && (
           <Card className="space-y-4">
-            <div className="text-sm font-semibold">Basics</div>
+            <div className="text-body font-semibold">Basics</div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Gender</label>
+              <label className="mb-1.5 block text-body font-medium text-muted-foreground">Gender</label>
               <div className="flex gap-2">{([["male", "Male"], ["female", "Female"]] as const).map(([v, l]) => <Chip key={v} selected={c.gender === v} onClick={() => set({ gender: v })}>{l}</Chip>)}</div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -178,7 +178,7 @@ export function PreferencesEditorCard({ clientId, includeProfile = false, onSave
         <Card>
         <FieldGroup title="Goal" hint="What everything else is built to serve.">
         <div>
-          <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><Target className="size-4" /> Primary goal</label>
+          <label className="mb-1.5 flex items-center gap-1.5 text-body font-medium text-muted-foreground"><Target className="size-4" /> Primary goal</label>
           <Select value={p.primaryGoal ?? ""} onChange={(v) => setP({ primaryGoal: (v || null) as ClientPreferences["primaryGoal"] })} options={opts(PRIMARY_GOAL_LABELS)} />
         </div>
         <Field label={`Target weight (${weightLabel(units)})`} inputMode="decimal" value={tw != null ? String(tw) : ""} onChange={(e) => setP({ targetWeightKg: e.target.value ? displayToKg(Number(e.target.value.replace(/[^\d.]/g, "")), units) : null })} placeholder={self ? "Where you're headed" : "Where they're headed"} />
@@ -188,16 +188,16 @@ export function PreferencesEditorCard({ clientId, includeProfile = false, onSave
         <Card>
         <FieldGroup title="Training" hint="How much, how often, and where.">
         <div>
-          <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><Activity className="size-4" /> Activity level</label>
+          <label className="mb-1.5 flex items-center gap-1.5 text-body font-medium text-muted-foreground"><Activity className="size-4" /> Activity level</label>
           <Select value={p.activityLevel ?? ""} onChange={(v) => setP({ activityLevel: (v || null) as ClientPreferences["activityLevel"] })} options={opts(ACTIVITY_LEVEL_LABELS)} />
-          <p className="mt-1 px-1 text-xs text-muted-foreground">Day-to-day movement outside workouts — sets the calorie baseline.</p>
+          <p className="mt-1 px-1 text-caption text-muted-foreground">Day-to-day movement outside workouts — sets the calorie baseline.</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Workouts / week" icon={Dumbbell} inputMode="numeric" value={p.workoutsPerWeek != null ? String(p.workoutsPerWeek) : ""} onChange={(e) => setP({ workoutsPerWeek: num(e.target.value) })} />
           <Field label="Meals / day" icon={Utensils} inputMode="numeric" value={p.mealsPerDay != null ? String(p.mealsPerDay) : ""} onChange={(e) => setP({ mealsPerDay: num(e.target.value) })} />
         </div>
         <div>
-          <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-muted-foreground"><MapPin className="size-4" /> {self ? "Where you train" : "Where they train"}</label>
+          <label className="mb-1.5 flex items-center gap-1.5 text-body font-medium text-muted-foreground"><MapPin className="size-4" /> {self ? "Where you train" : "Where they train"}</label>
           <div className="flex flex-wrap gap-2">{WORKOUT_LOCATIONS.map((loc) => <Chip key={loc} selected={p.workoutLocation === loc} onClick={() => setP({ workoutLocation: p.workoutLocation === loc ? null : loc })}>{WORKOUT_LOCATION_LABELS[loc]}</Chip>)}</div>
         </div>
         </FieldGroup>
@@ -206,11 +206,11 @@ export function PreferencesEditorCard({ clientId, includeProfile = false, onSave
         <Card>
         <FieldGroup title="Food & limits" hint="What to plan around, and what to avoid.">
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Dietary approach</label>
+          <label className="mb-1.5 block text-body font-medium text-muted-foreground">Dietary approach</label>
           <Select value={p.dietaryApproach ?? ""} onChange={(v) => setP({ dietaryApproach: (v || null) as ClientPreferences["dietaryApproach"] })} options={opts(DIETARY_APPROACH_LABELS)} />
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-muted-foreground">Injuries or limitations</label>
+          <label className="mb-1.5 block text-body font-medium text-muted-foreground">Injuries or limitations</label>
           <Textarea value={p.limitations ?? ""} onChange={(e) => setP({ limitations: e.target.value || null })} placeholder={self ? "A bad knee, allergies, equipment you don't have…" : "A bad knee, allergies, equipment they don't have…"} rows={3} />
         </div>
         </FieldGroup>

@@ -185,7 +185,7 @@ export function CoachToday() {
             Body composition, on the components the rest of this screen uses.
 
             It was a `Card` containing two hand-rolled stat blocks — a muted
-            label div over a `text-2xl` numeral, twice — and a hand-rolled
+            label div over a `text-title-2` numeral, twice — and a hand-rolled
             `rounded-xl bg-surface-2` button. All three exist already, and two
             `StatCard`s of exactly this shape sit forty lines above under
             "Check-in rate" / "Workout rate", so the same kind of figure was
@@ -200,7 +200,7 @@ export function CoachToday() {
                 <StatCard
                   stack
                   label="Trending down"
-                  value={<><CountUp value={analytics.composition.improving} /><span className="text-sm font-medium text-muted-foreground"> / {analytics.composition.withTrend}</span></>}
+                  value={<><CountUp value={analytics.composition.improving} /><span className="text-body font-medium text-muted-foreground"> / {analytics.composition.withTrend}</span></>}
                   icon={TrendingDown}
                   tone="sleep"
                 />
@@ -242,13 +242,13 @@ export function CoachToday() {
               <div key={row.clientId} className="space-y-1.5 border-t border-border/40 pt-3 first:border-0 first:pt-0">
                 <button onClick={() => nav(row.items[0]!.link)} className="flex items-center gap-2 text-left hover:underline">
                   <Avatar {...clientAvatar({ id: row.clientId, displayName: row.name, avatarUrl: row.avatarUrl, avatarSeed: row.avatarSeed })} className="size-7" />
-                  <span className="truncate text-sm font-semibold">{row.name}</span>
+                  <span className="truncate text-body font-semibold">{row.name}</span>
                 </button>
                 <div className="flex flex-wrap gap-1.5">
                   {row.items.map((it) => {
                     const cd = attentionCoding(it.type);
                     return (
-                      <button key={it.type} onClick={() => nav(it.link)} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium transition-colors hover:opacity-80" style={{ background: `color-mix(in oklch, ${toneVar[cd.tone]} 14%, transparent)`, color: toneVar[cd.tone] }}>
+                      <button key={it.type} onClick={() => nav(it.link)} className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-caption font-medium transition-colors hover:opacity-80" style={{ background: `color-mix(in oklch, ${toneVar[cd.tone]} 14%, transparent)`, color: toneVar[cd.tone] }}>
                         <cd.icon className="size-3.5" />{it.label}{it.detail ? ` · ${it.detail}` : ""}
                       </button>
                     );
@@ -265,7 +265,7 @@ export function CoachToday() {
           <h3 className="px-1 text-micro uppercase text-muted-foreground">Recent client activity</h3>
           {groupByDay(activity).map(([day, evs]) => (
             <div key={day}>
-              <div className="px-1 pb-1 pt-2 text-xs font-semibold text-muted-foreground">{dayLabel(day)}</div>
+              <div className="px-1 pb-1 pt-2 text-caption font-semibold text-muted-foreground">{dayLabel(day)}</div>
               <Card className="divide-y divide-border/40 py-0.5">
                 {evs.map((ev) => <RosterRow key={ev.id} ev={ev} units={units} onOpen={() => nav(`/clients/${ev.clientId}/${rosterSubtab(ev.kind)}`)} />)}
               </Card>
@@ -280,7 +280,7 @@ export function CoachToday() {
         ) : (
           unread.slice(0, 10).map((n) => (
             <InsightCard key={n.id} timestamp={new Date(n.created_at).toLocaleString()} title={n.title}>
-              {n.message && <Card className="text-sm text-muted-foreground">{n.message}</Card>}
+              {n.message && <Card className="text-body text-muted-foreground">{n.message}</Card>}
             </InsightCard>
           ))
         )}
@@ -328,10 +328,10 @@ function RosterRow({ ev, units, onOpen }: { ev: RosterEvent; units: UnitPrefs; o
     <button onClick={onOpen} className="flex w-full items-center gap-3 py-2.5 text-left transition-opacity active:opacity-60">
       <IconBadge icon={meta.icon} tone={meta.tone} size="sm" />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm"><span className="font-semibold">{ev.clientName}</span> <span className="text-muted-foreground">· {ev.title}</span></div>
-        {sub && <div className="truncate text-xs text-muted-foreground">{sub}</div>}
+        <div className="truncate text-body"><span className="font-semibold">{ev.clientName}</span> <span className="text-muted-foreground">· {ev.title}</span></div>
+        {sub && <div className="truncate text-caption text-muted-foreground">{sub}</div>}
       </div>
-      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{time}</span>
+      <span className="shrink-0 text-caption tabular-nums text-muted-foreground">{time}</span>
       <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" />
     </button>
   );

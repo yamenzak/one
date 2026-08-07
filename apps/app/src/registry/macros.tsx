@@ -16,7 +16,7 @@ import { useUnits } from "../units.js";
 export function MetricChip({ metric, value, className }: { metric: MetricKey; value: ReactNode; className?: string }) {
   const m = METRICS[metric];
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", toneSoft[m.tone], className)}>
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-micro", toneSoft[m.tone], className)}>
       <m.icon className="size-3.5" />
       <span className="numeral">{value}</span>
     </span>
@@ -112,8 +112,8 @@ export function MacroBar({ proteinG, carbsG, fatG, targets, layout = "row", clas
                 narrow that the macro's NAME goes too, the answer is `stacked`,
                 not a narrower pill. */}
             <span className="relative min-w-0">
-              <span className="numeral block text-sm font-bold leading-none">{Math.round(grams[k]!)}<span className="text-xs font-medium opacity-70"> g</span></span>
-              <span className="block truncate text-xs font-medium leading-tight opacity-70">{m.label}{t ? ` / ${t}` : ""}</span>
+              <span className="numeral block text-body font-bold leading-none">{Math.round(grams[k]!)}<span className="text-caption font-medium opacity-70"> g</span></span>
+              <span className="block truncate text-caption font-medium leading-tight opacity-70">{m.label}{t ? ` / ${t}` : ""}</span>
             </span>
           </div>
         );
@@ -150,7 +150,7 @@ export function MacroTiles({ calories, proteinG, carbsG, fatG, label = false, cl
         return (
           <div key={k} className={cn("flex flex-col items-center gap-1 rounded-xl p-2.5", toneSoft[m.tone])}>
             <m.icon className="size-4" />
-            <span className="numeral text-lg font-semibold leading-none">{Math.round(v).toLocaleString()}</span>
+            <span className="numeral text-body-lg font-semibold leading-none">{Math.round(v).toLocaleString()}</span>
             {label && <span className="text-micro uppercase opacity-70">{m.label}</span>}
           </div>
         );
@@ -166,7 +166,7 @@ export function MicroGrid({ rows, className }: { rows: readonly (readonly [strin
   const present = rows.filter(([, v]) => v > 0);
   if (present.length === 0) return null;
   return (
-    <div className={cn("grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-xl bg-surface-2 p-3 text-sm", className)}>
+    <div className={cn("grid grid-cols-2 gap-x-4 gap-y-1.5 rounded-xl bg-surface-2 p-3 text-body", className)}>
       {present.map(([l, v, u]) => (
         <div key={l} className="flex items-center justify-between gap-2">
           <span className="min-w-0 truncate text-muted-foreground">{l}</span>

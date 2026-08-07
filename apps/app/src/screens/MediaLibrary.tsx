@@ -193,7 +193,7 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
         <Button size="icon" variant="secondary" onClick={onBack} aria-label="Back"><ArrowLeft /></Button>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-title-3">Media library</h1>
-          <p className="truncate text-xs text-muted-foreground">
+          <p className="truncate text-caption text-muted-foreground">
             Everything the app stores for you, including what the AI made
           </p>
         </div>
@@ -205,7 +205,7 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
           about the viewer's own files. */}
       {usage && (
         <Card className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between text-body">
             <div className="flex items-center gap-2.5"><IconBadge icon={ImageIcon} tone="sleep" size="sm" /><span className="font-semibold">Storage</span></div>
             <span className="numeral text-muted-foreground">
               {usage.unlimited ? `${usage.usedMb} MB used` : `${usage.usedMb} / ${usage.limitMb} MB`}
@@ -217,7 +217,7 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
           {!usage.unlimited && (
             <Meter size="md" value={usage.pct} max={100} tone={usage.pct >= 90 ? "danger" : usage.pct >= 70 ? "warning" : "sleep"} />
           )}
-          {!usage.unlimited && usage.pct >= 90 && <p className="text-xs text-danger">Almost full — delete media you no longer need, or upgrade your plan.</p>}
+          {!usage.unlimited && usage.pct >= 90 && <p className="text-caption text-danger">Almost full — delete media you no longer need, or upgrade your plan.</p>}
         </Card>
       )}
 
@@ -264,10 +264,10 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
             <div className="space-y-1 p-2.5">
               <div className="flex items-center gap-1.5">
                 <Badge tone="neutral">{labelOf(it)}</Badge>
-                {it.mine && <span className="text-xs font-medium text-muted-foreground">yours</span>}
+                {it.mine && <span className="text-caption font-medium text-muted-foreground">yours</span>}
               </div>
-              {it.clientName && <div className="truncate text-xs font-medium">{it.clientName}</div>}
-              <div className="numeral flex items-center justify-between text-xs text-muted-foreground">
+              {it.clientName && <div className="truncate text-caption font-medium">{it.clientName}</div>}
+              <div className="numeral flex items-center justify-between text-caption text-muted-foreground">
                 <span>{fmtBytes(it.sizeBytes)}</span><span>{fmtDate(it.createdAt)}</span>
               </div>
             </div>
@@ -278,7 +278,7 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
       {/* What is in view, and what it costs. Below the collection rather than
           above it, because it describes the result rather than the controls. */}
       {items !== null && !error && (narrowed || query.trim()) && shown.length > 0 && (
-        <p className="numeral px-1 text-xs text-muted-foreground">
+        <p className="numeral px-1 text-caption text-muted-foreground">
           {shown.length} of {items.length} file{items.length === 1 ? "" : "s"} · {fmtBytes(shownBytes)}
         </p>
       )}
@@ -363,18 +363,18 @@ function MediaDetail({ item, onClose, onDelete }: {
           <div className="grid aspect-[4/3] w-full place-items-center rounded-2xl bg-surface-2 text-muted-foreground">
             <div className="space-y-2 text-center">
               <IconBadge icon={iconOf(item.purpose)} tone="sleep" />
-              <div className="font-mono text-xs uppercase">{item.contentType.split("/").pop()}</div>
+              <div className="font-mono text-caption uppercase">{item.contentType.split("/").pop()}</div>
             </div>
           </div>
         )}
 
         <Group>
-          <Row trailing={<span className="text-sm text-muted-foreground">{labelOf(item)}</span>}>Kind</Row>
-          {item.clientName && <Row trailing={<span className="text-sm text-muted-foreground">{item.clientName}</span>}>Client</Row>}
-          {item.ownerName && <Row trailing={<span className="text-sm text-muted-foreground">{item.ownerName}</span>}>Uploaded by</Row>}
-          <Row trailing={<span className="numeral text-sm text-muted-foreground">{fmtDate(item.createdAt)}</span>}>Added</Row>
-          <Row trailing={<span className="numeral text-sm text-muted-foreground">{fmtBytes(item.sizeBytes)}</span>}>Size</Row>
-          <Row trailing={<span className="font-mono text-xs text-muted-foreground">{item.contentType}</span>}>Type</Row>
+          <Row trailing={<span className="text-body text-muted-foreground">{labelOf(item)}</span>}>Kind</Row>
+          {item.clientName && <Row trailing={<span className="text-body text-muted-foreground">{item.clientName}</span>}>Client</Row>}
+          {item.ownerName && <Row trailing={<span className="text-body text-muted-foreground">{item.ownerName}</span>}>Uploaded by</Row>}
+          <Row trailing={<span className="numeral text-body text-muted-foreground">{fmtDate(item.createdAt)}</span>}>Added</Row>
+          <Row trailing={<span className="numeral text-body text-muted-foreground">{fmtBytes(item.sizeBytes)}</span>}>Size</Row>
+          <Row trailing={<span className="font-mono text-caption text-muted-foreground">{item.contentType}</span>}>Type</Row>
         </Group>
 
         {/* The way to the file itself. A media URL is authed and same-origin, so

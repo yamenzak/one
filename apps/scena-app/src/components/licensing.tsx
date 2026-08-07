@@ -61,7 +61,7 @@ export function LicenseNote({ scope }: { scope: "media" | "slides" | "music" }) 
         : "images and video (including their audio)";
   const verb = scope === "music" ? "play them" : "display them";
   return (
-    <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-border/70 bg-muted/40 px-3.5 py-2.5 text-xs leading-relaxed text-muted-foreground">
+    <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-border/70 bg-muted/40 px-3.5 py-2.5 text-caption leading-relaxed text-muted-foreground">
       <Info className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
       <p className="min-w-0 flex-1">
         <span className="font-medium text-foreground">Your uploads</span> are yours to clear — {uploads} must be cleared for the way you {verb}. The{" "}

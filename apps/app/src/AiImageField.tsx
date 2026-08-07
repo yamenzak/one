@@ -68,7 +68,7 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
       {creating ? (
         <div className="flex flex-col items-center gap-1 text-primary">
           <AiAvatar className="size-6 animate-pulse" />
-          <span className="text-xs font-medium">Creating…</span>
+          <span className="text-caption font-medium">Creating…</span>
         </div>
       ) : value ? (
         // A photo fills its frame — and an EDITOR preview must show what the app
@@ -92,27 +92,27 @@ export function AiImageField({ value, onChange, feature, subject, hint, canAi, l
   if (stacked) {
     return (
       <div className="min-w-0 space-y-1.5">
-        {label && <div className="text-xs font-medium text-muted-foreground">{label}</div>}
+        {label && <div className="text-caption font-medium text-muted-foreground">{label}</div>}
         {box("aspect-square w-full")}
         {canAi && genButton("w-full")}
-        {err && <p className="text-xs text-warning">{err}</p>}
+        {err && <p className="text-caption text-warning">{err}</p>}
       </div>
     );
   }
 
   return (
     <div className="space-y-1.5">
-      {label && <div className="text-xs text-muted-foreground">{label}</div>}
+      {label && <div className="text-caption text-muted-foreground">{label}</div>}
       <div className="flex items-center gap-3">
         {box("shrink-0", { width: size, height: size })}
         {canAi && (
           <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5">
             {genButton()}
-            <p className="text-xs leading-snug text-muted-foreground">Original, license-free {feature === "food-image" ? "food render" : "exercise illustration"}. Style is set in AI settings.</p>
+            <p className="text-caption leading-snug text-muted-foreground">Original, license-free {feature === "food-image" ? "food render" : "exercise illustration"}. Style is set in AI settings.</p>
           </div>
         )}
       </div>
-      {err && <p className="text-xs text-warning">{err}</p>}
+      {err && <p className="text-caption text-warning">{err}</p>}
     </div>
   );
 }

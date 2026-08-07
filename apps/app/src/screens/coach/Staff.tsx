@@ -143,7 +143,7 @@ export function Staff() {
           is the in-CARD device; using both across four tabs of one screen gave the
           same idea two spellings. */}
       <Eyebrow action={<Button size="sm" onClick={() => setInviteOpen(true)}><Plus /> Invite</Button>}>Team</Eyebrow>
-      {msg && <p role="status" aria-live="polite" className="text-sm text-muted-foreground">{msg}</p>}
+      {msg && <p role="status" aria-live="polite" className="text-body text-muted-foreground">{msg}</p>}
       <Reveal loading={!members} className="space-y-3" skeleton={
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
@@ -226,11 +226,11 @@ export function Staff() {
               out. Now that the seat count is on screen, saying nothing here
               would be the odd choice. */}
           {seatsLeft === 0 && seatCap != null && (
-            <p className="pt-1 text-xs text-warning">
+            <p className="pt-1 text-caption text-warning">
               All {seatCap} seat{seatCap === 1 ? " is" : "s are"} in use. Upgrade your plan to add another coach.
             </p>
           )}
-          <p className="pt-1 text-xs text-muted-foreground">Clients appear in the Clients tab, not here.</p>
+          <p className="pt-1 text-caption text-muted-foreground">Clients appear in the Clients tab, not here.</p>
         </>
         )}
       </Reveal>
@@ -242,7 +242,7 @@ export function Staff() {
             <Chip selected={role === "trainer"} onClick={() => setRole("trainer")}>{personaLabel("trainer")}</Chip>
             {canAssistant && <Chip selected={role === "assistant"} onClick={() => setRole("assistant")}>{personaLabel("assistant")}</Chip>}
           </div>
-          <p className="text-xs text-muted-foreground">They sign in with a code — no password to set.</p>
+          <p className="text-caption text-muted-foreground">They sign in with a code — no password to set.</p>
         </div>
       </Sheet>
 
@@ -327,7 +327,7 @@ function PermissionSheet({ member, roles, rolePending, onRole, onClose, onSaved 
             roster's dropdown did — a demotion can be refused (the last owner)
             and a promotion can hit the seat ceiling. */}
         <div className="space-y-1.5">
-        <div className="text-sm font-medium text-muted-foreground">Role</div>
+        <div className="text-body font-medium text-muted-foreground">Role</div>
         <Select
           aria-label={`Role for ${member.name || member.email}`}
           value={member.role}
@@ -335,11 +335,11 @@ function PermissionSheet({ member, roles, rolePending, onRole, onClose, onSaved 
           options={roles}
         />
         </div>
-        <p className="text-sm text-muted-foreground">Override the role&rsquo;s defaults with a custom grant. Clear everything to fall back to the {personaLabel(member.role)} role.</p>
+        <p className="text-body text-muted-foreground">Override the role&rsquo;s defaults with a custom grant. Clear everything to fall back to the {personaLabel(member.role)} role.</p>
         <div className="max-h-[45vh] space-y-3 overflow-y-auto">
           {Object.entries(PERMISSION_CATALOG).map(([res, actions]) => (
             <div key={res}>
-              <div className="mb-1.5 text-sm font-medium capitalize">{res}</div>
+              <div className="mb-1.5 text-body font-medium capitalize">{res}</div>
               <div className="flex flex-wrap gap-2">{actions.map((a) => <Chip key={a} selected={(grant[res] ?? []).includes(a)} onClick={() => toggle(res, a)}>{a}</Chip>)}</div>
             </div>
           ))}

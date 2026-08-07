@@ -93,7 +93,7 @@ function SidebarFooter({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button className="grid size-9 shrink-0 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring" aria-label="Account">
-          <span className="grid size-8 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">{initials}</span>
+          <span className="grid size-8 place-items-center rounded-full bg-primary/15 text-caption font-bold text-primary">{initials}</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side={side} align="end">
@@ -127,7 +127,7 @@ function SidebarFooter({
       </div>
       <button onClick={onNavigateBilling} className="w-full rounded-xl bg-sidebar-accent/50 p-3 text-left transition-colors hover:bg-sidebar-accent">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-xs font-semibold">{planName}</span>
+          <span className="text-caption font-semibold">{planName}</span>
           <span className="font-mono text-caption text-muted-foreground tabular-nums">{bal.toLocaleString()} cr</span>
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
@@ -139,7 +139,7 @@ function SidebarFooter({
         </div>
       </button>
       <div className="flex items-center gap-2.5 px-1">
-        <div className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">{initials}</div>
+        <div className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/15 text-caption font-bold text-primary">{initials}</div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-caption font-medium">{email || "Operator"}</div>
           <div className="text-caption capitalize text-muted-foreground">{role ?? "Owner"}</div>
@@ -386,7 +386,7 @@ function OrgGate({ onResolved, onSignOut }: { onResolved: () => void; onSignOut:
   }, [onResolved]);
 
   if (needsOnboard) return <OrgOnboard onDone={onResolved} onSignOut={onSignOut} />;
-  return <div className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading…</div>;
+  return <div className="grid min-h-screen place-items-center text-body text-muted-foreground">Loading…</div>;
 }
 
 /** Full-screen boot splash — a thinking Scena while identity/tenant resolves. */
@@ -395,7 +395,7 @@ function Splash() {
     <div className="grid min-h-screen place-items-center">
       <div className="flex flex-col items-center gap-3">
         <ScenaMascot mood="thinking" size={96} />
-        <div className="text-sm text-muted-foreground">Loading…</div>
+        <div className="text-body text-muted-foreground">Loading…</div>
       </div>
     </div>
   );
@@ -407,8 +407,8 @@ function NotFound({ onHome }: { onHome: () => void }) {
     <div className="grid min-h-[60vh] place-items-center p-6">
       <div className="max-w-md text-center">
         <ScenaMascot mood="searching" size={112} className="mx-auto mb-2" />
-        <h2 className="text-lg font-semibold">This page wandered off</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">
+        <h2 className="text-body-lg font-semibold">This page wandered off</h2>
+        <p className="mt-1.5 text-body text-muted-foreground">
           We couldn't find that page. It may have moved, or the link is out of date.
         </p>
         <div className="mt-5 flex justify-center">

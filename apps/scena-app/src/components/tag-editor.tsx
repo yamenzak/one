@@ -27,7 +27,7 @@ export function TagEditor({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center gap-1.5 rounded-lg border border-input bg-transparent px-2 py-1.5 text-sm focus-within:ring-2 focus-within:ring-ring",
+        "flex flex-wrap items-center gap-1.5 rounded-lg border border-input bg-transparent px-2 py-1.5 text-body focus-within:ring-2 focus-within:ring-ring",
         className,
       )}
     >

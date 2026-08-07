@@ -13,7 +13,7 @@ export function Field({ label, children, hint }: { label: string; children: Reac
   return (
     <label className="flex flex-col gap-1">
       <div className="flex items-center gap-2">
-        <span className="w-[86px] shrink-0 text-xs text-muted-foreground">{label}</span>
+        <span className="w-[86px] shrink-0 text-caption text-muted-foreground">{label}</span>
         <span className="min-w-0 flex-1">{children}</span>
       </div>
       {hint && <span className="pl-[86px] text-caption leading-tight text-muted-foreground/70">{hint}</span>}
@@ -53,7 +53,7 @@ export function PanelGroup({
 }
 
 export function TextField({ value, onChange, placeholder, mono }: { value: string; onChange: (v: string) => void; placeholder?: string; mono?: boolean }) {
-  return <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={cn("h-8 text-xs", mono && "font-mono")} />;
+  return <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={cn("h-8 text-caption", mono && "font-mono")} />;
 }
 
 export function AreaField({ value, onChange, rows = 3, placeholder }: { value: string; onChange: (v: string) => void; rows?: number; placeholder?: string }) {
@@ -63,7 +63,7 @@ export function AreaField({ value, onChange, rows = 3, placeholder }: { value: s
       onChange={(e) => onChange(e.target.value)}
       rows={rows}
       placeholder={placeholder}
-      className="w-full resize-y rounded-md border border-input bg-transparent px-2.5 py-1.5 text-xs shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+      className="w-full resize-y rounded-md border border-input bg-transparent px-2.5 py-1.5 text-caption shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
     />
   );
 }
@@ -114,7 +114,7 @@ export function NumberField({
             setDraft(null);
           }
         }}
-        className={cn("h-8 px-2 font-mono text-xs tabular-nums", suffix && "pr-8")}
+        className={cn("h-8 px-2 font-mono text-caption tabular-nums", suffix && "pr-8")}
       />
       {suffix && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-caption text-muted-foreground">{suffix}</span>}
     </div>
@@ -156,7 +156,7 @@ export function SelectField<T extends string>({ value, onChange, options }: { va
     <Select
       value={value}
       onChange={(v) => onChange(v as T)}
-      className="h-8 w-full text-xs"
+      className="h-8 w-full text-caption"
       options={[...options.map((o) => ({ value: o.id, label: o.label }))]}
     />
   );
@@ -245,7 +245,7 @@ export function QuadField({
 export function SwitchField({ value, onChange, label }: { value: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <label className="flex cursor-pointer items-center justify-between gap-2 py-0.5">
-      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-caption text-muted-foreground">{label}</span>
       <Switch checked={value} onCheckedChange={onChange} />
     </label>
   );

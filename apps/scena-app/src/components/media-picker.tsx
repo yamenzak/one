@@ -76,7 +76,7 @@ export function MediaPicker({ open, kind = "image", title, onPick, onOpenChange 
           ) : !items ? (
             <div className="grid place-items-center py-16 text-muted-foreground"><Loader2 className="size-5 animate-spin" /></div>
           ) : items.length === 0 ? (
-            <div className="py-16 text-center text-sm text-muted-foreground">Your library is empty. Upload an asset to use it here.</div>
+            <div className="py-16 text-center text-body text-muted-foreground">Your library is empty. Upload an asset to use it here.</div>
           ) : (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
               {items.map((m) => (

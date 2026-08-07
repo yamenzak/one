@@ -184,7 +184,7 @@ function Stepper({ value, min, max, onChange, unit }: { value: number; min: numb
             {value}
           </motion.span>
         </AnimatePresence>
-        <span className="text-sm text-muted-foreground">{unit}</span>
+        <span className="text-body text-muted-foreground">{unit}</span>
       </div>
       <div className="flex items-center gap-1.5">
         <Button variant="secondary" size="icon-sm" aria-label={`Fewer ${unit}`} disabled={value <= min} onClick={() => step(-1)}><Minus /></Button>
@@ -334,7 +334,7 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
       <StepPanel step={step}>
         {step === 0 && (
           <div className="space-y-5">
-            <p className="px-1 text-sm text-muted-foreground">
+            <p className="px-1 text-body text-muted-foreground">
               A few basics so your coach can tailor everything — and so the app can work out your targets.
             </p>
 
@@ -358,7 +358,7 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
               {/* Asked because the body-composition formulas take it as an
                   input, not to categorise anyone. Saying so is cheaper than
                   leaving people to guess why it is required. */}
-              <p className="flex items-start gap-1.5 px-1 text-xs text-muted-foreground [&_svg]:mt-px [&_svg]:size-3.5 [&_svg]:shrink-0">
+              <p className="flex items-start gap-1.5 px-1 text-caption text-muted-foreground [&_svg]:mt-px [&_svg]:size-3.5 [&_svg]:shrink-0">
                 <Info /> Used by the body-fat and calorie formulas. Your coach sees it; nobody else does.
               </p>
             </Ask>
@@ -390,7 +390,7 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
                   )}
                 </motion.div>
               </AnimatePresence>
-              {heightEntered && !heightValid && <p className="px-1 text-xs text-warning">Enter a realistic height.</p>}
+              {heightEntered && !heightValid && <p className="px-1 text-caption text-warning">Enter a realistic height.</p>}
             </Card>
           </div>
         )}
@@ -414,7 +414,7 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
                     : gap === 0 ? "Right where you want to be"
                     : `${gap} ${wUnit} to ${(weightKg ?? 0) > (targetKg ?? 0) ? "lose" : "gain"}`}
                 </Readout>
-                <p className="px-1 text-xs text-muted-foreground">
+                <p className="px-1 text-caption text-muted-foreground">
                   Today&rsquo;s weight becomes the first point on your chart. Both are yours to change any time.
                 </p>
               </Card>
@@ -452,12 +452,12 @@ export function Onboarding({ clientId, displayName, onDone }: { clientId: string
                   the selection changes. */}
               <div className="grid grid-cols-7 gap-1.5">
                 {DAYS.map((d) => (
-                  <Chip key={d} selected={f.availableDays.includes(d)} onClick={() => toggleDay(d)} className="w-full justify-center px-0 text-xs">
+                  <Chip key={d} selected={f.availableDays.includes(d)} onClick={() => toggleDay(d)} className="w-full justify-center px-0 text-caption">
                     {d}
                   </Chip>
                 ))}
               </div>
-              {f.availableDays.length === 0 && <p className="px-1 text-xs text-muted-foreground">Pick at least one and your coach can build a week around it.</p>}
+              {f.availableDays.length === 0 && <p className="px-1 text-caption text-muted-foreground">Pick at least one and your coach can build a week around it.</p>}
             </Ask>
           </div>
         )}

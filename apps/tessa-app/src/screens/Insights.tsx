@@ -228,7 +228,7 @@ export function Insights() {
                 <div className="text-caption text-muted-foreground">{t(`insights.expiry.${b.bucket}` as "insights.expiry.week")}</div>
                 {/* Direct-labelled: five bars is few enough that a value on each
                     beats an axis, and it is the number a person acts on. */}
-                <div className="text-sm font-medium">{b.n}</div>
+                <div className="text-body font-medium">{b.n}</div>
               </div>
             ))}
           </div>

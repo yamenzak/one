@@ -274,7 +274,7 @@ function Body({ data, units, dateLabel, clientId, canBodyScan }: { data: Progres
                     <MiniStat icon={METRICS.fatMass.icon} tone={METRICS.fatMass.tone} label="Fat mass" value={kgToDisplay(fat!, units).toFixed(1)} sub={wl} />
                   </>
                 ) : (
-                  <p className="text-xs text-muted-foreground">Add your height in profile to unlock lean &amp; fat mass.</p>
+                  <p className="text-caption text-muted-foreground">Add your height in profile to unlock lean &amp; fat mass.</p>
                 )}
                 {bfSpark.length >= 2 && <div className="overflow-hidden"><Sparkline values={bfSpark} tone="sleep" width={190} height={40} className="w-full" /></div>}
               </div>
@@ -285,7 +285,7 @@ function Body({ data, units, dateLabel, clientId, canBodyScan }: { data: Progres
                   <div style={{ width: `${(lean / comp) * 100}%`, backgroundColor: toneVar.cardio }} />
                   <div style={{ width: `${(fat / comp) * 100}%`, backgroundColor: toneVar.sleep }} />
                 </div>
-                <div className="flex justify-between text-xs font-medium">
+                <div className="flex justify-between text-caption font-medium">
                   <span style={{ color: toneVar.cardio }}>Lean {Math.round((lean / comp) * 100)}%</span>
                   <span style={{ color: toneVar.sleep }}>Fat {Math.round((fat / comp) * 100)}%</span>
                 </div>
@@ -320,14 +320,14 @@ function Body({ data, units, dateLabel, clientId, canBodyScan }: { data: Progres
         <Stagger>
           <Card className="flex items-start gap-3 border border-warning/25 bg-warning-soft/40">
             <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
-            <div className="min-w-0"><div className="text-sm font-semibold">Posture screen</div><p className="text-sm text-muted-foreground">{POSTURE_GUIDANCE[body.latest.postureSeverity]} A higher neck angle is more upright.</p></div>
+            <div className="min-w-0"><div className="text-body font-semibold">Posture screen</div><p className="text-body text-muted-foreground">{POSTURE_GUIDANCE[body.latest.postureSeverity]} A higher neck angle is more upright.</p></div>
           </Card>
         </Stagger>
       )}
       <Stagger>
         <Card className="space-y-3">
-          <div className="text-sm font-semibold">Latest measurements</div>
-          {body.latest.somatotype && <div className="text-xs text-muted-foreground">Body type · <span className="font-semibold text-foreground">{body.latest.somatotype}</span></div>}
+          <div className="text-body font-semibold">Latest measurements</div>
+          {body.latest.somatotype && <div className="text-caption text-muted-foreground">Body type · <span className="font-semibold text-foreground">{body.latest.somatotype}</span></div>}
           <div className="grid grid-cols-3 gap-2">
             <MeasChip label="Chest" value={body.latest.chestCm} units={units} />
             <MeasChip label="Waist" value={body.latest.waistCm} units={units} />
@@ -369,7 +369,7 @@ function Training({ data, units }: { data: ProgressData; units: ReturnType<typeo
             <div className="space-y-4">
               <BarChart values={tonnageVals} labels={weekLabels} tone="activity" format={(v) => `${v.toLocaleString()} ${wl}`} />
               <div className="space-y-1.5 border-t border-border/40 pt-3">
-                <div className="flex items-center justify-between text-xs"><span className="font-medium text-muted-foreground">Sets per week</span><span className="numeral font-semibold">{training.totalSets} total</span></div>
+                <div className="flex items-center justify-between text-caption"><span className="font-medium text-muted-foreground">Sets per week</span><span className="numeral font-semibold">{training.totalSets} total</span></div>
                 <div className="overflow-hidden"><Sparkline values={setVals} tone="cardio" width={320} height={40} className="w-full" /></div>
               </div>
             </div>
@@ -378,22 +378,22 @@ function Training({ data, units }: { data: ProgressData; units: ReturnType<typeo
       </Stagger>
 
       <section className="space-y-2">
-        <Eyebrow action={<span className="text-xs font-medium text-muted-foreground">est. 1RM</span>}>Personal records</Eyebrow>
+        <Eyebrow action={<span className="text-caption font-medium text-muted-foreground">est. 1RM</span>}>Personal records</Eyebrow>
         <Stagger>
         <Card className="space-y-3">
           {training.prs.length === 0 ? <EmptyMini label="Log weighted sets to build your PR board" /> : (
             <div className="space-y-1.5">
               {training.prs.map((p, i) => (
                 <div key={p.exerciseId} className="flex items-center gap-3">
-                  <div className="numeral w-5 shrink-0 text-center text-xs font-bold text-muted-foreground">{i + 1}</div>
+                  <div className="numeral w-5 shrink-0 text-center text-caption font-bold text-muted-foreground">{i + 1}</div>
                   <ExerciseThumb thumb={p.thumb} size={36} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-medium">{p.name}</div>
+                    <div className="truncate text-body font-medium">{p.name}</div>
                     <Meter className="mt-1" tone="activity" value={p.e1rm} max={maxE1} />
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="numeral text-sm font-bold">{kgToDisplay(p.e1rm, units).toFixed(0)} <span className="text-xs font-medium text-muted-foreground">{wl}</span></div>
-                    <div className="numeral text-xs text-muted-foreground">{kgToDisplay(p.weight, units).toFixed(0)}×{p.reps}</div>
+                    <div className="numeral text-body font-bold">{kgToDisplay(p.e1rm, units).toFixed(0)} <span className="text-caption font-medium text-muted-foreground">{wl}</span></div>
+                    <div className="numeral text-caption text-muted-foreground">{kgToDisplay(p.weight, units).toFixed(0)}×{p.reps}</div>
                   </div>
                 </div>
               ))}
@@ -458,12 +458,12 @@ function TrendRow({ icon: Icon, tone, label, value, unit, values }: { icon: Luci
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="min-w-0">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground"><Icon className="size-4 shrink-0" style={{ color: toneVar[tone] }} />{label}</div>
+        <div className="flex items-center gap-2 text-body text-muted-foreground"><Icon className="size-4 shrink-0" style={{ color: toneVar[tone] }} />{label}</div>
         {value == null
-        ? <div className="mt-1"><NoData className="text-xs">Not yet</NoData></div>
-        : <div className="numeral mt-1 text-xl font-bold leading-none">{value.toFixed(1)}<span className="ml-1 text-sm font-medium text-muted-foreground">{unit}</span></div>}
+        ? <div className="mt-1"><NoData className="text-caption">Not yet</NoData></div>
+        : <div className="numeral mt-1 text-title-3 font-bold leading-none">{value.toFixed(1)}<span className="ml-1 text-body font-medium text-muted-foreground">{unit}</span></div>}
       </div>
-      {values.length >= 2 ? <div className="overflow-hidden"><Sparkline values={values} tone={tone} width={150} height={44} /></div> : <span className="text-xs text-muted-foreground">Not enough data</span>}
+      {values.length >= 2 ? <div className="overflow-hidden"><Sparkline values={values} tone={tone} width={150} height={44} /></div> : <span className="text-caption text-muted-foreground">Not enough data</span>}
     </div>
   );
 }
@@ -483,10 +483,10 @@ function MiniStat({ icon: Icon, tone, label, value, sub }: { icon: LucideIcon; t
   return (
     <div className="flex items-center gap-2.5">
       <Icon className="size-4 shrink-0" style={{ color: toneVar[tone] }} />
-      <span className="flex-1 truncate text-xs text-muted-foreground">{label}</span>
+      <span className="flex-1 truncate text-caption text-muted-foreground">{label}</span>
       {value == null
-        ? <NoData className="text-xs">Not yet</NoData>
-        : <span className="numeral text-sm font-bold">{value}{sub && <span className="ml-0.5 text-xs font-medium text-muted-foreground">{sub}</span>}</span>}
+        ? <NoData className="text-caption">Not yet</NoData>
+        : <span className="numeral text-body font-bold">{value}{sub && <span className="ml-0.5 text-caption font-medium text-muted-foreground">{sub}</span>}</span>}
     </div>
   );
 }
@@ -513,14 +513,14 @@ export function RangeChip({ status, range, convert, unit }: { status: RangeStat 
 function MeasChip({ label, value, units }: { label: string; value: number | null; units: ReturnType<typeof useUnits> }) {
   return (
     <div className="rounded-xl bg-surface-2 px-3 py-2.5">
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="text-caption font-medium text-muted-foreground">{label}</div>
       {value == null
-        ? <div className="mt-0.5"><NoData className="text-xs">Not yet</NoData></div>
-        : <div className="numeral mt-0.5 text-sm font-bold">{cmToLengthDisplay(value, units).toFixed(1)}<span className="ml-0.5 text-xs font-medium text-muted-foreground">{lengthLabel(units)}</span></div>}
+        ? <div className="mt-0.5"><NoData className="text-caption">Not yet</NoData></div>
+        : <div className="numeral mt-0.5 text-body font-bold">{cmToLengthDisplay(value, units).toFixed(1)}<span className="ml-0.5 text-caption font-medium text-muted-foreground">{lengthLabel(units)}</span></div>}
     </div>
   );
 }
 
 function EmptyMini({ label }: { label: string }) {
-  return <div className="grid h-24 place-items-center rounded-xl bg-surface-2 px-4 text-center text-xs text-muted-foreground">{label}</div>;
+  return <div className="grid h-24 place-items-center rounded-xl bg-surface-2 px-4 text-center text-caption text-muted-foreground">{label}</div>;
 }
