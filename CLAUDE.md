@@ -724,29 +724,37 @@ handlers are woven through Kova's notification registry, entitlement gates and
 `requireClientAccess`. Only the reconciliation logic moved.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. Measured 2026-08-02, per package: **548 kova/api + 197 kova/domain +
-146 tessa/api + 87 tessa/domain + 85 tenancy + 70 kova/app + 54 commerce +
-48 ai + 47 ui + 45 billing + 35 billing-rail + 24 notify + 17 template +
-14 core + 14 purge + 13 tessa/app + 12 auth + 7 protocol + 7 i18n + 3 admin +
-3 app-kit + 21 storage + 3 email** (1,497 total, 31 skipped). The older figure
-quoted here counted Kova and the packages only — Tessa's 240 were never in it.
-The ui count DROPPED and the kova/app count rose by the same shape: Stage 0b
-moved Kova's eleven accent tones — and the contrast tests that guard them — out
-of `@4dl/ui` and into the app. The template's 17 are 11 conformance (plain Node,
-no fixtures) + 6 integration (the real worker through Miniflare, on the real
-`*.localhost` host topology).
+moves. **Measured 2026-08-07** from one `pnpm test`, per package: **632 kova/api
+(+31 skipped) + 237 kova/domain + 204 scena/api + 146 tessa/api + 107 tenancy +
+99 kova/app + 87 tessa/domain + 78 ui + 75 ai + 63 commerce + 61 scena/widgets +
+45 billing + 45 billing-rail + 44 core + 40 scena/timeline + 35 auth +
+24 notify + 19 scena/manifest + 19 scena/app + 18 scena/protocol + 18 storage +
+17 kova/protocol + 17 template + 17 app-kit + 14 tessa/app + 14 purge +
+9 email + 7 i18n + 6 scena/brand + 4 admin** — **2,201 passing, 31 skipped**,
+57 turbo tasks, all green.
+
+Scena's 407 (204 api + 19 app + 184 across its five pure packages) were never in
+the older figure at all; nor were Tessa's. `@scena/timeline`'s 40 are the ones
+that matter most per line — they prove
+`position(t) = (t − T0) mod cycleLength`, which is the whole product.
+The template's 17 are 11 conformance (plain Node, no fixtures) + 6 integration
+(the real worker through Miniflare, on the real `*.localhost` host topology).
 Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
 `@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
 The pricing and normalizer suites live
 in `apps/api/test` and are already *inside* the API count — the older
 "protocol/pricing/normalizer" phrasing double-counted them. **E2E is separate**
 (`pnpm e2e`, not part of `pnpm test`): 3 Playwright specs for Kova, ~40 s all in,
-all green — plus Tessa's 2 and Scena's, each in its own package on its own port
+all green — plus Tessa's 2 and Scena's 1, each in its own package on its own port
 (**8787 Kova, 8788 Tessa, 8789 Scena + 8790 its player**). Sharing a port makes
 whichever suite runs second drive another product's worker, which fails as
 "element not found" rather than as a conflict; the same is true of wrangler's
 DEFAULT devtools inspector on 9229, so each suite past the first pins its own
 (`--inspector-port`, Tessa 9230, Scena 9231/9232).
+Scena has **two more configs outside the gate**, both because they need the
+development platform-admin lane and the gate must never have it: `wall` (the
+two-screens-same-slide spec, 1 spec, ~1 min) and `shots` (4 projects × 21
+images, ~20 min). All measured green 2026-08-07.
 
 **Built and tested:** foundation, auth (OTP + passkeys, incl. autofill /
 conditional UI), tenancy + row-level scope, the AI suite (credits reserve →
