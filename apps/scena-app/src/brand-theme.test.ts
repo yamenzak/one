@@ -17,9 +17,9 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { brandCss, isDefaultBrand, parseThemeCss, type BrandKit } from "./brand-theme.js";
+import { brandCss, isDefaultBrand, parseThemeCss, type WorkspaceBrand } from "./brand-theme.js";
 
-const kit = (over: Partial<BrandKit> = {}): BrandKit => ({
+const kit = (over: Partial<WorkspaceBrand> = {}): WorkspaceBrand => ({
   radius: 16,
   bodyFont: "Inter",
   theme: { light: {}, dark: {} },

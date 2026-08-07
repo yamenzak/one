@@ -57,9 +57,8 @@ import {
 } from "../api.js";
 import { TagEditor } from "../components/tag-editor.js";
 import { useCan } from "../permissions.js";
-import { StatusDot, dimsOf } from "./Screens.js";
-import { Pill } from "../components/status.js";
-import { Badge, Button, cn, ConfirmDialog, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger, toast, usePageChrome } from "@4dl/ui";
+import { dimsOf } from "./Screens.js";
+import { Badge, Button, cn, ConfirmDialog, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, StatusDot, Switch, Tabs, TabsContent, TabsList, TabsTrigger, toast, usePageChrome } from "@4dl/ui";
 
 const NONE = "__none__";
 
@@ -210,7 +209,7 @@ export function ScreenDetailPage() {
             title={writable ? <EditableName screen={screen} onRenamed={reload} /> : screen.name}
             description={
               <span className="flex items-center gap-1.5">
-                <StatusDot online={online} />
+                <StatusDot tone={online ? "success" : "neutral"} ping={online} />
                 <span className={online ? "text-success" : "text-muted-foreground"}>{online ? "Online" : "Offline"}</span>
                 {activeChannel && <span className="text-muted-foreground">· playing {activeChannel}</span>}
               </span>
@@ -429,7 +428,7 @@ function StatusPanel({ screen, activeChannel }: { screen: Screen; activeChannel:
     { label: "Last seen", value: lastSeen(live?.lastSeen ?? screen.last_seen), icon: <Clock /> },
   ];
   return (
-    <Panel title="Status" icon={<StatusDot online={online} />} action={<Pill tone={online ? "success" : "muted"}>{online ? "Online" : "Offline"}</Pill>}>
+    <Panel title="Status" icon={<StatusDot tone={online ? "success" : "neutral"} ping={online} />} action={<Badge tone={online ? "success" : "neutral"}>{online ? "Online" : "Offline"}</Badge>}>
       <dl className="space-y-2.5">
         {stats.map((s) => (
           <div key={s.label} className="flex items-center gap-2.5 text-body">

@@ -961,3 +961,65 @@ Every anchor is `page.getByRole("main")`-scoped now, and every heading anchor is
   against a stale one on the other, which is precisely the failure the wall spec
   exists to catch, arriving through the harness. `readFrame` captures the
   overlay text first, foregrounds, and waits for the text to MOVE.
+
+---
+
+## UI-4 — the app stops carrying a design system
+
+Stages 7a–7h made Scena's screens obey the language. This stage is a different
+question: how much of its UI is Scena's at all? The answer was more than it
+looked, and the excess was not inert.
+
+### `components/status.tsx` was a second design system, 90 lines long
+
+It re-declared `Tone`, re-declared soft and solid tone maps, and re-implemented
+a badge and a stat card that `@4dl/ui` already owns. Three components, 26 call
+sites. All of it compiled, all of it looked plausible, and none of it failed
+anything.
+
+Two of the three were strictly worse than what they duplicated:
+
+- **`StatTile` vs `StatCard`.** The platform's takes `null` and renders
+  `NoData`; Scena's took a string and rendered whatever it was given. That is
+  the exact §5 defect Analytics shipped — four tiles reading `0 · 0 · 0 · 0s`
+  where the workspace had no data at all.
+- **`Pill` vs `Badge`.** Same shape, one tone vocabulary apart.
+
+### And the tone vocabulary is where it stopped being cosmetic
+
+`@4dl/ui`'s tones are `success | warning | danger | primary | neutral`, plus
+whatever accents an app registers. Scena's local `Tone` read
+`success | warning | info | destructive | muted | primary` — three names the
+platform does not have, and **`info` has no token anywhere**. Not in
+`tokens.css`, not in Scena's `index.css`, not in a Tailwind `@theme` block.
+
+So `bg-info/12 text-info` was never generated. Verified in the built CSS:
+`bg-success`, `text-success` and `bg-destructive` each appear once;
+`bg-info` and `text-info` appear **zero** times. The three
+`<Pill tone="info">` in the operator console — a model's tier, a promo's kind,
+a comped workspace — rendered as unstyled text where a coloured pill was
+intended, and had since the tone was written.
+
+A second tone vocabulary is not a naming collision. It is a second set of
+colours that nothing backs.
+
+### What moved, and what the guard now catches
+
+`StatusDot` went INTO `@4dl/ui` — it was genuinely missing, it is two elements
+and no logic, and having it in the app is what let a whole vocabulary grow
+around it. `Badge` gained `solid` for the one pill that has to win against a
+thumbnail. `status.tsx` is deleted, along with the three per-page
+`StatusDot({ online })` wrappers that only turned a boolean into a tone.
+
+`scripts/ui-ownership.test.mjs` had **`Tone` on its allow-list**, filed under
+"names too generic to own". That was the wrong call and it is why this survived:
+`Tone` is not a generic noun, it is the vocabulary. It is off the list, the scan
+now reads `export type` and `export interface` (a shadowing TYPE is how it hid),
+and check 2 is scoped to the SPAs — a worker's `Branding` on the wire and
+Tessa's `Tone` of voice for generated copy are not second Buttons.
+
+Two real collisions came out of that widening and were renamed rather than
+waived: Scena's `Branding` (the workspace's brand record) → `WorkspaceBrand`,
+Tessa's (its public page's look) → `PublicBranding`. Neither is the platform's
+`Branding`, which is the theme knobs `applyBranding` consumes — three different
+things wearing one word.

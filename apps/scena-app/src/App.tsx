@@ -190,7 +190,7 @@ export function App() {
   }, [refreshKey, me?.authenticated, me?.tenantId]);
 
   // Brand kit → the whole dashboard follows the tenant's colours/radius/font
-  // (§6). Fetched once per active tenant; the Branding tab applies edits live.
+  // (§6). Fetched once per active tenant; the Brand kit tab applies edits live.
   useEffect(() => {
     if (!me?.authenticated || !me.tenantId) return;
     getBranding().then(applyBrandTheme).catch(() => {});

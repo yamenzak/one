@@ -248,7 +248,7 @@ export function expiryTextWith(
 
 // ── Practice settings, billing and AI ───────────────────────────────────────
 
-export interface Branding {
+export interface PublicBranding {
   primary: string | null;
   logoUrl: string | null;
   headline: string | null;
@@ -265,10 +265,10 @@ export interface AiSettings {
 }
 
 export const settings = {
-  read: () => api.get<{ branding: Branding; prefs: Prefs; ai: AiSettings; canUseAi: boolean }>("/api/settings"),
+  read: () => api.get<{ branding: PublicBranding; prefs: Prefs; ai: AiSettings; canUseAi: boolean }>("/api/settings"),
   /** Partial by section — the server merges, so one control never clears another. */
-  save: (patch: { branding?: Partial<Branding>; prefs?: Partial<Prefs>; ai?: { features?: Record<string, boolean>; tone?: string } }) =>
-    api.patch<{ branding: Branding; prefs: Prefs; ai: AiSettings }>("/api/settings", patch),
+  save: (patch: { branding?: Partial<PublicBranding>; prefs?: Partial<Prefs>; ai?: { features?: Record<string, boolean>; tone?: string } }) =>
+    api.patch<{ branding: PublicBranding; prefs: Prefs; ai: AiSettings }>("/api/settings", patch),
 };
 
 export interface Balance {

@@ -92,6 +92,23 @@ const fail = (msg) => {
 };
 
 const appDirs = existsSync(APPS) ? readdirSync(APPS).filter((d) => statSync(join(APPS, d)).isDirectory()) : [];
+
+/**
+ * The directories that RENDER — the SPAs, not the workers.
+ *
+ * Checks 1 and 3 are about files (`components/ui/`, a second `cn`) and are
+ * right to sweep everything. Check 2 is about NAMES, and a worker sharing a
+ * name with a UI component is not the failure it describes: `host-context.ts`
+ * exports a `Branding` because that is the tenant's branding on the wire, and
+ * Tessa's `ai.ts` exports a `Tone` because generated copy has a tone of voice.
+ * Neither is a second Button.
+ *
+ * Derived by looking for a `vite.config`, not hardcoded — the one thing this
+ * repo has learned twice is that a per-app list is a per-app list somebody
+ * forgets. `apps.json` names each app's SPA by PACKAGE name, and resolving
+ * those to directories costs a second read for the same answer.
+ */
+const spaDirs = appDirs.filter((d) => ["ts", "js", "mts"].some((e) => existsSync(join(APPS, d, `vite.config.${e}`))));
 const rel = (f) => f.slice(APPS.length + 1);
 
 /* ── 1. no private `components/ui/` ─────────────────────────────────────────
@@ -111,13 +128,30 @@ for (const app of appDirs) {
    Catches the same drift under a different directory — `src/ui/Button.tsx`,
    `src/widgets/Card.tsx` — which is where it would move if only rule 1 held. */
 const platform = platformExports();
-// Names too generic to own: an app may legitimately define these for itself.
-const GENERIC = new Set(["Page", "Screen", "Section", "Media", "Thumb", "Unit", "Tone", "Delta", "Photo", "Rail", "Filters", "Choice", "Field"]);
-for (const app of appDirs) {
+/*
+  Names too generic to own: an app may legitimately define these for itself.
+
+  ⚠️ `Tone` WAS ON THIS LIST, and it should never have been. It is not a generic
+  noun an app might reach for — it IS the tone vocabulary, and the whole point
+  of the platform's is that `success | warning | danger | primary | neutral`
+  plus app-registered accents is the only set. Scena declared its own with
+  `info`, `destructive` and `muted` in it, and shipped `<Badge tone="info">`
+  three times in the operator console. Nothing defines `--info`, so Tailwind
+  never generated `bg-info` or `text-info` (verified absent from the built CSS
+  while `bg-success` and `bg-destructive` were present) — those pills rendered
+  as unstyled text, silently, past every test and every screenshot.
+
+  A second tone vocabulary is not a naming collision. It is a second set of
+  colours that the tokens do not back.
+*/
+const GENERIC = new Set(["Page", "Screen", "Section", "Media", "Thumb", "Unit", "Delta", "Photo", "Rail", "Filters", "Choice", "Field"]);
+for (const app of spaDirs) {
   for (const f of walk(join(APPS, app, "src"))) {
     if (KNOWN.has(rel(f))) continue;
     const src = readFileSync(f, "utf8");
-    for (const m of src.matchAll(/^export (?:function|const) ([A-Z][A-Za-z0-9_]*)/gm)) {
+    // `type` and `interface` too: a shadowing TYPE is how Scena's `Tone` hid
+    // from this check for as long as it existed.
+    for (const m of src.matchAll(/^export (?:function|const|type|interface) ([A-Z][A-Za-z0-9_]*)/gm)) {
       const name = m[1];
       if (!platform.has(name) || GENERIC.has(name)) continue;
       fail(`${rel(f)} exports \`${name}\`, which @4dl/ui already exports. Two components with one name is how a design system stops being one.`);

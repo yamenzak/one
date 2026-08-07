@@ -7,8 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { Download, BarChart3 } from "lucide-react";
-import { StatTile } from "../components/status.js";
-import { Card, EmptyState, LoadError, PageHeader, SectionHeader, Skeleton, usePageChrome } from "@4dl/ui";
+import { Card, EmptyState, LoadError, PageHeader, SectionHeader, Skeleton, StatCard, usePageChrome } from "@4dl/ui";
 import { getAnalytics, analyticsCsvUrl, type AnalyticsSummary } from "../api.js";
 
 /** Trigger a CSV download without navigating away from the page. */
@@ -111,10 +110,10 @@ export function AnalyticsPage() {
       ) : (
         <div className="flex flex-col gap-5">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            <StatTile label="Total plays" value={data.totalPlays.toLocaleString()} valueClassName="text-primary" />
-            <StatTile label="Active screens" value={data.activeScreens.toLocaleString()} />
-            <StatTile label="Distinct content" value={data.byContent.length.toLocaleString()} />
-            <StatTile label="Airtime" value={fmtDur(totalMs)} />
+            <StatCard label="Total plays" value={data.totalPlays.toLocaleString()} />
+            <StatCard label="Active screens" value={data.activeScreens.toLocaleString()} />
+            <StatCard label="Distinct content" value={data.byContent.length.toLocaleString()} />
+            <StatCard label="Airtime" value={fmtDur(totalMs)} />
           </div>
 
           <Card>

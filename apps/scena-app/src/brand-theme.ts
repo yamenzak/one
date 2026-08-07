@@ -31,7 +31,7 @@ import { widgetTokens, widgetTokensCss, deriveTokens, THEME_TOKENS, type ThemeMa
 
 export { deriveTokens, THEME_TOKENS, type ThemeMaps };
 
-export interface BrandKit {
+export interface WorkspaceBrand {
   brandName?: string;
   radius: number;
   bodyFont: string;
@@ -53,7 +53,7 @@ function blockFor(selector: string, tokens: Record<string, string>, extra: strin
 }
 
 /** Is this kit the untouched default? Then rely on index.css (no injection). */
-export function isDefaultBrand(brand: BrandKit): boolean {
+export function isDefaultBrand(brand: WorkspaceBrand): boolean {
   const light = brand.theme?.light ?? {};
   const dark = brand.theme?.dark ?? {};
   return (
@@ -64,7 +64,7 @@ export function isDefaultBrand(brand: BrandKit): boolean {
 }
 
 /** Build the full CSS the brand injects (exposed for tests / preview). */
-export function brandCss(brand: BrandKit): string {
+export function brandCss(brand: WorkspaceBrand): string {
   const rootExtra = [`  --radius: ${clamp(brand.radius ?? 16, 0, 64)}px;`];
   if (brand.bodyFont) rootExtra.push(`  --font-sans: "${brand.bodyFont}", system-ui, sans-serif;`);
   // The radius and font are theme-independent, so they ride the `:root` block —
@@ -80,7 +80,7 @@ export function brandCss(brand: BrandKit): string {
 }
 
 /** Inject (or refresh) the brand stylesheet. Default kit ⇒ remove it. */
-export function applyBrandTheme(brand: BrandKit): void {
+export function applyBrandTheme(brand: WorkspaceBrand): void {
   if (typeof document === "undefined") return;
   if (isDefaultBrand(brand)) return clearBrandTheme();
   let el = document.getElementById(STYLE_ID) as HTMLStyleElement | null;

@@ -247,15 +247,49 @@ export function SubCard({ className, ...props }: HTMLAttributes<HTMLDivElement>)
   return <div className={cn("rounded-xl bg-surface-2 p-4", className)} {...props} />;
 }
 
-// ── Badge / Chip ───────────────────────────────────────────────────────────
-export function Badge({ tone = "neutral", className, ...props }: HTMLAttributes<HTMLSpanElement> & { tone?: Tone }) {
+// ── Badge / Chip / StatusDot ───────────────────────────────────────────────
+export function Badge({ tone = "neutral", solid, className, ...props }: HTMLAttributes<HTMLSpanElement> & {
+  tone?: Tone;
+  /**
+   * The tone at FULL strength with ink chosen for it, instead of the pale tint.
+   *
+   * For the one badge on a screen that has to win against a photograph or a
+   * busy row — a "Live" pill over a video thumbnail. `toneFill` picks the
+   * foreground by measured contrast, so it stays readable on a tenant's own
+   * brand colour where a shared on-colour would not.
+   */
+  solid?: boolean;
+}) {
   return (
     <span
       // `micro` IS the badge role (§5: "overline, badge") and it already carries
       // 600 and +0.02em, so `font-semibold` here was the weight said twice.
-      className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-micro [&_svg]:size-3.5", toneSoft[tone], className)}
+      className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-micro [&_svg]:size-3.5", (solid ? toneFill : toneSoft)[tone], className)}
       {...props}
     />
+  );
+}
+
+/**
+ * A small state dot — live, online, healthy, off.
+ *
+ * Genuinely missing from the system: Scena had one, and having it there rather
+ * than here is what let a whole parallel tone vocabulary grow around it (see
+ * the note on `Tone` above). It is two elements and no logic, which is exactly
+ * the size of thing an app reimplements rather than asks for.
+ *
+ * `ping` is the live pulse. It is decorative and marked `aria-hidden`; the
+ * MEANING must be in the text beside it, because a colour is not a label.
+ */
+export function StatusDot({ tone = "neutral", ping, className }: { tone?: Tone; ping?: boolean; className?: string }) {
+  return (
+    <span
+      className={cn("relative inline-flex size-2 shrink-0 rounded-full", className)}
+      style={{ backgroundColor: toneVar[tone] }}
+      aria-hidden
+    >
+      {ping && <span className="absolute inset-0 animate-ping rounded-full opacity-60" style={{ backgroundColor: toneVar[tone] }} />}
+    </span>
   );
 }
 

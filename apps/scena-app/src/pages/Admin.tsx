@@ -20,7 +20,6 @@
  * control, not a lost one.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { StatTile, StatusDot, Pill, type Tone } from "../components/status.js";
 import { confirmDialog } from "../components/confirm.js";
 import {
   Loader2,
@@ -41,7 +40,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { FEATURE_CATALOG, QUOTA_CATALOG, FEATURE_CATEGORIES } from "@scena/manifest";
-import { Button, Card, cn, Dialog, DialogContent, DialogDescription, DialogFooter, EmptyState, Group, Input, Label, Row, SectionHeader, Select, Separator, Skeleton, Switch, toast } from "@4dl/ui";
+import { Badge, Button, Card, cn, Dialog, DialogContent, DialogDescription, DialogFooter, EmptyState, Group, Input, Label, Row, SectionHeader, Select, Separator, Skeleton, StatCard, StatusDot, Switch, toast, type Tone } from "@4dl/ui";
 import {
   getAdminConfig,
   setAdminConfig,
@@ -302,10 +301,10 @@ export function StripeTab() {
           </Button>
         </div>
         {ping ? (
-          <Pill tone={ping.ok ? "success" : "destructive"} className="w-fit">
-            <StatusDot tone={ping.ok ? "success" : "destructive"} />
+          <Badge tone={ping.ok ? "success" : "danger"} className="w-fit">
+            <StatusDot tone={ping.ok ? "success" : "danger"} />
             {ping.ok ? `Connected: ${ping.account}` : `Not connected: ${ping.error}`}
-          </Pill>
+          </Badge>
         ) : null}
       </Card>
 
@@ -514,7 +513,7 @@ function PlanRow({
       sub={
         <span className="flex items-center gap-2">
           <span className="font-mono">{plan.id}</span>
-          <StatusDot tone={plan.active ? "success" : "muted"} />
+          <StatusDot tone={plan.active ? "success" : "neutral"} />
           {plan.active ? "Active" : "Off"}
           {plan.stripe_price_id ? " · Stripe synced" : " · not in Stripe"}
         </span>
@@ -707,9 +706,9 @@ function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose
 /** Neutral tier + tone from the underlying model id — vendor-agnostic so the
  *  admin table reads as capability tiers, not provider jargon. */
 function modelProvider(cf: string): { label: string; tone: Tone } {
-  if (/^@cf\//.test(cf)) return { label: "Standard", tone: "info" };
+  if (/^@cf\//.test(cf)) return { label: "Standard", tone: "neutral" };
   if (/gemini|lyria/i.test(cf)) return { label: "Advanced", tone: "primary" };
-  return { label: "External", tone: "muted" };
+  return { label: "External", tone: "neutral" };
 }
 
 const TASK_FILTERS: { id: string; label: string }[] = [
@@ -844,7 +843,7 @@ function ModelRow({ model, onSave, last }: { model: AdminModel; onSave: (m: Admi
       className={cn(model.enabled !== 1 && "opacity-60")}
       sub={
         <span className="flex items-center gap-1.5">
-          <Pill tone={prov.tone}>{prov.label}</Pill>
+          <Badge tone={prov.tone}>{prov.label}</Badge>
           <span className="capitalize">{model.task}</span>
           <span className="truncate font-mono">· {model.cf_model}</span>
         </span>
@@ -908,9 +907,9 @@ export function LibraryTab() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-3 gap-3">
-        <StatTile label="Tracks" value={num(tracks.length)} />
-        <StatTile label="Genres" value={num(genres)} />
-        <StatTile label="Total runtime" value={mmss(runtime)} />
+        <StatCard label="Tracks" value={num(tracks.length)} />
+        <StatCard label="Genres" value={num(genres)} />
+        <StatCard label="Total runtime" value={mmss(runtime)} />
       </div>
       <Card>
         <div className="mb-4 gap-3">
@@ -1232,9 +1231,9 @@ export function PromosTab() {
                   divider={i < promos.length - 1}
                   sub={
                     <span className="flex items-center gap-1.5">
-                      <Pill tone={p.kind === "plan" ? "primary" : "info"}>
+                      <Badge tone={p.kind === "plan" ? "primary" : "neutral"}>
                         {p.kind === "plan" ? `Gift ${p.plan_id} · ${p.plan_months}mo` : `${num(p.credits ?? 0)} cr`}
-                      </Pill>
+                      </Badge>
                       <span className="truncate">{p.note || "no note"}</span>
                     </span>
                   }
@@ -1261,7 +1260,7 @@ export function PromosTab() {
                 >
                   <span className="flex items-center gap-2 font-mono">
                     {p.code}
-                    {p.active ? null : <Pill tone="muted">off</Pill>}
+                    {p.active ? null : <Badge tone="neutral">off</Badge>}
                   </span>
                 </Row>
               ))}
@@ -1432,9 +1431,9 @@ export function TenantsTab() {
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-3 gap-3">
-        <StatTile label="Tenants" value={num(tenants.length)} />
-        <StatTile label="Active" value={num(active)} dot={<StatusDot tone="success" />} />
-        <StatTile label="Suspended / pending" value={num(suspended)} dot={<StatusDot tone={suspended ? "warning" : "muted"} />} />
+        <StatCard label="Tenants" value={num(tenants.length)} />
+        <StatCard label="Active" value={num(active)} tone="success" />
+        <StatCard label="Suspended / pending" value={num(suspended)} tone={suspended ? "warning" : "neutral"} />
       </div>
 
       <Card>
@@ -1468,8 +1467,8 @@ export function TenantsTab() {
                       <StatusDot tone={tone} />
                       <span className="capitalize">{t.status.replace(/_/g, " ")}</span>
                       <span className="capitalize">· {t.plan_id}</span>
-                      {t.comp ? <Pill tone="info">comped</Pill> : null}
-                      {isDemo ? <Pill tone="muted">demo · system</Pill> : null}
+                      {t.comp ? <Badge tone="neutral">comped</Badge> : null}
+                      {isDemo ? <Badge tone="neutral">demo · system</Badge> : null}
                     </span>
                   }
                   trailing={

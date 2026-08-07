@@ -108,7 +108,7 @@ export interface Board {
   /** Queue boards only: the service desks (one station login each). */
   counters?: QueueCounter[];
   /** Present on the public live read — the workspace brand kit for kiosks/control apps. */
-  branding?: Branding;
+  branding?: WorkspaceBrand;
 }
 
 export async function createBoard(kind: BoardKind, name: string, config: unknown = {}): Promise<{ id: string; kind: string; name: string }> {
@@ -593,7 +593,7 @@ export interface BrandLogo {
   mime?: string;
 }
 
-export interface Branding {
+export interface WorkspaceBrand {
   brandName: string;
   radius: number;
   headingFont: string;
@@ -604,13 +604,13 @@ export interface Branding {
   logos: BrandLogo[];
 }
 
-export async function getBranding(): Promise<Branding> {
-  return ((await (await fetch(`${API_BASE}/api/branding`)).json()) as { branding: Branding }).branding;
+export async function getBranding(): Promise<WorkspaceBrand> {
+  return ((await (await fetch(`${API_BASE}/api/branding`)).json()) as { branding: WorkspaceBrand }).branding;
 }
-export async function setBranding(patch: Partial<Branding>): Promise<Branding> {
+export async function setBranding(patch: Partial<WorkspaceBrand>): Promise<WorkspaceBrand> {
   const res = await fetch(`${API_BASE}/api/branding`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
   if (!res.ok) throw new Error(`save failed (${res.status})`);
-  return ((await res.json()) as { branding: Branding }).branding;
+  return ((await res.json()) as { branding: WorkspaceBrand }).branding;
 }
 
 /* ------------------------------ media library ---------------------------- */

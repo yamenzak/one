@@ -45,7 +45,7 @@ import {
   type SettingsGroup,
 } from "@4dl/ui";
 import { PasskeysCard } from "@4dl/app-kit";
-import { billing as billingApi, fmt, settings as settingsApi, type AiSettings, type Branding } from "../data.js";
+import { billing as billingApi, fmt, settings as settingsApi, type AiSettings, type PublicBranding } from "../data.js";
 import { useI18n, useT } from "../i18n.js";
 import { StaffSection } from "./Staff.js";
 
@@ -153,18 +153,18 @@ function LanguageRow() {
 }
 
 /**
- * Branding: the accent, the logo, and the two lines on the sign-in screen.
+ * PublicBranding: the accent, the logo, and the two lines on the sign-in screen.
  *
  * A Save button rather than instant controls, because these are typed rather
  * than toggled — an instant write per keystroke would be a request per character.
  */
-function BrandSection({ initial, onBack }: { initial: Branding; onBack: () => void }) {
+function BrandSection({ initial, onBack }: { initial: PublicBranding; onBack: () => void }) {
   const t = useT();
-  const [form, setForm] = useState<Branding>(initial);
+  const [form, setForm] = useState<PublicBranding>(initial);
   const { busy, msg, err, run } = useAction(fmt);
   const dirty = JSON.stringify(form) !== JSON.stringify(initial);
 
-  const set = <K extends keyof Branding>(k: K, v: Branding[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const set = <K extends keyof PublicBranding>(k: K, v: PublicBranding[K]) => setForm((f) => ({ ...f, [k]: v }));
 
   return (
     <SettingsPage title={t("settings.brand")} description={t("settings.brand.intro")} onBack={onBack}>

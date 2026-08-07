@@ -9,7 +9,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Play, Pause, Trash2, Megaphone, Clock, Sparkles, Bot, Upload, FolderOpen, Plus, MoreVertical, Pencil, Radio, Link2 } from "lucide-react";
-import { StatusDot as SharedStatusDot } from "../components/status.js";
 import { useCan } from "../permissions.js";
 import { confirmDialog } from "../components/confirm.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
@@ -34,7 +33,7 @@ import {
 } from "../api.js";
 import { MediaPicker } from "./MediaLibrary.js";
 import { GEMINI_VOICES, AD_STYLE_PRESETS, DEFAULT_GEMINI_VOICE, DEFAULT_AD_STYLE, composeAdSpeech } from "../voices.js";
-import { Badge, Button, Card, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, SkeletonList, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
+import { Badge, Button, Card, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, SkeletonList, StatusDot, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
 import { ScenaMascot } from "../brand.js";
 
 type Kind = "audio" | "video" | "command";
@@ -411,7 +410,7 @@ export function AdProfileDetailPage() {
                   <div key={a.id} className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/40">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-body font-semibold">
-                        <StatusDot active={!!a.enabled} />
+                        <StatusDot tone={a.enabled ? "success" : "neutral"} />
                         <span className="truncate">{a.name}</span>
                         <Badge>{a.kind}</Badge>
                       </div>
@@ -460,10 +459,6 @@ export function AdProfileDetailPage() {
       )}
     </div>
   );
-}
-
-function StatusDot({ active }: { active: boolean }) {
-  return <SharedStatusDot tone={active ? "success" : "muted"} />;
 }
 
 function NewAd({ profileId, onCreated }: { profileId: string; onCreated: () => void }) {

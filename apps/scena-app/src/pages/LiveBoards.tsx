@@ -11,7 +11,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Plus, MonitorPlay, Radio, Ticket, Trash2, LayoutGrid, KeyRound, RefreshCw, ShieldUser, Eye, EyeOff, Trophy } from "lucide-react";
 import { ScenaMascot } from "../brand.js";
-import { Pill } from "../components/status.js";
 import {
   listBoards,
   createBoard,
@@ -39,7 +38,18 @@ import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { GEMINI_TTS_VOICES } from "@scena/protocol";
 import type { QueueState, RoomState, ScoreState } from "@scena/protocol";
-import { Button, cn, Dialog, DialogContent, Input, LoadError, NoData, PageHeader, Select, SettingsIndex, SettingsPage as SectionFrame, SkeletonList, Switch, toast, usePageChrome } from "@4dl/ui";
+import { Badge, Button, cn, Dialog, DialogContent, Input, LoadError, NoData, PageHeader, Select, SettingsIndex, SettingsPage as SectionFrame, SkeletonList, Switch, toast, usePageChrome } from "@4dl/ui";
+
+/**
+ * The board's kind as a WORD THAT STARTS A SENTENCE.
+ *
+ * `kind` is a wire value — "queue" | "room" | "score" — and it was rendered
+ * verbatim at the head of two sentences: a row's sub read "queue · Now serving
+ * A001" and the detail frame's description "queue board · 2 waiting". §5 is
+ * sentence case everywhere, and a lower-case first word beside a capitalised
+ * one on the next row reads as a bug rather than as a style.
+ */
+const kindWord = (kind: BoardKind) => kind.charAt(0).toUpperCase() + kind.slice(1);
 
 /** The three board kinds, treated equally in the picker + empty state. */
 const BOARD_TYPES: { kind: BoardKind; label: string; hint: string; icon: typeof Ticket }[] = [
@@ -184,7 +194,7 @@ export function LiveBoardsPage() {
       <div className="mx-auto max-w-3xl">
         <SectionFrame
           title={open.name}
-          description={`${open.kind} board · ${boardSummary(open)}`}
+          description={`${kindWord(open.kind)} board · ${boardSummary(open)}`}
           onBack={() => openBoard(null)}
           action={
             canDelete ? (
@@ -258,8 +268,8 @@ export function LiveBoardsPage() {
                 label: b.name,
                 // The current value, exactly as the settings grammar asks: what
                 // this board is doing right now, without opening it.
-                sub: `${b.kind} · ${boardSummary(b)}`,
-                trailing: <Pill tone="success">Live</Pill>,
+                sub: `${kindWord(b.kind)} · ${boardSummary(b)}`,
+                trailing: <Badge tone="success">Live</Badge>,
                 onClick: () => openBoard(b.id),
               })),
             },

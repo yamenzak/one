@@ -47,7 +47,7 @@ import {
   uploadToLibrary,
   type AiModel,
   type AiDefaults,
-  type Branding,
+  type WorkspaceBrand,
   type BrandLogo,
 } from "../api.js";
 
@@ -336,7 +336,7 @@ const PRESET_COLORS = ["#6366f1", "#0ea5e9", "#10b981", "#f43f5e", "#f59e0b", "#
  * separately from the editor is two sources for one answer.
  */
 function useBrandKit() {
-  const [b, setB] = useState<Branding | null>(null);
+  const [b, setB] = useState<WorkspaceBrand | null>(null);
   const [saving, setSaving] = useState(false);
   /*
    * The last SAVED kit, re-applied when the settings screen unmounts, so an
@@ -345,7 +345,7 @@ function useBrandKit() {
    * the index and in again is a normal thing to do mid-edit, and restoring
    * there would silently discard the work.
    */
-  const savedRef = useRef<Branding | null>(null);
+  const savedRef = useRef<WorkspaceBrand | null>(null);
 
   useEffect(() => {
     getBranding()
@@ -360,7 +360,7 @@ function useBrandKit() {
   }, []);
 
   /** Merge a patch, re-render, and apply the theme live across the whole UI. */
-  const update = (p: Partial<Branding>) =>
+  const update = (p: Partial<WorkspaceBrand>) =>
     setB((cur) => {
       if (!cur) return cur;
       const next = { ...cur, ...p };
