@@ -47,7 +47,20 @@ function ClientStatus({ client, att }: { client: ClientSummary; att: Map<string,
  *  branded deep-link (also emailed) the coach can show in the gym. */
 interface Invite { url: string; token: string; email: string; delivery: { sent: boolean; reason: string | null } }
 
-export function Clients() {
+/**
+ * The roster.
+ *
+ * `pane` is the SAME screen in the two-pane's list column (§11.3): a Collection
+ * at ≥1100 keeps its list beside whatever is open. It drops the page chrome —
+ * the `column` wrapper, the anchor, the bottom padding for the tab island — and
+ * keeps everything else, including the create sheet, so adding a client from
+ * the pane works exactly as it does from the page.
+ *
+ * The anchor goes because §7 allows one hero per screen and in a two-pane the
+ * record beside it owns that: the list is the `title`, the record is the
+ * `identity`. Two `display` numerals side by side is two screens.
+ */
+export function Clients({ pane = false }: { pane?: boolean } = {}) {
   const nav = useNavigate();
   const { ctx } = useSession();
   const isOwner = ctx?.active?.role === "owner";
@@ -181,11 +194,12 @@ export function Clients() {
   }, [wantsNew, setParams]);
 
   return (
-    <Page className="column space-y-4 p-4 pb-28">
+    <Page className={pane ? "space-y-3 py-4" : "column space-y-4 p-4 pb-28"}>
       {/* T1 (§1). The roster IS the screen, so the anchor is its size — and the
           sub-line carries the only fact a coach scans for on arrival: how many
-          of them want something. */}
-      <Anchor eyebrow={"Clients"} sub={(() => {
+          of them want something. Not in the pane: the record beside it is the
+          screen's one hero. */}
+      {!pane && <Anchor eyebrow={"Clients"} sub={(() => {
             if (!clients?.length) return "None yet";
             // Same rule as the rows: someone who has never signed in is
             // "Invited", not "needs a look".
@@ -211,7 +225,7 @@ export function Clients() {
             return [head, waiting].filter(Boolean).join(" · ") || "All caught up";
           })()}>
         <CountUp value={clients?.length ?? 0} />
-      </Anchor>
+      </Anchor>}
 
       {freeing && (
         <Card className="space-y-2.5 border border-primary/25" role="status" aria-live="polite">
@@ -510,7 +524,13 @@ export function ClientDetail() {
           three specs then failed on copy that was correctly deleted. An
           attribute is the right handle: it survives every wording change and
           says out loud that something depends on it. */}
-      <div data-coach-view className="sticky top-16 z-20 px-4 pb-2 pt-2">
+      {/* `top-[var(--chrome-top)]`, not `top-16`: the number is only right in
+          the document scroller. In a `Shape` pane — which is its own scroller,
+          starting at the viewport top — sixty-four pixels put this bar in the
+          MIDDLE of the content it floats over, where it intercepted clicks on
+          everything behind it. The variable is 0 there and the bar height in
+          the shell (tokens.css). */}
+      <div data-coach-view className="sticky top-[var(--chrome-top,0px)] z-20 px-4 pb-2 pt-2">
         <div className="column">
           <SectionSwitcher
             sections={TABS}

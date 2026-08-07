@@ -71,17 +71,28 @@ test("the coach's studio", async () => {
     await shoot(page, project, "coach-add-client");
   });
 
+  // `/overview` is not one of the client's subtabs either — same trap the plans
+  // step below documents. It rendered `today` by fallback, so the URL in this
+  // spec named a screen that does not exist while the picture was of one that
+  // does. Same image, honest address.
   await test.step("a client", async () => {
-    await visit(page, `${base}/clients/${world.client.id}/overview`, shell);
+    await visit(page, `${base}/clients/${world.client.id}/today`, shell);
     await shoot(page, project, "coach-client", { settle: 600 });
   });
 
   // The section menu — the control that replaced the icon rail. Opened rather
   // than described, because the whole claim is that six sections read better
   // with words than as six glyphs, and only a picture settles that.
+  //
+  // SCOPED TO THE DETAIL, and that is not defensive: at ≥1100 the roster is a
+  // `Shape` list pane on the left, so the client's name is on TWO buttons —
+  // their row in the list and the switcher's trigger — and the list one comes
+  // first in the DOM. `.first()` clicked the row, navigated nowhere new, and
+  // waited thirty seconds for a menu nobody had opened. `data-coach-view` is
+  // the attribute `ClientDetail` publishes for exactly this.
   await test.step("the client's sections", async () => {
-    await visit(page, `${base}/clients/${world.client.id}/overview`, shell);
-    await page.getByRole("button", { name: new RegExp(DEMO_CLIENT, "i") }).first().click();
+    await visit(page, `${base}/clients/${world.client.id}/today`, shell);
+    await page.locator("[data-coach-view]").getByRole("button", { name: new RegExp(DEMO_CLIENT, "i") }).first().click();
     await shoot(page, project, "coach-client-sections", { ready: page.getByText("Go to") });
     await page.keyboard.press("Escape");
   });

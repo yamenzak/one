@@ -10,6 +10,8 @@ import { Routes, Route, Navigate, Outlet, useNavigate, useLocation, useParams } 
 import {
   ChevronDown,
   AppBar, Avatar, BottomTabs, NavRail, Button, ChevronRight, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+  Shape,
+  EmptyState,
   Home, Dumbbell, Utensils, LineChart, Users, LayoutGrid, Wallet, Calendar, Settings as SettingsIcon, Sun, Moon, LogOut, Store, HeartPulse, ShieldCheck, ArrowLeftRight, Check, BookOpen, Hand, LifeBuoy, Spinner, CircleUser, SlidersHorizontal, KeyRound, ImageIcon, RefreshCw, AlertTriangle, ArrowRight, brandMark, hasIcon, hasWordmark, markPlateClass, toneVar, type TabDef, type Tone,
 } from "@4dl/ui";
 import { resolveStanding, tenantStandingOfGate } from "@4dl/tenancy/model";
@@ -186,9 +188,24 @@ export function Shell() {
         <Route path="eat" element={<ClientArea>{(cid) => <Eat clientId={cid} />}</ClientArea>} />
         <Route path="progress" element={<ClientArea>{(cid) => <Progress clientId={cid} />}</ClientArea>} />
         <Route path="wellness" element={<ClientArea>{(cid) => <Wellness clientId={cid} />}</ClientArea>} />
-        <Route path="clients" element={<CoachArea><Clients /></CoachArea>} />
-        <Route path="clients/:clientId" element={<CoachArea><ClientDetail /></CoachArea>} />
-        <Route path="clients/:clientId/:subtab" element={<CoachArea><ClientDetail /></CoachArea>} />
+        {/*
+          THE ROSTER IS A COLLECTION, SO AT ≥1100 IT IS A TWO-PANE (§11.3).
+
+          These were three sibling routes, so opening a client REPLACED the list
+          it came from — at 1440 that meant a 686px column, 46% of the viewport
+          empty, and going back nine times to work through ten clients. Nested
+          under one layout route, `Shape` keeps the list beside the record.
+
+          Below 1100 `Shape` renders its children alone, so the narrow layout is
+          exactly what it was: `/clients` is the full roster page and
+          `/clients/:id` is a full record page. Nothing about the phone is
+          re-expressed here, which is why this cannot regress it.
+        */}
+        <Route path="clients" element={<CoachArea><ClientsShape /></CoachArea>}>
+          <Route index element={<Clients />} />
+          <Route path=":clientId" element={<ClientDetail />} />
+          <Route path=":clientId/:subtab" element={<ClientDetail />} />
+        </Route>
         <Route path="library" element={<CoachArea><Library /></CoachArea>} />
         <Route path="library/:tab" element={<CoachArea><Library /></CoachArea>} />
         <Route path="sessions" element={<CoachArea><Sessions /></CoachArea>} />
@@ -477,9 +494,21 @@ function TabLayout() {
         Applied here, once, rather than in ~40 screens that would each have to
         remember. Screens that genuinely need the full width (a plan builder
         canvas, a two-pane roster) opt out with `data-fullbleed` on their own
-        root, which the negative margins below release.
+        root, which the negative margins below release. A `Shape` in one of its
+        pane arrangements publishes `data-shape` and is released the same way —
+        the panes ARE the layout there, so capping them at a 720px column would
+        leave a 340px list beside a 380px record.
+
+        `--chrome-top` says how far below the viewport top this scroller starts
+        (tokens.css). The app bar is sticky and above it, so that is the bar's
+        own height — and a `Shape` pane, being its own scroller, resets it to 0.
       */}
-      <main className="column [&>[data-fullbleed]]:max-w-none">
+      {/* `has-[>…]` on the column ITSELF, not `[&>…]` on the child. Releasing
+          the child's `max-width` leaves it inside a 720px parent, so the first
+          two-pane rendered a 340px list beside a 380px record and clipped the
+          rest off the right edge — the same dead space this replaced, in a
+          different place. The column is what has to stand down. */}
+      <main className="column [--chrome-top:var(--app-bar-h)] has-[>[data-fullbleed]]:max-w-none has-[>[data-shape]]:max-w-none">
         <ErrorBoundary resetKey={loc.pathname}><Outlet /></ErrorBoundary>
       </main>
       </div>
@@ -647,6 +676,33 @@ function ClientArea({ children }: { children: (clientId: string) => ReactNode })
 }
 
 /** Guard: coach-surface routes. */
+/**
+ * The clients two-pane.
+ *
+ * `Shape` is controlled — `@4dl/ui` has no router — so this is where the app
+ * says what "selected" means. It reads the PATHNAME rather than `useParams`
+ * because a layout route does not see the params its children match.
+ */
+function ClientsShape() {
+  const { pathname } = useLocation();
+  const selected = /^\/clients\/[^/]+/.test(pathname);
+  return (
+    <Shape
+      list={<Clients pane />}
+      selected={selected}
+      placeholder={
+        <EmptyState
+          icon={Users}
+          title="Pick a client"
+          description="Their day, plans, goals and progress open here — the roster stays beside them."
+        />
+      }
+    >
+      <Outlet />
+    </Shape>
+  );
+}
+
 function CoachArea({ children }: { children: ReactNode }) {
   const clientSurface = useClientSurface();
   if (clientSurface) return <Navigate to="/today" replace />;

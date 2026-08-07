@@ -130,6 +130,26 @@
   color-scheme: dark;
   --radius: 1rem;
 
+  /*
+    THE CHROME CONTRACT — two lengths, one question each.
+
+    `--app-bar-h` is what `AppBar` measures, published rather than repeated so a
+    screen can reason about the bar without re-typing `4rem + safe-area` and
+    drifting from it.
+
+    `--chrome-top` is the interesting one: HOW FAR BELOW THE VIEWPORT TOP THIS
+    SCROLL CONTAINER BEGINS. A shell with a sticky app bar sets it to the bar's
+    height on the element it scrolls; a `Shape` pane RESETS it to 0 on itself,
+    because a pane is its own scroller and its own top. Everything sticky then
+    writes `top-[var(--chrome-top,0px)]` once and is correct in both — which is
+    what a hard-coded `top-16` was not: inside a pane it stuck sixty-four pixels
+    down, floating over the content and swallowing clicks meant for it.
+
+    0 by default, so a surface with no chrome above it needs no opinion.
+  */
+  --app-bar-h: calc(4rem + env(safe-area-inset-top));
+  --chrome-top: 0px;
+
   /* How present the brand wash is (layout.tsx `Atmosphere`). The same mix reads
      roughly twice as heavy on a white page as on a black one, so light mode
      halves it rather than the component branching on theme. */

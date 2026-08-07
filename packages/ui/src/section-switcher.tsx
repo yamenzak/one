@@ -40,6 +40,7 @@ import { ChevronDown, Check, type LucideIcon } from "./lib/icons.js";
 import { Sheet } from "./overlays.js";
 import { Group, Row } from "./layout.js";
 import { toneVar, type Tone } from "./primitives.js";
+import { useShape } from "./shapes.js";
 import { cn } from "./lib/utils.js";
 
 export interface SectionDef<T extends string> {
@@ -62,7 +63,11 @@ export interface SectionSwitcherProps<T extends string> {
   /** An avatar, a logo, a colour swatch. */
   leading?: ReactNode;
   /** Rendered as a separate control on the left. Its own tap target, because a
-   *  Back nested inside the menu trigger is a Back nobody can hit. */
+   *  Back nested inside the menu trigger is a Back nobody can hit.
+   *
+   *  DROPPED inside a `Shape` two-pane (§11.4 rule 3): the list it returns to
+   *  is already on screen, so the arrow is a control that appears to do
+   *  nothing. The caller passes it unconditionally and the shape decides. */
   onBack?: () => void;
   backLabel?: string;
   /** The sheet's title. Defaults to "Go to". */
@@ -85,6 +90,7 @@ export function SectionSwitcher<T extends string>({
   className,
 }: SectionSwitcherProps<T>) {
   const [open, setOpen] = useState(false);
+  const { twoPane } = useShape();
   const current = sections.find((s) => s.value === value) ?? sections[0];
   const CurrentIcon = current?.icon;
 
@@ -99,7 +105,7 @@ export function SectionSwitcher<T extends string>({
           className,
         )}
       >
-        {onBack && (
+        {onBack && !twoPane && (
           <button
             type="button"
             onClick={onBack}

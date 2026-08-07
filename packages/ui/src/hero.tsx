@@ -22,15 +22,22 @@
  * ── Two-pane, and why `back` is optional ────────────────────────────────────
  *
  * On a phone a record is a pushed page and needs a way back. In a `Shape`
- * two-pane at ≥1100 the list is ON SCREEN to its left, so a back button points
- * at something already visible. Pass `back` and it renders below `lg` only —
- * the caller does not branch, and the same tree serves both (§11.4 rule 3).
+ * two-pane the list is ON SCREEN to its left, so a back button points at
+ * something already visible. Pass `back` and it renders wherever the list is
+ * NOT beside it — the caller does not branch, and the same tree serves both
+ * (§11.4 rule 3).
+ *
+ * That condition is the SHAPE, not a width. The first version wrote `lg:hidden`
+ * on the button, which is the same sentence one word wrong: a Focus screen —
+ * a record with no list pane at all — loses its only way back the moment the
+ * window passes 1024. `useShape()` asks the question that was actually meant.
  */
 
 import type { ReactNode } from "react";
 import { motion } from "motion/react";
 import { ArrowLeft } from "./lib/icons.js";
 import { anchorIn } from "./lib/animation.js";
+import { useShape } from "./shapes.js";
 import { cn } from "./lib/utils.js";
 
 export interface HeroProps {
@@ -43,8 +50,8 @@ export interface HeroProps {
   /** This record's actions. Not the page's — those are the shell's. */
   actions?: ReactNode;
   /**
-   * Rendered BELOW `lg` only: in a two-pane the list it would return to is
-   * already beside it.
+   * Dropped inside a `Shape` two-pane, where the list it would return to is
+   * already beside it. Rendered everywhere else.
    */
   back?: { label?: string; onClick: () => void };
   /** Sections, tags, a segmented control — anything that belongs to the record. */
@@ -53,12 +60,13 @@ export interface HeroProps {
 }
 
 export function Hero({ leading, children, status, actions, back, footer, className }: HeroProps) {
+  const { twoPane } = useShape();
   return (
     <motion.header variants={anchorIn} className={cn("mb-6", className)}>
-      {back && (
+      {back && !twoPane && (
         <button
           onClick={back.onClick}
-          className="mb-3 inline-flex items-center gap-1.5 rounded-sm text-caption font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 lg:hidden"
+          className="mb-3 inline-flex items-center gap-1.5 rounded-sm text-caption font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
         >
           <ArrowLeft className="size-4" /> {back.label ?? "Back"}
         </button>

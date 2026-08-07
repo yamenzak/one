@@ -45,7 +45,9 @@ export function AppBar({ leading, title, trailing, bare, scrolled }: { leading?:
     ? cn("flex items-center rounded-full px-3 py-1.5 transition-colors duration-300", showPills && "border border-border/40 bg-background/60 backdrop-blur-md")
     : "flex items-center";
   return (
-    <header className={cn("sticky top-0 z-30 flex h-[calc(4rem+env(safe-area-inset-top))] items-center justify-between gap-3 px-4 pt-[env(safe-area-inset-top)]", !bare && "border-b border-border/40 bg-background/80 backdrop-blur-xl")}>
+    // `--app-bar-h` rather than the literal, so a shell can set `--chrome-top`
+    // from the bar's height instead of re-typing it (tokens.css).
+    <header className={cn("sticky top-0 z-30 flex h-[var(--app-bar-h)] items-center justify-between gap-3 px-4 pt-[env(safe-area-inset-top)]", !bare && "border-b border-border/40 bg-background/80 backdrop-blur-xl")}>
       <div className={cn(cluster, "min-w-0 gap-2")}>{leading}</div>
       {title && <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-body-lg">{title}</div>}
       <div className={cn(cluster, "gap-1.5")}>{trailing}</div>
@@ -346,18 +348,45 @@ export function ScrollArea({
   className,
   viewportClassName,
   mask,
+  label,
 }: {
   children: ReactNode;
   className?: string;
   viewportClassName?: string;
   /** Fade the scroll edges. Off by default — it costs a mask layer. */
   mask?: boolean;
+  /**
+   * Names the scrollable area for assistive tech, as a landmark.
+   *
+   * It has to land on the VIEWPORT and it has to bring a role: the viewport is
+   * the focusable scroller, and `aria-label` on a `div` with no role is ignored
+   * outright. `Shape` labelled its panes before this existed and the labels
+   * were decorative — present in the source, absent from the tree.
+   */
+  label?: string;
 }) {
   return (
     <ScrollAreaPrimitive.Root className={cn("relative overflow-hidden", className)}>
       <ScrollAreaPrimitive.Viewport
+        role={label ? "region" : undefined}
+        aria-label={label}
         className={cn(
           "size-full outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+          /*
+            RADIX WRAPS THE CHILDREN IN `display: table`, and it has to be
+            undone. That wrapper is how the primitive lets content exceed the
+            viewport horizontally — which also means nothing inside can ever be
+            NARROWER than its content, so `truncate`, `min-w-0` and `flex-1`
+            all stop working.
+
+            It shows up as a layout that looks fine until the data is real: the
+            first two-pane roster ran every client's email straight off the
+            right edge and pushed the search field's two buttons out of the
+            pane entirely, while the same rows truncated correctly one route
+            away. Every `ScrollArea` here scrolls vertically, so the wrapper
+            buys nothing and costs that.
+          */
+          "[&>div]:block!",
           // A fade distance, not a design token — there is no spacing variable
           // to resolve here, and naming a non-existent one silently voids the
           // whole mask-image rather than failing.
