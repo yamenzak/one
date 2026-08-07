@@ -211,7 +211,7 @@ function ScoreControls({
             <div className="text-sm font-bold uppercase tracking-wide text-foreground/80">{s.short || s.name}</div>
             <div className="font-mono text-6xl font-black tabular-nums text-foreground">{s.score}</div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" className="size-11" onClick={() => onAdjust(s.id, -1)} disabled={s.score <= 0}>
+              <Button variant="outline" size="icon" className="size-11" aria-label={`Subtract a point from ${s.short || s.name}`} onClick={() => onAdjust(s.id, -1)} disabled={s.score <= 0}>
                 <Minus className="h-5 w-5" />
               </Button>
               <Button size="lg" className="h-11 px-6 text-lg" onClick={() => onAdjust(s.id, 1)}>

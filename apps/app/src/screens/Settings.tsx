@@ -174,7 +174,7 @@ export function Settings({ onBack, view = "studio" }: { onBack: () => void; view
           every settings detail page a pair of stacked back buttons. */}
       {view === "studio" && !inSection && (
         <div className="flex items-center gap-3">
-          <Button size="icon" variant="secondary" onClick={onBack}><ArrowLeft /></Button>
+          <Button size="icon" variant="secondary" aria-label="Back" onClick={onBack}><ArrowLeft /></Button>
           <h1 className="text-title-2">{VIEW_TITLE[view]}</h1>
         </div>
       )}
@@ -1771,7 +1771,11 @@ function CopyField({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
       <div className="text-micro uppercaser text-muted-foreground">{label}</div>
-      <button onClick={copy} className="flex w-full items-center gap-1.5 text-left" title="Copy">
+      {/* The name has to be the ACTION. Left to its contents this button
+          announces as the value itself — "sk_live_9f2…, button" — with nothing
+          saying it copies, and `title` does not override a content-derived
+          name. */}
+      <button onClick={copy} className="flex w-full items-center gap-1.5 text-left" title="Copy" aria-label={`Copy ${label}`}>
         <code className="min-w-0 flex-1 truncate font-mono text-caption">{value}</code>
         {copied ? <Check className="size-3 shrink-0 text-success" /> : <Copy className="size-3 shrink-0 text-muted-foreground" />}
       </button>

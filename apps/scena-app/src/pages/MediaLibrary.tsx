@@ -146,7 +146,7 @@ export function MediaLibraryPage() {
     (canWrite || canDelete) && (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="secondary" size="icon" className="size-7">
+          <Button variant="secondary" size="icon" className="size-7" aria-label={`Actions for ${m.name}`}>
             <MoreVertical className="size-4" />
           </Button>
         </DropdownMenuTrigger>

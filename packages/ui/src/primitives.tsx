@@ -158,9 +158,50 @@ const buttonVariants = cva(
   },
 );
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
-  asChild?: boolean;
-}
+/**
+ * AN ICON BUTTON MUST BE NAMED, AND THE TYPE SYSTEM SAYS SO.
+ *
+ * `size="icon"` renders a glyph and nothing else, so its accessible name is
+ * whatever `aria-label` says — there is no text node to fall back on. Without
+ * one it announces as "button", it cannot be reached by voice control ("click
+ * delete" matches nothing), and it is invisible in an accessibility tree audit.
+ *
+ * This was 36 buttons out of 101 across the three apps, which is the shape of a
+ * rule that exists in the document and nowhere in the code (§12). A lint could
+ * find it, but a TYPE stops it being written — the error arrives in the editor
+ * rather than in CI, and it cannot be forgotten by an app that never opted in.
+ *
+ * A tooltip is NOT a name. `Tooltip` wraps its child in Radix's trigger, which
+ * sets `aria-describedby` — supplementary text, announced after the name if at
+ * all, and absent entirely while the tooltip is closed. Fourteen widget-palette
+ * buttons relied on exactly that.
+ *
+ * `title` is not accepted either. It is a name of last resort in the HTML
+ * accessibility mapping, never surfaced on touch, and inconsistently announced.
+ * Where a control wants a hover hint AND a name, it takes both.
+ */
+type ButtonSize = "sm" | "default" | "lg" | "icon" | "icon-sm";
+type Named = { "aria-label": string } | { "aria-labelledby": string };
+
+/*
+  Two branches, and the second is deliberately wider than "size is icon".
+
+  `Filters` picks its size at RUNTIME — `size={active > 0 ? "sm" : "icon"}` —
+  because the control is icon-only until a facet turns on and then shows its
+  count. Its size is `"sm" | "icon"`, which fits neither a strictly-icon branch
+  nor a strictly-text one, so a narrower rule would have rejected a button that
+  is correctly labelled. Requiring a name for any size that is not STATICALLY
+  known to be a text button is both the fix and the honest rule: if the compiler
+  cannot see that this button has words in it, neither can a screen reader.
+*/
+type SizeProps =
+  | { size?: "sm" | "default" | "lg" | null }
+  | ({ size: ButtonSize | null } & Named);
+
+export type ButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "size"> &
+  Omit<VariantProps<typeof buttonVariants>, "size"> & {
+    asChild?: boolean;
+  } & SizeProps;
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({ className, variant, size, asChild, ...props }, ref) => {
   const Comp = asChild ? Slot : "button";

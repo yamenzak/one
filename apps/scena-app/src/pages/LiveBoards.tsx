@@ -450,6 +450,7 @@ function ScoreManager({ boardId, state, onSaved }: { boardId: string; state: Sco
             className="size-8 text-muted-foreground"
             disabled={sides.length <= 2}
             title={sides.length <= 2 ? "Keep at least two sides" : "Remove side"}
+            aria-label={`Remove side ${i + 1}`}
             onClick={() => removeSide(i)}
           >
             <Trash2 className="size-3.5" />
@@ -722,7 +723,7 @@ function CredentialRow({ u, onRegenerate }: { u: BoardUser; onRegenerate: () => 
           <span className="opacity-60">code shown once</span>
         </div>
       </div>
-      <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" onClick={onRegenerate} title="Issue a new code">
+      <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" onClick={onRegenerate} title="Issue a new code" aria-label="Issue a new code">
         <RefreshCw className="size-3.5" />
       </Button>
     </div>
@@ -781,6 +782,7 @@ function CounterManager({ boardId, initial, onSaved }: { boardId: string; initia
               className="size-8 text-muted-foreground"
               disabled={counters.length <= 1}
               title={counters.length <= 1 ? "Keep at least one counter" : "Remove counter"}
+              aria-label={`Remove counter ${i + 1}`}
               onClick={() => remove(i)}
             >
               <Trash2 className="size-3.5" />
@@ -848,7 +850,7 @@ function CategoryManager({ boardId, initial }: { boardId: string; initial: Queue
             className="h-8 w-14 text-center font-mono"
           />
           <Input value={cat.name} onChange={(e) => edit(i, { name: e.target.value })} className="h-8 flex-1" />
-          <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" onClick={() => remove(i)}>
+          <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" aria-label={`Remove row ${i + 1}`} onClick={() => remove(i)}>
             <Trash2 className="size-3.5" />
           </Button>
         </div>
@@ -1138,6 +1140,7 @@ function RoomManager({ boardId, state, onSaved }: { boardId: string; state: Room
               className="size-8 text-muted-foreground"
               disabled={statuses.length <= 1}
               title={statuses.length <= 1 ? "Keep at least one status" : "Remove status"}
+              aria-label={`Remove status ${i + 1}`}
               onClick={() => removeStatus(i)}
             >
               <Trash2 className="size-3.5" />
@@ -1170,6 +1173,7 @@ function RoomManager({ boardId, state, onSaved }: { boardId: string; state: Room
               className="size-8 text-muted-foreground"
               disabled={rooms.length <= 1}
               title={rooms.length <= 1 ? "Keep at least one room" : "Remove room"}
+              aria-label={`Remove room ${i + 1}`}
               onClick={() => removeRoom(i)}
             >
               <Trash2 className="size-3.5" />

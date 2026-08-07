@@ -191,7 +191,7 @@ export function HtmlEditorDialog({ open, initialHtml, title, mode = "edit", surf
                   <Textarea value={input} onChange={(e) => setInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); } }}
                     placeholder={creating ? `Describe the ${noun} to create…` : "Describe a change…"} className="max-h-24 min-h-9 flex-1 resize-none text-caption" />
-                  <Button size="icon" className="size-9 shrink-0" disabled={aiBusy || !input.trim()} onClick={sendChat}><Send className="size-4" /></Button>
+                  <Button size="icon" className="size-9 shrink-0" aria-label="Send" disabled={aiBusy || !input.trim()} onClick={sendChat}><Send className="size-4" /></Button>
                 </div>
               </div>
             )}

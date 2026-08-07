@@ -798,13 +798,13 @@ function SlideCard({
 
         {canWrite && (
           <div className="absolute right-2 top-2 flex gap-1">
-            <Button variant="secondary" size="icon" className="size-7 cursor-grab shadow-sm active:cursor-grabbing" title="Drag to reorder">
+            <Button variant="secondary" size="icon" className="size-7 cursor-grab shadow-sm active:cursor-grabbing" title="Drag to reorder" aria-label="Drag to reorder">
               <GripVertical className="size-3.5" />
             </Button>
-            <Button variant="secondary" size="icon" className="size-7 shadow-sm" onClick={onSettings} title="Slide settings">
+            <Button variant="secondary" size="icon" className="size-7 shadow-sm" onClick={onSettings} title="Slide settings" aria-label="Slide settings">
               <Settings2 className="size-3.5" />
             </Button>
-            <Button variant="destructive" size="icon" className="size-7 shadow-sm" onClick={onDelete} title="Remove">
+            <Button variant="destructive" size="icon" className="size-7 shadow-sm" onClick={onDelete} title="Remove" aria-label="Remove slide">
               <Trash2 className="size-3.5" />
             </Button>
           </div>

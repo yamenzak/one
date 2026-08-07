@@ -135,6 +135,7 @@ export function WidgetProfilesPage() {
                         setEditing(p);
                       }}
                       title="Rename profile"
+                      aria-label={`Rename ${p.name}`}
                     >
                       <Pencil className="size-4" />
                     </Button>
@@ -149,6 +150,7 @@ export function WidgetProfilesPage() {
                         remove(p);
                       }}
                       title="Delete profile"
+                      aria-label={`Delete ${p.name}`}
                     >
                       <Trash2 className="size-4" />
                     </Button>

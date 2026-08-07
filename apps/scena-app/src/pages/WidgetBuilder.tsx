@@ -873,8 +873,20 @@ function Builder({ profileId }: { profileId: string }) {
                     const usable = canUseWidget(w.type);
                     return (
                       <Tooltip key={w.type} content={usable ? w.label : `${w.label} — Upgrade`} side="right">
+                        {/*
+                          A TOOLTIP IS NOT A NAME. Radix's trigger sets
+                          `aria-describedby`, which is supplementary text
+                          announced after the name — and only while the tooltip
+                          is open. With no `aria-label` these fourteen buttons,
+                          the only way to add anything to a widget profile,
+                          announced as "button" and could not be reached by
+                          voice control. `Button size="icon"` now demands a name
+                          at the type level; this is a raw <button>, so it says
+                          so here.
+                        */}
                         <button
                           onClick={() => onPick(w.type)}
+                          aria-label={usable ? `Add ${w.label}` : `${w.label} — not on your plan`}
                           className={cn(
                             "relative flex size-10 items-center justify-center rounded-lg transition-colors [&_svg]:size-[18px]",
                             usable ? "text-muted-foreground hover:bg-accent hover:text-foreground" : "text-muted-foreground/40 hover:bg-accent/40",
@@ -1122,7 +1134,7 @@ function MultiPanel({
   onDelete: () => void;
 }) {
   const A = ({ k, icon, label }: { k: AlignKind; icon: React.ReactNode; label: string }) => (
-    <Button variant="outline" size="icon" className="size-8" title={label} onClick={() => onAlign(k)}>
+    <Button variant="outline" size="icon" className="size-8" title={label} aria-label={label} onClick={() => onAlign(k)}>
       {icon}
     </Button>
   );
@@ -1140,10 +1152,10 @@ function MultiPanel({
       </div>
       <div className="mb-2 text-caption font-medium text-muted-foreground">Distribute</div>
       <div className="mb-3 flex gap-1">
-        <Button variant="outline" size="icon" className="size-8" title="Distribute horizontally" onClick={() => onDistribute("h")}>
+        <Button variant="outline" size="icon" className="size-8" title="Distribute horizontally" aria-label="Distribute horizontally" onClick={() => onDistribute("h")}>
           <AlignHorizontalSpaceAround className="size-4" />
         </Button>
-        <Button variant="outline" size="icon" className="size-8" title="Distribute vertically" onClick={() => onDistribute("v")}>
+        <Button variant="outline" size="icon" className="size-8" title="Distribute vertically" aria-label="Distribute vertically" onClick={() => onDistribute("v")}>
           <AlignVerticalSpaceAround className="size-4" />
         </Button>
       </div>

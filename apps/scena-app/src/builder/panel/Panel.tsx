@@ -139,7 +139,7 @@ function LibraryUrlField({ value, onChange, placeholder }: { value: string; onCh
   return (
     <div className="flex items-center gap-1.5">
       <div className="min-w-0 flex-1"><TextField value={value} onChange={onChange} placeholder={placeholder ?? "https://…"} mono /></div>
-      <Button type="button" variant="outline" size="icon" className="size-8 shrink-0" title="Choose from library" onClick={() => setPick(true)}>
+      <Button type="button" variant="outline" size="icon" className="size-8 shrink-0" title="Choose from library" aria-label="Choose from library" onClick={() => setPick(true)}>
         <ImageIcon className="size-3.5" />
       </Button>
       <MediaPicker open={pick} kind="image" onOpenChange={setPick} onPick={(url) => onChange(url)} />
@@ -437,9 +437,9 @@ function MenuItemsEditor({ node, onConfig }: { node: WNode; onConfig: (p: Record
           </div>
           <div className="flex items-center gap-1">
             <TextField value={it.note ?? ""} onChange={(v) => patch(i, { note: v })} placeholder="Note (optional)" />
-            <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground" disabled={i === 0} onClick={() => move(i, -1)}><ChevronUp className="size-3.5" /></Button>
-            <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground" disabled={i === items.length - 1} onClick={() => move(i, 1)}><ChevronDown className="size-3.5" /></Button>
-            <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground hover:text-destructive" onClick={() => set(items.filter((_, j) => j !== i))}><Trash2 className="size-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground" aria-label={`Move item ${i + 1} up`} disabled={i === 0} onClick={() => move(i, -1)}><ChevronUp className="size-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground" aria-label={`Move item ${i + 1} down`} disabled={i === items.length - 1} onClick={() => move(i, 1)}><ChevronDown className="size-3.5" /></Button>
+            <Button variant="ghost" size="icon" className="size-7 shrink-0 text-muted-foreground hover:text-destructive" aria-label={`Remove item ${i + 1}`} onClick={() => set(items.filter((_, j) => j !== i))}><Trash2 className="size-3.5" /></Button>
           </div>
         </div>
       ))}
@@ -507,9 +507,9 @@ function StackItemEditor({ index, total, item, parent, boards, feeds, weather, l
           Slide {index + 1}
           <span className="text-caption font-normal text-muted-foreground">· {widgetDef(item.widget.type)?.label ?? item.widget.type}</span>
         </button>
-        <Button variant="ghost" size="icon" className="size-6 text-muted-foreground" disabled={index === 0} onClick={() => onMove(-1)}><ChevronUp className="size-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="size-6 text-muted-foreground" disabled={index === total - 1} onClick={() => onMove(1)}><ChevronDown className="size-3.5" /></Button>
-        <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-destructive" onClick={onRemove}><Trash2 className="size-3.5" /></Button>
+        <Button variant="ghost" size="icon" className="size-6 text-muted-foreground" aria-label={`Move slide ${index + 1} up`} disabled={index === 0} onClick={() => onMove(-1)}><ChevronUp className="size-3.5" /></Button>
+        <Button variant="ghost" size="icon" className="size-6 text-muted-foreground" aria-label={`Move slide ${index + 1} down`} disabled={index === total - 1} onClick={() => onMove(1)}><ChevronDown className="size-3.5" /></Button>
+        <Button variant="ghost" size="icon" className="size-6 text-muted-foreground hover:text-destructive" aria-label={`Remove slide ${index + 1}`} onClick={onRemove}><Trash2 className="size-3.5" /></Button>
       </div>
       {open && (
         <div className="px-2 pb-1">

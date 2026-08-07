@@ -126,9 +126,17 @@ function SidebarFooter({
         {emergencyActive && <span className="ml-1 text-caption font-medium text-destructive">Takeover active</span>}
       </div>
       <button onClick={onNavigateBilling} className="w-full rounded-xl bg-sidebar-accent/50 p-3 text-left transition-colors hover:bg-sidebar-accent">
-        <div className="mb-2 flex items-center justify-between">
+        {/*
+          The balance used to appear TWICE in this 40px block — "1,000 cr" here
+          in `font-mono`, and "AI credits · 1,000 / 1,000" two lines below in the
+          sans, at the SAME size. So it bought no scanning advantage over the
+          line that already carries it with its denominator, and the same number
+          rendered in two typefaces a centimetre apart. The caption below is the
+          more informative of the two, so it is the one that stays.
+        */}
+        <div className="mb-2 flex items-center justify-between gap-2">
           <span className="text-caption font-semibold">{planName}</span>
-          <span className="font-mono text-caption text-muted-foreground tabular-nums">{bal.toLocaleString()} cr</span>
+          {low && <span className="text-micro uppercase text-warning">Low</span>}
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div className={`h-full rounded-full transition-[width] duration-500 ${low ? "bg-warning" : "bg-primary"}`} style={{ width: `${pct}%` }} />

@@ -59,7 +59,7 @@ export function QueueControls({
       <div className={`mb-5 flex items-center justify-center gap-3 ${lockCounter ? "hidden" : ""}`}>
         <span className="text-sm text-muted-foreground">Counter / desk</span>
         <div className="flex items-center gap-1.5">
-          <Button variant="outline" size="icon" onClick={() => setCounter(Math.max(1, counter - 1))}>
+          <Button variant="outline" size="icon" aria-label="Previous counter" onClick={() => setCounter(Math.max(1, counter - 1))}>
             <Minus className="h-4 w-4" />
           </Button>
           <Input
@@ -69,7 +69,7 @@ export function QueueControls({
             onChange={(e) => setCounter(Math.max(1, Number(e.target.value) || 1))}
             className="w-16 text-center font-mono text-base font-semibold tabular-nums"
           />
-          <Button variant="outline" size="icon" onClick={() => setCounter(counter + 1)}>
+          <Button variant="outline" size="icon" aria-label="Next counter" onClick={() => setCounter(counter + 1)}>
             <Plus className="h-4 w-4" />
           </Button>
         </div>
