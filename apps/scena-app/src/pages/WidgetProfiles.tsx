@@ -8,13 +8,12 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, LayoutGrid, Pencil, Trash2, ChevronRight } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card.js";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { ProfileStartDialog } from "../builder/ProfileStartDialog.js";
-import { Badge, Button, Input, Skeleton, toast } from "@4dl/ui";
+import { Badge, Button, Dialog, DialogContent, DialogFooter, Input, Skeleton, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   listWidgetProfiles, updateWidgetProfile, deleteWidgetProfile,
@@ -174,8 +173,7 @@ function RenameProfile({ profile, onOpenChange, onSaved }: { profile: WidgetProf
   }
   return (
     <Dialog open={!!profile} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Rename profile</DialogTitle></DialogHeader>
+      <DialogContent title="Rename profile">
         <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>

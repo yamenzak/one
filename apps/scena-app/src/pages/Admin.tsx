@@ -22,18 +22,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
-} from "../components/ui/dialog.js";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "../components/ui/select.js";
 import { StatTile, StatusDot, Pill, type Tone } from "../components/status.js";
 import { confirmDialog } from "../components/confirm.js";
 import { Loader2, Music, Ticket, Users, RefreshCw, AlertTriangle, CreditCard, Package, Sparkles, Tag, Search, Upload, Trash2, ImagePlus, Plus, Pencil } from "lucide-react";
 import { cn } from "../lib/utils.js";
 import { FEATURE_CATALOG, QUOTA_CATALOG, FEATURE_CATEGORIES } from "@scena/manifest";
-import { Badge, Button, Input, Label, Separator, Skeleton, Switch, toast } from "@4dl/ui";
+import { Badge, Button, Dialog, Select, DialogContent, DialogDescription, DialogFooter, Input, Label, Separator, Skeleton, Switch, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   getAdminConfig,
@@ -241,14 +235,11 @@ export function StripeTab() {
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <Label>Mode</Label>
-            <Select value={cfg["stripe.mode"] ?? "disabled"} onValueChange={(v) => set("stripe.mode", v)}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="disabled">Disabled</SelectItem>
-                <SelectItem value="test">Test</SelectItem>
-                <SelectItem value="live">Live</SelectItem>
-              </SelectContent>
-            </Select>
+            <Select value={cfg["stripe.mode"] ?? "disabled"} onChange={(v) => set("stripe.mode", v)} className="w-full" options={[
+              { value: "disabled", label: "Disabled" },
+              { value: "test", label: "Test" },
+              { value: "live", label: "Live" },
+            ]} />
           </div>
           {field("stripe.secret_key", "Secret key", "sk_test_…")}
           {field("stripe.publishable_key", "Publishable key", "pk_test_…")}
@@ -277,28 +268,22 @@ export function StripeTab() {
           {field("ai.default_markup", "Default AI markup ×")}
           <div className="flex flex-col gap-1.5">
             <Label>AI mock mode</Label>
-            <Select value={cfg["ai.mock"] ?? "auto"} onValueChange={(v) => set("ai.mock", v)}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">Auto (mock if no Workers AI)</SelectItem>
-                <SelectItem value="on">On (always mock)</SelectItem>
-                <SelectItem value="off">Off (require Workers AI)</SelectItem>
-              </SelectContent>
-            </Select>
+            <Select value={cfg["ai.mock"] ?? "auto"} onChange={(v) => set("ai.mock", v)} className="w-full" options={[
+              { value: "auto", label: "Auto (mock if no Workers AI)" },
+              { value: "on", label: "On (always mock)" },
+              { value: "off", label: "Off (require Workers AI)" },
+            ]} />
           </div>
 
           <Separator />
           <SectionLabel>Email (transactional)</SectionLabel>
           <div className="flex flex-col gap-1.5">
             <Label>Provider</Label>
-            <Select value={cfg["email.provider"] ?? "disabled"} onValueChange={(v) => set("email.provider", v)}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="disabled">Disabled</SelectItem>
-                <SelectItem value="cloudflare">Cloudflare Email Sending</SelectItem>
-                <SelectItem value="mock">Mock (development only)</SelectItem>
-              </SelectContent>
-            </Select>
+            <Select value={cfg["email.provider"] ?? "disabled"} onChange={(v) => set("email.provider", v)} className="w-full" options={[
+              { value: "disabled", label: "Disabled" },
+              { value: "cloudflare", label: "Cloudflare Email Sending" },
+              { value: "mock", label: "Mock (development only)" },
+            ]} />
             <p className="text-xs text-muted-foreground">
               Mock logs the message instead of sending it, including sign-in codes — outside development it refuses rather than
               reporting a delivery that never happened.
@@ -313,13 +298,7 @@ export function StripeTab() {
           {field("weather.api_key", "Platform OpenWeather key", "OpenWeather One Call key…", "Company key that powers every weather source (Sources → Weather). Empty ⇒ locations show mock conditions for free. Each real fetch charges the tenant the per-call price below.")}
           <div className="flex flex-col gap-1.5">
             <Label>OpenWeather One Call version</Label>
-            <Select value={cfg["weather.onecall_version"] ?? "4.0"} onValueChange={(v) => set("weather.onecall_version", v)}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="4.0">4.0 (current)</SelectItem>
-                <SelectItem value="3.0">3.0 (legacy)</SelectItem>
-              </SelectContent>
-            </Select>
+            <Select value={cfg["weather.onecall_version"] ?? "4.0"} onChange={(v) => set("weather.onecall_version", v)} className="w-full" options={[{ value: "4.0", label: "4.0 (current)" }, { value: "3.0", label: "3.0 (legacy)" }]} />
             <p className="text-[11px] text-muted-foreground">Match your key's subscription — a key is subscribed to one version, not both. New OpenWeather keys are 4.0.</p>
           </div>
           {field("weather.credits_per_call", "Weather credits per call", "3", "Credits charged per real weather fetch — per location, once an hour within its opening-hours window.")}
@@ -496,13 +475,10 @@ function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="flex max-h-[88dvh] flex-col overflow-hidden sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>{plan.name} — entitlements</DialogTitle>
-          <DialogDescription>
+      <DialogContent title={<>{plan.name} — entitlements</>} className="flex max-h-[88dvh] flex-col overflow-hidden sm:max-w-3xl">
+      <DialogDescription>
             Applies to <b>every current and future tenant</b> on <span className="font-mono">{plan.id}</span> (per-tenant overrides still win). <b>-1</b> = unlimited on any quota.
           </DialogDescription>
-        </DialogHeader>
         {!ent ? <Loading /> : (
           <>
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
@@ -848,15 +824,12 @@ function TrackDialog({ track, open, onClose, onSaved }: { track: LibraryTrack | 
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{editing ? "Edit track" : "Add a track"}</DialogTitle>
-          <DialogDescription>
+      <DialogContent title={editing ? "Edit track" : "Add a track"} className="sm:max-w-md">
+      <DialogDescription>
             {editing
               ? "Update the track's details. The audio itself is immutable — delete and re-add to swap the file."
               : "Upload audio the platform is licensed to share. It becomes available to every tenant whose plan includes the Music library."}
           </DialogDescription>
-        </DialogHeader>
         <div className="flex flex-col gap-3 py-2">
           <div className="space-y-1.5">
             <Label>Genre</Label>
@@ -874,14 +847,11 @@ function TrackDialog({ track, open, onClose, onSaved }: { track: LibraryTrack | 
           </div>
           <div className="space-y-1.5">
             <Label>Type</Label>
-            <Select value={vocal || "unset"} onValueChange={(v) => setVocal(v === "unset" ? "" : (v as "vocal" | "instrumental"))}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unset">Unset</SelectItem>
-                <SelectItem value="vocal">Vocal</SelectItem>
-                <SelectItem value="instrumental">Instrumental</SelectItem>
-              </SelectContent>
-            </Select>
+            <Select value={vocal || "unset"} onChange={(v) => setVocal(v === "unset" ? "" : (v as "vocal" | "instrumental"))} className="w-full" options={[
+              { value: "unset", label: "Unset" },
+              { value: "vocal", label: "Vocal" },
+              { value: "instrumental", label: "Instrumental" },
+            ]} />
           </div>
           <input ref={artRef} type="file" accept="image/*" onChange={onArt} className="hidden" />
           <input ref={fileRef} type="file" accept="audio/*" onChange={onFile} className="hidden" />
@@ -1019,11 +989,8 @@ function PromoDialog({ open, plans, onClose, onSaved }: { open: boolean; plans: 
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>New promo code</DialogTitle>
-          <DialogDescription>Gift credits or a comped plan to a tenant. They redeem it from their Billing page.</DialogDescription>
-        </DialogHeader>
+      <DialogContent title="New promo code" className="sm:max-w-md">
+      <DialogDescription>Gift credits or a comped plan to a tenant. They redeem it from their Billing page.</DialogDescription>
         <div className="flex flex-col gap-3 py-2">
           <div className="space-y-1.5">
             <Label>Code</Label>
@@ -1045,12 +1012,9 @@ function PromoDialog({ open, plans, onClose, onSaved }: { open: boolean; plans: 
             <div className="flex gap-2">
               <div className="flex-1 space-y-1.5">
                 <Label>Plan</Label>
-                <Select value={form.planId} onValueChange={(v) => setForm({ ...form, planId: v })}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {plans.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Select value={form.planId} onChange={(v) => setForm({ ...form, planId: v })} className="w-full" options={[
+                  ...plans.map((p) => ({ value: p.id, label: p.name })),
+                ]} />
               </div>
               <div className="w-24 space-y-1.5">
                 <Label>Months</Label>
@@ -1226,14 +1190,11 @@ function AdjustCreditsModal({ tenant, onClose, onDone }: { tenant: AdminTenant |
 
   return (
     <Dialog open={Boolean(tenant)} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent title="Adjust credits" className="sm:max-w-sm">
         <form onSubmit={submit}>
-          <DialogHeader>
-            <DialogTitle>Adjust credits</DialogTitle>
-            <DialogDescription>
+      <DialogDescription>
               Add credits to <span className="font-mono">{tenant?.tenant_id}</span>. Use a negative amount to remove.
             </DialogDescription>
-          </DialogHeader>
           <div className="py-4">
             <Label>Amount</Label>
             <Input autoFocus value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5 font-mono tabular-nums" />
@@ -1293,13 +1254,10 @@ function OverridesModal({ tenantId, onClose }: { tenantId: string; onClose: () =
   const planGrant = data?.plan.aiCredits.monthlyGrant ?? 0;
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="flex max-h-[88dvh] flex-col overflow-hidden sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Entitlement overrides</DialogTitle>
-          <DialogDescription>
+      <DialogContent title="Entitlement overrides" className="flex max-h-[88dvh] flex-col overflow-hidden sm:max-w-2xl">
+      <DialogDescription>
             Gift extra allowances on top of <b>{data?.planId ?? "…"}</b> for <span className="font-mono">{tenantId}</span>. Blank = inherit the plan (the plan value is shown as a hint). -1 = unlimited.
           </DialogDescription>
-        </DialogHeader>
         {!data ? <Loading /> : (
           <>
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
@@ -1320,14 +1278,11 @@ function OverridesModal({ tenantId, onClose }: { tenantId: string; onClose: () =
                   {OVR_FEATURES.map((x) => (
                     <label key={x.key} className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
                       <span className="flex-1">{x.label}</span>
-                      <Select value={f[x.key] ?? "inherit"} onValueChange={(v) => setF({ ...f, [x.key]: v as "inherit" | "on" | "off" })}>
-                        <SelectTrigger className="h-8 w-28"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="inherit">Inherit</SelectItem>
-                          <SelectItem value="on">Grant on</SelectItem>
-                          <SelectItem value="off">Force off</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Select value={f[x.key] ?? "inherit"} onChange={(v) => setF({ ...f, [x.key]: v as "inherit" | "on" | "off" })} className="h-8 w-28" options={[
+                        { value: "inherit", label: "Inherit" },
+                        { value: "on", label: "Grant on" },
+                        { value: "off", label: "Force off" },
+                      ]} />
                     </label>
                   ))}
                 </div>

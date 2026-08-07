@@ -5,8 +5,7 @@
  * <ConfirmHost/> lives near the app root.
  */
 import { useEffect, useState } from "react";
-import { Button } from "@4dl/ui";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog.js";
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter } from "@4dl/ui";
 
 interface ConfirmOptions {
   title: string;
@@ -42,11 +41,8 @@ export function ConfirmHost() {
 
   return (
     <Dialog open={Boolean(pending)} onOpenChange={(o) => !o && close(false)}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle>{pending?.title}</DialogTitle>
-          {pending?.description ? <DialogDescription>{pending.description}</DialogDescription> : null}
-        </DialogHeader>
+      <DialogContent title={pending?.title} className="sm:max-w-sm">
+      {pending?.description ? <DialogDescription>{pending.description}</DialogDescription> : null}
         <DialogFooter>
           <Button variant="ghost" onClick={() => close(false)}>
             {pending?.cancelText ?? "Cancel"}

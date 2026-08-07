@@ -16,9 +16,8 @@
  */
 import { useEffect, useState } from "react";
 import { Receipt, Check, Sparkles, ArrowRight, Lock, Loader2 } from "lucide-react";
-import { Button, Group, Input, LoadError, Meter, Row, Skeleton, toast } from "@4dl/ui";
+import { Button, Dialog, DialogContent, DialogFooter, Group, Input, LoadError, Meter, Row, Skeleton, toast } from "@4dl/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { PageHeader } from "../components/page-header.js";
 import { LegalDialog, LegalLinks, type LegalDoc } from "../legal/content.js";
 import { cn } from "@/lib/utils";
@@ -391,10 +390,7 @@ function PlanChangeDialog({ target, currentPrice, stripeEnabled, busy, onConfirm
   const feats = planHighlights(target);
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{dir === "up" ? "Upgrade to" : dir === "down" ? "Switch to" : "Switch to"} {target.name}</DialogTitle>
-        </DialogHeader>
+      <DialogContent title={`${dir === "up" ? "Upgrade to" : "Switch to"} ${target.name}`} className="sm:max-w-md">
         <div className="flex items-baseline gap-1.5">
           <span className="text-2xl font-bold tracking-tight">{paid ? dollars(target.price_cents) : "Free"}</span>
           {paid && <span className="text-sm text-muted-foreground">/{target.interval}</span>}
@@ -472,10 +468,7 @@ function BillingSkeleton() {
 function DowngradeModal({ planName, violations, onClose }: { planName: string; violations: Violation[]; onClose: () => void }) {
   return (
     <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Can’t downgrade to {planName} yet</DialogTitle>
-        </DialogHeader>
+      <DialogContent title={<>Can’t downgrade to {planName} yet</>}>
         <p className="text-sm text-muted-foreground">You’re still using more than {planName} allows. Resolve these, then try again:</p>
         <div className="flex flex-col gap-2">
           {violations.map((v, i) => (

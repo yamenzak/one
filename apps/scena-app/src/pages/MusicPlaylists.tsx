@@ -15,10 +15,7 @@ import {
   Pencil, GripVertical, SlidersHorizontal, Sparkles, Library, Images, ShieldCheck, Mic, Disc3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu.js";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { PageHeader } from "../components/page-header.js";
 import { TagEditor } from "../components/tag-editor.js";
 import { usePageChrome } from "../components/page-chrome.js";
@@ -28,7 +25,7 @@ import { offerPublishAffected } from "../components/publish-affected.js";
 import { TrackMetaDialog, mmss } from "../components/track-meta-dialog.js";
 import { LicenseBadge, LicenseNote } from "../components/licensing.js";
 import { MediaPicker } from "./MediaLibrary.js";
-import { Badge, Button, Input, Label, LoadError, Row, Skeleton, Switch, Textarea, toast } from "@4dl/ui";
+import { Badge, Button, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Input, Label, LoadError, Row, Select, Skeleton, Switch, Textarea, toast } from "@4dl/ui";
 import { PlaylistLibrary } from "../components/playlist-library.js";
 import { EmptyState } from "../components/empty.js";
 import {
@@ -497,8 +494,7 @@ function DeletePlaylistDialog({ open, onOpenChange, name, onConfirm }: {
   useEffect(() => { if (open) { setAlsoMedia(false); setBusy(false); } }, [open]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Delete “{name}”?</DialogTitle></DialogHeader>
+      <DialogContent title={<>Delete “{name}”?</>}>
         <p className="text-sm text-muted-foreground">This removes the playlist. Any channel using it loses this music. This can't be undone.</p>
         <label className="flex items-center justify-between gap-3 rounded-lg border p-3">
           <span className="min-w-0">
@@ -558,8 +554,7 @@ function AiMusicDialog({ open, onOpenChange, onAdd }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle>Generate music with AI</DialogTitle></DialogHeader>
+      <DialogContent title="Generate music with AI" className="sm:max-w-lg">
         <div className="space-y-3">
           <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g. Warm lo-fi hip-hop with soft piano and vinyl crackle" className="min-h-24" />
           <div className="grid grid-cols-2 gap-2">
@@ -575,13 +570,10 @@ function AiMusicDialog({ open, onOpenChange, onAdd }: {
             {models.length > 0 && (
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Model</Label>
-                <Select value={modelId || "__default"} onValueChange={(v) => setModelId(v === "__default" ? "" : v)}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__default">Default model</SelectItem>
-                    {models.map((m) => <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Select value={modelId || "__default"} onChange={(v) => setModelId(v === "__default" ? "" : v)} className="w-full" options={[
+                  { value: "__default", label: "Default model" },
+                  ...models.map((m) => ({ value: m.id, label: m.label })),
+                ]} />
               </div>
             )}
           </div>
@@ -643,10 +635,7 @@ function PublicLibraryDialog({ open, onOpenChange, onAdd }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">Public library <LicenseBadge source="public" /></DialogTitle>
-        </DialogHeader>
+      <DialogContent title={<>Public library <LicenseBadge source="public" /></>} className="sm:max-w-2xl">
         {!data ? (
           <div className="space-y-2 py-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}</div>
         ) : !data.enabled ? (

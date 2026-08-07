@@ -110,22 +110,51 @@ export function Dialog({ open, onOpenChange, children }: { open: boolean; onOpen
   );
 }
 
-export function DialogContent({ title, children, className }: { title?: string; children: ReactNode; className?: string }) {
+/**
+ * `title` is a NODE, not a string: a dialog whose heading carries an icon or a
+ * status pill beside the words is ordinary, and the alternative is every such
+ * caller reaching past this component to build its own heading — which is how
+ * a design system ends up with four dialog headers.
+ *
+ * `srTitle` is for the rare dialog with no visible heading at all (a legal
+ * reader, a media picker that is all chrome). Radix requires an accessible
+ * name; without one this falls back to the literal word "Dialog", which is a
+ * name that tells a screen-reader user nothing.
+ */
+export function DialogContent({ title, srTitle, children, className, dismissible = true }: {
+  title?: ReactNode;
+  srTitle?: string;
+  children: ReactNode;
+  className?: string;
+  /**
+   * `false` for a dialog that must be ANSWERED, not escaped — the X goes, and
+   * so do Escape and the outside click. Hiding only the button is the trap:
+   * Radix still closes on both, so the dialog looks unavoidable and is not.
+   * Same name and same meaning as `FixedDrawer`'s.
+   */
+  dismissible?: boolean;
+}) {
+  const block = (e: Event) => { if (!dismissible) e.preventDefault(); };
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className={overlayCls} />
       <DialogPrimitive.Content
+        onEscapeKeyDown={block}
+        onPointerDownOutside={block}
+        onInteractOutside={block}
         className={cn(
           "fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-border/60 bg-popover p-6 shadow-lg outline-none",
           "data-[state=open]:animate-[content-in_var(--dur-base)_var(--ease-out)] data-[state=closed]:animate-[content-out_var(--dur-fast)_var(--ease-out)]",
           className,
         )}
       >
-        {title && <DialogPrimitive.Title className="mb-4 text-title-3">{title}</DialogPrimitive.Title>}
-        {!title && <DialogPrimitive.Title className="sr-only">Dialog</DialogPrimitive.Title>}
-        <DialogPrimitive.Close className={cn("absolute right-4 top-4 grid size-9 place-items-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground", FOCUS)}>
-          <X className="size-4" />
-        </DialogPrimitive.Close>
+        {title && <DialogPrimitive.Title className="mb-4 pr-10 text-title-3">{title}</DialogPrimitive.Title>}
+        {!title && <DialogPrimitive.Title className="sr-only">{srTitle ?? "Dialog"}</DialogPrimitive.Title>}
+        {dismissible && (
+          <DialogPrimitive.Close aria-label="Close" className={cn("absolute right-4 top-4 grid size-9 place-items-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-secondary hover:text-foreground", FOCUS)}>
+            <X className="size-4" />
+          </DialogPrimitive.Close>
+        )}
         {children}
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>
@@ -134,6 +163,42 @@ export function DialogContent({ title, children, className }: { title?: string; 
 
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
+
+/**
+ * The line under the title that says what the dialog is for.
+ *
+ * It is Radix's `Description`, not a styled paragraph, so it becomes the
+ * dialog's `aria-describedby` and is read out with the title. A hand-rolled
+ * `<p className="text-muted-foreground">` looks identical and is silent, which
+ * is why every app was writing one.
+ *
+ * ⚠️ It sits directly under the title, so it carries a NEGATIVE top margin —
+ * `DialogContent` already spaces the title away from the body.
+ */
+export function DialogDescription({ children, className }: { children: ReactNode; className?: string }) {
+  return <DialogPrimitive.Description className={cn("-mt-2 mb-4 text-sm text-muted-foreground", className)}>{children}</DialogPrimitive.Description>;
+}
+
+/**
+ * The action row a dialog ends in.
+ *
+ * Right-aligned on a pointer, FULL-WIDTH AND STACKED below `sm` — a pair of
+ * small buttons in the bottom-right corner of a phone dialog is the hardest
+ * place on the screen to hit with a thumb, and reversing the order there puts
+ * the confirming action on top where the thumb already is.
+ */
+export function DialogFooter({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end [&>button]:w-full sm:[&>button]:w-auto",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
 
 /** Lightweight confirm step for consequential/destructive actions — a centered
  *  Dialog with a cancel + confirm pair. Confirming runs `onConfirm` and closes. */
@@ -276,11 +341,18 @@ export function Sheet({ open, onClose, title, titleAction, footer, size = "defau
 export const DropdownMenu = DropdownPrimitive.Root;
 export const DropdownMenuTrigger = DropdownPrimitive.Trigger;
 
-export function DropdownMenuContent({ children, align = "end", className }: { children: ReactNode; align?: "start" | "end" | "center"; className?: string }) {
+/**
+ * `side` for the same reason `Tooltip` has one: a menu triggered from a footer
+ * pinned to the bottom of a left-hand rail has nowhere to open downward, and
+ * Radix's collision handling flips it into a position nothing was designed at.
+ * Naming the side is the caller saying where the rail is.
+ */
+export function DropdownMenuContent({ children, align = "end", side, className }: { children: ReactNode; align?: "start" | "end" | "center"; side?: "top" | "right" | "bottom" | "left"; className?: string }) {
   return (
     <DropdownPrimitive.Portal>
       <DropdownPrimitive.Content
         align={align}
+        side={side}
         sideOffset={8}
         className={cn(
           "z-50 min-w-48 rounded-2xl border border-border/60 bg-popover p-1.5 shadow-lg outline-none",
@@ -294,12 +366,23 @@ export function DropdownMenuContent({ children, align = "end", className }: { ch
   );
 }
 
-export function DropdownMenuItem({ children, onSelect, className, destructive }: { children: ReactNode; onSelect?: () => void; className?: string; destructive?: boolean }) {
+/**
+ * ⚠️ `onSelect`, not `onClick`. Radix forwards DOM props, so an `onClick` here
+ * compiles, renders, and works with a mouse — and does nothing on Enter or
+ * Space, because keyboard activation of a menu item is not a click. The two
+ * look identical in review and differ only for people not using a pointer.
+ *
+ * `disabled` is the honest form of an action that exists but is not available
+ * right now: removing the row instead makes the menu change length between
+ * openings, so nobody learns where anything is.
+ */
+export function DropdownMenuItem({ children, onSelect, className, destructive, disabled }: { children: ReactNode; onSelect?: () => void; className?: string; destructive?: boolean; disabled?: boolean }) {
   return (
     <DropdownPrimitive.Item
       onSelect={onSelect}
+      disabled={disabled}
       className={cn(
-        "flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-body outline-none transition-colors [&_svg]:size-4 [&_svg]:text-muted-foreground",
+        "flex cursor-pointer items-center gap-2.5 rounded-xl px-3 py-2.5 text-body outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-45 [&_svg]:size-4 [&_svg]:text-muted-foreground",
         destructive
           ? "text-danger hover:bg-danger-soft data-[highlighted]:bg-danger-soft [&_svg]:text-danger"
           : "text-foreground hover:bg-secondary data-[highlighted]:bg-secondary",
@@ -517,13 +600,40 @@ export function IconTabs<T extends string>({
  * how "no choice / auto" is spelled. `disabled` on an option keeps a value
  * VISIBLE but unpickable, which is what a withdrawn-but-stored choice needs.
  */
-export function Select<T extends string>({ value, onChange, options, placeholder, className, disabled, "aria-label": ariaLabel }: { value: T; onChange: (v: T) => void; options: { value: T; label: string; disabled?: boolean }[]; placeholder?: string; className?: string; disabled?: boolean; "aria-label"?: string }) {
+/**
+ * A select is a LIST, so it takes one — not eight components you assemble.
+ *
+ * `label` is a `ReactNode` because the selected value is rendered through
+ * Radix's `ItemText`, which carries whatever the item held: an option with a
+ * flag, a swatch, or a capitalised span is ordinary, and the alternative is
+ * every such caller dropping back to the primitive.
+ *
+ * `size="sm"` is the dense form for a toolbar or a table row, where the 44px
+ * default control is taller than the row it sits in. `id` so a `<Label htmlFor>`
+ * can point at it — without one, a labelled select in a form has no label.
+ */
+export function Select<T extends string>({ value, onChange, options, placeholder, className, disabled, id, size = "default", title, "aria-label": ariaLabel }: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: ReactNode; disabled?: boolean }[];
+  placeholder?: string;
+  className?: string;
+  disabled?: boolean;
+  id?: string;
+  size?: "default" | "sm";
+  /** Native tooltip for a trigger whose label is truncated. */
+  title?: string;
+  "aria-label"?: string;
+}) {
   return (
     <SelectPrimitive.Root value={value} onValueChange={(v) => onChange(v as T)} disabled={disabled}>
       <SelectPrimitive.Trigger
+        id={id}
+        title={title}
         aria-label={ariaLabel}
         className={cn(
-          "inline-flex h-11 w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-input bg-secondary/50 px-3.5 text-sm outline-none transition-colors focus-visible:border-primary/70 data-[placeholder]:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60",
+          "inline-flex w-full min-w-0 items-center justify-between gap-2 rounded-xl border border-input bg-secondary/50 outline-none transition-colors focus-visible:border-primary/70 data-[placeholder]:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-60",
+          size === "sm" ? "h-9 px-3 text-sm" : "h-11 px-3.5 text-sm",
           FOCUS,
           className,
         )}

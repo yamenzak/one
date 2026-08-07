@@ -9,7 +9,6 @@ import { AppShell, type NavGroup } from "./components/app-shell.js";
 import { PageChromeProvider } from "./components/page-chrome.js";
 import { RoleProvider } from "./permissions.js";
 import { EntitlementsProvider } from "./entitlements.js";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "./components/ui/dropdown-menu.js";
 import { cn } from "@/lib/utils";
 import { clearEmergency, getActiveEmergency, getMe, getBilling, getBranding, type ActiveEmergency, type Me, type BillingState } from "./api.js";
 import { applyBrandTheme, clearBrandTheme } from "./brand-theme.js";
@@ -40,7 +39,7 @@ import { MusicPlaylistsPage, MusicPlaylistDetailPage } from "./pages/MusicPlayli
 import { WidgetProfilesPage } from "./pages/WidgetProfiles.js";
 import { SettingsPage } from "./pages/Settings.js";
 import { PairModal } from "./components/PairModal.js";
-import { Button, toast } from "@4dl/ui";
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, toast } from "@4dl/ui";
 
 /**
  * Poll `fn` every `ms`, but skip while the tab is hidden and refetch the moment
@@ -99,9 +98,9 @@ function SidebarFooter({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side={side} align="end">
-        <DropdownMenuItem onClick={onNavigateBilling}>{planName} · {bal.toLocaleString()} cr</DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setLegalDoc("terms")}><Scale className="size-4" /> Terms & privacy</DropdownMenuItem>
-        <DropdownMenuItem onClick={onSignOut}><LogOut className="size-4" /> Sign out</DropdownMenuItem>
+        <DropdownMenuItem onSelect={onNavigateBilling}>{planName} · {bal.toLocaleString()} cr</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => setLegalDoc("terms")}><Scale className="size-4" /> Terms & privacy</DropdownMenuItem>
+        <DropdownMenuItem onSelect={onSignOut}><LogOut className="size-4" /> Sign out</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

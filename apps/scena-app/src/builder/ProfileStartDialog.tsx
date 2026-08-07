@@ -11,8 +11,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LayoutTemplate, SquareDashed, CopyPlus, Loader2, Sparkles, Wand2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.js";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { cn } from "@/lib/utils";
 import { useFeature } from "../entitlements.js";
 import {
@@ -21,7 +19,7 @@ import {
 import { WidgetContent } from "./WidgetView.js";
 import { DESIGN_W, DESIGN_H, type WNode } from "./types.js";
 import { templatesByCategory, type Template } from "./templates.js";
-import { Button, Input, ScrollArea, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, toast } from "@4dl/ui";
+import { Button, Dialog, DialogContent, Input, ScrollArea, Select, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, toast } from "@4dl/ui";
 
 const DEFAULT_W = 1920, DEFAULT_H = 1080;
 
@@ -216,10 +214,7 @@ export function ProfileStartDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[88dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
-        <DialogHeader className="border-b px-5 py-4">
-          <DialogTitle>Create a widget profile</DialogTitle>
-        </DialogHeader>
+      <DialogContent title="Create a widget profile" className="flex max-h-[88dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl">
 
         <Tabs value={tab} onValueChange={setTab} className="flex min-h-0 flex-1 flex-col gap-0">
           <div className="px-5 pt-4">
@@ -286,12 +281,9 @@ export function ProfileStartDialog({
                     </div>
                     <div className="space-y-1">
                       <label className="text-xs font-medium text-muted-foreground">Model</label>
-                      <Select value={aiModelId || (aiModels[0]?.id ?? "")} onValueChange={setAiModelId}>
-                        <SelectTrigger><SelectValue placeholder="Default model" /></SelectTrigger>
-                        <SelectContent>
-                          {aiModels.map((m) => <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <Select value={aiModelId || (aiModels[0]?.id ?? "")} onChange={setAiModelId} placeholder="Default model" options={[
+                        ...aiModels.map((m) => ({ value: m.id, label: m.label })),
+                      ]} />
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">The model composes a {DEFAULT_W}×{DEFAULT_H} scene from real widgets, then opens it in the builder to refine.</p>
@@ -337,12 +329,9 @@ export function ProfileStartDialog({
             <div className="space-y-3 px-5 py-5">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Copy from</label>
-                <Select value={srcId} onValueChange={setSrcId}>
-                  <SelectTrigger><SelectValue placeholder="Pick a profile" /></SelectTrigger>
-                  <SelectContent>
-                    {profiles.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Select value={srcId} onChange={setSrcId} placeholder="Pick a profile" options={[
+                  ...profiles.map((p) => ({ value: p.id, label: p.name })),
+                ]} />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">New name</label>

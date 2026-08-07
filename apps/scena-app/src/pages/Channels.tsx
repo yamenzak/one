@@ -9,8 +9,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, Tv, Layers, Music, LayoutGrid, Megaphone, Rocket, History, Clock, ChevronRight, ArrowLeft, Search, Tag, Pencil, Check, Trash2 } from "lucide-react";
 import { Card } from "../components/ui/card.js";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { PageHeader } from "../components/page-header.js";
 import { DevicePreview } from "../components/device-preview.js";
 import { usePageChrome } from "../components/page-chrome.js";
@@ -18,7 +16,7 @@ import { TagEditor } from "../components/tag-editor.js";
 import { ConfirmDialog } from "../components/confirm-dialog.js";
 import { useCan } from "../permissions.js";
 import { cn } from "@/lib/utils";
-import { Badge, Button, Collection, Filters, Input, Label, Skeleton, toast, type FacetSelection } from "@4dl/ui";
+import { Badge, Button, Collection, Dialog, DialogContent, DialogFooter, Filters, Input, Label, Select, Skeleton, toast, type FacetSelection } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   listChannels, createChannel, publishChannelNote, setChannelComposition, updateChannel, deleteChannel,
@@ -177,8 +175,7 @@ function NewChannelDialog({ open, onOpenChange, onCreated }: { open: boolean; on
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>New channel</DialogTitle></DialogHeader>
+      <DialogContent title="New channel">
         <div className="space-y-2">
           <Input autoFocus placeholder="e.g. Lobby" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} />
         </div>
@@ -436,13 +433,10 @@ function ComposerRow({
         <Label className="font-medium">{title}</Label>
         <div className="text-xs text-muted-foreground">{description}</div>
       </div>
-      <Select value={value ?? NONE} disabled={disabled} onValueChange={(v) => onChange(v === NONE ? null : v)}>
-        <SelectTrigger className="w-full sm:w-56"><SelectValue /></SelectTrigger>
-        <SelectContent>
-          <SelectItem value={NONE}>None</SelectItem>
-          {options.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
-        </SelectContent>
-      </Select>
+      <Select value={value ?? NONE} disabled={disabled} onChange={(v) => onChange(v === NONE ? null : v)} className="w-full sm:w-56" options={[
+        { value: NONE, label: "None" },
+        ...options.map((o) => ({ value: o.id, label: o.name })),
+      ]} />
     </div>
   );
 }
@@ -541,8 +535,7 @@ function HistoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle>Version history</DialogTitle></DialogHeader>
+      <DialogContent title="Version history" className="sm:max-w-lg">
         {loading ? (
           <div className="space-y-2 py-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}</div>
         ) : versions.length === 0 ? (

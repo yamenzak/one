@@ -28,16 +28,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { FONT_FAMILIES, DEFAULT_TOKENS } from "@scena/manifest";
 import { Sparkles, Palette, MonitorPlay, Mail, Sliders, RotateCcw, Wand2, ImagePlus, Trash2, Loader2, Type } from "lucide-react";
-import {
-  SectionDetail,
-  SettingsIndex,
-  SettingsPage as SectionFrame,
-  toast,
-  type SettingsEntry,
-} from "@4dl/ui";
+import { SectionDetail, Select, SettingsIndex, SettingsPage as SectionFrame, toast, type SettingsEntry } from "@4dl/ui";
 import { Badge, Button, Input, Label, Separator, Skeleton, Switch, Textarea } from "@4dl/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { useCan } from "../permissions.js";
@@ -266,12 +259,9 @@ export function SettingsPage() {
                       ) : opts.length === 0 ? (
                         <span className="w-72 text-right text-[11px] text-muted-foreground">No models enabled for this task.</span>
                       ) : (
-                        <Select value={defaults?.[t.id] ?? ""} onValueChange={(v) => pickDefault(t.id, v)}>
-                          <SelectTrigger className="w-72"><SelectValue placeholder="Choose a model" /></SelectTrigger>
-                          <SelectContent>
-                            {opts.map((m) => <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
+                        <Select value={defaults?.[t.id] ?? ""} onChange={(v) => pickDefault(t.id, v)} className="w-72" placeholder="Choose a model" options={[
+                          ...opts.map((m) => ({ value: m.id, label: m.label })),
+                        ]} />
                       )}
                     </div>
                   </div>
@@ -472,17 +462,11 @@ function BrandIdentity({ brand, canManage }: { brand: BrandKit; canManage: boole
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Heading font</Label>
-            <Select value={b.headingFont} onValueChange={(v) => update({ headingFont: v })} disabled={!canManage}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>{FONTS.map((f) => <SelectItem key={f} value={f} style={{ fontFamily: f }}>{f}</SelectItem>)}</SelectContent>
-            </Select>
+            <Select value={b.headingFont} onChange={(v) => update({ headingFont: v })} disabled={!canManage} className="w-full" options={[...FONTS.map((f) => ({ value: f, label: f }))]} />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Body font · drives all UI text</Label>
-            <Select value={b.bodyFont} onValueChange={(v) => update({ bodyFont: v })} disabled={!canManage}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>{FONTS.map((f) => <SelectItem key={f} value={f} style={{ fontFamily: f }}>{f}</SelectItem>)}</SelectContent>
-            </Select>
+            <Select value={b.bodyFont} onChange={(v) => update({ bodyFont: v })} disabled={!canManage} className="w-full" options={[...FONTS.map((f) => ({ value: f, label: f }))]} />
           </div>
         </div>
 
@@ -545,10 +529,9 @@ function BrandPalette({ brand }: { brand: BrandKit }) {
           <ColorField label="Accent" value={genAccent} onChange={setGenAccent} />
           <div className="flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Neutral tint</Label>
-            <Select value={genNeutral} onValueChange={setGenNeutral}>
-              <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-              <SelectContent>{NEUTRAL_TINTS.map((n) => <SelectItem key={n.id} value={n.id}>{n.label}</SelectItem>)}</SelectContent>
-            </Select>
+            <Select value={genNeutral} onChange={setGenNeutral} className="w-full" options={[
+              ...NEUTRAL_TINTS.map((n) => ({ value: n.id, label: n.label })),
+            ]} />
           </div>
           <div className="flex items-end">
             <Button className="w-full" onClick={generate}><Wand2 className="size-4" /> Generate</Button>

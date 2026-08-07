@@ -27,7 +27,6 @@ import {
   AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround, PanelRightClose, Plus, SlidersHorizontal, Sparkles, Lock,
 } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../components/ui/sheet.js";
 import { cn } from "@/lib/utils";
 import {
   getWidgetProfile, saveProfileWidgets, listBoards, listFeeds, listWeatherLocations, getBranding,
@@ -44,7 +43,7 @@ import { TransformBox, GroupBox, SELECT, SELECT_WASH, type Phase } from "../buil
 import { AiLayoutDialog } from "../builder/AiLayoutDialog.js";
 import { intersects, alignPatches, distributePatches, clampPos, type AlignKind } from "../builder/geometry.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
-import { Badge, Button, LoadError, Separator, Skeleton, toast, Tooltip } from "@4dl/ui";
+import { Badge, Button, LoadError, Separator, Sheet, Skeleton, toast, Tooltip } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 
 /** Accept both the flat WNode shape and the manifest rect-tuple shape. */
@@ -675,13 +674,11 @@ function Builder({ profileId }: { profileId: string }) {
           </Button>
         </div>
 
-        {/* Palette sheet (bottom) — labelled, touch-friendly grid. A definite
-            height + a native-overflow body is what actually scrolls (a flex-1
-            ScrollArea in an auto-height sheet has no bound to scroll within). */}
-        <Sheet open={paletteOpen} onOpenChange={setPaletteOpen}>
-          <SheetContent side="bottom" className="h-[75vh] gap-0 overflow-hidden rounded-t-2xl">
-            <SheetHeader className="pb-2"><SheetTitle>Add a widget</SheetTitle></SheetHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
+        {/* Palette sheet — `tall`, because a picker you scroll should open at
+            the ceiling rather than growing to fit and leaving the last row
+            below the fold. The shared Sheet owns the height and the scroll. */}
+        <Sheet open={paletteOpen} onClose={() => setPaletteOpen(false)} title="Add a widget" size="tall">
+            <div>
               {WIDGET_GROUPS.map((group) => (
                 <div key={group} className="mb-4">
                   <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group}</div>
@@ -701,15 +698,11 @@ function Builder({ profileId }: { profileId: string }) {
                 </div>
               ))}
             </div>
-          </SheetContent>
         </Sheet>
 
-        {/* Properties sheet (bottom) — same body as the desktop aside */}
-        <Sheet open={mobilePanelOpen} onOpenChange={setMobilePanelOpen}>
-          <SheetContent side="bottom" className="h-[85vh] gap-0 overflow-hidden rounded-t-2xl p-0">
-            <SheetHeader className="border-b px-4 py-3"><SheetTitle>Layers & properties</SheetTitle></SheetHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto">{panelBody}</div>
-          </SheetContent>
+        {/* Properties sheet — same body as the desktop aside */}
+        <Sheet open={mobilePanelOpen} onClose={() => setMobilePanelOpen(false)} title="Layers & properties" size="tall">
+          {panelBody}
         </Sheet>
         </LiveDataProvider>
 

@@ -3,12 +3,7 @@ import { Circle, Menu, PanelLeft, MoreVertical } from "lucide-react";
 
 import { ScenaIcon } from "../brand.js";
 import { cn } from "@/lib/utils";
-import { Button, ScrollArea, Tooltip } from "@4dl/ui";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import {
-  Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Breadcrumbs, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, NavDrawer, ScrollArea, Tooltip } from "@4dl/ui";
 import { useChrome, type Crumb, type PageAction, type PageActionItem } from "@/components/page-chrome";
 
 const COLLAPSE_KEY = "scena.sidebar.collapsed";
@@ -91,29 +86,15 @@ function SidebarBody({
   );
 }
 
+/**
+ * The trail, from `@4dl/ui`.
+ *
+ * "Home" is prepended here rather than in the shared component: what the root
+ * of a trail is called, and where it points, is a product decision — this app's
+ * root is the fleet.
+ */
 function ShellBreadcrumbs({ crumbs, onCrumb }: { crumbs: Crumb[]; onCrumb?: (to: string) => void }) {
-  const all: Crumb[] = [{ label: "Home", to: "/" }, ...crumbs];
-  return (
-    <Breadcrumb className="min-w-0">
-      <BreadcrumbList className="flex-nowrap">
-        {all.map((c, i) => {
-          const last = i === all.length - 1;
-          return (
-            <React.Fragment key={`${c.label}-${i}`}>
-              <BreadcrumbItem className="min-w-0">
-                {last || !c.to ? (
-                  <BreadcrumbPage className="truncate">{c.label}</BreadcrumbPage>
-                ) : (
-                  <BreadcrumbLink onClick={() => onCrumb?.(c.to!)} className="truncate">{c.label}</BreadcrumbLink>
-                )}
-              </BreadcrumbItem>
-              {!last && <BreadcrumbSeparator />}
-            </React.Fragment>
-          );
-        })}
-      </BreadcrumbList>
-    </Breadcrumb>
-  );
+  return <Breadcrumbs crumbs={[{ label: "Home", to: "/" }, ...crumbs]} onNavigate={(to) => onCrumb?.(to)} />;
 }
 
 /** Flatten actions into dropdown-menu rows. A `menu` action (has items) becomes
@@ -125,13 +106,13 @@ function actionMenuRows(actions: PageAction[]): React.ReactNode[] {
       if (i > 0) rows.push(<DropdownMenuSeparator key={`${a.key}-sep`} />);
       rows.push(<DropdownMenuLabel key={`${a.key}-lbl`}>{a.label}</DropdownMenuLabel>);
       a.items.forEach((it: PageActionItem) => rows.push(
-        <DropdownMenuItem key={it.key} disabled={it.disabled} onClick={it.onClick} className={it.variant === "destructive" ? "text-destructive" : undefined}>
+        <DropdownMenuItem key={it.key} disabled={it.disabled} onSelect={it.onClick} destructive={it.variant === "destructive"}>
           {it.icon}{it.label}
         </DropdownMenuItem>,
       ));
     } else {
       rows.push(
-        <DropdownMenuItem key={a.key} disabled={a.disabled} onClick={a.onClick} className={a.variant === "destructive" ? "text-destructive" : undefined}>
+        <DropdownMenuItem key={a.key} disabled={a.disabled} onSelect={a.onClick} destructive={a.variant === "destructive"}>
           {a.icon}{a.label}
         </DropdownMenuItem>,
       );
@@ -158,7 +139,7 @@ function ShellActions({ actions }: { actions: PageAction[] }) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
                 {a.items.map((it) => (
-                  <DropdownMenuItem key={it.key} disabled={it.disabled} onClick={it.onClick} className={it.variant === "destructive" ? "text-destructive" : undefined}>{it.icon}{it.label}</DropdownMenuItem>
+                  <DropdownMenuItem key={it.key} disabled={it.disabled} onSelect={it.onClick} destructive={it.variant === "destructive"}>{it.icon}{it.label}</DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -216,16 +197,15 @@ export function AppShell({ navGroups, active, onNavigate, fallbackCrumb, onCrumb
         {/* Main column: a thin top bar in the chrome + the inset content panel */}
         <div className="flex min-w-0 flex-1 flex-col gap-2 p-2 md:pl-0">
           <header className="flex h-10 shrink-0 items-center gap-1.5 px-1">
-            {/* Mobile: hamburger → sheet */}
-            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-              <Button variant="ghost" size="icon" className="size-8 md:hidden" aria-label="Open navigation" onClick={() => setMobileOpen(true)}>
-                <Menu className="size-5" />
-              </Button>
-              <SheetContent side="left" className="w-[260px] bg-sidebar p-0 text-sidebar-foreground">
-                <SheetHeader className="sr-only"><SheetTitle>Navigation</SheetTitle></SheetHeader>
-                <SidebarBody navGroups={navGroups} active={active} onNavigate={handleNavigate} footer={footer} collapsed={false} />
-              </SheetContent>
-            </Sheet>
+            {/* Mobile: hamburger → the off-canvas nav panel. The SAME
+                `SidebarBody` the desktop rail renders — one navigation drawn
+                twice, never two lists that drift apart. */}
+            <Button variant="ghost" size="icon" className="size-8 md:hidden" aria-label="Open navigation" onClick={() => setMobileOpen(true)}>
+              <Menu className="size-5" />
+            </Button>
+            <NavDrawer open={mobileOpen} onClose={() => setMobileOpen(false)}>
+              <SidebarBody navGroups={navGroups} active={active} onNavigate={handleNavigate} footer={footer} collapsed={false} />
+            </NavDrawer>
             {/* Desktop: collapse toggle */}
             <Button variant="ghost" size="icon" className="hidden size-8 text-muted-foreground md:inline-flex" onClick={toggleCollapsed} aria-label="Toggle sidebar">
               <PanelLeft className="size-4" />

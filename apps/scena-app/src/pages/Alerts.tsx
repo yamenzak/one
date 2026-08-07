@@ -21,9 +21,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Plus, X, Webhook, Mail, Monitor, Wifi, WifiOff, BellRing } from "lucide-react";
-import { Badge, Button, GlanceStrip, Group, Input, LoadError, Row, Section, SkeletonList, toast, useAction } from "@4dl/ui";
+import { Badge, Button, GlanceStrip, Group, Input, LoadError, Row, Section, Select, SkeletonList, toast, useAction } from "@4dl/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
@@ -203,13 +202,7 @@ function RuleForm({ onAdd }: { onAdd: () => Promise<void> }) {
       className="mt-4 space-y-2"
     >
       <div className="flex gap-2">
-        <Select value={channel} onValueChange={(v) => setChannel(v as "webhook" | "email")}>
-          <SelectTrigger size="sm" className="w-28"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="webhook">Webhook</SelectItem>
-            <SelectItem value="email">Email</SelectItem>
-          </SelectContent>
-        </Select>
+        <Select value={channel} onChange={(v) => setChannel(v as "webhook" | "email")} className="w-28" size="sm" options={[{ value: "webhook", label: "Webhook" }, { value: "email", label: "Email" }]} />
         <Input
           value={target}
           onChange={(e) => setTarget(e.target.value)}

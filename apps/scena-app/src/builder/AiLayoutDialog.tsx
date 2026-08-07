@@ -10,9 +10,7 @@
  */
 import { useEffect, useState } from "react";
 import { Sparkles, Send, Loader2, Wand2, PencilRuler } from "lucide-react";
-import { Button, Textarea } from "@4dl/ui";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.js";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
+import { Button, Dialog, DialogContent, Select, Textarea } from "@4dl/ui";
 import { cn } from "@/lib/utils";
 import { aiLayout, listAiModels, type AiModel } from "../api.js";
 import type { WNode } from "./types.js";
@@ -92,10 +90,7 @@ export function AiLayoutDialog({ open, nodes, designW, designH, onOpenChange, on
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!busy) onOpenChange(o); }}>
-      <DialogContent className="max-w-[min(560px,95vw)]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Sparkles className="size-4 text-primary" /> Design with AI</DialogTitle>
-        </DialogHeader>
+      <DialogContent title={<><Sparkles className="size-4 text-primary" /> Design with AI</>} className="max-w-[min(560px,95vw)]">
 
         {hasCanvas && (
           <div className="grid grid-cols-2 gap-2">
@@ -129,13 +124,10 @@ export function AiLayoutDialog({ open, nodes, designW, designH, onOpenChange, on
         {models.length > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-medium text-muted-foreground">Model</span>
-            <Select value={modelId || "__default"} onValueChange={(v) => setModelId(v === "__default" ? "" : v)}>
-              <SelectTrigger className="h-8 flex-1 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__default">Default model</SelectItem>
-                {models.map((m) => <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Select value={modelId || "__default"} onChange={(v) => setModelId(v === "__default" ? "" : v)} className="h-8 flex-1 text-xs" options={[
+              { value: "__default", label: "Default model" },
+              ...models.map((m) => ({ value: m.id, label: m.label })),
+            ]} />
           </div>
         )}
 

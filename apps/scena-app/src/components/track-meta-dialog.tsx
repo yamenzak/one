@@ -8,9 +8,8 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { ImageIcon, Music, Trash2, Loader2 } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog.js";
 import { TagEditor } from "./tag-editor.js";
-import { Button, Input, Label, toast } from "@4dl/ui";
+import { Button, Dialog, DialogContent, DialogFooter, Input, Label, toast } from "@4dl/ui";
 import { uploadAsset, assetUrl } from "../api.js";
 
 export interface TrackMeta {
@@ -80,8 +79,7 @@ export function TrackMetaDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+      <DialogContent title={title} className="sm:max-w-md">
         <div className="space-y-3.5">
           {/* Cover art */}
           <div className="flex items-center gap-3">

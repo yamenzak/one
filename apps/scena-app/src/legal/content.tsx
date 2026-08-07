@@ -10,7 +10,7 @@
  * object below (currently Four Degree Labs, Abu Dhabi, UAE).
  */
 import { useEffect, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.js";
+import { Dialog, DialogContent } from "@4dl/ui";
 
 /** Product + legal identifiers. Fill the bracketed fields for your entity. */
 export const LEGAL = {
@@ -196,14 +196,11 @@ export function LegalDialog({ doc, onClose }: { doc: LegalDoc | null; onClose: (
   );
   return (
     <Dialog open={!!doc} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="flex max-h-[85dvh] max-w-[min(760px,95vw)] flex-col overflow-hidden sm:max-w-[min(760px,95vw)]">
-        <DialogHeader>
-          <DialogTitle className="sr-only">Legal</DialogTitle>
-          <div className="flex gap-1.5">
+      <DialogContent title="Legal" className="flex max-h-[85dvh] max-w-[min(760px,95vw)] flex-col overflow-hidden sm:max-w-[min(760px,95vw)]">
+      <div className="flex gap-1.5">
             <Tab id="terms" label="Terms of Service" />
             <Tab id="privacy" label="Privacy Policy" />
           </div>
-        </DialogHeader>
         <div className="-mr-2 min-h-0 flex-1 overflow-y-auto pr-2">
           {active === "privacy" ? <PrivacyContent /> : <TermsContent />}
         </div>

@@ -25,9 +25,6 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Check, Loader2, MailWarning, MoreVertical, SlidersHorizontal, Copy, Trash2, UserPlus, UserRound, UserX } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "../components/ui/dialog.js";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "../components/ui/dropdown-menu.js";
 import {
   getTeam,
   getStaff,
@@ -46,7 +43,7 @@ import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
 import { cn } from "@/lib/utils";
-import { Badge, Button, Collection, Group, Input, Label, Row, Section, toast } from "@4dl/ui";
+import { Badge, Button, Collection, Dialog, DialogContent, DialogDescription, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Group, Input, Label, Row, Section, Select, toast } from "@4dl/ui";
 
 type Grant = Record<string, string[]>;
 const cloneGrant = (g: Grant): Grant => Object.fromEntries(Object.entries(g).map(([k, v]) => [k, [...v]]));
@@ -303,14 +300,14 @@ function MemberMenu({ m, roles, onRole, onEdit, onRevoke }: {
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Role</DropdownMenuLabel>
         {roles.map((r) => (
-          <DropdownMenuItem key={r} disabled={r === m.role} onClick={() => onRole(m, r)}>
+          <DropdownMenuItem key={r} disabled={r === m.role} onSelect={() => onRole(m, r)}>
             <span className="capitalize">{r}</span>
             {r === m.role && <Check className="ml-auto size-4" />}
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => onEdit(m)}><SlidersHorizontal className="size-4" /> Narrow access…</DropdownMenuItem>
-        <DropdownMenuItem className="text-destructive" onClick={() => onRevoke(m)}><Trash2 className="size-4" /> Remove</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => onEdit(m)}><SlidersHorizontal className="size-4" /> Narrow access…</DropdownMenuItem>
+        <DropdownMenuItem className="text-destructive" onSelect={() => onRevoke(m)}><Trash2 className="size-4" /> Remove</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -334,13 +331,10 @@ function EditAccessDialog({ member, onClose, onSaved }: { member: TenantMember |
   }
   return (
     <Dialog open={!!member} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Access for {member?.name}</DialogTitle>
-          <DialogDescription>
+      <DialogContent title={<>Access for {member?.name}</>}>
+      <DialogDescription>
             Check exactly what this person can do. Applying a role from the dropdown resets these to that preset.
           </DialogDescription>
-        </DialogHeader>
         <div className="mb-2"><PresetRow onPick={(r) => setGrant(cloneGrant(ROLE_PRESETS[r] ?? {}))} /></div>
         <PermissionGrid value={grant} onChange={setGrant} />
         {/*
@@ -400,17 +394,14 @@ function InviteDialog({ open, onClose, roles, onSent }: { open: boolean; onClose
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); reset(); } }}>
-      <DialogContent>
+      <DialogContent title={!sent ? "Invite someone" : sent.emailed ? "Invitation sent" : "Invitation created"}>
         {sent ? (
           <>
-            <DialogHeader>
-              <DialogTitle>{sent.emailed ? "Invitation sent" : "Invitation created"}</DialogTitle>
-              <DialogDescription>
+      <DialogDescription>
                 {sent.emailed
                   ? "They'll get an email with a link. It works once, and expires in seven days."
                   : "The email could not be delivered, so pass this link on yourself. It works once, and expires in seven days."}
               </DialogDescription>
-            </DialogHeader>
             {!sent.emailed && (
               <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
                 <MailWarning className="mt-0.5 size-4 shrink-0 text-warning" />
@@ -431,10 +422,7 @@ function InviteDialog({ open, onClose, roles, onSent }: { open: boolean; onClose
           </>
         ) : (
           <form onSubmit={submit}>
-            <DialogHeader>
-              <DialogTitle>Invite someone</DialogTitle>
-              <DialogDescription>They'll set themselves up and sign in with a one-time code — there's no password for you to choose.</DialogDescription>
-            </DialogHeader>
+      <DialogDescription>They'll set themselves up and sign in with a one-time code — there's no password for you to choose.</DialogDescription>
             <div className="space-y-3 py-3">
               <div>
                 <Label htmlFor="inv-email">Email</Label>
@@ -442,12 +430,9 @@ function InviteDialog({ open, onClose, roles, onSent }: { open: boolean; onClose
               </div>
               <div>
                 <Label htmlFor="inv-role">Role</Label>
-                <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-                  <SelectTrigger id="inv-role" className="mt-1.5"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {roles.map((r) => <SelectItem key={r} value={r}><span className="capitalize">{r}</span></SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Select value={role} onChange={(v) => setRole(v as Role)} className="mt-1.5" id="inv-role" options={[
+                  ...roles.map((r) => ({ value: r, label: <span className="capitalize">{r}</span> })),
+                ]} />
                 <p className="mt-1.5 text-xs text-muted-foreground">You can narrow what they can do once they've accepted.</p>
               </div>
               {err && <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</div>}

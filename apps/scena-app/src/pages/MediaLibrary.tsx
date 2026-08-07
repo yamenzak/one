@@ -7,8 +7,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Upload, Code2, Trash2, MoreVertical, Search, Pencil, Tag as TagIcon, ImageIcon, Check, Music, SlidersHorizontal } from "lucide-react";
 import { Card } from "../components/ui/card.js";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu.js";
 import { TagEditor } from "../components/tag-editor.js";
 import { ConfirmDialog } from "../components/confirm-dialog.js";
 import { useCan } from "../permissions.js";
@@ -16,7 +14,7 @@ import { HtmlEditorDialog, HtmlThumb } from "../components/html-editor.js";
 import { LicenseBadge, LicenseNote } from "../components/licensing.js";
 import { TrackMetaDialog, mmss } from "../components/track-meta-dialog.js";
 import { listMedia, uploadToLibrary, updateMedia, deleteMedia, assetUrl, type Media, type MediaKind } from "../api.js";
-import { Badge, Button, Collection, Filters, Input, Row, Skeleton, toast, type FacetSelection, useCollectionView } from "@4dl/ui";
+import { Badge, Button, Collection, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Filters, Input, Row, Skeleton, toast, type FacetSelection, useCollectionView } from "@4dl/ui";
 
 const KINDS = [
   { key: "", label: "All" },
@@ -133,11 +131,11 @@ export function MediaLibraryPage() {
         <Button variant="secondary" size="icon" className="size-7"><MoreVertical className="size-4" /></Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {canWrite && m.kind === "html" && <DropdownMenuItem onClick={() => setEditHtml(m)}><Code2 className="size-4" /> Edit HTML</DropdownMenuItem>}
-        {canWrite && m.kind === "audio" && <DropdownMenuItem onClick={() => setEditAudio(m)}><SlidersHorizontal className="size-4" /> Edit details</DropdownMenuItem>}
-        {canWrite && <DropdownMenuItem onClick={() => setRename(m)}><Pencil className="size-4" /> Rename</DropdownMenuItem>}
-        {canWrite && <DropdownMenuItem onClick={() => setTagsOf(m)}><TagIcon className="size-4" /> Tags…</DropdownMenuItem>}
-        {canDelete && <DropdownMenuItem className="text-destructive" onClick={() => setDel(m)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>}
+        {canWrite && m.kind === "html" && <DropdownMenuItem onSelect={() => setEditHtml(m)}><Code2 className="size-4" /> Edit HTML</DropdownMenuItem>}
+        {canWrite && m.kind === "audio" && <DropdownMenuItem onSelect={() => setEditAudio(m)}><SlidersHorizontal className="size-4" /> Edit details</DropdownMenuItem>}
+        {canWrite && <DropdownMenuItem onSelect={() => setRename(m)}><Pencil className="size-4" /> Rename</DropdownMenuItem>}
+        {canWrite && <DropdownMenuItem onSelect={() => setTagsOf(m)}><TagIcon className="size-4" /> Tags…</DropdownMenuItem>}
+        {canDelete && <DropdownMenuItem className="text-destructive" onSelect={() => setDel(m)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -258,8 +256,7 @@ function RenameMediaDialog({ media, onClose, onSaved }: { media: Media | null; o
   }
   return (
     <Dialog open={!!media} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Rename</DialogTitle></DialogHeader>
+      <DialogContent title="Rename">
         <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} maxLength={120} />
         <DialogFooter><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={save}>Save</Button></DialogFooter>
       </DialogContent>
@@ -277,8 +274,7 @@ function TagsMediaDialog({ media, onClose, onSaved }: { media: Media | null; onC
   }
   return (
     <Dialog open={!!media} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Tags · {media?.name}</DialogTitle></DialogHeader>
+      <DialogContent title={<>Tags · {media?.name}</>}>
         <TagEditor tags={tags} onChange={setTags} placeholder="Add a tag…" />
         <DialogFooter><Button variant="ghost" onClick={onClose}>Cancel</Button><Button onClick={save}>Save</Button></DialogFooter>
       </DialogContent>
@@ -334,8 +330,7 @@ export function MediaPicker({ open, onOpenChange, onPick, kinds, title = "Pick f
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
-        <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+      <DialogContent title={title} className="sm:max-w-3xl">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

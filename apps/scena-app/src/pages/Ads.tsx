@@ -10,10 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Play, Pause, Trash2, Megaphone, Clock, Sparkles, Bot, Upload, FolderOpen, Plus, MoreVertical, Pencil, Radio, Link2 } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card.js";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu.js";
 import { PageHeader } from "../components/page-header.js";
 import { StatusDot as SharedStatusDot } from "../components/status.js";
 import { usePageChrome } from "../components/page-chrome.js";
@@ -41,7 +38,7 @@ import {
 } from "../api.js";
 import { MediaPicker } from "./MediaLibrary.js";
 import { GEMINI_VOICES, AD_STYLE_PRESETS, DEFAULT_GEMINI_VOICE, DEFAULT_AD_STYLE, composeAdSpeech } from "../voices.js";
-import { Badge, Button, Input, Label, LoadError, Skeleton, Switch, Textarea, toast } from "@4dl/ui";
+import { Badge, Button, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Input, Label, LoadError, Select, Skeleton, Switch, Textarea, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 
 type Kind = "audio" | "video" | "command";
@@ -135,8 +132,8 @@ export function AdsPage() {
                           <Button variant="ghost" size="icon" className="size-8" aria-label="Profile actions"><MoreVertical className="size-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {canWrite && <DropdownMenuItem onClick={() => setRename(p)}><Pencil className="size-4" /> Rename</DropdownMenuItem>}
-                          {canDelete && <DropdownMenuItem className="text-destructive" onClick={() => remove(p)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>}
+                          {canWrite && <DropdownMenuItem onSelect={() => setRename(p)}><Pencil className="size-4" /> Rename</DropdownMenuItem>}
+                          {canDelete && <DropdownMenuItem className="text-destructive" onSelect={() => remove(p)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
@@ -167,8 +164,7 @@ function NewProfileDialog({ open, onOpenChange, onCreated }: { open: boolean; on
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>New ad profile</DialogTitle></DialogHeader>
+      <DialogContent title="New ad profile">
         <Input autoFocus placeholder="e.g. Lobby promos" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} />
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
@@ -192,8 +188,7 @@ function RenameProfileDialog({ profile, onClose, onSaved }: { profile: AdProfile
   }
   return (
     <Dialog open={!!profile} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Rename profile</DialogTitle></DialogHeader>
+      <DialogContent title="Rename profile">
         <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
@@ -461,21 +456,15 @@ function NewAd({ profileId, onCreated }: { profileId: string; onCreated: () => v
                 <div className="flex gap-2">
                   <div className="flex flex-1 flex-col gap-1.5">
                     <Label className="text-xs text-muted-foreground">Voice</Label>
-                    <Select value={voice} onValueChange={setVoice}>
-                      <SelectTrigger className="w-full" title={GEMINI_VOICES.find((v) => v.id === voice)?.vibe}><SelectValue placeholder="Voice" /></SelectTrigger>
-                      <SelectContent>
-                        {GEMINI_VOICES.map((v) => <SelectItem key={v.id} value={v.id} title={v.vibe}>{v.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Select value={voice} onChange={setVoice} className="w-full" title={GEMINI_VOICES.find((v) => v.id === voice)?.vibe} placeholder="Voice" options={[
+                      ...GEMINI_VOICES.map((v) => ({ value: v.id, label: v.label })),
+                    ]} />
                   </div>
                   <div className="flex flex-1 flex-col gap-1.5">
                     <Label className="text-xs text-muted-foreground">Style</Label>
-                    <Select value={style} onValueChange={setStyle}>
-                      <SelectTrigger className="w-full" title={AD_STYLE_PRESETS.find((s) => s.id === style)?.hint}><SelectValue placeholder="Style" /></SelectTrigger>
-                      <SelectContent>
-                        {AD_STYLE_PRESETS.map((s) => <SelectItem key={s.id} value={s.id} title={s.hint}>{s.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Select value={style} onChange={setStyle} className="w-full" title={AD_STYLE_PRESETS.find((s) => s.id === style)?.hint} placeholder="Style" options={[
+                      ...AD_STYLE_PRESETS.map((s) => ({ value: s.id, label: s.label })),
+                    ]} />
                   </div>
                 </div>
                 <div className="-mt-1 text-xs text-muted-foreground">{AD_STYLE_PRESETS.find((s) => s.id === style)?.hint} · {GEMINI_VOICES.find((v) => v.id === voice)?.vibe}</div>

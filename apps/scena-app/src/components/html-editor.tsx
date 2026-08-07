@@ -6,9 +6,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { Code2, Sparkles, Send, Eye } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog.js";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select.js";
-import { Button, Textarea, toast } from "@4dl/ui";
+import { Button, Dialog, DialogContent, DialogFooter, Select, Textarea, toast } from "@4dl/ui";
 import { slideDocument } from "@scena/manifest";
 import { aiGenerate, listAiModels, type AiModel } from "../api.js";
 
@@ -143,8 +141,7 @@ export function HtmlEditorDialog({ open, initialHtml, title, mode = "edit", surf
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[min(1100px,95vw)] sm:max-w-[min(1100px,95vw)]">
-        <DialogHeader><DialogTitle>{title ?? (surface === "widget" ? "Edit HTML widget" : "Edit HTML slide")}</DialogTitle></DialogHeader>
+      <DialogContent title={title ?? (surface === "widget" ? "Edit HTML widget" : "Edit HTML slide")} className="max-w-[min(1100px,95vw)] sm:max-w-[min(1100px,95vw)]">
 
         <div className="grid gap-4 md:grid-cols-2">
           {/* Left — code / AI chat (+ preview tab on mobile) */}
@@ -167,13 +164,10 @@ export function HtmlEditorDialog({ open, initialHtml, title, mode = "edit", surf
               <div className="flex flex-1 flex-col overflow-hidden">
                 {models.length > 0 && (
                   <div className="border-b p-2">
-                    <Select value={modelId || "__default"} onValueChange={(v) => setModelId(v === "__default" ? "" : v)}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__default">Default model</SelectItem>
-                        {models.map((m) => <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Select value={modelId || "__default"} onChange={(v) => setModelId(v === "__default" ? "" : v)} className="h-8 text-xs" options={[
+                      { value: "__default", label: "Default model" },
+                      ...models.map((m) => ({ value: m.id, label: m.label })),
+                    ]} />
                   </div>
                 )}
                 <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-3">

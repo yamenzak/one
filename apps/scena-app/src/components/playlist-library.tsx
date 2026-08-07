@@ -23,9 +23,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { MoreVertical, Pencil, Plus, Tag as TagIcon, Trash2, type LucideIcon } from "lucide-react";
-import { Button, Collection, Filters, Input, toast, type FacetSelection } from "@4dl/ui";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog.js";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "./ui/dropdown-menu.js";
+import { Button, Collection, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Filters, Input, toast, type FacetSelection } from "@4dl/ui";
 import { ConfirmDialog } from "./confirm-dialog.js";
 import { TagEditor } from "./tag-editor.js";
 
@@ -110,9 +108,9 @@ export function PlaylistLibrary<T extends PlaylistLike>({
         <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${p.name}`}><MoreVertical className="size-4" /></Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {perms.write && <DropdownMenuItem onClick={() => setRename(p)}><Pencil className="size-4" /> Rename</DropdownMenuItem>}
-        {perms.write && <DropdownMenuItem onClick={() => setTagsOf(p)}><TagIcon className="size-4" /> Tags…</DropdownMenuItem>}
-        {perms.delete && <DropdownMenuItem className="text-destructive" onClick={() => setDel(p)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>}
+        {perms.write && <DropdownMenuItem onSelect={() => setRename(p)}><Pencil className="size-4" /> Rename</DropdownMenuItem>}
+        {perms.write && <DropdownMenuItem onSelect={() => setTagsOf(p)}><TagIcon className="size-4" /> Tags…</DropdownMenuItem>}
+        {perms.delete && <DropdownMenuItem destructive onSelect={() => setDel(p)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>}
       </DropdownMenuContent>
     </DropdownMenu>
   ) : undefined;
@@ -218,8 +216,7 @@ function NameDialog({ open, onOpenChange, title, placeholder, confirmLabel, init
 
   return (
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>{title}</DialogTitle></DialogHeader>
+      <DialogContent title={title}>
         <Input
           autoFocus
           maxLength={80}
@@ -256,8 +253,7 @@ function TagsDialog<T extends PlaylistLike>({ playlist, onClose, onSave }: {
 
   return (
     <Dialog open={!!playlist} onOpenChange={(o) => !o && !busy && onClose()}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Tags · {playlist?.name}</DialogTitle></DialogHeader>
+      <DialogContent title={<>Tags · {playlist?.name}</>}>
         <TagEditor tags={tags} onChange={setTags} placeholder="Add a tag…" />
         <DialogFooter>
           <Button variant="ghost" disabled={busy} onClick={onClose}>Cancel</Button>

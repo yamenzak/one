@@ -17,8 +17,6 @@ import { ScenaMascot } from "../brand.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { Pill } from "../components/status.js";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.js";
 import { cn } from "@/lib/utils";
 import {
   listBoards, createBoard, getBoardAnnounce, setBoardAnnounce, previewBoardAnnounce,
@@ -29,7 +27,7 @@ import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { GEMINI_TTS_VOICES } from "@scena/protocol";
 import type { QueueState, RoomState, ScoreState } from "@scena/protocol";
-import { Button, Input, LoadError, SettingsIndex, SettingsPage as SectionFrame, SkeletonList, Switch, toast } from "@4dl/ui";
+import { Button, Dialog, DialogContent, Input, LoadError, Select, SettingsIndex, SettingsPage as SectionFrame, SkeletonList, Switch, toast } from "@4dl/ui";
 
 /** The three board kinds, treated equally in the picker + empty state. */
 const BOARD_TYPES: { kind: BoardKind; label: string; hint: string; icon: typeof Ticket }[] = [
@@ -357,10 +355,7 @@ function RoomStartDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[88dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        <DialogHeader className="border-b px-5 py-4">
-          <DialogTitle>New room board</DialogTitle>
-        </DialogHeader>
+      <DialogContent title="New room board" className="flex max-h-[88dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <div className="grid grid-cols-1 gap-3 px-5 py-4 sm:grid-cols-2">
           {ROOM_TEMPLATES.map((t) => (
             <button
@@ -677,22 +672,18 @@ function AnnouncePanel({ boardId }: { boardId: string }) {
           />
           <div className="text-[10px] text-muted-foreground">Write it in the chosen language. {"{ticket}"} and {"{counter}"} are read as natural whole numbers (e.g. “A forty-two”).</div>
           <div className="grid grid-cols-2 gap-2">
-            <Select value={c.languageCode} onValueChange={(v) => save({ languageCode: v })}>
-              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
-              <SelectContent>{a.languages.map((l) => <SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>)}</SelectContent>
-            </Select>
-            <Select value={c.voice} onValueChange={(v) => save({ voice: v })}>
-              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
-              <SelectContent>{voices.map((v) => <SelectItem key={v.id} value={v.id}>{v.label} · {v.gender === "female" ? "♀" : "♂"}</SelectItem>)}</SelectContent>
-            </Select>
-            <Select value={String(c.rate)} onValueChange={(v) => save({ rate: Number(v) })}>
-              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
-              <SelectContent>{RATE_OPTS.map((o) => <SelectItem key={o.v} value={String(o.v)}>{o.l}</SelectItem>)}</SelectContent>
-            </Select>
-            <Select value={String(c.repeat)} onValueChange={(v) => save({ repeat: Number(v) })}>
-              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
-              <SelectContent>{[1, 2, 3].map((n) => <SelectItem key={n} value={String(n)}>Say {n}×</SelectItem>)}</SelectContent>
-            </Select>
+            <Select value={c.languageCode} onChange={(v) => save({ languageCode: v })} size="sm" options={[
+              ...a.languages.map((l) => ({ value: l.code, label: l.label })),
+            ]} />
+            <Select value={c.voice} onChange={(v) => save({ voice: v })} size="sm" options={[
+              ...voices.map((v) => ({ value: v.id, label: <>{v.label} · {v.gender === "female" ? "♀" : "♂"}</> })),
+            ]} />
+            <Select value={String(c.rate)} onChange={(v) => save({ rate: Number(v) })} size="sm" options={[
+              ...RATE_OPTS.map((o) => ({ value: String(o.v), label: o.l })),
+            ]} />
+            <Select value={String(c.repeat)} onChange={(v) => save({ repeat: Number(v) })} size="sm" options={[
+              ...[1, 2, 3].map((n) => ({ value: String(n), label: <>Say {n}×</> })),
+            ]} />
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={preview} disabled={previewing}>{previewing ? "Generating…" : "▶ Preview"}</Button>
@@ -828,10 +819,9 @@ function RoomManager({ boardId, state, onSaved }: { boardId: string; state: Room
         {rooms.map((r, i) => (
           <div key={r.id} className="flex items-center gap-2">
             <Input value={r.name} onChange={(e) => editRoom(i, { name: e.target.value })} placeholder={`Room ${i + 1}`} className="h-8 flex-1" />
-            <Select value={r.status} onValueChange={(v) => editRoom(i, { status: v })}>
-              <SelectTrigger size="sm" className="w-32"><SelectValue /></SelectTrigger>
-              <SelectContent>{statuses.map((s) => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
-            </Select>
+            <Select value={r.status} onChange={(v) => editRoom(i, { status: v })} className="w-32" size="sm" options={[
+              ...statuses.map((s) => ({ value: s.id, label: s.label })),
+            ]} />
             <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" disabled={rooms.length <= 1} title={rooms.length <= 1 ? "Keep at least one room" : "Remove room"} onClick={() => removeRoom(i)}><Trash2 className="size-3.5" /></Button>
           </div>
         ))}

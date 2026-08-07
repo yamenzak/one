@@ -14,9 +14,6 @@ import { useFeature } from "../entitlements.js";
 import { LockedFeatureCard } from "../components/feature-gate.js";
 import { PageHeader } from "../components/page-header.js";
 import { DevicePreview } from "../components/device-preview.js";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "../components/ui/select.js";
 import { cn } from "@/lib/utils";
 import {
   getScreen, sendCommand, listChannels, setDeviceDimensions, setDeviceActiveChannel,
@@ -30,7 +27,7 @@ import { TagEditor } from "../components/tag-editor.js";
 import { useCan } from "../permissions.js";
 import { StatusDot, dimsOf } from "./Screens.js";
 import { Pill } from "../components/status.js";
-import { Badge, Button, Group, Input, Label, LoadError, Row, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger, toast } from "@4dl/ui";
+import { Badge, Button, Group, Select, Input, Label, LoadError, Row, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 
 const NONE = "__none__";
@@ -503,13 +500,10 @@ function ChannelSection({ screen, channels, writable }: { screen: Screen; channe
 
       <div className="max-w-sm space-y-1.5">
         <label className="text-xs text-muted-foreground">Active channel</label>
-        <Select value={active} disabled={!writable} onValueChange={chooseActive}>
-          <SelectTrigger className="w-full"><SelectValue placeholder="Select a channel" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={NONE}>No channel</SelectItem>
-            {channels.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <Select value={active} disabled={!writable} onChange={chooseActive} className="w-full" placeholder="Select a channel" options={[
+          { value: NONE, label: "No channel" },
+          ...channels.map((c) => ({ value: c.id, label: c.name })),
+        ]} />
       </div>
 
       <div className="space-y-2">
@@ -765,10 +759,9 @@ function AddRuleForm({ track, channels, onAdd }: {
         {track.kind === "channel" && (
           <div className="flex min-w-[140px] flex-1 flex-col gap-1">
             <Label className="text-[11px] text-muted-foreground">Channel</Label>
-            <Select value={channelId} onValueChange={setChannelId}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Channel" /></SelectTrigger>
-              <SelectContent>{channels.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-            </Select>
+            <Select value={channelId} onChange={setChannelId} className="h-8 text-xs" placeholder="Channel" options={[
+              ...channels.map((c) => ({ value: c.id, label: c.name })),
+            ]} />
           </div>
         )}
         {track.kind === "channel" && (

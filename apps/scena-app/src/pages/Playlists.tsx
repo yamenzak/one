@@ -8,9 +8,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, ImageIcon, Video, Code2, Trash2, Clock, Layers, Tag as TagIcon, Pencil, GripVertical, Settings2, Images, FileImage, Sparkles } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card.js";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu.js";
 import { PageHeader } from "../components/page-header.js";
 import { TagEditor } from "../components/tag-editor.js";
 import { usePageChrome } from "../components/page-chrome.js";
@@ -26,7 +23,7 @@ import {
 import { MediaPicker } from "./MediaLibrary.js";
 import { HtmlEditorDialog, HtmlThumb } from "../components/html-editor.js";
 import { LicenseNote } from "../components/licensing.js";
-import { Badge, Button, Input, Label, LoadError, Row, Separator, Skeleton, Switch, Textarea, toast } from "@4dl/ui";
+import { Badge, Button, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Input, Label, LoadError, Row, Select, Separator, Skeleton, Switch, Textarea, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import { PlaylistLibrary } from "../components/playlist-library.js";
 
@@ -463,8 +460,7 @@ function DeletePlaylistDialog({ open, onOpenChange, name, onConfirm }: {
   useEffect(() => { if (open) { setAlsoMedia(false); setBusy(false); } }, [open]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Delete “{name}”?</DialogTitle></DialogHeader>
+      <DialogContent title={<>Delete “{name}”?</>}>
         <p className="text-sm text-muted-foreground">This removes the playlist and its slides. Any channel using it loses these slides. This can't be undone.</p>
         <label className="flex items-center justify-between gap-3 rounded-lg border p-3">
           <span className="min-w-0">
@@ -588,8 +584,7 @@ function SlideSettingsDialog({ slide, defaultDur, onClose, onSave }: {
 
   return (
     <Dialog open={!!slide} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Slide settings</DialogTitle></DialogHeader>
+      <DialogContent title="Slide settings">
         <div className="space-y-5">
           {type === "video" && (
             <div className="space-y-2">
@@ -702,28 +697,23 @@ function AiImageDialog({ open, onOpenChange, onAdd }: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader><DialogTitle>Generate an image with AI</DialogTitle></DialogHeader>
+      <DialogContent title="Generate an image with AI" className="sm:max-w-lg">
         <div className="space-y-3">
           <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g. A calm abstract background with soft gradient waves" className="min-h-24" />
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Aspect</Label>
-              <Select value={aspect} onValueChange={(v) => setAspect(v as Aspect)}>
-                <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                <SelectContent>{(Object.keys(IMG_ASPECTS) as Aspect[]).map((k) => <SelectItem key={k} value={k}>{IMG_ASPECTS[k].label}</SelectItem>)}</SelectContent>
-              </Select>
+              <Select value={aspect} onChange={(v) => setAspect(v as Aspect)} className="w-full" options={[
+                ...(Object.keys(IMG_ASPECTS) as Aspect[]).map((k) => ({ value: k, label: IMG_ASPECTS[k].label })),
+              ]} />
             </div>
             {models.length > 0 && (
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Model</Label>
-                <Select value={modelId || "__default"} onValueChange={(v) => setModelId(v === "__default" ? "" : v)}>
-                  <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__default">Default model</SelectItem>
-                    {models.map((m) => <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Select value={modelId || "__default"} onChange={(v) => setModelId(v === "__default" ? "" : v)} className="w-full" options={[
+                  { value: "__default", label: "Default model" },
+                  ...models.map((m) => ({ value: m.id, label: m.label })),
+                ]} />
               </div>
             )}
           </div>

@@ -11,16 +11,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, RefreshCw, X, ExternalLink, Rss, Trash2, Inbox, Globe, Sheet, Table2, MoreVertical, CloudSun } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card.js";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../components/ui/dialog.js";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { cn } from "@/lib/utils";
-import { Badge, Button, Input, Label, LoadError, Skeleton, toast } from "@4dl/ui";
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Input, Label, LoadError, Select, Skeleton, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   listFeeds, getFeed, createSource, updateSource, previewSource, addFeedItem, deleteFeedItem, refreshFeed, deleteFeed,
@@ -200,7 +197,7 @@ export function FeedsPage() {
                           <Button variant="ghost" size="icon" className="size-8" aria-label="Source actions"><MoreVertical className="size-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="text-destructive" onClick={() => removeSource(f)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onSelect={() => removeSource(f)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -226,8 +223,8 @@ export function FeedsPage() {
                         <Button variant="ghost" size="icon" className="size-8" aria-label="Location actions"><MoreVertical className="size-4" /></Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditLoc(l)}><CloudSun className="size-4" /> Edit</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onClick={() => removeWeather(l)}><Trash2 className="size-4" /> Remove</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setEditLoc(l)}><CloudSun className="size-4" /> Edit</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onSelect={() => removeWeather(l)}><Trash2 className="size-4" /> Remove</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -508,13 +505,12 @@ function SourceConfigFields({ provider, cfg, setCfg }: { provider: SourceProvide
 function FrequencySelect({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const known = FREQUENCIES.some((f) => f.sec === value);
   return (
-    <Select value={known ? String(value) : "custom"} onValueChange={(v) => { if (v !== "custom") onChange(Number(v)); }}>
-      <SelectTrigger className="h-9 w-44 text-sm"><SelectValue /></SelectTrigger>
-      <SelectContent>
-        {FREQUENCIES.map((f) => <SelectItem key={f.sec} value={String(f.sec)} className="text-sm">{f.label}</SelectItem>)}
-        {!known && <SelectItem value="custom" className="text-sm">Custom ({value}s)</SelectItem>}
-      </SelectContent>
-    </Select>
+    <Select value={known ? String(value) : "custom"} onChange={(v) => { if (v !== "custom") onChange(Number(v)); }} className="h-9 w-44 text-sm" options={[
+      ...FREQUENCIES.map((f) => ({ value: String(f.sec), label: f.label })),
+      // A CONDITIONAL entry, not a mapped one: spreading `cond && obj`
+      // spreads `false` when the condition is off, which is not an array.
+      ...(known ? [] : [{ value: "custom", label: `Custom (${value}s)` }]),
+    ]} />
   );
 }
 
@@ -525,12 +521,9 @@ interface WeatherWindow { openHour: number; closeHour: number; tz: string; units
 /** An hour-of-day picker (00:00 … 24:00). */
 function HourSelect({ value, onChange }: { value: number; onChange: (h: number) => void }) {
   return (
-    <Select value={String(value)} onValueChange={(v) => onChange(Number(v))}>
-      <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-      <SelectContent>
-        {Array.from({ length: 25 }, (_, h) => <SelectItem key={h} value={String(h)} className="text-sm">{String(h).padStart(2, "0")}:00</SelectItem>)}
-      </SelectContent>
-    </Select>
+    <Select value={String(value)} onChange={(v) => onChange(Number(v))} className="h-9 text-sm" options={[
+      ...Array.from({ length: 25 }, (_, h) => ({ value: String(h), label: <>{String(h).padStart(2, "0")}:00</> })),
+    ]} />
   );
 }
 
@@ -552,13 +545,7 @@ function WeatherWindowFields({ w, setW, perCall }: { w: WeatherWindow; setW: (u:
         </div>
         <div className="space-y-1.5">
           <Label>Units</Label>
-          <Select value={w.units} onValueChange={(v) => setW({ units: v })}>
-            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="metric" className="text-sm">Metric (°C)</SelectItem>
-              <SelectItem value="imperial" className="text-sm">Imperial (°F)</SelectItem>
-            </SelectContent>
-          </Select>
+          <Select value={w.units} onChange={(v) => setW({ units: v })} className="h-9 text-sm" options={[{ value: "metric", label: "Metric (°C)" }, { value: "imperial", label: "Imperial (°F)" }]} />
         </div>
       </div>
       <p className="rounded-lg border border-dashed px-3 py-2 text-[11px] text-muted-foreground">
@@ -633,12 +620,9 @@ function NewSourceDialog({ open, onClose, onCreate, onCreateWeather, weatherPerC
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent title="New source" className="sm:max-w-lg">
         <form onSubmit={submit}>
-          <DialogHeader>
-            <DialogTitle>New source</DialogTitle>
-            <DialogDescription>Connect live data for your ticker, metric, menu, weather, and text widgets.</DialogDescription>
-          </DialogHeader>
+      <DialogDescription>Connect live data for your ticker, metric, menu, weather, and text widgets.</DialogDescription>
           <div className="max-h-[65vh] space-y-4 overflow-y-auto py-3 pr-1">
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(PROVIDERS) as NewProvider[]).map((p) => {
@@ -745,11 +729,8 @@ function WeatherEditDialog({ loc, perCall, onClose, onSaved }: {
 
   return (
     <Dialog open={!!loc} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Weather location</DialogTitle>
-          <DialogDescription>Set the opening hours so this location is only fetched — and billed — while you're open.</DialogDescription>
-        </DialogHeader>
+      <DialogContent title="Weather location" className="sm:max-w-lg">
+      <DialogDescription>Set the opening hours so this location is only fetched — and billed — while you're open.</DialogDescription>
         <div className="space-y-4 py-3">
           <div className="space-y-1.5"><Label>Label</Label><Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Location name" /></div>
           <WeatherWindowFields w={w} setW={setW} perCall={perCall} />

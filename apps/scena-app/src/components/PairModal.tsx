@@ -1,8 +1,7 @@
 import { useRef, useState } from "react";
 import { MonitorSmartphone, Sparkles } from "lucide-react";
 import { ScenaMascot } from "../brand.js";
-import { Dialog, DialogContent } from "./ui/dialog.js";
-import { Button, Input, Switch } from "@4dl/ui";
+import { Button, Dialog, DialogContent, Input, Switch } from "@4dl/ui";
 import { cn } from "@/lib/utils";
 import { claimScreen, type ClaimResult } from "../api.js";
 
@@ -89,7 +88,7 @@ export function PairModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && close()}>
-      <DialogContent className="overflow-hidden p-0 sm:max-w-3xl" showCloseButton>
+      <DialogContent className="overflow-hidden p-0 sm:max-w-3xl" dismissible>
         {paired ? (
           <div className="flex flex-col items-center justify-center gap-2 px-8 py-14 text-center">
             <ScenaMascot mood="happy" size={132} />

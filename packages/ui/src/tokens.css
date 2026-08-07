@@ -310,6 +310,47 @@ body {
     transform: translateY(4px) scale(0.995);
   }
 }
+/**
+ * The off-canvas navigation panel (`NavDrawer`), in and out.
+ *
+ * A SLIDE, not a settle. §8's "everything settles down" is about surfaces that
+ * arrive on top of the page — a dialog, a menu, a sheet. This one arrives from
+ * the EDGE it belongs to, and it is standing in for a sidebar that lives there
+ * permanently: fading or scaling it would deny where it came from. The exit is
+ * decisive and slightly faster, same rule as `content-out`.
+ */
+@keyframes nav-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes nav-out-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+@keyframes nav-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes nav-out-right {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
 @keyframes menu-in {
   from {
     opacity: 0;

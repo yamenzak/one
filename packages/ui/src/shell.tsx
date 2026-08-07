@@ -12,6 +12,7 @@ import { cn } from "./lib/utils.js";
 import { toneVar, type Tone } from "./primitives.js";
 import { ChevronRight, ThumbsDown, ThumbsUp, type LucideIcon } from "./lib/icons.js";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 
 export interface TabDef {
   key: string;
@@ -404,5 +405,54 @@ export function Breadcrumbs({ crumbs, onNavigate, className }: {
         })}
       </ol>
     </nav>
+  );
+}
+
+/**
+ * The off-canvas navigation panel — a rail's mobile form.
+ *
+ * A dashboard app with a sidebar needs one, and the sidebar is not a thing you
+ * can shrink to a phone: it is a list of destinations, and at 375px a list of
+ * destinations is the whole screen or it is nothing. So it slides in over the
+ * content, from the edge the sidebar lives on, and dismisses on any choice.
+ *
+ * ⚠️ Not `Sheet`. That is a bottom drawer with a drag handle, built for a form
+ * or a picker you pull up and push back down. Navigation comes from the SIDE,
+ * because that is where the thing it replaces is, and because a nav panel is
+ * full-height by nature — a bottom sheet that covers 86% of the screen and
+ * cannot cover the rest is a worse version of the same panel.
+ *
+ * The children are the same sidebar body the desktop renders. That is the
+ * point: one navigation, drawn twice, never two lists that drift.
+ */
+export function NavDrawer({ open, onClose, side = "left", label = "Navigation", children }: {
+  open: boolean;
+  onClose: () => void;
+  side?: "left" | "right";
+  /** The panel's accessible name. It has no visible heading by design. */
+  label?: string;
+  children: ReactNode;
+}) {
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay /* design-tokens-exempt: a modal scrim is black in both modes — it darkens what is behind it, so it cannot be a surface token. Same value as `overlayCls`. */
+          className="fixed inset-0 z-50 bg-black/55 backdrop-blur-[2px] data-[state=open]:animate-[overlay-in_var(--dur-fast)_var(--ease-out)] data-[state=closed]:animate-[overlay-out_var(--dur-fast)_var(--ease-out)]" />
+        <DialogPrimitive.Content
+          className={cn(
+            "fixed inset-y-0 z-50 flex w-[17rem] max-w-[85vw] flex-col border-border/60 bg-sidebar text-sidebar-foreground outline-none",
+            side === "left"
+              ? "left-0 border-r data-[state=open]:animate-[nav-in-left_var(--dur-base)_var(--ease-out)] data-[state=closed]:animate-[nav-out-left_var(--dur-fast)_var(--ease-out)]"
+              : "right-0 border-l data-[state=open]:animate-[nav-in-right_var(--dur-base)_var(--ease-out)] data-[state=closed]:animate-[nav-out-right_var(--dur-fast)_var(--ease-out)]",
+          )}
+        >
+          {/* No visible heading: the panel IS the navigation, and a "Navigation"
+              title above a list of destinations is a label for a label. Radix
+              still requires an accessible name. */}
+          <DialogPrimitive.Title className="sr-only">{label}</DialogPrimitive.Title>
+          {children}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

@@ -6,9 +6,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Loader2, Check } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog.js";
 import { listMedia, uploadToLibrary, API_BASE, type Media } from "../api.js";
-import { Button, LoadError } from "@4dl/ui";
+import { Button, Dialog, DialogContent, LoadError } from "@4dl/ui";
 
 /** Absolute URL for an asset path (library rows store "/api/assets/<hash>"). */
 export function assetSrc(url: string | null | undefined): string {
@@ -65,15 +64,10 @@ export function MediaPicker({ open, kind = "image", title, onPick, onOpenChange 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85dvh] max-w-[min(720px,95vw)] flex-col overflow-hidden sm:max-w-[min(720px,95vw)]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between gap-2">
-            <span>{title ?? "Choose from library"}</span>
+      <DialogContent title={<><span>{title ?? "Choose from library"}</span>
             <Button size="sm" variant="outline" className="mr-6" disabled={uploading} onClick={() => fileRef.current?.click()}>
               {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />} Upload
-            </Button>
-          </DialogTitle>
-        </DialogHeader>
+            </Button></>} className="flex max-h-[85dvh] max-w-[min(720px,95vw)] flex-col overflow-hidden sm:max-w-[min(720px,95vw)]">
         <input ref={fileRef} type="file" accept={kind === "image" ? "image/*" : kind === "video" ? "video/*" : "audio/*"} className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) void onUpload(f); e.target.value = ""; }} />
         <div className="min-h-0 flex-1 overflow-y-auto">

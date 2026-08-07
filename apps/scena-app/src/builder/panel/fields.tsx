@@ -7,8 +7,7 @@
 import * as React from "react";
 import { ChevronDown, Link2, Unlink2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Input, Switch } from "@4dl/ui";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select.js";
+import { Input, Select, Switch } from "@4dl/ui";
 
 /** A labelled row: caption on the left, control on the right. */
 export function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
@@ -91,10 +90,9 @@ export function SliderField({ value, onChange, min, max, step = 1 }: { value: nu
 
 export function SelectField<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { id: T; label: string }[] }) {
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as T)}>
-      <SelectTrigger className="h-8 w-full text-xs"><SelectValue /></SelectTrigger>
-      <SelectContent>{options.map((o) => <SelectItem key={o.id} value={o.id} className="text-xs">{o.label}</SelectItem>)}</SelectContent>
-    </Select>
+    <Select value={value} onChange={(v) => onChange(v as T)} className="h-8 w-full text-xs" options={[
+      ...options.map((o) => ({ value: o.id, label: o.label })),
+    ]} />
   );
 }
 

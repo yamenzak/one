@@ -1,5 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog.js";
-import { Button } from "@4dl/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter } from "@4dl/ui";
 
 /** A small confirm/cancel dialog for destructive or irreversible actions. */
 export function ConfirmDialog({
@@ -23,11 +22,8 @@ export function ConfirmDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          {description && <DialogDescription>{description}</DialogDescription>}
-        </DialogHeader>
+      <DialogContent title={title} className="sm:max-w-md">
+      {description && <DialogDescription>{description}</DialogDescription>}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
             Cancel

@@ -10,8 +10,7 @@
 
 import { useState } from "react";
 import { Info } from "lucide-react";
-import { Dialog, DialogContent } from "./ui/dialog.js";
-import { Button, Input, Label, Textarea } from "@4dl/ui";
+import { Button, Dialog, DialogContent, Input, Label, Textarea } from "@4dl/ui";
 import { cn } from "@/lib/utils";
 import { broadcastEmergency, type ActiveEmergency, type OverrideTone } from "../api.js";
 import { TONE_UI, TONE_ORDER, OVERRIDE_PRESETS, type OverridePreset } from "../overrides.js";
@@ -70,7 +69,7 @@ export function EmergencyModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && close()}>
-      <DialogContent className="overflow-hidden p-0 sm:max-w-xl" showCloseButton={false}>
+      <DialogContent className="overflow-hidden p-0 sm:max-w-xl" dismissible={false}>
         {/* Tone-colored header */}
         <div className={cn("flex items-center gap-3.5 px-6 py-5 text-white transition-colors", ui.header)}>
           <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/20">
