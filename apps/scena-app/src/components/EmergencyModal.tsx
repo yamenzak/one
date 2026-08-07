@@ -10,8 +10,7 @@
 
 import { useState } from "react";
 import { Info } from "lucide-react";
-import { Button, Dialog, DialogContent, Input, Label, Textarea } from "@4dl/ui";
-import { cn } from "@/lib/utils";
+import { Button, cn, Dialog, DialogContent, Input, Label, Textarea } from "@4dl/ui";
 import { broadcastEmergency, type ActiveEmergency, type OverrideTone } from "../api.js";
 import { TONE_UI, TONE_ORDER, OVERRIDE_PRESETS, type OverridePreset } from "../overrides.js";
 
@@ -91,11 +90,15 @@ export function EmergencyModal({
           {/* Presets */}
           <Label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Emergency</Label>
           <div className="mb-4 flex flex-wrap gap-1.5">
-            {emergency.map((p) => <PresetChip key={p.id} preset={p} active={title === p.title} onClick={() => pickPreset(p)} />)}
+            {emergency.map((p) => (
+              <PresetChip key={p.id} preset={p} active={title === p.title} onClick={() => pickPreset(p)} />
+            ))}
           </div>
           <Label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Notices</Label>
           <div className="mb-5 flex flex-wrap gap-1.5">
-            {notices.map((p) => <PresetChip key={p.id} preset={p} active={title === p.title} onClick={() => pickPreset(p)} />)}
+            {notices.map((p) => (
+              <PresetChip key={p.id} preset={p} active={title === p.title} onClick={() => pickPreset(p)} />
+            ))}
           </div>
 
           {/* Message */}
@@ -141,7 +144,9 @@ export function EmergencyModal({
           {error && <div className="mb-3.5 text-sm text-destructive">{error}</div>}
 
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={close}>Cancel</Button>
+            <Button variant="ghost" onClick={close}>
+              Cancel
+            </Button>
             {!confirming ? (
               <Button variant={ui.urgent ? "destructive" : "default"} disabled={!title.trim()} onClick={() => setConfirming(true)}>
                 <HeaderIcon className="size-4" /> Broadcast now

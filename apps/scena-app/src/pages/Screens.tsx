@@ -7,16 +7,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, BellRing, ChevronRight, MonitorSpeaker, RectangleHorizontal, RectangleVertical, Sparkles, Wifi, WifiOff } from "lucide-react";
-import { Card } from "../components/ui/card.js";
 import { PageHeader } from "../components/page-header.js";
 import { DevicePreview } from "../components/device-preview.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { StatusDot as SharedStatusDot } from "../components/status.js";
 import { useCan } from "../permissions.js";
-import { cn } from "@/lib/utils";
 import { listScreens, createDisplay, listAlerts, type Screen } from "../api.js";
 import { GetStarted } from "../components/get-started.js";
-import { Badge, Collection, Filters, GlanceStrip, Row, toast, type FacetSelection, useCollectionView } from "@4dl/ui";
+import { Badge, Card, cn, Collection, Filters, GlanceStrip, Row, toast, type FacetSelection, useCollectionView } from "@4dl/ui";
 
 /** Compact "last seen" label for offline devices. */
 function lastSeenLabel(ts?: number | null): string | null {
@@ -65,7 +63,9 @@ export function ScreensPage({ onPair }: { onPair: () => void }) {
     {
       crumbs: [{ label: "Screens" }],
       actions: [
-        ...(canCreate ? [{ key: "new-display", label: "New display", icon: <Sparkles className="size-4" />, overflow: "always" as const, onClick: () => void newDisplay() }] : []),
+        ...(canCreate
+          ? [{ key: "new-display", label: "New display", icon: <Sparkles className="size-4" />, overflow: "always" as const, onClick: () => void newDisplay() }]
+          : []),
         ...(canPair ? [{ key: "pair", label: "Pair screen", icon: <Plus className="size-4" />, onClick: onPair }] : []),
       ],
     },
@@ -80,15 +80,26 @@ export function ScreensPage({ onPair }: { onPair: () => void }) {
     either refreshes it or leaves it alone.
   */
   const load = useCallback(
-    () => listScreens().then((s) => { setScreens(s); setError(null); }).catch((e) => setError(e instanceof Error ? e.message : String(e))),
+    () =>
+      listScreens()
+        .then((s) => {
+          setScreens(s);
+          setError(null);
+        })
+        .catch((e) => setError(e instanceof Error ? e.message : String(e))),
     [],
   );
   useEffect(() => {
     let alive = true;
-    const tick = () => { if (alive) void load(); };
+    const tick = () => {
+      if (alive) void load();
+    };
     tick();
     const t = setInterval(tick, 5000); // live-ish fleet view (§23)
-    return () => { alive = false; clearInterval(t); };
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
   }, [load]);
 
   const online = screens?.filter((s) => s.live?.online).length ?? 0;
@@ -103,7 +114,9 @@ export function ScreensPage({ onPair }: { onPair: () => void }) {
     listAlerts()
       .then((a) => alive && setOpenAlerts(a.filter((x) => x.type !== "recovery" && x.resolved_at === null).length))
       .catch(() => alive && setOpenAlerts(null));
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, []);
 
   /*
@@ -112,10 +125,20 @@ export function ScreensPage({ onPair }: { onPair: () => void }) {
     to read every card — on a wall of forty screens, which is the size at which
     somebody installs digital signage.
   */
-  const facetGroups = useMemo(() => [
-    { key: "status", label: "Status", options: [{ value: "online", label: "Online" }, { value: "offline", label: "Offline" }] },
-    { key: "tag", label: "Tag", options: allTags.map((t) => ({ value: t, label: t })) },
-  ], [allTags]);
+  const facetGroups = useMemo(
+    () => [
+      {
+        key: "status",
+        label: "Status",
+        options: [
+          { value: "online", label: "Online" },
+          { value: "offline", label: "Offline" },
+        ],
+      },
+      { key: "tag", label: "Tag", options: allTags.map((t) => ({ value: t, label: t })) },
+    ],
+    [allTags],
+  );
 
   const shown = useMemo(() => {
     if (!screens) return null;
@@ -207,10 +230,7 @@ function DeviceCard({ screen, onClick }: { screen: Screen; onClick: () => void }
   const seen = lastSeenLabel(screen.live?.lastSeen);
   const channel = screen.channel_name;
   return (
-    <Card
-      onClick={onClick}
-      className="group relative cursor-pointer overflow-hidden p-0 transition-all hover:bg-surface-2 active:scale-[0.99]"
-    >
+    <Card onClick={onClick} className="group relative cursor-pointer overflow-hidden p-0 transition-all hover:bg-surface-2 active:scale-[0.99]">
       <div className="relative">
         {/* Live, clock-computed view of what this device is showing right now. */}
         <DevicePreview channelId={screen.channel_id} online={online} className="rounded-none ring-0" />
@@ -230,11 +250,7 @@ function DeviceCard({ screen, onClick }: { screen: Screen; onClick: () => void }
           <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-foreground" />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {channel ? (
-            <Badge className="font-normal">{channel}</Badge>
-          ) : (
-            <Badge className="font-normal text-muted-foreground">Unassigned</Badge>
-          )}
+          {channel ? <Badge className="font-normal">{channel}</Badge> : <Badge className="font-normal text-muted-foreground">Unassigned</Badge>}
           <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
             {portrait ? <RectangleVertical className="size-3" /> : <RectangleHorizontal className="size-3" />}
             {resolutionLabel(screen)}
@@ -244,7 +260,9 @@ function DeviceCard({ screen, onClick }: { screen: Screen; onClick: () => void }
         {(screen.tags?.length ?? 0) > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-1">
             {screen.tags!.slice(0, 5).map((t) => (
-              <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">{t}</span>
+              <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">
+                {t}
+              </span>
             ))}
           </div>
         )}

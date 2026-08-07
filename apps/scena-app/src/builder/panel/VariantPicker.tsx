@@ -4,9 +4,9 @@
  * thumbnails use the same `WidgetContent` renderer the canvas + player use, with
  * the variant applied, so they're always accurate.
  */
-import { cn } from "@/lib/utils";
 import { WidgetContent } from "../WidgetView.js";
 import type { WNode } from "../types.js";
+import { cn } from "@4dl/ui";
 
 const PREVIEW_W = 132;
 const PREVIEW_H = 78;
@@ -15,7 +15,11 @@ const DESIGN_W = 640;
 const DESIGN_H = Math.round((DESIGN_W * PREVIEW_H) / PREVIEW_W);
 
 export function VariantPicker({
-  node, configKey = "variant", value, options, onPick,
+  node,
+  configKey = "variant",
+  value,
+  options,
+  onPick,
 }: {
   node: WNode;
   configKey?: string;
@@ -34,16 +38,24 @@ export function VariantPicker({
             key={o.id}
             type="button"
             onClick={() => onPick(o.id)}
-            className={cn("group flex flex-col overflow-hidden rounded-lg border-2 text-left transition-colors", active ? "border-primary" : "border-transparent hover:border-border")}
+            className={cn(
+              "group flex flex-col overflow-hidden rounded-lg border-2 text-left transition-colors",
+              active ? "border-primary" : "border-transparent hover:border-border",
+            )}
           >
-            <div className="relative" style={{ width: "100%", height: PREVIEW_H, background: "linear-gradient(135deg, oklch(0.28 0.03 300), oklch(0.19 0.02 300))" }}>
+            <div
+              className="relative"
+              style={{ width: "100%", height: PREVIEW_H, background: "linear-gradient(135deg, oklch(0.28 0.03 300), oklch(0.19 0.02 300))" }}
+            >
               <div style={{ position: "absolute", inset: 0 }}>
                 <div style={{ width: DESIGN_W, height: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "top left" }}>
                   <WidgetContent node={preview} />
                 </div>
               </div>
             </div>
-            <span className={cn("truncate px-1.5 py-1 text-[10.5px] font-medium", active ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground")}>{o.label}</span>
+            <span className={cn("truncate px-1.5 py-1 text-[10.5px] font-medium", active ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground")}>
+              {o.label}
+            </span>
           </button>
         );
       })}

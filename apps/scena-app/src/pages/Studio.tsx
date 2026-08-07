@@ -16,16 +16,30 @@ import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { DevicePreview } from "../components/device-preview.js";
 import { assetSrc } from "../components/media-picker.js";
-import { cn } from "@/lib/utils";
 import { useCan } from "../permissions.js";
-import { Badge, Button, LoadError, Skeleton, toast } from "@4dl/ui";
+import { Badge, Button, cn, LoadError, Skeleton, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
-  getScreen, getChannel, getSlidePlaylist, getMusicPlaylist,
-  addPlaylistSlide, deletePlaylistSlide, reorderPlaylistSlidesApi,
-  addPlaylistTrack, deletePlaylistTrack,
-  uploadAsset, registerMedia, mediaKind, seedSampleDisplay, seedDisplayChannel, publishChannel, getChannelPublishState,
-  type Screen, type Channel, type PlaylistSlide, type PlaylistTrack,
+  getScreen,
+  getChannel,
+  getSlidePlaylist,
+  getMusicPlaylist,
+  addPlaylistSlide,
+  deletePlaylistSlide,
+  reorderPlaylistSlidesApi,
+  addPlaylistTrack,
+  deletePlaylistTrack,
+  uploadAsset,
+  registerMedia,
+  mediaKind,
+  seedSampleDisplay,
+  seedDisplayChannel,
+  publishChannel,
+  getChannelPublishState,
+  type Screen,
+  type Channel,
+  type PlaylistSlide,
+  type PlaylistTrack,
 } from "../api.js";
 
 /** ms → m:ss for a track duration. */
@@ -40,8 +54,14 @@ function probeAudioMs(file: File): Promise<number> {
     const a = document.createElement("audio");
     a.preload = "metadata";
     const url = URL.createObjectURL(file);
-    a.onloadedmetadata = () => { resolve(Math.round((a.duration || 0) * 1000)); URL.revokeObjectURL(url); };
-    a.onerror = () => { resolve(0); URL.revokeObjectURL(url); };
+    a.onloadedmetadata = () => {
+      resolve(Math.round((a.duration || 0) * 1000));
+      URL.revokeObjectURL(url);
+    };
+    a.onerror = () => {
+      resolve(0);
+      URL.revokeObjectURL(url);
+    };
     a.src = url;
   });
 }
@@ -114,7 +134,9 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
     }
   }, [mode, screenId, displayChannelId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const title = mode === "display" ? (channel?.name ?? "Display") : (screen?.name ?? "Display");
   const backTo = mode === "display" ? "/" : `/screens/${screenId}`;
@@ -138,7 +160,10 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
         await addPlaylistSlide(slidePlaylistId, { type: kind, assetHash: hash, assetUrl: url });
         added++;
       }
-      if (added) { toast.success(`Added ${added} slide${added === 1 ? "" : "s"}.`); await load(); }
+      if (added) {
+        toast.success(`Added ${added} slide${added === 1 ? "" : "s"}.`);
+        await load();
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -150,8 +175,13 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
   async function removeSlide(slideId: string) {
     if (!slidePlaylistId) return;
     setSlides((prev) => prev.filter((s) => s.id !== slideId)); // optimistic
-    try { await deletePlaylistSlide(slidePlaylistId, slideId); setDirty(true); }
-    catch { toast.error("Couldn't remove the slide"); void load(); }
+    try {
+      await deletePlaylistSlide(slidePlaylistId, slideId);
+      setDirty(true);
+    } catch {
+      toast.error("Couldn't remove the slide");
+      void load();
+    }
   }
 
   const musicPlaylistId = channel?.music_playlist_id ?? null;
@@ -169,7 +199,10 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
         await addPlaylistTrack(musicPlaylistId, { title, assetHash: hash, assetUrl: url, durationMs });
         added++;
       }
-      if (added) { toast.success(`Added ${added} track${added === 1 ? "" : "s"}.`); await load(); }
+      if (added) {
+        toast.success(`Added ${added} track${added === 1 ? "" : "s"}.`);
+        await load();
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -180,8 +213,13 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
   async function removeTrack(trackId: string) {
     if (!musicPlaylistId) return;
     setTracks((prev) => prev.filter((t) => t.id !== trackId));
-    try { await deletePlaylistTrack(musicPlaylistId, trackId); setDirty(true); }
-    catch { toast.error("Couldn't remove the track"); void load(); }
+    try {
+      await deletePlaylistTrack(musicPlaylistId, trackId);
+      setDirty(true);
+    } catch {
+      toast.error("Couldn't remove the track");
+      void load();
+    }
   }
 
   async function loadSample() {
@@ -193,15 +231,23 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Couldn't load the sample");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function publish() {
     if (!channel) return;
     setPublishing(true);
-    try { await publishChannel(channel.id); setDirty(false); toast.success("Published — screens are updating."); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Publish failed"); }
-    finally { setPublishing(false); }
+    try {
+      await publishChannel(channel.id);
+      setDirty(false);
+      toast.success("Published — screens are updating.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Publish failed");
+    } finally {
+      setPublishing(false);
+    }
   }
 
   /* ---- drag reorder ---- */
@@ -217,15 +263,40 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
     if (!moved) return;
     next.splice(to, 0, moved);
     setSlides(next);
-    try { await reorderPlaylistSlidesApi(slidePlaylistId, next.map((s) => s.id)); setDirty(true); }
-    catch { toast.error("Couldn't reorder"); void load(); }
+    try {
+      await reorderPlaylistSlidesApi(
+        slidePlaylistId,
+        next.map((s) => s.id),
+      );
+      setDirty(true);
+    } catch {
+      toast.error("Couldn't reorder");
+      void load();
+    }
   }
 
   if (loading) {
-    return <div className="space-y-5"><Skeleton className="h-9 w-64" /><div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]"><Skeleton className="aspect-video w-full rounded-xl" /><Skeleton className="h-64 w-full rounded-xl" /></div></div>;
+    return (
+      <div className="space-y-5">
+        <Skeleton className="h-9 w-64" />
+        <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+          <Skeleton className="aspect-video w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+      </div>
+    );
   }
   if (error) {
-    return <LoadError what={mode === "display" ? "this display" : "this screen"} error={error} onRetry={() => { setLoading(true); void load(); }} />;
+    return (
+      <LoadError
+        what={mode === "display" ? "this display" : "this screen"}
+        error={error}
+        onRetry={() => {
+          setLoading(true);
+          void load();
+        }}
+      />
+    );
   }
   if (mode === "screen" && !screen) {
     return <EmptyState title="Screen not found" description="It may have been removed." />;
@@ -238,12 +309,22 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
     if (mode === "display") return <EmptyState title="Display not found" description="It may have been removed." />;
     return (
       <div className="space-y-5">
-        <PageHeader back={{ label: backLabel, onClick: () => navigate(backTo) }} title={`${title} · Studio`} description="Set up this screen's own display to start adding content." />
+        <PageHeader
+          back={{ label: backLabel, onClick: () => navigate(backTo) }}
+          title={`${title} · Studio`}
+          description="Set up this screen's own display to start adding content."
+        />
         <EmptyState
           scena="searching"
           title="No display yet"
           description="This screen is showing the built-in demo. Give it its own display — we'll seed a starter scene you can edit."
-          action={writable ? <Button onClick={loadSample} disabled={busy}><Sparkles className="size-4" /> {busy ? "Setting up…" : "Set up this display"}</Button> : undefined}
+          action={
+            writable ? (
+              <Button onClick={loadSample} disabled={busy}>
+                <Sparkles className="size-4" /> {busy ? "Setting up…" : "Set up this display"}
+              </Button>
+            ) : undefined
+          }
         />
       </div>
     );
@@ -256,7 +337,11 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
       <PageHeader
         back={{ label: backLabel, onClick: () => navigate(backTo) }}
         title={`${title} · Studio`}
-        description={mode === "display" ? "Prep this display's content, then bind it to a screen when you pair one." : "Everything this screen shows, in one place. Add content, then publish."}
+        description={
+          mode === "display"
+            ? "Prep this display's content, then bind it to a screen when you pair one."
+            : "Everything this screen shows, in one place. Add content, then publish."
+        }
       >
         <div className="mt-3 flex items-center gap-2">
           {dirty && <Badge className="gap-1 text-[11px]">Unpublished changes</Badge>}
@@ -283,11 +368,17 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
           {/* Slides */}
           <section className="rounded-xl border p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm font-semibold"><LayoutGrid className="size-4 text-primary" /> Slides <span className="text-muted-foreground">· {slides.length}</span></div>
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <LayoutGrid className="size-4 text-primary" /> Slides <span className="text-muted-foreground">· {slides.length}</span>
+              </div>
               {writable && (
                 <div className="flex gap-1.5">
-                  <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => fileRef.current?.click()} disabled={busy}><ImagePlus className="size-3.5" /> Add</Button>
-                  <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={loadSample} disabled={busy}><Sparkles className="size-3.5" /> Sample</Button>
+                  <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => fileRef.current?.click()} disabled={busy}>
+                    <ImagePlus className="size-3.5" /> Add
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs" onClick={loadSample} disabled={busy}>
+                    <Sparkles className="size-3.5" /> Sample
+                  </Button>
                 </div>
               )}
               <input ref={fileRef} type="file" accept="image/*,video/*" multiple hidden onChange={(e) => addImages(e.target.files)} />
@@ -298,8 +389,12 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
                 <p className="text-[13px] text-muted-foreground">This display has no slides yet.</p>
                 {writable && (
                   <div className="flex flex-wrap justify-center gap-2">
-                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => fileRef.current?.click()} disabled={busy}><ImagePlus className="size-3.5" /> Add images</Button>
-                    <Button size="sm" className="gap-1.5" onClick={loadSample} disabled={busy}><Sparkles className="size-3.5" /> Load a sample scene</Button>
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => fileRef.current?.click()} disabled={busy}>
+                      <ImagePlus className="size-3.5" /> Add images
+                    </Button>
+                    <Button size="sm" className="gap-1.5" onClick={loadSample} disabled={busy}>
+                      <Sparkles className="size-3.5" /> Load a sample scene
+                    </Button>
                   </div>
                 )}
               </div>
@@ -311,9 +406,15 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
                     draggable={writable}
                     onDragStart={() => (dragFrom.current = i)}
                     onDragEnter={() => setOver(i)}
-                    onDragEnd={() => { dragFrom.current = null; setOver(null); }}
+                    onDragEnd={() => {
+                      dragFrom.current = null;
+                      setOver(null);
+                    }}
                     onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => { e.preventDefault(); void drop(i); }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      void drop(i);
+                    }}
                     className={cn("group relative aspect-video overflow-hidden rounded-lg border bg-muted", over === i && "ring-2 ring-primary")}
                   >
                     {s.type === "html" ? (
@@ -325,8 +426,16 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
                     )}
                     {writable && (
                       <>
-                        <span className="absolute left-1 top-1 rounded bg-black/45 p-0.5 text-white opacity-0 transition group-hover:opacity-100"><GripVertical className="size-3.5" /></span>
-                        <button onClick={() => removeSlide(s.id)} aria-label="Remove slide" className="absolute right-1 top-1 rounded bg-black/45 p-1 text-white opacity-0 transition hover:bg-destructive group-hover:opacity-100"><Trash2 className="size-3.5" /></button>
+                        <span className="absolute left-1 top-1 rounded bg-black/45 p-0.5 text-white opacity-0 transition group-hover:opacity-100">
+                          <GripVertical className="size-3.5" />
+                        </span>
+                        <button
+                          onClick={() => removeSlide(s.id)}
+                          aria-label="Remove slide"
+                          className="absolute right-1 top-1 rounded bg-black/45 p-1 text-white opacity-0 transition hover:bg-destructive group-hover:opacity-100"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
                       </>
                     )}
                   </div>
@@ -334,7 +443,10 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
               </div>
             )}
 
-            <button onClick={() => navigate(`/playlists/${slidePlaylistId}`)} className="mt-3 flex w-full items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+            <button
+              onClick={() => navigate(`/playlists/${slidePlaylistId}`)}
+              className="mt-3 flex w-full items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
               Open full slide editor (HTML · AI · timing) <ExternalLink className="size-3" />
             </button>
           </section>
@@ -342,9 +454,13 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
           {/* Music */}
           <section className="rounded-xl border p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-sm font-semibold"><Music className="size-4 text-primary" /> Music <span className="text-muted-foreground">· {tracks.length}</span></div>
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Music className="size-4 text-primary" /> Music <span className="text-muted-foreground">· {tracks.length}</span>
+              </div>
               {writable && musicPlaylistId && (
-                <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => audioRef.current?.click()} disabled={addingMusic}><Plus className="size-3.5" /> {addingMusic ? "Adding…" : "Add"}</Button>
+                <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => audioRef.current?.click()} disabled={addingMusic}>
+                  <Plus className="size-3.5" /> {addingMusic ? "Adding…" : "Add"}
+                </Button>
               )}
               <input ref={audioRef} type="file" accept="audio/*" multiple hidden onChange={(e) => addAudio(e.target.files)} />
             </div>
@@ -360,13 +476,24 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
                       {t.artist && <div className="truncate text-[11px] text-muted-foreground">{t.artist}</div>}
                     </div>
                     <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">{fmtDur(t.duration_ms)}</span>
-                    {writable && <button onClick={() => removeTrack(t.id)} aria-label="Remove track" className="shrink-0 text-muted-foreground opacity-0 transition hover:text-destructive group-hover:opacity-100"><Trash2 className="size-3.5" /></button>}
+                    {writable && (
+                      <button
+                        onClick={() => removeTrack(t.id)}
+                        aria-label="Remove track"
+                        className="shrink-0 text-muted-foreground opacity-0 transition hover:text-destructive group-hover:opacity-100"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
             )}
             {musicPlaylistId && (
-              <button onClick={() => navigate(`/music/${musicPlaylistId}`)} className="mt-3 flex w-full items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+              <button
+                onClick={() => navigate(`/music/${musicPlaylistId}`)}
+                className="mt-3 flex w-full items-center justify-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+              >
                 Open full music editor (library · reorder · metadata) <ExternalLink className="size-3" />
               </button>
             )}
@@ -374,12 +501,18 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
 
           {/* Widgets */}
           <section className="flex items-center gap-3 rounded-xl border p-4">
-            <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary [&_svg]:size-4"><LayoutGrid /></div>
+            <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary [&_svg]:size-4">
+              <LayoutGrid />
+            </div>
             <div className="min-w-0 flex-1">
               <div className="text-sm font-semibold">Widgets</div>
               <div className="text-xs text-muted-foreground">Clock, text, weather, tickers, boards…</div>
             </div>
-            {channel.widget_profile_id && <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => navigate(`/widgets?profile=${channel.widget_profile_id}`)}>Open builder <ExternalLink className="size-3" /></Button>}
+            {channel.widget_profile_id && (
+              <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" onClick={() => navigate(`/widgets?profile=${channel.widget_profile_id}`)}>
+                Open builder <ExternalLink className="size-3" />
+              </Button>
+            )}
           </section>
         </div>
       </div>

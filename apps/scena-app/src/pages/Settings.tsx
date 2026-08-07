@@ -28,9 +28,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { FONT_FAMILIES, DEFAULT_TOKENS } from "@scena/manifest";
 import { Sparkles, Palette, MonitorPlay, Mail, Sliders, RotateCcw, Wand2, ImagePlus, Trash2, Loader2, Type } from "lucide-react";
-import { SectionDetail, Select, SettingsIndex, SettingsPage as SectionFrame, toast, type SettingsEntry } from "@4dl/ui";
+import { Card, SectionDetail, Select, SettingsIndex, SettingsPage as SectionFrame, toast, type SettingsEntry } from "@4dl/ui";
 import { Badge, Button, Input, Label, Separator, Skeleton, Switch, Textarea } from "@4dl/ui";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { useCan } from "../permissions.js";
@@ -74,8 +73,10 @@ export function SettingsPage() {
 
   const open = (s: string | null, subKey: string | null = null) => {
     const next = new URLSearchParams(params);
-    if (s) next.set("s", s); else next.delete("s");
-    if (subKey) next.set("sub", subKey); else next.delete("sub");
+    if (s) next.set("s", s);
+    else next.delete("s");
+    if (subKey) next.set("sub", subKey);
+    else next.delete("sub");
     setParams(next);
   };
 
@@ -101,10 +102,19 @@ export function SettingsPage() {
   const syncOn = canSync && freeRun === false;
 
   useEffect(() => {
-    getMe().then((m) => setEmail(m.email)).catch(() => setEmail(null)).finally(() => setEmailLoaded(true));
-    listAiModels().then(setModels).catch(() => setModels([]));
-    getAiDefaults().then(setDefaults).catch(() => setDefaults({}));
-    getPlayback().then((p) => setFreeRun(p.freeRun)).catch(() => setFreeRun(null));
+    getMe()
+      .then((m) => setEmail(m.email))
+      .catch(() => setEmail(null))
+      .finally(() => setEmailLoaded(true));
+    listAiModels()
+      .then(setModels)
+      .catch(() => setModels([]));
+    getAiDefaults()
+      .then(setDefaults)
+      .catch(() => setDefaults({}));
+    getPlayback()
+      .then((p) => setFreeRun(p.freeRun))
+      .catch(() => setFreeRun(null));
   }, []);
 
   const brand = useBrandKit();
@@ -117,9 +127,7 @@ export function SettingsPage() {
     setFreeRun(!v);
     try {
       await setPlayback(!v);
-      toast.success(v
-        ? "Multi-screen sync on — republish channels to apply."
-        : "Multi-screen sync off — screens free-run. Republish channels to apply.");
+      toast.success(v ? "Multi-screen sync on — republish channels to apply." : "Multi-screen sync off — screens free-run. Republish channels to apply.");
     } catch (e) {
       // The switch showed the new position before the server agreed. Put it
       // back, or the control claims a setting the workspace does not have.
@@ -131,16 +139,19 @@ export function SettingsPage() {
   async function pickDefault(task: string, modelId: string) {
     const before = defaults;
     setDefaults({ ...(defaults ?? {}), [task]: modelId });
-    try { await setAiDefaults({ [task]: modelId }); toast.success("Default model updated."); }
-    catch (e) { setDefaults(before); toast.error(e instanceof Error ? e.message : "Couldn’t save the default"); }
+    try {
+      await setAiDefaults({ [task]: modelId });
+      toast.success("Default model updated.");
+    } catch (e) {
+      setDefaults(before);
+      toast.error(e instanceof Error ? e.message : "Couldn’t save the default");
+    }
   }
 
   /* ── the index ─────────────────────────────────────────────────────────── */
 
   const aiSetCount = defaults ? AI_TASKS.filter((t) => defaults[t.id]).length : null;
-  const tokenCount = brand.b
-    ? Object.keys(brand.b.theme?.light ?? {}).length + Object.keys(brand.b.theme?.dark ?? {}).length
-    : null;
+  const tokenCount = brand.b ? Object.keys(brand.b.theme?.light ?? {}).length + Object.keys(brand.b.theme?.dark ?? {}).length : null;
 
   const rows: Record<string, SettingsEntry> = {
     brand: {
@@ -148,18 +159,21 @@ export function SettingsPage() {
       icon: Palette,
       tone: "primary",
       label: "Brand kit",
-      sub: brand.b === null
-        ? "Loading…"
-        : [brand.b.brandName || "No brand name", `${tokenCount} custom token${tokenCount === 1 ? "" : "s"}`, `${(brand.b.logos ?? []).length} logo${(brand.b.logos ?? []).length === 1 ? "" : "s"}`].join(" · "),
+      sub:
+        brand.b === null
+          ? "Loading…"
+          : [
+              brand.b.brandName || "No brand name",
+              `${tokenCount} custom token${tokenCount === 1 ? "" : "s"}`,
+              `${(brand.b.logos ?? []).length} logo${(brand.b.logos ?? []).length === 1 ? "" : "s"}`,
+            ].join(" · "),
       onClick: () => open("brand"),
     },
     playback: {
       key: "playback",
       icon: MonitorPlay,
       label: "Playback",
-      sub: !canSync
-        ? "Screens free-run · not in your plan"
-        : freeRun === null ? "Loading…" : syncOn ? "Multi-screen sync on" : "Screens free-run",
+      sub: !canSync ? "Screens free-run · not in your plan" : freeRun === null ? "Loading…" : syncOn ? "Multi-screen sync on" : "Screens free-run",
       onClick: () => open("playback"),
     },
     ai: {
@@ -173,7 +187,7 @@ export function SettingsPage() {
       key: "signin",
       icon: Mail,
       label: "Sign-in",
-      sub: !emailLoaded ? "Loading…" : email ?? "Couldn’t load your account",
+      sub: !emailLoaded ? "Loading…" : (email ?? "Couldn’t load your account"),
       onClick: () => open("signin"),
     },
   };
@@ -209,29 +223,28 @@ export function SettingsPage() {
       {section === "playback" && (
         <SectionFrame title="Playback" onBack={back}>
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-sm">
+            <div className="mb-4">
+              <h3 className="text-base font-semibold leading-none flex items-center gap-2 text-sm">
                 <MonitorPlay className="size-4 text-muted-foreground" />
                 Multi-screen sync
                 <FeatureLockBadge feature="multiScreenSync" className="ml-1" />
-              </CardTitle>
+              </h3>
               <p className="text-xs text-muted-foreground">
-                When two or more screens play the same channel, sync keeps them frame-aligned so a video wall reads as one picture. A single screen always free-runs on its own — this only affects channels shared by several screens.
+                When two or more screens play the same channel, sync keeps them frame-aligned so a video wall reads as one picture. A single screen always
+                free-runs on its own — this only affects channels shared by several screens.
               </p>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <label className={`flex items-center justify-between gap-4 rounded-lg border px-3.5 py-3 ${canSync ? "cursor-pointer" : "opacity-60"}`}>
-                <div className="min-w-0">
-                  <div className="text-sm font-medium">Keep screens in sync</div>
-                  <div className="text-xs text-muted-foreground">
-                    {canSync
-                      ? "Frame-align screens sharing a channel. Republish channels to apply."
-                      : "Your plan doesn’t include multi-screen sync — screens free-run. Upgrade to enable."}
-                  </div>
+            </div>
+            <label className={`flex items-center justify-between gap-4 rounded-lg border px-3.5 py-3 ${canSync ? "cursor-pointer" : "opacity-60"}`}>
+              <div className="min-w-0">
+                <div className="text-sm font-medium">Keep screens in sync</div>
+                <div className="text-xs text-muted-foreground">
+                  {canSync
+                    ? "Frame-align screens sharing a channel. Republish channels to apply."
+                    : "Your plan doesn’t include multi-screen sync — screens free-run. Upgrade to enable."}
                 </div>
-                <Switch checked={syncOn} onCheckedChange={toggleSync} disabled={!canSync || freeRun === null} />
-              </label>
-            </CardContent>
+              </div>
+              <Switch checked={syncOn} onCheckedChange={toggleSync} disabled={!canSync || freeRun === null} />
+            </label>
           </Card>
         </SectionFrame>
       )}
@@ -243,31 +256,33 @@ export function SettingsPage() {
           onBack={back}
         >
           <Card>
-            <CardContent className="flex flex-col gap-1 pt-6">
-              {AI_TASKS.map((t, i) => {
-                const opts = (models ?? []).filter((m) => m.task === t.id);
-                return (
-                  <div key={t.id}>
-                    {i > 0 ? <Separator className="my-1" /> : null}
-                    <div className="flex items-center gap-4 py-2">
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[13px] font-medium">{t.label}</div>
-                        <div className="text-[11px] text-muted-foreground">{t.hint}</div>
-                      </div>
-                      {models === null ? (
-                        <Skeleton className="h-9 w-72" />
-                      ) : opts.length === 0 ? (
-                        <span className="w-72 text-right text-[11px] text-muted-foreground">No models enabled for this task.</span>
-                      ) : (
-                        <Select value={defaults?.[t.id] ?? ""} onChange={(v) => pickDefault(t.id, v)} className="w-72" placeholder="Choose a model" options={[
-                          ...opts.map((m) => ({ value: m.id, label: m.label })),
-                        ]} />
-                      )}
+            {AI_TASKS.map((t, i) => {
+              const opts = (models ?? []).filter((m) => m.task === t.id);
+              return (
+                <div key={t.id}>
+                  {i > 0 ? <Separator className="my-1" /> : null}
+                  <div className="flex items-center gap-4 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-medium">{t.label}</div>
+                      <div className="text-[11px] text-muted-foreground">{t.hint}</div>
                     </div>
+                    {models === null ? (
+                      <Skeleton className="h-9 w-72" />
+                    ) : opts.length === 0 ? (
+                      <span className="w-72 text-right text-[11px] text-muted-foreground">No models enabled for this task.</span>
+                    ) : (
+                      <Select
+                        value={defaults?.[t.id] ?? ""}
+                        onChange={(v) => pickDefault(t.id, v)}
+                        className="w-72"
+                        placeholder="Choose a model"
+                        options={[...opts.map((m) => ({ value: m.id, label: m.label }))]}
+                      />
+                    )}
                   </div>
-                );
-              })}
-            </CardContent>
+                </div>
+              );
+            })}
           </Card>
         </SectionFrame>
       )}
@@ -275,26 +290,27 @@ export function SettingsPage() {
       {section === "signin" && (
         <SectionFrame title="Sign-in" onBack={back}>
           <Card>
-            <CardContent className="pt-6">
-              {/*
+            {/*
                 This was a form for claiming a global USERNAME so a person could
                 sign in with a handle and a password. Both are gone: everyone
                 who is a person signs in with an emailed code or a passkey, and
                 the only handle left belongs to a STATION, which is provisioned
                 on the Live Boards screen and never edits its own.
               */}
-              {!emailLoaded ? (
-                <Skeleton className="h-9 w-full" />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  {email ? (
-                    <>You sign in with a one-time code emailed to <span className="font-medium text-foreground">{email}</span>, or with a passkey. There is no password to manage.</>
-                  ) : (
-                    <>We couldn’t load your account just now. Reload the page to try again.</>
-                  )}
-                </p>
-              )}
-            </CardContent>
+            {!emailLoaded ? (
+              <Skeleton className="h-9 w-full" />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {email ? (
+                  <>
+                    You sign in with a one-time code emailed to <span className="font-medium text-foreground">{email}</span>, or with a passkey. There is no
+                    password to manage.
+                  </>
+                ) : (
+                  <>We couldn’t load your account just now. Reload the page to try again.</>
+                )}
+              </p>
+            )}
           </Card>
         </SectionFrame>
       )}
@@ -334,8 +350,15 @@ function useBrandKit() {
   const savedRef = useRef<Branding | null>(null);
 
   useEffect(() => {
-    getBranding().then((v) => { setB(v); savedRef.current = v; }).catch(() => {});
-    return () => { if (savedRef.current) applyBrandTheme(savedRef.current); };
+    getBranding()
+      .then((v) => {
+        setB(v);
+        savedRef.current = v;
+      })
+      .catch(() => {});
+    return () => {
+      if (savedRef.current) applyBrandTheme(savedRef.current);
+    };
   }, []);
 
   /** Merge a patch, re-render, and apply the theme live across the whole UI. */
@@ -352,7 +375,8 @@ function useBrandKit() {
     setB((cur) => {
       if (!cur) return cur;
       const side = { ...(cur.theme?.[mode] ?? {}) };
-      if (value.trim()) side[token] = value.trim(); else delete side[token];
+      if (value.trim()) side[token] = value.trim();
+      else delete side[token];
       const next = { ...cur, theme: { ...cur.theme, [mode]: side } };
       applyBrandTheme(next);
       return next;
@@ -367,8 +391,11 @@ function useBrandKit() {
       savedRef.current = fresh;
       applyBrandTheme(fresh);
       toast.success("Brand saved — the whole workspace now follows it.");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not save"); }
-    finally { setSaving(false); }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function saveLogos(logos: BrandLogo[]) {
@@ -376,8 +403,11 @@ function useBrandKit() {
     const next = { ...b, logos };
     setB(next);
     savedRef.current = next;
-    try { await setBranding({ logos }); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Save failed"); }
+    try {
+      await setBranding({ logos });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    }
   }
 
   return { b, setB, saving, save, update, setToken, saveLogos, savedRef };
@@ -385,14 +415,25 @@ function useBrandKit() {
 
 type BrandKit = ReturnType<typeof useBrandKit>;
 
-function BrandKitSections({ brand, canManage, openKey, onOpen }: {
+function BrandKitSections({
+  brand,
+  canManage,
+  openKey,
+  onOpen,
+}: {
   brand: BrandKit;
   canManage: boolean;
   openKey: string | null;
   onOpen: (key: string | null) => void;
 }) {
   const { b } = brand;
-  if (!b) return <div className="flex flex-col gap-4"><Skeleton className="h-40 w-full rounded-xl" /><Skeleton className="h-56 w-full rounded-xl" /></div>;
+  if (!b)
+    return (
+      <div className="flex flex-col gap-4">
+        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-56 w-full rounded-xl" />
+      </div>
+    );
 
   const tokenCount = Object.keys(b.theme?.light ?? {}).length + Object.keys(b.theme?.dark ?? {}).length;
   const logoCount = (b.logos ?? []).length;
@@ -447,37 +488,63 @@ function BrandIdentity({ brand, canManage }: { brand: BrandKit; canManage: boole
   if (!b) return null;
   return (
     <Card>
-      <CardContent className="flex flex-col gap-5 pt-6">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Brand name</Label>
-            <Input value={b.brandName} disabled={!canManage} onChange={(e) => update({ brandName: e.target.value })} placeholder="e.g. Acme Clinic" maxLength={80} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Corner radius · {b.radius}px</Label>
-            <input type="range" min={0} max={32} value={b.radius} disabled={!canManage} onChange={(e) => update({ radius: +e.target.value })} className="mt-2 w-full accent-primary" />
-          </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs text-muted-foreground">Brand name</Label>
+          <Input
+            value={b.brandName}
+            disabled={!canManage}
+            onChange={(e) => update({ brandName: e.target.value })}
+            placeholder="e.g. Acme Clinic"
+            maxLength={80}
+          />
         </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Heading font</Label>
-            <Select value={b.headingFont} onChange={(v) => update({ headingFont: v })} disabled={!canManage} className="w-full" options={[...FONTS.map((f) => ({ value: f, label: f }))]} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Body font · drives all UI text</Label>
-            <Select value={b.bodyFont} onChange={(v) => update({ bodyFont: v })} disabled={!canManage} className="w-full" options={[...FONTS.map((f) => ({ value: f, label: f }))]} />
-          </div>
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs text-muted-foreground">Corner radius · {b.radius}px</Label>
+          <input
+            type="range"
+            min={0}
+            max={32}
+            value={b.radius}
+            disabled={!canManage}
+            onChange={(e) => update({ radius: +e.target.value })}
+            className="mt-2 w-full accent-primary"
+          />
         </div>
+      </div>
 
-        <UiSampler brandName={b.brandName} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs text-muted-foreground">Heading font</Label>
+          <Select
+            value={b.headingFont}
+            onChange={(v) => update({ headingFont: v })}
+            disabled={!canManage}
+            className="w-full"
+            options={[...FONTS.map((f) => ({ value: f, label: f }))]}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label className="text-xs text-muted-foreground">Body font · drives all UI text</Label>
+          <Select
+            value={b.bodyFont}
+            onChange={(v) => update({ bodyFont: v })}
+            disabled={!canManage}
+            className="w-full"
+            options={[...FONTS.map((f) => ({ value: f, label: f }))]}
+          />
+        </div>
+      </div>
 
-        {canManage && (
-          <div className="flex justify-end">
-            <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save brand"}</Button>
-          </div>
-        )}
-      </CardContent>
+      <UiSampler brandName={b.brandName} />
+
+      {canManage && (
+        <div className="flex justify-end">
+          <Button onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save brand"}
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }
@@ -503,7 +570,10 @@ function BrandPalette({ brand }: { brand: BrandKit }) {
     if (!b) return;
     const parsed = parseThemeCss(pasted);
     const n = Object.keys(parsed.light).length + Object.keys(parsed.dark).length;
-    if (!n) { toast.error("No shadcn tokens found — paste a :root { … } / .dark { … } theme."); return; }
+    if (!n) {
+      toast.error("No shadcn tokens found — paste a :root { … } / .dark { … } theme.");
+      return;
+    }
     update({ theme: { light: { ...b.theme.light, ...parsed.light }, dark: { ...b.theme.dark, ...parsed.dark } } });
     setPasted("");
     toast.success(`Imported ${n} token${n === 1 ? "" : "s"}. Save to keep.`);
@@ -511,50 +581,71 @@ function BrandPalette({ brand }: { brand: BrandKit }) {
 
   return (
     <Card>
-      <CardHeader>
+      <div className="mb-4">
         <p className="text-xs text-muted-foreground">
-          Generate a coherent shadcn palette from a brand colour, or paste one you already have. Either way it previews across the whole workspace immediately and is <b>not saved until you press Save</b> — leaving Settings puts the last saved kit back.
+          Generate a coherent shadcn palette from a brand colour, or paste one you already have. Either way it previews across the whole workspace immediately
+          and is <b>not saved until you press Save</b> — leaving Settings puts the last saved kit back.
         </p>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4 pt-0">
-        <div className="flex flex-wrap gap-1.5">
-          {PRESET_COLORS.map((c) => (
-            <button key={c} onClick={() => setGenColor(c)} title={c} aria-label={`Use ${c}`}
-              className={`size-7 rounded-full ring-2 ring-offset-2 ring-offset-background transition ${genColor.toLowerCase() === c ? "ring-foreground" : "ring-transparent hover:ring-border"}`}
-              style={{ background: c }} />
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <ColorField label="Brand colour" value={genColor} onChange={setGenColor} />
-          <ColorField label="Accent" value={genAccent} onChange={setGenAccent} />
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Neutral tint</Label>
-            <Select value={genNeutral} onChange={setGenNeutral} className="w-full" options={[
-              ...NEUTRAL_TINTS.map((n) => ({ value: n.id, label: n.label })),
-            ]} />
-          </div>
-          <div className="flex items-end">
-            <Button className="w-full" onClick={generate}><Wand2 className="size-4" /> Generate</Button>
-          </div>
-        </div>
-
-        <Separator />
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {PRESET_COLORS.map((c) => (
+          <button
+            key={c}
+            onClick={() => setGenColor(c)}
+            title={c}
+            aria-label={`Use ${c}`}
+            className={`size-7 rounded-full ring-2 ring-offset-2 ring-offset-background transition ${genColor.toLowerCase() === c ? "ring-foreground" : "ring-transparent hover:ring-border"}`}
+            style={{ background: c }}
+          />
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <ColorField label="Brand colour" value={genColor} onChange={setGenColor} />
+        <ColorField label="Accent" value={genAccent} onChange={setGenAccent} />
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs text-muted-foreground">Paste a shadcn theme</Label>
-          <Textarea value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder={":root { --primary: oklch(…); … }\n.dark { … }"} className="h-24 font-mono text-[11px]" />
-          <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="outline" disabled={!pasted.trim()} onClick={applyPastedTheme}>Import tokens</Button>
-            {tokenCount > 0 && (
-              <Button size="sm" variant="ghost" className="text-muted-foreground" onClick={() => { update({ theme: { light: {}, dark: {} } }); toast.success("Theme reset to the shipped defaults."); }}>
-                <RotateCcw className="size-3.5" /> Reset to defaults
-              </Button>
-            )}
-            {/* The generator used to leave the only Save button one card away,
-                which is how a generated palette got previewed and abandoned. */}
-            <Button size="sm" className="ml-auto" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save brand"}</Button>
-          </div>
+          <Label className="text-xs text-muted-foreground">Neutral tint</Label>
+          <Select value={genNeutral} onChange={setGenNeutral} className="w-full" options={[...NEUTRAL_TINTS.map((n) => ({ value: n.id, label: n.label }))]} />
         </div>
-      </CardContent>
+        <div className="flex items-end">
+          <Button className="w-full" onClick={generate}>
+            <Wand2 className="size-4" /> Generate
+          </Button>
+        </div>
+      </div>
+
+      <Separator />
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-xs text-muted-foreground">Paste a shadcn theme</Label>
+        <Textarea
+          value={pasted}
+          onChange={(e) => setPasted(e.target.value)}
+          placeholder={":root { --primary: oklch(…); … }\n.dark { … }"}
+          className="h-24 font-mono text-[11px]"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" disabled={!pasted.trim()} onClick={applyPastedTheme}>
+            Import tokens
+          </Button>
+          {tokenCount > 0 && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-muted-foreground"
+              onClick={() => {
+                update({ theme: { light: {}, dark: {} } });
+                toast.success("Theme reset to the shipped defaults.");
+              }}
+            >
+              <RotateCcw className="size-3.5" /> Reset to defaults
+            </Button>
+          )}
+          {/* The generator used to leave the only Save button one card away,
+                which is how a generated palette got previewed and abandoned. */}
+          <Button size="sm" className="ml-auto" onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save brand"}
+          </Button>
+        </div>
+      </div>
     </Card>
   );
 }
@@ -578,45 +669,71 @@ function BrandAssets({ brand }: { brand: BrandKit }) {
       await setBranding({ logos: next.logos });
       savedRef.current = next;
       toast.success("Logo added.");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Upload failed"); }
-    finally { setUploading(false); }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
     <Card>
-      <CardHeader>
+      <div className="mb-4">
         <p className="text-xs text-muted-foreground">
-          Your logo and any variants (dark, light, mark, wordmark…). They are saved to the media library and available to the <b>Company logo</b> widget and the AI generators. Unlike the palette, these save as soon as you add or remove one.
+          Your logo and any variants (dark, light, mark, wordmark…). They are saved to the media library and available to the <b>Company logo</b> widget and the
+          AI generators. Unlike the palette, these save as soon as you add or remove one.
         </p>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3 pt-0">
-        {(b.logos ?? []).length > 0 && (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {b.logos.map((l) => (
-              <div key={l.id} className="flex items-center gap-3 rounded-lg border p-2">
-                <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-[repeating-conic-gradient(#0000_0deg_90deg,#8884_90deg_180deg)] bg-[length:14px_14px]">
-                  <img src={l.url} alt={l.label} className="max-h-12 max-w-12 object-contain" />
-                </span>
-                <Input
-                  value={l.label}
-                  onChange={(e) => setB({ ...b, logos: (b.logos ?? []).map((x) => (x.id === l.id ? { ...x, label: e.target.value } : x)) })}
-                  onBlur={() => saveLogos(b.logos)}
-                  className="h-8 flex-1 text-sm" maxLength={40} placeholder="Variant name"
-                />
-                <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-destructive" aria-label={`Remove ${l.label}`}
-                  onClick={() => void saveLogos((b.logos ?? []).filter((x) => x.id !== l.id))}>
-                  <Trash2 className="size-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
+      </div>
+      {(b.logos ?? []).length > 0 && (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {b.logos.map((l) => (
+            <div key={l.id} className="flex items-center gap-3 rounded-lg border p-2">
+              <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-[repeating-conic-gradient(#0000_0deg_90deg,#8884_90deg_180deg)] bg-[length:14px_14px]">
+                <img src={l.url} alt={l.label} className="max-h-12 max-w-12 object-contain" />
+              </span>
+              <Input
+                value={l.label}
+                onChange={(e) => setB({ ...b, logos: (b.logos ?? []).map((x) => (x.id === l.id ? { ...x, label: e.target.value } : x)) })}
+                onBlur={() => saveLogos(b.logos)}
+                className="h-8 flex-1 text-sm"
+                maxLength={40}
+                placeholder="Variant name"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 text-muted-foreground hover:text-destructive"
+                aria-label={`Remove ${l.label}`}
+                onClick={() => void saveLogos((b.logos ?? []).filter((x) => x.id !== l.id))}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+      <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed py-3 text-sm text-muted-foreground transition-colors hover:bg-accent">
+        {uploading ? (
+          <>
+            <Loader2 className="size-4 animate-spin" /> Uploading…
+          </>
+        ) : (
+          <>
+            <ImagePlus className="size-4" /> Upload a logo
+          </>
         )}
-        <label className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed py-3 text-sm text-muted-foreground transition-colors hover:bg-accent">
-          {uploading ? <><Loader2 className="size-4 animate-spin" /> Uploading…</> : <><ImagePlus className="size-4" /> Upload a logo</>}
-          <input type="file" accept="image/*" className="hidden" disabled={uploading}
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) void addLogo(f); e.target.value = ""; }} />
-        </label>
-      </CardContent>
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          disabled={uploading}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void addLogo(f);
+            e.target.value = "";
+          }}
+        />
+      </label>
     </Card>
   );
 }
@@ -626,32 +743,33 @@ function BrandTokens({ brand }: { brand: BrandKit }) {
   if (!b) return null;
   return (
     <Card>
-      <CardHeader>
+      <div className="mb-4">
         <p className="text-xs text-muted-foreground">
-          The single source of truth. Set any token; blank fields fall back to the shipped default. Accepts any CSS colour (hex, <code>oklch()</code>, <code>hsl()</code>).
+          The single source of truth. Set any token; blank fields fall back to the shipped default. Accepts any CSS colour (hex, <code>oklch()</code>,{" "}
+          <code>hsl()</code>).
         </p>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4 pt-0">
-        <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-1.5 text-[11px]">
-          <span className="font-semibold uppercase tracking-wider text-muted-foreground">Token</span>
-          <span className="w-32 text-center font-semibold uppercase tracking-wider text-muted-foreground">Light</span>
-          <span className="w-32 text-center font-semibold uppercase tracking-wider text-muted-foreground">Dark</span>
-          {THEME_TOKENS.map((t) => (
-            <TokenRow
-              key={t}
-              token={t}
-              light={b.theme?.light?.[t] ?? ""}
-              dark={b.theme?.dark?.[t] ?? ""}
-              lightDefault={DEFAULT_TOKENS.light[t] ?? ""}
-              darkDefault={DEFAULT_TOKENS.dark[t] ?? ""}
-              onChange={setToken}
-            />
-          ))}
-        </div>
-        <div className="flex justify-end">
-          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save brand"}</Button>
-        </div>
-      </CardContent>
+      </div>
+      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-1.5 text-[11px]">
+        <span className="font-semibold uppercase tracking-wider text-muted-foreground">Token</span>
+        <span className="w-32 text-center font-semibold uppercase tracking-wider text-muted-foreground">Light</span>
+        <span className="w-32 text-center font-semibold uppercase tracking-wider text-muted-foreground">Dark</span>
+        {THEME_TOKENS.map((t) => (
+          <TokenRow
+            key={t}
+            token={t}
+            light={b.theme?.light?.[t] ?? ""}
+            dark={b.theme?.dark?.[t] ?? ""}
+            lightDefault={DEFAULT_TOKENS.light[t] ?? ""}
+            darkDefault={DEFAULT_TOKENS.dark[t] ?? ""}
+            onChange={setToken}
+          />
+        ))}
+      </div>
+      <div className="flex justify-end">
+        <Button onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save brand"}
+        </Button>
+      </div>
     </Card>
   );
 }
@@ -662,22 +780,53 @@ function ColorField({ label, value, disabled, onChange }: { label: string; value
     <div className="flex flex-col gap-1.5">
       <Label className="text-xs text-muted-foreground">{label}</Label>
       <div className="flex items-center gap-2 rounded-lg border p-1.5">
-        <input type="color" value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} className="size-8 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0" aria-label={label} />
-        <input value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)} className="w-full bg-transparent font-mono text-xs uppercase outline-none" maxLength={7} aria-label={`${label} hex`} />
+        <input
+          type="color"
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+          className="size-8 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
+          aria-label={label}
+        />
+        <input
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full bg-transparent font-mono text-xs uppercase outline-none"
+          maxLength={7}
+          aria-label={`${label} hex`}
+        />
       </div>
     </div>
   );
 }
 
 /** One token row: label + light/dark inputs with swatches (placeholder = default). */
-function TokenRow({ token, light, dark, lightDefault, darkDefault, onChange }: {
-  token: string; light: string; dark: string; lightDefault: string; darkDefault: string;
+function TokenRow({
+  token,
+  light,
+  dark,
+  lightDefault,
+  darkDefault,
+  onChange,
+}: {
+  token: string;
+  light: string;
+  dark: string;
+  lightDefault: string;
+  darkDefault: string;
   onChange: (mode: "light" | "dark", token: string, value: string) => void;
 }) {
   const cell = (mode: "light" | "dark", value: string, defaultVal: string) => (
     <div className="flex w-32 items-center gap-1.5 rounded-md border px-1.5 py-1">
       <span className="size-4 shrink-0 rounded-sm border" style={{ background: value || defaultVal }} />
-      <input value={value} onChange={(e) => onChange(mode, token, e.target.value)} placeholder={defaultVal.replace(/oklch\(|\)/g, "")} aria-label={`--${token} ${mode}`} className="w-full bg-transparent font-mono text-[10px] outline-none placeholder:text-muted-foreground/50" />
+      <input
+        value={value}
+        onChange={(e) => onChange(mode, token, e.target.value)}
+        placeholder={defaultVal.replace(/oklch\(|\)/g, "")}
+        aria-label={`--${token} ${mode}`}
+        className="w-full bg-transparent font-mono text-[10px] outline-none placeholder:text-muted-foreground/50"
+      />
     </div>
   );
   return (
@@ -696,8 +845,12 @@ function UiSampler({ brandName }: { brandName: string }) {
       <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{brandName || "Your workspace"} · live preview</div>
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm">Primary</Button>
-        <Button size="sm" variant="secondary">Secondary</Button>
-        <Button size="sm" variant="outline">Outline</Button>
+        <Button size="sm" variant="secondary">
+          Secondary
+        </Button>
+        <Button size="sm" variant="outline">
+          Outline
+        </Button>
         <Badge>Default</Badge>
         <Badge tone="success">Success</Badge>
         <Badge tone="warning">Warning</Badge>

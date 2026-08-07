@@ -21,8 +21,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Plus, X, Webhook, Mail, Monitor, Wifi, WifiOff, BellRing } from "lucide-react";
-import { Badge, Button, GlanceStrip, Group, Input, LoadError, Row, Section, Select, SkeletonList, toast, useAction } from "@4dl/ui";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
+import { Badge, Button, Card, GlanceStrip, Group, Input, LoadError, Row, Section, Select, SkeletonList, toast, useAction } from "@4dl/ui";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
@@ -41,7 +40,10 @@ export function AlertsPage() {
   const reload = useCallback(async () => {
     try {
       const [a, r, s] = await Promise.all([listAlerts(), listAlertRules(), listScreens()]);
-      setAlerts(a); setRules(r); setScreens(s); setError(null);
+      setAlerts(a);
+      setRules(r);
+      setScreens(s);
+      setError(null);
     } catch (e) {
       setError(errorText(e, "We couldn’t reach the server."));
     }
@@ -86,11 +88,7 @@ export function AlertsPage() {
           ) : !alerts ? (
             <SkeletonList rows={4} card />
           ) : alerts.length === 0 ? (
-            <EmptyState
-              scena="happy"
-              title="All clear"
-              description="No alerts right now — the fleet is healthy. New offline events will show up here."
-            />
+            <EmptyState scena="happy" title="All clear" description="No alerts right now — the fleet is healthy. New offline events will show up here." />
           ) : (
             <Group>
               {alerts.map((a) => {
@@ -103,7 +101,17 @@ export function AlertsPage() {
                     iconTone={recovery ? "success" : open ? "danger" : "neutral"}
                     sub={a.message}
                     value={new Date(a.at).toLocaleTimeString()}
-                    valueSub={open ? <Badge tone="danger" className="text-[10px]">OPEN</Badge> : recovery ? "Recovered" : "Resolved"}
+                    valueSub={
+                      open ? (
+                        <Badge tone="danger" className="text-[10px]">
+                          OPEN
+                        </Badge>
+                      ) : recovery ? (
+                        "Recovered"
+                      ) : (
+                        "Resolved"
+                      )
+                    }
                   >
                     {a.screen_name ?? "Screen"}
                   </Row>
@@ -115,24 +123,22 @@ export function AlertsPage() {
 
         <Section title="Alert rules">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm">Where alerts go</CardTitle>
+            <div className="mb-4">
+              <h3 className="text-base font-semibold leading-none text-sm">Where alerts go</h3>
               <p className="text-xs text-muted-foreground">Beyond this dashboard. Offline alerts always appear here.</p>
-            </CardHeader>
-            <CardContent className="pt-0">
-              {rules === null ? (
-                <SkeletonList rows={2} />
-              ) : rules.length === 0 ? (
-                <p className="py-2 text-[13px] text-muted-foreground">No delivery rules yet — alerts stay in the dashboard. Add a webhook or email below.</p>
-              ) : (
-                <Group className="bg-transparent">
-                  {rules.map((r) => (
-                    <RuleRow key={r.id} rule={r} onDeleted={reload} />
-                  ))}
-                </Group>
-              )}
-              <RuleForm onAdd={reload} />
-            </CardContent>
+            </div>
+            {rules === null ? (
+              <SkeletonList rows={2} />
+            ) : rules.length === 0 ? (
+              <p className="py-2 text-[13px] text-muted-foreground">No delivery rules yet — alerts stay in the dashboard. Add a webhook or email below.</p>
+            ) : (
+              <Group className="bg-transparent">
+                {rules.map((r) => (
+                  <RuleRow key={r.id} rule={r} onDeleted={reload} />
+                ))}
+              </Group>
+            )}
+            <RuleForm onAdd={reload} />
           </Card>
         </Section>
       </div>
@@ -149,30 +155,37 @@ function RuleRow({ rule, onDeleted }: { rule: AlertRule; onDeleted: () => Promis
         sub={`${rule.channel}${rule.target ? ` · ${rule.target}` : ""}`}
         trailing={
           <Button
-            variant="ghost" size="icon"
+            variant="ghost"
+            size="icon"
             className="size-7 shrink-0 text-muted-foreground hover:text-destructive"
             aria-label={`Delete the ${rule.channel} rule`}
             disabled={busy === "delete"}
             onClick={() =>
-              run("delete", async () => {
-                const ok = await confirmDialog({
-                  title: "Delete this alert rule?",
-                  description: "Offline alerts will stop being delivered to this destination.",
-                  confirmText: "Delete rule",
-                  destructive: true,
-                });
-                if (!ok) return;
-                await deleteAlertRule(rule.id);
-                await onDeleted();
-                toast.success("Alert rule deleted.");
-              }, "Couldn’t delete the rule — it is still in place.")
+              run(
+                "delete",
+                async () => {
+                  const ok = await confirmDialog({
+                    title: "Delete this alert rule?",
+                    description: "Offline alerts will stop being delivered to this destination.",
+                    confirmText: "Delete rule",
+                    destructive: true,
+                  });
+                  if (!ok) return;
+                  await deleteAlertRule(rule.id);
+                  await onDeleted();
+                  toast.success("Alert rule deleted.");
+                },
+                "Couldn’t delete the rule — it is still in place.",
+              )
             }
           >
             <X />
           </Button>
         }
       >
-        <span className="capitalize">{rule.type} &gt; {rule.threshold_sec}s</span>
+        <span className="capitalize">
+          {rule.type} &gt; {rule.threshold_sec}s
+        </span>
       </Row>
       {/* The refusal belongs on the control that was refused, not in a global
           toast that has scrolled past by the time you look for it. */}
@@ -190,19 +203,32 @@ function RuleForm({ onAdd }: { onAdd: () => Promise<void> }) {
       onSubmit={(e) => {
         e.preventDefault();
         if (!target.trim()) return;
-        void run("add", async () => {
-          await addAlertRule({ type: "offline", thresholdSec: 90, channel, target: target.trim() });
-          // Cleared only AFTER the server took it. Clearing first is how a
-          // refused address disappears with nothing to correct.
-          setTarget("");
-          await onAdd();
-          toast.success(channel === "email" ? "Email alert recipient added." : "Webhook alert added.");
-        }, "Couldn’t add the rule — nothing was changed.");
+        void run(
+          "add",
+          async () => {
+            await addAlertRule({ type: "offline", thresholdSec: 90, channel, target: target.trim() });
+            // Cleared only AFTER the server took it. Clearing first is how a
+            // refused address disappears with nothing to correct.
+            setTarget("");
+            await onAdd();
+            toast.success(channel === "email" ? "Email alert recipient added." : "Webhook alert added.");
+          },
+          "Couldn’t add the rule — nothing was changed.",
+        );
       }}
       className="mt-4 space-y-2"
     >
       <div className="flex gap-2">
-        <Select value={channel} onChange={(v) => setChannel(v as "webhook" | "email")} className="w-28" size="sm" options={[{ value: "webhook", label: "Webhook" }, { value: "email", label: "Email" }]} />
+        <Select
+          value={channel}
+          onChange={(v) => setChannel(v as "webhook" | "email")}
+          className="w-28"
+          size="sm"
+          options={[
+            { value: "webhook", label: "Webhook" },
+            { value: "email", label: "Email" },
+          ]}
+        />
         <Input
           value={target}
           onChange={(e) => setTarget(e.target.value)}

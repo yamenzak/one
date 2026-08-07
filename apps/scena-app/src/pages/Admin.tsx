@@ -20,14 +20,46 @@
  * control, not a lost one.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import { StatTile, StatusDot, Pill, type Tone } from "../components/status.js";
 import { confirmDialog } from "../components/confirm.js";
-import { Loader2, Music, Ticket, Users, RefreshCw, AlertTriangle, CreditCard, Package, Sparkles, Tag, Search, Upload, Trash2, ImagePlus, Plus, Pencil } from "lucide-react";
-import { cn } from "../lib/utils.js";
+import {
+  Loader2,
+  Music,
+  Ticket,
+  Users,
+  RefreshCw,
+  AlertTriangle,
+  CreditCard,
+  Package,
+  Sparkles,
+  Tag,
+  Search,
+  Upload,
+  Trash2,
+  ImagePlus,
+  Plus,
+  Pencil,
+} from "lucide-react";
 import { FEATURE_CATALOG, QUOTA_CATALOG, FEATURE_CATEGORIES } from "@scena/manifest";
-import { Badge, Button, Dialog, Select, DialogContent, DialogDescription, DialogFooter, Input, Label, Separator, Skeleton, Switch, toast } from "@4dl/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  cn,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  Input,
+  Label,
+  SectionHeader,
+  Select,
+  Separator,
+  Skeleton,
+  Switch,
+  toast,
+} from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   getAdminConfig,
@@ -126,7 +158,9 @@ export function DangerTab() {
       if (r.error || !r.ok) throw new Error(r.error || "Wipe failed");
       toast.success(`Wiped ${r.tables ?? 0} tables · ${r.objects ?? 0} files. Reloading…`);
       // Our own session is gone now — send everyone back to a clean login.
-      setTimeout(() => { window.location.href = "/"; }, 1500);
+      setTimeout(() => {
+        window.location.href = "/";
+      }, 1500);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Wipe failed");
       setBusy(false);
@@ -135,41 +169,69 @@ export function DangerTab() {
 
   return (
     <Card className="max-w-2xl border-destructive/40">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-destructive"><AlertTriangle className="size-4" /> Factory reset</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-muted-foreground">
-          Permanently deletes <b className="text-foreground">everything</b> — all workspaces, users, screens, channels, boards, credentials, and uploaded media — and resets this deployment to a fresh install. The plan catalog is re-seeded so it stays usable. <b className="text-foreground">This cannot be undone.</b>
-        </div>
+      <SectionHeader
+        title={
+          <>
+            <AlertTriangle className="size-4" /> Factory reset
+          </>
+        }
+        className="mb-4"
+      />
+      <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-muted-foreground">
+        Permanently deletes <b className="text-foreground">everything</b> — all workspaces, users, screens, channels, boards, credentials, and uploaded media —
+        and resets this deployment to a fresh install. The plan catalog is re-seeded so it stays usable.{" "}
+        <b className="text-foreground">This cannot be undone.</b>
+      </div>
 
-        {stage === "idle" ? (
-          <Button variant="destructive" className="w-fit" disabled={busy} onClick={requestCode}>
-            {busy ? <Loader2 className="size-4 animate-spin" /> : <AlertTriangle className="size-4" />} Start factory reset
-          </Button>
-        ) : (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground">We emailed a 6-digit code to <span className="font-medium text-foreground">{sentTo}</span>. Enter it and type the phrase to confirm.</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label htmlFor="nuke-otp">Confirmation code</Label>
-                <Input id="nuke-otp" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" inputMode="numeric" className="font-mono tracking-[0.3em]" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="nuke-phrase">Type <span className="font-mono text-destructive">WIPE EVERYTHING</span></Label>
-                <Input id="nuke-phrase" value={phrase} onChange={(e) => setPhrase(e.target.value)} placeholder="WIPE EVERYTHING" />
-              </div>
+      {stage === "idle" ? (
+        <Button variant="destructive" className="w-fit" disabled={busy} onClick={requestCode}>
+          {busy ? <Loader2 className="size-4 animate-spin" /> : <AlertTriangle className="size-4" />} Start factory reset
+        </Button>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-muted-foreground">
+            We emailed a 6-digit code to <span className="font-medium text-foreground">{sentTo}</span>. Enter it and type the phrase to confirm.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="nuke-otp">Confirmation code</Label>
+              <Input
+                id="nuke-otp"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000"
+                inputMode="numeric"
+                className="font-mono tracking-[0.3em]"
+              />
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="destructive" disabled={busy || otp.length < 6 || phrase.trim() !== "WIPE EVERYTHING"} onClick={confirmWipe}>
-                {busy ? <Loader2 className="size-4 animate-spin" /> : <AlertTriangle className="size-4" />} Wipe everything now
-              </Button>
-              <Button variant="ghost" disabled={busy} onClick={() => { setStage("idle"); setOtp(""); setPhrase(""); }}>Cancel</Button>
-              <button type="button" className="text-xs text-muted-foreground hover:text-foreground" disabled={busy} onClick={requestCode}>Resend code</button>
+            <div className="space-y-1.5">
+              <Label htmlFor="nuke-phrase">
+                Type <span className="font-mono text-destructive">WIPE EVERYTHING</span>
+              </Label>
+              <Input id="nuke-phrase" value={phrase} onChange={(e) => setPhrase(e.target.value)} placeholder="WIPE EVERYTHING" />
             </div>
           </div>
-        )}
-      </CardContent>
+          <div className="flex items-center gap-2">
+            <Button variant="destructive" disabled={busy || otp.length < 6 || phrase.trim() !== "WIPE EVERYTHING"} onClick={confirmWipe}>
+              {busy ? <Loader2 className="size-4 animate-spin" /> : <AlertTriangle className="size-4" />} Wipe everything now
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              onClick={() => {
+                setStage("idle");
+                setOtp("");
+                setPhrase("");
+              }}
+            >
+              Cancel
+            </Button>
+            <button type="button" className="text-xs text-muted-foreground hover:text-foreground" disabled={busy} onClick={requestCode}>
+              Resend code
+            </button>
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
@@ -181,7 +243,9 @@ export function StripeTab() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    getAdminConfig().then(setCfg).catch(() => {});
+    getAdminConfig()
+      .then(setCfg)
+      .catch(() => {});
   }, []);
   if (!cfg) return <Loading />;
 
@@ -228,98 +292,145 @@ export function StripeTab() {
   return (
     <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.1fr_1fr]">
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Stripe credentials</CardTitle>
+        <div className="mb-4">
+          <h3 className="text-base font-semibold leading-none text-base">Stripe credentials</h3>
           <p className="text-sm text-muted-foreground">Keys are stored server-side and never shipped to the browser or screens.</p>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <Label>Mode</Label>
-            <Select value={cfg["stripe.mode"] ?? "disabled"} onChange={(v) => set("stripe.mode", v)} className="w-full" options={[
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label>Mode</Label>
+          <Select
+            value={cfg["stripe.mode"] ?? "disabled"}
+            onChange={(v) => set("stripe.mode", v)}
+            className="w-full"
+            options={[
               { value: "disabled", label: "Disabled" },
               { value: "test", label: "Test" },
               { value: "live", label: "Live" },
-            ]} />
-          </div>
-          {field("stripe.secret_key", "Secret key", "sk_test_…")}
-          {field("stripe.publishable_key", "Publishable key", "pk_test_…")}
-          {field("stripe.webhook_secret", "Webhook signing secret", "whsec_…", "Endpoint: /api/stripe/webhook")}
-          <div className="flex items-center gap-2 pt-1">
-            <Button disabled={busy} onClick={save}>Save</Button>
-            <Button variant="outline" disabled={busy} onClick={sync}>Sync catalog → Stripe</Button>
-          </div>
-          {ping ? (
-            <Pill tone={ping.ok ? "success" : "destructive"} className="w-fit">
-              <StatusDot tone={ping.ok ? "success" : "destructive"} />
-              {ping.ok ? `Connected: ${ping.account}` : `Not connected: ${ping.error}`}
-            </Pill>
-          ) : null}
-        </CardContent>
+            ]}
+          />
+        </div>
+        {field("stripe.secret_key", "Secret key", "sk_test_…")}
+        {field("stripe.publishable_key", "Publishable key", "pk_test_…")}
+        {field("stripe.webhook_secret", "Webhook signing secret", "whsec_…", "Endpoint: /api/stripe/webhook")}
+        <div className="flex items-center gap-2 pt-1">
+          <Button disabled={busy} onClick={save}>
+            Save
+          </Button>
+          <Button variant="outline" disabled={busy} onClick={sync}>
+            Sync catalog → Stripe
+          </Button>
+        </div>
+        {ping ? (
+          <Pill tone={ping.ok ? "success" : "destructive"} className="w-fit">
+            <StatusDot tone={ping.ok ? "success" : "destructive"} />
+            {ping.ok ? `Connected: ${ping.account}` : `Not connected: ${ping.error}`}
+          </Pill>
+        ) : null}
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Billing policy</CardTitle>
+        <div className="mb-4">
+          <h3 className="text-base font-semibold leading-none text-base">Billing policy</h3>
           <p className="text-sm text-muted-foreground">Dunning windows, AI margin, transactional email, and platform provider keys.</p>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          {field("billing.grace_days", "Grace days (past-due → suspend)")}
-          {field("billing.delete_days", "Delete days (suspend → auto-delete)")}
-          {field("ai.default_markup", "Default AI markup ×")}
-          <div className="flex flex-col gap-1.5">
-            <Label>AI mock mode</Label>
-            <Select value={cfg["ai.mock"] ?? "auto"} onChange={(v) => set("ai.mock", v)} className="w-full" options={[
+        </div>
+        {field("billing.grace_days", "Grace days (past-due → suspend)")}
+        {field("billing.delete_days", "Delete days (suspend → auto-delete)")}
+        {field("ai.default_markup", "Default AI markup ×")}
+        <div className="flex flex-col gap-1.5">
+          <Label>AI mock mode</Label>
+          <Select
+            value={cfg["ai.mock"] ?? "auto"}
+            onChange={(v) => set("ai.mock", v)}
+            className="w-full"
+            options={[
               { value: "auto", label: "Auto (mock if no Workers AI)" },
               { value: "on", label: "On (always mock)" },
               { value: "off", label: "Off (require Workers AI)" },
-            ]} />
-          </div>
+            ]}
+          />
+        </div>
 
-          <Separator />
-          <SectionLabel>Email (transactional)</SectionLabel>
-          <div className="flex flex-col gap-1.5">
-            <Label>Provider</Label>
-            <Select value={cfg["email.provider"] ?? "disabled"} onChange={(v) => set("email.provider", v)} className="w-full" options={[
+        <Separator />
+        <SectionLabel>Email (transactional)</SectionLabel>
+        <div className="flex flex-col gap-1.5">
+          <Label>Provider</Label>
+          <Select
+            value={cfg["email.provider"] ?? "disabled"}
+            onChange={(v) => set("email.provider", v)}
+            className="w-full"
+            options={[
               { value: "disabled", label: "Disabled" },
               { value: "cloudflare", label: "Cloudflare Email Sending" },
               { value: "mock", label: "Mock (development only)" },
-            ]} />
-            <p className="text-xs text-muted-foreground">
-              Mock logs the message instead of sending it, including sign-in codes — outside development it refuses rather than
-              reporting a delivery that never happened.
-            </p>
-          </div>
-          {field("email.from", "From address", "Scena <noreply@yourdomain>")}
-          {field("email.admin", "Send test emails to", "you@company.com", "Where the Send test button below delivers. Billing and screen notices go to each workspace's own owners, not here.")}
+            ]}
+          />
+          <p className="text-xs text-muted-foreground">
+            Mock logs the message instead of sending it, including sign-in codes — outside development it refuses rather than reporting a delivery that never
+            happened.
+          </p>
+        </div>
+        {field("email.from", "From address", "Scena <noreply@yourdomain>")}
+        {field(
+          "email.admin",
+          "Send test emails to",
+          "you@company.com",
+          "Where the Send test button below delivers. Billing and screen notices go to each workspace's own owners, not here.",
+        )}
 
-          <Separator />
-          <SectionLabel>Platform provider keys</SectionLabel>
-          {field("google.gemini_key", "Platform Gemini API key", "AIza…", "One key for all Google AI — Gemini/Lyria generation, queue voice announcements (Gemini TTS), and the model-registry Sync. Each generation is metered at the model's rate (Google's list price × markup) in credits — no BYO key.")}
-          {field("weather.api_key", "Platform OpenWeather key", "OpenWeather One Call key…", "Company key that powers every weather source (Sources → Weather). Empty ⇒ locations show mock conditions for free. Each real fetch charges the tenant the per-call price below.")}
-          <div className="flex flex-col gap-1.5">
-            <Label>OpenWeather One Call version</Label>
-            <Select value={cfg["weather.onecall_version"] ?? "4.0"} onChange={(v) => set("weather.onecall_version", v)} className="w-full" options={[{ value: "4.0", label: "4.0 (current)" }, { value: "3.0", label: "3.0 (legacy)" }]} />
-            <p className="text-[11px] text-muted-foreground">Match your key's subscription — a key is subscribed to one version, not both. New OpenWeather keys are 4.0.</p>
-          </div>
-          {field("weather.credits_per_call", "Weather credits per call", "3", "Credits charged per real weather fetch — per location, once an hour within its opening-hours window.")}
+        <Separator />
+        <SectionLabel>Platform provider keys</SectionLabel>
+        {field(
+          "google.gemini_key",
+          "Platform Gemini API key",
+          "AIza…",
+          "One key for all Google AI — Gemini/Lyria generation, queue voice announcements (Gemini TTS), and the model-registry Sync. Each generation is metered at the model's rate (Google's list price × markup) in credits — no BYO key.",
+        )}
+        {field(
+          "weather.api_key",
+          "Platform OpenWeather key",
+          "OpenWeather One Call key…",
+          "Company key that powers every weather source (Sources → Weather). Empty ⇒ locations show mock conditions for free. Each real fetch charges the tenant the per-call price below.",
+        )}
+        <div className="flex flex-col gap-1.5">
+          <Label>OpenWeather One Call version</Label>
+          <Select
+            value={cfg["weather.onecall_version"] ?? "4.0"}
+            onChange={(v) => set("weather.onecall_version", v)}
+            className="w-full"
+            options={[
+              { value: "4.0", label: "4.0 (current)" },
+              { value: "3.0", label: "3.0 (legacy)" },
+            ]}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Match your key's subscription — a key is subscribed to one version, not both. New OpenWeather keys are 4.0.
+          </p>
+        </div>
+        {field(
+          "weather.credits_per_call",
+          "Weather credits per call",
+          "3",
+          "Credits charged per real weather fetch — per location, once an hour within its opening-hours window.",
+        )}
 
-          <div className="flex items-center gap-2 pt-1">
-            <Button disabled={busy} onClick={save}>Save policy</Button>
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={async () => {
-                await save();
-                const r = await sendTestEmail();
-                if (r.skipped) toast.error("Email disabled — enable a provider first.");
-                else if (r.ok) toast.success(`Test email ${r.mocked ? "logged (mock)" : "sent"} to ${r.to}`);
-                else toast.error(`Test failed: ${r.error}`);
-              }}
-            >
-              Send test email
-            </Button>
-          </div>
-        </CardContent>
+        <div className="flex items-center gap-2 pt-1">
+          <Button disabled={busy} onClick={save}>
+            Save policy
+          </Button>
+          <Button
+            variant="outline"
+            disabled={busy}
+            onClick={async () => {
+              await save();
+              const r = await sendTestEmail();
+              if (r.skipped) toast.error("Email disabled — enable a provider first.");
+              else if (r.ok) toast.success(`Test email ${r.mocked ? "logged (mock)" : "sent"} to ${r.to}`);
+              else toast.error(`Test failed: ${r.error}`);
+            }}
+          >
+            Send test email
+          </Button>
+        </div>
       </Card>
     </div>
   );
@@ -329,8 +440,13 @@ export function StripeTab() {
 export function PlansTab() {
   const [plans, setPlans] = useState<Plan[] | null>(null);
   const [editing, setEditing] = useState<Plan | null>(null);
-  const reload = () => adminListPlans().then(setPlans).catch(() => {});
-  useEffect(() => { reload(); }, []);
+  const reload = () =>
+    adminListPlans()
+      .then(setPlans)
+      .catch(() => {});
+  useEffect(() => {
+    reload();
+  }, []);
   if (!plans) return <Loading />;
 
   async function savePrice(p: Plan, cents: number) {
@@ -345,43 +461,71 @@ export function PlansTab() {
       await adminSavePlan(p.id, { entitlements_json: JSON.stringify(ent) });
       toast.success(`Updated ${p.name} grant.`);
       await reload();
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="text-base">Plans &amp; entitlements</CardTitle>
-        <p className="text-sm text-muted-foreground">Edit price/grant inline and click away to save. <b>Configure</b> opens the full entitlements editor — changes apply to <b>every current and future tenant</b> on the plan (per-tenant overrides in the Tenants tab still win).</p>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Plan</TableHead>
-                <TableHead className="w-36">Price ¢/mo</TableHead>
-                <TableHead className="w-36">Grant cr/mo</TableHead>
-                <TableHead>Stripe</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Entitlements</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {plans.map((p) => (
-                <PlanRow key={p.id} plan={p} onPrice={savePrice} onGrant={saveGrant} onConfigure={() => setEditing(p)} />
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
-      {editing && <PlanEntitlementsModal plan={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload(); }} />}
+      <div className="mb-4">
+        <h3 className="text-base font-semibold leading-none text-base">Plans &amp; entitlements</h3>
+        <p className="text-sm text-muted-foreground">
+          Edit price/grant inline and click away to save. <b>Configure</b> opens the full entitlements editor — changes apply to{" "}
+          <b>every current and future tenant</b> on the plan (per-tenant overrides in the Tenants tab still win).
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Plan</TableHead>
+              <TableHead className="w-36">Price ¢/mo</TableHead>
+              <TableHead className="w-36">Grant cr/mo</TableHead>
+              <TableHead>Stripe</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Entitlements</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {plans.map((p) => (
+              <PlanRow key={p.id} plan={p} onPrice={savePrice} onGrant={saveGrant} onConfigure={() => setEditing(p)} />
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      {editing && (
+        <PlanEntitlementsModal
+          plan={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            reload();
+          }}
+        />
+      )}
     </Card>
   );
 }
 
-function PlanRow({ plan, onPrice, onGrant, onConfigure }: { plan: Plan; onPrice: (p: Plan, c: number) => void; onGrant: (p: Plan, g: number) => void; onConfigure: () => void }) {
-  const grant = (() => { try { return (JSON.parse(plan.entitlements_json) as { aiCredits?: { monthlyGrant?: number } }).aiCredits?.monthlyGrant ?? 0; } catch { return 0; } })();
+function PlanRow({
+  plan,
+  onPrice,
+  onGrant,
+  onConfigure,
+}: {
+  plan: Plan;
+  onPrice: (p: Plan, c: number) => void;
+  onGrant: (p: Plan, g: number) => void;
+  onConfigure: () => void;
+}) {
+  const grant = (() => {
+    try {
+      return (JSON.parse(plan.entitlements_json) as { aiCredits?: { monthlyGrant?: number } }).aiCredits?.monthlyGrant ?? 0;
+    } catch {
+      return 0;
+    }
+  })();
   const [price, setPrice] = useState(String(plan.price_cents));
   const [g, setG] = useState(String(grant));
   return (
@@ -391,7 +535,12 @@ function PlanRow({ plan, onPrice, onGrant, onConfigure }: { plan: Plan; onPrice:
         <div className="font-mono text-xs text-muted-foreground">{plan.id}</div>
       </TableCell>
       <TableCell>
-        <Input value={price} onChange={(e) => setPrice(e.target.value)} onBlur={() => onPrice(plan, Number(price) || 0)} className="h-9 w-28 font-mono tabular-nums" />
+        <Input
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          onBlur={() => onPrice(plan, Number(price) || 0)}
+          className="h-9 w-28 font-mono tabular-nums"
+        />
       </TableCell>
       <TableCell>
         <Input value={g} onChange={(e) => setG(e.target.value)} onBlur={() => onGrant(plan, Number(g) || 0)} className="h-9 w-28 font-mono tabular-nums" />
@@ -403,7 +552,9 @@ function PlanRow({ plan, onPrice, onGrant, onConfigure }: { plan: Plan; onPrice:
         </Pill>
       </TableCell>
       <TableCell className="text-right">
-        <Button size="sm" variant="outline" onClick={onConfigure}>Configure</Button>
+        <Button size="sm" variant="outline" onClick={onConfigure}>
+          Configure
+        </Button>
       </TableCell>
     </TableRow>
   );
@@ -427,9 +578,9 @@ const PLAN_QUOTAS = QUOTA_CATALOG;
 */
 const PLAN_BOOL_FEATURES = FEATURE_CATALOG;
 /** Features grouped by catalog category, in category order, for a tidy editor. */
-const FEATURE_GROUPS = FEATURE_CATEGORIES
-  .map((cat) => ({ cat, items: PLAN_BOOL_FEATURES.filter((f) => f.category === cat) }))
-  .filter((g) => g.items.length > 0);
+const FEATURE_GROUPS = FEATURE_CATEGORIES.map((cat) => ({ cat, items: PLAN_BOOL_FEATURES.filter((f) => f.category === cat) })).filter(
+  (g) => g.items.length > 0,
+);
 
 type PlanEnt = {
   quotas: Record<string, number>;
@@ -444,21 +595,27 @@ function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose
 
   useEffect(() => {
     let parsed: PlanEnt;
-    try { parsed = JSON.parse(plan.entitlements_json) as PlanEnt; } catch { parsed = { quotas: {}, features: {}, aiCredits: {} }; }
+    try {
+      parsed = JSON.parse(plan.entitlements_json) as PlanEnt;
+    } catch {
+      parsed = { quotas: {}, features: {}, aiCredits: {} };
+    }
     parsed.quotas ??= {};
     parsed.features ??= {};
     parsed.aiCredits ??= {};
     setEnt(parsed);
   }, [plan]);
 
-  const setQuota = (k: string, v: string) => setEnt((e) => e && ({ ...e, quotas: { ...e.quotas, [k]: v.trim() === "" || v.trim() === "-" ? 0 : Math.trunc(Number(v)) || 0 } }));
-  const setBool = (k: string, v: boolean) => setEnt((e) => e && ({ ...e, features: { ...e.features, [k]: v } }));
-  const toggleList = (k: string, opt: string) => setEnt((e) => {
-    if (!e) return e;
-    const cur = Array.isArray(e.features[k]) ? (e.features[k] as string[]) : [];
-    const next = cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt];
-    return { ...e, features: { ...e.features, [k]: next } };
-  });
+  const setQuota = (k: string, v: string) =>
+    setEnt((e) => e && { ...e, quotas: { ...e.quotas, [k]: v.trim() === "" || v.trim() === "-" ? 0 : Math.trunc(Number(v)) || 0 } });
+  const setBool = (k: string, v: boolean) => setEnt((e) => e && { ...e, features: { ...e.features, [k]: v } });
+  const toggleList = (k: string, opt: string) =>
+    setEnt((e) => {
+      if (!e) return e;
+      const cur = Array.isArray(e.features[k]) ? (e.features[k] as string[]) : [];
+      const next = cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt];
+      return { ...e, features: { ...e.features, [k]: next } };
+    });
 
   async function save() {
     if (!ent) return;
@@ -474,12 +631,20 @@ function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose
   }
 
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent title={<>{plan.name} — entitlements</>} className="flex max-h-[88dvh] flex-col overflow-hidden sm:max-w-3xl">
-      <DialogDescription>
-            Applies to <b>every current and future tenant</b> on <span className="font-mono">{plan.id}</span> (per-tenant overrides still win). <b>-1</b> = unlimited on any quota.
-          </DialogDescription>
-        {!ent ? <Loading /> : (
+        <DialogDescription>
+          Applies to <b>every current and future tenant</b> on <span className="font-mono">{plan.id}</span> (per-tenant overrides still win). <b>-1</b> =
+          unlimited on any quota.
+        </DialogDescription>
+        {!ent ? (
+          <Loading />
+        ) : (
           <>
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
               <div className="space-y-2">
@@ -488,7 +653,11 @@ function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose
                   {PLAN_QUOTAS.map((x) => (
                     <label key={x.key} className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
                       <span className="flex-1">{x.label}</span>
-                      <Input value={String(ent.quotas[x.key] ?? 0)} onChange={(e) => setQuota(x.key, e.target.value)} className="h-8 w-20 text-right font-mono tabular-nums" />
+                      <Input
+                        value={String(ent.quotas[x.key] ?? 0)}
+                        onChange={(e) => setQuota(x.key, e.target.value)}
+                        className="h-8 w-20 text-right font-mono tabular-nums"
+                      />
                     </label>
                   ))}
                 </div>
@@ -504,7 +673,11 @@ function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose
                         <label key={x.key} title={x.description} className="flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm">
                           <span className="flex-1 text-muted-foreground">
                             {x.label}
-                            {x.safety && <span className="ml-1.5 rounded bg-muted px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground/70">always on</span>}
+                            {x.safety && (
+                              <span className="ml-1.5 rounded bg-muted px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                                always on
+                              </span>
+                            )}
                           </span>
                           <Switch checked={Boolean(ent.features[x.key])} onCheckedChange={(v) => setBool(x.key, v)} />
                         </label>
@@ -516,12 +689,20 @@ function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose
 
               <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
                 <span className="flex-1">Monthly AI credit grant</span>
-                <Input value={String(ent.aiCredits.monthlyGrant ?? 0)} onChange={(e) => setEnt((s) => s && ({ ...s, aiCredits: { ...s.aiCredits, monthlyGrant: Math.trunc(Number(e.target.value)) || 0 } }))} className="h-8 w-24 text-right font-mono tabular-nums" />
+                <Input
+                  value={String(ent.aiCredits.monthlyGrant ?? 0)}
+                  onChange={(e) => setEnt((s) => s && { ...s, aiCredits: { ...s.aiCredits, monthlyGrant: Math.trunc(Number(e.target.value)) || 0 } })}
+                  className="h-8 w-24 text-right font-mono tabular-nums"
+                />
               </label>
             </div>
             <DialogFooter className="border-t pt-3">
-              <Button variant="ghost" onClick={onClose}>Cancel</Button>
-              <Button disabled={saving} onClick={save}>{saving ? "Saving…" : "Save entitlements"}</Button>
+              <Button variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button disabled={saving} onClick={save}>
+                {saving ? "Saving…" : "Save entitlements"}
+              </Button>
             </DialogFooter>
           </>
         )}
@@ -552,8 +733,13 @@ export function ModelsTab() {
   const [syncing, setSyncing] = useState(false);
   const [q, setQ] = useState("");
   const [task, setTask] = useState("all");
-  const reload = () => adminListModels().then(setModels).catch(() => {});
-  useEffect(() => { reload(); }, []);
+  const reload = () =>
+    adminListModels()
+      .then(setModels)
+      .catch(() => {});
+  useEffect(() => {
+    reload();
+  }, []);
 
   async function save(m: AdminModel, patch: Partial<AdminModel>) {
     await adminSaveModel(m.id, patch);
@@ -561,17 +747,22 @@ export function ModelsTab() {
   }
   async function resync() {
     setSyncing(true);
-    try { const r = await adminResyncModels(); toast.success(`Catalog synced · ${r.added} added, ${r.updated} updated`); await reload(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Re-sync failed"); }
-    finally { setSyncing(false); }
+    try {
+      const r = await adminResyncModels();
+      toast.success(`Catalog synced · ${r.added} added, ${r.updated} updated`);
+      await reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Re-sync failed");
+    } finally {
+      setSyncing(false);
+    }
   }
 
   const filtered = useMemo(() => {
     if (!models) return null;
     const needle = q.trim().toLowerCase();
-    return models.filter((m) =>
-      (task === "all" || m.task === task) &&
-      (!needle || m.label.toLowerCase().includes(needle) || m.cf_model.toLowerCase().includes(needle)),
+    return models.filter(
+      (m) => (task === "all" || m.task === task) && (!needle || m.label.toLowerCase().includes(needle) || m.cf_model.toLowerCase().includes(needle)),
     );
   }, [models, q, task]);
 
@@ -580,11 +771,14 @@ export function ModelsTab() {
 
   return (
     <Card>
-      <CardHeader className="gap-3">
+      <div className="mb-4 gap-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-base">AI model catalog &amp; pricing</CardTitle>
-            <p className="text-sm text-muted-foreground">Unit rates set the cost basis; Markup × sets the margin (3× ≈ 67%). Advanced models run on the platform key, metered at the provider's list price. Sync refreshes the live model catalog when the platform key is set.</p>
+            <h3 className="text-base font-semibold leading-none text-base">AI model catalog &amp; pricing</h3>
+            <p className="text-sm text-muted-foreground">
+              Unit rates set the cost basis; Markup × sets the margin (3× ≈ 67%). Advanced models run on the platform key, metered at the provider's list price.
+              Sync refreshes the live model catalog when the platform key is set.
+            </p>
           </div>
           <Button variant="outline" disabled={syncing} onClick={resync}>
             <RefreshCw className={cn("size-4", syncing && "animate-spin")} /> {syncing ? "Syncing…" : "Re-sync catalog"}
@@ -594,37 +788,41 @@ export function ModelsTab() {
           <SearchBox value={q} onChange={setQ} placeholder="Search models…" className="w-full sm:w-64" />
           <div className="flex flex-wrap gap-1.5">
             {TASK_FILTERS.map((t) => (
-              <Button key={t.id} size="sm" variant={task === t.id ? "default" : "outline"} onClick={() => setTask(t.id)}>{t.label}</Button>
+              <Button key={t.id} size="sm" variant={task === t.id ? "default" : "outline"} onClick={() => setTask(t.id)}>
+                {t.label}
+              </Button>
             ))}
           </div>
-          <span className="ml-auto text-sm text-muted-foreground tabular-nums">{filtered?.length ?? 0} shown · {enabled}/{models.length} enabled</span>
+          <span className="ml-auto text-sm text-muted-foreground tabular-nums">
+            {filtered?.length ?? 0} shown · {enabled}/{models.length} enabled
+          </span>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
+      </div>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Model</TableHead>
+              <TableHead>Provider</TableHead>
+              <TableHead>Task</TableHead>
+              <TableHead className="text-right">Cost basis</TableHead>
+              <TableHead className="w-24">Markup ×</TableHead>
+              <TableHead className="text-right">Enabled</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered && filtered.length > 0 ? (
+              filtered.map((m) => <ModelRow key={m.id} model={m} onSave={save} />)
+            ) : (
               <TableRow className="hover:bg-transparent">
-                <TableHead>Model</TableHead>
-                <TableHead>Provider</TableHead>
-                <TableHead>Task</TableHead>
-                <TableHead className="text-right">Cost basis</TableHead>
-                <TableHead className="w-24">Markup ×</TableHead>
-                <TableHead className="text-right">Enabled</TableHead>
+                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                  No models match your search.
+                </TableCell>
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered && filtered.length > 0 ? (
-                filtered.map((m) => <ModelRow key={m.id} model={m} onSave={save} />)
-              ) : (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">No models match your search.</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </Card>
   );
 }
@@ -634,11 +832,20 @@ function costBasis(m: AdminModel): React.ReactNode {
   if (m.task === "text") {
     const i = m.input_rate != null ? num(Math.round(m.input_rate)) : "—";
     const o = m.output_rate != null ? num(Math.round(m.output_rate)) : "—";
-    return <span className="font-mono tabular-nums text-muted-foreground">{i} in · {o} out<span className="ml-1 text-[10px] uppercase">/Mtok</span></span>;
+    return (
+      <span className="font-mono tabular-nums text-muted-foreground">
+        {i} in · {o} out<span className="ml-1 text-[10px] uppercase">/Mtok</span>
+      </span>
+    );
   }
   const r = m.unit_rate != null ? num(Math.round(m.unit_rate)) : "—";
   const unit = (m.unit_kind ?? "").replace(/_/g, " ") || "unit";
-  return <span className="font-mono tabular-nums text-muted-foreground">{r}<span className="ml-1 text-[10px] uppercase">{unit}</span></span>;
+  return (
+    <span className="font-mono tabular-nums text-muted-foreground">
+      {r}
+      <span className="ml-1 text-[10px] uppercase">{unit}</span>
+    </span>
+  );
 }
 
 function ModelRow({ model, onSave }: { model: AdminModel; onSave: (m: AdminModel, patch: Partial<AdminModel>) => void }) {
@@ -650,13 +857,24 @@ function ModelRow({ model, onSave }: { model: AdminModel; onSave: (m: AdminModel
         <div className="font-medium">{model.label}</div>
         <div className="font-mono text-xs text-muted-foreground">{model.cf_model}</div>
       </TableCell>
-      <TableCell><Pill tone={prov.tone}>{prov.label}</Pill></TableCell>
-      <TableCell><Badge className="capitalize">{model.task}</Badge></TableCell>
+      <TableCell>
+        <Pill tone={prov.tone}>{prov.label}</Pill>
+      </TableCell>
+      <TableCell>
+        <Badge className="capitalize">{model.task}</Badge>
+      </TableCell>
       <TableCell className="text-right">{costBasis(model)}</TableCell>
       <TableCell>
-        <Input value={markup} onChange={(e) => setMarkup(e.target.value)} onBlur={() => onSave(model, { markup: Number(markup) || model.markup })} className="h-9 w-20 font-mono tabular-nums" />
+        <Input
+          value={markup}
+          onChange={(e) => setMarkup(e.target.value)}
+          onBlur={() => onSave(model, { markup: Number(markup) || model.markup })}
+          className="h-9 w-20 font-mono tabular-nums"
+        />
       </TableCell>
-      <TableCell className="text-right"><Switch checked={model.enabled === 1} onCheckedChange={(c) => onSave(model, { enabled: c ? 1 : 0 })} /></TableCell>
+      <TableCell className="text-right">
+        <Switch checked={model.enabled === 1} onCheckedChange={(c) => onSave(model, { enabled: c ? 1 : 0 })} />
+      </TableCell>
     </TableRow>
   );
 }
@@ -667,8 +885,13 @@ export function LibraryTab() {
   const [q, setQ] = useState("");
   // null = closed · "new" = add · a track = edit.
   const [dialog, setDialog] = useState<LibraryTrack | "new" | null>(null);
-  const reload = () => adminListLibrary().then((r) => setTracks(r.tracks)).catch(() => setTracks([]));
-  useEffect(() => { reload(); }, []);
+  const reload = () =>
+    adminListLibrary()
+      .then((r) => setTracks(r.tracks))
+      .catch(() => setTracks([]));
+  useEffect(() => {
+    reload();
+  }, []);
   const close = () => setDialog(null);
   if (!tracks) return <Loading />;
 
@@ -678,7 +901,12 @@ export function LibraryTab() {
   const runtime = tracks.reduce((s, t) => s + t.duration_ms, 0);
 
   async function del(t: LibraryTrack) {
-    const ok = await confirmDialog({ title: `Delete “${t.title}”?`, description: "This removes the track from every tenant's public library.", confirmText: "Delete track", destructive: true });
+    const ok = await confirmDialog({
+      title: `Delete “${t.title}”?`,
+      description: "This removes the track from every tenant's public library.",
+      confirmText: "Delete track",
+      destructive: true,
+    });
     if (!ok) return;
     await adminDeleteLibraryTrack(t.id);
     reload();
@@ -693,65 +921,93 @@ export function LibraryTab() {
         <StatTile label="Total runtime" value={mmss(runtime)} />
       </div>
       <Card>
-        <CardHeader className="gap-3">
+        <div className="mb-4 gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <CardTitle className="text-base">Public library</CardTitle>
+              <h3 className="text-base font-semibold leading-none text-base">Public library</h3>
               <p className="text-sm text-muted-foreground">Licensed tracks available to every tenant whose plan includes the Music library.</p>
             </div>
             <div className="flex items-center gap-2">
               {tracks.length > 0 && <SearchBox value={q} onChange={setQ} placeholder="Search tracks…" className="w-full sm:w-56" />}
-              <Button onClick={() => setDialog("new")}><Plus className="size-4" /> Add track</Button>
+              <Button onClick={() => setDialog("new")}>
+                <Plus className="size-4" /> Add track
+              </Button>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
-          {tracks.length === 0 ? (
-            <EmptyState icon={Music} title="No public tracks yet" description="Upload licensed audio to build the shared library every tenant can use." action={<Button onClick={() => setDialog("new")}><Plus className="size-4" /> Add your first track</Button>} className="border-0 bg-transparent py-8" />
-          ) : visible.length === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">No tracks match your search.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Track</TableHead>
-                    <TableHead>Genre</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Length</TableHead>
-                    <TableHead className="w-20 text-right" />
+        </div>
+        {tracks.length === 0 ? (
+          <EmptyState
+            icon={Music}
+            title="No public tracks yet"
+            description="Upload licensed audio to build the shared library every tenant can use."
+            action={
+              <Button onClick={() => setDialog("new")}>
+                <Plus className="size-4" /> Add your first track
+              </Button>
+            }
+            className="border-0 bg-transparent py-8"
+          />
+        ) : visible.length === 0 ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">No tracks match your search.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Track</TableHead>
+                  <TableHead>Genre</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Length</TableHead>
+                  <TableHead className="w-20 text-right" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visible.map((t) => (
+                  <TableRow key={t.id} className="cursor-pointer" onClick={() => setDialog(t)}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground">
+                          {t.art_url ? <img src={t.art_url} alt="" className="size-full object-cover" /> : <Music className="size-4" />}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{t.title}</div>
+                          {t.artist ? <div className="truncate text-xs text-muted-foreground">{t.artist}</div> : null}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{t.genre || "Uncategorized"}</TableCell>
+                    <TableCell>
+                      {t.vocal ? (
+                        <Pill tone="muted" className="capitalize">
+                          {t.vocal}
+                        </Pill>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-mono tabular-nums text-muted-foreground">{mmss(t.duration_ms)}</TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" className="size-8" aria-label="Edit track" onClick={() => setDialog(t)}>
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="size-8 text-muted-foreground hover:text-destructive"
+                          aria-label="Delete track"
+                          onClick={() => del(t)}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visible.map((t) => (
-                    <TableRow key={t.id} className="cursor-pointer" onClick={() => setDialog(t)}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground">
-                            {t.art_url ? <img src={t.art_url} alt="" className="size-full object-cover" /> : <Music className="size-4" />}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="truncate font-medium">{t.title}</div>
-                            {t.artist ? <div className="truncate text-xs text-muted-foreground">{t.artist}</div> : null}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{t.genre || "Uncategorized"}</TableCell>
-                      <TableCell>{t.vocal ? <Pill tone="muted" className="capitalize">{t.vocal}</Pill> : <span className="text-muted-foreground">—</span>}</TableCell>
-                      <TableCell className="text-right font-mono tabular-nums text-muted-foreground">{mmss(t.duration_ms)}</TableCell>
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <div className="flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" className="size-8" aria-label="Edit track" onClick={() => setDialog(t)}><Pencil className="size-4" /></Button>
-                          <Button size="icon" variant="ghost" className="size-8 text-muted-foreground hover:text-destructive" aria-label="Delete track" onClick={() => del(t)}><Trash2 className="size-4" /></Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </Card>
       <TrackDialog track={dialog === "new" ? null : dialog} open={dialog !== null} onClose={close} onSaved={reload} />
     </div>
@@ -786,8 +1042,12 @@ function TrackDialog({ track, open, onClose, onSaved }: { track: LibraryTrack | 
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
-    try { const { hash, url } = await uploadAsset(f); setArt({ hash, url }); }
-    catch { toast.error("Could not upload cover art"); }
+    try {
+      const { hash, url } = await uploadAsset(f);
+      setArt({ hash, url });
+    } catch {
+      toast.error("Could not upload cover art");
+    }
   }
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -798,19 +1058,48 @@ function TrackDialog({ track, open, onClose, onSaved }: { track: LibraryTrack | 
   }
 
   async function submit() {
-    if (!genre.trim()) { toast.error("Pick a genre."); return; }
+    if (!genre.trim()) {
+      toast.error("Pick a genre.");
+      return;
+    }
     setBusy(true);
     try {
       if (editing && track) {
-        const r = await adminUpdateLibraryTrack(track.id, { genre: genre.trim(), title: title.trim(), artist: artist.trim(), vocal: vocal || null, artHash: art?.hash ?? null, artUrl: art?.url ?? null });
-        if (r.error) { toast.error(r.error); return; }
+        const r = await adminUpdateLibraryTrack(track.id, {
+          genre: genre.trim(),
+          title: title.trim(),
+          artist: artist.trim(),
+          vocal: vocal || null,
+          artHash: art?.hash ?? null,
+          artUrl: art?.url ?? null,
+        });
+        if (r.error) {
+          toast.error(r.error);
+          return;
+        }
         toast.success("Track updated.");
       } else {
-        if (!file) { toast.error("Choose an audio file."); return; }
+        if (!file) {
+          toast.error("Choose an audio file.");
+          return;
+        }
         const durationMs = await audioFileDuration(file);
         const { hash, url } = await uploadAsset(file);
-        const r = await adminAddLibraryTrack({ genre: genre.trim(), title: title.trim() || file.name.replace(/\.[^.]+$/, ""), artist: artist.trim(), assetHash: hash, assetUrl: url, durationMs, vocal: vocal || undefined, artHash: art?.hash, artUrl: art?.url });
-        if (r.error) { toast.error(r.error); return; }
+        const r = await adminAddLibraryTrack({
+          genre: genre.trim(),
+          title: title.trim() || file.name.replace(/\.[^.]+$/, ""),
+          artist: artist.trim(),
+          assetHash: hash,
+          assetUrl: url,
+          durationMs,
+          vocal: vocal || undefined,
+          artHash: art?.hash,
+          artUrl: art?.url,
+        });
+        if (r.error) {
+          toast.error(r.error);
+          return;
+        }
         toast.success("Added to the public library — licensed for every tenant with the Music library feature.");
       }
       onSaved();
@@ -823,13 +1112,18 @@ function TrackDialog({ track, open, onClose, onSaved }: { track: LibraryTrack | 
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent title={editing ? "Edit track" : "Add a track"} className="sm:max-w-md">
-      <DialogDescription>
-            {editing
-              ? "Update the track's details. The audio itself is immutable — delete and re-add to swap the file."
-              : "Upload audio the platform is licensed to share. It becomes available to every tenant whose plan includes the Music library."}
-          </DialogDescription>
+        <DialogDescription>
+          {editing
+            ? "Update the track's details. The audio itself is immutable — delete and re-add to swap the file."
+            : "Upload audio the platform is licensed to share. It becomes available to every tenant whose plan includes the Music library."}
+        </DialogDescription>
         <div className="flex flex-col gap-3 py-2">
           <div className="space-y-1.5">
             <Label>Genre</Label>
@@ -837,27 +1131,44 @@ function TrackDialog({ track, open, onClose, onSaved }: { track: LibraryTrack | 
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
-              <Label>Title <span className="font-normal text-muted-foreground">(optional)</span></Label>
+              <Label>
+                Title <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
               <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="from filename" />
             </div>
             <div className="space-y-1.5">
-              <Label>Artist <span className="font-normal text-muted-foreground">(optional)</span></Label>
+              <Label>
+                Artist <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
               <Input value={artist} onChange={(e) => setArtist(e.target.value)} />
             </div>
           </div>
           <div className="space-y-1.5">
             <Label>Type</Label>
-            <Select value={vocal || "unset"} onChange={(v) => setVocal(v === "unset" ? "" : (v as "vocal" | "instrumental"))} className="w-full" options={[
-              { value: "unset", label: "Unset" },
-              { value: "vocal", label: "Vocal" },
-              { value: "instrumental", label: "Instrumental" },
-            ]} />
+            <Select
+              value={vocal || "unset"}
+              onChange={(v) => setVocal(v === "unset" ? "" : (v as "vocal" | "instrumental"))}
+              className="w-full"
+              options={[
+                { value: "unset", label: "Unset" },
+                { value: "vocal", label: "Vocal" },
+                { value: "instrumental", label: "Instrumental" },
+              ]}
+            />
           </div>
           <input ref={artRef} type="file" accept="image/*" onChange={onArt} className="hidden" />
           <input ref={fileRef} type="file" accept="audio/*" onChange={onFile} className="hidden" />
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <Button variant="outline" onClick={() => artRef.current?.click()}>
-              {art ? <><ImagePlus className="size-4 text-success" /> Cover ✓</> : <><ImagePlus className="size-4" /> Cover art</>}
+              {art ? (
+                <>
+                  <ImagePlus className="size-4 text-success" /> Cover ✓
+                </>
+              ) : (
+                <>
+                  <ImagePlus className="size-4" /> Cover art
+                </>
+              )}
             </Button>
             {!editing && (
               <Button variant="outline" onClick={() => fileRef.current?.click()}>
@@ -867,7 +1178,9 @@ function TrackDialog({ track, open, onClose, onSaved }: { track: LibraryTrack | 
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
           <Button onClick={submit} disabled={busy}>
             {busy ? <Loader2 className="size-4 animate-spin" /> : null}
             {editing ? "Save changes" : "Add track"}
@@ -878,13 +1191,19 @@ function TrackDialog({ track, open, onClose, onSaved }: { track: LibraryTrack | 
   );
 }
 
-const mmss = (ms: number) => { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+const mmss = (ms: number) => {
+  const s = Math.round(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+};
 
 function audioFileDuration(file: File): Promise<number> {
   return new Promise((resolve, reject) => {
     const el = document.createElement("audio");
     el.preload = "metadata";
-    el.onloadedmetadata = () => { URL.revokeObjectURL(el.src); resolve(Number.isFinite(el.duration) ? Math.round(el.duration * 1000) : 0); };
+    el.onloadedmetadata = () => {
+      URL.revokeObjectURL(el.src);
+      resolve(Number.isFinite(el.duration) ? Math.round(el.duration * 1000) : 0);
+    };
     el.onerror = () => reject(new Error("could not read audio"));
     el.src = URL.createObjectURL(file);
   });
@@ -895,64 +1214,96 @@ export function PromosTab() {
   const [promos, setPromos] = useState<PromoCode[] | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const reload = () => adminListPromos().then(setPromos).catch(() => {});
-  useEffect(() => { reload(); adminListPlans().then(setPlans).catch(() => {}); }, []);
+  const reload = () =>
+    adminListPromos()
+      .then(setPromos)
+      .catch(() => {});
+  useEffect(() => {
+    reload();
+    adminListPlans()
+      .then(setPlans)
+      .catch(() => {});
+  }, []);
   const close = () => setDialogOpen(false);
   if (!promos) return <Loading />;
 
   return (
     <>
-    <Card>
-      <CardHeader className="gap-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <CardTitle className="text-base">Promo codes <span className="ml-1 text-sm font-normal text-muted-foreground tabular-nums">{promos.length}</span></CardTitle>
-            <p className="text-sm text-muted-foreground">Gift credits or a comped plan to a tenant.</p>
+      <Card>
+        <div className="mb-4 gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-base font-semibold leading-none text-base">
+                Promo codes <span className="ml-1 text-sm font-normal text-muted-foreground tabular-nums">{promos.length}</span>
+              </h3>
+              <p className="text-sm text-muted-foreground">Gift credits or a comped plan to a tenant.</p>
+            </div>
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="size-4" /> New code
+            </Button>
           </div>
-          <Button onClick={() => setDialogOpen(true)}><Plus className="size-4" /> New code</Button>
         </div>
-      </CardHeader>
-      <CardContent>
         {promos.length === 0 ? (
-          <EmptyState icon={Ticket} title="No promo codes yet" description="Create a credit top-up or plan gift to share with a tenant." action={<Button onClick={() => setDialogOpen(true)}><Plus className="size-4" /> Create a code</Button>} className="border-0 bg-transparent py-8" />
+          <EmptyState
+            icon={Ticket}
+            title="No promo codes yet"
+            description="Create a credit top-up or plan gift to share with a tenant."
+            action={
+              <Button onClick={() => setDialogOpen(true)}>
+                <Plus className="size-4" /> Create a code
+              </Button>
+            }
+            className="border-0 bg-transparent py-8"
+          />
         ) : (
           <div className="overflow-x-auto">
             <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Code</TableHead>
-                    <TableHead>Reward</TableHead>
-                    <TableHead className="text-right">Used</TableHead>
-                    <TableHead className="hidden md:table-cell">Note</TableHead>
-                    <TableHead className="w-24 text-right" />
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Code</TableHead>
+                  <TableHead>Reward</TableHead>
+                  <TableHead className="text-right">Used</TableHead>
+                  <TableHead className="hidden md:table-cell">Note</TableHead>
+                  <TableHead className="w-24 text-right" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {promos.map((p) => (
+                  <TableRow key={p.code}>
+                    <TableCell>
+                      <span className="flex items-center gap-2 font-mono text-sm font-semibold">
+                        {p.code}
+                        {p.active ? null : <Pill tone="muted">off</Pill>}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <Pill tone={p.kind === "plan" ? "primary" : "info"}>
+                        {p.kind === "plan" ? `Gift ${p.plan_id} · ${p.plan_months}mo` : `${num(p.credits ?? 0)} cr`}
+                      </Pill>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {p.redeemed_count}
+                      {p.max_redemptions ? `/${p.max_redemptions}` : ""}
+                    </TableCell>
+                    <TableCell className="hidden max-w-[220px] truncate text-muted-foreground md:table-cell">{p.note || "—"}</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={async () => {
+                          await adminTogglePromo(p.code);
+                          await reload();
+                        }}
+                      >
+                        {p.active ? "Disable" : "Enable"}
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {promos.map((p) => (
-                    <TableRow key={p.code}>
-                      <TableCell>
-                        <span className="flex items-center gap-2 font-mono text-sm font-semibold">
-                          {p.code}
-                          {p.active ? null : <Pill tone="muted">off</Pill>}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Pill tone={p.kind === "plan" ? "primary" : "info"}>
-                          {p.kind === "plan" ? `Gift ${p.plan_id} · ${p.plan_months}mo` : `${num(p.credits ?? 0)} cr`}
-                        </Pill>
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">{p.redeemed_count}{p.max_redemptions ? `/${p.max_redemptions}` : ""}</TableCell>
-                      <TableCell className="hidden max-w-[220px] truncate text-muted-foreground md:table-cell">{p.note || "—"}</TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" variant="ghost" onClick={async () => { await adminTogglePromo(p.code); await reload(); }}>{p.active ? "Disable" : "Enable"}</Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </Card>
       <PromoDialog open={dialogOpen} plans={plans} onClose={close} onSaved={reload} />
     </>
@@ -963,7 +1314,9 @@ export function PromosTab() {
 function PromoDialog({ open, plans, onClose, onSaved }: { open: boolean; plans: Plan[]; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({ code: "", kind: "credits", credits: "1000", planId: "pro", planMonths: "12", maxRedemptions: "", note: "" });
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (open) setForm({ code: "", kind: "credits", credits: "1000", planId: "pro", planMonths: "12", maxRedemptions: "", note: "" }); }, [open]);
+  useEffect(() => {
+    if (open) setForm({ code: "", kind: "credits", credits: "1000", planId: "pro", planMonths: "12", maxRedemptions: "", note: "" });
+  }, [open]);
 
   async function create() {
     if (!form.code.trim()) return;
@@ -978,7 +1331,10 @@ function PromoDialog({ open, plans, onClose, onSaved }: { open: boolean; plans: 
         maxRedemptions: form.maxRedemptions ? Number(form.maxRedemptions) : null,
         note: form.note,
       });
-      if (r.error) { toast.error(r.error === "code exists" ? "That code already exists." : r.error); return; }
+      if (r.error) {
+        toast.error(r.error === "code exists" ? "That code already exists." : r.error);
+        return;
+      }
       toast.success(`Created ${form.code.trim()}.`);
       onSaved();
       onClose();
@@ -988,13 +1344,24 @@ function PromoDialog({ open, plans, onClose, onSaved }: { open: boolean; plans: 
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent title="New promo code" className="sm:max-w-md">
-      <DialogDescription>Gift credits or a comped plan to a tenant. They redeem it from their Billing page.</DialogDescription>
+        <DialogDescription>Gift credits or a comped plan to a tenant. They redeem it from their Billing page.</DialogDescription>
         <div className="flex flex-col gap-3 py-2">
           <div className="space-y-1.5">
             <Label>Code</Label>
-            <Input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="WELCOME2026" className="font-mono uppercase" autoFocus />
+            <Input
+              value={form.code}
+              onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
+              placeholder="WELCOME2026"
+              className="font-mono uppercase"
+              autoFocus
+            />
           </div>
           <div className="flex gap-2">
             {(["credits", "plan"] as const).map((k) => (
@@ -1012,9 +1379,12 @@ function PromoDialog({ open, plans, onClose, onSaved }: { open: boolean; plans: 
             <div className="flex gap-2">
               <div className="flex-1 space-y-1.5">
                 <Label>Plan</Label>
-                <Select value={form.planId} onChange={(v) => setForm({ ...form, planId: v })} className="w-full" options={[
-                  ...plans.map((p) => ({ value: p.id, label: p.name })),
-                ]} />
+                <Select
+                  value={form.planId}
+                  onChange={(v) => setForm({ ...form, planId: v })}
+                  className="w-full"
+                  options={[...plans.map((p) => ({ value: p.id, label: p.name }))]}
+                />
               </div>
               <div className="w-24 space-y-1.5">
                 <Label>Months</Label>
@@ -1023,7 +1393,9 @@ function PromoDialog({ open, plans, onClose, onSaved }: { open: boolean; plans: 
             </div>
           )}
           <div className="space-y-1.5">
-            <Label>Max redemptions <span className="font-normal text-muted-foreground">(blank = ∞)</span></Label>
+            <Label>
+              Max redemptions <span className="font-normal text-muted-foreground">(blank = ∞)</span>
+            </Label>
             <Input value={form.maxRedemptions} onChange={(e) => setForm({ ...form, maxRedemptions: e.target.value })} className="font-mono tabular-nums" />
           </div>
           <div className="space-y-1.5">
@@ -1032,8 +1404,12 @@ function PromoDialog({ open, plans, onClose, onSaved }: { open: boolean; plans: 
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={create} disabled={busy || !form.code.trim()}>{busy ? <Loader2 className="size-4 animate-spin" /> : null}Create code</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={create} disabled={busy || !form.code.trim()}>
+            {busy ? <Loader2 className="size-4 animate-spin" /> : null}Create code
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -1052,8 +1428,13 @@ export function TenantsTab() {
   const [overridesFor, setOverridesFor] = useState<string | null>(null);
   const [creditsFor, setCreditsFor] = useState<AdminTenant | null>(null);
   const [q, setQ] = useState("");
-  const reload = () => adminListTenants().then(setTenants).catch(() => {});
-  useEffect(() => { reload(); }, []);
+  const reload = () =>
+    adminListTenants()
+      .then(setTenants)
+      .catch(() => {});
+  useEffect(() => {
+    reload();
+  }, []);
 
   async function life(t: AdminTenant, action: "suspend" | "reactivate" | "delete") {
     if (action === "delete") {
@@ -1094,75 +1475,99 @@ export function TenantsTab() {
       </div>
 
       <Card>
-        <CardHeader className="gap-3">
+        <div className="mb-4 gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <CardTitle className="text-base">Tenants</CardTitle>
+              <h3 className="text-base font-semibold leading-none text-base">Tenants</h3>
               <p className="text-sm text-muted-foreground">Adjust credits, entitlement overrides, and lifecycle.</p>
             </div>
-            <Button variant="outline" onClick={sweep}><RefreshCw className="size-4" /> Run lifecycle sweep</Button>
+            <Button variant="outline" onClick={sweep}>
+              <RefreshCw className="size-4" /> Run lifecycle sweep
+            </Button>
           </div>
           {tenants.length > 0 && <SearchBox value={q} onChange={setQ} placeholder="Search tenants…" className="w-full sm:w-64" />}
-        </CardHeader>
-        <CardContent>
-          {tenants.length === 0 ? (
-            <EmptyState icon={Users} title="No tenants yet" description="Tenants appear here once workspaces sign up." className="border-0 bg-transparent py-8" />
-          ) : visible && visible.length === 0 ? (
-            <div className="py-10 text-center text-sm text-muted-foreground">No tenants match your search.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Tenant</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(visible ?? []).map((t) => {
-                    const tone = TENANT_TONE[t.status] ?? "muted";
-                    const isDemo = t.tenant_id === DEMO_TENANT_ID;
-                    return (
-                      <TableRow key={t.tenant_id}>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-sm font-semibold">{t.tenant_id}</span>
-                            {isDemo ? <Pill tone="muted">demo · system</Pill> : null}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="flex items-center gap-1.5">
-                            <span className="capitalize text-muted-foreground">{t.plan_id}</span>
-                            {t.comp ? <Pill tone="info">comped</Pill> : null}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <Pill tone={tone}><StatusDot tone={tone} /> <span className="capitalize">{t.status.replace(/_/g, " ")}</span></Pill>
-                        </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums">{num(t.balance)}</TableCell>
-                        <TableCell>
-                          <div className="flex shrink-0 justify-end gap-1.5">
-                            <Button size="sm" variant="ghost" onClick={() => setOverridesFor(t.tenant_id)}>Overrides</Button>
-                            <Button size="sm" variant="ghost" onClick={() => setCreditsFor(t)}>Credits</Button>
-                            {isDemo ? null : t.status === "suspended"
-                              ? <Button size="sm" variant="ghost" onClick={() => life(t, "reactivate")}>Reactivate</Button>
-                              : <Button size="sm" variant="ghost" onClick={() => life(t, "suspend")}>Suspend</Button>}
-                            {isDemo ? null : <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => life(t, "delete")}>Delete</Button>}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
+        </div>
+        {tenants.length === 0 ? (
+          <EmptyState icon={Users} title="No tenants yet" description="Tenants appear here once workspaces sign up." className="border-0 bg-transparent py-8" />
+        ) : visible && visible.length === 0 ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">No tenants match your search.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Tenant</TableHead>
+                  <TableHead>Plan</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(visible ?? []).map((t) => {
+                  const tone = TENANT_TONE[t.status] ?? "muted";
+                  const isDemo = t.tenant_id === DEMO_TENANT_ID;
+                  return (
+                    <TableRow key={t.tenant_id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm font-semibold">{t.tenant_id}</span>
+                          {isDemo ? <Pill tone="muted">demo · system</Pill> : null}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="flex items-center gap-1.5">
+                          <span className="capitalize text-muted-foreground">{t.plan_id}</span>
+                          {t.comp ? <Pill tone="info">comped</Pill> : null}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Pill tone={tone}>
+                          <StatusDot tone={tone} /> <span className="capitalize">{t.status.replace(/_/g, " ")}</span>
+                        </Pill>
+                      </TableCell>
+                      <TableCell className="text-right font-mono tabular-nums">{num(t.balance)}</TableCell>
+                      <TableCell>
+                        <div className="flex shrink-0 justify-end gap-1.5">
+                          <Button size="sm" variant="ghost" onClick={() => setOverridesFor(t.tenant_id)}>
+                            Overrides
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setCreditsFor(t)}>
+                            Credits
+                          </Button>
+                          {isDemo ? null : t.status === "suspended" ? (
+                            <Button size="sm" variant="ghost" onClick={() => life(t, "reactivate")}>
+                              Reactivate
+                            </Button>
+                          ) : (
+                            <Button size="sm" variant="ghost" onClick={() => life(t, "suspend")}>
+                              Suspend
+                            </Button>
+                          )}
+                          {isDemo ? null : (
+                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => life(t, "delete")}>
+                              Delete
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </Card>
-      {overridesFor && <OverridesModal tenantId={overridesFor} onClose={() => { setOverridesFor(null); reload(); }} />}
+      {overridesFor && (
+        <OverridesModal
+          tenantId={overridesFor}
+          onClose={() => {
+            setOverridesFor(null);
+            reload();
+          }}
+        />
+      )}
       <AdjustCreditsModal tenant={creditsFor} onClose={() => setCreditsFor(null)} onDone={reload} />
     </div>
   );
@@ -1172,7 +1577,9 @@ export function TenantsTab() {
 function AdjustCreditsModal({ tenant, onClose, onDone }: { tenant: AdminTenant | null; onClose: () => void; onDone: () => void }) {
   const [amount, setAmount] = useState("1000");
   const [saving, setSaving] = useState(false);
-  useEffect(() => { if (tenant) setAmount("1000"); }, [tenant]);
+  useEffect(() => {
+    if (tenant) setAmount("1000");
+  }, [tenant]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1189,19 +1596,28 @@ function AdjustCreditsModal({ tenant, onClose, onDone }: { tenant: AdminTenant |
   }
 
   return (
-    <Dialog open={Boolean(tenant)} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open={Boolean(tenant)}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent title="Adjust credits" className="sm:max-w-sm">
         <form onSubmit={submit}>
-      <DialogDescription>
-              Add credits to <span className="font-mono">{tenant?.tenant_id}</span>. Use a negative amount to remove.
-            </DialogDescription>
+          <DialogDescription>
+            Add credits to <span className="font-mono">{tenant?.tenant_id}</span>. Use a negative amount to remove.
+          </DialogDescription>
           <div className="py-4">
             <Label>Amount</Label>
             <Input autoFocus value={amount} onChange={(e) => setAmount(e.target.value)} className="mt-1.5 font-mono tabular-nums" />
           </div>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button type="submit" disabled={saving}>{saving ? "Saving…" : "Apply"}</Button>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving}>
+              {saving ? "Saving…" : "Apply"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -1226,12 +1642,18 @@ function OverridesModal({ tenantId, onClose }: { tenantId: string; onClose: () =
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    adminGetTenantEntitlements(tenantId).then((d) => {
-      setData(d);
-      setQ(Object.fromEntries(OVR_QUOTAS.map((x) => [x.key, d.overrides.quotas?.[x.key] != null ? String(d.overrides.quotas![x.key]) : ""])));
-      setF(Object.fromEntries(OVR_FEATURES.map((x) => [x.key, d.overrides.features?.[x.key] == null ? "inherit" : d.overrides.features[x.key] ? "on" : "off"])) as Record<string, "inherit" | "on" | "off">);
-      setGrant(d.overrides.aiCredits?.monthlyGrant != null ? String(d.overrides.aiCredits.monthlyGrant) : "");
-    }).catch(() => {});
+    adminGetTenantEntitlements(tenantId)
+      .then((d) => {
+        setData(d);
+        setQ(Object.fromEntries(OVR_QUOTAS.map((x) => [x.key, d.overrides.quotas?.[x.key] != null ? String(d.overrides.quotas![x.key]) : ""])));
+        setF(
+          Object.fromEntries(
+            OVR_FEATURES.map((x) => [x.key, d.overrides.features?.[x.key] == null ? "inherit" : d.overrides.features[x.key] ? "on" : "off"]),
+          ) as Record<string, "inherit" | "on" | "off">,
+        );
+        setGrant(d.overrides.aiCredits?.monthlyGrant != null ? String(d.overrides.aiCredits.monthlyGrant) : "");
+      })
+      .catch(() => {});
   }, [tenantId]);
 
   async function save() {
@@ -1239,7 +1661,9 @@ function OverridesModal({ tenantId, onClose }: { tenantId: string; onClose: () =
     const quotas: Record<string, number> = {};
     for (const { key } of OVR_QUOTAS) if (q[key]?.trim() !== "" && q[key] != null && !Number.isNaN(Number(q[key]))) quotas[key] = Math.trunc(Number(q[key]));
     const features: Record<string, boolean> = {};
-    for (const { key } of OVR_FEATURES) if (f[key] === "on") features[key] = true; else if (f[key] === "off") features[key] = false;
+    for (const { key } of OVR_FEATURES)
+      if (f[key] === "on") features[key] = true;
+      else if (f[key] === "off") features[key] = false;
     const overrides: { quotas?: Record<string, number>; features?: Record<string, boolean>; aiCredits?: { monthlyGrant: number } } = {};
     if (Object.keys(quotas).length) overrides.quotas = quotas;
     if (Object.keys(features).length) overrides.features = features;
@@ -1253,12 +1677,20 @@ function OverridesModal({ tenantId, onClose }: { tenantId: string; onClose: () =
   const planQ = data?.plan.quotas ?? {};
   const planGrant = data?.plan.aiCredits.monthlyGrant ?? 0;
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent title="Entitlement overrides" className="flex max-h-[88dvh] flex-col overflow-hidden sm:max-w-2xl">
-      <DialogDescription>
-            Gift extra allowances on top of <b>{data?.planId ?? "…"}</b> for <span className="font-mono">{tenantId}</span>. Blank = inherit the plan (the plan value is shown as a hint). -1 = unlimited.
-          </DialogDescription>
-        {!data ? <Loading /> : (
+        <DialogDescription>
+          Gift extra allowances on top of <b>{data?.planId ?? "…"}</b> for <span className="font-mono">{tenantId}</span>. Blank = inherit the plan (the plan
+          value is shown as a hint). -1 = unlimited.
+        </DialogDescription>
+        {!data ? (
+          <Loading />
+        ) : (
           <>
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
               <div className="space-y-2">
@@ -1267,7 +1699,12 @@ function OverridesModal({ tenantId, onClose }: { tenantId: string; onClose: () =
                   {OVR_QUOTAS.map((x) => (
                     <label key={x.key} className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
                       <span className="flex-1">{x.label}</span>
-                      <Input value={q[x.key] ?? ""} onChange={(e) => setQ({ ...q, [x.key]: e.target.value })} placeholder={String(planQ[x.key] ?? 0)} className="h-8 w-20 text-right font-mono tabular-nums" />
+                      <Input
+                        value={q[x.key] ?? ""}
+                        onChange={(e) => setQ({ ...q, [x.key]: e.target.value })}
+                        placeholder={String(planQ[x.key] ?? 0)}
+                        className="h-8 w-20 text-right font-mono tabular-nums"
+                      />
                     </label>
                   ))}
                 </div>
@@ -1278,24 +1715,47 @@ function OverridesModal({ tenantId, onClose }: { tenantId: string; onClose: () =
                   {OVR_FEATURES.map((x) => (
                     <label key={x.key} className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
                       <span className="flex-1">{x.label}</span>
-                      <Select value={f[x.key] ?? "inherit"} onChange={(v) => setF({ ...f, [x.key]: v as "inherit" | "on" | "off" })} className="h-8 w-28" options={[
-                        { value: "inherit", label: "Inherit" },
-                        { value: "on", label: "Grant on" },
-                        { value: "off", label: "Force off" },
-                      ]} />
+                      <Select
+                        value={f[x.key] ?? "inherit"}
+                        onChange={(v) => setF({ ...f, [x.key]: v as "inherit" | "on" | "off" })}
+                        className="h-8 w-28"
+                        options={[
+                          { value: "inherit", label: "Inherit" },
+                          { value: "on", label: "Grant on" },
+                          { value: "off", label: "Force off" },
+                        ]}
+                      />
                     </label>
                   ))}
                 </div>
               </div>
-                            <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
+              <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm text-muted-foreground">
                 <span className="flex-1">Monthly AI credit grant</span>
-                <Input value={grant} onChange={(e) => setGrant(e.target.value)} placeholder={String(planGrant)} className="h-8 w-24 text-right font-mono tabular-nums" />
+                <Input
+                  value={grant}
+                  onChange={(e) => setGrant(e.target.value)}
+                  placeholder={String(planGrant)}
+                  className="h-8 w-24 text-right font-mono tabular-nums"
+                />
               </label>
             </div>
             <DialogFooter className="border-t pt-3">
-              <Button variant="ghost" onClick={() => { setQ(Object.fromEntries(OVR_QUOTAS.map((x) => [x.key, ""]))); setF(Object.fromEntries(OVR_FEATURES.map((x) => [x.key, "inherit"])) as Record<string, "inherit" | "on" | "off">); setGrant(""); }}>Clear all</Button>
-              <Button variant="ghost" onClick={onClose}>Cancel</Button>
-              <Button disabled={saving} onClick={save}>{saving ? "Saving…" : "Save overrides"}</Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setQ(Object.fromEntries(OVR_QUOTAS.map((x) => [x.key, ""])));
+                  setF(Object.fromEntries(OVR_FEATURES.map((x) => [x.key, "inherit"])) as Record<string, "inherit" | "on" | "off">);
+                  setGrant("");
+                }}
+              >
+                Clear all
+              </Button>
+              <Button variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button disabled={saving} onClick={save}>
+                {saving ? "Saving…" : "Save overrides"}
+              </Button>
             </DialogFooter>
           </>
         )}

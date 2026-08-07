@@ -11,10 +11,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  Plus, Music, Music2, Upload, Trash2, Shuffle, Search, Tag as TagIcon,
-  Pencil, GripVertical, SlidersHorizontal, Sparkles, Library, Images, ShieldCheck, Mic, Disc3,
+  Plus,
+  Music,
+  Music2,
+  Upload,
+  Trash2,
+  Shuffle,
+  Search,
+  Tag as TagIcon,
+  Pencil,
+  GripVertical,
+  SlidersHorizontal,
+  Sparkles,
+  Library,
+  Images,
+  ShieldCheck,
+  Mic,
+  Disc3,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
 import { PageHeader } from "../components/page-header.js";
 import { TagEditor } from "../components/tag-editor.js";
@@ -25,14 +39,51 @@ import { offerPublishAffected } from "../components/publish-affected.js";
 import { TrackMetaDialog, mmss } from "../components/track-meta-dialog.js";
 import { LicenseBadge, LicenseNote } from "../components/licensing.js";
 import { MediaPicker } from "./MediaLibrary.js";
-import { Badge, Button, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Input, Label, LoadError, Row, Select, Skeleton, Switch, Textarea, toast } from "@4dl/ui";
+import {
+  Badge,
+  Button,
+  cn,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Input,
+  Label,
+  LoadError,
+  Row,
+  Select,
+  Skeleton,
+  Switch,
+  Textarea,
+  toast,
+} from "@4dl/ui";
 import { PlaylistLibrary } from "../components/playlist-library.js";
 import { EmptyState } from "../components/empty.js";
 import {
-  listMusicPlaylists, createMusicPlaylist, getMusicPlaylist, updateMusicPlaylist, deleteMusicPlaylist,
-  addPlaylistTrack, updatePlaylistTrack, deletePlaylistTrack, reorderPlaylistTracksApi, addPublicTrackToPlaylist,
-  uploadToLibrary, registerMedia, aiGenerate, listAiModels, browseLibrary, assetUrl,
-  type MusicPlaylist, type PlaylistTrack, type Media, type AiModel, type LibraryBrowse,
+  listMusicPlaylists,
+  createMusicPlaylist,
+  getMusicPlaylist,
+  updateMusicPlaylist,
+  deleteMusicPlaylist,
+  addPlaylistTrack,
+  updatePlaylistTrack,
+  deletePlaylistTrack,
+  reorderPlaylistTracksApi,
+  addPublicTrackToPlaylist,
+  uploadToLibrary,
+  registerMedia,
+  aiGenerate,
+  listAiModels,
+  browseLibrary,
+  assetUrl,
+  type MusicPlaylist,
+  type PlaylistTrack,
+  type Media,
+  type AiModel,
+  type LibraryBrowse,
 } from "../api.js";
 
 /** Long-form total-duration label (e.g. "3 tracks · 12 min"). */
@@ -66,7 +117,12 @@ function subLine(p: MusicPlaylist): string {
 function parseGenres(raw: string | null | undefined): string[] {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw;
-  try { const v = JSON.parse(raw); return Array.isArray(v) ? v.filter((x) => typeof x === "string") : []; } catch { return []; }
+  try {
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
 }
 
 /* ================================ List view ============================== */
@@ -79,9 +135,13 @@ export function MusicPlaylistsPage() {
 
   const reload = () => {
     setError(null);
-    return listMusicPlaylists().then(setPlaylists).catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    return listMusicPlaylists()
+      .then(setPlaylists)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   };
-  useEffect(() => { reload(); }, []);
+  useEffect(() => {
+    reload();
+  }, []);
 
   /*
     The failed-load branch here was its own bug, distinct from the slide list's:
@@ -116,13 +176,7 @@ export function MusicPlaylistsPage() {
       // list view has.
       searchText={(p) => (p.genres ?? []).join(" ")}
       row={(p, menu) => (
-        <Row
-          icon={p.shuffle ? Shuffle : Music}
-          iconTone="primary"
-          onClick={() => navigate(`/music/${p.id}`)}
-          sub={subLine(p)}
-          trailing={menu}
-        >
+        <Row icon={p.shuffle ? Shuffle : Music} iconTone="primary" onClick={() => navigate(`/music/${p.id}`)} sub={subLine(p)} trailing={menu}>
           {p.name}
         </Row>
       )}
@@ -163,7 +217,9 @@ export function MusicPlaylistDetailPage() {
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   };
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    load();
+  }, [id]);
 
   async function uploadMany(files: FileList | null) {
     if (!files?.length) return;
@@ -171,13 +227,22 @@ export function MusicPlaylistDetailPage() {
     try {
       for (const file of Array.from(files)) {
         const m = await uploadToLibrary(file); // lands in the Media library (kind=audio)
-        await addPlaylistTrack(id, { title: file.name.replace(/\.[^.]+$/, ""), assetHash: m.hash, assetUrl: m.url, durationMs: m.durationMs ?? 1000, mediaId: m.id });
+        await addPlaylistTrack(id, {
+          title: file.name.replace(/\.[^.]+$/, ""),
+          assetHash: m.hash,
+          assetUrl: m.url,
+          durationMs: m.durationMs ?? 1000,
+          mediaId: m.id,
+        });
       }
       await load();
       toast.success(`${files.length} track${files.length === 1 ? "" : "s"} added.`);
       void offerPublishAffected("music", id);
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Upload failed"); }
-    finally { setBusy(false); }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   /** Turn Media-library audio into tracks (media stays in the library). */
@@ -185,10 +250,17 @@ export function MusicPlaylistDetailPage() {
     for (const m of items) {
       if (m.kind !== "audio" || !m.asset_hash || !m.asset_url) continue;
       await addPlaylistTrack(id, {
-        title: m.name, artist: m.artist ?? undefined, album: m.album ?? undefined,
-        assetHash: m.asset_hash, assetUrl: m.asset_url, durationMs: m.duration_ms ?? 1000,
-        artHash: m.art_hash ?? undefined, artUrl: m.art_url ?? undefined,
-        genres: parseGenres(m.genres), vocal: m.vocal ?? undefined, mediaId: m.id,
+        title: m.name,
+        artist: m.artist ?? undefined,
+        album: m.album ?? undefined,
+        assetHash: m.asset_hash,
+        assetUrl: m.asset_url,
+        durationMs: m.duration_ms ?? 1000,
+        artHash: m.art_hash ?? undefined,
+        artUrl: m.art_url ?? undefined,
+        genres: parseGenres(m.genres),
+        vocal: m.vocal ?? undefined,
+        mediaId: m.id,
       });
     }
     await load();
@@ -200,22 +272,43 @@ export function MusicPlaylistDetailPage() {
     const ok = await confirmDialog({
       title: `Remove “${title}”?`,
       description: "It leaves this playlist but stays in your Media library.",
-      confirmText: "Remove track", destructive: true,
+      confirmText: "Remove track",
+      destructive: true,
     });
     if (!ok) return;
-    try { await deletePlaylistTrack(id, tid); await load(); toast.success("Track removed."); void offerPublishAffected("music", id); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Could not remove track"); }
+    try {
+      await deletePlaylistTrack(id, tid);
+      await load();
+      toast.success("Track removed.");
+      void offerPublishAffected("music", id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not remove track");
+    }
   }
 
   function drop(to: number) {
-    if (drag === null || drag === to) { setDrag(null); setOver(null); return; }
+    if (drag === null || drag === to) {
+      setDrag(null);
+      setOver(null);
+      return;
+    }
     const next = [...tracks];
     const [moved] = next.splice(drag, 1);
-    if (!moved) { setDrag(null); setOver(null); return; }
+    if (!moved) {
+      setDrag(null);
+      setOver(null);
+      return;
+    }
     next.splice(to, 0, moved);
     setPl((p) => (p ? { ...p, tracks: next } : p));
-    reorderPlaylistTracksApi(id, next.map((t) => t.id)).then(() => offerPublishAffected("music", id)).catch(() => load());
-    setDrag(null); setOver(null);
+    reorderPlaylistTracksApi(
+      id,
+      next.map((t) => t.id),
+    )
+      .then(() => offerPublishAffected("music", id))
+      .catch(() => load());
+    setDrag(null);
+    setOver(null);
   }
 
   async function patch(p: { name?: string; shuffle?: boolean; tags?: string[] }) {
@@ -224,8 +317,10 @@ export function MusicPlaylistDetailPage() {
       await updateMusicPlaylist(id, p);
       // Shuffle changes what screens play; a rename/tag edit doesn't.
       if ("shuffle" in p) void offerPublishAffected("music", id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save");
+      load();
     }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Could not save"); load(); }
   }
 
   const title = pl?.name || "Music playlist";
@@ -238,16 +333,34 @@ export function MusicPlaylistDetailPage() {
     {
       crumbs: [{ label: "Music playlists", to: "/music" }, { label: pl?.name ?? "Playlist" }],
       actions: [
-        ...(canWrite ? [{
-          key: "add", label: "Add", icon: <Plus className="size-4" />, disabled: busy,
-          items: [
-            { key: "upload", label: "Upload audio", icon: <Upload className="size-4" />, onClick: () => audioInput.current?.click() },
-            { key: "ai", label: "Generate with AI", icon: <Sparkles className="size-4" />, onClick: () => setAiOpen(true) },
-            { key: "lib", label: "Pick from media library", icon: <Images className="size-4" />, onClick: () => setPickerOpen(true) },
-            { key: "public", label: "Public library", icon: <Library className="size-4" />, onClick: () => setPublicOpen(true) },
-          ],
-        }] : []),
-        ...(canDelete ? [{ key: "delete", label: "Delete playlist", icon: <Trash2 className="size-4" />, variant: "destructive" as const, overflow: "always" as const, onClick: () => setDelOpen(true) }] : []),
+        ...(canWrite
+          ? [
+              {
+                key: "add",
+                label: "Add",
+                icon: <Plus className="size-4" />,
+                disabled: busy,
+                items: [
+                  { key: "upload", label: "Upload audio", icon: <Upload className="size-4" />, onClick: () => audioInput.current?.click() },
+                  { key: "ai", label: "Generate with AI", icon: <Sparkles className="size-4" />, onClick: () => setAiOpen(true) },
+                  { key: "lib", label: "Pick from media library", icon: <Images className="size-4" />, onClick: () => setPickerOpen(true) },
+                  { key: "public", label: "Public library", icon: <Library className="size-4" />, onClick: () => setPublicOpen(true) },
+                ],
+              },
+            ]
+          : []),
+        ...(canDelete
+          ? [
+              {
+                key: "delete",
+                label: "Delete playlist",
+                icon: <Trash2 className="size-4" />,
+                variant: "destructive" as const,
+                overflow: "always" as const,
+                onClick: () => setDelOpen(true),
+              },
+            ]
+          : []),
       ],
     },
     [pl?.name, canWrite, canDelete, busy],
@@ -255,7 +368,17 @@ export function MusicPlaylistDetailPage() {
 
   return (
     <div>
-      <input ref={audioInput} type="file" accept="audio/*" multiple className="hidden" onChange={(e) => { uploadMany(e.target.files); e.target.value = ""; }} />
+      <input
+        ref={audioInput}
+        type="file"
+        accept="audio/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          uploadMany(e.target.files);
+          e.target.value = "";
+        }}
+      />
 
       <PageHeader
         title={canWrite ? <EditablePlaylistName name={title} onRename={(n) => patch({ name: n })} /> : title}
@@ -266,9 +389,20 @@ export function MusicPlaylistDetailPage() {
           <div className="mt-3 flex min-w-0 items-center gap-1.5">
             <TagIcon className="size-3.5 shrink-0 text-muted-foreground" />
             {canWrite ? (
-              <TagEditor tags={pl?.tags ?? []} onChange={(tags) => patch({ tags })} placeholder="Add tags…" className="min-w-[220px] border-none px-0 py-0 focus-within:ring-0" />
+              <TagEditor
+                tags={pl?.tags ?? []}
+                onChange={(tags) => patch({ tags })}
+                placeholder="Add tags…"
+                className="min-w-[220px] border-none px-0 py-0 focus-within:ring-0"
+              />
             ) : (
-              <div className="flex flex-wrap gap-1">{(pl?.tags ?? []).map((t) => <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-secondary-foreground">{t}</span>)}</div>
+              <div className="flex flex-wrap gap-1">
+                {(pl?.tags ?? []).map((t) => (
+                  <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-xs font-medium text-secondary-foreground">
+                    {t}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
         )}
@@ -279,13 +413,28 @@ export function MusicPlaylistDetailPage() {
         <div>
           {!loading && tracks.length > 0 && <LicenseNote scope="music" />}
           {error && !loading ? (
-            <LoadError what="this playlist" error={error} onRetry={() => { setLoading(true); void load(); }} />
+            <LoadError
+              what="this playlist"
+              error={error}
+              onRetry={() => {
+                setLoading(true);
+                void load();
+              }}
+            />
           ) : loading ? (
             <div className="overflow-hidden rounded-xl bg-card shadow-sm">
-              {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="m-2 h-12 rounded-lg" />)}
+              {[0, 1, 2, 3].map((i) => (
+                <Skeleton key={i} className="m-2 h-12 rounded-lg" />
+              ))}
             </div>
           ) : tracks.length === 0 ? (
-            <EmptyState icon={Music2} title="No tracks yet" description={canWrite ? "Use Add to upload audio, generate with AI, or pick from your Media or the public library." : "This playlist has no tracks yet."} />
+            <EmptyState
+              icon={Music2}
+              title="No tracks yet"
+              description={
+                canWrite ? "Use Add to upload audio, generate with AI, or pick from your Media or the public library." : "This playlist has no tracks yet."
+              }
+            />
           ) : (
             <div className="overflow-hidden rounded-xl bg-card shadow-sm">
               <Table>
@@ -311,7 +460,10 @@ export function MusicPlaylistDetailPage() {
                       over={over === i && drag !== null && drag !== i}
                       onDragStart={() => setDrag(i)}
                       onDragEnter={() => setOver(i)}
-                      onDragEnd={() => { setDrag(null); setOver(null); }}
+                      onDragEnd={() => {
+                        setDrag(null);
+                        setOver(null);
+                      }}
                       onDrop={() => drop(i)}
                       onEdit={() => setEditTrack(t)}
                       onDelete={() => removeTrack(t.id, t.title)}
@@ -328,7 +480,9 @@ export function MusicPlaylistDetailPage() {
           <div className="rounded-xl bg-card p-4 shadow-sm">
             <h3 className="text-sm font-semibold">Playback</h3>
             <label className="mt-3 flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-sm"><Shuffle className="size-4 text-muted-foreground" /> Shuffle</span>
+              <span className="flex items-center gap-2 text-sm">
+                <Shuffle className="size-4 text-muted-foreground" /> Shuffle
+              </span>
               <Switch checked={!!pl?.shuffle} disabled={!canWrite} onCheckedChange={(v) => patch({ shuffle: v })} />
             </label>
             <p className="mt-1.5 text-xs text-muted-foreground">Deterministic per cycle — every screen shuffles identically.</p>
@@ -337,14 +491,31 @@ export function MusicPlaylistDetailPage() {
           <div className="rounded-xl bg-card p-4 shadow-sm">
             <h3 className="text-sm font-semibold">In this playlist</h3>
             <dl className="mt-3 space-y-2 text-sm">
-              <div className="flex items-center justify-between"><dt className="text-muted-foreground">Tracks</dt><dd className="font-medium tabular-nums">{tracks.length}</dd></div>
-              <div className="flex items-center justify-between"><dt className="text-muted-foreground">Total time</dt><dd className="font-medium tabular-nums">{totalMs ? mmss(totalMs) : "—"}</dd></div>
-              <div className="flex items-center justify-between"><dt className="text-muted-foreground">Vocal / Instrumental</dt><dd className="font-medium tabular-nums">{vocalN} / {instN}</dd></div>
+              <div className="flex items-center justify-between">
+                <dt className="text-muted-foreground">Tracks</dt>
+                <dd className="font-medium tabular-nums">{tracks.length}</dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-muted-foreground">Total time</dt>
+                <dd className="font-medium tabular-nums">{totalMs ? mmss(totalMs) : "—"}</dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-muted-foreground">Vocal / Instrumental</dt>
+                <dd className="font-medium tabular-nums">
+                  {vocalN} / {instN}
+                </dd>
+              </div>
             </dl>
             {genres.length > 0 && (
               <div className="mt-3">
                 <div className="mb-1.5 text-xs text-muted-foreground">Genres</div>
-                <div className="flex flex-wrap gap-1">{genres.map((g) => <Badge key={g}  className="font-normal">{g}</Badge>)}</div>
+                <div className="flex flex-wrap gap-1">
+                  {genres.map((g) => (
+                    <Badge key={g} className="font-normal">
+                      {g}
+                    </Badge>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -357,7 +528,15 @@ export function MusicPlaylistDetailPage() {
         onOpenChange={setAiOpen}
         onAdd={async (r) => {
           const name = r.prompt.trim().slice(0, 60) || "AI track";
-          const mediaId = await registerMedia({ kind: "audio", name, assetHash: r.assetHash, assetUrl: r.assetUrl, durationMs: r.durationMs, source: "ai", genres: ["AI"] }).catch(() => undefined);
+          const mediaId = await registerMedia({
+            kind: "audio",
+            name,
+            assetHash: r.assetHash,
+            assetUrl: r.assetUrl,
+            durationMs: r.durationMs,
+            source: "ai",
+            genres: ["AI"],
+          }).catch(() => undefined);
           await addPlaylistTrack(id, { title: name, assetHash: r.assetHash, assetUrl: r.assetUrl, durationMs: r.durationMs, genres: ["AI"], mediaId });
           await load();
           toast.success("AI track added.");
@@ -368,32 +547,87 @@ export function MusicPlaylistDetailPage() {
         open={publicOpen}
         onOpenChange={setPublicOpen}
         onAdd={async (libraryIds) => {
-          let ok = 0; let blocked: string | null = null;
+          let ok = 0;
+          let blocked: string | null = null;
           for (const lid of libraryIds) {
             const r = await addPublicTrackToPlaylist(id, lid);
-            if (r.id) ok++; else if (r.error) blocked = r.error === "library limit reached" ? `Library limit reached (${r.used}/${r.limit}).` : r.error;
+            if (r.id) ok++;
+            else if (r.error) blocked = r.error === "library limit reached" ? `Library limit reached (${r.used}/${r.limit}).` : r.error;
           }
           await load();
-          if (ok) { toast.success(`${ok} licensed track${ok === 1 ? "" : "s"} added.`); void offerPublishAffected("music", id); }
+          if (ok) {
+            toast.success(`${ok} licensed track${ok === 1 ? "" : "s"} added.`);
+            void offerPublishAffected("music", id);
+          }
           if (blocked) toast.error(blocked);
         }}
       />
       <TrackMetaDialog
         open={!!editTrack}
         onOpenChange={(o) => !o && setEditTrack(null)}
-        initial={editTrack ? { title: editTrack.title, artist: editTrack.artist ?? "", album: editTrack.album ?? "", genres: editTrack.genres ?? [], vocal: (editTrack.vocal as "vocal" | "instrumental" | "") ?? "", artHash: editTrack.art_hash ?? null, artUrl: editTrack.art_url ?? null } : null}
+        initial={
+          editTrack
+            ? {
+                title: editTrack.title,
+                artist: editTrack.artist ?? "",
+                album: editTrack.album ?? "",
+                genres: editTrack.genres ?? [],
+                vocal: (editTrack.vocal as "vocal" | "instrumental" | "") ?? "",
+                artHash: editTrack.art_hash ?? null,
+                artUrl: editTrack.art_url ?? null,
+              }
+            : null
+        }
         onSave={async (p) => {
           if (!editTrack) return;
           const tid = editTrack.id;
-          setPl((prev) => (prev ? { ...prev, tracks: prev.tracks.map((t) => (t.id === tid ? { ...t, title: p.title, artist: p.artist, album: p.album, genres: p.genres, vocal: p.vocal || null, art_hash: p.artHash, art_url: p.artUrl } : t)) } : prev));
-          await updatePlaylistTrack(id, tid, { title: p.title, artist: p.artist, album: p.album, genres: p.genres, vocal: p.vocal || null, artHash: p.artHash, artUrl: p.artUrl });
+          setPl((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  tracks: prev.tracks.map((t) =>
+                    t.id === tid
+                      ? {
+                          ...t,
+                          title: p.title,
+                          artist: p.artist,
+                          album: p.album,
+                          genres: p.genres,
+                          vocal: p.vocal || null,
+                          art_hash: p.artHash,
+                          art_url: p.artUrl,
+                        }
+                      : t,
+                  ),
+                }
+              : prev,
+          );
+          await updatePlaylistTrack(id, tid, {
+            title: p.title,
+            artist: p.artist,
+            album: p.album,
+            genres: p.genres,
+            vocal: p.vocal || null,
+            artHash: p.artHash,
+            artUrl: p.artUrl,
+          });
           toast.success("Track updated.");
           void offerPublishAffected("music", id);
         }}
       />
       <DeletePlaylistDialog
-        open={delOpen} onOpenChange={setDelOpen} name={title}
-        onConfirm={async (alsoMedia) => { try { await deleteMusicPlaylist(id, alsoMedia); toast.success("Playlist deleted"); navigate("/music"); } catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); } }}
+        open={delOpen}
+        onOpenChange={setDelOpen}
+        name={title}
+        onConfirm={async (alsoMedia) => {
+          try {
+            await deleteMusicPlaylist(id, alsoMedia);
+            toast.success("Playlist deleted");
+            navigate("/music");
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Delete failed");
+          }
+        }}
       />
     </div>
   );
@@ -403,29 +637,79 @@ function EditablePlaylistName({ name, onRename }: { name: string; onRename: (n: 
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(name);
   const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (editing) { ref.current?.focus(); ref.current?.select(); } }, [editing]);
+  useEffect(() => {
+    if (editing) {
+      ref.current?.focus();
+      ref.current?.select();
+    }
+  }, [editing]);
   function save() {
     const n = val.trim();
     setEditing(false);
-    if (!n || n === name) { setVal(name); return; }
+    if (!n || n === name) {
+      setVal(name);
+      return;
+    }
     onRename(n);
   }
   if (editing) {
-    return <Input ref={ref} value={val} onChange={(e) => setVal(e.target.value)} onBlur={save}
-      onKeyDown={(e) => { if (e.key === "Enter") save(); if (e.key === "Escape") { setVal(name); setEditing(false); } }}
-      maxLength={80} className="h-10 w-64 text-2xl! font-semibold" />;
+    return (
+      <Input
+        ref={ref}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") save();
+          if (e.key === "Escape") {
+            setVal(name);
+            setEditing(false);
+          }
+        }}
+        maxLength={80}
+        className="h-10 w-64 text-2xl! font-semibold"
+      />
+    );
   }
   return (
-    <button onClick={() => { setVal(name); setEditing(true); }} className="group/n inline-flex items-center gap-2 text-left" title="Rename playlist">
+    <button
+      onClick={() => {
+        setVal(name);
+        setEditing(true);
+      }}
+      className="group/n inline-flex items-center gap-2 text-left"
+      title="Rename playlist"
+    >
       <span className="truncate text-xl font-semibold tracking-tight md:text-2xl">{name}</span>
       <Pencil className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/n:opacity-70" />
     </button>
   );
 }
 
-function TrackRow({ track, index, canWrite, dragging, over, onDragStart, onDragEnter, onDragEnd, onDrop, onEdit, onDelete }: {
-  track: PlaylistTrack; index: number; canWrite: boolean; dragging: boolean; over: boolean;
-  onDragStart: () => void; onDragEnter: () => void; onDragEnd: () => void; onDrop: () => void; onEdit: () => void; onDelete: () => void;
+function TrackRow({
+  track,
+  index,
+  canWrite,
+  dragging,
+  over,
+  onDragStart,
+  onDragEnter,
+  onDragEnd,
+  onDrop,
+  onEdit,
+  onDelete,
+}: {
+  track: PlaylistTrack;
+  index: number;
+  canWrite: boolean;
+  dragging: boolean;
+  over: boolean;
+  onDragStart: () => void;
+  onDragEnter: () => void;
+  onDragEnd: () => void;
+  onDrop: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   const licensed = !!track.library_id;
   return (
@@ -435,12 +719,17 @@ function TrackRow({ track, index, canWrite, dragging, over, onDragStart, onDragE
       onDragEnter={onDragEnter}
       onDragOver={(e) => e.preventDefault()}
       onDragEnd={onDragEnd}
-      onDrop={(e) => { e.preventDefault(); onDrop(); }}
+      onDrop={(e) => {
+        e.preventDefault();
+        onDrop();
+      }}
       className={cn(dragging && "opacity-40", over && "border-t-2 border-t-primary")}
     >
       {canWrite && (
         <TableCell className="pr-0">
-          <span className="cursor-grab text-muted-foreground/50 active:cursor-grabbing" title="Drag to reorder"><GripVertical className="size-4" /></span>
+          <span className="cursor-grab text-muted-foreground/50 active:cursor-grabbing" title="Drag to reorder">
+            <GripVertical className="size-4" />
+          </span>
         </TableCell>
       )}
       <TableCell className="text-center tabular-nums text-muted-foreground">{index + 1}</TableCell>
@@ -457,7 +746,12 @@ function TrackRow({ track, index, canWrite, dragging, over, onDragStart, onDragE
             {/* Artist + vocal marker collapse into this cell below the sm breakpoint. */}
             <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground sm:hidden">
               <span className="truncate">{track.artist || "Unknown artist"}</span>
-              {track.vocal && <span className="inline-flex shrink-0 items-center gap-0.5">· {track.vocal === "vocal" ? <Mic className="size-3" /> : <Disc3 className="size-3" />}{track.vocal === "vocal" ? "Vocal" : "Instr."}</span>}
+              {track.vocal && (
+                <span className="inline-flex shrink-0 items-center gap-0.5">
+                  · {track.vocal === "vocal" ? <Mic className="size-3" /> : <Disc3 className="size-3" />}
+                  {track.vocal === "vocal" ? "Vocal" : "Instr."}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -465,20 +759,33 @@ function TrackRow({ track, index, canWrite, dragging, over, onDragStart, onDragE
       <TableCell className="hidden text-muted-foreground sm:table-cell">
         <div className="flex items-center gap-1.5">
           <span className="truncate">{track.artist || "Unknown artist"}</span>
-          {track.vocal && <span className="inline-flex shrink-0 items-center gap-0.5 text-xs">{track.vocal === "vocal" ? <Mic className="size-3" /> : <Disc3 className="size-3" />}{track.vocal === "vocal" ? "Vocal" : "Instr."}</span>}
+          {track.vocal && (
+            <span className="inline-flex shrink-0 items-center gap-0.5 text-xs">
+              {track.vocal === "vocal" ? <Mic className="size-3" /> : <Disc3 className="size-3" />}
+              {track.vocal === "vocal" ? "Vocal" : "Instr."}
+            </span>
+          )}
         </div>
       </TableCell>
       <TableCell className="hidden lg:table-cell">
         <div className="flex flex-wrap gap-1">
-          {(track.genres ?? []).slice(0, 3).map((g) => <Badge key={g}  className="font-normal">{g}</Badge>)}
+          {(track.genres ?? []).slice(0, 3).map((g) => (
+            <Badge key={g} className="font-normal">
+              {g}
+            </Badge>
+          ))}
         </div>
       </TableCell>
       <TableCell className="text-right tabular-nums text-muted-foreground">{mmss(track.duration_ms)}</TableCell>
       {canWrite && (
         <TableCell>
           <div className="flex items-center justify-end gap-0.5">
-            <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" onClick={onEdit} title="Edit details"><SlidersHorizontal className="size-4" /></Button>
-            <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-destructive" onClick={onDelete} title="Remove"><Trash2 className="size-4" /></Button>
+            <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" onClick={onEdit} title="Edit details">
+              <SlidersHorizontal className="size-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-destructive" onClick={onDelete} title="Remove">
+              <Trash2 className="size-4" />
+            </Button>
           </div>
         </TableCell>
       )}
@@ -486,12 +793,25 @@ function TrackRow({ track, index, canWrite, dragging, over, onDragStart, onDragE
   );
 }
 
-function DeletePlaylistDialog({ open, onOpenChange, name, onConfirm }: {
-  open: boolean; onOpenChange: (o: boolean) => void; name: string; onConfirm: (alsoMedia: boolean) => Promise<void>;
+function DeletePlaylistDialog({
+  open,
+  onOpenChange,
+  name,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  name: string;
+  onConfirm: (alsoMedia: boolean) => Promise<void>;
 }) {
   const [alsoMedia, setAlsoMedia] = useState(false);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (open) { setAlsoMedia(false); setBusy(false); } }, [open]);
+  useEffect(() => {
+    if (open) {
+      setAlsoMedia(false);
+      setBusy(false);
+    }
+  }, [open]);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title={<>Delete “{name}”?</>}>
@@ -504,8 +824,20 @@ function DeletePlaylistDialog({ open, onOpenChange, name, onConfirm }: {
           <Switch checked={alsoMedia} onCheckedChange={setAlsoMedia} />
         </label>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button variant="destructive" disabled={busy} onClick={async () => { setBusy(true); await onConfirm(alsoMedia); setBusy(false); }}>{busy ? "Deleting…" : "Delete playlist"}</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              await onConfirm(alsoMedia);
+              setBusy(false);
+            }}
+          >
+            {busy ? "Deleting…" : "Delete playlist"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -520,8 +852,13 @@ const MUSIC_LENGTHS = [
   { label: "30s", secs: 30 },
 ] as const;
 
-function AiMusicDialog({ open, onOpenChange, onAdd }: {
-  open: boolean; onOpenChange: (v: boolean) => void;
+function AiMusicDialog({
+  open,
+  onOpenChange,
+  onAdd,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
   onAdd: (r: { assetHash: string; assetUrl: string; durationMs: number; prompt: string }) => Promise<void>;
 }) {
   const [prompt, setPrompt] = useState("");
@@ -532,48 +869,83 @@ function AiMusicDialog({ open, onOpenChange, onAdd }: {
   const [err, setErr] = useState<string | null>(null);
   const [result, setResult] = useState<{ assetHash: string; assetUrl: string; durationMs: number } | null>(null);
 
-  useEffect(() => { if (open) { setPrompt(""); setErr(null); setResult(null); setSecs(15); } }, [open]);
-  useEffect(() => { listAiModels().then((ms) => setModels(ms.filter((m) => m.task === "music"))).catch(() => {}); }, []);
+  useEffect(() => {
+    if (open) {
+      setPrompt("");
+      setErr(null);
+      setResult(null);
+      setSecs(15);
+    }
+  }, [open]);
+  useEffect(() => {
+    listAiModels()
+      .then((ms) => setModels(ms.filter((m) => m.task === "music")))
+      .catch(() => {});
+  }, []);
 
   async function generate() {
-    setBusy(true); setErr(null); setResult(null);
+    setBusy(true);
+    setErr(null);
+    setResult(null);
     try {
       const r = await aiGenerate({ task: "music", prompt, options: { durationSec: secs }, ...(modelId ? { modelId } : {}) });
       if (!r.ok || !r.assetUrl || !r.assetHash) throw new Error(r.detail || r.error || "Generation failed");
       setResult({ assetHash: r.assetHash, assetUrl: r.assetUrl, durationMs: r.durationMs ?? secs * 1000 });
-    } catch (e) { setErr(e instanceof Error ? e.message : "Failed"); } finally { setBusy(false); }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function add() {
     if (!result) return;
     setBusy(true);
-    try { await onAdd({ ...result, prompt }); onOpenChange(false); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Could not add"); }
-    finally { setBusy(false); }
+    try {
+      await onAdd({ ...result, prompt });
+      onOpenChange(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not add");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title="Generate music with AI" className="sm:max-w-lg">
         <div className="space-y-3">
-          <Textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="e.g. Warm lo-fi hip-hop with soft piano and vinyl crackle" className="min-h-24" />
+          <Textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="e.g. Warm lo-fi hip-hop with soft piano and vinyl crackle"
+            className="min-h-24"
+          />
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Length</Label>
               <div className="flex gap-1.5">
                 {MUSIC_LENGTHS.map((l) => (
-                  <button key={l.secs} type="button" onClick={() => setSecs(l.secs)}
-                    className={`flex-1 rounded-md border px-2 py-1.5 text-xs font-medium ${secs === l.secs ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}>{l.label}</button>
+                  <button
+                    key={l.secs}
+                    type="button"
+                    onClick={() => setSecs(l.secs)}
+                    className={`flex-1 rounded-md border px-2 py-1.5 text-xs font-medium ${secs === l.secs ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
+                  >
+                    {l.label}
+                  </button>
                 ))}
               </div>
             </div>
             {models.length > 0 && (
               <div className="space-y-1">
                 <Label className="text-xs text-muted-foreground">Model</Label>
-                <Select value={modelId || "__default"} onChange={(v) => setModelId(v === "__default" ? "" : v)} className="w-full" options={[
-                  { value: "__default", label: "Default model" },
-                  ...models.map((m) => ({ value: m.id, label: m.label })),
-                ]} />
+                <Select
+                  value={modelId || "__default"}
+                  onChange={(v) => setModelId(v === "__default" ? "" : v)}
+                  className="w-full"
+                  options={[{ value: "__default", label: "Default model" }, ...models.map((m) => ({ value: m.id, label: m.label }))]}
+                />
               </div>
             )}
           </div>
@@ -584,17 +956,27 @@ function AiMusicDialog({ open, onOpenChange, onAdd }: {
             </div>
           )}
           {err && <p className="text-sm text-destructive">{err}</p>}
-          <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><ShieldCheck className="size-3.5" /> Uses your AI credits · generated music is licensed to you.</p>
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <ShieldCheck className="size-3.5" /> Uses your AI credits · generated music is licensed to you.
+          </p>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           {result ? (
             <>
-              <Button variant="outline" disabled={busy} onClick={generate}>Regenerate</Button>
-              <Button disabled={busy} onClick={add}>Add to playlist</Button>
+              <Button variant="outline" disabled={busy} onClick={generate}>
+                Regenerate
+              </Button>
+              <Button disabled={busy} onClick={add}>
+                Add to playlist
+              </Button>
             </>
           ) : (
-            <Button disabled={busy || !prompt.trim()} onClick={generate}>{busy ? "Generating…" : "Generate"}</Button>
+            <Button disabled={busy || !prompt.trim()} onClick={generate}>
+              {busy ? "Generating…" : "Generate"}
+            </Button>
           )}
         </DialogFooter>
       </DialogContent>
@@ -604,8 +986,14 @@ function AiMusicDialog({ open, onOpenChange, onAdd }: {
 
 /* --------------------------- Public library pick -------------------------- */
 
-function PublicLibraryDialog({ open, onOpenChange, onAdd }: {
-  open: boolean; onOpenChange: (o: boolean) => void; onAdd: (libraryIds: string[]) => Promise<void>;
+function PublicLibraryDialog({
+  open,
+  onOpenChange,
+  onAdd,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  onAdd: (libraryIds: string[]) => Promise<void>;
 }) {
   const [data, setData] = useState<LibraryBrowse | null>(null);
   const [genre, setGenre] = useState<string>("");
@@ -615,34 +1003,70 @@ function PublicLibraryDialog({ open, onOpenChange, onAdd }: {
 
   useEffect(() => {
     if (!open) return;
-    setSel(new Set()); setQ(""); setGenre(""); setData(null);
-    browseLibrary().then(setData).catch(() => setData({ enabled: false, limit: 0, used: 0, genres: [], tracks: [] }));
+    setSel(new Set());
+    setQ("");
+    setGenre("");
+    setData(null);
+    browseLibrary()
+      .then(setData)
+      .catch(() => setData({ enabled: false, limit: 0, used: 0, genres: [], tracks: [] }));
   }, [open]);
 
   const tracks = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return (data?.tracks ?? []).filter((t) => (!genre || t.genre === genre) && (!needle || t.title.toLowerCase().includes(needle) || (t.artist ?? "").toLowerCase().includes(needle)));
+    return (data?.tracks ?? []).filter(
+      (t) => (!genre || t.genre === genre) && (!needle || t.title.toLowerCase().includes(needle) || (t.artist ?? "").toLowerCase().includes(needle)),
+    );
   }, [data, genre, q]);
 
-  function toggle(idv: string) { setSel((s) => { const n = new Set(s); n.has(idv) ? n.delete(idv) : n.add(idv); return n; }); }
+  function toggle(idv: string) {
+    setSel((s) => {
+      const n = new Set(s);
+      n.has(idv) ? n.delete(idv) : n.add(idv);
+      return n;
+    });
+  }
 
   async function confirm() {
     if (!sel.size) return;
     setBusy(true);
-    try { await onAdd([...sel]); onOpenChange(false); }
-    finally { setBusy(false); }
+    try {
+      await onAdd([...sel]);
+      onOpenChange(false);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent title={<>Public library <LicenseBadge source="public" /></>} className="sm:max-w-2xl">
+      <DialogContent
+        title={
+          <>
+            Public library <LicenseBadge source="public" />
+          </>
+        }
+        className="sm:max-w-2xl"
+      >
         {!data ? (
-          <div className="space-y-2 py-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}</div>
+          <div className="space-y-2 py-2">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-lg" />
+            ))}
+          </div>
         ) : !data.enabled ? (
-          <EmptyState icon={Library} title="Public library not in your plan" description="Upgrade to a plan that includes the licensed music library to use these tracks." className="border-0 bg-transparent py-8" />
+          <EmptyState
+            icon={Library}
+            title="Public library not in your plan"
+            description="Upgrade to a plan that includes the licensed music library to use these tracks."
+            className="border-0 bg-transparent py-8"
+          />
         ) : (
           <>
-            <p className="text-xs text-muted-foreground">Licensed for your commercial use. {data.limit >= 0 ? `Using ${data.used}/${data.limit} library tracks.` : `Using ${data.used} library tracks (unlimited).`}</p>
+            <p className="text-xs text-muted-foreground">
+              Licensed for your commercial use.{" "}
+              {data.limit >= 0 ? `Using ${data.used}/${data.limit} library tracks.` : `Using ${data.used} library tracks (unlimited).`}
+            </p>
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -650,9 +1074,22 @@ function PublicLibraryDialog({ open, onOpenChange, onAdd }: {
               </div>
               {data.genres.length > 0 && (
                 <div className="flex flex-wrap gap-1.5">
-                  <button type="button" onClick={() => setGenre("")} className={`rounded-full border px-2.5 py-1 text-xs font-medium ${genre === "" ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}>All</button>
+                  <button
+                    type="button"
+                    onClick={() => setGenre("")}
+                    className={`rounded-full border px-2.5 py-1 text-xs font-medium ${genre === "" ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
+                  >
+                    All
+                  </button>
                   {data.genres.map((g) => (
-                    <button key={g.genre} type="button" onClick={() => setGenre(g.genre)} className={`rounded-full border px-2.5 py-1 text-xs font-medium ${genre === g.genre ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}>{g.genre}</button>
+                    <button
+                      key={g.genre}
+                      type="button"
+                      onClick={() => setGenre(g.genre)}
+                      className={`rounded-full border px-2.5 py-1 text-xs font-medium ${genre === g.genre ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted"}`}
+                    >
+                      {g.genre}
+                    </button>
                   ))}
                 </div>
               )}
@@ -660,28 +1097,38 @@ function PublicLibraryDialog({ open, onOpenChange, onAdd }: {
             <div className="max-h-[52vh] space-y-1.5 overflow-y-auto">
               {tracks.length === 0 ? (
                 <div className="py-10 text-center text-sm text-muted-foreground">No tracks found.</div>
-              ) : tracks.map((t) => {
-                const on = sel.has(t.id);
-                return (
-                  <button key={t.id} type="button" onClick={() => toggle(t.id)}
-                    className={`flex w-full items-center gap-3 rounded-lg border-2 px-3 py-2 text-left transition-colors ${on ? "border-primary bg-primary/5" : "border-transparent bg-muted/40 hover:bg-muted"}`}>
-                    <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-background text-muted-foreground">
-                      {t.art_url ? <img src={assetUrl(t.art_url)} alt="" className="size-full object-cover" /> : <Music className="size-4" />}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">{t.title}</div>
-                      <div className="truncate text-xs text-muted-foreground">{[t.artist || "Unknown", t.genre, t.vocal].filter(Boolean).join(" · ")}</div>
-                    </div>
-                    <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{mmss(t.duration_ms)}</span>
-                  </button>
-                );
-              })}
+              ) : (
+                tracks.map((t) => {
+                  const on = sel.has(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => toggle(t.id)}
+                      className={`flex w-full items-center gap-3 rounded-lg border-2 px-3 py-2 text-left transition-colors ${on ? "border-primary bg-primary/5" : "border-transparent bg-muted/40 hover:bg-muted"}`}
+                    >
+                      <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-background text-muted-foreground">
+                        {t.art_url ? <img src={assetUrl(t.art_url)} alt="" className="size-full object-cover" /> : <Music className="size-4" />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium">{t.title}</div>
+                        <div className="truncate text-xs text-muted-foreground">{[t.artist || "Unknown", t.genre, t.vocal].filter(Boolean).join(" · ")}</div>
+                      </div>
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-muted-foreground">{mmss(t.duration_ms)}</span>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </>
         )}
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button disabled={busy || sel.size === 0 || !data?.enabled} onClick={confirm}>{busy ? "Adding…" : `Add ${sel.size || ""}`.trim()}</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button disabled={busy || sel.size === 0 || !data?.enabled} onClick={confirm}>
+            {busy ? "Adding…" : `Add ${sel.size || ""}`.trim()}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

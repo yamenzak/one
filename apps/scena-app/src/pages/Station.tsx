@@ -9,8 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, RotateCcw, Hash, Minus, Plus } from "lucide-react";
-import { Card, CardContent } from "../components/ui/card.js";
-import { Badge, Button, Input, Separator, Tabs, TabsContent, TabsList, TabsTrigger } from "@4dl/ui";
+import { Badge, Button, Card, Input, Separator, Tabs, TabsContent, TabsList, TabsTrigger } from "@4dl/ui";
 import type { QueueState, RoomState } from "@scena/protocol";
 
 type Series = QueueState["series"][number];
@@ -51,18 +50,18 @@ export function QueueControls({
     <>
       {/* NOW SERVING */}
       <Card className="mb-5 border-border/60 bg-card/60">
-        <CardContent className="flex flex-col items-center gap-1 py-8">
-          <div className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Now serving</div>
-          <div className="font-mono text-7xl font-bold leading-none tabular-nums">{fmt(state?.prefix ?? "", state?.serving ?? null)}</div>
-          <div className="mt-1 text-sm text-muted-foreground">{state?.counter != null ? `Counter ${state.counter}` : "—"}</div>
-        </CardContent>
+        <div className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Now serving</div>
+        <div className="font-mono text-7xl font-bold leading-none tabular-nums">{fmt(state?.prefix ?? "", state?.serving ?? null)}</div>
+        <div className="mt-1 text-sm text-muted-foreground">{state?.counter != null ? `Counter ${state.counter}` : "—"}</div>
       </Card>
 
       {/* Counter / desk selector — hidden for a station locked to one counter. */}
       <div className={`mb-5 flex items-center justify-center gap-3 ${lockCounter ? "hidden" : ""}`}>
         <span className="text-sm text-muted-foreground">Counter / desk</span>
         <div className="flex items-center gap-1.5">
-          <Button variant="outline" size="icon" onClick={() => setCounter(Math.max(1, counter - 1))}><Minus className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" onClick={() => setCounter(Math.max(1, counter - 1))}>
+            <Minus className="h-4 w-4" />
+          </Button>
           <Input
             type="number"
             min={1}
@@ -70,7 +69,9 @@ export function QueueControls({
             onChange={(e) => setCounter(Math.max(1, Number(e.target.value) || 1))}
             className="w-16 text-center font-mono text-base font-semibold tabular-nums"
           />
-          <Button variant="outline" size="icon" onClick={() => setCounter(counter + 1)}><Plus className="h-4 w-4" /></Button>
+          <Button variant="outline" size="icon" onClick={() => setCounter(counter + 1)}>
+            <Plus className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 
@@ -92,13 +93,7 @@ export function QueueControls({
           const nextUp = s.waiting > 0 ? (s.serving ?? 0) + 1 : null;
           return (
             <TabsContent key={seriesKey(s)} value={seriesKey(s)}>
-              <SeriesPanel
-                s={s}
-                nextUp={nextUp}
-                onNext={() => onNext(categoryId)}
-                onCallNumber={(n) => onCallNumber(n, categoryId)}
-                onRecall={onRecall}
-              />
+              <SeriesPanel s={s} nextUp={nextUp} onNext={() => onNext(categoryId)} onCallNumber={(n) => onCallNumber(n, categoryId)} onRecall={onRecall} />
             </TabsContent>
           );
         })}
@@ -128,44 +123,56 @@ function SeriesPanel({
 
   return (
     <Card>
-      <CardContent className="flex flex-col gap-4 py-6">
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <Stat label="Waiting" value={String(s.waiting)} />
-          <Stat label="Next up" value={fmt(s.prefix, nextUp)} accent />
-          <Stat label="Issued" value={fmt(s.prefix, s.issued || null)} />
+      <div className="grid grid-cols-3 gap-3 text-center">
+        <Stat label="Waiting" value={String(s.waiting)} />
+        <Stat label="Next up" value={fmt(s.prefix, nextUp)} accent />
+        <Stat label="Issued" value={fmt(s.prefix, s.issued || null)} />
+      </div>
+
+      <Button size="lg" className="h-16 text-lg" onClick={onNext} disabled={s.waiting === 0}>
+        Call next <ChevronRight className="h-5 w-5" />
+      </Button>
+
+      <Separator />
+
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <label className="mb-1.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+            <Hash className="h-3 w-3" /> Call a specific number
+          </label>
+          <Input
+            type="number"
+            min={1}
+            inputMode="numeric"
+            placeholder="e.g. 42"
+            value={num}
+            onChange={(e) => setNum(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && canCall) {
+                onCallNumber(specific);
+                setNum("");
+              }
+            }}
+            className="font-mono"
+          />
         </div>
-
-        <Button size="lg" className="h-16 text-lg" onClick={onNext} disabled={s.waiting === 0}>
-          Call next <ChevronRight className="h-5 w-5" />
+        <Button
+          variant="secondary"
+          className="h-9"
+          disabled={!canCall}
+          onClick={() => {
+            onCallNumber(specific);
+            setNum("");
+          }}
+        >
+          Call {s.prefix}
+          {canCall ? String(specific).padStart(3, "0") : "###"}
         </Button>
+      </div>
 
-        <Separator />
-
-        <div className="flex items-end gap-2">
-          <div className="flex-1">
-            <label className="mb-1.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-              <Hash className="h-3 w-3" /> Call a specific number
-            </label>
-            <Input
-              type="number"
-              min={1}
-              inputMode="numeric"
-              placeholder="e.g. 42"
-              value={num}
-              onChange={(e) => setNum(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && canCall) { onCallNumber(specific); setNum(""); } }}
-              className="font-mono"
-            />
-          </div>
-          <Button variant="secondary" className="h-9" disabled={!canCall} onClick={() => { onCallNumber(specific); setNum(""); }}>
-            Call {s.prefix}{canCall ? String(specific).padStart(3, "0") : "###"}
-          </Button>
-        </div>
-
-        <Button variant="outline" onClick={onRecall}>
-          <RotateCcw className="h-4 w-4" /> Recall current
-        </Button>
-      </CardContent>
+      <Button variant="outline" onClick={onRecall}>
+        <RotateCcw className="h-4 w-4" /> Recall current
+      </Button>
     </Card>
   );
 }
@@ -195,28 +202,34 @@ function RecentStrip({ recent, defaultPrefix }: { recent: QueueState["recent"]; 
   );
 }
 
-export function RoomControls({ state, onFlip, onlyRoomId }: { state: RoomState | null; onFlip: (roomId: string, statusId: string) => void; onlyRoomId?: string | null }) {
+export function RoomControls({
+  state,
+  onFlip,
+  onlyRoomId,
+}: {
+  state: RoomState | null;
+  onFlip: (roomId: string, statusId: string) => void;
+  onlyRoomId?: string | null;
+}) {
   if (!state) return null;
   const rooms = onlyRoomId ? state.rooms.filter((r) => r.id === onlyRoomId) : state.rooms;
   return (
     <div className="flex flex-col gap-3">
       {rooms.map((room) => (
         <Card key={room.id}>
-          <CardContent className="py-4">
-            <div className="mb-3 font-semibold">{room.name}</div>
-            <div className="flex flex-wrap gap-2">
-              {state.statuses.map((st) => (
-                <button
-                  key={st.id}
-                  onClick={() => onFlip(room.id, st.id)}
-                  style={{ background: st.color }}
-                  className={`flex-1 rounded-lg px-3 py-3 text-sm font-bold text-neutral-900 transition ${room.status === st.id ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "opacity-80 hover:opacity-100"}`}
-                >
-                  {st.label}
-                </button>
-              ))}
-            </div>
-          </CardContent>
+          <div className="mb-3 font-semibold">{room.name}</div>
+          <div className="flex flex-wrap gap-2">
+            {state.statuses.map((st) => (
+              <button
+                key={st.id}
+                onClick={() => onFlip(room.id, st.id)}
+                style={{ background: st.color }}
+                className={`flex-1 rounded-lg px-3 py-3 text-sm font-bold text-neutral-900 transition ${room.status === st.id ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "opacity-80 hover:opacity-100"}`}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
         </Card>
       ))}
     </div>

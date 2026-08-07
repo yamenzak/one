@@ -9,8 +9,7 @@
  */
 import { MonitorPlay, Sparkles, LayoutGrid, Rocket, ArrowRight } from "lucide-react";
 import { ScenaMascot } from "../brand.js";
-import { Button } from "@4dl/ui";
-import { cn } from "@/lib/utils";
+import { Button, cn } from "@4dl/ui";
 
 const STEPS = [
   { icon: MonitorPlay, title: "Pair or create", body: "Claim a screen's code, or build a display first — either way it gets its own editable content." },
@@ -66,14 +65,14 @@ export function GetStarted({
           {STEPS.map((s, i) => (
             <div key={s.title} className="relative rounded-xl border bg-card/40 p-4">
               <div className="mb-2 flex items-center gap-2">
-                <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary [&_svg]:size-4"><s.icon /></span>
+                <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary [&_svg]:size-4">
+                  <s.icon />
+                </span>
                 <span className="text-[11px] font-semibold text-muted-foreground">Step {i + 1}</span>
               </div>
               <div className="text-sm font-semibold">{s.title}</div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{s.body}</p>
-              {i < STEPS.length - 1 && (
-                <ArrowRight className="absolute -right-2.5 top-1/2 hidden size-4 -translate-y-1/2 text-muted-foreground/40 sm:block" />
-              )}
+              {i < STEPS.length - 1 && <ArrowRight className="absolute -right-2.5 top-1/2 hidden size-4 -translate-y-1/2 text-muted-foreground/40 sm:block" />}
             </div>
           ))}
         </div>
@@ -97,7 +96,14 @@ function ChoiceCard({
 }) {
   return (
     <div className={cn("flex flex-col rounded-2xl border p-5 transition-colors", accent ? "border-primary/30 bg-primary/[0.03]" : "bg-card/40")}>
-      <div className={cn("mb-3 grid size-11 place-items-center rounded-xl [&_svg]:size-5", accent ? "bg-primary text-primary-foreground" : "bg-muted text-foreground")}>{icon}</div>
+      <div
+        className={cn(
+          "mb-3 grid size-11 place-items-center rounded-xl [&_svg]:size-5",
+          accent ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
+        )}
+      >
+        {icon}
+      </div>
       <div className="text-base font-bold">{title}</div>
       <p className="mt-1.5 flex-1 text-[13px] leading-relaxed text-muted-foreground">{body}</p>
       {cta && (

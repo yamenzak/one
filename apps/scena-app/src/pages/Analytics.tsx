@@ -7,10 +7,9 @@
 
 import { useEffect, useState } from "react";
 import { Download, BarChart3 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
 import { PageHeader } from "../components/page-header.js";
 import { StatTile } from "../components/status.js";
-import { LoadError, Skeleton } from "@4dl/ui";
+import { Card, LoadError, SectionHeader, Skeleton } from "@4dl/ui";
 import { usePageChrome } from "../components/page-chrome.js";
 import { getAnalytics, analyticsCsvUrl, type AnalyticsSummary } from "../api.js";
 import { EmptyState } from "../components/empty.js";
@@ -31,7 +30,15 @@ export function AnalyticsPage() {
 
   useEffect(() => {
     let alive = true;
-    const load = () => getAnalytics().then((d) => { if (alive) { setData(d); setErr(null); } }).catch((e) => alive && setErr(e instanceof Error ? e.message : String(e)));
+    const load = () =>
+      getAnalytics()
+        .then((d) => {
+          if (alive) {
+            setData(d);
+            setErr(null);
+          }
+        })
+        .catch((e) => alive && setErr(e instanceof Error ? e.message : String(e)));
     load();
     const t = setInterval(load, 3000);
     return () => {
@@ -43,7 +50,10 @@ export function AnalyticsPage() {
   usePageChrome(
     {
       crumbs: [{ label: "Analytics" }],
-      actions: data && data.totalPlays > 0 ? [{ key: "csv", label: "Export CSV", icon: <Download className="size-4" />, variant: "outline", onClick: () => downloadCsv() }] : [],
+      actions:
+        data && data.totalPlays > 0
+          ? [{ key: "csv", label: "Export CSV", icon: <Download className="size-4" />, variant: "outline", onClick: () => downloadCsv() }]
+          : [],
     },
     [data?.totalPlays],
   );
@@ -54,14 +64,29 @@ export function AnalyticsPage() {
     <div>
       <PageHeader
         title="Analytics"
-        description={data ? `${data.totalPlays.toLocaleString()} plays across ${data.activeScreens} active screen${data.activeScreens === 1 ? "" : "s"}` : "Proof-of-play telemetry from your fleet."}
+        description={
+          data
+            ? `${data.totalPlays.toLocaleString()} plays across ${data.activeScreens} active screen${data.activeScreens === 1 ? "" : "s"}`
+            : "Proof-of-play telemetry from your fleet."
+        }
       />
 
       {/* This polls every three seconds, so the error only replaces the page
           while there is nothing to replace — a working dashboard must not blink
           to an error card because one request in nine hundred dropped. */}
       {err && !data ? (
-        <LoadError what="analytics" error={err} onRetry={() => void getAnalytics().then((d) => { setData(d); setErr(null); }).catch(() => undefined)} />
+        <LoadError
+          what="analytics"
+          error={err}
+          onRetry={() =>
+            void getAnalytics()
+              .then((d) => {
+                setData(d);
+                setErr(null);
+              })
+              .catch(() => undefined)
+          }
+        />
       ) : !data ? (
         <AnalyticsSkeleton />
       ) : (
@@ -74,46 +99,45 @@ export function AnalyticsPage() {
           </div>
 
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Plays per day</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <DayChart days={data.byDay} />
-            </CardContent>
+            <SectionHeader title="Plays per day" className="mb-4" />
+            <DayChart days={data.byDay} />
           </Card>
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.3fr_1fr]">
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Most played</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {data.byContent.length === 0 ? (
-                  <Empty />
-                ) : (
-                  <div className="flex flex-col">
-                    {data.byContent.map((c) => (
-                      <Row key={c.contentId} left={c.contentId} right={`${c.plays.toLocaleString()} plays`} sub={fmtDur(c.totalMs)} bar={c.plays / (data.byContent[0]?.plays || 1)} />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
+              <SectionHeader title="Most played" className="mb-4" />
+              {data.byContent.length === 0 ? (
+                <Empty />
+              ) : (
+                <div className="flex flex-col">
+                  {data.byContent.map((c) => (
+                    <Row
+                      key={c.contentId}
+                      left={c.contentId}
+                      right={`${c.plays.toLocaleString()} plays`}
+                      sub={fmtDur(c.totalMs)}
+                      bar={c.plays / (data.byContent[0]?.plays || 1)}
+                    />
+                  ))}
+                </div>
+              )}
             </Card>
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">By screen</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {data.byScreen.length === 0 ? (
-                  <Empty />
-                ) : (
-                  <div className="flex flex-col">
-                    {data.byScreen.map((s) => (
-                      <Row key={s.screenId} left={s.name ?? s.screenId.slice(0, 10)} right={s.plays.toLocaleString()} bar={s.plays / (data.byScreen[0]?.plays || 1)} />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
+              <SectionHeader title="By screen" className="mb-4" />
+              {data.byScreen.length === 0 ? (
+                <Empty />
+              ) : (
+                <div className="flex flex-col">
+                  {data.byScreen.map((s) => (
+                    <Row
+                      key={s.screenId}
+                      left={s.name ?? s.screenId.slice(0, 10)}
+                      right={s.plays.toLocaleString()}
+                      bar={s.plays / (data.byScreen[0]?.plays || 1)}
+                    />
+                  ))}
+                </div>
+              )}
             </Card>
           </div>
         </div>
@@ -173,39 +197,33 @@ function AnalyticsSkeleton() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
           <Card key={i}>
-            <CardContent className="p-5">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="mt-2.5 h-7 w-16" />
-            </CardContent>
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="mt-2.5 h-7 w-16" />
           </Card>
         ))}
       </div>
       <Card>
-        <CardHeader className="pb-3">
+        <div className="mb-4 pb-3">
           <Skeleton className="h-4 w-24" />
-        </CardHeader>
-        <CardContent>
-          <div className="flex h-40 items-end gap-2">
-            {Array.from({ length: 10 }).map((_, i) => (
-              <Skeleton key={i} className="flex-1 rounded-t-sm" style={{ height: `${30 + ((i * 37) % 70)}%` }} />
-            ))}
-          </div>
-        </CardContent>
+        </div>
+        <div className="flex h-40 items-end gap-2">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <Skeleton key={i} className="flex-1 rounded-t-sm" style={{ height: `${30 + ((i * 37) % 70)}%` }} />
+          ))}
+        </div>
       </Card>
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.3fr_1fr]">
         {[0, 1].map((col) => (
           <Card key={col}>
-            <CardHeader className="pb-3">
+            <div className="mb-4 pb-3">
               <Skeleton className="h-4 w-24" />
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="space-y-2">
-                  <Skeleton className="h-3.5 w-full" />
-                  <Skeleton className="h-1 w-full rounded-full" />
-                </div>
-              ))}
-            </CardContent>
+            </div>
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-3.5 w-full" />
+                <Skeleton className="h-1 w-full rounded-full" />
+              </div>
+            ))}
           </Card>
         ))}
       </div>

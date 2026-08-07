@@ -2,8 +2,20 @@ import * as React from "react";
 import { Circle, Menu, PanelLeft, MoreVertical } from "lucide-react";
 
 import { ScenaIcon } from "../brand.js";
-import { cn } from "@/lib/utils";
-import { Breadcrumbs, Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, NavDrawer, ScrollArea, Tooltip } from "@4dl/ui";
+import {
+  Breadcrumbs,
+  Button,
+  cn,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  NavDrawer,
+  ScrollArea,
+  Tooltip,
+} from "@4dl/ui";
 import { useChrome, type Crumb, type PageAction, type PageActionItem } from "@/components/page-chrome";
 
 const COLLAPSE_KEY = "scena.sidebar.collapsed";
@@ -42,9 +54,7 @@ function NavButton({ item, active, collapsed, onClick }: { item: NavItem; active
       className={cn(
         "group flex items-center rounded-lg text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         collapsed ? "mx-auto size-10 justify-center" : "w-full gap-3 px-2.5 py-2",
-        active
-          ? "bg-sidebar-accent text-sidebar-accent-foreground"
-          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+        active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
       )}
     >
       <span className="flex size-[18px] shrink-0 items-center justify-center [&_svg]:size-[18px]">{item.icon ?? <Circle />}</span>
@@ -60,7 +70,11 @@ function NavButton({ item, active, collapsed, onClick }: { item: NavItem; active
 }
 
 function SidebarBody({
-  navGroups, active, onNavigate, footer, collapsed,
+  navGroups,
+  active,
+  onNavigate,
+  footer,
+  collapsed,
 }: Pick<AppShellProps, "navGroups" | "active" | "onNavigate" | "footer"> & { collapsed: boolean }) {
   return (
     <div className="flex h-full flex-col">
@@ -71,9 +85,7 @@ function SidebarBody({
         <nav className="flex flex-col gap-4 py-2">
           {navGroups.map((group) => (
             <div key={group.label} className="flex flex-col gap-1">
-              {!collapsed && (
-                <div className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">{group.label}</div>
-              )}
+              {!collapsed && <div className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">{group.label}</div>}
               {group.items.map((item) => (
                 <NavButton key={item.key} item={item} active={item.key === active} collapsed={collapsed} onClick={() => onNavigate(item.key)} />
               ))}
@@ -105,15 +117,19 @@ function actionMenuRows(actions: PageAction[]): React.ReactNode[] {
     if (a.items?.length) {
       if (i > 0) rows.push(<DropdownMenuSeparator key={`${a.key}-sep`} />);
       rows.push(<DropdownMenuLabel key={`${a.key}-lbl`}>{a.label}</DropdownMenuLabel>);
-      a.items.forEach((it: PageActionItem) => rows.push(
-        <DropdownMenuItem key={it.key} disabled={it.disabled} onSelect={it.onClick} destructive={it.variant === "destructive"}>
-          {it.icon}{it.label}
-        </DropdownMenuItem>,
-      ));
+      a.items.forEach((it: PageActionItem) =>
+        rows.push(
+          <DropdownMenuItem key={it.key} disabled={it.disabled} onSelect={it.onClick} destructive={it.variant === "destructive"}>
+            {it.icon}
+            {it.label}
+          </DropdownMenuItem>,
+        ),
+      );
     } else {
       rows.push(
         <DropdownMenuItem key={a.key} disabled={a.disabled} onSelect={a.onClick} destructive={a.variant === "destructive"}>
-          {a.icon}{a.label}
+          {a.icon}
+          {a.label}
         </DropdownMenuItem>,
       );
     }
@@ -135,22 +151,33 @@ function ShellActions({ actions }: { actions: PageAction[] }) {
           a.items?.length ? (
             <DropdownMenu key={a.key}>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant={a.variant ?? "default"} disabled={a.disabled}>{a.icon}<span className="hidden md:inline">{a.label}</span></Button>
+                <Button size="sm" variant={a.variant ?? "default"} disabled={a.disabled}>
+                  {a.icon}
+                  <span className="hidden md:inline">{a.label}</span>
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
                 {a.items.map((it) => (
-                  <DropdownMenuItem key={it.key} disabled={it.disabled} onSelect={it.onClick} destructive={it.variant === "destructive"}>{it.icon}{it.label}</DropdownMenuItem>
+                  <DropdownMenuItem key={it.key} disabled={it.disabled} onSelect={it.onClick} destructive={it.variant === "destructive"}>
+                    {it.icon}
+                    {it.label}
+                  </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button key={a.key} size="sm" variant={a.variant ?? "default"} disabled={a.disabled} onClick={a.onClick}>{a.icon}<span className="hidden md:inline">{a.label}</span></Button>
+            <Button key={a.key} size="sm" variant={a.variant ?? "default"} disabled={a.disabled} onClick={a.onClick}>
+              {a.icon}
+              <span className="hidden md:inline">{a.label}</span>
+            </Button>
           ),
         )}
         {overflowOnly.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8" aria-label="More actions"><MoreVertical className="size-4" /></Button>
+              <Button variant="ghost" size="icon" className="size-8" aria-label="More actions">
+                <MoreVertical className="size-4" />
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">{actionMenuRows(overflowOnly)}</DropdownMenuContent>
           </DropdownMenu>
@@ -160,7 +187,9 @@ function ShellActions({ actions }: { actions: PageAction[] }) {
       <div className="sm:hidden">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="size-8" aria-label="Page actions"><MoreVertical className="size-4" /></Button>
+            <Button variant="ghost" size="icon" className="size-8" aria-label="Page actions">
+              <MoreVertical className="size-4" />
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">{actionMenuRows(actions)}</DropdownMenuContent>
         </DropdownMenu>
@@ -170,17 +199,27 @@ function ShellActions({ actions }: { actions: PageAction[] }) {
 }
 
 export function AppShell({ navGroups, active, onNavigate, fallbackCrumb, onCrumb, footer, children }: AppShellProps) {
-  const [collapsed, setCollapsed] = React.useState<boolean>(() => (typeof localStorage !== "undefined" && localStorage.getItem(COLLAPSE_KEY) === "1"));
+  const [collapsed, setCollapsed] = React.useState<boolean>(() => typeof localStorage !== "undefined" && localStorage.getItem(COLLAPSE_KEY) === "1");
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const chrome = useChrome();
 
   const toggleCollapsed = () =>
     setCollapsed((c) => {
-      try { localStorage.setItem(COLLAPSE_KEY, c ? "0" : "1"); } catch { /* ignore */ }
+      try {
+        localStorage.setItem(COLLAPSE_KEY, c ? "0" : "1");
+      } catch {
+        /* ignore */
+      }
       return !c;
     });
 
-  const handleNavigate = React.useCallback((key: string) => { onNavigate(key); setMobileOpen(false); }, [onNavigate]);
+  const handleNavigate = React.useCallback(
+    (key: string) => {
+      onNavigate(key);
+      setMobileOpen(false);
+    },
+    [onNavigate],
+  );
   const crumbs: Crumb[] = chrome.crumbs.length ? chrome.crumbs : fallbackCrumb ? [{ label: fallbackCrumb }] : [];
 
   return (
@@ -207,7 +246,13 @@ export function AppShell({ navGroups, active, onNavigate, fallbackCrumb, onCrumb
               <SidebarBody navGroups={navGroups} active={active} onNavigate={handleNavigate} footer={footer} collapsed={false} />
             </NavDrawer>
             {/* Desktop: collapse toggle */}
-            <Button variant="ghost" size="icon" className="hidden size-8 text-muted-foreground md:inline-flex" onClick={toggleCollapsed} aria-label="Toggle sidebar">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden size-8 text-muted-foreground md:inline-flex"
+              onClick={toggleCollapsed}
+              aria-label="Toggle sidebar"
+            >
               <PanelLeft className="size-4" />
             </Button>
             <ShellBreadcrumbs crumbs={crumbs} onCrumb={onCrumb} />

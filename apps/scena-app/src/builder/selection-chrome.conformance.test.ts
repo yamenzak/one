@@ -94,8 +94,17 @@ describe("the builder's selection chrome", () => {
 
   it("is what the marquee uses, rather than a theme token", () => {
     const page = readFileSync(PAGE, "utf8");
-    const marquee = /marquee && <div[\s\S]{0,400}?\/>/.exec(page)?.[0] ?? "";
-    expect(marquee).not.toBe("");
+    /*
+      ⚠️ TOLERANT OF LAYOUT, STRICT ABOUT SUBSTANCE. This was
+      `/marquee && <div[\s\S]{0,400}?\/>/`, which asserted a FORMATTING choice:
+      the moment the element wrapped onto its own line as `{marquee && (`, the
+      regex matched nothing, `marquee` fell back to `""`, and the three checks
+      below all passed vacuously against an empty string. The `not.toBe("")`
+      line is what turned that into a failure instead of a silent green — keep
+      it, and keep the pattern indifferent to where the newlines land.
+    */
+    const marquee = /marquee\s*&&\s*\(?\s*<div[\s\S]{0,400}?\/>/.exec(page)?.[0] ?? "";
+    expect(marquee, "the marquee element was not found — has it been renamed?").not.toBe("");
     // The marquee imports the constant; it must not carry the hue itself, and
     // must not fall back to `border-primary` / `bg-primary/…`.
     expect(marquee).toContain("SELECT");

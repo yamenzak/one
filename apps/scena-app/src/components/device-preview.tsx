@@ -11,7 +11,7 @@ import { MonitorOff, Radio, ImageOff } from "lucide-react";
 import { slideTimeline, type Manifest, type Slide } from "@scena/manifest";
 import { resolveAt, cyclePositionAt, type Timeline } from "@scena/timeline";
 import { getManifest } from "../api.js";
-import { cn } from "@/lib/utils";
+import { cn } from "@4dl/ui";
 
 type Props = {
   channelId?: string | null;

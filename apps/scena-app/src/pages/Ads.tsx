@@ -9,7 +9,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Play, Pause, Trash2, Megaphone, Clock, Sparkles, Bot, Upload, FolderOpen, Plus, MoreVertical, Pencil, Radio, Link2 } from "lucide-react";
-import { Card, CardContent } from "../components/ui/card.js";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
 import { PageHeader } from "../components/page-header.js";
 import { StatusDot as SharedStatusDot } from "../components/status.js";
@@ -38,7 +37,26 @@ import {
 } from "../api.js";
 import { MediaPicker } from "./MediaLibrary.js";
 import { GEMINI_VOICES, AD_STYLE_PRESETS, DEFAULT_GEMINI_VOICE, DEFAULT_AD_STYLE, composeAdSpeech } from "../voices.js";
-import { Badge, Button, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Input, Label, LoadError, Select, Skeleton, Switch, Textarea, toast } from "@4dl/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Input,
+  Label,
+  LoadError,
+  Select,
+  Skeleton,
+  Switch,
+  Textarea,
+  toast,
+} from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 
 type Kind = "audio" | "video" | "command";
@@ -62,44 +80,77 @@ export function AdsPage() {
   const [newOpen, setNewOpen] = useState(false);
   const [rename, setRename] = useState<AdProfile | null>(null);
 
-  const reload = () => listAdProfiles().then((p) => { setProfiles(p); setLoadFailed(false); }).catch(() => { setProfiles((prev) => prev ?? []); setLoadFailed(true); });
-  useEffect(() => { reload(); }, []);
+  const reload = () =>
+    listAdProfiles()
+      .then((p) => {
+        setProfiles(p);
+        setLoadFailed(false);
+      })
+      .catch(() => {
+        setProfiles((prev) => prev ?? []);
+        setLoadFailed(true);
+      });
+  useEffect(() => {
+    reload();
+  }, []);
 
   usePageChrome(
-    { crumbs: [{ label: "Ad profiles" }], actions: canCreate ? [{ key: "new", label: "New profile", icon: <Plus className="size-4" />, onClick: () => setNewOpen(true) }] : [] },
+    {
+      crumbs: [{ label: "Ad profiles" }],
+      actions: canCreate ? [{ key: "new", label: "New profile", icon: <Plus className="size-4" />, onClick: () => setNewOpen(true) }] : [],
+    },
     [canCreate],
   );
 
   async function remove(p: AdProfile) {
     const ok = await confirmDialog({
       title: `Delete “${p.name}”?`,
-      description: p.channelCount ? `${p.channelCount} channel${p.channelCount === 1 ? "" : "s"} bound to this rotation will lose it. This can't be undone.` : "This removes the profile and its ads. This can't be undone.",
+      description: p.channelCount
+        ? `${p.channelCount} channel${p.channelCount === 1 ? "" : "s"} bound to this rotation will lose it. This can't be undone.`
+        : "This removes the profile and its ads. This can't be undone.",
       confirmText: "Delete profile",
       destructive: true,
     });
     if (!ok) return;
-    try { await deleteAdProfile(p.id); toast.success("Profile deleted."); reload(); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); }
+    try {
+      await deleteAdProfile(p.id);
+      toast.success("Profile deleted.");
+      reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Delete failed");
+    }
   }
 
   return (
     <div>
       <PageHeader
         title="Ad profiles"
-        description={profiles ? `${profiles.length} profile${profiles.length === 1 ? "" : "s"} · reusable rotations you bind to any channel` : "Reusable ad rotations you can bind to any number of channels."}
+        description={
+          profiles
+            ? `${profiles.length} profile${profiles.length === 1 ? "" : "s"} · reusable rotations you bind to any channel`
+            : "Reusable ad rotations you can bind to any number of channels."
+        }
       />
 
       {loadFailed && <LoadError what="ad profiles" error="We couldn’t reach the server." onRetry={reload} />}
       {!profiles ? (
         <div className="overflow-hidden rounded-xl bg-card shadow-sm">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="m-2 h-12 rounded-lg" />)}
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="m-2 h-12 rounded-lg" />
+          ))}
         </div>
       ) : profiles.length === 0 ? (
         <EmptyState
           scena="idle"
           title="No ad profiles yet"
           description="Create a rotation, fill it with audio/video/command interrupts, then bind it to any channel — author once, reuse everywhere."
-          action={canCreate ? <Button onClick={() => setNewOpen(true)}><Plus className="size-4" /> New profile</Button> : undefined}
+          action={
+            canCreate ? (
+              <Button onClick={() => setNewOpen(true)}>
+                <Plus className="size-4" /> New profile
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <div className="overflow-hidden rounded-xl bg-card shadow-sm">
@@ -117,23 +168,41 @@ export function AdsPage() {
                 <TableRow key={p.id} className="cursor-pointer" onClick={() => navigate(`/ads/${p.id}`)}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Radio className="size-4" /></div>
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Radio className="size-4" />
+                      </div>
                       <span className="truncate font-medium">{p.name}</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">{p.adCount ?? 0}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {p.channelCount ? <span className="inline-flex items-center gap-1 text-xs"><Link2 className="size-3" /> {p.channelCount}</span> : <span className="text-xs text-muted-foreground/60">unbound</span>}
+                    {p.channelCount ? (
+                      <span className="inline-flex items-center gap-1 text-xs">
+                        <Link2 className="size-3" /> {p.channelCount}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/60">unbound</span>
+                    )}
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     {(canWrite || canDelete) && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-8" aria-label="Profile actions"><MoreVertical className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="size-8" aria-label="Profile actions">
+                            <MoreVertical className="size-4" />
+                          </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {canWrite && <DropdownMenuItem onSelect={() => setRename(p)}><Pencil className="size-4" /> Rename</DropdownMenuItem>}
-                          {canDelete && <DropdownMenuItem className="text-destructive" onSelect={() => remove(p)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>}
+                          {canWrite && (
+                            <DropdownMenuItem onSelect={() => setRename(p)}>
+                              <Pencil className="size-4" /> Rename
+                            </DropdownMenuItem>
+                          )}
+                          {canDelete && (
+                            <DropdownMenuItem className="text-destructive" onSelect={() => remove(p)}>
+                              <Trash2 className="size-4" /> Delete
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
@@ -158,17 +227,33 @@ function NewProfileDialog({ open, onOpenChange, onCreated }: { open: boolean; on
     setBusy(true);
     try {
       const id = await createAdProfile(name.trim() || "Ad profile");
-      onOpenChange(false); setName(""); onCreated(id); toast.success("Profile created.");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not create profile"); }
-    finally { setBusy(false); }
+      onOpenChange(false);
+      setName("");
+      onCreated(id);
+      toast.success("Profile created.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not create profile");
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent title="New ad profile">
-        <Input autoFocus placeholder="e.g. Lobby promos" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} />
+        <Input
+          autoFocus
+          placeholder="e.g. Lobby promos"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && create()}
+        />
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={create} disabled={busy}>{busy ? "Creating…" : "Create"}</Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={create} disabled={busy}>
+            {busy ? "Creating…" : "Create"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -178,21 +263,34 @@ function NewProfileDialog({ open, onOpenChange, onCreated }: { open: boolean; on
 function RenameProfileDialog({ profile, onClose, onSaved }: { profile: AdProfile | null; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (profile) setName(profile.name); }, [profile]);
+  useEffect(() => {
+    if (profile) setName(profile.name);
+  }, [profile]);
   async function save() {
     if (!profile) return;
     setBusy(true);
-    try { await updateAdProfile(profile.id, { name: name.trim() || profile.name }); onClose(); onSaved(); toast.success("Renamed."); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Rename failed"); }
-    finally { setBusy(false); }
+    try {
+      await updateAdProfile(profile.id, { name: name.trim() || profile.name });
+      onClose();
+      onSaved();
+      toast.success("Renamed.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Rename failed");
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <Dialog open={!!profile} onOpenChange={(o) => !o && onClose()}>
       <DialogContent title="Rename profile">
         <Input autoFocus value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} />
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={busy}>{busy ? "Saving…" : "Save"}</Button>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={busy}>
+            {busy ? "Saving…" : "Save"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -218,23 +316,43 @@ export function AdProfileDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const reload = () => {
     setError(null);
-    return getAdProfile(id).then((p) => { setProfile(p); setAds(p.ads); }).catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setLoaded(true));
+    return getAdProfile(id)
+      .then((p) => {
+        setProfile(p);
+        setAds(p.ads);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoaded(true));
   };
-  useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [id]);
+  useEffect(() => {
+    reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [id]);
 
   usePageChrome(
     {
       crumbs: [{ label: "Ad profiles", to: "/ads" }, { label: profile?.name ?? "…" }],
-      actions: canDelete ? [{ key: "del", label: "Delete profile", icon: <Trash2 className="size-4" />, variant: "destructive", overflow: "always", onClick: remove }] : [],
+      actions: canDelete
+        ? [{ key: "del", label: "Delete profile", icon: <Trash2 className="size-4" />, variant: "destructive", overflow: "always", onClick: remove }]
+        : [],
     },
     [profile?.name, canDelete],
   );
 
   async function remove() {
-    const ok = await confirmDialog({ title: `Delete “${profile?.name}”?`, description: "Channels bound to this rotation lose it. This can't be undone.", confirmText: "Delete profile", destructive: true });
+    const ok = await confirmDialog({
+      title: `Delete “${profile?.name}”?`,
+      description: "Channels bound to this rotation lose it. This can't be undone.",
+      confirmText: "Delete profile",
+      destructive: true,
+    });
     if (!ok) return;
-    try { await deleteAdProfile(id); toast.success("Profile deleted."); navigate("/ads"); }
-    catch (e) { toast.error(e instanceof Error ? e.message : "Delete failed"); }
+    try {
+      await deleteAdProfile(id);
+      toast.success("Profile deleted.");
+      navigate("/ads");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Delete failed");
+    }
   }
 
   async function play(a: Ad) {
@@ -245,7 +363,12 @@ export function AdProfileDetailPage() {
   }
 
   async function remove_ad(a: Ad) {
-    const ok = await confirmDialog({ title: `Delete “${a.name}”?`, description: "This interrupt is removed from the rotation immediately.", confirmText: "Delete ad", destructive: true });
+    const ok = await confirmDialog({
+      title: `Delete “${a.name}”?`,
+      description: "This interrupt is removed from the rotation immediately.",
+      confirmText: "Delete ad",
+      destructive: true,
+    });
     if (!ok) return;
     await deleteAd(a.id);
     reload();
@@ -273,63 +396,103 @@ export function AdProfileDetailPage() {
     <div>
       <PageHeader
         title={profile?.name ?? "Ad profile"}
-        description={profile ? (profile.channelCount ? `Bound to ${profile.channelCount} channel${profile.channelCount === 1 ? "" : "s"} · bind more in Channels → Ads` : "Not bound yet — assign it in Channels → Ads to put it on air.") : "…"}
+        description={
+          profile
+            ? profile.channelCount
+              ? `Bound to ${profile.channelCount} channel${profile.channelCount === 1 ? "" : "s"} · bind more in Channels → Ads`
+              : "Not bound yet — assign it in Channels → Ads to put it on air."
+            : "…"
+        }
         back={{ label: "Ad profiles", onClick: () => navigate("/ads") }}
       />
 
       {!loaded ? (
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_1.2fr]">
-          <Card><CardContent className="space-y-3 p-5">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-9 w-full" />)}</CardContent></Card>
-          <Card><CardContent className="space-y-2 p-5">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}</CardContent></Card>
+          <Card>
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-9 w-full" />
+            ))}
+          </Card>
+          <Card>
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-lg" />
+            ))}
+          </Card>
         </div>
       ) : (
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_1.2fr]">
-          {canWrite ? <NewAd profileId={id} onCreated={() => { reload(); toast.success("Ad created — it enters the rotation."); void offerPublishAffected("ad", id); }} /> : <div />}
+          {canWrite ? (
+            <NewAd
+              profileId={id}
+              onCreated={() => {
+                reload();
+                toast.success("Ad created — it enters the rotation.");
+                void offerPublishAffected("ad", id);
+              }}
+            />
+          ) : (
+            <div />
+          )}
 
           <Card>
-            <CardContent className="p-5">
-              <div className="mb-3 font-semibold">Ad rotation</div>
-              {ads.length === 0 ? (
-                <EmptyState
-                  icon={Megaphone}
-                  title="No ads in this profile"
-                  description="Create an interrupt on the left to start the rotation."
-                  className="py-12"
-                />
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {ads.map((a) => (
-                    <div key={a.id} className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/40">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 text-sm font-semibold">
-                          <StatusDot active={!!a.enabled} />
-                          <span className="truncate">{a.name}</span>
-                          <Badge>{a.kind}</Badge>
-                        </div>
-                        <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
-                          <Clock className="size-3" />
-                          every {a.every_min} min · {Math.round(a.duration_ms / 1000)}s
-                          {!a.enabled && <span className="text-warning">· paused</span>}
-                        </div>
+            <div className="mb-3 font-semibold">Ad rotation</div>
+            {ads.length === 0 ? (
+              <EmptyState
+                icon={Megaphone}
+                title="No ads in this profile"
+                description="Create an interrupt on the left to start the rotation."
+                className="py-12"
+              />
+            ) : (
+              <div className="flex flex-col gap-2">
+                {ads.map((a) => (
+                  <div key={a.id} className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/40">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-sm font-semibold">
+                        <StatusDot active={!!a.enabled} />
+                        <span className="truncate">{a.name}</span>
+                        <Badge>{a.kind}</Badge>
                       </div>
-                      <div className="flex shrink-0 gap-1.5">
-                        <Button size="sm" onClick={() => play(a)}><Play className="size-3.5" /> Play now</Button>
-                        {canWrite && (
-                          <Button size="sm" variant="ghost" onClick={async () => { await toggleAd(a.id); reload(); void offerPublishAffected("ad", id); }}>
-                            {a.enabled ? <><Pause className="size-3.5" /> Pause</> : <><Play className="size-3.5" /> Resume</>}
-                          </Button>
-                        )}
-                        {canDelete && (
-                          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove_ad(a)}>
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        )}
+                      <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Clock className="size-3" />
+                        every {a.every_min} min · {Math.round(a.duration_ms / 1000)}s{!a.enabled && <span className="text-warning">· paused</span>}
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
+                    <div className="flex shrink-0 gap-1.5">
+                      <Button size="sm" onClick={() => play(a)}>
+                        <Play className="size-3.5" /> Play now
+                      </Button>
+                      {canWrite && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={async () => {
+                            await toggleAd(a.id);
+                            reload();
+                            void offerPublishAffected("ad", id);
+                          }}
+                        >
+                          {a.enabled ? (
+                            <>
+                              <Pause className="size-3.5" /> Pause
+                            </>
+                          ) : (
+                            <>
+                              <Play className="size-3.5" /> Resume
+                            </>
+                          )}
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove_ad(a)}>
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
       )}
@@ -363,7 +526,11 @@ function NewAd({ profileId, onCreated }: { profileId: string; onCreated: () => v
   // prompt-steerable for radio-style reads). Gemini runs on the company key, so
   // the model only appears once the platform Gemini key is configured (admin).
   const [ttsModels, setTtsModels] = useState<AiModel[]>([]);
-  useEffect(() => { listAiModels().then((ms) => setTtsModels(ms.filter((m) => m.task === "tts" && m.id.startsWith("gemini-")))).catch(() => setTtsModels([])); }, []);
+  useEffect(() => {
+    listAiModels()
+      .then((ms) => setTtsModels(ms.filter((m) => m.task === "tts" && m.id.startsWith("gemini-"))))
+      .catch(() => setTtsModels([]));
+  }, []);
   const geminiTtsModelId = ttsModels[0]?.id ?? "";
 
   async function onUpload(file: File | null | undefined) {
@@ -373,7 +540,10 @@ function NewAd({ profileId, onCreated }: { profileId: string; onCreated: () => v
       const m = await uploadToLibrary(file);
       if (m.kind === "audio") setAudioUrl(m.url);
       else if (m.kind === "video") setVideoUrl(m.url);
-      else { toast.error("Pick an audio or video file."); return; }
+      else {
+        toast.error("Pick an audio or video file.");
+        return;
+      }
       if (m.durationMs) setDurationSec(String(Math.max(1, Math.round(m.durationMs / 1000))));
       toast.success("Uploaded.");
     } catch (e) {
@@ -395,7 +565,12 @@ function NewAd({ profileId, onCreated }: { profileId: string; onCreated: () => v
     if (!voiceText.trim() || !geminiTtsModelId) return;
     setBusy(true);
     try {
-      const r = await aiGenerate({ task: "tts", modelId: geminiTtsModelId, prompt: composeAdSpeech(style, voiceText), options: { voice, libraryName: voiceText.trim().slice(0, 80) } });
+      const r = await aiGenerate({
+        task: "tts",
+        modelId: geminiTtsModelId,
+        prompt: composeAdSpeech(style, voiceText),
+        options: { voice, libraryName: voiceText.trim().slice(0, 80) },
+      });
       if (r.ok && r.assetUrl) setAudioUrl(r.assetUrl);
       else toast.error(r.error === "insufficient_credits" ? "Not enough AI credits — top up in Billing." : r.detail || r.error || "Voice generation failed");
     } catch (e) {
@@ -420,130 +595,212 @@ function NewAd({ profileId, onCreated }: { profileId: string; onCreated: () => v
     });
     setBusy(false);
     if (r.error) toast.error(r.error === "ads not in plan" ? "Ads are a premium feature — upgrade your plan." : r.error);
-    else { setName(""); setAudioUrl(""); setVideoUrl(""); setHtml(""); setVoiceText(""); setCompanionUrl(""); onCreated(); }
+    else {
+      setName("");
+      setAudioUrl("");
+      setVideoUrl("");
+      setHtml("");
+      setVoiceText("");
+      setCompanionUrl("");
+      onCreated();
+    }
   }
 
   return (
     <Card>
-      <CardContent className="flex flex-col gap-3.5 p-5">
-        <div className="font-semibold">New ad</div>
+      <div className="font-semibold">New ad</div>
 
-        <div className="flex gap-2">
-          {KINDS.map((k) => (
-            <Button key={k.id} variant={kind === k.id ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setKind(k.id)}>{k.label}</Button>
-          ))}
-        </div>
-        <div className="-mt-2 text-xs text-muted-foreground">{KINDS.find((k) => k.id === kind)!.hint}</div>
+      <div className="flex gap-2">
+        {KINDS.map((k) => (
+          <Button key={k.id} variant={kind === k.id ? "default" : "outline"} size="sm" className="flex-1" onClick={() => setKind(k.id)}>
+            {k.label}
+          </Button>
+        ))}
+      </div>
+      <div className="-mt-2 text-xs text-muted-foreground">{KINDS.find((k) => k.id === kind)!.hint}</div>
 
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ad name" />
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ad name" />
 
-        {kind === "audio" && (
-          <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-              <Bot className="size-3.5 text-primary" /> AI voice
-              <span className="ml-auto inline-flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"><Sparkles className="size-3" /> Gemini</span>
+      {kind === "audio" && (
+        <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+            <Bot className="size-3.5 text-primary" /> AI voice
+            <span className="ml-auto inline-flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+              <Sparkles className="size-3" /> Gemini
+            </span>
+          </div>
+
+          {!geminiTtsModelId ? (
+            <div className="rounded-md bg-muted/60 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+              Ad voice is generated by Google Gemini's natural TTS. Add your{" "}
+              <Link to="/settings" className="font-medium text-primary underline-offset-2 hover:underline">
+                Gemini API key in Settings → AI
+              </Link>{" "}
+              to enable it. You can still upload or pick a clip below.
             </div>
+          ) : (
+            <>
+              <Textarea
+                value={voiceText}
+                onChange={(e) => setVoiceText(e.target.value)}
+                rows={2}
+                placeholder="Now serving our summer menu — ask about today's special."
+                className="min-h-16"
+              />
+              <div className="flex gap-2">
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Label className="text-xs text-muted-foreground">Voice</Label>
+                  <Select
+                    value={voice}
+                    onChange={setVoice}
+                    className="w-full"
+                    title={GEMINI_VOICES.find((v) => v.id === voice)?.vibe}
+                    placeholder="Voice"
+                    options={[...GEMINI_VOICES.map((v) => ({ value: v.id, label: v.label }))]}
+                  />
+                </div>
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <Label className="text-xs text-muted-foreground">Style</Label>
+                  <Select
+                    value={style}
+                    onChange={setStyle}
+                    className="w-full"
+                    title={AD_STYLE_PRESETS.find((s) => s.id === style)?.hint}
+                    placeholder="Style"
+                    options={[...AD_STYLE_PRESETS.map((s) => ({ value: s.id, label: s.label }))]}
+                  />
+                </div>
+              </div>
+              <div className="-mt-1 text-xs text-muted-foreground">
+                {AD_STYLE_PRESETS.find((s) => s.id === style)?.hint} · {GEMINI_VOICES.find((v) => v.id === voice)?.vibe}
+              </div>
+              <Button variant="outline" size="sm" disabled={busy || !voiceText.trim()} onClick={generateVoice}>
+                {busy ? "Generating…" : "Generate voice"}
+              </Button>
+            </>
+          )}
 
-            {!geminiTtsModelId ? (
-              <div className="rounded-md bg-muted/60 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
-                Ad voice is generated by Google Gemini's natural TTS. Add your{" "}
-                <Link to="/settings" className="font-medium text-primary underline-offset-2 hover:underline">Gemini API key in Settings → AI</Link>{" "}
-                to enable it. You can still upload or pick a clip below.
+          <div className="flex items-center gap-2">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">or use a clip</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="flex-1" disabled={busy} onClick={() => fileInput.current?.click()}>
+              <Upload className="size-3.5" /> Upload
+            </Button>
+            <Button variant="outline" size="sm" className="flex-1" disabled={busy} onClick={() => setPickerOpen(true)}>
+              <FolderOpen className="size-3.5" /> Library
+            </Button>
+          </div>
+          {audioUrl && <audio controls src={`${API_BASE}${audioUrl}`} className="w-full" />}
+          <Label className="flex cursor-pointer items-center gap-2 text-xs font-normal text-muted-foreground">
+            <Switch checked={hideBadge} onCheckedChange={setHideBadge} />
+            Silent overlay — play the audio with no “Advertisement” badge (screen stays unchanged)
+          </Label>
+
+          <div className="mt-1 flex flex-col gap-2 border-t pt-2.5">
+            <div className="text-[11px] font-semibold text-muted-foreground">
+              Companion image <span className="font-normal">(optional)</span>
+            </div>
+            <div className="-mt-1 text-[11px] text-muted-foreground">
+              Shows full-screen while the voice plays — pair a still creative with the read. Leave empty to just play the audio over whatever's on screen.
+            </div>
+            {companionUrl ? (
+              <div className="flex items-center gap-2">
+                <img src={`${API_BASE}${companionUrl}`} alt="" className="h-14 w-24 rounded-md border object-cover" />
+                <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setCompanionUrl("")}>
+                  Remove
+                </Button>
               </div>
             ) : (
-              <>
-                <Textarea value={voiceText} onChange={(e) => setVoiceText(e.target.value)} rows={2} placeholder="Now serving our summer menu — ask about today's special." className="min-h-16" />
-                <div className="flex gap-2">
-                  <div className="flex flex-1 flex-col gap-1.5">
-                    <Label className="text-xs text-muted-foreground">Voice</Label>
-                    <Select value={voice} onChange={setVoice} className="w-full" title={GEMINI_VOICES.find((v) => v.id === voice)?.vibe} placeholder="Voice" options={[
-                      ...GEMINI_VOICES.map((v) => ({ value: v.id, label: v.label })),
-                    ]} />
-                  </div>
-                  <div className="flex flex-1 flex-col gap-1.5">
-                    <Label className="text-xs text-muted-foreground">Style</Label>
-                    <Select value={style} onChange={setStyle} className="w-full" title={AD_STYLE_PRESETS.find((s) => s.id === style)?.hint} placeholder="Style" options={[
-                      ...AD_STYLE_PRESETS.map((s) => ({ value: s.id, label: s.label })),
-                    ]} />
-                  </div>
-                </div>
-                <div className="-mt-1 text-xs text-muted-foreground">{AD_STYLE_PRESETS.find((s) => s.id === style)?.hint} · {GEMINI_VOICES.find((v) => v.id === voice)?.vibe}</div>
-                <Button variant="outline" size="sm" disabled={busy || !voiceText.trim()} onClick={generateVoice}>{busy ? "Generating…" : "Generate voice"}</Button>
-              </>
+              <Button variant="outline" size="sm" className="self-start" disabled={busy} onClick={() => setCompanionOpen(true)}>
+                <FolderOpen className="size-3.5" /> Pick image
+              </Button>
             )}
-
-            <div className="flex items-center gap-2">
-              <div className="h-px flex-1 bg-border" />
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground">or use a clip</span>
-              <div className="h-px flex-1 bg-border" />
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1" disabled={busy} onClick={() => fileInput.current?.click()}><Upload className="size-3.5" /> Upload</Button>
-              <Button variant="outline" size="sm" className="flex-1" disabled={busy} onClick={() => setPickerOpen(true)}><FolderOpen className="size-3.5" /> Library</Button>
-            </div>
-            {audioUrl && <audio controls src={`${API_BASE}${audioUrl}`} className="w-full" />}
-            <Label className="flex cursor-pointer items-center gap-2 text-xs font-normal text-muted-foreground">
-              <Switch checked={hideBadge} onCheckedChange={setHideBadge} />
-              Silent overlay — play the audio with no “Advertisement” badge (screen stays unchanged)
-            </Label>
-
-            <div className="mt-1 flex flex-col gap-2 border-t pt-2.5">
-              <div className="text-[11px] font-semibold text-muted-foreground">Companion image <span className="font-normal">(optional)</span></div>
-              <div className="-mt-1 text-[11px] text-muted-foreground">Shows full-screen while the voice plays — pair a still creative with the read. Leave empty to just play the audio over whatever's on screen.</div>
-              {companionUrl ? (
-                <div className="flex items-center gap-2">
-                  <img src={`${API_BASE}${companionUrl}`} alt="" className="h-14 w-24 rounded-md border object-cover" />
-                  <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => setCompanionUrl("")}>Remove</Button>
-                </div>
-              ) : (
-                <Button variant="outline" size="sm" className="self-start" disabled={busy} onClick={() => setCompanionOpen(true)}><FolderOpen className="size-3.5" /> Pick image</Button>
-              )}
-            </div>
-          </div>
-        )}
-        {kind === "video" && (
-          <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
-            <div className="text-xs font-semibold text-muted-foreground">Video clip</div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="flex-1" disabled={busy} onClick={() => fileInput.current?.click()}><Upload className="size-3.5" /> Upload mp4</Button>
-              <Button variant="outline" size="sm" className="flex-1" disabled={busy} onClick={() => setPickerOpen(true)}><FolderOpen className="size-3.5" /> Library</Button>
-            </div>
-            {videoUrl && <video controls src={`${API_BASE}${videoUrl}`} className="w-full rounded-md" />}
-          </div>
-        )}
-        {kind === "command" && <Textarea value={html} onChange={(e) => setHtml(e.target.value)} rows={3} placeholder="<div style='...'>Flash sale!</div>" className="min-h-20 font-mono text-xs" />}
-
-        <div className="flex gap-2.5">
-          <div className="flex flex-1 flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Every (min)</Label>
-            <Input value={everyMin} onChange={(e) => setEveryMin(e.target.value)} className="font-mono text-xs" />
-          </div>
-          <div className="flex flex-1 flex-col gap-1.5">
-            <Label className="text-xs text-muted-foreground">Duration (s)</Label>
-            <Input value={durationSec} onChange={(e) => setDurationSec(e.target.value)} className="font-mono text-xs" />
           </div>
         </div>
-
-        <Button disabled={busy || (kind === "audio" ? !audioUrl : kind === "video" ? !videoUrl : !html.trim())} onClick={submit}>Create ad</Button>
-        {(kind === "audio" ? !audioUrl : kind === "video" ? !videoUrl : !html.trim()) && (
-          <div className="-mt-2 text-[11px] text-muted-foreground">{kind === "audio" ? "Generate a voice or pick an audio clip first." : kind === "video" ? "Upload or pick a video first." : "Add the HTML for the interrupt."}</div>
-        )}
-
-        {/* Shared upload input + library picker for the audio/video kinds. */}
-        <input
-          ref={fileInput}
-          type="file"
-          accept={kind === "video" ? "video/*" : "audio/*"}
-          className="hidden"
-          onChange={(e) => { onUpload(e.target.files?.[0]); e.target.value = ""; }}
+      )}
+      {kind === "video" && (
+        <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3">
+          <div className="text-xs font-semibold text-muted-foreground">Video clip</div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="flex-1" disabled={busy} onClick={() => fileInput.current?.click()}>
+              <Upload className="size-3.5" /> Upload mp4
+            </Button>
+            <Button variant="outline" size="sm" className="flex-1" disabled={busy} onClick={() => setPickerOpen(true)}>
+              <FolderOpen className="size-3.5" /> Library
+            </Button>
+          </div>
+          {videoUrl && <video controls src={`${API_BASE}${videoUrl}`} className="w-full rounded-md" />}
+        </div>
+      )}
+      {kind === "command" && (
+        <Textarea
+          value={html}
+          onChange={(e) => setHtml(e.target.value)}
+          rows={3}
+          placeholder="<div style='...'>Flash sale!</div>"
+          className="min-h-20 font-mono text-xs"
         />
-        {pickerOpen && (
-          <MediaPicker open={pickerOpen} onOpenChange={setPickerOpen} onPick={onPick} kinds={kind === "video" ? ["video"] : ["audio"]} title={kind === "video" ? "Pick a video" : "Pick an audio clip"} />
-        )}
-        {companionOpen && (
-          <MediaPicker open={companionOpen} onOpenChange={setCompanionOpen} onPick={(items) => { const m = items[0]; if (m?.asset_url) setCompanionUrl(m.asset_url); }} kinds={["image"]} title="Pick a companion image" />
-        )}
-      </CardContent>
+      )}
+
+      <div className="flex gap-2.5">
+        <div className="flex flex-1 flex-col gap-1.5">
+          <Label className="text-xs text-muted-foreground">Every (min)</Label>
+          <Input value={everyMin} onChange={(e) => setEveryMin(e.target.value)} className="font-mono text-xs" />
+        </div>
+        <div className="flex flex-1 flex-col gap-1.5">
+          <Label className="text-xs text-muted-foreground">Duration (s)</Label>
+          <Input value={durationSec} onChange={(e) => setDurationSec(e.target.value)} className="font-mono text-xs" />
+        </div>
+      </div>
+
+      <Button disabled={busy || (kind === "audio" ? !audioUrl : kind === "video" ? !videoUrl : !html.trim())} onClick={submit}>
+        Create ad
+      </Button>
+      {(kind === "audio" ? !audioUrl : kind === "video" ? !videoUrl : !html.trim()) && (
+        <div className="-mt-2 text-[11px] text-muted-foreground">
+          {kind === "audio"
+            ? "Generate a voice or pick an audio clip first."
+            : kind === "video"
+              ? "Upload or pick a video first."
+              : "Add the HTML for the interrupt."}
+        </div>
+      )}
+
+      {/* Shared upload input + library picker for the audio/video kinds. */}
+      <input
+        ref={fileInput}
+        type="file"
+        accept={kind === "video" ? "video/*" : "audio/*"}
+        className="hidden"
+        onChange={(e) => {
+          onUpload(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      {pickerOpen && (
+        <MediaPicker
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          onPick={onPick}
+          kinds={kind === "video" ? ["video"] : ["audio"]}
+          title={kind === "video" ? "Pick a video" : "Pick an audio clip"}
+        />
+      )}
+      {companionOpen && (
+        <MediaPicker
+          open={companionOpen}
+          onOpenChange={setCompanionOpen}
+          onPick={(items) => {
+            const m = items[0];
+            if (m?.asset_url) setCompanionUrl(m.asset_url);
+          }}
+          kinds={["image"]}
+          title="Pick a companion image"
+        />
+      )}
     </Card>
   );
 }

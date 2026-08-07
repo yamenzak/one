@@ -15,8 +15,8 @@ import { Database, Loader2 } from "lucide-react";
 import { Field, SelectField, NumberField, SwitchField } from "./fields.js";
 import { getSourceData, type Feed } from "../../api.js";
 import { str, num, type FieldBinding } from "@scena/widgets";
-import { cn } from "@/lib/utils";
 import type { WNode } from "../types.js";
+import { cn } from "@4dl/ui";
 
 function readBindings(node: WNode): Record<string, FieldBinding> {
   const b = node.config.bindings;
@@ -35,7 +35,12 @@ function colIndexOf(columns: string[], ref: string | number | undefined): number
 }
 
 export function BindControl({
-  node, field, kind, label, sources, onConfig,
+  node,
+  field,
+  kind,
+  label,
+  sources,
+  onConfig,
 }: {
   node: WNode;
   field: string;
@@ -56,26 +61,42 @@ export function BindControl({
   // columns and sample rows (the same call already gave us the columns).
   React.useEffect(() => {
     let live = true;
-    if (!b?.sourceId) { setCols([]); setRows([]); return; }
+    if (!b?.sourceId) {
+      setCols([]);
+      setRows([]);
+      return;
+    }
     setLoading(true);
     getSourceData(b.sourceId)
-      .then((ds) => { if (live) { setCols(ds.columns); setRows(ds.rows.slice(0, 50)); } })
-      .catch(() => { if (live) { setCols([]); setRows([]); } })
-      .finally(() => { if (live) setLoading(false); });
-    return () => { live = false; };
+      .then((ds) => {
+        if (live) {
+          setCols(ds.columns);
+          setRows(ds.rows.slice(0, 50));
+        }
+      })
+      .catch(() => {
+        if (live) {
+          setCols([]);
+          setRows([]);
+        }
+      })
+      .finally(() => {
+        if (live) setLoading(false);
+      });
+    return () => {
+      live = false;
+    };
   }, [b?.sourceId]);
 
   const write = (next: FieldBinding | null) => {
     const map = { ...bindings };
-    if (next) map[field] = next; else delete map[field];
+    if (next) map[field] = next;
+    else delete map[field];
     onConfig({ bindings: map });
   };
   const patch = (p: Partial<FieldBinding>) => write({ ...(b ?? { sourceId: "" }), kind, ...p } as FieldBinding);
 
-  const colOpts = (allowNone: boolean) => [
-    ...(allowNone ? [{ id: "", label: "— none —" }] : []),
-    ...cols.map((c) => ({ id: c, label: c })),
-  ];
+  const colOpts = (allowNone: boolean) => [...(allowNone ? [{ id: "", label: "— none —" }] : []), ...cols.map((c) => ({ id: c, label: c }))];
 
   // Selected-column indices (for viewer highlighting).
   const valCol = colIndexOf(cols, b?.col);
@@ -96,11 +117,7 @@ export function BindControl({
 
   return (
     <div className="rounded-lg border border-dashed p-2">
-      <SwitchField
-        label={`Bind ${label} to a source`}
-        value={on}
-        onChange={(v) => (v ? patch({ sourceId: sources[0]?.id ?? "" }) : write(null))}
-      />
+      <SwitchField label={`Bind ${label} to a source`} value={on} onChange={(v) => (v ? patch({ sourceId: sources[0]?.id ?? "" }) : write(null))} />
       {on && (
         <div className="mt-2 flex flex-col gap-2">
           <Field label="Source">
@@ -113,9 +130,11 @@ export function BindControl({
           {sources.length === 0 && <p className="text-[10.5px] text-muted-foreground">Create a source on the Sources page first.</p>}
 
           {/* Live data viewer — click to pick. */}
-          {b?.sourceId && (
-            loading ? (
-              <div className="flex items-center gap-1.5 py-2 text-[10.5px] text-muted-foreground"><Loader2 className="size-3 animate-spin" /> Loading data…</div>
+          {b?.sourceId &&
+            (loading ? (
+              <div className="flex items-center gap-1.5 py-2 text-[10.5px] text-muted-foreground">
+                <Loader2 className="size-3 animate-spin" /> Loading data…
+              </div>
             ) : cols.length === 0 ? (
               <p className="text-[10.5px] text-muted-foreground">No columns yet — refresh the source or check its mapping.</p>
             ) : (
@@ -126,9 +145,15 @@ export function BindControl({
                 {kind === "list" && (
                   // A text legend so the label/value/note columns aren't distinguished by colour alone (a11y).
                   <div className="flex flex-wrap gap-x-3 gap-y-1 border-b px-2 py-1 text-[10px] text-muted-foreground">
-                    <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm bg-primary" /> Label</span>
-                    <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm bg-success" /> Value</span>
-                    <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm bg-warning" /> Note</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="size-2 rounded-sm bg-primary" /> Label
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="size-2 rounded-sm bg-success" /> Value
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <span className="size-2 rounded-sm bg-warning" /> Note
+                    </span>
                   </div>
                 )}
                 <div className="max-h-40 overflow-auto">
@@ -155,51 +180,85 @@ export function BindControl({
                     </thead>
                     <tbody>
                       {rows.length === 0 ? (
-                        <tr><td colSpan={cols.length} className="px-2 py-2 text-center text-muted-foreground">No rows yet.</td></tr>
-                      ) : rows.map((r, ri) => (
-                        <tr key={ri} className={cn(kind === "value" && b?.join == null && ri === valRow && "bg-primary/5")}>
-                          {cols.map((_, ci) => {
-                            const selected = kind === "value" && b?.join == null && ci === valCol && ri === valRow;
-                            return (
-                              <td
-                                key={ci}
-                                onClick={() => onCell(ci, ri)}
-                                title={r[ci] ?? ""}
-                                className={cn(
-                                  "max-w-[120px] cursor-pointer truncate border-b border-r px-2 py-1 last:border-r-0 hover:bg-accent",
-                                  selected && "bg-primary/20 font-medium text-primary",
-                                )}
-                              >
-                                {r[ci] ?? ""}
-                              </td>
-                            );
-                          })}
+                        <tr>
+                          <td colSpan={cols.length} className="px-2 py-2 text-center text-muted-foreground">
+                            No rows yet.
+                          </td>
                         </tr>
-                      ))}
+                      ) : (
+                        rows.map((r, ri) => (
+                          <tr key={ri} className={cn(kind === "value" && b?.join == null && ri === valRow && "bg-primary/5")}>
+                            {cols.map((_, ci) => {
+                              const selected = kind === "value" && b?.join == null && ci === valCol && ri === valRow;
+                              return (
+                                <td
+                                  key={ci}
+                                  onClick={() => onCell(ci, ri)}
+                                  title={r[ci] ?? ""}
+                                  className={cn(
+                                    "max-w-[120px] cursor-pointer truncate border-b border-r px-2 py-1 last:border-r-0 hover:bg-accent",
+                                    selected && "bg-primary/20 font-medium text-primary",
+                                  )}
+                                >
+                                  {r[ci] ?? ""}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
               </div>
-            )
-          )}
+            ))}
 
           {/* Precise mapping controls (mirror the viewer selection). */}
           {kind === "value" ? (
             <>
-              <Field label="Column"><SelectField value={str(b?.col)} onChange={(v) => patch({ col: v })} options={colOpts(false)} /></Field>
-              {!b?.join && <Field label="Row" hint="0 = first data row"><NumberField value={num(b?.row, 0)} onChange={(v) => patch({ row: v })} min={0} /></Field>}
+              <Field label="Column">
+                <SelectField value={str(b?.col)} onChange={(v) => patch({ col: v })} options={colOpts(false)} />
+              </Field>
+              {!b?.join && (
+                <Field label="Row" hint="0 = first data row">
+                  <NumberField value={num(b?.row, 0)} onChange={(v) => patch({ row: v })} min={0} />
+                </Field>
+              )}
               <SwitchField label="Join whole column" value={!!b?.join} onChange={(v) => patch({ join: v ? " · " : undefined })} />
-              {b?.join != null && <Field label="Separator"><SelectField value={str(b?.join, " · ")} onChange={(v) => patch({ join: v })} options={[{ id: " · ", label: "Dot ·" }, { id: ", ", label: "Comma" }, { id: " — ", label: "Dash —" }, { id: "\n", label: "New line" }]} /></Field>}
+              {b?.join != null && (
+                <Field label="Separator">
+                  <SelectField
+                    value={str(b?.join, " · ")}
+                    onChange={(v) => patch({ join: v })}
+                    options={[
+                      { id: " · ", label: "Dot ·" },
+                      { id: ", ", label: "Comma" },
+                      { id: " — ", label: "Dash —" },
+                      { id: "\n", label: "New line" },
+                    ]}
+                  />
+                </Field>
+              )}
             </>
           ) : (
             <>
-              <Field label="Label col"><SelectField value={str(b?.labelCol)} onChange={(v) => patch({ labelCol: v })} options={colOpts(false)} /></Field>
-              <Field label="Value col"><SelectField value={str(b?.valueCol)} onChange={(v) => patch({ valueCol: v })} options={colOpts(true)} /></Field>
-              <Field label="Note col"><SelectField value={str(b?.noteCol)} onChange={(v) => patch({ noteCol: v })} options={colOpts(true)} /></Field>
-              <Field label="Max rows" hint="0 = all"><NumberField value={num(b?.max, 0)} onChange={(v) => patch({ max: v })} min={0} max={50} /></Field>
+              <Field label="Label col">
+                <SelectField value={str(b?.labelCol)} onChange={(v) => patch({ labelCol: v })} options={colOpts(false)} />
+              </Field>
+              <Field label="Value col">
+                <SelectField value={str(b?.valueCol)} onChange={(v) => patch({ valueCol: v })} options={colOpts(true)} />
+              </Field>
+              <Field label="Note col">
+                <SelectField value={str(b?.noteCol)} onChange={(v) => patch({ noteCol: v })} options={colOpts(true)} />
+              </Field>
+              <Field label="Max rows" hint="0 = all">
+                <NumberField value={num(b?.max, 0)} onChange={(v) => patch({ max: v })} min={0} max={50} />
+              </Field>
             </>
           )}
-          <p className="flex items-center gap-1 text-[10.5px] text-muted-foreground"><Database className="size-3" /> Live — refreshes on the source's schedule.</p>
+          <p className="flex items-center gap-1 text-[10.5px] text-muted-foreground">
+            <Database className="size-3" /> Live — refreshes on the source's schedule.
+          </p>
         </div>
       )}
     </div>

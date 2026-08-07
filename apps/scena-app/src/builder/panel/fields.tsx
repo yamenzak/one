@@ -6,8 +6,7 @@
  */
 import * as React from "react";
 import { ChevronDown, Link2, Unlink2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Input, Select, Switch } from "@4dl/ui";
+import { cn, Input, Select, Switch } from "@4dl/ui";
 
 /** A labelled row: caption on the left, control on the right. */
 export function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
@@ -23,12 +22,26 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 }
 
 /** A collapsible titled group. */
-export function Group({ title, children, defaultOpen = true, right }: { title: string; children: React.ReactNode; defaultOpen?: boolean; right?: React.ReactNode }) {
+export function Group({
+  title,
+  children,
+  defaultOpen = true,
+  right,
+}: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+  right?: React.ReactNode;
+}) {
   const [open, setOpen] = React.useState(defaultOpen);
   return (
     <div className="border-b last:border-b-0">
       <div className="flex items-center">
-        <button type="button" onClick={() => setOpen((o) => !o)} className="flex flex-1 items-center gap-1.5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="flex flex-1 items-center gap-1.5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+        >
           <ChevronDown className={cn("size-3.5 transition-transform", !open && "-rotate-90")} />
           {title}
         </button>
@@ -44,10 +57,32 @@ export function TextField({ value, onChange, placeholder, mono }: { value: strin
 }
 
 export function AreaField({ value, onChange, rows = 3, placeholder }: { value: string; onChange: (v: string) => void; rows?: number; placeholder?: string }) {
-  return <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={rows} placeholder={placeholder} className="w-full resize-y rounded-md border border-input bg-transparent px-2.5 py-1.5 text-xs shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />;
+  return (
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      rows={rows}
+      placeholder={placeholder}
+      className="w-full resize-y rounded-md border border-input bg-transparent px-2.5 py-1.5 text-xs shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+    />
+  );
 }
 
-export function NumberField({ value, onChange, min, max, step, suffix }: { value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; suffix?: string }) {
+export function NumberField({
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  suffix,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  suffix?: string;
+}) {
   // A local draft so mid-edit input (a decimal point, a leading "-", a cleared
   // field) isn't clobbered by the controlled value — which read as the setting
   // "resetting" while you typed. The draft masks the field until blur, then it
@@ -69,8 +104,16 @@ export function NumberField({ value, onChange, min, max, step, suffix }: { value
         inputMode="decimal"
         value={shown}
         step={step}
-        onChange={(e) => { setDraft(e.target.value); commit(e.target.value); }}
-        onBlur={() => { if (draft !== null) { commit(draft); setDraft(null); } }}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          commit(e.target.value);
+        }}
+        onBlur={() => {
+          if (draft !== null) {
+            commit(draft);
+            setDraft(null);
+          }
+        }}
         className={cn("h-8 px-2 font-mono text-xs tabular-nums", suffix && "pr-8")}
       />
       {suffix && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{suffix}</span>}
@@ -79,10 +122,30 @@ export function NumberField({ value, onChange, min, max, step, suffix }: { value
 }
 
 /** A range slider with a live numeric readout. */
-export function SliderField({ value, onChange, min, max, step = 1 }: { value: number; onChange: (v: number) => void; min: number; max: number; step?: number }) {
+export function SliderField({
+  value,
+  onChange,
+  min,
+  max,
+  step = 1,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  min: number;
+  max: number;
+  step?: number;
+}) {
   return (
     <div className="flex items-center gap-2.5">
-      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="h-1.5 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary" />
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="h-1.5 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+      />
       <span className="w-9 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">{Math.round(value)}</span>
     </div>
   );
@@ -90,9 +153,12 @@ export function SliderField({ value, onChange, min, max, step = 1 }: { value: nu
 
 export function SelectField<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: { id: T; label: string }[] }) {
   return (
-    <Select value={value} onChange={(v) => onChange(v as T)} className="h-8 w-full text-xs" options={[
-      ...options.map((o) => ({ value: o.id, label: o.label })),
-    ]} />
+    <Select
+      value={value}
+      onChange={(v) => onChange(v as T)}
+      className="h-8 w-full text-xs"
+      options={[...options.map((o) => ({ value: o.id, label: o.label }))]}
+    />
   );
 }
 
@@ -101,8 +167,15 @@ export function SegField<T extends string>({ value, onChange, options }: { value
   return (
     <div className="flex gap-1 rounded-lg bg-muted p-0.5">
       {options.map((o) => (
-        <button key={o.id} type="button" onClick={() => onChange(o.id)}
-          className={cn("flex-1 rounded-[6px] px-2 py-1 text-[11px] font-medium transition-colors", value === o.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
+        <button
+          key={o.id}
+          type="button"
+          onClick={() => onChange(o.id)}
+          className={cn(
+            "flex-1 rounded-[6px] px-2 py-1 text-[11px] font-medium transition-colors",
+            value === o.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
           {o.label}
         </button>
       ))}
@@ -115,7 +188,15 @@ export function SegField<T extends string>({ value, onChange, options }: { value
  * equal), four labelled numbers when unlinked. Used for radius (corners) and
  * border width (sides). `all` is the shared value; `sides` the per-side values.
  */
-export function QuadField({ all, sides, labels, onAll, onSide, min = 0, max = 400 }: {
+export function QuadField({
+  all,
+  sides,
+  labels,
+  onAll,
+  onSide,
+  min = 0,
+  max = 400,
+}: {
   all: number;
   sides: [number, number, number, number];
   labels: [string, string, string, string];
@@ -129,11 +210,22 @@ export function QuadField({ all, sides, labels, onAll, onSide, min = 0, max = 40
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1.5">
-        <button type="button" onClick={() => setLinked((l) => !l)} title={linked ? "Per-side" : "Link sides"}
-          className={cn("flex size-8 shrink-0 items-center justify-center rounded-md border", linked ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent")}>
+        <button
+          type="button"
+          onClick={() => setLinked((l) => !l)}
+          title={linked ? "Per-side" : "Link sides"}
+          className={cn(
+            "flex size-8 shrink-0 items-center justify-center rounded-md border",
+            linked ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent",
+          )}
+        >
           {linked ? <Link2 className="size-3.5" /> : <Unlink2 className="size-3.5" />}
         </button>
-        {linked && <span className="min-w-0 flex-1"><NumberField value={all} onChange={onAll} min={min} max={max} suffix="px" /></span>}
+        {linked && (
+          <span className="min-w-0 flex-1">
+            <NumberField value={all} onChange={onAll} min={min} max={max} suffix="px" />
+          </span>
+        )}
         {!linked && <span className="flex-1 text-[10.5px] text-muted-foreground">Independent sides</span>}
       </div>
       {!linked && (

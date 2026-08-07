@@ -12,7 +12,7 @@
  * so they read as one designed system rather than loud stickers.
  */
 import { ShieldCheck, Sparkles, UserRound, Info } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@4dl/ui";
 
 export type Provenance = string | null | undefined;
 
@@ -38,7 +38,10 @@ export function LicenseBadge({ source, className }: { source: Provenance; classN
   }
   if (source === "upload") {
     return (
-      <span className={cn(BADGE_BASE, "bg-muted text-muted-foreground ring-border", className)} title="Your upload — you're responsible for clearing its rights">
+      <span
+        className={cn(BADGE_BASE, "bg-muted text-muted-foreground ring-border", className)}
+        title="Your upload — you're responsible for clearing its rights"
+      >
         <UserRound className="size-3" /> Your upload
       </span>
     );
@@ -51,9 +54,11 @@ export function LicenseBadge({ source, className }: { source: Provenance; classN
  *  context. Kept in step with the Terms and Privacy Policy. */
 export function LicenseNote({ scope }: { scope: "media" | "slides" | "music" }) {
   const uploads =
-    scope === "media" ? "images, video, and music (including audio inside a video)"
-    : scope === "music" ? "audio you upload"
-    : "images and video (including their audio)";
+    scope === "media"
+      ? "images, video, and music (including audio inside a video)"
+      : scope === "music"
+        ? "audio you upload"
+        : "images and video (including their audio)";
   const verb = scope === "music" ? "play them" : "display them";
   return (
     <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-border/70 bg-muted/40 px-3.5 py-2.5 text-xs leading-relaxed text-muted-foreground">

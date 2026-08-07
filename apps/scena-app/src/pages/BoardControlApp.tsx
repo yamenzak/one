@@ -13,8 +13,7 @@
  */
 import { useEffect, useState } from "react";
 import { Loader2, LogOut, Bell, RotateCcw, Minus, Plus } from "lucide-react";
-import { Card, CardContent } from "../components/ui/card.js";
-import { Button, Input } from "@4dl/ui";
+import { Button, Card, Input } from "@4dl/ui";
 import { confirmDialog } from "../components/confirm.js";
 import {
   getBoard,
@@ -74,7 +73,11 @@ export function BoardControlApp({ me, onSignedOut }: { me: Me; onSignedOut: () =
 
   // Board users land here outside the operator shell — apply the workspace brand
   // so the control surface follows it too.
-  useEffect(() => { getBranding().then(applyBrandTheme).catch(() => {}); }, []);
+  useEffect(() => {
+    getBranding()
+      .then(applyBrandTheme)
+      .catch(() => {});
+  }, []);
 
   async function act(fn: () => Promise<void>) {
     setErr(null);
@@ -121,7 +124,9 @@ export function BoardControlApp({ me, onSignedOut }: { me: Me; onSignedOut: () =
               <div>
                 <div className="text-lg font-semibold text-foreground">This board is no longer available</div>
                 <p className="mt-1 text-sm text-muted-foreground">It may have been deleted. Please sign out.</p>
-                <Button className="mt-5" onClick={doSignOut}><LogOut className="h-4 w-4" /> Sign out</Button>
+                <Button className="mt-5" onClick={doSignOut}>
+                  <LogOut className="h-4 w-4" /> Sign out
+                </Button>
               </div>
             </div>
           ) : !board ? (
@@ -189,7 +194,9 @@ function ScoreControls({
   onReset?: () => void;
 }) {
   const [period, setPeriod] = useState("");
-  useEffect(() => { if (state) setPeriod(state.period); }, [state?.period]);
+  useEffect(() => {
+    if (state) setPeriod(state.period);
+  }, [state?.period]);
   if (!state) return null;
   const sides = onlySideId ? state.sides.filter((s) => s.id === onlySideId) : state.sides;
 
@@ -201,25 +208,23 @@ function ScoreControls({
       <div className={`grid gap-3 ${sides.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
         {sides.map((s) => (
           <Card key={s.id}>
-            <CardContent className="flex flex-col items-center gap-3 py-6">
-              <div className="text-sm font-bold uppercase tracking-wide text-foreground/80">{s.short || s.name}</div>
-              <div className="font-mono text-6xl font-black tabular-nums text-foreground">{s.score}</div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" className="size-11" onClick={() => onAdjust(s.id, -1)} disabled={s.score <= 0}>
-                  <Minus className="h-5 w-5" />
+            <div className="text-sm font-bold uppercase tracking-wide text-foreground/80">{s.short || s.name}</div>
+            <div className="font-mono text-6xl font-black tabular-nums text-foreground">{s.score}</div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" className="size-11" onClick={() => onAdjust(s.id, -1)} disabled={s.score <= 0}>
+                <Minus className="h-5 w-5" />
+              </Button>
+              <Button size="lg" className="h-11 px-6 text-lg" onClick={() => onAdjust(s.id, 1)}>
+                <Plus className="h-5 w-5" /> 1
+              </Button>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {[2, 3].map((n) => (
+                <Button key={n} variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => onAdjust(s.id, n)}>
+                  +{n}
                 </Button>
-                <Button size="lg" className="h-11 px-6 text-lg" onClick={() => onAdjust(s.id, 1)}>
-                  <Plus className="h-5 w-5" /> 1
-                </Button>
-              </div>
-              <div className="flex items-center gap-1.5">
-                {[2, 3].map((n) => (
-                  <Button key={n} variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground" onClick={() => onAdjust(s.id, n)}>
-                    +{n}
-                  </Button>
-                ))}
-              </div>
-            </CardContent>
+              ))}
+            </div>
           </Card>
         ))}
       </div>
@@ -231,12 +236,16 @@ function ScoreControls({
             <Input
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") onPeriod(period); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onPeriod(period);
+              }}
               placeholder="Q3 · 04:12"
               className="font-mono"
             />
           </div>
-          <Button variant="secondary" onClick={() => onPeriod(period)}>Set</Button>
+          <Button variant="secondary" onClick={() => onPeriod(period)}>
+            Set
+          </Button>
         </div>
       )}
 

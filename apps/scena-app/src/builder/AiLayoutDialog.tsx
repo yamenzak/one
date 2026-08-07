@@ -10,8 +10,7 @@
  */
 import { useEffect, useState } from "react";
 import { Sparkles, Send, Loader2, Wand2, PencilRuler } from "lucide-react";
-import { Button, Dialog, DialogContent, Select, Textarea } from "@4dl/ui";
-import { cn } from "@/lib/utils";
+import { Button, cn, Dialog, DialogContent, Select, Textarea } from "@4dl/ui";
 import { aiLayout, listAiModels, type AiModel } from "../api.js";
 import type { WNode } from "./types.js";
 
@@ -31,8 +30,12 @@ function toNode(raw: unknown, i: number): WNode | null {
   return {
     id: `${o.type}_${Date.now().toString(36)}${seq}`,
     type: o.type as WNode["type"],
-    x: num(o.x, 0), y: num(o.y, 0), w: num(o.w, 200), h: num(o.h, 120),
-    rot: num(o.rot, 0), z: num(o.z, 10 + i),
+    x: num(o.x, 0),
+    y: num(o.y, 0),
+    w: num(o.w, 200),
+    h: num(o.h, 120),
+    rot: num(o.rot, 0),
+    z: num(o.z, 10 + i),
     style: o.style && typeof o.style === "object" ? (o.style as Record<string, unknown>) : {},
     config: o.config && typeof o.config === "object" ? (o.config as Record<string, unknown>) : {},
   };
@@ -44,7 +47,14 @@ const EXAMPLES = [
   "A lobby dashboard: a live clock, a countdown to our 3pm event, and two KPI stats",
 ];
 
-export function AiLayoutDialog({ open, nodes, designW, designH, onOpenChange, onApply }: {
+export function AiLayoutDialog({
+  open,
+  nodes,
+  designW,
+  designH,
+  onOpenChange,
+  onApply,
+}: {
   open: boolean;
   nodes: WNode[];
   designW: number;
@@ -63,19 +73,32 @@ export function AiLayoutDialog({ open, nodes, designW, designH, onOpenChange, on
   const [modelId, setModelId] = useState<string>("");
 
   useEffect(() => {
-    if (open) { setPrompt(""); setError(null); setMode(nodes.length > 0 ? "improve" : "fresh"); }
+    if (open) {
+      setPrompt("");
+      setError(null);
+      setMode(nodes.length > 0 ? "improve" : "fresh");
+    }
   }, [open, nodes.length]);
-  useEffect(() => { listAiModels().then((ms) => setModels(ms.filter((m) => m.task === "text"))).catch(() => {}); }, []);
+  useEffect(() => {
+    listAiModels()
+      .then((ms) => setModels(ms.filter((m) => m.task === "text")))
+      .catch(() => {});
+  }, []);
 
   async function run() {
     const msg = prompt.trim();
     if (!msg || busy) return;
-    setBusy(true); setError(null);
+    setBusy(true);
+    setError(null);
     try {
       const send = mode === "improve" && hasCanvas ? nodes.map(toSpec) : [];
       const r = await aiLayout({ prompt: msg, widgets: send, designW, designH, ...(modelId ? { modelId } : {}) });
       if (!r.ok || !Array.isArray(r.widgets) || !r.widgets.length) {
-        throw new Error(r.detail || (r.error === "insufficient_credits" ? "Not enough credits for this generation." : r.error) || "The model returned no layout — try rephrasing.");
+        throw new Error(
+          r.detail ||
+            (r.error === "insufficient_credits" ? "Not enough credits for this generation." : r.error) ||
+            "The model returned no layout — try rephrasing.",
+        );
       }
       const out = r.widgets.map(toNode).filter((n): n is WNode => n !== null);
       if (!out.length) throw new Error("The model returned no usable widgets — try again.");
@@ -89,33 +112,63 @@ export function AiLayoutDialog({ open, nodes, designW, designH, onOpenChange, on
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!busy) onOpenChange(o); }}>
-      <DialogContent title={<><Sparkles className="size-4 text-primary" /> Design with AI</>} className="max-w-[min(560px,95vw)]">
-
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!busy) onOpenChange(o);
+      }}
+    >
+      <DialogContent
+        title={
+          <>
+            <Sparkles className="size-4 text-primary" /> Design with AI
+          </>
+        }
+        className="max-w-[min(560px,95vw)]"
+      >
         {hasCanvas && (
           <div className="grid grid-cols-2 gap-2">
-            <ModeCard active={mode === "improve"} onClick={() => setMode("improve")}
-              icon={<Wand2 />} title="Improve current"
-              desc="Keep what's here — add, resize and rebalance the layout." />
-            <ModeCard active={mode === "fresh"} onClick={() => setMode("fresh")}
-              icon={<PencilRuler />} title="Start fresh"
-              desc="Ignore the canvas and design a new layout from scratch." />
+            <ModeCard
+              active={mode === "improve"}
+              onClick={() => setMode("improve")}
+              icon={<Wand2 />}
+              title="Improve current"
+              desc="Keep what's here — add, resize and rebalance the layout."
+            />
+            <ModeCard
+              active={mode === "fresh"}
+              onClick={() => setMode("fresh")}
+              icon={<PencilRuler />}
+              title="Start fresh"
+              desc="Ignore the canvas and design a new layout from scratch."
+            />
           </div>
         )}
 
         <Textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); run(); } }}
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              e.preventDefault();
+              run();
+            }
+          }}
           autoFocus
-          placeholder={mode === "improve" ? "What should change? e.g. “add a QR to the bottom-right and make the headline bigger”" : "Describe the layout to design…"}
+          placeholder={
+            mode === "improve" ? "What should change? e.g. “add a QR to the bottom-right and make the headline bigger”" : "Describe the layout to design…"
+          }
           className="min-h-24 resize-none text-sm"
         />
 
         <div className="flex flex-wrap gap-1.5">
           {EXAMPLES.map((ex) => (
-            <button key={ex} type="button" onClick={() => setPrompt(ex)}
-              className="rounded-full border px-2.5 py-1 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+            <button
+              key={ex}
+              type="button"
+              onClick={() => setPrompt(ex)}
+              className="rounded-full border px-2.5 py-1 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
               {ex.length > 46 ? ex.slice(0, 44) + "…" : ex}
             </button>
           ))}
@@ -124,10 +177,12 @@ export function AiLayoutDialog({ open, nodes, designW, designH, onOpenChange, on
         {models.length > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-medium text-muted-foreground">Model</span>
-            <Select value={modelId || "__default"} onChange={(v) => setModelId(v === "__default" ? "" : v)} className="h-8 flex-1 text-xs" options={[
-              { value: "__default", label: "Default model" },
-              ...models.map((m) => ({ value: m.id, label: m.label })),
-            ]} />
+            <Select
+              value={modelId || "__default"}
+              onChange={(v) => setModelId(v === "__default" ? "" : v)}
+              className="h-8 flex-1 text-xs"
+              options={[{ value: "__default", label: "Default model" }, ...models.map((m) => ({ value: m.id, label: m.label }))]}
+            />
           </div>
         )}
 
@@ -136,9 +191,19 @@ export function AiLayoutDialog({ open, nodes, designW, designH, onOpenChange, on
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-[11px] text-muted-foreground">Uses AI credits · follows your brand · one undo reverses it.</p>
           <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+            <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
+              Cancel
+            </Button>
             <Button onClick={run} disabled={busy || !prompt.trim()}>
-              {busy ? <><Loader2 className="size-4 animate-spin" /> Designing…</> : <><Send className="size-4" /> Generate</>}
+              {busy ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" /> Designing…
+                </>
+              ) : (
+                <>
+                  <Send className="size-4" /> Generate
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -149,9 +214,17 @@ export function AiLayoutDialog({ open, nodes, designW, designH, onOpenChange, on
 
 function ModeCard({ active, onClick, icon, title, desc }: { active: boolean; onClick: () => void; icon: React.ReactNode; title: string; desc: string }) {
   return (
-    <button type="button" onClick={onClick}
-      className={cn("flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors", active ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-accent")}>
-      <span className={cn("flex items-center gap-1.5 text-sm font-medium", active ? "text-primary" : "")}>{icon} {title}</span>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex flex-col gap-1 rounded-lg border p-3 text-left transition-colors",
+        active ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-accent",
+      )}
+    >
+      <span className={cn("flex items-center gap-1.5 text-sm font-medium", active ? "text-primary" : "")}>
+        {icon} {title}
+      </span>
       <span className="text-[11px] leading-snug text-muted-foreground">{desc}</span>
     </button>
   );

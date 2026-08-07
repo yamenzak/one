@@ -42,8 +42,29 @@ import { PERMISSION_CATALOG, ROLE_PRESETS } from "../permissions.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
-import { cn } from "@/lib/utils";
-import { Badge, Button, Collection, Dialog, DialogContent, DialogDescription, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Group, Input, Label, Row, Section, Select, toast } from "@4dl/ui";
+import {
+  Badge,
+  Button,
+  cn,
+  Collection,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  Group,
+  Input,
+  Label,
+  Row,
+  Section,
+  Select,
+  toast,
+} from "@4dl/ui";
 
 type Grant = Record<string, string[]>;
 const cloneGrant = (g: Grant): Grant => Object.fromEntries(Object.entries(g).map(([k, v]) => [k, [...v]]));
@@ -52,7 +73,8 @@ const cloneGrant = (g: Grant): Grant => Object.fromEntries(Object.entries(g).map
 function PermissionGrid({ value, onChange }: { value: Grant; onChange: (g: Grant) => void }) {
   function toggle(res: string, act: string) {
     const cur = new Set(value[res] ?? []);
-    if (cur.has(act)) cur.delete(act); else cur.add(act);
+    if (cur.has(act)) cur.delete(act);
+    else cur.add(act);
     const next = { ...value, [res]: [...cur] };
     if (!next[res]!.length) delete next[res];
     onChange(next);
@@ -66,8 +88,15 @@ function PermissionGrid({ value, onChange }: { value: Grant; onChange: (g: Grant
             {r.actions.map((a) => {
               const on = value[r.resource]?.includes(a);
               return (
-                <button key={a} type="button" onClick={() => toggle(r.resource, a)}
-                  className={cn("rounded-full border px-2.5 py-0.5 text-[11px] font-medium capitalize transition-colors", on ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent")}>
+                <button
+                  key={a}
+                  type="button"
+                  onClick={() => toggle(r.resource, a)}
+                  className={cn(
+                    "rounded-full border px-2.5 py-0.5 text-[11px] font-medium capitalize transition-colors",
+                    on ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent",
+                  )}
+                >
                   {a}
                 </button>
               );
@@ -85,7 +114,9 @@ function PresetRow({ onPick }: { onPick: (role: Role) => void }) {
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="text-xs text-muted-foreground">Start from:</span>
       {(["owner", "operator", "receptionist", "viewer"] as Role[]).map((r) => (
-        <button key={r} type="button" onClick={() => onPick(r)} className="rounded-md border px-2 py-0.5 text-[11px] font-medium capitalize hover:bg-accent">{r}</button>
+        <button key={r} type="button" onClick={() => onPick(r)} className="rounded-md border px-2 py-0.5 text-[11px] font-medium capitalize hover:bg-accent">
+          {r}
+        </button>
       ))}
     </div>
   );
@@ -114,10 +145,15 @@ export function TeamPage() {
   const reload = () => {
     setError(null);
     return Promise.all([getTeam(), getStaff()])
-      .then(([t, st]) => { setTeam(t); setStaff(st); })
+      .then(([t, st]) => {
+        setTeam(t);
+        setStaff(st);
+      })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   };
-  useEffect(() => { reload(); }, []);
+  useEffect(() => {
+    reload();
+  }, []);
 
   const [editAccess, setEditAccess] = useState<TenantMember | null>(null);
 
@@ -193,7 +229,11 @@ export function TeamPage() {
     return team.members.filter((m) => `${m.name} ${m.email ?? ""}`.toLowerCase().includes(needle));
   }, [team, q]);
 
-  const inviteButton = <Button onClick={() => setInviteOpen(true)}><UserPlus className="size-4" /> Invite</Button>;
+  const inviteButton = (
+    <Button onClick={() => setInviteOpen(true)}>
+      <UserPlus className="size-4" /> Invite
+    </Button>
+  );
 
   return (
     <div>
@@ -256,15 +296,7 @@ export function TeamPage() {
             iconTone={m.email ? "primary" : "warning"}
             sub={m.email ?? "No address — this member cannot be sent a sign-in code"}
             value={<Badge className="capitalize">{m.role}</Badge>}
-            trailing={
-              <MemberMenu
-                m={m}
-                roles={roles}
-                onRole={changeRole}
-                onEdit={setEditAccess}
-                onRevoke={revoke}
-              />
-            }
+            trailing={<MemberMenu m={m} roles={roles} onRole={changeRole} onEdit={setEditAccess} onRevoke={revoke} />}
           >
             {m.name}
           </Row>
@@ -285,7 +317,13 @@ export function TeamPage() {
  * a select that is always armed on every row is a mis-tap away from demoting a
  * colleague.
  */
-function MemberMenu({ m, roles, onRole, onEdit, onRevoke }: {
+function MemberMenu({
+  m,
+  roles,
+  onRole,
+  onEdit,
+  onRevoke,
+}: {
   m: TenantMember;
   roles: Role[];
   onRole: (m: TenantMember, r: Role) => void;
@@ -295,7 +333,9 @@ function MemberMenu({ m, roles, onRole, onEdit, onRevoke }: {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${m.name}`}><MoreVertical className="size-4" /></Button>
+        <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${m.name}`}>
+          <MoreVertical className="size-4" />
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Role</DropdownMenuLabel>
@@ -306,8 +346,12 @@ function MemberMenu({ m, roles, onRole, onEdit, onRevoke }: {
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => onEdit(m)}><SlidersHorizontal className="size-4" /> Narrow access…</DropdownMenuItem>
-        <DropdownMenuItem className="text-destructive" onSelect={() => onRevoke(m)}><Trash2 className="size-4" /> Remove</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => onEdit(m)}>
+          <SlidersHorizontal className="size-4" /> Narrow access…
+        </DropdownMenuItem>
+        <DropdownMenuItem className="text-destructive" onSelect={() => onRevoke(m)}>
+          <Trash2 className="size-4" /> Remove
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -317,7 +361,9 @@ function MemberMenu({ m, roles, onRole, onEdit, onRevoke }: {
 function EditAccessDialog({ member, onClose, onSaved }: { member: TenantMember | null; onClose: () => void; onSaved: () => void }) {
   const [grant, setGrant] = useState<Grant>({});
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (member) setGrant(cloneGrant(member.permissions ?? {})); }, [member]);
+  useEffect(() => {
+    if (member) setGrant(cloneGrant(member.permissions ?? {}));
+  }, [member]);
   async function save() {
     if (!member) return;
     setBusy(true);
@@ -326,16 +372,24 @@ function EditAccessDialog({ member, onClose, onSaved }: { member: TenantMember |
       toast.success(`Access updated for ${member.name}.`);
       onSaved();
       onClose();
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Could not save"); }
-    finally { setBusy(false); }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not save");
+    } finally {
+      setBusy(false);
+    }
   }
   return (
-    <Dialog open={!!member} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open={!!member}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent title={<>Access for {member?.name}</>}>
-      <DialogDescription>
-            Check exactly what this person can do. Applying a role from the dropdown resets these to that preset.
-          </DialogDescription>
-        <div className="mb-2"><PresetRow onPick={(r) => setGrant(cloneGrant(ROLE_PRESETS[r] ?? {}))} /></div>
+        <DialogDescription>Check exactly what this person can do. Applying a role from the dropdown resets these to that preset.</DialogDescription>
+        <div className="mb-2">
+          <PresetRow onPick={(r) => setGrant(cloneGrant(ROLE_PRESETS[r] ?? {}))} />
+        </div>
         <PermissionGrid value={grant} onChange={setGrant} />
         {/*
           This can only ever take capability AWAY. The server intersects what is
@@ -347,8 +401,12 @@ function EditAccessDialog({ member, onClose, onSaved }: { member: TenantMember |
           Narrows what the role already allows. Anything ticked here that their role doesn't include is ignored — change the role to grant more.
         </p>
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button>
-          <Button onClick={save} disabled={busy}>{busy ? <Loader2 className="size-4 animate-spin" /> : "Save access"}</Button>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={busy}>
+            {busy ? <Loader2 className="size-4 animate-spin" /> : "Save access"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -374,7 +432,10 @@ function InviteDialog({ open, onClose, roles, onSent }: { open: boolean; onClose
   const [sent, setSent] = useState<{ url: string; emailed: boolean; emailError: string | null } | null>(null);
 
   function reset() {
-    setEmail(""); setRole("receptionist"); setErr(null); setSent(null);
+    setEmail("");
+    setRole("receptionist");
+    setErr(null);
+    setSent(null);
   }
 
   async function submit(e: React.FormEvent) {
@@ -393,15 +454,23 @@ function InviteDialog({ open, onClose, roles, onSent }: { open: boolean; onClose
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); reset(); } }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) {
+          onClose();
+          reset();
+        }
+      }}
+    >
       <DialogContent title={!sent ? "Invite someone" : sent.emailed ? "Invitation sent" : "Invitation created"}>
         {sent ? (
           <>
-      <DialogDescription>
-                {sent.emailed
-                  ? "They'll get an email with a link. It works once, and expires in seven days."
-                  : "The email could not be delivered, so pass this link on yourself. It works once, and expires in seven days."}
-              </DialogDescription>
+            <DialogDescription>
+              {sent.emailed
+                ? "They'll get an email with a link. It works once, and expires in seven days."
+                : "The email could not be delivered, so pass this link on yourself. It works once, and expires in seven days."}
+            </DialogDescription>
             {!sent.emailed && (
               <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
                 <MailWarning className="mt-0.5 size-4 shrink-0 text-warning" />
@@ -411,35 +480,68 @@ function InviteDialog({ open, onClose, roles, onSent }: { open: boolean; onClose
             )}
             <div className="flex items-center gap-2 rounded-lg border bg-muted/40 p-3">
               <code className="min-w-0 flex-1 truncate font-mono text-xs">{sent.url}</code>
-              <Button size="sm" variant="outline" onClick={() => { void navigator.clipboard.writeText(sent.url); toast.success("Link copied."); }}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  void navigator.clipboard.writeText(sent.url);
+                  toast.success("Link copied.");
+                }}
+              >
                 <Copy className="size-3.5" />
               </Button>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={reset}>Invite someone else</Button>
-              <Button onClick={() => { onClose(); reset(); }}>Done</Button>
+              <Button variant="outline" onClick={reset}>
+                Invite someone else
+              </Button>
+              <Button
+                onClick={() => {
+                  onClose();
+                  reset();
+                }}
+              >
+                Done
+              </Button>
             </DialogFooter>
           </>
         ) : (
           <form onSubmit={submit}>
-      <DialogDescription>They'll set themselves up and sign in with a one-time code — there's no password for you to choose.</DialogDescription>
+            <DialogDescription>They'll set themselves up and sign in with a one-time code — there's no password for you to choose.</DialogDescription>
             <div className="space-y-3 py-3">
               <div>
                 <Label htmlFor="inv-email">Email</Label>
-                <Input id="inv-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="colleague@company.com" autoComplete="off" required className="mt-1.5" />
+                <Input
+                  id="inv-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="colleague@company.com"
+                  autoComplete="off"
+                  required
+                  className="mt-1.5"
+                />
               </div>
               <div>
                 <Label htmlFor="inv-role">Role</Label>
-                <Select value={role} onChange={(v) => setRole(v as Role)} className="mt-1.5" id="inv-role" options={[
-                  ...roles.map((r) => ({ value: r, label: <span className="capitalize">{r}</span> })),
-                ]} />
+                <Select
+                  value={role}
+                  onChange={(v) => setRole(v as Role)}
+                  className="mt-1.5"
+                  id="inv-role"
+                  options={[...roles.map((r) => ({ value: r, label: <span className="capitalize">{r}</span> }))]}
+                />
                 <p className="mt-1.5 text-xs text-muted-foreground">You can narrow what they can do once they've accepted.</p>
               </div>
               {err && <div className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</div>}
             </div>
             <DialogFooter>
-              <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-              <Button type="submit" disabled={busy || !email.trim()}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send invitation"}</Button>
+              <Button type="button" variant="ghost" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={busy || !email.trim()}>
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send invitation"}
+              </Button>
             </DialogFooter>
           </form>
         )}

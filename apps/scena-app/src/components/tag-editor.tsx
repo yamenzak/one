@@ -1,7 +1,6 @@
 import * as React from "react";
 import { X } from "lucide-react";
-import { Badge } from "@4dl/ui";
-import { cn } from "@/lib/utils";
+import { Badge, cn } from "@4dl/ui";
 
 /** Freeform tag input: removable chips + type-to-add (Enter or comma). */
 export function TagEditor({
@@ -33,7 +32,7 @@ export function TagEditor({
       )}
     >
       {safe.map((t) => (
-        <Badge key={t}  className="gap-1 pl-2 pr-1 font-normal">
+        <Badge key={t} className="gap-1 pl-2 pr-1 font-normal">
           {t}
           <button
             type="button"
@@ -49,7 +48,10 @@ export function TagEditor({
         value={input}
         onChange={(e) => setInput(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === ",") { e.preventDefault(); add(input); }
+          if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            add(input);
+          }
           if (e.key === "Backspace" && !input && safe.length) onChange(safe.slice(0, -1));
         }}
         onBlur={() => input && add(input)}

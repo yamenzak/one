@@ -16,22 +16,12 @@
  */
 import { useEffect, useState } from "react";
 import { Receipt, Check, Sparkles, ArrowRight, Lock, Loader2 } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogFooter, Group, Input, LoadError, Meter, Row, Skeleton, toast } from "@4dl/ui";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
+import { Button, Card, cn, Dialog, DialogContent, DialogFooter, Group, Input, LoadError, Meter, Row, SectionHeader, Skeleton, toast } from "@4dl/ui";
 import { PageHeader } from "../components/page-header.js";
 import { LegalDialog, LegalLinks, type LegalDoc } from "../legal/content.js";
-import { cn } from "@/lib/utils";
 import { FEATURE_CATALOG, QUOTA_CATALOG } from "@scena/manifest";
 import { EmptyState } from "../components/empty.js";
-import {
-  getBilling,
-  changePlan,
-  buyPack,
-  redeemPromo,
-  type BillingState,
-  type Plan,
-  type Violation,
-} from "../api.js";
+import { getBilling, changePlan, buyPack, redeemPromo, type BillingState, type Plan, type Violation } from "../api.js";
 
 const dollars = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 const num = (n: number) => n.toLocaleString();
@@ -59,14 +49,23 @@ export function BillingPage() {
 
   const reload = () => {
     setError(null);
-    return getBilling().then(setState).catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    return getBilling()
+      .then(setState)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
   };
-  useEffect(() => { reload(); }, []);
+  useEffect(() => {
+    reload();
+  }, []);
 
   if (!state) {
     // A genuine outage and a first load are different states. Hanging on the
     // skeleton is the failure this distinction exists to prevent.
-    if (error) return <div className="mx-auto max-w-md py-10"><LoadError what="billing" error={error} onRetry={reload} /></div>;
+    if (error)
+      return (
+        <div className="mx-auto max-w-md py-10">
+          <LoadError what="billing" error={error} onRetry={reload} />
+        </div>
+      );
     return <BillingSkeleton />;
   }
 
@@ -82,11 +81,17 @@ export function BillingPage() {
     setBusy(p.id);
     try {
       const r = await changePlan(p.id);
-      if (r.blocked) { setPending(null); setDowngrade({ plan: p, violations: r.violations ?? [] }); }
-      else if (r.checkoutUrl) window.location.href = r.checkoutUrl;
+      if (r.blocked) {
+        setPending(null);
+        setDowngrade({ plan: p, violations: r.violations ?? [] });
+      } else if (r.checkoutUrl) window.location.href = r.checkoutUrl;
       else if (r.error === "payments_unavailable") toast.error("Online payments aren't enabled yet — contact us to upgrade.");
       else if (r.error) toast.error(r.error);
-      else { setPending(null); await reload(); toast.success(`You're now on ${p.name}.`); }
+      else {
+        setPending(null);
+        await reload();
+        toast.success(`You're now on ${p.name}.`);
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Plan change failed");
     } finally {
@@ -99,7 +104,10 @@ export function BillingPage() {
     try {
       const r = await buyPack(packId);
       if (r.checkoutUrl) window.location.href = r.checkoutUrl;
-      else toast.error(r.error === "stripe not configured" ? "Stripe is not configured — ask your admin to enable payments." : r.error ?? "Checkout unavailable");
+      else
+        toast.error(
+          r.error === "stripe not configured" ? "Stripe is not configured — ask your admin to enable payments." : (r.error ?? "Checkout unavailable"),
+        );
     } catch (e) {
       // Was a bare `finally`. A refused checkout rejected into the app-wide
       // "Something didn't load" toast, which names neither the pack nor why.
@@ -136,79 +144,67 @@ export function BillingPage() {
       <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
         {/* Current plan */}
         <Card className="flex flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current plan</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col gap-4">
-            <div className="flex items-baseline gap-2.5">
-              <span className="text-2xl font-semibold tracking-tight">{plan?.name ?? sub.plan_id}</span>
-              <span className="font-mono text-sm tabular-nums text-muted-foreground">
-                {plan ? (plan.price_cents === 0 ? "Free" : `${dollars(plan.price_cents)}/${plan.interval}`) : ""}
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-4 border-t pt-4 text-sm">
-              <div>
-                <div className="text-xs text-muted-foreground">Status</div>
-                <div className={cn("mt-1 flex items-center gap-1.5 font-medium capitalize", statusText)}>
-                  <span className={cn("size-2 shrink-0 rounded-full", statusDot)} />
-                  {status}
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Monthly grant</div>
-                <div className="mt-1 font-mono font-medium tabular-nums">{grant ? num(grant) : "—"}</div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Renews</div>
-                <div className="mt-1 font-mono font-medium tabular-nums">{sub.current_period_end ? fmtDate(sub.current_period_end) : "—"}</div>
+          <SectionHeader title="Current plan" className="mb-4" />
+          <div className="flex items-baseline gap-2.5">
+            <span className="text-2xl font-semibold tracking-tight">{plan?.name ?? sub.plan_id}</span>
+            <span className="font-mono text-sm tabular-nums text-muted-foreground">
+              {plan ? (plan.price_cents === 0 ? "Free" : `${dollars(plan.price_cents)}/${plan.interval}`) : ""}
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-4 border-t pt-4 text-sm">
+            <div>
+              <div className="text-xs text-muted-foreground">Status</div>
+              <div className={cn("mt-1 flex items-center gap-1.5 font-medium capitalize", statusText)}>
+                <span className={cn("size-2 shrink-0 rounded-full", statusDot)} />
+                {status}
               </div>
             </div>
-          </CardContent>
+            <div>
+              <div className="text-xs text-muted-foreground">Monthly grant</div>
+              <div className="mt-1 font-mono font-medium tabular-nums">{grant ? num(grant) : "—"}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Renews</div>
+              <div className="mt-1 font-mono font-medium tabular-nums">{sub.current_period_end ? fmtDate(sub.current_period_end) : "—"}</div>
+            </div>
+          </div>
         </Card>
 
         {/* AI credit balance meter */}
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">AI credit balance</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="numeral text-3xl font-semibold">{num(balance.balance)}</div>
-            {grant > 0 && (
-              <Meter
-                className="mt-3"
-                size="md"
-                value={balance.balance}
-                max={grant}
-                tone="primary"
-                valueLabel={`${num(balance.balance)} / ${num(grant)} grant · ${num(balance.available)} available`}
-              />
-            )}
-            <div className="mt-3 text-xs text-muted-foreground/70">$1 = 1,000 credits · charged per model at generation time.</div>
-          </CardContent>
+          <SectionHeader title="AI credit balance" className="mb-4" />
+          <div className="numeral text-3xl font-semibold">{num(balance.balance)}</div>
+          {grant > 0 && (
+            <Meter
+              className="mt-3"
+              size="md"
+              value={balance.balance}
+              max={grant}
+              tone="primary"
+              valueLabel={`${num(balance.balance)} / ${num(grant)} grant · ${num(balance.available)} available`}
+            />
+          )}
+          <div className="mt-3 text-xs text-muted-foreground/70">$1 = 1,000 credits · charged per model at generation time.</div>
         </Card>
 
         {/* Media storage meter */}
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Media storage</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="font-mono text-3xl font-semibold tabular-nums">{storage ? mb(storage.usedBytes) : "—"}</div>
-            {storage && storage.limitBytes > 0 && (
-              <Meter
-                className="mt-3"
-                size="md"
-                value={storage.usedBytes}
-                max={storage.limitBytes}
-                // Past 90% the bar is the warning — the number beside it is the
-                // same number it was at 40%, and nobody reads two of those.
-                tone={storagePct >= 90 ? "danger" : "primary"}
-                valueLabel={`${mb(storage.usedBytes)} / ${mb(storage.limitBytes)} used`}
-              />
-            )}
-            {storage && storage.limitBytes < 0 && <div className="mt-3 text-xs text-muted-foreground">Unlimited on this plan.</div>}
-            <div className="mt-3 text-xs text-muted-foreground/70">Uploads and generated assets. Deleting media from the library frees it.</div>
-          </CardContent>
+          <SectionHeader title="Media storage" className="mb-4" />
+          <div className="font-mono text-3xl font-semibold tabular-nums">{storage ? mb(storage.usedBytes) : "—"}</div>
+          {storage && storage.limitBytes > 0 && (
+            <Meter
+              className="mt-3"
+              size="md"
+              value={storage.usedBytes}
+              max={storage.limitBytes}
+              // Past 90% the bar is the warning — the number beside it is the
+              // same number it was at 40%, and nobody reads two of those.
+              tone={storagePct >= 90 ? "danger" : "primary"}
+              valueLabel={`${mb(storage.usedBytes)} / ${mb(storage.limitBytes)} used`}
+            />
+          )}
+          {storage && storage.limitBytes < 0 && <div className="mt-3 text-xs text-muted-foreground">Unlimited on this plan.</div>}
+          <div className="mt-3 text-xs text-muted-foreground/70">Uploads and generated assets. Deleting media from the library frees it.</div>
         </Card>
       </div>
 
@@ -221,13 +217,17 @@ export function BillingPage() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {plans.map((p) => {
             const current = p.id === sub.plan_id;
-            const rank = (plan?.price_cents ?? 0);
+            const rank = plan?.price_cents ?? 0;
             const dir = p.price_cents > rank ? "up" : p.price_cents < rank ? "down" : "same";
             const feats = planHighlights(p);
             return (
-              <div key={p.id}
-                className={cn("relative flex flex-col rounded-2xl border p-5", current ? "border-primary shadow-sm ring-1 ring-primary" : "bg-card")}>
-                {current && <span className="absolute right-4 top-4 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Current</span>}
+              <div
+                key={p.id}
+                className={cn("relative flex flex-col rounded-2xl border p-5", current ? "border-primary shadow-sm ring-1 ring-primary" : "bg-card")}
+              >
+                {current && (
+                  <span className="absolute right-4 top-4 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Current</span>
+                )}
                 <div className="text-sm font-semibold">{p.name}</div>
                 <div className="mt-1.5 flex items-baseline gap-1">
                   <span className="text-2xl font-bold tracking-tight">{p.price_cents === 0 ? "Free" : dollars(p.price_cents)}</span>
@@ -257,85 +257,70 @@ export function BillingPage() {
           })}
         </div>
         <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
-          Paid plans renew automatically until cancelled; AI credits are consumed at generation time and are non-refundable. By subscribing you agree to our <LegalLinks onOpen={setLegalDoc} />.
+          Paid plans renew automatically until cancelled; AI credits are consumed at generation time and are non-refundable. By subscribing you agree to our{" "}
+          <LegalLinks onOpen={setLegalDoc} />.
         </p>
       </div>
 
       {/* Packs + promo */}
       <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Credit packs</CardTitle>
+          <div className="mb-4 pb-3">
+            <h3 className="text-base font-semibold leading-none text-base">Credit packs</h3>
             <p className="text-xs text-muted-foreground">One-time top-ups. Purchased credits never expire.</p>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {packs.map((pk) => (
-              <div key={pk.id} className="flex flex-col items-center rounded-xl border p-4 text-center">
-                <div className="font-mono text-xl font-semibold tabular-nums">{num(pk.credits)}</div>
-                <div className="mb-3 text-xs text-muted-foreground">credits</div>
-                <Button variant="outline" size="sm" className="w-full" disabled={busy === pk.id} onClick={() => purchase(pk.id)}>
-                  {dollars(pk.price_cents)}
-                </Button>
-              </div>
-            ))}
-          </CardContent>
+          </div>
+          {packs.map((pk) => (
+            <div key={pk.id} className="flex flex-col items-center rounded-xl border p-4 text-center">
+              <div className="font-mono text-xl font-semibold tabular-nums">{num(pk.credits)}</div>
+              <div className="mb-3 text-xs text-muted-foreground">credits</div>
+              <Button variant="outline" size="sm" className="w-full" disabled={busy === pk.id} onClick={() => purchase(pk.id)}>
+                {dollars(pk.price_cents)}
+              </Button>
+            </div>
+          ))}
         </Card>
 
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Redeem a code</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-2">
-              <Input
-                value={promo}
-                onChange={(e) => setPromo(e.target.value.toUpperCase())}
-                placeholder="PROMO CODE"
-                className="font-mono uppercase"
-              />
-              <Button disabled={busy === "promo"} onClick={applyPromo}>Redeem</Button>
-            </div>
-            {promoMsg && (
-              <div className={cn("mt-2 text-xs", promoMsg.ok ? "text-success" : "text-destructive")}>{promoMsg.text}</div>
-            )}
-          </CardContent>
+          <SectionHeader title="Redeem a code" className="mb-4" />
+          <div className="flex gap-2">
+            <Input value={promo} onChange={(e) => setPromo(e.target.value.toUpperCase())} placeholder="PROMO CODE" className="font-mono uppercase" />
+            <Button disabled={busy === "promo"} onClick={applyPromo}>
+              Redeem
+            </Button>
+          </div>
+          {promoMsg && <div className={cn("mt-2 text-xs", promoMsg.ok ? "text-success" : "text-destructive")}>{promoMsg.text}</div>}
         </Card>
       </div>
 
       {/* Ledger */}
       <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Credit ledger</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {ledger.length === 0 ? (
-            <EmptyState icon={Receipt} title="No activity yet" description="Credit grants, purchases, and AI usage will appear here as they happen." />
-          ) : (
-            <Group>
-              {ledger.map((l) => (
-                <Row
-                  key={l.id}
-                  icon={Receipt}
-                  iconTone={l.delta >= 0 ? "success" : "neutral"}
-                  sub={`${fmtDate(l.created_at)}${l.ref ? ` · ${l.ref}` : ""}`}
-                  value={<span className={l.delta >= 0 ? "text-success" : undefined}>{l.delta >= 0 ? "+" : ""}{num(l.delta)}</span>}
-                  valueSub={`balance ${num(l.balance)}`}
-                >
-                  {reasonLabel(l.reason)}
-                </Row>
-              ))}
-            </Group>
-          )}
-        </CardContent>
+        <SectionHeader title="Credit ledger" className="mb-4" />
+        {ledger.length === 0 ? (
+          <EmptyState icon={Receipt} title="No activity yet" description="Credit grants, purchases, and AI usage will appear here as they happen." />
+        ) : (
+          <Group>
+            {ledger.map((l) => (
+              <Row
+                key={l.id}
+                icon={Receipt}
+                iconTone={l.delta >= 0 ? "success" : "neutral"}
+                sub={`${fmtDate(l.created_at)}${l.ref ? ` · ${l.ref}` : ""}`}
+                value={
+                  <span className={l.delta >= 0 ? "text-success" : undefined}>
+                    {l.delta >= 0 ? "+" : ""}
+                    {num(l.delta)}
+                  </span>
+                }
+                valueSub={`balance ${num(l.balance)}`}
+              >
+                {reasonLabel(l.reason)}
+              </Row>
+            ))}
+          </Group>
+        )}
       </Card>
 
-      {downgrade && (
-        <DowngradeModal
-          planName={downgrade.plan.name}
-          violations={downgrade.violations}
-          onClose={() => setDowngrade(null)}
-        />
-      )}
+      {downgrade && <DowngradeModal planName={downgrade.plan.name} violations={downgrade.violations} onClose={() => setDowngrade(null)} />}
       {pending && (
         <PlanChangeDialog
           target={pending}
@@ -343,7 +328,9 @@ export function BillingPage() {
           stripeEnabled={state.stripeEnabled}
           busy={busy === pending.id}
           onConfirm={() => confirmPlan(pending)}
-          onClose={() => { if (busy !== pending.id) setPending(null); }}
+          onClose={() => {
+            if (busy !== pending.id) setPending(null);
+          }}
         />
       )}
       <LegalDialog doc={legalDoc} onClose={() => setLegalDoc(null)} />
@@ -357,7 +344,11 @@ export function BillingPage() {
  *  allow-list). Add a catalogued feature and it appears here automatically. */
 function planHighlights(p: Plan): string[] {
   let ent: { quotas?: Record<string, number>; features?: Record<string, unknown> } = {};
-  try { ent = JSON.parse(p.entitlements_json || "{}"); } catch { /* empty */ }
+  try {
+    ent = JSON.parse(p.entitlements_json || "{}");
+  } catch {
+    /* empty */
+  }
   const q = ent.quotas ?? {};
   const f = ent.features ?? {};
   const out: string[] = [];
@@ -380,8 +371,20 @@ function planHighlights(p: Plan): string[] {
 }
 
 /** Confirm-before-switch dialog — no plan ever changes on a single click. */
-function PlanChangeDialog({ target, currentPrice, stripeEnabled, busy, onConfirm, onClose }: {
-  target: Plan; currentPrice: number; stripeEnabled: boolean; busy: boolean; onConfirm: () => void; onClose: () => void;
+function PlanChangeDialog({
+  target,
+  currentPrice,
+  stripeEnabled,
+  busy,
+  onConfirm,
+  onClose,
+}: {
+  target: Plan;
+  currentPrice: number;
+  stripeEnabled: boolean;
+  busy: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
 }) {
   const paid = target.price_cents > 0;
   const dir = target.price_cents > currentPrice ? "up" : target.price_cents < currentPrice ? "down" : "same";
@@ -389,7 +392,12 @@ function PlanChangeDialog({ target, currentPrice, stripeEnabled, busy, onConfirm
   const blockedNoStripe = needsPayment && !stripeEnabled;
   const feats = planHighlights(target);
   return (
-    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent title={`${dir === "up" ? "Upgrade to" : "Switch to"} ${target.name}`} className="sm:max-w-md">
         <div className="flex items-baseline gap-1.5">
           <span className="text-2xl font-bold tracking-tight">{paid ? dollars(target.price_cents) : "Free"}</span>
@@ -408,16 +416,30 @@ function PlanChangeDialog({ target, currentPrice, stripeEnabled, busy, onConfirm
             Online payments aren't enabled yet. Contact us to move onto a paid plan.
           </div>
         ) : needsPayment ? (
-          <p className="text-[12.5px] text-muted-foreground">You'll be taken to secure checkout (Stripe) to enter payment. Your plan changes once payment succeeds.</p>
+          <p className="text-[12.5px] text-muted-foreground">
+            You'll be taken to secure checkout (Stripe) to enter payment. Your plan changes once payment succeeds.
+          </p>
         ) : dir === "down" ? (
-          <p className="text-[12.5px] text-muted-foreground">You'll move down to {target.name}. If you're using more than it allows, we'll show what to remove first.</p>
+          <p className="text-[12.5px] text-muted-foreground">
+            You'll move down to {target.name}. If you're using more than it allows, we'll show what to remove first.
+          </p>
         ) : (
           <p className="text-[12.5px] text-muted-foreground">Confirm switching your workspace to {target.name}.</p>
         )}
         <DialogFooter>
-          <Button variant="ghost" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
           <Button onClick={onConfirm} disabled={busy || blockedNoStripe}>
-            {busy ? <Loader2 className="size-4 animate-spin" /> : needsPayment ? <>Continue to checkout <ArrowRight className="size-4" /></> : "Switch plan"}
+            {busy ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : needsPayment ? (
+              <>
+                Continue to checkout <ArrowRight className="size-4" />
+              </>
+            ) : (
+              "Switch plan"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -434,32 +456,26 @@ function BillingSkeleton() {
       </div>
       <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
         <Card>
-          <CardContent className="space-y-4 py-6">
-            <Skeleton className="h-8 w-48" />
-            <div className="grid grid-cols-3 gap-4 border-t pt-4">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="space-y-2">
-                  <Skeleton className="h-3 w-16" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-              ))}
-            </div>
-          </CardContent>
+          <Skeleton className="h-8 w-48" />
+          <div className="grid grid-cols-3 gap-4 border-t pt-4">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-3 w-16" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+            ))}
+          </div>
         </Card>
         <Card>
-          <CardContent className="space-y-3 py-6">
-            <Skeleton className="h-9 w-28" />
-            <Skeleton className="h-1.5 w-full rounded-full" />
-            <Skeleton className="h-3 w-40" />
-          </CardContent>
+          <Skeleton className="h-9 w-28" />
+          <Skeleton className="h-1.5 w-full rounded-full" />
+          <Skeleton className="h-3 w-40" />
         </Card>
       </div>
       <Card>
-        <CardContent className="grid gap-2.5 py-6 sm:grid-cols-2">
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-16 rounded-xl" />
-          ))}
-        </CardContent>
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-16 rounded-xl" />
+        ))}
       </Card>
     </div>
   );
@@ -467,7 +483,12 @@ function BillingSkeleton() {
 
 function DowngradeModal({ planName, violations, onClose }: { planName: string; violations: Violation[]; onClose: () => void }) {
   return (
-    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent title={<>Can’t downgrade to {planName} yet</>}>
         <p className="text-sm text-muted-foreground">You’re still using more than {planName} allows. Resolve these, then try again:</p>
         <div className="flex flex-col gap-2">
@@ -492,11 +513,37 @@ function violationText(v: Violation): string {
 }
 
 function labelResource(r: string): string {
-  return ({ pairedDevices: "paired screens", channels: "channels", feeds: "feeds", scheduleRules: "schedule rules", liveBoards: "live boards", stations: "stations", roomQueueManagement: "queue/room boards" } as Record<string, string>)[r] ?? r;
+  return (
+    (
+      {
+        pairedDevices: "paired screens",
+        channels: "channels",
+        feeds: "feeds",
+        scheduleRules: "schedule rules",
+        liveBoards: "live boards",
+        stations: "stations",
+        roomQueueManagement: "queue/room boards",
+      } as Record<string, string>
+    )[r] ?? r
+  );
 }
 
 function reasonLabel(r: string): string {
-  return ({ "grant.monthly": "Monthly grant", "pack.purchase": "Credit pack", "promo.redeem": "Promo redeemed", "admin.grant": "Admin adjustment", "admin.adjust": "Admin adjustment", "ai.text": "AI slide", "ai.image": "AI image", "ai.tts": "AI voice", "ai.generation": "AI generation" } as Record<string, string>)[r] ?? r;
+  return (
+    (
+      {
+        "grant.monthly": "Monthly grant",
+        "pack.purchase": "Credit pack",
+        "promo.redeem": "Promo redeemed",
+        "admin.grant": "Admin adjustment",
+        "admin.adjust": "Admin adjustment",
+        "ai.text": "AI slide",
+        "ai.image": "AI image",
+        "ai.tts": "AI voice",
+        "ai.generation": "AI generation",
+      } as Record<string, string>
+    )[r] ?? r
+  );
 }
 
 function planGrantN(p: Plan): number {
@@ -511,5 +558,16 @@ function planGrant(p: Plan): string {
 }
 
 function humanPromoError(code: string): string {
-  return ({ not_found: "That code doesn’t exist.", inactive: "That code is no longer active.", expired: "That code has expired.", exhausted: "That code has been fully redeemed.", already_redeemed: "You’ve already redeemed this code.", bad_plan: "That code points to a missing plan." } as Record<string, string>)[code] ?? code;
+  return (
+    (
+      {
+        not_found: "That code doesn’t exist.",
+        inactive: "That code is no longer active.",
+        expired: "That code has expired.",
+        exhausted: "That code has been fully redeemed.",
+        already_redeemed: "You’ve already redeemed this code.",
+        bad_plan: "That code points to a missing plan.",
+      } as Record<string, string>
+    )[code] ?? code
+  );
 }

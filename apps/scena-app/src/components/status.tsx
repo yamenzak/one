@@ -5,8 +5,7 @@
  * follows the tenant's brand + light/dark automatically.
  */
 import type { ReactNode } from "react";
-import { cn } from "@/lib/utils";
-import { Card, CardContent } from "./ui/card.js";
+import { Card, cn } from "@4dl/ui";
 
 /** Semantic tones, mapped to the theme's status tokens. */
 export type Tone = "success" | "warning" | "info" | "destructive" | "muted" | "primary";
@@ -52,14 +51,26 @@ export function StatusDot({ tone = "muted", ping = false, className }: { tone?: 
 /** A rounded status pill. Soft (tinted) by default; `solid` for bold emphasis. */
 export function Pill({ tone = "muted", solid = false, children, className }: { tone?: Tone; solid?: boolean; children: ReactNode; className?: string }) {
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap", (solid ? PILL_SOLID : PILL_SOFT)[tone], className)}>
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap",
+        (solid ? PILL_SOLID : PILL_SOFT)[tone],
+        className,
+      )}
+    >
       {children}
     </span>
   );
 }
 
 /** A labelled metric card (KPI tile) — the shared version of the per-page copies. */
-export function StatTile({ label, value, dot, valueClassName, className }: {
+export function StatTile({
+  label,
+  value,
+  dot,
+  valueClassName,
+  className,
+}: {
   label: ReactNode;
   value: ReactNode;
   dot?: ReactNode;
@@ -68,10 +79,11 @@ export function StatTile({ label, value, dot, valueClassName, className }: {
 }) {
   return (
     <Card className={className}>
-      <CardContent className="p-5">
-        <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">{dot}{label}</div>
-        <div className={cn("mt-1.5 font-mono text-2xl font-semibold tabular-nums", valueClassName)}>{value}</div>
-      </CardContent>
+      <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        {dot}
+        {label}
+      </div>
+      <div className={cn("mt-1.5 font-mono text-2xl font-semibold tabular-nums", valueClassName)}>{value}</div>
     </Card>
   );
 }

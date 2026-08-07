@@ -10,19 +10,52 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, RefreshCw, X, ExternalLink, Rss, Trash2, Inbox, Globe, Sheet, Table2, MoreVertical, CloudSun } from "lucide-react";
-import { Card, CardContent } from "../components/ui/card.js";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
-import { cn } from "@/lib/utils";
-import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Input, Label, LoadError, Select, Skeleton, toast } from "@4dl/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  cn,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Input,
+  Label,
+  LoadError,
+  Select,
+  Skeleton,
+  toast,
+} from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
-  listFeeds, getFeed, createSource, updateSource, previewSource, addFeedItem, deleteFeedItem, refreshFeed, deleteFeed,
-  listWeatherLocations, addWeatherLocation, updateWeatherLocation, deleteWeatherLocation, refreshWeatherLocation,
-  type Feed, type SourceProvider, type SourceDataset, type WeatherLocation, type WeatherLocationInput,
+  listFeeds,
+  getFeed,
+  createSource,
+  updateSource,
+  previewSource,
+  addFeedItem,
+  deleteFeedItem,
+  refreshFeed,
+  deleteFeed,
+  listWeatherLocations,
+  addWeatherLocation,
+  updateWeatherLocation,
+  deleteWeatherLocation,
+  refreshWeatherLocation,
+  type Feed,
+  type SourceProvider,
+  type SourceDataset,
+  type WeatherLocation,
+  type WeatherLocationInput,
 } from "../api.js";
 
 /** Providers shown in the picker. `weather` is a metered, company-provided
@@ -56,7 +89,11 @@ function weatherCallsPerDay(open: number, close: number): number {
 
 /** The browser's IANA timezone, for a sensible default when adding a location. */
 function browserTz(): string {
-  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch { return "UTC"; }
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
 }
 
 /** Common timezones for the picker's datalist (the field accepts any IANA id). */
@@ -64,8 +101,20 @@ function tzOptions(): string[] {
   try {
     const fn = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf;
     if (fn) return fn("timeZone");
-  } catch { /* older browsers */ }
-  return ["UTC", "Europe/London", "Europe/Amsterdam", "America/New_York", "America/Chicago", "America/Los_Angeles", "Asia/Dubai", "Asia/Singapore", "Australia/Sydney"];
+  } catch {
+    /* older browsers */
+  }
+  return [
+    "UTC",
+    "Europe/London",
+    "Europe/Amsterdam",
+    "America/New_York",
+    "America/Chicago",
+    "America/Los_Angeles",
+    "Asia/Dubai",
+    "Asia/Singapore",
+    "Australia/Sydney",
+  ];
 }
 
 /* ================================ List view ============================== */
@@ -94,10 +143,15 @@ export function FeedsPage() {
       return [];
     }
   }
-  useEffect(() => { reloadList(); }, []);
+  useEffect(() => {
+    reloadList();
+  }, []);
 
   usePageChrome(
-    { crumbs: [{ label: "Sources" }], actions: canCreate ? [{ key: "new", label: "New source", icon: <Plus className="size-4" />, onClick: () => setAddOpen(true) }] : [] },
+    {
+      crumbs: [{ label: "Sources" }],
+      actions: canCreate ? [{ key: "new", label: "New source", icon: <Plus className="size-4" />, onClick: () => setAddOpen(true) }] : [],
+    },
     [canCreate],
   );
 
@@ -110,7 +164,10 @@ export function FeedsPage() {
 
   async function createWeather(input: WeatherLocationInput) {
     const r = await addWeatherLocation(input);
-    if (r.error) { toast.error(r.error); return; }
+    if (r.error) {
+      toast.error(r.error);
+      return;
+    }
     await reloadList();
     toast.success("Weather location added.");
   }
@@ -155,17 +212,25 @@ export function FeedsPage() {
       />
 
       {error ? (
-        <Card className="border-dashed"><CardContent className="py-14 text-center text-sm text-muted-foreground">Couldn't reach the API: {error}</CardContent></Card>
+        <Card className="border-dashed">Couldn't reach the API: {error}</Card>
       ) : !feeds ? (
         <div className="overflow-hidden rounded-xl bg-card shadow-sm">
-          {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="m-2 h-12 rounded-lg" />)}
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="m-2 h-12 rounded-lg" />
+          ))}
         </div>
       ) : total === 0 ? (
         <EmptyState
           scena="idle"
           title="No sources yet"
           description="Connect a Google Sheet or public API, add a weather location, or curate a manual list — then bind it to a widget in the builder."
-          action={canCreate ? <Button onClick={() => setAddOpen(true)}><Plus className="size-4" /> Add your first source</Button> : undefined}
+          action={
+            canCreate ? (
+              <Button onClick={() => setAddOpen(true)}>
+                <Plus className="size-4" /> Add your first source
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <div className="overflow-hidden rounded-xl bg-card shadow-sm">
@@ -185,19 +250,33 @@ export function FeedsPage() {
                   <TableRow key={f.id} className="cursor-pointer" onClick={() => navigate(`/feeds/${f.id}`)}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="size-4" /></div>
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                          <Icon className="size-4" />
+                        </div>
                         <span className="truncate font-medium">{f.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell><Badge className="font-normal">{PROVIDERS[f.provider]?.label ?? f.provider}</Badge></TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">{f.itemCount ?? 0} <span className="text-xs">{isTabular(f.provider) ? "row" : "item"}{(f.itemCount ?? 0) === 1 ? "" : "s"}</span></TableCell>
+                    <TableCell>
+                      <Badge className="font-normal">{PROVIDERS[f.provider]?.label ?? f.provider}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {f.itemCount ?? 0}{" "}
+                      <span className="text-xs">
+                        {isTabular(f.provider) ? "row" : "item"}
+                        {(f.itemCount ?? 0) === 1 ? "" : "s"}
+                      </span>
+                    </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-8" aria-label="Source actions"><MoreVertical className="size-4" /></Button>
+                          <Button variant="ghost" size="icon" className="size-8" aria-label="Source actions">
+                            <MoreVertical className="size-4" />
+                          </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="text-destructive" onSelect={() => removeSource(f)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive" onSelect={() => removeSource(f)}>
+                            <Trash2 className="size-4" /> Delete
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -208,23 +287,37 @@ export function FeedsPage() {
                 <TableRow key={l.id} className="cursor-pointer" onClick={() => setEditLoc(l)}>
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><CloudSun className="size-4" /></div>
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <CloudSun className="size-4" />
+                      </div>
                       <div className="min-w-0">
                         <div className="truncate font-medium">{l.label}</div>
-                        <div className="text-[11px] tabular-nums text-muted-foreground">{l.current ? `${l.current.temp}° · ${l.current.condition}` : "no data yet"}</div>
+                        <div className="text-[11px] tabular-nums text-muted-foreground">
+                          {l.current ? `${l.current.temp}° · ${l.current.condition}` : "no data yet"}
+                        </div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell><Badge className="font-normal">Weather</Badge></TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">~{l.dailyCredits} <span className="text-xs">cr/day</span></TableCell>
+                  <TableCell>
+                    <Badge className="font-normal">Weather</Badge>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    ~{l.dailyCredits} <span className="text-xs">cr/day</span>
+                  </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="size-8" aria-label="Location actions"><MoreVertical className="size-4" /></Button>
+                        <Button variant="ghost" size="icon" className="size-8" aria-label="Location actions">
+                          <MoreVertical className="size-4" />
+                        </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setEditLoc(l)}><CloudSun className="size-4" /> Edit</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onSelect={() => removeWeather(l)}><Trash2 className="size-4" /> Remove</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setEditLoc(l)}>
+                          <CloudSun className="size-4" /> Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onSelect={() => removeWeather(l)}>
+                          <Trash2 className="size-4" /> Remove
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -258,9 +351,14 @@ export function SourceDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const reload = () => {
     setError(null);
-    return getFeed(id).then(setFeed).catch((e) => setError(e instanceof Error ? e.message : String(e))).finally(() => setLoaded(true));
+    return getFeed(id)
+      .then(setFeed)
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoaded(true));
   };
-  useEffect(() => { reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [id]);
+  useEffect(() => {
+    reload(); /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [id]);
 
   async function refresh() {
     if (!feed) return;
@@ -274,7 +372,12 @@ export function SourceDetailPage() {
 
   async function remove() {
     if (!feed) return;
-    const ok = await confirmDialog({ title: `Delete “${feed.name}”?`, description: "The source is removed. Widgets bound to it will stop updating.", confirmText: "Delete source", destructive: true });
+    const ok = await confirmDialog({
+      title: `Delete “${feed.name}”?`,
+      description: "The source is removed. Widgets bound to it will stop updating.",
+      confirmText: "Delete source",
+      destructive: true,
+    });
     if (!ok) return;
     await deleteFeed(feed.id);
     toast.success(`Source “${feed.name}” deleted.`);
@@ -285,8 +388,25 @@ export function SourceDetailPage() {
     {
       crumbs: [{ label: "Sources", to: "/feeds" }, { label: feed?.name ?? "…" }],
       actions: [
-        ...(feed && feed.provider !== "manual" ? [{ key: "refresh", label: busy ? "Refreshing…" : "Refresh", icon: <RefreshCw className={cn("size-4", busy && "animate-spin")} />, disabled: busy, onClick: refresh }] : []),
-        { key: "delete", label: "Delete source", icon: <Trash2 className="size-4" />, variant: "destructive" as const, overflow: "always" as const, onClick: remove },
+        ...(feed && feed.provider !== "manual"
+          ? [
+              {
+                key: "refresh",
+                label: busy ? "Refreshing…" : "Refresh",
+                icon: <RefreshCw className={cn("size-4", busy && "animate-spin")} />,
+                disabled: busy,
+                onClick: refresh,
+              },
+            ]
+          : []),
+        {
+          key: "delete",
+          label: "Delete source",
+          icon: <Trash2 className="size-4" />,
+          variant: "destructive" as const,
+          overflow: "always" as const,
+          onClick: remove,
+        },
       ],
     },
     [feed?.name, feed?.provider, busy],
@@ -301,7 +421,11 @@ export function SourceDetailPage() {
     );
   }
   if (loaded && !feed) {
-    return <div><PageHeader title="Source" description="Not found." back={{ label: "Sources", onClick: () => navigate("/feeds") }} /></div>;
+    return (
+      <div>
+        <PageHeader title="Source" description="Not found." back={{ label: "Sources", onClick: () => navigate("/feeds") }} />
+      </div>
+    );
   }
 
   const freq = feed ? FREQUENCIES.find((f) => f.sec === feed.refreshSec)?.label : "";
@@ -312,19 +436,24 @@ export function SourceDetailPage() {
     <div>
       <PageHeader
         title={feed?.name ?? "Source"}
-        description={feed ? `${PROVIDERS[feed.provider]?.label ?? feed.provider} source · ${count} ${unit}${count === 1 ? "" : "s"}${feed.provider !== "manual" && freq ? ` · refreshes ${freq.toLowerCase()}` : ""}` : "…"}
+        description={
+          feed
+            ? `${PROVIDERS[feed.provider]?.label ?? feed.provider} source · ${count} ${unit}${count === 1 ? "" : "s"}${feed.provider !== "manual" && freq ? ` · refreshes ${freq.toLowerCase()}` : ""}`
+            : "…"
+        }
         back={{ label: "All sources", onClick: () => navigate("/feeds") }}
       />
 
       {!loaded || !feed ? (
-        <Card><CardContent className="space-y-3 p-5"><Skeleton className="h-9 w-full" /><Skeleton className="h-24 w-full" /></CardContent></Card>
+        <Card>
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </Card>
       ) : (
         <Card>
-          <CardContent className="p-5">
-            {feed.provider === "manual" && <ManualItems feed={feed} onReload={reload} />}
-            {feed.provider === "rss" && <RssDetail feed={feed} onReload={reload} />}
-            {isTabular(feed.provider) && <TabularDetail feed={feed} onReload={reload} />}
-          </CardContent>
+          {feed.provider === "manual" && <ManualItems feed={feed} onReload={reload} />}
+          {feed.provider === "rss" && <RssDetail feed={feed} onReload={reload} />}
+          {isTabular(feed.provider) && <TabularDetail feed={feed} onReload={reload} />}
         </Card>
       )}
     </div>
@@ -339,28 +468,53 @@ function ManualItems({ feed, onReload }: { feed: Feed; onReload: () => Promise<v
         onSubmit={async (e) => {
           e.preventDefault();
           const el = e.currentTarget.elements.namedItem("t") as HTMLInputElement;
-          if (el.value.trim()) { await addFeedItem(feed.id, el.value.trim()); el.value = ""; await onReload(); }
+          if (el.value.trim()) {
+            await addFeedItem(feed.id, el.value.trim());
+            el.value = "";
+            await onReload();
+          }
         }}
         className="mb-4 flex gap-2"
       >
         <Input name="t" placeholder="Add an item…" className="flex-1" />
-        <Button type="submit"><Plus className="size-4" /> Add</Button>
+        <Button type="submit">
+          <Plus className="size-4" /> Add
+        </Button>
       </form>
-      <ItemList feed={feed} onDelete={async (itemId) => { await deleteFeedItem(feed.id, itemId); await onReload(); }} />
+      <ItemList
+        feed={feed}
+        onDelete={async (itemId) => {
+          await deleteFeedItem(feed.id, itemId);
+          await onReload();
+        }}
+      />
     </>
   );
 }
 
 function ItemList({ feed, onDelete }: { feed: Feed; onDelete?: (itemId: string) => void }) {
   const items = feed.items ?? [];
-  if (items.length === 0) return <div className="rounded-lg border border-dashed bg-card/40 px-4 py-10 text-center text-sm text-muted-foreground">No items yet.</div>;
+  if (items.length === 0)
+    return <div className="rounded-lg border border-dashed bg-card/40 px-4 py-10 text-center text-sm text-muted-foreground">No items yet.</div>;
   return (
     <div className="divide-y rounded-lg border">
       {items.map((it) => (
         <div key={it.id} className="group flex items-center gap-2.5 px-3 py-2.5">
           <span className="min-w-0 flex-1 truncate text-sm">{it.title}</span>
-          {it.link && <a href={it.link} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="size-3" /> link</a>}
-          {onDelete && <button onClick={() => onDelete(it.id)} className="shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground group-hover:opacity-100" aria-label="Remove item"><X className="size-4" /></button>}
+          {it.link && (
+            <a href={it.link} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-primary hover:underline">
+              <ExternalLink className="size-3" /> link
+            </a>
+          )}
+          {onDelete && (
+            <button
+              onClick={() => onDelete(it.id)}
+              className="shrink-0 rounded-md p-1 text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground group-hover:opacity-100"
+              aria-label="Remove item"
+            >
+              <X className="size-4" />
+            </button>
+          )}
         </div>
       ))}
     </div>
@@ -376,7 +530,10 @@ function RssDetail({ feed, onReload }: { feed: Feed; onReload: () => Promise<voi
   const [refreshSec, setRefreshSec] = useState(feed.refreshSec ?? 900);
   const [saving, setSaving] = useState(false);
   const curCount = feed.config.count ?? 30;
-  const nextCount = (() => { const n = parseInt(cfg.count ?? "", 10); return Number.isFinite(n) && n > 0 ? Math.min(100, n) : 30; })();
+  const nextCount = (() => {
+    const n = parseInt(cfg.count ?? "", 10);
+    return Number.isFinite(n) && n > 0 ? Math.min(100, n) : 30;
+  })();
   const dirty = refreshSec !== (feed.refreshSec ?? 900) || cfg.url !== (feed.config.url ?? "") || nextCount !== curCount;
   const save = async () => {
     setSaving(true);
@@ -389,12 +546,21 @@ function RssDetail({ feed, onReload }: { feed: Feed; onReload: () => Promise<voi
     <div className="space-y-4">
       <SourceConfigFields provider="rss" cfg={cfg} setCfg={setCfg} />
       <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1.5"><Label>Refresh frequency</Label><FrequencySelect value={refreshSec} onChange={setRefreshSec} /></div>
+        <div className="space-y-1.5">
+          <Label>Refresh frequency</Label>
+          <FrequencySelect value={refreshSec} onChange={setRefreshSec} />
+        </div>
         <div className="flex-1" />
-        {dirty && <Button size="sm" disabled={saving} onClick={save}>{saving ? "Saving…" : "Save changes"}</Button>}
+        {dirty && (
+          <Button size="sm" disabled={saving} onClick={save}>
+            {saving ? "Saving…" : "Save changes"}
+          </Button>
+        )}
       </div>
       <div>
-        <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"><Rss className="size-3.5" /> Headlines</div>
+        <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <Rss className="size-3.5" /> Headlines
+        </div>
         <ItemList feed={feed} />
       </div>
     </div>
@@ -404,12 +570,20 @@ function RssDetail({ feed, onReload }: { feed: Feed; onReload: () => Promise<voi
 /** API / Sheet: an editable config + frequency + a live dataset preview. */
 function TabularDetail({ feed, onReload }: { feed: Feed; onReload: () => Promise<void> }) {
   const [cfg, setCfg] = useState<Record<string, string>>(() => ({
-    url: feed.config.url ?? "", path: feed.config.path ?? "", sheetId: feed.config.sheetId ?? "", gid: feed.config.gid ?? "",
+    url: feed.config.url ?? "",
+    path: feed.config.path ?? "",
+    sheetId: feed.config.sheetId ?? "",
+    gid: feed.config.gid ?? "",
   }));
   const [refreshSec, setRefreshSec] = useState(feed.refreshSec ?? 900);
   const [saving, setSaving] = useState(false);
   const dirty = useMemo(
-    () => refreshSec !== (feed.refreshSec ?? 900) || cfg.url !== (feed.config.url ?? "") || cfg.path !== (feed.config.path ?? "") || cfg.sheetId !== (feed.config.sheetId ?? "") || cfg.gid !== (feed.config.gid ?? ""),
+    () =>
+      refreshSec !== (feed.refreshSec ?? 900) ||
+      cfg.url !== (feed.config.url ?? "") ||
+      cfg.path !== (feed.config.path ?? "") ||
+      cfg.sheetId !== (feed.config.sheetId ?? "") ||
+      cfg.gid !== (feed.config.gid ?? ""),
     [cfg, refreshSec, feed],
   );
   const save = async () => {
@@ -429,10 +603,16 @@ function TabularDetail({ feed, onReload }: { feed: Feed; onReload: () => Promise
           <FrequencySelect value={refreshSec} onChange={setRefreshSec} />
         </div>
         <div className="flex-1" />
-        {dirty && <Button size="sm" disabled={saving} onClick={save}>{saving ? "Saving…" : "Save changes"}</Button>}
+        {dirty && (
+          <Button size="sm" disabled={saving} onClick={save}>
+            {saving ? "Saving…" : "Save changes"}
+          </Button>
+        )}
       </div>
       <div>
-        <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground"><Table2 className="size-3.5" /> Data preview</div>
+        <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <Table2 className="size-3.5" /> Data preview
+        </div>
         <DatasetTable dataset={feed.dataset ?? { columns: [], rows: [] }} />
       </div>
     </div>
@@ -441,19 +621,42 @@ function TabularDetail({ feed, onReload }: { feed: Feed; onReload: () => Promise
 
 /** A compact, scrollable preview of a normalized dataset. */
 function DatasetTable({ dataset }: { dataset: SourceDataset }) {
-  if (dataset.columns.length === 0) return <div className="rounded-lg border border-dashed bg-card/40 px-4 py-10 text-center text-sm text-muted-foreground">No data yet — check the URL/mapping and refresh.</div>;
+  if (dataset.columns.length === 0)
+    return (
+      <div className="rounded-lg border border-dashed bg-card/40 px-4 py-10 text-center text-sm text-muted-foreground">
+        No data yet — check the URL/mapping and refresh.
+      </div>
+    );
   const rows = dataset.rows.slice(0, 12);
   return (
     <div className="max-h-72 overflow-auto rounded-lg border">
       <table className="w-full text-xs">
         <thead className="sticky top-0 bg-muted/80 backdrop-blur">
-          <tr>{dataset.columns.map((c, i) => <th key={i} className="px-2.5 py-1.5 text-left font-semibold">{c}</th>)}</tr>
+          <tr>
+            {dataset.columns.map((c, i) => (
+              <th key={i} className="px-2.5 py-1.5 text-left font-semibold">
+                {c}
+              </th>
+            ))}
+          </tr>
         </thead>
         <tbody className="divide-y">
-          {rows.map((r, ri) => <tr key={ri} className="hover:bg-muted/40">{dataset.columns.map((_, ci) => <td key={ci} className="max-w-[220px] truncate px-2.5 py-1.5 tabular-nums">{r[ci] ?? ""}</td>)}</tr>)}
+          {rows.map((r, ri) => (
+            <tr key={ri} className="hover:bg-muted/40">
+              {dataset.columns.map((_, ci) => (
+                <td key={ci} className="max-w-[220px] truncate px-2.5 py-1.5 tabular-nums">
+                  {r[ci] ?? ""}
+                </td>
+              ))}
+            </tr>
+          ))}
         </tbody>
       </table>
-      {dataset.rows.length > rows.length && <div className="border-t px-2.5 py-1.5 text-[11px] text-muted-foreground">+ {dataset.rows.length - rows.length} more row{dataset.rows.length - rows.length === 1 ? "" : "s"}</div>}
+      {dataset.rows.length > rows.length && (
+        <div className="border-t px-2.5 py-1.5 text-[11px] text-muted-foreground">
+          + {dataset.rows.length - rows.length} more row{dataset.rows.length - rows.length === 1 ? "" : "s"}
+        </div>
+      )}
     </div>
   );
 }
@@ -471,15 +674,36 @@ function configFor(provider: SourceProvider, cfg: Record<string, string>): Recor
   return {};
 }
 
-function SourceConfigFields({ provider, cfg, setCfg }: { provider: SourceProvider; cfg: Record<string, string>; setCfg: (u: (c: Record<string, string>) => Record<string, string>) => void }) {
+function SourceConfigFields({
+  provider,
+  cfg,
+  setCfg,
+}: {
+  provider: SourceProvider;
+  cfg: Record<string, string>;
+  setCfg: (u: (c: Record<string, string>) => Record<string, string>) => void;
+}) {
   const set = (k: string) => (v: string) => setCfg((c) => ({ ...c, [k]: v }));
   if (provider === "rss") {
     return (
       <div className="space-y-3">
-        <div className="space-y-1.5"><Label>RSS URL</Label><Input value={cfg.url} onChange={(e) => set("url")(e.target.value)} className="font-mono text-xs" placeholder="https://…/feed.xml" /></div>
         <div className="space-y-1.5">
-          <Label>Entries to fetch <span className="font-normal text-muted-foreground">(1–100)</span></Label>
-          <Input type="number" min={1} max={100} value={cfg.count} onChange={(e) => set("count")(e.target.value)} className="w-32 text-xs tabular-nums" placeholder="30" />
+          <Label>RSS URL</Label>
+          <Input value={cfg.url} onChange={(e) => set("url")(e.target.value)} className="font-mono text-xs" placeholder="https://…/feed.xml" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>
+            Entries to fetch <span className="font-normal text-muted-foreground">(1–100)</span>
+          </Label>
+          <Input
+            type="number"
+            min={1}
+            max={100}
+            value={cfg.count}
+            onChange={(e) => set("count")(e.target.value)}
+            className="w-32 text-xs tabular-nums"
+            placeholder="30"
+          />
           <p className="text-[10.5px] text-muted-foreground">How many recent headlines to keep. Default 30.</p>
         </div>
       </div>
@@ -488,16 +712,41 @@ function SourceConfigFields({ provider, cfg, setCfg }: { provider: SourceProvide
   if (provider === "api") {
     return (
       <div className="space-y-3">
-        <div className="space-y-1.5"><Label>Endpoint URL</Label><Input value={cfg.url} onChange={(e) => set("url")(e.target.value)} className="font-mono text-xs" placeholder="https://api.example.com/stats" /></div>
-        <div className="space-y-1.5"><Label>Data path <span className="font-normal text-muted-foreground">(optional)</span></Label><Input value={cfg.path} onChange={(e) => set("path")(e.target.value)} className="font-mono text-xs" placeholder="data.items" /><p className="text-[10.5px] text-muted-foreground">Dot/bracket path to the array or object to tabulate, e.g. <code>results[0].rows</code>. Leave blank for the whole response.</p></div>
+        <div className="space-y-1.5">
+          <Label>Endpoint URL</Label>
+          <Input value={cfg.url} onChange={(e) => set("url")(e.target.value)} className="font-mono text-xs" placeholder="https://api.example.com/stats" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>
+            Data path <span className="font-normal text-muted-foreground">(optional)</span>
+          </Label>
+          <Input value={cfg.path} onChange={(e) => set("path")(e.target.value)} className="font-mono text-xs" placeholder="data.items" />
+          <p className="text-[10.5px] text-muted-foreground">
+            Dot/bracket path to the array or object to tabulate, e.g. <code>results[0].rows</code>. Leave blank for the whole response.
+          </p>
+        </div>
       </div>
     );
   }
   // gsheet
   return (
     <div className="space-y-3">
-      <div className="space-y-1.5"><Label>Sheet URL or ID</Label><Input value={cfg.sheetId} onChange={(e) => set("sheetId")(e.target.value)} className="font-mono text-xs" placeholder="https://docs.google.com/spreadsheets/d/…" /><p className="text-[10.5px] text-muted-foreground">The sheet must be shared as “Anyone with the link”. The first row is used as column headers.</p></div>
-      <div className="space-y-1.5"><Label>Tab gid <span className="font-normal text-muted-foreground">(optional)</span></Label><Input value={cfg.gid} onChange={(e) => set("gid")(e.target.value)} className="font-mono text-xs w-32" placeholder="0" /></div>
+      <div className="space-y-1.5">
+        <Label>Sheet URL or ID</Label>
+        <Input
+          value={cfg.sheetId}
+          onChange={(e) => set("sheetId")(e.target.value)}
+          className="font-mono text-xs"
+          placeholder="https://docs.google.com/spreadsheets/d/…"
+        />
+        <p className="text-[10.5px] text-muted-foreground">The sheet must be shared as “Anyone with the link”. The first row is used as column headers.</p>
+      </div>
+      <div className="space-y-1.5">
+        <Label>
+          Tab gid <span className="font-normal text-muted-foreground">(optional)</span>
+        </Label>
+        <Input value={cfg.gid} onChange={(e) => set("gid")(e.target.value)} className="font-mono text-xs w-32" placeholder="0" />
+      </div>
     </div>
   );
 }
@@ -505,25 +754,40 @@ function SourceConfigFields({ provider, cfg, setCfg }: { provider: SourceProvide
 function FrequencySelect({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const known = FREQUENCIES.some((f) => f.sec === value);
   return (
-    <Select value={known ? String(value) : "custom"} onChange={(v) => { if (v !== "custom") onChange(Number(v)); }} className="h-9 w-44 text-sm" options={[
-      ...FREQUENCIES.map((f) => ({ value: String(f.sec), label: f.label })),
-      // A CONDITIONAL entry, not a mapped one: spreading `cond && obj`
-      // spreads `false` when the condition is off, which is not an array.
-      ...(known ? [] : [{ value: "custom", label: `Custom (${value}s)` }]),
-    ]} />
+    <Select
+      value={known ? String(value) : "custom"}
+      onChange={(v) => {
+        if (v !== "custom") onChange(Number(v));
+      }}
+      className="h-9 w-44 text-sm"
+      options={[
+        ...FREQUENCIES.map((f) => ({ value: String(f.sec), label: f.label })),
+        // A CONDITIONAL entry, not a mapped one: spreading `cond && obj`
+        // spreads `false` when the condition is off, which is not an array.
+        ...(known ? [] : [{ value: "custom", label: `Custom (${value}s)` }]),
+      ]}
+    />
   );
 }
 
 /* ------------------------------ weather config ---------------------------- */
 
-interface WeatherWindow { openHour: number; closeHour: number; tz: string; units: string }
+interface WeatherWindow {
+  openHour: number;
+  closeHour: number;
+  tz: string;
+  units: string;
+}
 
 /** An hour-of-day picker (00:00 … 24:00). */
 function HourSelect({ value, onChange }: { value: number; onChange: (h: number) => void }) {
   return (
-    <Select value={String(value)} onChange={(v) => onChange(Number(v))} className="h-9 text-sm" options={[
-      ...Array.from({ length: 25 }, (_, h) => ({ value: String(h), label: <>{String(h).padStart(2, "0")}:00</> })),
-    ]} />
+    <Select
+      value={String(value)}
+      onChange={(v) => onChange(Number(v))}
+      className="h-9 text-sm"
+      options={[...Array.from({ length: 25 }, (_, h) => ({ value: String(h), label: <>{String(h).padStart(2, "0")}:00</> }))]}
+    />
   );
 }
 
@@ -534,22 +798,44 @@ function WeatherWindowFields({ w, setW, perCall }: { w: WeatherWindow; setW: (u:
   return (
     <>
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5"><Label>Opens</Label><HourSelect value={w.openHour} onChange={(h) => setW({ openHour: h })} /></div>
-        <div className="space-y-1.5"><Label>Closes</Label><HourSelect value={w.closeHour} onChange={(h) => setW({ closeHour: h })} /></div>
+        <div className="space-y-1.5">
+          <Label>Opens</Label>
+          <HourSelect value={w.openHour} onChange={(h) => setW({ openHour: h })} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Closes</Label>
+          <HourSelect value={w.closeHour} onChange={(h) => setW({ closeHour: h })} />
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label>Timezone</Label>
           <Input list="tz-list" value={w.tz} onChange={(e) => setW({ tz: e.target.value })} className="text-xs" placeholder="Europe/Amsterdam" />
-          <datalist id="tz-list">{tzOptions().map((z) => <option key={z} value={z} />)}</datalist>
+          <datalist id="tz-list">
+            {tzOptions().map((z) => (
+              <option key={z} value={z} />
+            ))}
+          </datalist>
         </div>
         <div className="space-y-1.5">
           <Label>Units</Label>
-          <Select value={w.units} onChange={(v) => setW({ units: v })} className="h-9 text-sm" options={[{ value: "metric", label: "Metric (°C)" }, { value: "imperial", label: "Imperial (°F)" }]} />
+          <Select
+            value={w.units}
+            onChange={(v) => setW({ units: v })}
+            className="h-9 text-sm"
+            options={[
+              { value: "metric", label: "Metric (°C)" },
+              { value: "imperial", label: "Imperial (°F)" },
+            ]}
+          />
         </div>
       </div>
       <p className="rounded-lg border border-dashed px-3 py-2 text-[11px] text-muted-foreground">
-        Refreshes once an hour while open — about <b className="tabular-nums">{calls} call{calls === 1 ? "" : "s"}/day</b> ≈ <b className="tabular-nums">{calls * perCall} credits/day</b>. Screens keep showing the last reading outside these hours.
+        Refreshes once an hour while open — about{" "}
+        <b className="tabular-nums">
+          {calls} call{calls === 1 ? "" : "s"}/day
+        </b>{" "}
+        ≈ <b className="tabular-nums">{calls * perCall} credits/day</b>. Screens keep showing the last reading outside these hours.
       </p>
     </>
   );
@@ -557,7 +843,13 @@ function WeatherWindowFields({ w, setW, perCall }: { w: WeatherWindow; setW: (u:
 
 /* ------------------------------ new source -------------------------------- */
 
-function NewSourceDialog({ open, onClose, onCreate, onCreateWeather, weatherPerCall }: {
+function NewSourceDialog({
+  open,
+  onClose,
+  onCreate,
+  onCreateWeather,
+  weatherPerCall,
+}: {
   open: boolean;
   onClose: () => void;
   onCreate: (input: { name: string; provider: SourceProvider; config?: unknown; refreshSec?: number }) => Promise<void>;
@@ -577,24 +869,37 @@ function NewSourceDialog({ open, onClose, onCreate, onCreateWeather, weatherPerC
   const [testing, setTesting] = useState(false);
 
   function reset() {
-    setProvider("gsheet"); setName(""); setCfg({ url: "", path: "", sheetId: "", gid: "", count: "" });
-    setRefreshSec(900); setCity(""); setWState({ openHour: 8, closeHour: 20, tz: browserTz(), units: "metric" });
-    setPreview(null); setPreviewErr(null); setBusy(false); setTesting(false);
+    setProvider("gsheet");
+    setName("");
+    setCfg({ url: "", path: "", sheetId: "", gid: "", count: "" });
+    setRefreshSec(900);
+    setCity("");
+    setWState({ openHour: 8, closeHour: 20, tz: browserTz(), units: "metric" });
+    setPreview(null);
+    setPreviewErr(null);
+    setBusy(false);
+    setTesting(false);
   }
-  function close() { onClose(); reset(); }
+  function close() {
+    onClose();
+    reset();
+  }
 
   const isFeed = provider !== "weather";
   const needsConfig = provider === "rss" || (isFeed && isTabular(provider as SourceProvider));
-  const configReady = provider === "weather"
-    ? !!city.trim()
-    : provider === "manual"
-      || (provider === "rss" && (cfg.url ?? "").trim())
-      || (provider === "api" && (cfg.url ?? "").trim())
-      || (provider === "gsheet" && (cfg.sheetId ?? "").trim());
+  const configReady =
+    provider === "weather"
+      ? !!city.trim()
+      : provider === "manual" ||
+        (provider === "rss" && (cfg.url ?? "").trim()) ||
+        (provider === "api" && (cfg.url ?? "").trim()) ||
+        (provider === "gsheet" && (cfg.sheetId ?? "").trim());
 
   async function test() {
     if (provider === "weather") return;
-    setTesting(true); setPreviewErr(null); setPreview(null);
+    setTesting(true);
+    setPreviewErr(null);
+    setPreview(null);
     const r = await previewSource(provider as SourceProvider, configFor(provider as SourceProvider, cfg));
     setTesting(false);
     if (r.error || !r.dataset) setPreviewErr(r.error ?? "No data returned");
@@ -609,29 +914,52 @@ function NewSourceDialog({ open, onClose, onCreate, onCreateWeather, weatherPerC
       if (provider === "weather") {
         await onCreateWeather({ city: city.trim(), openHour: w.openHour, closeHour: w.closeHour, tz: w.tz, units: w.units });
       } else {
-        if (!name.trim()) { setBusy(false); return; }
+        if (!name.trim()) {
+          setBusy(false);
+          return;
+        }
         await onCreate({ name: name.trim(), provider: provider as SourceProvider, config: configFor(provider as SourceProvider, cfg), refreshSec });
       }
       close();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Could not create source");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) close(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) close();
+      }}
+    >
       <DialogContent title="New source" className="sm:max-w-lg">
         <form onSubmit={submit}>
-      <DialogDescription>Connect live data for your ticker, metric, menu, weather, and text widgets.</DialogDescription>
+          <DialogDescription>Connect live data for your ticker, metric, menu, weather, and text widgets.</DialogDescription>
           <div className="max-h-[65vh] space-y-4 overflow-y-auto py-3 pr-1">
             <div className="grid grid-cols-2 gap-2">
               {(Object.keys(PROVIDERS) as NewProvider[]).map((p) => {
                 const meta = PROVIDERS[p];
                 const Icon = meta.icon;
                 return (
-                  <button key={p} type="button" onClick={() => { setProvider(p); setPreview(null); setPreviewErr(null); }}
-                    className={cn("flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors", provider === p ? "border-primary/50 bg-primary/5" : "hover:bg-muted")}>
-                    <span className="flex items-center gap-1.5 text-sm font-medium"><Icon className="size-3.5" /> {meta.label}</span>
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => {
+                      setProvider(p);
+                      setPreview(null);
+                      setPreviewErr(null);
+                    }}
+                    className={cn(
+                      "flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors",
+                      provider === p ? "border-primary/50 bg-primary/5" : "hover:bg-muted",
+                    )}
+                  >
+                    <span className="flex items-center gap-1.5 text-sm font-medium">
+                      <Icon className="size-3.5" /> {meta.label}
+                    </span>
                     <span className="text-xs text-muted-foreground">{meta.blurb}</span>
                   </button>
                 );
@@ -656,17 +984,26 @@ function NewSourceDialog({ open, onClose, onCreate, onCreateWeather, weatherPerC
                 {needsConfig && <SourceConfigFields provider={provider as SourceProvider} cfg={cfg} setCfg={setCfg} />}
 
                 {provider !== "manual" && (
-                  <div className="space-y-1.5"><Label>Refresh frequency</Label><FrequencySelect value={refreshSec} onChange={setRefreshSec} /></div>
+                  <div className="space-y-1.5">
+                    <Label>Refresh frequency</Label>
+                    <FrequencySelect value={refreshSec} onChange={setRefreshSec} />
+                  </div>
                 )}
 
                 {isTabular(provider as SourceProvider) && (
                   <div className="rounded-lg border border-dashed p-3">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-medium">Fetch &amp; preview</span>
-                      <Button type="button" variant="outline" size="sm" disabled={!configReady || testing} onClick={test}><RefreshCw className={cn("size-3.5", testing && "animate-spin")} /> {testing ? "Fetching…" : "Fetch"}</Button>
+                      <Button type="button" variant="outline" size="sm" disabled={!configReady || testing} onClick={test}>
+                        <RefreshCw className={cn("size-3.5", testing && "animate-spin")} /> {testing ? "Fetching…" : "Fetch"}
+                      </Button>
                     </div>
                     {previewErr && <p className="mt-2 text-xs text-destructive">{previewErr}</p>}
-                    {preview && <div className="mt-2"><DatasetTable dataset={preview} /></div>}
+                    {preview && (
+                      <div className="mt-2">
+                        <DatasetTable dataset={preview} />
+                      </div>
+                    )}
                     {!preview && !previewErr && <p className="mt-2 text-[11px] text-muted-foreground">Fetch once to confirm the columns before saving.</p>}
                   </div>
                 )}
@@ -674,8 +1011,12 @@ function NewSourceDialog({ open, onClose, onCreate, onCreateWeather, weatherPerC
             )}
           </div>
           <DialogFooter>
-            <Button type="button" variant="ghost" onClick={close}>Cancel</Button>
-            <Button type="submit" disabled={busy || !configReady}>{busy ? (provider === "weather" ? "Adding…" : "Creating…") : provider === "weather" ? "Add location" : "Create source"}</Button>
+            <Button type="button" variant="ghost" onClick={close}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={busy || !configReady}>
+              {busy ? (provider === "weather" ? "Adding…" : "Creating…") : provider === "weather" ? "Add location" : "Create source"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -685,7 +1026,12 @@ function NewSourceDialog({ open, onClose, onCreate, onCreateWeather, weatherPerC
 
 /* ---------------------------- weather edit dialog ------------------------- */
 
-function WeatherEditDialog({ loc, perCall, onClose, onSaved }: {
+function WeatherEditDialog({
+  loc,
+  perCall,
+  onClose,
+  onSaved,
+}: {
   loc: WeatherLocation | null;
   perCall: number;
   onClose: () => void;
@@ -717,7 +1063,9 @@ function WeatherEditDialog({ loc, perCall, onClose, onSaved }: {
       onClose();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save");
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function refreshNow() {
@@ -728,18 +1076,32 @@ function WeatherEditDialog({ loc, perCall, onClose, onSaved }: {
   }
 
   return (
-    <Dialog open={!!loc} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog
+      open={!!loc}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
       <DialogContent title="Weather location" className="sm:max-w-lg">
-      <DialogDescription>Set the opening hours so this location is only fetched — and billed — while you're open.</DialogDescription>
+        <DialogDescription>Set the opening hours so this location is only fetched — and billed — while you're open.</DialogDescription>
         <div className="space-y-4 py-3">
-          <div className="space-y-1.5"><Label>Label</Label><Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Location name" /></div>
+          <div className="space-y-1.5">
+            <Label>Label</Label>
+            <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Location name" />
+          </div>
           <WeatherWindowFields w={w} setW={setW} perCall={perCall} />
         </div>
         <DialogFooter className="gap-2 sm:justify-between">
-          <Button type="button" variant="outline" size="sm" onClick={refreshNow}><RefreshCw className="size-3.5" /> Refresh now</Button>
+          <Button type="button" variant="outline" size="sm" onClick={refreshNow}>
+            <RefreshCw className="size-3.5" /> Refresh now
+          </Button>
           <div className="flex gap-2">
-            <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button type="button" disabled={busy} onClick={save}>{busy ? "Saving…" : "Save"}</Button>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="button" disabled={busy} onClick={save}>
+              {busy ? "Saving…" : "Save"}
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>

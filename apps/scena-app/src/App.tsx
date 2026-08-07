@@ -9,7 +9,6 @@ import { AppShell, type NavGroup } from "./components/app-shell.js";
 import { PageChromeProvider } from "./components/page-chrome.js";
 import { RoleProvider } from "./permissions.js";
 import { EntitlementsProvider } from "./entitlements.js";
-import { cn } from "@/lib/utils";
 import { clearEmergency, getActiveEmergency, getMe, getBilling, getBranding, type ActiveEmergency, type Me, type BillingState } from "./api.js";
 import { applyBrandTheme, clearBrandTheme } from "./brand-theme.js";
 import { EmergencyModal } from "./components/EmergencyModal.js";
@@ -39,7 +38,7 @@ import { MusicPlaylistsPage, MusicPlaylistDetailPage } from "./pages/MusicPlayli
 import { WidgetProfilesPage } from "./pages/WidgetProfiles.js";
 import { SettingsPage } from "./pages/Settings.js";
 import { PairModal } from "./components/PairModal.js";
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, toast } from "@4dl/ui";
+import { Button, cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, toast } from "@4dl/ui";
 
 /**
  * Poll `fn` every `ms`, but skip while the tab is hidden and refetch the moment
