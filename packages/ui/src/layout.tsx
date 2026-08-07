@@ -441,7 +441,22 @@ export const Row = forwardRef<HTMLElement, RowProps>(function Row(
     </>
   );
 
-  const tail = trailing ?? (
+  /*
+    ⚠️ `value` AND `trailing` COMPOSE. This was `trailing ?? (value + chevron)`,
+    so passing both silently DISCARDED the value — the prop was accepted, the
+    types were happy, and the fact never reached the screen. Scena's Team roster
+    hit it: every member row passed `value={<Badge>{role}</Badge>}` alongside a ⋮
+    menu, so nobody's role was ever shown and the source said it was.
+
+    They are different slots and always were: `value` is a FACT about the row —
+    a count, a status, a role — and `trailing` is a CONTROL. A row can have both,
+    and one quietly winning is the worst of the three possible behaviours.
+
+    The chevron still yields to `trailing`, which is correct rather than an
+    oversight: it is an affordance for "this row opens something", and a row
+    carrying its own control has a more specific one.
+  */
+  const tail = (
     <>
       {value !== undefined && (
         <span className="shrink-0 text-right">
@@ -449,7 +464,7 @@ export const Row = forwardRef<HTMLElement, RowProps>(function Row(
           {valueSub && <span className="mt-0.5 block text-caption text-muted-foreground">{valueSub}</span>}
         </span>
       )}
-      {showChevron && <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />}
+      {trailing ?? (showChevron && <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />)}
     </>
   );
 

@@ -28,7 +28,7 @@ import {
 import { DevicePreview } from "../components/device-preview.js";
 import { TagEditor } from "../components/tag-editor.js";
 import { useCan } from "../permissions.js";
-import { Badge, Button, Card, cn, Collection, ConfirmDialog, Dialog, DialogContent, DialogFooter, EmptyState, Filters, Input, Label, PageHeader, Select, Skeleton, toast, type FacetSelection, usePageChrome } from "@4dl/ui";
+import { Badge, Button, Card, cn, Collection, ConfirmDialog, Dialog, DialogContent, DialogFooter, EmptyState, Filters, Input, Label, PageHeader, Row, Select, Skeleton, toast, type FacetSelection, useCollectionView, usePageChrome } from "@4dl/ui";
 import {
   listChannels,
   createChannel,
@@ -71,6 +71,20 @@ const SOURCES = [
   { key: "ad", label: "Ads", icon: Megaphone },
 ] as const;
 
+/** Which of the four reusable sources this channel has bound. */
+const boundIds = (c: ComposedChannel): Record<(typeof SOURCES)[number]["key"], string | null> => ({
+  slide: c.slide_playlist_id ?? null,
+  music: c.music_playlist_id ?? null,
+  widget: c.widget_profile_id ?? null,
+  ad: c.ad_profile_id ?? null,
+});
+const setCount = (c: ComposedChannel) => SOURCES.filter((s) => boundIds(c)[s.key]).length;
+/** The bound sources by name, or the words for none — never an empty line. */
+const sourceSummary = (c: ComposedChannel) => {
+  const on = SOURCES.filter((s) => boundIds(c)[s.key]).map((s) => s.label);
+  return on.length ? on.join(" · ") : "Nothing bound yet";
+};
+
 /* ================================ List view ============================== */
 
 export function ChannelsPage() {
@@ -82,6 +96,7 @@ export function ChannelsPage() {
   const [q, setQ] = useState("");
   const [facets, setFacets] = useState<FacetSelection>({ tag: null });
   const [newOpen, setNewOpen] = useState(false);
+  const [view, setView] = useCollectionView("scena.channels", "grid");
 
   const reload = () => {
     setError(null);
@@ -111,6 +126,20 @@ export function ChannelsPage() {
   return (
     <div>
       {/*
+        §1: ONE T1 ANCHOR, AND THIS SCREEN HAD NONE.
+
+        The list opened straight onto a search field, so the largest text on the
+        page was a channel's own slide — somebody's marketing headline at
+        display size inside a live preview. Content shouting over chrome is the
+        intended arrangement; content shouting with NO chrome to recede behind
+        it is the inversion, and it left the page nameless beside every sibling
+        list (Screens, Team, Billing) that carries a title.
+      */}
+      <PageHeader
+        title="Channels"
+        description={channels ? `${channels.length} channel${channels.length === 1 ? "" : "s"}` : "Compose slides, music and widgets, then publish."}
+      />
+      {/*
         The same four hand-rolled branches this screen shared with the media
         library, and the same bug in each: a failed load rendered
         `Couldn't reach the API: [object Object]` with no retry, and the
@@ -124,19 +153,41 @@ export function ChannelsPage() {
         error={error}
         onRetry={() => void reload()}
         noun="channels"
+        view={view}
+        onView={setView}
         query={q}
         onQuery={setQ}
         narrowed={Boolean(facets.tag)}
         onClearFilters={() => setFacets({ tag: null })}
         filter={<Filters groups={facetGroups} value={facets} onChange={setFacets} />}
         action={newButton}
+        thumb={56}
         empty={{
           icon: Layers,
           title: "No channels yet",
           description: "Create one, pick its slides, music, and widgets, then publish to your screens — it goes live in seconds.",
           action: newButton,
         }}
-        renderList={(c: ComposedChannel) => <ChannelCard key={c.id} channel={c} onOpen={() => navigate(`/channels/${c.id}`)} />}
+        /*
+          §11: "cards never stretch; columns multiply." `ChannelCard` is a card
+          — a 16:9 live preview with a caption — and it was passed as the LIST
+          renderer with no grid alongside it, so at desktop each channel became
+          one 1120×650 tile and a workspace with five of them was five screens
+          of scrolling. It is the grid shape now, with a real `Row` for the list
+          view, the same pair `Screens` uses.
+        */
+        renderList={(c: ComposedChannel) => (
+          <Row
+            icon={Tv}
+            iconTone="primary"
+            sub={sourceSummary(c)}
+            value={<span className="numeral text-caption text-muted-foreground">{setCount(c)}/{SOURCES.length}</span>}
+            onClick={() => navigate(`/channels/${c.id}`)}
+          >
+            {c.name}
+          </Row>
+        )}
+        renderGrid={(c: ComposedChannel) => <ChannelCard key={c.id} channel={c} onOpen={() => navigate(`/channels/${c.id}`)} />}
       />
 
       <NewChannelDialog open={newOpen} onOpenChange={setNewOpen} onCreated={(id) => navigate(`/channels/${id}`)} />
@@ -145,13 +196,8 @@ export function ChannelsPage() {
 }
 
 function ChannelCard({ channel, onOpen }: { channel: ComposedChannel; onOpen: () => void }) {
-  const ids = {
-    slide: channel.slide_playlist_id ?? null,
-    music: channel.music_playlist_id ?? null,
-    widget: channel.widget_profile_id ?? null,
-    ad: channel.ad_profile_id ?? null,
-  };
-  const setCount = SOURCES.filter((s) => ids[s.key]).length;
+  const ids = boundIds(channel);
+  const bound = setCount(channel);
   return (
     <Card onClick={onOpen} className="group cursor-pointer overflow-hidden p-0 transition-all hover:bg-surface-2 active:scale-[0.99]">
       <DevicePreview channelId={channel.id} online className="rounded-none ring-0" />
@@ -159,7 +205,7 @@ function ChannelCard({ channel, onOpen }: { channel: ComposedChannel; onOpen: ()
         <div className="flex items-center gap-2">
           <span className="truncate text-body font-semibold">{channel.name}</span>
           <span className="ml-auto shrink-0 text-caption tabular-nums text-muted-foreground">
-            {setCount}/{SOURCES.length}
+            {bound}/{SOURCES.length}
           </span>
           <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-foreground" />
         </div>

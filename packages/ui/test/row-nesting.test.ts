@@ -57,6 +57,32 @@ describe("Row: a navigating row with trailing content", () => {
     expect(src).toMatch(/if \(href\) \{[\s\S]*?<motion\.a[\s\S]*?\{body\}/);
   });
 
+  /*
+    A SECOND SILENT LOSS IN THE SAME COMPONENT, AND THE SAME SHAPE.
+
+    `tail` was `trailing ?? (value + chevron)`, so a row given BOTH props kept
+    only the control and dropped the fact. Nothing failed: the prop is optional,
+    the types allow it, the source reads as if the value is shown. Scena's Team
+    roster passed `value={<Badge>{role}</Badge>}` beside a ⋮ menu on every
+    member, so no role was ever rendered — found by photographing the screen,
+    not by reading it.
+  */
+  it("renders `value` AND `trailing` — one must not swallow the other", () => {
+    const tail = /const tail = \(([\s\S]*?)\n  \);/.exec(src)?.[1] ?? "";
+    expect(tail, "the tail expression moved — this test is reading the wrong code").not.toBe("");
+    expect(tail, "`trailing ?? (value…)` is the bug: passing both drops the value").not.toMatch(/^\s*trailing \?\?/);
+    expect(tail, "the value slot must render on its own terms").toContain("value !== undefined");
+    expect(tail, "trailing must still render").toContain("trailing ??");
+  });
+
+  it("still lets `trailing` replace the chevron", () => {
+    // The chevron means "this row opens something". A row carrying its own
+    // control has a more specific affordance, so it keeps yielding — composing
+    // THOSE two would put a ⋮ and a › side by side on every actionable row.
+    const tail = /const tail = \(([\s\S]*?)\n  \);/.exec(src)?.[1] ?? "";
+    expect(tail).toMatch(/trailing \?\? \(showChevron &&/);
+  });
+
   it("gives the navigating half back the row's left padding", () => {
     // Without this the tap target starts 16px inside the row's edge, which is
     // invisible in review and felt immediately on a phone.

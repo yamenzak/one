@@ -242,6 +242,14 @@ export function TeamPage() {
         count. They are their own group rather than ghost rows in the list,
         because everything you can do to a member — change their role, narrow
         their access — you cannot do to an invitation.
+
+        ⚠️ `inviteButton` is passed to the roster's EMPTY state and NOT to its
+        header. Invite is already the shell's page action (`usePageChrome`
+        above), so an `action` on the populated Collection put the same filled
+        primary button on screen twice, 285px apart. The empty state is a
+        different context and keeps its own: there is no roster to search, the
+        header is a sentence about nothing, and the call to action belongs in
+        the panel that is explaining the emptiness.
       */}
       {staff && staff.invitations.length > 0 && (
         <Section title="Invited — not signed in yet" className="mb-6">
@@ -280,7 +288,6 @@ export function TeamPage() {
         noun="members"
         query={q}
         onQuery={setQ}
-        action={inviteButton}
         empty={{
           icon: UserPlus,
           title: "Nobody here yet",
@@ -291,7 +298,16 @@ export function TeamPage() {
           <Row
             icon={m.email ? UserRound : UserX}
             iconTone={m.email ? "primary" : "warning"}
-            sub={m.email ?? "No address — this member cannot be sent a sign-in code"}
+            /*
+              THE SUB IS THE SECOND FACT, NEVER THE FIRST ONE RESTATED.
+
+              A member who has not set a name comes back with their address as
+              `name`, so this row printed the same string on both lines — the
+              email at `body-lg` and the email again at `caption` directly
+              under it. Undefined when they match: `Row` then renders the
+              single line, which is all there is to say.
+            */
+            sub={m.email == null ? "No address — this member cannot be sent a sign-in code" : m.email === m.name ? undefined : m.email}
             value={<Badge className="capitalize">{m.role}</Badge>}
             trailing={<MemberMenu m={m} roles={roles} onRole={changeRole} onEdit={setEditAccess} onRevoke={revoke} />}
           >
