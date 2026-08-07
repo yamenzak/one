@@ -73,6 +73,7 @@ import { useHistory } from "../builder/history.js";
 import { TransformBox, GroupBox, SELECT, SELECT_WASH, type Phase } from "../builder/TransformBox.js";
 import { AiLayoutDialog } from "../builder/AiLayoutDialog.js";
 import { intersects, alignPatches, distributePatches, clampPos, type AlignKind } from "../builder/geometry.js";
+import { confirmDialog } from "../components/confirm.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
 import { Badge, Button, cn, EmptyState, LoadError, Separator, Sheet, Skeleton, toast, Tooltip } from "@4dl/ui";
 import { SLIDE_CANVAS } from "../builder/canvas.js";
@@ -143,6 +144,25 @@ function Builder({ profileId }: { profileId: string }) {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
+
+  /*
+    THE TAB-CLOSE CASE, which had no guard at all.
+
+    The back-link asked before leaving; closing the tab, reloading, or following
+    a link out of the app did not, so an hour of layout work went with it in
+    silence. This is the ONE place a native prompt is correct — the browser will
+    not show a custom dialog here, by design, and refusing to use the native one
+    means showing nothing.
+
+    Registered only while `dirty`: a listener that is always present makes some
+    browsers treat every navigation as unsaved.
+  */
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
 
   const [showGrid, setShowGrid] = useState(true);
   const [snap, setSnap] = useState(true);
@@ -741,16 +761,37 @@ function Builder({ profileId }: { profileId: string }) {
       <div className="relative flex h-[calc(100vh-6.5rem)] min-h-[520px] flex-col overflow-hidden rounded-xl border bg-card">
         {/* Toolbar */}
         <div className="flex items-center gap-1.5 border-b px-2.5 py-2">
-          <Button asChild variant="ghost" size="icon" className="size-8 shrink-0">
-            <Link
-              to="/profiles"
-              title="Back to widget profiles"
-              onClick={(e) => {
-                if (dirty && !window.confirm("You have unsaved changes. Leave without saving?")) e.preventDefault();
-              }}
-            >
-              <ArrowLeft className="size-4" />
-            </Link>
+          {/*
+            ⚠️ ALWAYS `preventDefault`, then ask, then navigate.
+
+            The native `confirm()` this replaces was here because it is
+            SYNCHRONOUS and a link's `onClick` has to decide before the browser
+            follows it. The app's own dialog returns a promise, so the order
+            inverts: stop the navigation unconditionally, and perform it
+            ourselves once the answer is in. Reading it the other way round —
+            `if (await …) return` — lets the link fire while the dialog is still
+            open, which loses the work the dialog was protecting.
+          */}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0"
+            aria-label="Back to widget profiles"
+            onClick={async () => {
+              if (dirty) {
+                const ok = await confirmDialog({
+                  title: "Leave without saving?",
+                  description: "This layout has changes that have not been saved. They are lost if you leave now.",
+                  confirmText: "Discard changes",
+                  cancelText: "Keep editing",
+                  destructive: true,
+                });
+                if (!ok) return;
+              }
+              navigate("/profiles");
+            }}
+          >
+            <ArrowLeft />
           </Button>
           <div className="mr-1 min-w-0">
             <div className="truncate text-sm font-semibold leading-tight">{name}</div>
