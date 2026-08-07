@@ -20,7 +20,6 @@
  * control, not a lost one.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import { StatTile, StatusDot, Pill, type Tone } from "../components/status.js";
 import { confirmDialog } from "../components/confirm.js";
 import {
@@ -42,7 +41,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { FEATURE_CATALOG, QUOTA_CATALOG, FEATURE_CATEGORIES } from "@scena/manifest";
-import { Badge, Button, Card, cn, Dialog, DialogContent, DialogDescription, DialogFooter, EmptyState, Input, Label, SectionHeader, Select, Separator, Skeleton, Switch, toast } from "@4dl/ui";
+import { Button, Card, cn, Dialog, DialogContent, DialogDescription, DialogFooter, EmptyState, Group, Input, Label, Row, SectionHeader, Select, Separator, Skeleton, Switch, toast } from "@4dl/ui";
 import {
   getAdminConfig,
   setAdminConfig,
@@ -458,23 +457,11 @@ export function PlansTab() {
         </p>
       </div>
       <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead>Plan</TableHead>
-              <TableHead className="w-36">Price ¢/mo</TableHead>
-              <TableHead className="w-36">Grant cr/mo</TableHead>
-              <TableHead>Stripe</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Entitlements</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {plans.map((p) => (
-              <PlanRow key={p.id} plan={p} onPrice={savePrice} onGrant={saveGrant} onConfigure={() => setEditing(p)} />
-            ))}
-          </TableBody>
-        </Table>
+        <Group>
+          {plans.map((p, i) => (
+            <PlanRow key={p.id} plan={p} onPrice={savePrice} onGrant={saveGrant} onConfigure={() => setEditing(p)} last={i === plans.length - 1} />
+          ))}
+        </Group>
       </div>
       {editing && (
         <PlanEntitlementsModal
@@ -490,16 +477,27 @@ export function PlansTab() {
   );
 }
 
+/**
+ * One plan — a `Row`, and the two editable numbers live in `trailing`.
+ *
+ * The grid this replaces put Price and Grant in their own columns because a
+ * table needs one shape per row. But nobody compares four plans' prices by
+ * scanning a column here; they open the console to CHANGE one. So the numbers
+ * sit together where the hand is, each with its own label, and the plan's
+ * identity and standing read as a sentence on the left.
+ */
 function PlanRow({
   plan,
   onPrice,
   onGrant,
   onConfigure,
+  last,
 }: {
   plan: Plan;
   onPrice: (p: Plan, c: number) => void;
   onGrant: (p: Plan, g: number) => void;
   onConfigure: () => void;
+  last: boolean;
 }) {
   const grant = (() => {
     try {
@@ -511,34 +509,46 @@ function PlanRow({
   const [price, setPrice] = useState(String(plan.price_cents));
   const [g, setG] = useState(String(grant));
   return (
-    <TableRow>
-      <TableCell>
-        <div className="font-medium">{plan.name}</div>
-        <div className="font-mono text-xs text-muted-foreground">{plan.id}</div>
-      </TableCell>
-      <TableCell>
-        <Input
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          onBlur={() => onPrice(plan, Number(price) || 0)}
-          className="h-9 w-28 font-mono tabular-nums"
-        />
-      </TableCell>
-      <TableCell>
-        <Input value={g} onChange={(e) => setG(e.target.value)} onBlur={() => onGrant(plan, Number(g) || 0)} className="h-9 w-28 font-mono tabular-nums" />
-      </TableCell>
-      <TableCell>{plan.stripe_price_id ? <Pill tone="info">synced</Pill> : <span className="text-muted-foreground">—</span>}</TableCell>
-      <TableCell>
-        <Pill tone={plan.active ? "success" : "muted"}>
-          <StatusDot tone={plan.active ? "success" : "muted"} /> {plan.active ? "Active" : "Off"}
-        </Pill>
-      </TableCell>
-      <TableCell className="text-right">
-        <Button size="sm" variant="outline" onClick={onConfigure}>
-          Configure
-        </Button>
-      </TableCell>
-    </TableRow>
+    <Row
+      divider={!last}
+      sub={
+        <span className="flex items-center gap-2">
+          <span className="font-mono">{plan.id}</span>
+          <StatusDot tone={plan.active ? "success" : "muted"} />
+          {plan.active ? "Active" : "Off"}
+          {plan.stripe_price_id ? " · Stripe synced" : " · not in Stripe"}
+        </span>
+      }
+      trailing={
+        <span className="flex shrink-0 items-center gap-3">
+          <label className="flex flex-col items-end gap-1">
+            <span className="text-micro uppercase text-muted-foreground">¢ / mo</span>
+            <Input
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              onBlur={() => onPrice(plan, Number(price) || 0)}
+              aria-label={`${plan.name} price in cents per month`}
+              className="h-9 w-24 font-mono tabular-nums"
+            />
+          </label>
+          <label className="flex flex-col items-end gap-1">
+            <span className="text-micro uppercase text-muted-foreground">cr / mo</span>
+            <Input
+              value={g}
+              onChange={(e) => setG(e.target.value)}
+              onBlur={() => onGrant(plan, Number(g) || 0)}
+              aria-label={`${plan.name} monthly credit grant`}
+              className="h-9 w-24 font-mono tabular-nums"
+            />
+          </label>
+          <Button size="sm" variant="outline" onClick={onConfigure}>
+            Configure
+          </Button>
+        </span>
+      }
+    >
+      {plan.name}
+    </Row>
   );
 }
 
@@ -781,29 +791,15 @@ export function ModelsTab() {
         </div>
       </div>
       <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead>Model</TableHead>
-              <TableHead>Provider</TableHead>
-              <TableHead>Task</TableHead>
-              <TableHead className="text-right">Cost basis</TableHead>
-              <TableHead className="w-24">Markup ×</TableHead>
-              <TableHead className="text-right">Enabled</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered && filtered.length > 0 ? (
-              filtered.map((m) => <ModelRow key={m.id} model={m} onSave={save} />)
-            ) : (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
-                  No models match your search.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+        {filtered && filtered.length > 0 ? (
+          <Group>
+            {filtered.map((m, i) => (
+              <ModelRow key={m.id} model={m} onSave={save} last={i === filtered.length - 1} />
+            ))}
+          </Group>
+        ) : (
+          <p className="py-10 text-center text-sm text-muted-foreground">No models match your search.</p>
+        )}
       </div>
     </Card>
   );
@@ -830,34 +826,48 @@ function costBasis(m: AdminModel): React.ReactNode {
   );
 }
 
-function ModelRow({ model, onSave }: { model: AdminModel; onSave: (m: AdminModel, patch: Partial<AdminModel>) => void }) {
+/**
+ * One model in the catalog.
+ *
+ * The cost basis is the ONE number an operator scans down this list — "what am
+ * I paying for a thousand tokens of that" — so it is the `value`, which `Row`
+ * right-aligns and sets in tabular figures. That is the column-comparison a
+ * table was providing, kept; the other five columns were identity and controls,
+ * which read better as a line and a cluster.
+ */
+function ModelRow({ model, onSave, last }: { model: AdminModel; onSave: (m: AdminModel, patch: Partial<AdminModel>) => void; last: boolean }) {
   const [markup, setMarkup] = useState(String(model.markup));
   const prov = modelProvider(model.cf_model);
   return (
-    <TableRow className={cn(model.enabled !== 1 && "opacity-60")}>
-      <TableCell>
-        <div className="font-medium">{model.label}</div>
-        <div className="font-mono text-xs text-muted-foreground">{model.cf_model}</div>
-      </TableCell>
-      <TableCell>
-        <Pill tone={prov.tone}>{prov.label}</Pill>
-      </TableCell>
-      <TableCell>
-        <Badge className="capitalize">{model.task}</Badge>
-      </TableCell>
-      <TableCell className="text-right">{costBasis(model)}</TableCell>
-      <TableCell>
-        <Input
-          value={markup}
-          onChange={(e) => setMarkup(e.target.value)}
-          onBlur={() => onSave(model, { markup: Number(markup) || model.markup })}
-          className="h-9 w-20 font-mono tabular-nums"
-        />
-      </TableCell>
-      <TableCell className="text-right">
-        <Switch checked={model.enabled === 1} onCheckedChange={(c) => onSave(model, { enabled: c ? 1 : 0 })} />
-      </TableCell>
-    </TableRow>
+    <Row
+      divider={!last}
+      className={cn(model.enabled !== 1 && "opacity-60")}
+      sub={
+        <span className="flex items-center gap-1.5">
+          <Pill tone={prov.tone}>{prov.label}</Pill>
+          <span className="capitalize">{model.task}</span>
+          <span className="truncate font-mono">· {model.cf_model}</span>
+        </span>
+      }
+      trailing={
+        <span className="flex shrink-0 items-center gap-3">
+          <span className="text-right">{costBasis(model)}</span>
+          <label className="flex flex-col items-end gap-1">
+            <span className="text-micro uppercase text-muted-foreground">markup ×</span>
+            <Input
+              value={markup}
+              onChange={(e) => setMarkup(e.target.value)}
+              onBlur={() => onSave(model, { markup: Number(markup) || model.markup })}
+              aria-label={`${model.label} markup multiplier`}
+              className="h-9 w-20 font-mono tabular-nums"
+            />
+          </label>
+          <Switch checked={model.enabled === 1} onCheckedChange={(c) => onSave(model, { enabled: c ? 1 : 0 })} aria-label={`${model.label} enabled`} />
+        </span>
+      }
+    >
+      {model.label}
+    </Row>
   );
 }
 
@@ -932,63 +942,40 @@ export function LibraryTab() {
         ) : visible.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">No tracks match your search.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Track</TableHead>
-                  <TableHead>Genre</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="text-right">Length</TableHead>
-                  <TableHead className="w-20 text-right" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visible.map((t) => (
-                  <TableRow key={t.id} className="cursor-pointer" onClick={() => setDialog(t)}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground">
-                          {t.art_url ? <img src={t.art_url} alt="" className="size-full object-cover" /> : <Music className="size-4" />}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="truncate font-medium">{t.title}</div>
-                          {t.artist ? <div className="truncate text-xs text-muted-foreground">{t.artist}</div> : null}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{t.genre || "Uncategorized"}</TableCell>
-                    <TableCell>
-                      {t.vocal ? (
-                        <Pill tone="muted" className="capitalize">
-                          {t.vocal}
-                        </Pill>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right font-mono tabular-nums text-muted-foreground">{mmss(t.duration_ms)}</TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex justify-end gap-1">
-                        <Button size="icon" variant="ghost" className="size-8" aria-label="Edit track" onClick={() => setDialog(t)}>
-                          <Pencil className="size-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="size-8 text-muted-foreground hover:text-destructive"
-                          aria-label="Delete track"
-                          onClick={() => del(t)}
-                        >
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <Group>
+            {visible.map((t, i) => (
+              <Row
+                key={t.id}
+                divider={i < visible.length - 1}
+                onClick={() => setDialog(t)}
+                leading={
+                  <span className="grid size-9 shrink-0 place-items-center overflow-hidden rounded-md bg-surface-2 text-muted-foreground">
+                    {t.art_url ? <img src={t.art_url} alt="" className="size-full object-cover" /> : <Music className="size-4" />}
+                  </span>
+                }
+                sub={[t.artist || null, t.genre || "Uncategorized", t.vocal || null].filter(Boolean).join(" · ")}
+                trailing={
+                  <span className="flex shrink-0 items-center gap-1">
+                    <span className="numeral mr-1 text-caption text-muted-foreground">{mmss(t.duration_ms)}</span>
+                    <Button size="icon-sm" variant="ghost" aria-label={`Edit ${t.title}`} onClick={(e) => { e.stopPropagation(); setDialog(t); }}>
+                      <Pencil />
+                    </Button>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="text-muted-foreground hover:text-danger"
+                      aria-label={`Delete ${t.title}`}
+                      onClick={(e) => { e.stopPropagation(); void del(t); }}
+                    >
+                      <Trash2 />
+                    </Button>
+                  </span>
+                }
+              >
+                {t.title}
+              </Row>
+            ))}
+          </Group>
         )}
       </Card>
       <TrackDialog track={dialog === "new" ? null : dialog} open={dialog !== null} onClose={close} onSaved={reload} />
@@ -1238,37 +1225,27 @@ export function PromosTab() {
             className="border-0 bg-transparent py-8"
           />
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Code</TableHead>
-                  <TableHead>Reward</TableHead>
-                  <TableHead className="text-right">Used</TableHead>
-                  <TableHead className="hidden md:table-cell">Note</TableHead>
-                  <TableHead className="w-24 text-right" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {promos.map((p) => (
-                  <TableRow key={p.code}>
-                    <TableCell>
-                      <span className="flex items-center gap-2 font-mono text-sm font-semibold">
-                        {p.code}
-                        {p.active ? null : <Pill tone="muted">off</Pill>}
-                      </span>
-                    </TableCell>
-                    <TableCell>
+            <Group>
+              {promos.map((p, i) => (
+                <Row
+                  key={p.code}
+                  divider={i < promos.length - 1}
+                  sub={
+                    <span className="flex items-center gap-1.5">
                       <Pill tone={p.kind === "plan" ? "primary" : "info"}>
                         {p.kind === "plan" ? `Gift ${p.plan_id} · ${p.plan_months}mo` : `${num(p.credits ?? 0)} cr`}
                       </Pill>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {p.redeemed_count}
-                      {p.max_redemptions ? `/${p.max_redemptions}` : ""}
-                    </TableCell>
-                    <TableCell className="hidden max-w-[220px] truncate text-muted-foreground md:table-cell">{p.note || "—"}</TableCell>
-                    <TableCell className="text-right">
+                      <span className="truncate">{p.note || "no note"}</span>
+                    </span>
+                  }
+                  trailing={
+                    <span className="flex shrink-0 items-center gap-3">
+                      {/* Redemptions against the cap — the one number an
+                          operator scans down this list. */}
+                      <span className="numeral text-caption text-muted-foreground">
+                        {p.redeemed_count}
+                        {p.max_redemptions ? `/${p.max_redemptions}` : ""}
+                      </span>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -1279,12 +1256,16 @@ export function PromosTab() {
                       >
                         {p.active ? "Disable" : "Enable"}
                       </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                    </span>
+                  }
+                >
+                  <span className="flex items-center gap-2 font-mono">
+                    {p.code}
+                    {p.active ? null : <Pill tone="muted">off</Pill>}
+                  </span>
+                </Row>
+              ))}
+            </Group>
         )}
       </Card>
       <PromoDialog open={dialogOpen} plans={plans} onClose={close} onSaved={reload} />
@@ -1474,71 +1455,56 @@ export function TenantsTab() {
         ) : visible && visible.length === 0 ? (
           <div className="py-10 text-center text-sm text-muted-foreground">No tenants match your search.</div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Tenant</TableHead>
-                  <TableHead>Plan</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Balance</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(visible ?? []).map((t) => {
-                  const tone = TENANT_TONE[t.status] ?? "muted";
-                  const isDemo = t.tenant_id === DEMO_TENANT_ID;
-                  return (
-                    <TableRow key={t.tenant_id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-sm font-semibold">{t.tenant_id}</span>
-                          {isDemo ? <Pill tone="muted">demo · system</Pill> : null}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className="flex items-center gap-1.5">
-                          <span className="capitalize text-muted-foreground">{t.plan_id}</span>
-                          {t.comp ? <Pill tone="info">comped</Pill> : null}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Pill tone={tone}>
-                          <StatusDot tone={tone} /> <span className="capitalize">{t.status.replace(/_/g, " ")}</span>
-                        </Pill>
-                      </TableCell>
-                      <TableCell className="text-right font-mono tabular-nums">{num(t.balance)}</TableCell>
-                      <TableCell>
-                        <div className="flex shrink-0 justify-end gap-1.5">
-                          <Button size="sm" variant="ghost" onClick={() => setOverridesFor(t.tenant_id)}>
-                            Overrides
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => setCreditsFor(t)}>
-                            Credits
-                          </Button>
-                          {isDemo ? null : t.status === "suspended" ? (
-                            <Button size="sm" variant="ghost" onClick={() => life(t, "reactivate")}>
-                              Reactivate
-                            </Button>
-                          ) : (
-                            <Button size="sm" variant="ghost" onClick={() => life(t, "suspend")}>
-                              Suspend
-                            </Button>
-                          )}
-                          {isDemo ? null : (
-                            <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => life(t, "delete")}>
-                              Delete
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <Group>
+            {(visible ?? []).map((t, i) => {
+              const tone = TENANT_TONE[t.status] ?? "muted";
+              const isDemo = t.tenant_id === DEMO_TENANT_ID;
+              return (
+                <Row
+                  key={t.tenant_id}
+                  divider={i < (visible?.length ?? 0) - 1}
+                  sub={
+                    <span className="flex items-center gap-1.5">
+                      <StatusDot tone={tone} />
+                      <span className="capitalize">{t.status.replace(/_/g, " ")}</span>
+                      <span className="capitalize">· {t.plan_id}</span>
+                      {t.comp ? <Pill tone="info">comped</Pill> : null}
+                      {isDemo ? <Pill tone="muted">demo · system</Pill> : null}
+                    </span>
+                  }
+                  trailing={
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {/* The balance is the number an operator scans down this
+                          list; the four actions are what they came to press. */}
+                      <span className="numeral mr-1 tabular-nums">{num(t.balance)}</span>
+                      <Button size="sm" variant="ghost" onClick={() => setOverridesFor(t.tenant_id)}>
+                        Overrides
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setCreditsFor(t)}>
+                        Credits
+                      </Button>
+                      {isDemo ? null : t.status === "suspended" ? (
+                        <Button size="sm" variant="ghost" onClick={() => life(t, "reactivate")}>
+                          Reactivate
+                        </Button>
+                      ) : (
+                        <Button size="sm" variant="ghost" onClick={() => life(t, "suspend")}>
+                          Suspend
+                        </Button>
+                      )}
+                      {isDemo ? null : (
+                        <Button size="sm" variant="ghost" className="text-danger hover:text-danger" onClick={() => life(t, "delete")}>
+                          Delete
+                        </Button>
+                      )}
+                    </span>
+                  }
+                >
+                  <span className="font-mono">{t.tenant_id}</span>
+                </Row>
+              );
+            })}
+          </Group>
         )}
       </Card>
       {overridesFor && (

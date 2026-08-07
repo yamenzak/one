@@ -41,14 +41,13 @@ const UI_SRC = join(ROOT, "packages/ui/src");
 /**
  * Files an app is still allowed to own, and why.
  *
- * `apps/scena-app/src/components/ui/table.tsx` — UI-LANGUAGE §11 lists "add a
- * data table where mobile has rows" under what desktop must NOT do, so its
- * eight users convert to Group/Row rather than to a shared `Table`. That is
- * per-screen design work (which column becomes the primary line, which the
- * value), and it lands screen by screen in the UI-3 sweep. Deleting the entry
- * and the file is the last commit of that sweep.
+ * EMPTY, and that is the intended steady state. It held
+ * `scena-app/src/components/ui/table.tsx` through UI-1 and UI-2 while its eight
+ * users were redesigned; UI-3 finished them and the file is gone. Adding an
+ * entry here is a deliberate, reviewed exception with a reason and, if it is
+ * temporary, the work that removes it.
  */
-const KNOWN = new Set(["scena-app/src/components/ui/table.tsx"]);
+const KNOWN = new Set([]);
 
 /** Every `.tsx`/`.ts` file under a directory, relative to `apps/`. */
 function walk(dir, out = []) {

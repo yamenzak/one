@@ -10,10 +10,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, RefreshCw, X, ExternalLink, Rss, Trash2, Inbox, Globe, Sheet, Table2, MoreVertical, CloudSun } from "lucide-react";
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
 import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
-import { Badge, Button, Card, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Input, Label, LoadError, PageHeader, Select, Skeleton, toast, usePageChrome } from "@4dl/ui";
+import { Button, Card, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Section, Select, Skeleton, SkeletonList, toast, usePageChrome } from "@4dl/ui";
 import { ScenaMascot } from "../brand.js";
 import {
   listFeeds,
@@ -191,13 +190,12 @@ export function FeedsPage() {
       />
 
       {error ? (
-        <Card className="border-dashed">Couldn't reach the API: {error}</Card>
+        // Was a dashed Card reading "Couldn't reach the API: [object Object]"
+        // with nothing to press. `LoadError` carries the server's own words and
+        // a retry — the same treatment every other list on this app already had.
+        <LoadError what="sources" error={error} onRetry={reloadList} />
       ) : !feeds ? (
-        <div className="overflow-hidden rounded-xl bg-card shadow-sm">
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="m-2 h-12 rounded-lg" />
-          ))}
-        </div>
+        <SkeletonList card rows={4} thumb={36} />
       ) : total === 0 ? (
         <EmptyState
           art={<ScenaMascot mood="idle" size={116} className="mb-1" />}
@@ -212,99 +210,94 @@ export function FeedsPage() {
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-xl bg-card shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Name</TableHead>
-                <TableHead className="w-32">Type</TableHead>
-                <TableHead className="w-40 text-right">Detail</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {feeds.map((f) => {
-                const Icon = PROVIDERS[f.provider]?.icon ?? Inbox;
-                return (
-                  <TableRow key={f.id} className="cursor-pointer" onClick={() => navigate(`/feeds/${f.id}`)}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                          <Icon className="size-4" />
-                        </div>
-                        <span className="truncate font-medium">{f.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className="font-normal">{PROVIDERS[f.provider]?.label ?? f.provider}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {f.itemCount ?? 0}{" "}
-                      <span className="text-xs">
-                        {isTabular(f.provider) ? "row" : "item"}
-                        {(f.itemCount ?? 0) === 1 ? "" : "s"}
-                      </span>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+        /*
+          TWO GROUPS, not one table with a Type column.
+
+          A data source and a weather location are different things that happen
+          to feed the same widgets, and the only reason they shared a grid was
+          that a table needs every row to have the same columns — so a "Type"
+          column was invented to say which kind you were looking at. Split, the
+          heading says it and the column disappears.
+
+          Each row's second line is the fact you would otherwise read off the
+          right-hand column: how much data a source has, or what the weather
+          costs per day.
+        */
+        <>
+          {feeds.length > 0 && (
+            <Section title="Data sources">
+              <Group>
+                {feeds.map((f, i) => {
+                  const Icon = PROVIDERS[f.provider]?.icon ?? Inbox;
+                  const unit = isTabular(f.provider) ? "row" : "item";
+                  const n = f.itemCount ?? 0;
+                  return (
+                    <Row
+                      key={f.id}
+                      icon={Icon}
+                      iconTone="primary"
+                      onClick={() => navigate(`/feeds/${f.id}`)}
+                      sub={`${PROVIDERS[f.provider]?.label ?? f.provider} · ${n} ${unit}${n === 1 ? "" : "s"}`}
+                      divider={i < feeds.length - 1}
+                      trailing={
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${f.name}`} onClick={(e) => e.stopPropagation()}>
+                              <MoreVertical />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem destructive onSelect={() => removeSource(f)}>
+                              <Trash2 className="size-4" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      }
+                    >
+                      {f.name}
+                    </Row>
+                  );
+                })}
+              </Group>
+            </Section>
+          )}
+
+          {weather.length > 0 && (
+            <Section title="Weather">
+              <Group>
+                {weather.map((l, i) => (
+                  <Row
+                    key={l.id}
+                    icon={CloudSun}
+                    iconTone="primary"
+                    onClick={() => setEditLoc(l)}
+                    sub={`${l.current ? `${l.current.temp}° · ${l.current.condition}` : "no data yet"} · ~${l.dailyCredits} cr/day`}
+                    divider={i < weather.length - 1}
+                    trailing={
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-8" aria-label="Source actions">
-                            <MoreVertical className="size-4" />
+                          <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${l.label}`} onClick={(e) => e.stopPropagation()}>
+                            <MoreVertical />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem className="text-destructive" onSelect={() => removeSource(f)}>
-                            <Trash2 className="size-4" /> Delete
+                          <DropdownMenuItem onSelect={() => setEditLoc(l)}>
+                            <CloudSun className="size-4" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem destructive onSelect={() => removeWeather(l)}>
+                            <Trash2 className="size-4" /> Remove
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-              {weather.map((l) => (
-                <TableRow key={l.id} className="cursor-pointer" onClick={() => setEditLoc(l)}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <CloudSun className="size-4" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="truncate font-medium">{l.label}</div>
-                        <div className="text-[11px] tabular-nums text-muted-foreground">
-                          {l.current ? `${l.current.temp}° · ${l.current.condition}` : "no data yet"}
-                        </div>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className="font-normal">Weather</Badge>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
-                    ~{l.dailyCredits} <span className="text-xs">cr/day</span>
-                  </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="size-8" aria-label="Location actions">
-                          <MoreVertical className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setEditLoc(l)}>
-                          <CloudSun className="size-4" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive" onSelect={() => removeWeather(l)}>
-                          <Trash2 className="size-4" /> Remove
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                    }
+                  >
+                    {l.label}
+                  </Row>
+                ))}
+              </Group>
+            </Section>
+          )}
+        </>
       )}
 
       <NewSourceDialog open={addOpen} onClose={() => setAddOpen(false)} onCreate={createNew} onCreateWeather={createWeather} weatherPerCall={perCall} />

@@ -29,7 +29,6 @@ import {
   Mic,
   Disc3,
 } from "lucide-react";
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
 import { TagEditor } from "../components/tag-editor.js";
 import { useCan } from "../permissions.js";
 import { confirmDialog } from "../components/confirm.js";
@@ -37,7 +36,7 @@ import { offerPublishAffected } from "../components/publish-affected.js";
 import { TrackMetaDialog, mmss } from "../components/track-meta-dialog.js";
 import { LicenseBadge, LicenseNote } from "../components/licensing.js";
 import { MediaPicker } from "./MediaLibrary.js";
-import { Badge, Button, cn, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
+import { Badge, Button, cn, Dialog, DialogContent, DialogFooter, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
 import { PlaylistLibrary } from "../components/playlist-library.js";
 import {
   listMusicPlaylists,
@@ -413,42 +412,29 @@ export function MusicPlaylistDetailPage() {
               }
             />
           ) : (
-            <div className="overflow-hidden rounded-xl bg-card shadow-sm">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    {canWrite && <TableHead className="w-8" />}
-                    <TableHead className="w-10 text-center">#</TableHead>
-                    <TableHead>Track</TableHead>
-                    <TableHead className="hidden sm:table-cell">Artist</TableHead>
-                    <TableHead className="hidden lg:table-cell">Genres</TableHead>
-                    <TableHead className="w-20 text-right">Length</TableHead>
-                    {canWrite && <TableHead className="w-20" />}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tracks.map((t, i) => (
-                    <TrackRow
-                      key={t.id}
-                      track={t}
-                      index={i}
-                      canWrite={canWrite}
-                      dragging={drag === i}
-                      over={over === i && drag !== null && drag !== i}
-                      onDragStart={() => setDrag(i)}
-                      onDragEnter={() => setOver(i)}
-                      onDragEnd={() => {
-                        setDrag(null);
-                        setOver(null);
-                      }}
-                      onDrop={() => drop(i)}
-                      onEdit={() => setEditTrack(t)}
-                      onDelete={() => removeTrack(t.id, t.title)}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            /* No header row. The columns it labelled are gone — each track
+               states its own artist, genres and length in place. */
+            <Group>
+              {tracks.map((t, i) => (
+                <TrackRow
+                  key={t.id}
+                  track={t}
+                  index={i}
+                  canWrite={canWrite}
+                  dragging={drag === i}
+                  over={over === i && drag !== null && drag !== i}
+                  onDragStart={() => setDrag(i)}
+                  onDragEnter={() => setOver(i)}
+                  onDragEnd={() => {
+                    setDrag(null);
+                    setOver(null);
+                  }}
+                  onDrop={() => drop(i)}
+                  onEdit={() => setEditTrack(t)}
+                  onDelete={() => removeTrack(t.id, t.title)}
+                />
+              ))}
+            </Group>
           )}
         </div>
 
@@ -663,6 +649,24 @@ function EditablePlaylistName({ name, onRename }: { name: string; onRename: (n: 
   );
 }
 
+/**
+ * One track — a `Row`, not a `<tr>`.
+ *
+ * ⚠️ THIS IS THE CLEAREST CASE FOR UI-LANGUAGE §11 IN THE WHOLE APP. The table
+ * version rendered the ARTIST TWICE: once in a `sm:hidden` block tucked under
+ * the title, and again in a `hidden sm:table-cell` column — two copies of one
+ * fact, because a table cannot reflow a column into a line. Genres were a third
+ * column that simply vanished below `lg`, and the drag handle was a column of
+ * its own. "If desktop needs a different component, the abstraction is wrong."
+ *
+ * As a row there is one artist line, the genres ride with it, and nothing is
+ * hidden at any width. The duration sits with the controls in `trailing`,
+ * because `Row` renders `trailing` INSTEAD of `value` — and a track's length is
+ * a fact you read, not a column you compare down.
+ *
+ * The drag affordance is on a wrapping `div`: `Row` has no drag props and
+ * should not — reordering is this screen's behaviour, not the grammar's.
+ */
 function TrackRow({
   track,
   index,
@@ -689,8 +693,10 @@ function TrackRow({
   onDelete: () => void;
 }) {
   const licensed = !!track.library_id;
+  const genres = (track.genres ?? []).slice(0, 3);
+  const vocal = track.vocal ? (track.vocal === "vocal" ? "Vocal" : "Instrumental") : null;
   return (
-    <TableRow
+    <div
       draggable={canWrite}
       onDragStart={onDragStart}
       onDragEnter={onDragEnter}
@@ -702,71 +708,43 @@ function TrackRow({
       }}
       className={cn(dragging && "opacity-40", over && "border-t-2 border-t-primary")}
     >
-      {canWrite && (
-        <TableCell className="pr-0">
-          <span className="cursor-grab text-muted-foreground/50 active:cursor-grabbing" title="Drag to reorder">
-            <GripVertical className="size-4" />
-          </span>
-        </TableCell>
-      )}
-      <TableCell className="text-center tabular-nums text-muted-foreground">{index + 1}</TableCell>
-      <TableCell>
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted text-muted-foreground">
-            {track.art_url ? <img src={assetUrl(track.art_url)} alt="" className="size-full object-cover" /> : <Music className="size-4" />}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="truncate font-medium">{track.title}</span>
-              {licensed && <LicenseBadge source="public" />}
-            </div>
-            {/* Artist + vocal marker collapse into this cell below the sm breakpoint. */}
-            <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground sm:hidden">
-              <span className="truncate">{track.artist || "Unknown artist"}</span>
-              {track.vocal && (
-                <span className="inline-flex shrink-0 items-center gap-0.5">
-                  · {track.vocal === "vocal" ? <Mic className="size-3" /> : <Disc3 className="size-3" />}
-                  {track.vocal === "vocal" ? "Vocal" : "Instr."}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </TableCell>
-      <TableCell className="hidden text-muted-foreground sm:table-cell">
-        <div className="flex items-center gap-1.5">
-          <span className="truncate">{track.artist || "Unknown artist"}</span>
-          {track.vocal && (
-            <span className="inline-flex shrink-0 items-center gap-0.5 text-xs">
-              {track.vocal === "vocal" ? <Mic className="size-3" /> : <Disc3 className="size-3" />}
-              {track.vocal === "vocal" ? "Vocal" : "Instr."}
+      <Row
+        leading={
+          <span className="flex items-center gap-2">
+            {canWrite && (
+              <span className="cursor-grab text-muted-foreground/50 active:cursor-grabbing" title="Drag to reorder">
+                <GripVertical className="size-4" />
+              </span>
+            )}
+            <span className="w-5 shrink-0 text-right text-caption tabular-nums text-muted-foreground">{index + 1}</span>
+            <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-md bg-surface-2 text-muted-foreground">
+              {track.art_url ? <img src={assetUrl(track.art_url)} alt="" className="size-full object-cover" /> : <Music className="size-4" />}
             </span>
-          )}
-        </div>
-      </TableCell>
-      <TableCell className="hidden lg:table-cell">
-        <div className="flex flex-wrap gap-1">
-          {(track.genres ?? []).slice(0, 3).map((g) => (
-            <Badge key={g} className="font-normal">
-              {g}
-            </Badge>
-          ))}
-        </div>
-      </TableCell>
-      <TableCell className="text-right tabular-nums text-muted-foreground">{mmss(track.duration_ms)}</TableCell>
-      {canWrite && (
-        <TableCell>
-          <div className="flex items-center justify-end gap-0.5">
-            <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" onClick={onEdit} title="Edit details">
-              <SlidersHorizontal className="size-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="size-8 text-muted-foreground hover:text-destructive" onClick={onDelete} title="Remove">
-              <Trash2 className="size-4" />
-            </Button>
-          </div>
-        </TableCell>
-      )}
-    </TableRow>
+          </span>
+        }
+        sub={[track.artist || "Unknown artist", vocal, genres.join(", ") || null].filter(Boolean).join(" · ")}
+        trailing={
+          <span className="flex shrink-0 items-center gap-0.5">
+            <span className="numeral mr-1 text-caption text-muted-foreground">{mmss(track.duration_ms)}</span>
+            {canWrite && (
+              <>
+                <Button variant="ghost" size="icon-sm" className="text-muted-foreground" onClick={onEdit} aria-label={`Edit ${track.title}`}>
+                  <SlidersHorizontal />
+                </Button>
+                <Button variant="ghost" size="icon-sm" className="text-muted-foreground hover:text-danger" onClick={onDelete} aria-label={`Remove ${track.title}`}>
+                  <Trash2 />
+                </Button>
+              </>
+            )}
+          </span>
+        }
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="truncate">{track.title}</span>
+          {licensed && <LicenseBadge source="public" />}
+        </span>
+      </Row>
+    </div>
   );
 }
 

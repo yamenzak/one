@@ -9,7 +9,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Play, Pause, Trash2, Megaphone, Clock, Sparkles, Bot, Upload, FolderOpen, Plus, MoreVertical, Pencil, Radio, Link2 } from "lucide-react";
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
 import { StatusDot as SharedStatusDot } from "../components/status.js";
 import { useCan } from "../permissions.js";
 import { confirmDialog } from "../components/confirm.js";
@@ -35,7 +34,7 @@ import {
 } from "../api.js";
 import { MediaPicker } from "./MediaLibrary.js";
 import { GEMINI_VOICES, AD_STYLE_PRESETS, DEFAULT_GEMINI_VOICE, DEFAULT_AD_STYLE, composeAdSpeech } from "../voices.js";
-import { Badge, Button, Card, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Input, Label, LoadError, PageHeader, Select, Skeleton, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
+import { Badge, Button, Card, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, SkeletonList, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
 import { ScenaMascot } from "../brand.js";
 
 type Kind = "audio" | "video" | "command";
@@ -113,11 +112,7 @@ export function AdsPage() {
 
       {loadFailed && <LoadError what="ad profiles" error="We couldn’t reach the server." onRetry={reload} />}
       {!profiles ? (
-        <div className="overflow-hidden rounded-xl bg-card shadow-sm">
-          {[0, 1, 2, 3].map((i) => (
-            <Skeleton key={i} className="m-2 h-12 rounded-lg" />
-          ))}
-        </div>
+        <SkeletonList card rows={4} thumb={36} />
       ) : profiles.length === 0 ? (
         <EmptyState
           art={<ScenaMascot mood="idle" size={116} className="mb-1" />}
@@ -132,65 +127,53 @@ export function AdsPage() {
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-xl bg-card shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Name</TableHead>
-                <TableHead className="w-20 text-right">Ads</TableHead>
-                <TableHead className="w-28">Channels</TableHead>
-                <TableHead className="w-10" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {profiles.map((p) => (
-                <TableRow key={p.id} className="cursor-pointer" onClick={() => navigate(`/ads/${p.id}`)}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <Radio className="size-4" />
-                      </div>
-                      <span className="truncate font-medium">{p.name}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums text-muted-foreground">{p.adCount ?? 0}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {p.channelCount ? (
-                      <span className="inline-flex items-center gap-1 text-xs">
-                        <Link2 className="size-3" /> {p.channelCount}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground/60">unbound</span>
-                    )}
-                  </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    {(canWrite || canDelete) && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="size-8" aria-label="Profile actions">
-                            <MoreVertical className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {canWrite && (
-                            <DropdownMenuItem onSelect={() => setRename(p)}>
-                              <Pencil className="size-4" /> Rename
-                            </DropdownMenuItem>
-                          )}
-                          {canDelete && (
-                            <DropdownMenuItem className="text-destructive" onSelect={() => remove(p)}>
-                              <Trash2 className="size-4" /> Delete
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        /*
+          A `Group` of `Row`s, not a table. UI-LANGUAGE §11: the desktop form of
+          a list is the same rows with more room around them — a `<table>` drops
+          columns by POSITION under pressure, and here the first to go was the
+          binding count, which is the only reason to scan this list at all.
+
+          The counts moved into the row's sub-line, where they read as a
+          sentence about the profile rather than as two numbers under headings
+          you have to look back up to.
+        */
+        <Group>
+          {profiles.map((p, i) => (
+            <Row
+              key={p.id}
+              icon={Radio}
+              iconTone="primary"
+              onClick={() => navigate(`/ads/${p.id}`)}
+              sub={`${p.adCount ?? 0} ad${p.adCount === 1 ? "" : "s"} · ${p.channelCount ? `on ${p.channelCount} channel${p.channelCount === 1 ? "" : "s"}` : "not bound to a channel"}`}
+              divider={i < profiles.length - 1}
+              trailing={
+                canWrite || canDelete ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon-sm" aria-label={`Actions for ${p.name}`} onClick={(e) => e.stopPropagation()}>
+                        <MoreVertical />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {canWrite && (
+                        <DropdownMenuItem onSelect={() => setRename(p)}>
+                          <Pencil className="size-4" /> Rename
+                        </DropdownMenuItem>
+                      )}
+                      {canDelete && (
+                        <DropdownMenuItem destructive onSelect={() => remove(p)}>
+                          <Trash2 className="size-4" /> Delete
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : undefined
+              }
+            >
+              {p.name}
+            </Row>
+          ))}
+        </Group>
       )}
 
       <NewProfileDialog open={newOpen} onOpenChange={setNewOpen} onCreated={(id) => navigate(`/ads/${id}`)} />

@@ -355,7 +355,25 @@ export const Row = forwardRef<HTMLElement, RowProps>(function Row(
   const showChevron = chevron ?? (navigates && !trailing && value === undefined);
   const twoLine = Boolean(sub);
 
-  const body = (
+  /*
+    ⚠️ A NAVIGATING ROW WITH INTERACTIVE TRAILING IS TWO ELEMENTS, NOT ONE.
+
+    This used to render the whole row as a single `<button>` (or `<a>`) with
+    `trailing` inside it — so a row that navigates AND carries a switch, a ⋮
+    menu or a delete button put a control inside a button. That is invalid
+    HTML, and browsers do not agree on what it means: the inner control's click
+    may or may not also fire the row's, a screen reader announces one confusing
+    target instead of two, and Enter on the focused row can activate either.
+    Sixteen call sites across three apps shipped it, all looking correct.
+
+    So when a row both navigates and has trailing content, the navigating part
+    is its own element and `trailing` is its sibling. The negative margin lets
+    that element reclaim the row's left padding, so the tap target still starts
+    at the row's edge rather than 16px in.
+  */
+  const interactiveTrailing = navigates && trailing !== undefined;
+
+  const identity = (
     <>
       {(Icon || leading) && (
         <span className="grid shrink-0 place-items-center">
@@ -379,17 +397,25 @@ export const Row = forwardRef<HTMLElement, RowProps>(function Row(
         <span className={cn("block truncate text-body-lg", tone === "danger" && "text-danger")}>{children}</span>
         {sub && <span className="mt-0.5 block truncate text-caption text-muted-foreground">{sub}</span>}
       </span>
-      {trailing ?? (
-        <>
-          {value !== undefined && (
-            <span className="shrink-0 text-right">
-              <span className="numeral block text-body-lg">{value}</span>
-              {valueSub && <span className="mt-0.5 block text-caption text-muted-foreground">{valueSub}</span>}
-            </span>
-          )}
-          {showChevron && <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />}
-        </>
+    </>
+  );
+
+  const tail = trailing ?? (
+    <>
+      {value !== undefined && (
+        <span className="shrink-0 text-right">
+          <span className="numeral block text-body-lg">{value}</span>
+          {valueSub && <span className="mt-0.5 block text-caption text-muted-foreground">{valueSub}</span>}
+        </span>
       )}
+      {showChevron && <ChevronRight aria-hidden className="size-4 shrink-0 text-muted-foreground" />}
+    </>
+  );
+
+  const body = (
+    <>
+      {identity}
+      {tail}
     </>
   );
 
@@ -406,6 +432,24 @@ export const Row = forwardRef<HTMLElement, RowProps>(function Row(
     "last:after:hidden",
     className,
   );
+
+  // The navigating half, when `trailing` has to sit outside it. `-ml-4 pl-4`
+  // gives the target back the row's left padding; `self-stretch` gives it the
+  // full height, so everything but the trailing control is one tap.
+  const inner = "-ml-4 flex min-w-0 flex-1 items-center gap-3 self-stretch pl-4 text-left outline-none";
+
+  if (interactiveTrailing) {
+    return (
+      <motion.div ref={ref as never} variants={rowIn} className={cls}>
+        {href ? (
+          <a href={href} className={inner} {...pressProps}>{identity}</a>
+        ) : (
+          <button type="button" onClick={onClick} disabled={disabled} className={inner} {...pressProps}>{identity}</button>
+        )}
+        <span className="flex shrink-0 items-center">{tail}</span>
+      </motion.div>
+    );
+  }
 
   if (href) {
     return <motion.a ref={ref as never} variants={rowIn} href={href} className={cls} {...pressProps}>{body}</motion.a>;
