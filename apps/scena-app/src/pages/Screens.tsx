@@ -8,7 +8,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, BellRing, ChevronRight, MonitorSpeaker, RectangleHorizontal, RectangleVertical, Sparkles, Wifi, WifiOff } from "lucide-react";
 import { Card } from "../components/ui/card.js";
-import { Badge } from "../components/ui/badge.js";
 import { PageHeader } from "../components/page-header.js";
 import { DevicePreview } from "../components/device-preview.js";
 import { usePageChrome } from "../components/page-chrome.js";
@@ -17,7 +16,7 @@ import { useCan } from "../permissions.js";
 import { cn } from "@/lib/utils";
 import { listScreens, createDisplay, listAlerts, type Screen } from "../api.js";
 import { GetStarted } from "../components/get-started.js";
-import { Collection, Filters, GlanceStrip, Row, toast, useCollectionView, type FacetSelection } from "@4dl/ui";
+import { Badge, Collection, Filters, GlanceStrip, Row, toast, type FacetSelection, useCollectionView } from "@4dl/ui";
 
 /** Compact "last seen" label for offline devices. */
 function lastSeenLabel(ts?: number | null): string | null {
@@ -232,9 +231,9 @@ function DeviceCard({ screen, onClick }: { screen: Screen; onClick: () => void }
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {channel ? (
-            <Badge variant="secondary" className="font-normal">{channel}</Badge>
+            <Badge className="font-normal">{channel}</Badge>
           ) : (
-            <Badge variant="outline" className="font-normal text-muted-foreground">Unassigned</Badge>
+            <Badge className="font-normal text-muted-foreground">Unassigned</Badge>
           )}
           <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
             {portrait ? <RectangleVertical className="size-3" /> : <RectangleHorizontal className="size-3" />}

@@ -27,11 +27,7 @@ import {
   AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
   AlignHorizontalSpaceAround, AlignVerticalSpaceAround, PanelRightClose, Plus, SlidersHorizontal, Sparkles, Lock,
 } from "lucide-react";
-import { Button } from "../components/ui/button.js";
-import { Badge } from "../components/ui/badge.js";
-import { Separator } from "../components/ui/separator.js";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../components/ui/sheet.js";
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "../components/ui/tooltip.js";
 import { cn } from "@/lib/utils";
 import {
   getWidgetProfile, saveProfileWidgets, listBoards, listFeeds, listWeatherLocations, getBranding,
@@ -48,7 +44,7 @@ import { TransformBox, GroupBox, SELECT, SELECT_WASH, type Phase } from "../buil
 import { AiLayoutDialog } from "../builder/AiLayoutDialog.js";
 import { intersects, alignPatches, distributePatches, clampPos, type AlignKind } from "../builder/geometry.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
-import { LoadError, Skeleton, toast } from "@4dl/ui";
+import { Badge, Button, LoadError, Separator, Skeleton, toast, Tooltip } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 
 /** Accept both the flat WNode shape and the manifest rect-tuple shape. */
@@ -503,7 +499,7 @@ function Builder({ profileId }: { profileId: string }) {
 
   /* ------------------------------ render -------------------------------- */
   return (
-    <TooltipProvider delayDuration={200}>
+    <>
       <div className="relative flex h-[calc(100vh-6.5rem)] min-h-[520px] flex-col overflow-hidden rounded-xl border bg-card">
         {/* Toolbar */}
         <div className="flex items-center gap-1.5 border-b px-2.5 py-2">
@@ -574,16 +570,13 @@ function Builder({ profileId }: { profileId: string }) {
                 {WIDGET_REGISTRY.filter((w) => w.group === group).map((w) => {
                   const usable = canUseWidget(w.type);
                   return (
-                    <Tooltip key={w.type}>
-                      <TooltipTrigger asChild>
-                        <button onClick={() => onPick(w.type)}
-                          className={cn("relative flex size-10 items-center justify-center rounded-lg transition-colors [&_svg]:size-[18px]",
-                            usable ? "text-muted-foreground hover:bg-accent hover:text-foreground" : "text-muted-foreground/40 hover:bg-accent/40")}>
-                          {widgetIcon(w.icon)}
-                          {!usable && <Lock className="absolute bottom-0 right-0 size-3 rounded-full bg-background p-[1.5px] text-muted-foreground" />}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right">{usable ? w.label : `${w.label} — Upgrade`}</TooltipContent>
+                    <Tooltip key={w.type} content={usable ? w.label : `${w.label} — Upgrade`} side="right">
+                      <button onClick={() => onPick(w.type)}
+                        className={cn("relative flex size-10 items-center justify-center rounded-lg transition-colors [&_svg]:size-[18px]",
+                          usable ? "text-muted-foreground hover:bg-accent hover:text-foreground" : "text-muted-foreground/40 hover:bg-accent/40")}>
+                        {widgetIcon(w.icon)}
+                        {!usable && <Lock className="absolute bottom-0 right-0 size-3 rounded-full bg-background p-[1.5px] text-muted-foreground" />}
+                      </button>
                     </Tooltip>
                   );
                 })}
@@ -729,17 +722,14 @@ function Builder({ profileId }: { profileId: string }) {
           onApply={applyAiLayout}
         />
       </div>
-    </TooltipProvider>
+    </>
   );
 }
 
 function TB({ icon, label, active, disabled, onClick, className }: { icon: React.ReactNode; label: string; active?: boolean; disabled?: boolean; onClick: () => void; className?: string }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button variant={active ? "secondary" : "ghost"} size="icon" className={cn("size-8 shrink-0", className)} disabled={disabled} onClick={onClick} aria-label={label}>{icon}</Button>
-      </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
+    <Tooltip content={label}>
+      <Button variant={active ? "secondary" : "ghost"} size="icon" className={cn("size-8 shrink-0", className)} disabled={disabled} onClick={onClick} aria-label={label}>{icon}</Button>
     </Tooltip>
   );
 }

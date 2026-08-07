@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog.js";
-import { Button } from "./ui/button.js";
+import { Button } from "@4dl/ui";
 
 /** A small confirm/cancel dialog for destructive or irreversible actions. */
 export function ConfirmDialog({

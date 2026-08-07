@@ -5,7 +5,7 @@
  * <ConfirmHost/> lives near the app root.
  */
 import { useEffect, useState } from "react";
-import { Button } from "./ui/button.js";
+import { Button } from "@4dl/ui";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog.js";
 
 interface ConfirmOptions {

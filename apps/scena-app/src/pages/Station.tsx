@@ -9,12 +9,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, RotateCcw, Hash, Minus, Plus } from "lucide-react";
-import { Button } from "../components/ui/button.js";
 import { Card, CardContent } from "../components/ui/card.js";
-import { Input } from "../components/ui/input.js";
-import { Badge } from "../components/ui/badge.js";
-import { Separator } from "../components/ui/separator.js";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs.js";
+import { Badge, Button, Input, Separator, Tabs, TabsContent, TabsList, TabsTrigger } from "@4dl/ui";
 import type { QueueState, RoomState } from "@scena/protocol";
 
 type Series = QueueState["series"][number];
@@ -85,7 +81,7 @@ export function QueueControls({
               <span className="flex items-center gap-1.5 text-sm font-semibold">
                 <span className="font-mono">{s.prefix}</span>
                 {s.name ?? "Tickets"}
-                <Badge variant="secondary" className="tabular-nums">{s.waiting}</Badge>
+                <Badge className="tabular-nums">{s.waiting}</Badge>
               </span>
             </TabsTrigger>
           ))}

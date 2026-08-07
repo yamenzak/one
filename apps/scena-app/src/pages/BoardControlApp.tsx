@@ -13,9 +13,8 @@
  */
 import { useEffect, useState } from "react";
 import { Loader2, LogOut, Bell, RotateCcw, Minus, Plus } from "lucide-react";
-import { Button } from "../components/ui/button.js";
 import { Card, CardContent } from "../components/ui/card.js";
-import { Input } from "../components/ui/input.js";
+import { Button, Input } from "@4dl/ui";
 import { confirmDialog } from "../components/confirm.js";
 import {
   getBoard,

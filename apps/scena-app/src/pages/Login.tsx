@@ -18,9 +18,7 @@
  */
 import { useState } from "react";
 import { Loader2, Mail, ArrowLeft, MonitorSmartphone } from "lucide-react";
-import { Button } from "../components/ui/button.js";
-import { Input } from "../components/ui/input.js";
-import { Label } from "../components/ui/label.js";
+import { Button, Input, Label } from "@4dl/ui";
 import { ScenaMascot } from "../brand.js";
 import { authClient, signIn, emailOtp } from "../auth-client.js";
 

@@ -3,10 +3,8 @@ import { Circle, Menu, PanelLeft, MoreVertical } from "lucide-react";
 
 import { ScenaIcon } from "../brand.js";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button, ScrollArea, Tooltip } from "@4dl/ui";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
 import {
   Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
@@ -60,9 +58,8 @@ function NavButton({ item, active, collapsed, onClick }: { item: NavItem; active
   );
   if (!collapsed) return btn;
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>{btn}</TooltipTrigger>
-      <TooltipContent side="right">{item.label}</TooltipContent>
+    <Tooltip content={item.label} side="right">
+      {btn}
     </Tooltip>
   );
 }
@@ -206,7 +203,7 @@ export function AppShell({ navGroups, active, onNavigate, fallbackCrumb, onCrumb
   const crumbs: Crumb[] = chrome.crumbs.length ? chrome.crumbs : fallbackCrumb ? [{ label: fallbackCrumb }] : [];
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <>
       {/* 100dvh (not 100vh) so the frame matches the *visual* viewport on mobile —
           otherwise the browser chrome pushes it taller and the whole shell scrolls;
           only the inset <main> below should scroll. */}
@@ -246,6 +243,6 @@ export function AppShell({ navGroups, active, onNavigate, fallbackCrumb, onCrumb
           </main>
         </div>
       </div>
-    </TooltipProvider>
+    </>
   );
 }

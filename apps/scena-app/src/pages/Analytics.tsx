@@ -8,10 +8,9 @@
 import { useEffect, useState } from "react";
 import { Download, BarChart3 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { PageHeader } from "../components/page-header.js";
 import { StatTile } from "../components/status.js";
-import { LoadError } from "@4dl/ui";
+import { LoadError, Skeleton } from "@4dl/ui";
 import { usePageChrome } from "../components/page-chrome.js";
 import { getAnalytics, analyticsCsvUrl, type AnalyticsSummary } from "../api.js";
 import { EmptyState } from "../components/empty.js";

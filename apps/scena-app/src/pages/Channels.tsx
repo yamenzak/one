@@ -8,12 +8,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, Tv, Layers, Music, LayoutGrid, Megaphone, Rocket, History, Clock, ChevronRight, ArrowLeft, Search, Tag, Pencil, Check, Trash2 } from "lucide-react";
-import { Button } from "../components/ui/button.js";
 import { Card } from "../components/ui/card.js";
-import { Input } from "../components/ui/input.js";
-import { Label } from "../components/ui/label.js";
-import { Badge } from "../components/ui/badge.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { PageHeader } from "../components/page-header.js";
@@ -23,7 +18,7 @@ import { TagEditor } from "../components/tag-editor.js";
 import { ConfirmDialog } from "../components/confirm-dialog.js";
 import { useCan } from "../permissions.js";
 import { cn } from "@/lib/utils";
-import { Collection, Filters, toast, type FacetSelection } from "@4dl/ui";
+import { Badge, Button, Collection, Filters, Input, Label, Skeleton, toast, type FacetSelection } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   listChannels, createChannel, publishChannelNote, setChannelComposition, updateChannel, deleteChannel,
@@ -474,7 +469,7 @@ function VersionRow({
   }
   return (
     <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
-      <Badge variant={live ? "default" : "secondary"} className="tabular-nums">v{v.version}</Badge>
+      <Badge tone={live ? "primary" : "neutral"} className="tabular-nums">v{v.version}</Badge>
       <div className="min-w-0 flex-1">
         {editing ? (
           <Input

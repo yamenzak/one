@@ -10,12 +10,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   Radio, VolumeX, Volume2, RefreshCw, Moon, Sun, MonitorPlay, Bug, ScanLine, Unplug, Trash2, Pencil, Tag, Tv, Layers, Clock, X, Plus, CalendarClock, Sparkles,
 } from "lucide-react";
-import { Button } from "../components/ui/button.js";
-import { Input } from "../components/ui/input.js";
-import { Label } from "../components/ui/label.js";
-import { Badge } from "../components/ui/badge.js";
-import { Switch } from "../components/ui/switch.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { useFeature } from "../entitlements.js";
 import { LockedFeatureCard } from "../components/feature-gate.js";
 import { PageHeader } from "../components/page-header.js";
@@ -23,7 +17,6 @@ import { DevicePreview } from "../components/device-preview.js";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../components/ui/select.js";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs.js";
 import { cn } from "@/lib/utils";
 import {
   getScreen, sendCommand, listChannels, setDeviceDimensions, setDeviceActiveChannel,
@@ -37,7 +30,7 @@ import { TagEditor } from "../components/tag-editor.js";
 import { useCan } from "../permissions.js";
 import { StatusDot, dimsOf } from "./Screens.js";
 import { Pill } from "../components/status.js";
-import { Group, LoadError, Row, toast } from "@4dl/ui";
+import { Badge, Button, Group, Input, Label, LoadError, Row, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 
 const NONE = "__none__";
@@ -532,7 +525,7 @@ function ChannelSection({ screen, channels, writable }: { screen: Screen; channe
                   <div className="flex min-w-0 items-center gap-2">
                     <MonitorPlay className={cn("size-4 shrink-0", on ? "text-primary" : "text-muted-foreground")} />
                     <span className="truncate text-sm font-medium">{c.name}</span>
-                    {active === c.id && <Badge variant="secondary" className="font-normal">Active</Badge>}
+                    {active === c.id && <Badge className="font-normal">Active</Badge>}
                   </div>
                   <Switch checked={on} disabled={busy || !writable} onCheckedChange={(v) => toggleCarried(c.id, v)} />
                 </div>

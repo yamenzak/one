@@ -9,7 +9,7 @@
  */
 import { MonitorPlay, Sparkles, LayoutGrid, Rocket, ArrowRight } from "lucide-react";
 import { ScenaMascot } from "../brand.js";
-import { Button } from "./ui/button.js";
+import { Button } from "@4dl/ui";
 import { cn } from "@/lib/utils";
 
 const STEPS = [

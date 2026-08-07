@@ -2,9 +2,7 @@ import { useRef, useState } from "react";
 import { MonitorSmartphone, Sparkles } from "lucide-react";
 import { ScenaMascot } from "../brand.js";
 import { Dialog, DialogContent } from "./ui/dialog.js";
-import { Button } from "./ui/button.js";
-import { Input } from "./ui/input.js";
-import { Switch } from "./ui/switch.js";
+import { Button, Input, Switch } from "@4dl/ui";
 import { cn } from "@/lib/utils";
 import { claimScreen, type ClaimResult } from "../api.js";
 

@@ -11,10 +11,7 @@
 import { useState } from "react";
 import { Info } from "lucide-react";
 import { Dialog, DialogContent } from "./ui/dialog.js";
-import { Button } from "./ui/button.js";
-import { Input } from "./ui/input.js";
-import { Textarea } from "./ui/textarea.js";
-import { Label } from "./ui/label.js";
+import { Button, Input, Label, Textarea } from "@4dl/ui";
 import { cn } from "@/lib/utils";
 import { broadcastEmergency, type ActiveEmergency, type OverrideTone } from "../api.js";
 import { TONE_UI, TONE_ORDER, OVERRIDE_PRESETS, type OverridePreset } from "../overrides.js";

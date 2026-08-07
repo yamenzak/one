@@ -7,7 +7,7 @@
 import * as React from "react";
 import { RotateCcw } from "lucide-react";
 import { ScenaMascot } from "../brand.js";
-import { Button } from "./ui/button.js";
+import { Button } from "@4dl/ui";
 
 interface Props {
   resetKey: string;

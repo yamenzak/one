@@ -20,14 +20,7 @@
  * control, not a lost one.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "../components/ui/button.js";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Input } from "../components/ui/input.js";
-import { Label } from "../components/ui/label.js";
-import { Badge } from "../components/ui/badge.js";
-import { Switch } from "../components/ui/switch.js";
-import { Separator } from "../components/ui/separator.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table.js";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -40,7 +33,7 @@ import { confirmDialog } from "../components/confirm.js";
 import { Loader2, Music, Ticket, Users, RefreshCw, AlertTriangle, CreditCard, Package, Sparkles, Tag, Search, Upload, Trash2, ImagePlus, Plus, Pencil } from "lucide-react";
 import { cn } from "../lib/utils.js";
 import { FEATURE_CATALOG, QUOTA_CATALOG, FEATURE_CATEGORIES } from "@scena/manifest";
-import { toast } from "@4dl/ui";
+import { Badge, Button, Input, Label, Separator, Skeleton, Switch, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   getAdminConfig,
@@ -682,7 +675,7 @@ function ModelRow({ model, onSave }: { model: AdminModel; onSave: (m: AdminModel
         <div className="font-mono text-xs text-muted-foreground">{model.cf_model}</div>
       </TableCell>
       <TableCell><Pill tone={prov.tone}>{prov.label}</Pill></TableCell>
-      <TableCell><Badge variant="secondary" className="capitalize">{model.task}</Badge></TableCell>
+      <TableCell><Badge className="capitalize">{model.task}</Badge></TableCell>
       <TableCell className="text-right">{costBasis(model)}</TableCell>
       <TableCell>
         <Input value={markup} onChange={(e) => setMarkup(e.target.value)} onBlur={() => onSave(model, { markup: Number(markup) || model.markup })} className="h-9 w-20 font-mono tabular-nums" />

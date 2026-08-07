@@ -355,8 +355,22 @@ export function Skeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>
   return <div className={cn("skeleton rounded-xl", className)} {...props} />;
 }
 
-export function Separator({ className }: { className?: string }) {
-  return <div className={cn("h-px w-full bg-border", className)} />;
+/**
+ * A hairline.
+ *
+ * `orientation` is not a Scena quirk that leaked upward — a vertical rule
+ * between groups of controls in one toolbar is the same separator turned
+ * ninety degrees, and any app with a toolbar wants it. The default stays
+ * horizontal, so every existing call is unchanged.
+ */
+export function Separator({ className, orientation = "horizontal" }: { className?: string; orientation?: "horizontal" | "vertical" }) {
+  return (
+    <div
+      role="separator"
+      aria-orientation={orientation}
+      className={cn(orientation === "vertical" ? "h-full w-px self-stretch" : "h-px w-full", "shrink-0 bg-border", className)}
+    />
+  );
 }
 
 export function Spinner({ className }: { className?: string }) {

@@ -7,16 +7,8 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, ImageIcon, Video, Code2, Trash2, Clock, Layers, Tag as TagIcon, Pencil, GripVertical, Settings2, Images, FileImage, Sparkles } from "lucide-react";
-import { Button } from "../components/ui/button.js";
 import { Card, CardContent } from "../components/ui/card.js";
-import { Input } from "../components/ui/input.js";
-import { Textarea } from "../components/ui/textarea.js";
-import { Badge } from "../components/ui/badge.js";
-import { Label } from "../components/ui/label.js";
-import { Separator } from "../components/ui/separator.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
-import { Switch } from "../components/ui/switch.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu.js";
 import { PageHeader } from "../components/page-header.js";
@@ -34,7 +26,7 @@ import {
 import { MediaPicker } from "./MediaLibrary.js";
 import { HtmlEditorDialog, HtmlThumb } from "../components/html-editor.js";
 import { LicenseNote } from "../components/licensing.js";
-import { LoadError, Row, toast } from "@4dl/ui";
+import { Badge, Button, Input, Label, LoadError, Row, Separator, Skeleton, Switch, Textarea, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import { PlaylistLibrary } from "../components/playlist-library.js";
 
@@ -533,7 +525,7 @@ function SlideCard({ slide, index, canWrite, dragging, over, onDragStart, onDrag
         )}
       </div>
       <CardContent className="flex items-center justify-between gap-2 p-2.5">
-        <Badge variant="secondary" className="capitalize">{slide.type}</Badge>
+        <Badge className="capitalize">{slide.type}</Badge>
         <span className="flex items-center gap-2 text-xs text-muted-foreground">
           <span title="Media fit">{FIT_LABELS[fit]}</span>
           <span className="flex items-center gap-1"><Clock className="size-3" /> {slide.duration_ms ? fmtDur(slide.duration_ms) : "default"}</span>

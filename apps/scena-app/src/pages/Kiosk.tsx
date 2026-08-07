@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Printer, Ticket, ArrowRight, Users } from "lucide-react";
-import { Button } from "../components/ui/button.js";
+import { Button } from "@4dl/ui";
 import { getBoardLive, issueTicket, type Board } from "../api.js";
 import { applyBrandTheme } from "../brand-theme.js";
 import { useForcedDark } from "../theme.js";

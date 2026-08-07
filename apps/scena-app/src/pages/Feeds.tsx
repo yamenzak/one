@@ -10,12 +10,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, RefreshCw, X, ExternalLink, Rss, Trash2, Inbox, Globe, Sheet, Table2, MoreVertical, CloudSun } from "lucide-react";
-import { Button } from "../components/ui/button.js";
 import { Card, CardContent } from "../components/ui/card.js";
-import { Input } from "../components/ui/input.js";
-import { Label } from "../components/ui/label.js";
-import { Badge } from "../components/ui/badge.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../components/ui/dialog.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
@@ -25,7 +20,7 @@ import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { cn } from "@/lib/utils";
-import { LoadError, toast } from "@4dl/ui";
+import { Badge, Button, Input, Label, LoadError, Skeleton, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   listFeeds, getFeed, createSource, updateSource, previewSource, addFeedItem, deleteFeedItem, refreshFeed, deleteFeed,
@@ -197,7 +192,7 @@ export function FeedsPage() {
                         <span className="truncate font-medium">{f.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell><Badge variant="secondary" className="font-normal">{PROVIDERS[f.provider]?.label ?? f.provider}</Badge></TableCell>
+                    <TableCell><Badge className="font-normal">{PROVIDERS[f.provider]?.label ?? f.provider}</Badge></TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">{f.itemCount ?? 0} <span className="text-xs">{isTabular(f.provider) ? "row" : "item"}{(f.itemCount ?? 0) === 1 ? "" : "s"}</span></TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
@@ -223,7 +218,7 @@ export function FeedsPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell><Badge variant="secondary" className="font-normal">Weather</Badge></TableCell>
+                  <TableCell><Badge className="font-normal">Weather</Badge></TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">~{l.dailyCredits} <span className="text-xs">cr/day</span></TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>

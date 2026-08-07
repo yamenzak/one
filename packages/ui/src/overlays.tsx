@@ -323,11 +323,23 @@ export const Tabs = TabsPrimitive.Root;
 export function TabsList({ children, className }: { children: ReactNode; className?: string }) {
   return <TabsPrimitive.List className={cn("inline-flex items-center gap-1 rounded-full bg-secondary p-1", className)}>{children}</TabsPrimitive.List>;
 }
-export function TabsTrigger({ value, children }: { value: string; children: ReactNode }) {
+/**
+ * `disabled` is not decoration: a tab whose content does not exist yet has to
+ * be reachable-but-refused rather than absent, or the row of tabs changes width
+ * as data loads. `className` is the same escape hatch `TabsList` already takes —
+ * without it a caller cannot make tabs share the width evenly, which is the one
+ * layout decision only the caller knows.
+ */
+export function TabsTrigger({ value, children, className, disabled }: { value: string; children: ReactNode; className?: string; disabled?: boolean }) {
   return (
     <TabsPrimitive.Trigger
       value={value}
-      className={cn("rounded-full px-4 py-1.5 text-sm font-medium text-muted-foreground outline-none transition-colors data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm", FOCUS)}
+      disabled={disabled}
+      className={cn(
+        "rounded-full px-4 py-1.5 text-sm font-medium text-muted-foreground outline-none transition-colors data-[state=active]:bg-card data-[state=active]:text-foreground data-[state=active]:shadow-sm disabled:pointer-events-none disabled:opacity-45",
+        FOCUS,
+        className,
+      )}
     >
       {children}
     </TabsPrimitive.Trigger>
@@ -548,13 +560,26 @@ export function Select<T extends string>({ value, onChange, options, placeholder
 }
 
 // ── Tooltip ──────────────────────────────────────────────────────────────────
-export function Tooltip({ content, children }: { content: ReactNode; children: ReactNode }) {
+/**
+ * `side` matters on a rail. The default is `top`, which is right for a button
+ * in a row and wrong for an icon in a left-hand navigation rail — the label
+ * opens over the rail itself and covers the item above the one being pointed
+ * at. `delay` is here for the same reason: a rail whose every icon needs its
+ * label wants them instantly, while a tooltip that merely elaborates should
+ * wait so it does not flicker past on the way to something else.
+ */
+export function Tooltip({ content, children, side = "top", delay = 200 }: {
+  content: ReactNode;
+  children: ReactNode;
+  side?: "top" | "right" | "bottom" | "left";
+  delay?: number;
+}) {
   return (
-    <TooltipPrimitive.Provider delayDuration={200}>
+    <TooltipPrimitive.Provider delayDuration={delay}>
       <TooltipPrimitive.Root>
         <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
         <TooltipPrimitive.Portal>
-          <TooltipPrimitive.Content sideOffset={6} className="z-50 rounded-lg bg-foreground px-2.5 py-1.5 text-caption font-medium text-background shadow-md data-[state=delayed-open]:animate-[menu-in_var(--dur-fast)_var(--ease-out)]">
+          <TooltipPrimitive.Content side={side} sideOffset={6} className="z-50 rounded-lg bg-foreground px-2.5 py-1.5 text-caption font-medium text-background shadow-md data-[state=delayed-open]:animate-[menu-in_var(--dur-fast)_var(--ease-out)]">
             {content}
           </TooltipPrimitive.Content>
         </TooltipPrimitive.Portal>

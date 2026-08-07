@@ -1,6 +1,6 @@
 import * as React from "react";
 import { X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@4dl/ui";
 import { cn } from "@/lib/utils";
 
 /** Freeform tag input: removable chips + type-to-add (Enter or comma). */
@@ -33,7 +33,7 @@ export function TagEditor({
       )}
     >
       {safe.map((t) => (
-        <Badge key={t} variant="secondary" className="gap-1 pl-2 pr-1 font-normal">
+        <Badge key={t}  className="gap-1 pl-2 pr-1 font-normal">
           {t}
           <button
             type="button"

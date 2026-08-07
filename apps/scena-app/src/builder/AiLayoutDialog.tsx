@@ -10,8 +10,7 @@
  */
 import { useEffect, useState } from "react";
 import { Sparkles, Send, Loader2, Wand2, PencilRuler } from "lucide-react";
-import { Button } from "../components/ui/button.js";
-import { Textarea } from "../components/ui/textarea.js";
+import { Button, Textarea } from "@4dl/ui";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { cn } from "@/lib/utils";

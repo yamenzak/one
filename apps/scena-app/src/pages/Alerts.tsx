@@ -21,11 +21,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Plus, X, Webhook, Mail, Monitor, Wifi, WifiOff, BellRing } from "lucide-react";
-import { GlanceStrip, Group, LoadError, Row, Section, SkeletonList, toast, useAction } from "@4dl/ui";
-import { Button } from "../components/ui/button.js";
+import { Badge, Button, GlanceStrip, Group, Input, LoadError, Row, Section, SkeletonList, toast, useAction } from "@4dl/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Input } from "../components/ui/input.js";
-import { Badge } from "../components/ui/badge.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
@@ -107,7 +104,7 @@ export function AlertsPage() {
                     iconTone={recovery ? "success" : open ? "danger" : "neutral"}
                     sub={a.message}
                     value={new Date(a.at).toLocaleTimeString()}
-                    valueSub={open ? <Badge variant="destructive" className="text-[10px]">OPEN</Badge> : recovery ? "Recovered" : "Resolved"}
+                    valueSub={open ? <Badge tone="danger" className="text-[10px]">OPEN</Badge> : recovery ? "Recovered" : "Resolved"}
                   >
                     {a.screen_name ?? "Screen"}
                   </Row>

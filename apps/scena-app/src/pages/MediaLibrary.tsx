@@ -6,10 +6,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Upload, Code2, Trash2, MoreVertical, Search, Pencil, Tag as TagIcon, ImageIcon, Check, Music, SlidersHorizontal } from "lucide-react";
-import { Button } from "../components/ui/button.js";
 import { Card } from "../components/ui/card.js";
-import { Input } from "../components/ui/input.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu.js";
 import { TagEditor } from "../components/tag-editor.js";
@@ -19,7 +16,7 @@ import { HtmlEditorDialog, HtmlThumb } from "../components/html-editor.js";
 import { LicenseBadge, LicenseNote } from "../components/licensing.js";
 import { TrackMetaDialog, mmss } from "../components/track-meta-dialog.js";
 import { listMedia, uploadToLibrary, updateMedia, deleteMedia, assetUrl, type Media, type MediaKind } from "../api.js";
-import { Badge, Collection, Filters, Row, toast, useCollectionView, type FacetSelection } from "@4dl/ui";
+import { Badge, Button, Collection, Filters, Input, Row, Skeleton, toast, type FacetSelection, useCollectionView } from "@4dl/ui";
 
 const KINDS = [
   { key: "", label: "All" },

@@ -9,14 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Play, Pause, Trash2, Megaphone, Clock, Sparkles, Bot, Upload, FolderOpen, Plus, MoreVertical, Pencil, Radio, Link2 } from "lucide-react";
-import { Button } from "../components/ui/button.js";
 import { Card, CardContent } from "../components/ui/card.js";
-import { Input } from "../components/ui/input.js";
-import { Textarea } from "../components/ui/textarea.js";
-import { Label } from "../components/ui/label.js";
-import { Badge } from "../components/ui/badge.js";
-import { Switch } from "../components/ui/switch.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
@@ -48,7 +41,7 @@ import {
 } from "../api.js";
 import { MediaPicker } from "./MediaLibrary.js";
 import { GEMINI_VOICES, AD_STYLE_PRESETS, DEFAULT_GEMINI_VOICE, DEFAULT_AD_STYLE, composeAdSpeech } from "../voices.js";
-import { LoadError, toast } from "@4dl/ui";
+import { Badge, Button, Input, Label, LoadError, Skeleton, Switch, Textarea, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 
 type Kind = "audio" | "video" | "command";
@@ -316,7 +309,7 @@ export function AdProfileDetailPage() {
                         <div className="flex items-center gap-2 text-sm font-semibold">
                           <StatusDot active={!!a.enabled} />
                           <span className="truncate">{a.name}</span>
-                          <Badge variant="secondary">{a.kind}</Badge>
+                          <Badge>{a.kind}</Badge>
                         </div>
                         <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Clock className="size-3" />

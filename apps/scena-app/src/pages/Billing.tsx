@@ -16,11 +16,8 @@
  */
 import { useEffect, useState } from "react";
 import { Receipt, Check, Sparkles, ArrowRight, Lock, Loader2 } from "lucide-react";
-import { Group, LoadError, Meter, Row, toast } from "@4dl/ui";
-import { Button } from "../components/ui/button.js";
+import { Button, Group, Input, LoadError, Meter, Row, Skeleton, toast } from "@4dl/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Input } from "../components/ui/input.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { PageHeader } from "../components/page-header.js";
 import { LegalDialog, LegalLinks, type LegalDoc } from "../legal/content.js";

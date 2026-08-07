@@ -8,12 +8,9 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { ImageIcon, Music, Trash2, Loader2 } from "lucide-react";
-import { Button } from "./ui/button.js";
-import { Input } from "./ui/input.js";
-import { Label } from "./ui/label.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog.js";
 import { TagEditor } from "./tag-editor.js";
-import { toast } from "@4dl/ui";
+import { Button, Input, Label, toast } from "@4dl/ui";
 import { uploadAsset, assetUrl } from "../api.js";
 
 export interface TrackMeta {

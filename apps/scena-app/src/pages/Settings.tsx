@@ -35,15 +35,8 @@ import {
   toast,
   type SettingsEntry,
 } from "@4dl/ui";
-import { Button } from "../components/ui/button.js";
-import { Switch } from "../components/ui/switch.js";
+import { Badge, Button, Input, Label, Separator, Skeleton, Switch, Textarea } from "@4dl/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card.js";
-import { Input } from "../components/ui/input.js";
-import { Textarea } from "../components/ui/textarea.js";
-import { Label } from "../components/ui/label.js";
-import { Separator } from "../components/ui/separator.js";
-import { Skeleton } from "../components/ui/skeleton.js";
-import { Badge } from "../components/ui/badge.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
@@ -723,13 +716,18 @@ function UiSampler({ brandName }: { brandName: string }) {
         <Button size="sm" variant="secondary">Secondary</Button>
         <Button size="sm" variant="outline">Outline</Button>
         <Badge>Default</Badge>
-        <Badge variant="success">Success</Badge>
-        <Badge variant="warning">Warning</Badge>
-        <Badge variant="info">Info</Badge>
-        <Badge variant="destructive">Error</Badge>
+        <Badge tone="success">Success</Badge>
+        <Badge tone="warning">Warning</Badge>
+        <Badge tone="primary">Info</Badge>
+        <Badge tone="danger">Error</Badge>
       </div>
       <div className="mt-3 grid grid-cols-4 gap-2 sm:grid-cols-8">
-        {(["primary", "accent", "secondary", "muted", "success", "warning", "info", "destructive"] as const).map((t) => (
+        {/* The tokens that EXIST. `info` was in this list and is defined
+            nowhere, so the swatch rendered a transparent box captioned with a
+            colour name — a colour chart lying about the palette. The platform's
+            status tones are success / warning / danger, and informational
+            reads as the brand accent. */}
+        {(["primary", "accent", "secondary", "muted", "success", "warning", "destructive"] as const).map((t) => (
           <div key={t} className="flex flex-col items-center gap-1">
             <div className="h-8 w-full rounded-md border" style={{ background: `var(--${t})` }} />
             <span className="text-[9px] text-muted-foreground">{t}</span>

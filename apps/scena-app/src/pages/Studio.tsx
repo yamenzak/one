@@ -12,16 +12,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Sparkles, Music, LayoutGrid, ImagePlus, Trash2, Rocket, GripVertical, ExternalLink, Plus } from "lucide-react";
-import { Button } from "../components/ui/button.js";
-import { Badge } from "../components/ui/badge.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { DevicePreview } from "../components/device-preview.js";
 import { assetSrc } from "../components/media-picker.js";
 import { cn } from "@/lib/utils";
 import { useCan } from "../permissions.js";
-import { LoadError, toast } from "@4dl/ui";
+import { Badge, Button, LoadError, Skeleton, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   getScreen, getChannel, getSlidePlaylist, getMusicPlaylist,
@@ -262,7 +259,7 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
         description={mode === "display" ? "Prep this display's content, then bind it to a screen when you pair one." : "Everything this screen shows, in one place. Add content, then publish."}
       >
         <div className="mt-3 flex items-center gap-2">
-          {dirty && <Badge variant="secondary" className="gap-1 text-[11px]">Unpublished changes</Badge>}
+          {dirty && <Badge className="gap-1 text-[11px]">Unpublished changes</Badge>}
           {writable && (
             <Button size="sm" onClick={publish} disabled={publishing || !dirty} className="gap-1.5">
               <Rocket className="size-4" /> {publishing ? "Publishing…" : "Publish"}

@@ -28,8 +28,7 @@ import {
 } from "@scena/widgets";
 import type { RoomState } from "@scena/protocol";
 import { FONT_FAMILIES } from "@scena/manifest";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../components/ui/tabs.js";
-import { Button } from "../../components/ui/button.js";
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@4dl/ui";
 import { getSourceData, type Board, type Feed, type WeatherLocation, type BrandLogo } from "../../api.js";
 import type { WNode } from "../types.js";
 import { Field, Group, TextField, AreaField, NumberField, SliderField, SelectField, SegField, SwitchField, ColorField, QuadField } from "./fields.js";

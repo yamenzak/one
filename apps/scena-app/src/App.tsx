@@ -11,7 +11,6 @@ import { RoleProvider } from "./permissions.js";
 import { EntitlementsProvider } from "./entitlements.js";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "./components/ui/dropdown-menu.js";
 import { cn } from "@/lib/utils";
-import { Button } from "./components/ui/button.js";
 import { clearEmergency, getActiveEmergency, getMe, getBilling, getBranding, type ActiveEmergency, type Me, type BillingState } from "./api.js";
 import { applyBrandTheme, clearBrandTheme } from "./brand-theme.js";
 import { EmergencyModal } from "./components/EmergencyModal.js";
@@ -41,7 +40,7 @@ import { MusicPlaylistsPage, MusicPlaylistDetailPage } from "./pages/MusicPlayli
 import { WidgetProfilesPage } from "./pages/WidgetProfiles.js";
 import { SettingsPage } from "./pages/Settings.js";
 import { PairModal } from "./components/PairModal.js";
-import { toast } from "@4dl/ui";
+import { Button, toast } from "@4dl/ui";
 
 /**
  * Poll `fn` every `ms`, but skip while the tab is hidden and refetch the moment

@@ -14,14 +14,7 @@ import {
   Plus, Music, Music2, Upload, Trash2, Shuffle, Search, Tag as TagIcon,
   Pencil, GripVertical, SlidersHorizontal, Sparkles, Library, Images, ShieldCheck, Mic, Disc3,
 } from "lucide-react";
-import { Button } from "../components/ui/button.js";
 import { cn } from "@/lib/utils";
-import { Input } from "../components/ui/input.js";
-import { Label } from "../components/ui/label.js";
-import { Textarea } from "../components/ui/textarea.js";
-import { Badge } from "../components/ui/badge.js";
-import { Switch } from "../components/ui/switch.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../components/ui/dropdown-menu.js";
@@ -35,7 +28,7 @@ import { offerPublishAffected } from "../components/publish-affected.js";
 import { TrackMetaDialog, mmss } from "../components/track-meta-dialog.js";
 import { LicenseBadge, LicenseNote } from "../components/licensing.js";
 import { MediaPicker } from "./MediaLibrary.js";
-import { LoadError, Row, toast } from "@4dl/ui";
+import { Badge, Button, Input, Label, LoadError, Row, Skeleton, Switch, Textarea, toast } from "@4dl/ui";
 import { PlaylistLibrary } from "../components/playlist-library.js";
 import { EmptyState } from "../components/empty.js";
 import {
@@ -354,7 +347,7 @@ export function MusicPlaylistDetailPage() {
             {genres.length > 0 && (
               <div className="mt-3">
                 <div className="mb-1.5 text-xs text-muted-foreground">Genres</div>
-                <div className="flex flex-wrap gap-1">{genres.map((g) => <Badge key={g} variant="secondary" className="font-normal">{g}</Badge>)}</div>
+                <div className="flex flex-wrap gap-1">{genres.map((g) => <Badge key={g}  className="font-normal">{g}</Badge>)}</div>
               </div>
             )}
           </div>
@@ -480,7 +473,7 @@ function TrackRow({ track, index, canWrite, dragging, over, onDragStart, onDragE
       </TableCell>
       <TableCell className="hidden lg:table-cell">
         <div className="flex flex-wrap gap-1">
-          {(track.genres ?? []).slice(0, 3).map((g) => <Badge key={g} variant="secondary" className="font-normal">{g}</Badge>)}
+          {(track.genres ?? []).slice(0, 3).map((g) => <Badge key={g}  className="font-normal">{g}</Badge>)}
         </div>
       </TableCell>
       <TableCell className="text-right tabular-nums text-muted-foreground">{mmss(track.duration_ms)}</TableCell>

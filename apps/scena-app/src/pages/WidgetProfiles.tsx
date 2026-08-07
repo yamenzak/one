@@ -7,18 +7,14 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, LayoutGrid, Pencil, Trash2, ChevronRight } from "lucide-react";
-import { Button } from "../components/ui/button.js";
 import { Card, CardContent } from "../components/ui/card.js";
-import { Input } from "../components/ui/input.js";
-import { Badge } from "../components/ui/badge.js";
-import { Skeleton } from "../components/ui/skeleton.js";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog.js";
 import { PageHeader } from "../components/page-header.js";
 import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { ProfileStartDialog } from "../builder/ProfileStartDialog.js";
-import { toast } from "@4dl/ui";
+import { Badge, Button, Input, Skeleton, toast } from "@4dl/ui";
 import { EmptyState } from "../components/empty.js";
 import {
   listWidgetProfiles, updateWidgetProfile, deleteWidgetProfile,
@@ -125,7 +121,7 @@ export function WidgetProfilesPage() {
                     <ChevronRight className="ml-auto size-4 shrink-0 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <Badge variant="secondary" className="tabular-nums">{p.design_w ?? DEFAULT_W}×{p.design_h ?? DEFAULT_H}</Badge>
+                    <Badge className="tabular-nums">{p.design_w ?? DEFAULT_W}×{p.design_h ?? DEFAULT_H}</Badge>
                     <span className="text-xs text-muted-foreground">Reusable · shared across channels</span>
                   </div>
                 </div>

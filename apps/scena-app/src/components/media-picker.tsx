@@ -7,9 +7,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ImagePlus, Loader2, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog.js";
-import { Button } from "./ui/button.js";
 import { listMedia, uploadToLibrary, API_BASE, type Media } from "../api.js";
-import { LoadError } from "@4dl/ui";
+import { Button, LoadError } from "@4dl/ui";
 
 /** Absolute URL for an asset path (library rows store "/api/assets/<hash>"). */
 export function assetSrc(url: string | null | undefined): string {

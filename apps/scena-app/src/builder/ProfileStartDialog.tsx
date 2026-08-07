@@ -12,12 +12,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LayoutTemplate, SquareDashed, CopyPlus, Loader2, Sparkles, Wand2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.js";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs.js";
-import { Button } from "../components/ui/button.js";
-import { Input } from "../components/ui/input.js";
-import { Textarea } from "../components/ui/textarea.js";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select.js";
-import { ScrollArea } from "../components/ui/scroll-area.js";
 import { cn } from "@/lib/utils";
 import { useFeature } from "../entitlements.js";
 import {
@@ -26,7 +21,7 @@ import {
 import { WidgetContent } from "./WidgetView.js";
 import { DESIGN_W, DESIGN_H, type WNode } from "./types.js";
 import { templatesByCategory, type Template } from "./templates.js";
-import { toast } from "@4dl/ui";
+import { Button, Input, ScrollArea, Tabs, TabsContent, TabsList, TabsTrigger, Textarea, toast } from "@4dl/ui";
 
 const DEFAULT_W = 1920, DEFAULT_H = 1080;
 

@@ -7,9 +7,8 @@
 import * as React from "react";
 import { ChevronDown, Link2, Unlink2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Input } from "../../components/ui/input.js";
+import { Input, Switch } from "@4dl/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select.js";
-import { Switch } from "../../components/ui/switch.js";
 
 /** A labelled row: caption on the left, control on the right. */
 export function Field({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {

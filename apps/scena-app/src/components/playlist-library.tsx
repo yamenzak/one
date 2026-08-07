@@ -23,9 +23,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { MoreVertical, Pencil, Plus, Tag as TagIcon, Trash2, type LucideIcon } from "lucide-react";
-import { Collection, Filters, toast, type FacetSelection } from "@4dl/ui";
-import { Button } from "./ui/button.js";
-import { Input } from "./ui/input.js";
+import { Button, Collection, Filters, Input, toast, type FacetSelection } from "@4dl/ui";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "./ui/dialog.js";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "./ui/dropdown-menu.js";
 import { ConfirmDialog } from "./confirm-dialog.js";

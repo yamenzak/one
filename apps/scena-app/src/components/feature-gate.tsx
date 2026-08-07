@@ -14,8 +14,7 @@ import { Link } from "react-router-dom";
 import { Lock } from "lucide-react";
 import { featureMeta, type FeatureDef } from "@scena/manifest";
 import { useFeature } from "../entitlements.js";
-import { Badge } from "./ui/badge.js";
-import { Button } from "./ui/button.js";
+import { Badge, Button } from "@4dl/ui";
 import { cn } from "../lib/utils.js";
 
 /** Whether the tenant has `feature`, plus its catalog metadata (humanized
@@ -28,9 +27,14 @@ export function useFeatureGate(feature: string): { allowed: boolean; meta: Featu
 /** A small "🔒 Upgrade" pill that links to Billing. */
 export function UpgradeBadge({ className }: { className?: string }) {
   return (
-    <Badge asChild variant="secondary" className={cn("gap-1 font-normal", className)}>
-      <Link to="/billing"><Lock className="size-3" /> Upgrade</Link>
-    </Badge>
+    // The link WRAPS the badge rather than the badge becoming the link. The
+    // shared Badge is a span with no `asChild`, and giving it one would let any
+    // caller swap the element under a component whose whole job is a fixed
+    // shape. An anchor containing a span is the same pixel and the same
+    // semantics.
+    <Link to="/billing" className={cn("inline-flex rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/70", className)}>
+      <Badge tone="primary" className="gap-1 font-normal"><Lock className="size-3" /> Upgrade</Badge>
+    </Link>
   );
 }
 
