@@ -160,15 +160,42 @@ jobs:
           # resource as missing. Six tries over ~30s — long enough to settle,
           # short enough that a real failure still fails this run.
           d1_id_for()    { pnpm exec wrangler d1 list --json 2>/dev/null | json_only | jq -r --arg n "$1" '.[]? | select(.name == $n) | (.uuid // .id)' | head -1; }
-          kv_id_exact()  { pnpm exec wrangler kv namespace list 2>/dev/null | json_only | jq -r --arg t "$1" '.[]? | select(.title == $t) | .id' | head -1; }
           kv_id_suffix() { pnpm exec wrangler kv namespace list 2>/dev/null | json_only | jq -r --arg t "$1" '.[]? | select(.title | endswith($t)) | .id' | head -1; }
           settle() {
+            fn="$1"; shift
             for _ in 1 2 3 4 5 6; do
-              v=$("$1" "$2")
+              v=$("$fn" "$@")
               if [ -n "$v" ] && [ "$v" != "null" ]; then printf '%s' "$v"; return 0; fi
               sleep 5
             done
             return 1
+          }
+
+          # ── ⚠️ WRANGLER STOPPED PREFIXING THE WORKER NAME ─────────────────
+          #
+          # This looked for the exact title `<worker>-<binding>`, because that
+          # is what `wrangler kv namespace create CACHE` used to produce from
+          # inside apps/api: `kova-CACHE`. Wrangler 4 creates the title EXACTLY
+          # as given. So provisioning Scena created `PAIRING`, looked for
+          # `scena-PAIRING`, found nothing, and reported as missing a namespace
+          # it had just made — and the next run failed with the truth:
+          # "a KV namespace with the title PAIRING already exists".
+          #
+          # Both forms are accepted now, and both are matched EXACTLY. Never by
+          # suffix: `endswith("CACHE")` is what once made provisioning Kova
+          # adopt TESSA's cache namespace and commit its id. If BOTH forms
+          # exist this refuses rather than picking — the two belong to
+          # different eras of the same app, and binding the wrong one is
+          # silent.
+          kv_lookup() {   # kv_lookup <worker> <binding> → id, or empty
+            list=$(pnpm exec wrangler kv namespace list 2>/dev/null | json_only) || return 1
+            pre=$(printf '%s' "$list" | jq -r --arg t "$1-$2" '.[]? | select(.title == $t) | .id' | head -1)
+            bare=$(printf '%s' "$list" | jq -r --arg t "$2" '.[]? | select(.title == $t) | .id' | head -1)
+            if [ -n "$pre" ] && [ -n "$bare" ]; then
+              echo "::error::KV namespaces '$1-$2' AND '$2' both exist. Delete whichever this app does not bind — binding the wrong one fails silently." >&2
+              return 1
+            fi
+            printf '%s' "${pre:-$bare}"
           }
 
           bound=$(node ../../scripts/apps.mjs bound "$APP")
@@ -228,22 +255,21 @@ jobs:
           # the worker name and compared exactly; a namespace that does not
           # exist under that exact name is created, which produces that exact
           # name.
-          WANT_KV="${WORKER_NAME}-${KV_TITLE}"
-          echo "Looking for the KV namespace titled exactly: $WANT_KV"
+          echo "Looking for the KV namespace titled '${WORKER_NAME}-${KV_TITLE}' or '${KV_TITLE}'."
 
-          # Guarded on a non-empty title: `endswith("")` matches EVERY namespace,
-          # so an app that declares no KV would otherwise adopt a stranger's.
+          # Guarded on a non-empty title: an app that declares no KV must not
+          # go looking for one and adopt a stranger's.
           KV_ID=""
           if [ -z "$KV_TITLE" ]; then
             echo "No KV declared for $APP — skipping."
-          elif kv=$(require_list "KV namespaces" pnpm exec wrangler kv namespace list); then
-            KV_ID=$(printf '%s' "$kv" | jq -r --arg t "$WANT_KV" '.[]? | select(.title == $t) | .id' | head -1)
+          elif require_list "KV namespaces" pnpm exec wrangler kv namespace list >/dev/null; then
+            if KV_ID=$(kv_lookup "$WORKER_NAME" "$KV_TITLE"); then :; else fail=1; KV_ID=""; fi
             if [ -n "$KV_ID" ]; then
-              echo "✓ KV namespace ending in '$KV_TITLE' exists ($KV_ID)."
-            else
+              echo "✓ KV namespace for '$KV_TITLE' exists ($KV_ID) — adopting it."
+            elif [ "$fail" -eq 0 ]; then
               echo "Creating KV namespace '$KV_TITLE'…"
               create_it "KV namespace '$KV_TITLE'" pnpm exec wrangler kv namespace create "$KV_TITLE" || fail=1
-              KV_ID=$(settle kv_id_exact "$WANT_KV") || { echo "::error::KV '$WANT_KV' did not appear in the list within 30s. Re-run: a second run adopts it by title."; fail=1; }
+              KV_ID=$(settle kv_lookup "$WORKER_NAME" "$KV_TITLE") || { echo "::error::No KV namespace titled '${WORKER_NAME}-${KV_TITLE}' or '${KV_TITLE}' appeared within 30s. Re-run: a second run adopts it."; fail=1; }
             fi
           else
             fail=1
