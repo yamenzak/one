@@ -49,6 +49,13 @@ const logLevel = process.env.E2E_SERVER_LOGS ? "info" : "warn";
  */
 const DESKTOP = { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } };
 const NARROW = { ...devices["Desktop Chrome"], viewport: { width: 430, height: 932 }, isMobile: false, hasTouch: true };
+/*
+  TABLET — §11.2's own band, and the one nothing photographed. An operator with
+  an iPad in a venue is a real Scena user, and 834 is where the sidebar appears
+  (`md`) while the pointer is still a finger: the only width with both. Between
+  a 430 phone and a 1440 desk it was designed entirely by inference.
+*/
+const TABLET = { ...devices["Desktop Chrome"], viewport: { width: 834, height: 1112 }, isMobile: false, hasTouch: true };
 
 export default defineConfig({
   testDir: "./shots",
@@ -89,6 +96,7 @@ export default defineConfig({
   projects: [
     { name: "desktop-dark", use: DESKTOP },
     { name: "desktop-light", use: DESKTOP },
+    { name: "tablet-dark", use: TABLET },
     { name: "narrow-dark", use: NARROW },
     { name: "narrow-light", use: NARROW },
   ],

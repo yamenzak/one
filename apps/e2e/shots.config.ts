@@ -35,6 +35,14 @@ import { APP_PORT, ROOT_URL, SETUP_URL } from "./src/env.js";
  *  see. Desktop swaps the bottom tabs for the nav rail, which is a different
  *  set of chrome and has to be photographed as well as tested. */
 const PHONE = { ...devices["Pixel 7"], isMobile: false, hasTouch: true };
+/*
+  TABLET IS A NAMED WIDTH, NOT "SMALL DESKTOP" (§11.2), and until now nothing
+  photographed it — so the 768–1099 band was designed by inference from the two
+  ends of it. 834×1112 is an iPad Air held upright, which is the case that band
+  is actually about: a rail and a TOUCH pointer at the same time, which no other
+  width has. `hasTouch` is what makes that real here rather than a wide phone.
+*/
+const TABLET = { viewport: { width: 834, height: 1112 }, isMobile: false, hasTouch: true };
 const DESKTOP = { viewport: { width: 1440, height: 900 }, isMobile: false, hasTouch: false };
 
 export default defineConfig({
@@ -73,6 +81,7 @@ export default defineConfig({
   projects: [
     { name: "phone-dark", use: PHONE },
     { name: "phone-light", use: PHONE },
+    { name: "tablet-dark", use: TABLET },
     { name: "desktop-dark", use: DESKTOP },
     { name: "desktop-light", use: DESKTOP },
   ],

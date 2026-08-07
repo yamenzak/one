@@ -759,7 +759,7 @@ function Builder({ profileId }: { profileId: string }) {
     <>
       <div className="relative flex h-[calc(100vh-6.5rem)] min-h-[520px] flex-col overflow-hidden rounded-xl border bg-card">
         {/* Toolbar */}
-        <div className="flex items-center gap-1.5 border-b px-2.5 py-2">
+        <div className="flex flex-wrap items-center gap-1.5 border-b px-2.5 py-2">
           {/*
             ⚠️ ALWAYS `preventDefault`, then ask, then navigate.
 
@@ -792,7 +792,21 @@ function Builder({ profileId }: { profileId: string }) {
           >
             <ArrowLeft />
           </Button>
-          <div className="mr-1 min-w-0">
+          {/*
+            `basis-32` — a FLOOR, not just permission to shrink.
+
+            `min-w-0` alone says "you may collapse to nothing", and at tablet
+            width it did exactly that: the ≥md tool cluster (undo/redo, grid,
+            snap, three zoom controls, panel) plus two labelled buttons took the
+            whole row, the title's flex item resolved to zero, and the name of
+            the profile being edited disappeared. Not truncated — GONE, on the
+            one screen where an operator has several profiles and needs to know
+            which one is open. Found by photographing 834px for the first time.
+
+            The row wraps below, so what does not fit takes its own line rather
+            than eating the title.
+          */}
+          <div className="mr-1 min-w-0 flex-1 basis-32">
             <div className="truncate text-body font-semibold leading-tight">{name}</div>
             <div className="flex items-center gap-1.5 text-caption text-muted-foreground">
               <span className="tabular-nums">
@@ -803,9 +817,22 @@ function Builder({ profileId }: { profileId: string }) {
           </div>
 
           <div className="ml-auto flex items-center gap-1">
-            {/* Full tool cluster on ≥ md; on mobile it moves to the strip below so
-                the top bar stays uncramped (just back · title · save). */}
-            <div className="hidden items-center gap-1 md:flex">
+            {/*
+              Full tool cluster on ≥ lg; below that it moves to the strip under
+              the bar so the top row stays uncramped (back · title · AI · save).
+
+              It was `md` (768), and 834 — an iPad held upright — is exactly the
+              width where that is wrong: eleven controls plus two labelled
+              buttons left the title zero pixels, and once the title had a floor
+              the row wrapped and pushed SAVE off the right edge. Both were the
+              same misjudgement, that a tablet has a desk's worth of room. The
+              strip below already carries every one of these controls; `xl` is
+              simply where the bar can actually hold them. Not `lg` (1024): a
+              1024 window minus a 248 sidebar leaves the panel about 760, which
+              is the same squeeze one step along. The strip is a complete
+              alternative, so erring wide costs nothing.
+            */}
+            <div className="hidden items-center gap-1 xl:flex">
               <TB icon={<Undo2 />} label="Undo (⌘Z)" disabled={!history.canUndo} onClick={history.undo} />
               <TB icon={<Redo2 />} label="Redo (⇧⌘Z)" disabled={!history.canRedo} onClick={history.redo} />
               <Separator orientation="vertical" className="mx-0.5 h-5" />
@@ -836,8 +863,8 @@ function Builder({ profileId }: { profileId: string }) {
           </div>
         </div>
 
-        {/* Mobile tool strip (< md) — scrollable so nothing crowds the top bar. */}
-        <div className="flex items-center gap-1 overflow-x-auto border-b px-2 py-1 md:hidden">
+        {/* The tool strip (< xl) — scrollable, so nothing crowds the top bar. */}
+        <div className="flex items-center gap-1 overflow-x-auto border-b px-2 py-1 xl:hidden">
           <TB icon={<Undo2 />} label="Undo" disabled={!history.canUndo} onClick={history.undo} />
           <TB icon={<Redo2 />} label="Redo" disabled={!history.canRedo} onClick={history.redo} />
           <Separator orientation="vertical" className="mx-0.5 h-5" />
