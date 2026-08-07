@@ -17,9 +17,10 @@ import { api, todayLocal, errorText } from "../../api.js";
 import { useCan } from "../../FeatureLock.js";
 import { useUnits } from "../../units.js";
 import { ExerciseDetail, ExerciseRow, ExerciseThumb, metaText, type ExerciseInfo } from "../exercise.js";
+import { publishedInLane, supersededInLane } from "./lanes.js";
 
 interface PublishedPlan { id: string; name: string; body: WorkoutBody }
-type PlanRow = PublishedPlan & { status: string; publishedAt?: string | null };
+type PlanRow = PublishedPlan & { status: string; publishedAt?: string | null; variantId?: string | null };
 interface LoggedSet { setIndex: number; reps?: number | null; weightKg?: number | null; durationSeconds?: number | null; distanceM?: number | null; effortLabel?: "easy" | "perfect" | "hard" | null; completed: boolean }
 interface SessionEntry { blockIndex: number; slotIndex: number; exerciseId: string; sets: LoggedSet[] }
 /** The client's previous session for one exercise (the "last time" marquee). */
@@ -29,6 +30,7 @@ type ExerciseLite = ExerciseInfo;
 export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: string; initialDay?: number; onExit?: () => void }) {
   const [plan, setPlan] = useState<PlanRow | null | undefined>(undefined); // undefined = still loading
   const [allPlans, setAllPlans] = useState<PlanRow[]>([]);
+  const [lane, setLane] = useState<string | null>(null); // the client's current workout lane
   const [viewId, setViewId] = useState<string | null>(null); // null = current published plan
   const [histOpen, setHistOpen] = useState(false);
   const [preview, setPreview] = useState<{ day: WorkoutDay; index: number } | null>(null);
@@ -86,13 +88,18 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
     // and since `plan` stays `undefined` until a success the player sat on its
     // skeleton forever — no error, no retry, no way out but a reload.
     const [plansRes, exRes, sessRes] = await Promise.allSettled([
-      api.get<{ plans: PlanRow[] }>(`/api/workout-plans?clientId=${clientId}`),
+      api.get<{ plans: PlanRow[]; currentVariantId?: string | null }>(`/api/workout-plans?clientId=${clientId}`),
       api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all"),
       api.get<{ sessions: { entries: SessionEntry[] }[] }>(`/api/logs/workout-sessions?clientId=${clientId}&from=${date}&to=${date}`),
     ]);
     if (rid !== reqRef.current) return;
     if (plansRes.status !== "fulfilled") { setLoadError(true); return; }
-    setPlan(plansRes.value.plans.find((p) => p.status === "published") ?? null);
+    // The player runs the plan for the lane the client is ON — see `lanes.ts`.
+    // Unfiltered it started whichever lane's plan came back first, so a client
+    // on "Off week" was handed the work-week session.
+    const lane = plansRes.value.currentVariantId ?? null;
+    setLane(lane);
+    setPlan(publishedInLane(plansRes.value.plans, lane));
     setAllPlans(plansRes.value.plans);
     if (exRes.status === "fulfilled") setExercises(new Map(exRes.value.exercises.map((e) => [e.id, e])));
     const sess = new Map<string, LoggedSet[]>();
@@ -144,7 +151,7 @@ export function WorkoutPlayer({ clientId, initialDay, onExit }: { clientId: stri
   // targets the current plan, so past plans render read-only (preview only).
   const active = (viewId ? allPlans.find((p) => p.id === viewId) : plan) ?? plan ?? null;
   const isPast = !!active && !!plan && active.id !== plan.id;
-  const pastPlans = allPlans.filter((p) => p.status === "superseded");
+  const pastPlans = supersededInLane(allPlans, lane);
   const pickPlan = (id: string | null) => { setViewId(id); setHistOpen(false); };
 
   // The plan read failed. This has to be said out loud: the skeleton below is

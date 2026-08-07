@@ -1021,7 +1021,6 @@ point of splitting them.
 | `ci.yml` | pull request | typecheck, tests, and one E2E job per registered suite | no |
 | `deploy.yml` | push to `main`, manual | builds every SPA, deploys every app the registry marks deployable, then **probes each one's `/health`** | **no** — ships code only. It deliberately never writes worker secrets: re-putting `BETTER_AUTH_SECRET` on every deploy would re-sign every cookie and log everyone out |
 | `provision.yml` | manual, takes an app id | creates the D1 / KV / R2 that are **missing**, commits the ids, deploys, mints `BETTER_AUTH_SECRET` if the worker has none, seeds email, then probes `/health` | **no** — every action is guarded by an existence check |
-| `reset.yml` | manual | destroys and rebuilds everything | **YES** |
 
 So the steady state is: `deploy.yml` on every merge, `provision.yml` once per new
 app. Neither can lose data, so neither needs ceremony.
@@ -1053,64 +1052,30 @@ workflow — `scripts/apps-manifest.test.mjs` fails on an unregistered app,
 `.github/workflows/workflows-parse.test.mjs` on a workflow that would not parse.
 Both are in `pnpm test` too, so you find out locally.
 
-### `reset.yml` — for one moment, then delete it
+### `reset.yml` is GONE, deliberately
 
-It wipes what earlier `mossa`/`kova` deploys left on the account and rebuilds
-from nothing, so a first real launch starts clean. **It is not a maintenance
-tool**, and it destroys, with no undo and no export:
+There used to be a third workflow here that destroyed the account's D1, R2, KV
+and both workers and rebuilt from nothing. It existed for exactly one moment —
+clearing what earlier `mossa`/`kova` deploys had left behind so the first real
+launch started clean — and its own header said to delete it afterwards. That
+moment has passed, so it is deleted.
 
-- both **workers** — and with them every **Durable Object** (`TenantBillingDO`,
-  every tenant's credit balance; `InboxDO`) and every worker secret;
-- the **D1 database** — accounts, tenants, clients, plans, logs, and all of
-  `app_config` (Gemini key, Stripe credentials, Turnstile keys, email settings);
-- the **R2 bucket** — progress photos, lab documents, avatars, media;
-- the **KV namespace** — the API cache, the only cheap loss;
-- **tenant custom hostnames** on the zones you name — orphans once the worker
-  they pointed at is gone.
+It is not coming back, and a future "we need to wipe and start over" is not the
+reason to restore it. Every guard it carried (dispatch-only, a plan mode, a
+typed confirmation phrase, a repository variable as a disarm switch, a name
+allow-list) existed to make an accident less likely — not impossible. A
+destructive workflow kept around for a second use it was never designed for is
+how it eventually runs by accident, and the one thing none of those guards can
+give back is the data.
 
-**Five guards, all of which must agree:**
+**The steady state has no delete in it.** `deploy.yml` ships code;
+`provision.yml` creates only what is missing. Wiping a resource is a deliberate
+act in the Cloudflare dashboard, by a person who can see exactly what they are
+about to remove.
 
-1. `workflow_dispatch` only. There is no push trigger and there must never be
-   one.
-2. `mode` defaults to **plan** — inventory what it *would* delete, then stop.
-   Always plan first; the plan is also how you find resources this repo no
-   longer declares.
-3. `confirm` must be typed exactly: `DESTROY AND REBUILD`. Not a checkbox — a
-   checkbox is one mis-click.
-4. The repository variable `ALLOW_DESTRUCTIVE_RESET` must be `true`. Set it,
-   run, **unset it**. That is the disarm switch, and it lives in Settings rather
-   than in code.
-5. Nothing is deleted whose name does not match `patterns` (default
-   `kova,mossa`), anchored at the start. A resource this workflow does not
-   recognise belongs to something else on the account.
+### Rebuilding onto a fresh account: what has to be put back, in this order
 
-**Two things it needs that `deploy.yml` does not:**
-
-- **`contents: write`.** A recreated D1 and KV have *new ids*, and
-  `wrangler.jsonc` hardcodes the old ones. The workflow rewrites both and
-  commits. Without that step the deploy goes green and every request 500s at
-  runtime — bound to resources that no longer exist.
-- **`R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY`** (optional but usually
-  required). R2 will not delete a bucket that still holds objects, and wrangler
-  has no recursive delete — `wrangler r2 object` is get/put/delete for one key.
-  Emptying needs the S3-compatible API, and that needs an **R2 access key pair**
-  (dash → R2 → Manage API tokens), which is a *different credential* from
-  `CLOUDFLARE_API_TOKEN`. A Cloudflare API token cannot sign S3 requests.
-  Without them the workflow says so and stops rather than half-finishing.
-
-It also **seeds `email.provider` / `email.from`** at the end, which is the one
-thing that breaks the bootstrap deadlock in section 6: the console that edits
-those needs a sign-in, which needs an OTP, which needs email. A workflow with
-database access is the only actor that can cut that knot — but the sender still
-has to be **verified** in Cloudflare Email Sending or nothing delivers.
-
-**Afterwards: unset `ALLOW_DESTRUCTIVE_RESET`, then delete
-`.github/workflows/reset.yml`.** Keeping a destructive workflow around for a
-second use it was never designed for is how it eventually runs by accident.
-
-### After a reset: what has to be put back, in this order
-
-The workflow rebuilt the Cloudflare side. It touched **nothing outside your
+Provisioning rebuilds the Cloudflare side. It touches **nothing outside your
 Cloudflare account** — so every third-party object you had (Stripe endpoints and
 products, the Gemini key in Google's console, your Turnstile widget) still
 exists, unchanged. What was lost is the row in `app_config` that pointed at each
@@ -1185,8 +1150,8 @@ Be aware of these before launch; none are fixable from this document:
 
 - **Email config has a UI now** (Platform admin → Email delivery), but it cannot
   break the *bootstrap* deadlock — reaching it needs a sign-in, which needs an
-  OTP, which needs email. The first seed is still manual (section 6), or done
-  by `reset.yml` on a fresh install.
+  OTP, which needs email. The first seed is done by `provision.yml`
+  (`ON CONFLICT DO NOTHING`), or by hand — section 6.
 - **The AI mock lane can be forced on in production** via `ai.mock = on` and
   will bill credits for fabricated output. Leave it on `auto`.
 - **`/health` is liveness-only** — it never touches D1, so it will report

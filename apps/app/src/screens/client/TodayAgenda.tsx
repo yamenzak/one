@@ -15,9 +15,10 @@ import {
 import { api, isQueued, errorText } from "../../api.js";
 import { QueuedNotice } from "../../notices.js";
 import type { TodayBundle } from "./Today.js";
+import { publishedInLane } from "./lanes.js";
 
 interface Supp { id: string; name: string; dose: string | null; schedule: { slot: string }[] }
-interface MealPlan { status: string; body: { mealOptions?: { mealType: string }[] } }
+interface MealPlan { status: string; variantId?: string | null; body: { mealOptions?: { mealType: string }[] } }
 
 /** The agenda's own data, fetched with the rest of the Today page so it mounts
  *  complete — no skeleton→content swap that would stutter the page animation. */
@@ -27,10 +28,12 @@ export async function fetchAgenda(clientId: string, date: string): Promise<Agend
   const [s, sl, mp, food] = await Promise.all([
     api.get<{ supplements: Supp[] }>(`/api/supplements?clientId=${clientId}`).catch(() => ({ supplements: [] })),
     api.get<{ taken: { supplement_id: string; slot: string }[] }>(`/api/supplements/logs?clientId=${clientId}&date=${date}`).catch(() => ({ taken: [] })),
-    api.get<{ plans: MealPlan[] }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [] })),
+    api.get<{ plans: MealPlan[]; currentVariantId?: string | null }>(`/api/meal-plans?clientId=${clientId}`).catch(() => ({ plans: [], currentVariantId: null })),
     api.get<{ entries: { meal_type: string }[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`).catch(() => ({ entries: [] })),
   ]);
-  const pub = mp.plans.find((p) => p.status === "published");
+  // The lane the client is on decides which published plan is theirs today —
+  // see `lanes.ts`. Unfiltered, the agenda listed another lane's meals.
+  const pub = publishedInLane(mp.plans, mp.currentVariantId ?? null);
   const types = pub?.body.mealOptions ? [...new Set(pub.body.mealOptions.map((o) => o.mealType))] : [];
   const ord = (x: string) => { const i = MEAL_ORDER.indexOf(x); return i < 0 ? 99 : i; };
   return {

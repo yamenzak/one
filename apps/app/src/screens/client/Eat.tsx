@@ -14,6 +14,7 @@ import { FoodSearchSheet } from "./FoodSearchSheet.js";
 import { MealPlanDrawer } from "./MealPlanDrawer.js";
 import { CoachNote } from "./CoachNote.js";
 import { LaneSwitcher, type Lane } from "./LaneSwitcher.js";
+import { publishedInLane } from "./lanes.js";
 
 interface Entry { id: string; meal_type: string; label: string | null; calories: number; protein_g: number; carbs_g: number; fat_g: number; quantity: number | null; unit: string | null; image_url: string | null }
 /** A previously-logged food, ready to re-log at its last portion in one tap. */
@@ -103,7 +104,7 @@ export function Eat({ clientId }: { clientId: string }) {
       const mp = mpR.value;
       setVariants(mp.variants ?? []); setCurrentVariantId(mp.currentVariantId ?? null); setDefaultLabel(mp.defaultLabel || "Main");
       const cur = mp.currentVariantId ?? null;
-      const published = mp.plans.find((p) => p.status === "published" && (p.variantId ?? null) === cur);
+      const published = publishedInLane(mp.plans, cur);
       const opts = published?.body?.mealOptions ?? [];
       setMealPlan(published ? { name: published.name, meals: new Set(opts.map((o) => o.mealType)).size, options: opts.length } : null);
     }

@@ -14,8 +14,10 @@ import { api } from "../../api.js";
 import { useUnits } from "../../units.js";
 import { ExerciseRow } from "../exercise.js";
 
+import { supersededInLane } from "./lanes.js";
+
 type Kind = "workout" | "meal";
-interface PlanRow { id: string; name: string; status: string; publishedAt: string | null; createdAt: string; body: WorkoutBody & MealBody }
+interface PlanRow { id: string; name: string; status: string; publishedAt: string | null; createdAt: string; variantId?: string | null; body: WorkoutBody & MealBody }
 interface ExerciseLite { id: string; name: string }
 interface FoodRow { id: string; name: string; serving_size: number; calories: number; protein_g: number; carbs_g: number; fat_g: number }
 
@@ -41,15 +43,17 @@ export function PlanHistorySheet({ clientId, kind, onClose }: { clientId: string
     // Promise.all a failing library read discarded the plans too, and `plans` stays
     // null until a success — so the sheet showed its skeleton forever.
     const [pl, lib] = await Promise.allSettled([
-      api.get<{ plans: PlanRow[] }>(`/api/${endpoint}?clientId=${clientId}`),
+      api.get<{ plans: PlanRow[]; currentVariantId?: string | null }>(`/api/${endpoint}?clientId=${clientId}`),
       kind === "workout"
         ? api.get<{ exercises: ExerciseLite[] }>("/api/exercises?scope=all")
         : api.get<{ foods: FoodRow[] }>("/api/foods?scope=all"),
     ]);
     if (rid !== reqRef.current) return;
     if (pl.status !== "fulfilled") { setError(true); return; }
-    // Previous = superseded (the active plan is the published one, shown on the page).
-    setPlans(pl.value.plans.filter((p) => p.status === "superseded"));
+    // Previous = superseded IN THIS LANE (the active plan is the published one,
+    // shown on the page). Across lanes this listed plans that are still current
+    // somewhere else under the heading "Past plans" — see `lanes.ts`.
+    setPlans(supersededInLane(pl.value.plans, pl.value.currentVariantId ?? null));
     // Without the library, exercise/food names fall back to their placeholders —
     // the plan's structure (days, sets, macros) still reads correctly.
     if (lib.status === "fulfilled") {

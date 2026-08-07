@@ -29,8 +29,9 @@ import { Markdown } from "../../Markdown.js";
 import { AiAnalyzing } from "../../AiAnalyzing.js";
 import { AiAvatar } from "../../AiAvatar.js";
 import { FoodThumb, MacroSplitBar, FoodRow as FoodRowUI } from "../food.js";
+import { publishedInLane, supersededInLane } from "./lanes.js";
 
-interface Plan { id: string; name: string; status: string; publishedAt?: string | null; body: MealBody }
+interface Plan { id: string; name: string; status: string; publishedAt?: string | null; variantId?: string | null; body: MealBody }
 interface FoodRow {
   id: string; name: string; serving_size: number; serving_unit: string; calories: number;
   protein_g: number; carbs_g: number; fat_g: number; fiber_g: number; sugar_g: number; sodium_mg: number;
@@ -49,6 +50,7 @@ const metaFor = (m: string) => MEAL_META[m] ?? { label: m.replace(/_/g, " ").rep
 export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: string; onClose: () => void; onLogged: () => void }) {
   const [plan, setPlan] = useState<Plan | null | undefined>(undefined);
   const [allPlans, setAllPlans] = useState<Plan[]>([]);
+  const [lane, setLane] = useState<string | null>(null); // the client's current meal lane
   const [viewId, setViewId] = useState<string | null>(null); // null = the current published plan
   const [histOpen, setHistOpen] = useState(false);
   const [foods, setFoods] = useState<Map<string, FoodRow>>(new Map());
@@ -111,15 +113,20 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
   const load = useCallback(async () => {
     const rid = ++reqRef.current;
     const [pl, f, today, log] = await Promise.all([
-      api.get<{ plans: Plan[] }>(`/api/meal-plans?clientId=${clientId}`),
+      api.get<{ plans: Plan[]; currentVariantId?: string | null }>(`/api/meal-plans?clientId=${clientId}`),
       api.get<{ foods: FoodRow[] }>("/api/foods?scope=all"),
       api.get<{ goal: { targets: Targets | null } | null }>(`/api/today?clientId=${clientId}&date=${date}`).catch(() => ({ goal: null })),
       api.get<{ entries: { meal_plan_id?: string | null; meal_option_index?: number | null }[] }>(`/api/logs/food?clientId=${clientId}&date=${date}`).catch(() => ({ entries: [] })),
     ]);
     if (rid !== reqRef.current) return; // superseded by a newer client/date
-    const published = pl.plans.find((p) => p.status === "published") ?? null;
+    // THE LANE, not just "published" — see `lanes.ts`. Without it a client on
+    // "Off week" opened this drawer and read the "Work week" meals, because the
+    // list returns every lane's plans and the first published one won.
+    const lane = pl.currentVariantId ?? null;
+    const published = publishedInLane(pl.plans, lane);
     setPlan(published);
     setAllPlans(pl.plans);
+    setLane(lane);
     setFoods(new Map(f.foods.map((x) => [x.id, x])));
     setTargets(today.goal?.targets ?? null);
     setLoggedIdx(new Set((log.entries ?? []).filter((e) => e.meal_plan_id === published?.id && e.meal_option_index != null).map((e) => e.meal_option_index as number)));
@@ -134,7 +141,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
 
   // Logging always targets the current plan, so past plans render read-only.
   const firstShopIdx = (active?.body.mealOptions ?? []).findIndex((o) => !o.isFree);
-  const pastPlans = allPlans.filter((p) => p.status === "superseded");
+  const pastPlans = supersededInLane(allPlans, lane);
   // Don't clear counts/checked here — the shopping list is keyed to `active.id`,
   // so switching plans re-hydrates the target plan's own saved list (or empty).
   const pickPlan = (id: string | null) => { setViewId(id); setHistOpen(false); setView("plan"); };

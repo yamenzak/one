@@ -24,6 +24,7 @@ import { LogSheet } from "./LogSheet.js";
 import { ExerciseDetail, ExerciseThumb, pretty, splitList, metaText, type ExerciseInfo } from "../exercise.js";
 import { CoachNote } from "./CoachNote.js";
 import { LaneSwitcher, type Lane } from "./LaneSwitcher.js";
+import { publishedInLane } from "./lanes.js";
 
 interface Plan { id: string; name: string; status: string; variantId: string | null; body: WorkoutBody }
 interface Goal { status: string; targets: Record<string, number> | null; weeklyLoadTarget?: number | null }
@@ -167,7 +168,7 @@ export function Train({ clientId }: { clientId: string }) {
   const start = (day?: number) => nav(day != null ? `/train/session/${day}` : "/train/session");
 
   // Pick the published plan for the lane the client is on right now.
-  const published = plans?.find((p) => p.status === "published" && (p.variantId ?? null) === (currentVariantId ?? null));
+  const published = plans ? publishedInLane(plans, currentVariantId ?? null) : undefined;
   const hasData = week.activeCount > 0 || week.weekTonnage > 0 || recent.length > 0;
 
   return (
