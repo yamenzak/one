@@ -792,9 +792,15 @@ work list for the rewrite:
 | No `Anchor` — screens have no single largest thing; hero treatments vary | §1 |
 | No type scale — sizes are chosen per screen | §5 |
 | Radius base (0.95rem) contradicts the documented card radius | §6 |
-| `popIn` scales **up**; the language requires settling **down** | §8 |
 | Entrance has no tier ordering — chrome animates with content | §8 |
 | Desktop is "rail + max-w-3xl", not the three shapes | §11 |
+
+The last row is the one still open, and it is the only one. Measured at 1440
+on the coach's roster: a 96 rail, a 686 column, and **658px — 46% of the
+viewport — empty**, with opening a client REPLACING the list it came from.
+§11.3 says a Collection at ≥1100 is a two-pane; this is the screen that says
+it is not built. `popIn` came off this list because it was fixed: `settle`
+settles down and `popIn` is an alias of it.
 
 **Closed so far:** tokens (type scale, radius ladder, motion, atmosphere
 opacity), `lib/animation.ts`, the spine components, `Choice`, wizard chrome,

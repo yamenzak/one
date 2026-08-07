@@ -322,10 +322,10 @@ export const UI_RULES: UiRule[] = [
     },
   },
 
-  // ── §11 motion: a hand-written spring or duration ────────────────────────
+  // ── §8 motion: a hand-written spring or duration ─────────────────────────
   {
     id: "motion",
-    section: "UI-LANGUAGE §11",
+    section: "UI-LANGUAGE §8",
     ext: /\.tsx?$/,
     window: 3,
     // An ambient loop — a pulse, a shimmer — is a different class from a

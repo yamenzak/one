@@ -654,6 +654,68 @@ The shape every phone OS converged on, and why each half works:
   moment you are asked to accept it — not two taps earlier where it is only
   furniture.
 
+### The hero: four variants, one per screen, chosen by the destination's kind
+
+Every screen opens with exactly one hero. It is the T1 of §1 made concrete, and
+it is a CLOSED set — "hero treatments vary" was on this product's own defect
+list, and the fix for that is not taste, it is four names.
+
+| Variant | What it is | Use it when | Component |
+|---|---|---|---|
+| `anchor` | The one number, `display`, with an eyebrow above and a second fact below | The screen is ABOUT a measurement — a total, a score, a balance | `Anchor` |
+| `identity` | A face, a name, a status line, and this record's actions | The screen is about a PERSON or a THING — a client, a device, a channel | `Hero variant="identity"` |
+| `title` | A title, a description, and the page's actions | The screen is a LIST or a settings surface — there is no single number | `PageHeader` |
+| `none` | No hero; the surface's own chrome starts immediately | A task surface — a canvas, a player, a wizard step | — |
+
+**The kind picks it, not the author.** Overview → `anchor`. Collection →
+`title` on the list, `identity` on the record. Task → `none`. A screen that
+cannot pick one has more than one job (§1).
+
+**One per screen, and the detail pane counts as a screen.** In a two-pane
+(§11.3) the list has a `title` and the record has an `identity`, and that is one
+each — not two on one screen.
+
+### Sections: one shape, two properties
+
+`Section` is deliberately ONE component. What varies is not its structure but
+two properties, because a second section shape is how a screen starts having two
+kinds of everything:
+
+| Property | Values | Meaning |
+|---|---|---|
+| `emphasis` | `plain` (default) · `carded` | Whether the body sits on the page or on a `Card`. Carded is for a body that is a different KIND of thing from its neighbours — a chart among rows. |
+| `density` | `comfortable` (default) · `compact` | `compact` tightens the header→body gap for a section whose body is a single control. Never changes type, padding inside rows, or tap targets. |
+
+**The body is what actually varies**, and it is already a closed set: a `Group`
+of rows, a `TileGrid`, a chart, or free content. A section does not need a
+variant for each — it needs to not care.
+
+### The map: which motion, which skeleton
+
+Neither is a judgement call. A component that fetches ships `Component.Skeleton`
+beside it (rule below); a component that enters uses the variant for its tier.
+This is the table, and anything not in it is on the general-purpose `settle`.
+
+| Component | Tier | Entrance | Skeleton |
+|---|---|---|---|
+| `Atmosphere` | T0 | `atmosphereIn` | — |
+| `Anchor`, `Hero` | T1 | `anchorIn` | `SkeletonHero` |
+| `PageHeader` | T1 | `contentIn` | `SkeletonHeader` |
+| `Section`, `Card`, `Tile` | T3 | `contentIn` (inside `contentStagger`) | matches the body |
+| `Row` | T3 | `rowIn` inside `rowStagger` | `SkeletonRow` |
+| `Collection` | T3 | `rowStagger` | `SkeletonList` |
+| `StatCard`, `GlanceStrip` | T3 | `contentIn` | `SkeletonStat` / `SkeletonStatGrid` |
+| charts | T3 | `contentIn` | `SkeletonChart` |
+| `AppBar`, `BottomTabs`, `NavRail`, `NavSidebar` | T4 | `chromeIn` | never — chrome does not load |
+| sheets, dialogs | overlay | `sheetTransition` / `dialogVariants` | — |
+
+**Chrome never has a skeleton.** It is not waiting for data; it is the frame the
+data arrives into. A shimmering nav rail says the app is broken.
+
+**A skeleton has the geometry of the thing it replaces** — same row height, same
+count where the count is known, same column edges. Wrong geometry is worse than
+none: it teaches the eye a shape and then moves everything (see the rule below).
+
 ### A component ships its own loading state, or it is not finished
 
 **Loading is part of a component's definition, not something a screen bolts on.**
@@ -1203,8 +1265,9 @@ t=260   T4 chrome           opacity 0→1                     200ms  ← always 
 
 **Enter by scaling down, never up.** Content arrives already slightly too large
 and comes to rest. This one detail is the difference between "an app opened" and
-"an app was assembled in front of me". *(Note: the current `popIn` variant scales
-**up** from 0.96 — it must be inverted.)*
+"an app was assembled in front of me". *(This was inverted once — `popIn`
+scaled **up** from 0.96 — and is fixed: `settle` is the variant, `popIn` is a
+deprecated alias of it, and `lib/animation.ts` says so at the definition.)*
 
 - The **anchor is the transform origin** of the whole content layer. Everything
   settles toward the number.
@@ -1347,26 +1410,79 @@ Two rules that outrank all of them:
 
 ---
 
-## 11. Desktop
+## 11. Widths, navigation, and the shapes
 
-Not a second design. **The mobile column is the unit; desktop adds columns
-around it.**
+Not a second design. **The mobile column is the unit; wider viewports add
+columns around it.** Everything below follows from that one sentence.
 
-**The column is one class.** `.column` (tokens.css) is this table, and it is the
-only place these numbers appear. A screen that writes its own `max-w-*` inside
-the shell's column silently wins the cascade and pins the whole app narrower
-than the language says — which is exactly what happened, app-wide, unnoticed,
-because every screen agreed on the same wrong number.
+**The column is one class.** `.column` (tokens.css) is the table in §2, and it is
+the only place those numbers appear. A screen that writes its own `max-w-*`
+inside the shell's column silently wins the cascade and pins the whole app
+narrower than the language says — which is exactly what happened, app-wide,
+unnoticed, because every screen agreed on the same wrong number.
 
-### Three shapes
+### 11.1 The navigation model
 
-| Shape | From | Layout |
-|---|---|---|
-| **Focus** | `md` 768 | nav rail (72) + one centred column (max 640). Sheets → right panel (420). |
-| **Two-pane** | `lg` 1100 | nav rail + list pane (340) + detail column (max 720). **The detail pane is literally the mobile screen.** |
-| **Board** | `xl` 1400 | the above + a right column (320) of secondary cards |
+Three levels, and they are not interchangeable. Most "the desktop feels wrong"
+bugs are two of these wearing each other's clothes.
 
-### The rules that make it work
+| Level | What it is | Where it lives | How many |
+|---|---|---|---|
+| **Destination** | A place in the product. A noun. Survives a reload. | The tab island (phone) or the rail (≥md). **One surface per width, never both.** | **3–5.** Six means two of them are the same place. |
+| **Section** | A view of ONE destination — a lens, a filter, a sub-tab. | Inside the content column, under the hero. | Any, but they scroll rather than wrap to a second line |
+| **Record** | One thing from a collection. | A page (phone) or the detail pane (≥lg). | — |
+
+**The rules:**
+
+1. **One navigation surface at a time.** A rail AND a top nav bar is two answers
+   to "where am I". The top bar carries IDENTITY (the tenant), the ACCOUNT, and
+   this page's chrome — breadcrumb, actions. Never destinations.
+2. **A section is not a destination.** It does not appear in the rail, it does
+   not change the breadcrumb's first segment, and it is legitimate for it to be
+   lost on a reload if the app has not put it in the URL — a destination never is.
+3. **A destination's icon and its label travel together.** An icon-only rail item
+   is unnamed to voice control and ambiguous to everyone else; the rail is 96
+   wide precisely so the label fits under the glyph.
+4. **Depth is capped at destination → record → sheet.** A third pushed page means
+   the record needed sections, not more pages.
+
+### 11.2 Four widths
+
+| Width | Name | Navigation | Content |
+|---|---|---|---|
+| < 768 | **Phone** | floating tab island, 3–5 | one column, full width, 16 gutter |
+| 768–1099 | **Tablet** | rail 96 | **Focus** — one column, 640 |
+| 1100–1399 | **Desktop** | rail 96 | **Two-pane** — list 340 + detail ≤720 |
+| ≥ 1400 | **Wide** | rail 96 | **Board** — the above + aside 320 |
+
+Tablet is a named width, not "small desktop". It is the one place a rail and a
+touch pointer coexist, so tap targets stay at the phone's 48 and hover states
+stay behind `pointer: fine` (rule 4 below).
+
+### 11.3 What picks the shape — the destination's KIND, not the screen
+
+A screen does not choose its layout; its destination does. Three kinds, and the
+kind is a property of the destination in the app's nav registry:
+
+| Kind | Example | Phone | Tablet | Desktop | Wide |
+|---|---|---|---|---|---|
+| **Overview** | Today, Business | column | Focus | Focus | Board (aside = secondary cards) |
+| **Collection** | Clients, Library, Sessions | list → pushed page | Focus (list → page) | **Two-pane** | Two-pane + aside |
+| **Task** | a builder, a player, a wizard | full bleed | full bleed | full bleed | full bleed |
+
+**A Collection at ≥1100 shows its list and a record at the same time.** This is
+the rule the reference app breaks and the reason its desktop reads as a phone in
+the middle of a monitor: a ten-client roster rendered as a 686px column at
+1440px leaves **46% of the viewport empty**, and opening a client REPLACES the
+list it came from. The list is not decoration — it is how somebody works through
+ten clients without going back nine times.
+
+**Task surfaces are exempt on purpose.** A canvas, a video player and a wizard
+are not documents; a 720 column would make each of them worse. They take the
+width and bring their own chrome. What they may NOT do is invent a second
+navigation surface.
+
+### 11.4 The rules that make it work
 
 1. **Cards never stretch.** A card fills its column; columns multiply. This is
    why a card designed once is pixel-correct at every width — it is never asked
@@ -1382,13 +1498,19 @@ because every screen agreed on the same wrong number.
    `Enter` opens · `⌘K` command palette (when the product has one).
 6. **Everything focusable has a visible ring** — the same ring token, never
    `outline: none`.
+7. **A mobile affordance does not survive a wider viewport.** A swipe carousel
+   with pagination dots is how three cards fit on a phone; at 1100 the three
+   cards fit side by side and the dots are furniture for a gesture nobody will
+   make. Same content, different arrangement — which is rule 1 again.
 
-### What desktop must NOT do
+### What a wider viewport must NOT do
 
 - Stretch a row to 1400px with a value floating in the void.
 - Add a data table where mobile has rows. Same rows, more columns.
 - Introduce a top nav bar in addition to the rail.
 - Show more than one atmosphere per pane.
+- Leave the space beside the column empty and call it breathing room. Below
+  1100 that is the design; at 1100 it is a two-pane that was never built.
 
 ---
 
