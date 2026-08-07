@@ -45,7 +45,7 @@ export function ModeCard({ icon: Icon, label, hint, onClick, disabled, active, b
       <span className={cn("grid size-10 place-items-center rounded-xl transition-transform duration-200 group-hover:scale-105 group-active:scale-95 [&_svg]:size-[1.15rem]", toneSoft[tone])}>
         {busy ? <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <Icon />}
       </span>
-      <span className="text-[0.8rem] font-semibold leading-tight text-foreground">{label}</span>
+      <span className="text-caption font-semibold leading-tight text-foreground">{label}</span>
       <span className="text-xs leading-tight text-muted-foreground">{hint}</span>
     </motion.button>
   );
@@ -82,7 +82,7 @@ export function ModeRow({ icon: Icon, label, hint, onClick, disabled, active, bu
       </span>
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1.5">
-          <span className="text-[0.9rem] font-semibold leading-tight text-foreground">{label}</span>
+          <span className="text-caption font-semibold leading-tight text-foreground">{label}</span>
           {smart && <span className="rounded-full bg-primary/15 px-1.5 py-px text-xs font-bold uppercase leading-none tracking-wide text-primary">AI</span>}
         </span>
         <span className="mt-0.5 block truncate text-xs text-muted-foreground">{hint}</span>

@@ -261,13 +261,13 @@ export function WorkspaceSettingsPage() {
                   {i > 0 ? <Separator className="my-1" /> : null}
                   <div className="flex items-center gap-4 py-2">
                     <div className="min-w-0 flex-1">
-                      <div className="text-[13px] font-medium">{t.label}</div>
-                      <div className="text-[11px] text-muted-foreground">{t.hint}</div>
+                      <div className="text-caption font-medium">{t.label}</div>
+                      <div className="text-caption text-muted-foreground">{t.hint}</div>
                     </div>
                     {models === null ? (
                       <Skeleton className="h-9 w-72" />
                     ) : opts.length === 0 ? (
-                      <span className="w-72 text-right text-[11px] text-muted-foreground">No models enabled for this task.</span>
+                      <span className="w-72 text-right text-caption text-muted-foreground">No models enabled for this task.</span>
                     ) : (
                       <Select
                         value={defaults?.[t.id] ?? ""}
@@ -618,7 +618,7 @@ function BrandPalette({ brand }: { brand: BrandKit }) {
           value={pasted}
           onChange={(e) => setPasted(e.target.value)}
           placeholder={":root { --primary: oklch(…); … }\n.dark { … }"}
-          className="h-24 font-mono text-[11px]"
+          className="h-24 font-mono text-caption"
         />
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" disabled={!pasted.trim()} onClick={applyPastedTheme}>
@@ -747,7 +747,7 @@ function BrandTokens({ brand }: { brand: BrandKit }) {
           <code>hsl()</code>).
         </p>
       </div>
-      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-1.5 text-[11px]">
+      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-1.5 text-caption">
         <span className="font-semibold uppercase tracking-wider text-muted-foreground">Token</span>
         <span className="w-32 text-center font-semibold uppercase tracking-wider text-muted-foreground">Light</span>
         <span className="w-32 text-center font-semibold uppercase tracking-wider text-muted-foreground">Dark</span>
@@ -823,13 +823,13 @@ function TokenRow({
         onChange={(e) => onChange(mode, token, e.target.value)}
         placeholder={defaultVal.replace(/oklch\(|\)/g, "")}
         aria-label={`--${token} ${mode}`}
-        className="w-full bg-transparent font-mono text-[10px] outline-none placeholder:text-muted-foreground/50"
+        className="w-full bg-transparent font-mono text-caption outline-none placeholder:text-muted-foreground/50"
       />
     </div>
   );
   return (
     <>
-      <code className="truncate text-[11px] text-muted-foreground">--{token}</code>
+      <code className="truncate text-caption text-muted-foreground">--{token}</code>
       {cell("light", light, lightDefault)}
       {cell("dark", dark, darkDefault)}
     </>
@@ -840,7 +840,7 @@ function TokenRow({
 function UiSampler({ brandName }: { brandName: string }) {
   return (
     <div className="rounded-xl border p-4">
-      <div className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{brandName || "Your workspace"} · live preview</div>
+      <div className="mb-3 text-micro text-muted-foreground uppercase">{brandName || "Your workspace"} · live preview</div>
       <div className="flex flex-wrap items-center gap-2">
         <Button size="sm">Primary</Button>
         <Button size="sm" variant="secondary">
@@ -864,7 +864,7 @@ function UiSampler({ brandName }: { brandName: string }) {
         {(["primary", "accent", "secondary", "muted", "success", "warning", "destructive"] as const).map((t) => (
           <div key={t} className="flex flex-col items-center gap-1">
             <div className="h-8 w-full rounded-md border" style={{ background: `var(--${t})` }} />
-            <span className="text-[9px] text-muted-foreground">{t}</span>
+            <span className="text-caption text-muted-foreground">{t}</span>
           </div>
         ))}
       </div>

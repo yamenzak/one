@@ -31,10 +31,10 @@ function H({ children }: { children: React.ReactNode }) {
   return <h3 className="mb-1.5 mt-6 text-sm font-semibold text-foreground first:mt-0">{children}</h3>;
 }
 function P({ children }: { children: React.ReactNode }) {
-  return <p className="mb-3 text-[13px] leading-relaxed text-muted-foreground">{children}</p>;
+  return <p className="mb-3 text-caption leading-relaxed text-muted-foreground">{children}</p>;
 }
 function L({ children }: { children: React.ReactNode }) {
-  return <ul className="mb-3 ml-4 list-disc space-y-1 text-[13px] leading-relaxed text-muted-foreground marker:text-muted-foreground/50">{children}</ul>;
+  return <ul className="mb-3 ml-4 list-disc space-y-1 text-caption leading-relaxed text-muted-foreground marker:text-muted-foreground/50">{children}</ul>;
 }
 /* --------------------------------- terms ---------------------------------- */
 

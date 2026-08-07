@@ -127,24 +127,24 @@ export function BindControl({
               options={[{ id: "", label: "— pick a source —" }, ...sources.map((s) => ({ id: s.id, label: s.name }))]}
             />
           </Field>
-          {sources.length === 0 && <p className="text-[10.5px] text-muted-foreground">Create a source on the Sources page first.</p>}
+          {sources.length === 0 && <p className="text-caption text-muted-foreground">Create a source on the Sources page first.</p>}
 
           {/* Live data viewer — click to pick. */}
           {b?.sourceId &&
             (loading ? (
-              <div className="flex items-center gap-1.5 py-2 text-[10.5px] text-muted-foreground">
+              <div className="flex items-center gap-1.5 py-2 text-caption text-muted-foreground">
                 <Loader2 className="size-3 animate-spin" /> Loading data…
               </div>
             ) : cols.length === 0 ? (
-              <p className="text-[10.5px] text-muted-foreground">No columns yet — refresh the source or check its mapping.</p>
+              <p className="text-caption text-muted-foreground">No columns yet — refresh the source or check its mapping.</p>
             ) : (
               <div className="rounded-md border bg-card">
-                <div className="border-b px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                <div className="border-b px-2 py-1 text-micro text-muted-foreground uppercase">
                   {kind === "value" ? "Click a cell to bind its column + row" : "Click a header to set the label column"}
                 </div>
                 {kind === "list" && (
                   // A text legend so the label/value/note columns aren't distinguished by colour alone (a11y).
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 border-b px-2 py-1 text-[10px] text-muted-foreground">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 border-b px-2 py-1 text-caption text-muted-foreground">
                     <span className="inline-flex items-center gap-1">
                       <span className="size-2 rounded-sm bg-primary" /> Label
                     </span>
@@ -157,7 +157,7 @@ export function BindControl({
                   </div>
                 )}
                 <div className="max-h-40 overflow-auto">
-                  <table className="w-full border-collapse text-[11px]">
+                  <table className="w-full border-collapse text-caption">
                     <thead>
                       <tr>
                         {cols.map((c, ci) => (
@@ -256,7 +256,7 @@ export function BindControl({
               </Field>
             </>
           )}
-          <p className="flex items-center gap-1 text-[10.5px] text-muted-foreground">
+          <p className="flex items-center gap-1 text-caption text-muted-foreground">
             <Database className="size-3" /> Live — refreshes on the source's schedule.
           </p>
         </div>

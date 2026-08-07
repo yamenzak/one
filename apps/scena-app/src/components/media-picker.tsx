@@ -86,9 +86,9 @@ export function MediaPicker({ open, kind = "image", title, onPick, onOpenChange 
                   {kind === "image" ? (
                     <img src={assetSrc(m.asset_url)} alt={m.name} className="size-full object-contain" loading="lazy" />
                   ) : (
-                    <span className="flex size-full items-center justify-center p-2 text-center text-[11px] font-medium text-muted-foreground">{m.name}</span>
+                    <span className="flex size-full items-center justify-center p-2 text-center text-caption font-medium text-muted-foreground">{m.name}</span>
                   )}
-                  <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-black/50 px-1 py-0.5 text-[10px] text-white opacity-0 transition group-hover:opacity-100">{m.name}</span>
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-black/50 px-1 py-0.5 text-caption text-white opacity-0 transition group-hover:opacity-100">{m.name}</span>
                   <span className="pointer-events-none absolute right-1 top-1 grid size-5 place-items-center rounded-full bg-primary text-primary-foreground opacity-0 transition group-hover:opacity-100"><Check className="size-3" /></span>
                 </button>
               ))}

@@ -248,10 +248,10 @@ export function MediaLibraryPage() {
               <MediaThumb m={m} />
               {m.kind === "html" && canWrite && (
                 <button type="button" onClick={() => setEditHtml(m)} className="absolute inset-0" aria-label={`Edit ${m.name}`}>
-                  <span className="absolute inset-x-0 bottom-0 bg-scrim py-1 text-center text-[10px] font-medium text-white">Tap to edit</span>
+                  <span className="absolute inset-x-0 bottom-0 bg-scrim py-1 text-center text-caption font-medium text-white">Tap to edit</span>
                 </button>
               )}
-              <span className="absolute left-2 top-2 rounded bg-background/85 px-1.5 py-0.5 text-[10px] font-semibold uppercase">
+              <span className="absolute left-2 top-2 rounded bg-background/85 px-1.5 py-0.5 text-micro uppercase">
                 {m.kind === "audio" ? "music" : m.kind}
               </span>
               <LicenseBadge source={m.source} className="absolute bottom-2 left-2" />
@@ -529,7 +529,7 @@ export function MediaPicker({
                         <Check className="size-3.5" />
                       </span>
                     )}
-                    <div className="truncate px-1.5 py-1 text-[11px] font-medium">{m.name}</div>
+                    <div className="truncate px-1.5 py-1 text-caption font-medium">{m.name}</div>
                   </button>
                 );
               })}

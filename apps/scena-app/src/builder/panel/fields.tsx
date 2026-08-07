@@ -16,7 +16,7 @@ export function Field({ label, children, hint }: { label: string; children: Reac
         <span className="w-[86px] shrink-0 text-xs text-muted-foreground">{label}</span>
         <span className="min-w-0 flex-1">{children}</span>
       </div>
-      {hint && <span className="pl-[86px] text-[10.5px] leading-tight text-muted-foreground/70">{hint}</span>}
+      {hint && <span className="pl-[86px] text-caption leading-tight text-muted-foreground/70">{hint}</span>}
     </label>
   );
 }
@@ -40,7 +40,7 @@ export function PanelGroup({
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
-          className="flex flex-1 items-center gap-1.5 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+          className="flex flex-1 items-center gap-1.5 py-2.5 text-micro text-muted-foreground uppercase"
         >
           <ChevronDown className={cn("size-3.5 transition-transform", !open && "-rotate-90")} />
           {title}
@@ -116,7 +116,7 @@ export function NumberField({
         }}
         className={cn("h-8 px-2 font-mono text-xs tabular-nums", suffix && "pr-8")}
       />
-      {suffix && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">{suffix}</span>}
+      {suffix && <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-caption text-muted-foreground">{suffix}</span>}
     </div>
   );
 }
@@ -146,7 +146,7 @@ export function SliderField({
         onChange={(e) => onChange(Number(e.target.value))}
         className="h-1.5 min-w-0 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary"
       />
-      <span className="w-9 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">{Math.round(value)}</span>
+      <span className="w-9 shrink-0 text-right font-mono text-caption tabular-nums text-muted-foreground">{Math.round(value)}</span>
     </div>
   );
 }
@@ -172,7 +172,7 @@ export function SegField<T extends string>({ value, onChange, options }: { value
           type="button"
           onClick={() => onChange(o.id)}
           className={cn(
-            "flex-1 rounded-[6px] px-2 py-1 text-[11px] font-medium transition-colors",
+            "flex-1 rounded-md px-2 py-1 text-caption font-medium transition-colors",
             value === o.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
           )}
         >
@@ -226,14 +226,14 @@ export function QuadField({
             <NumberField value={all} onChange={onAll} min={min} max={max} suffix="px" />
           </span>
         )}
-        {!linked && <span className="flex-1 text-[10.5px] text-muted-foreground">Independent sides</span>}
+        {!linked && <span className="flex-1 text-caption text-muted-foreground">Independent sides</span>}
       </div>
       {!linked && (
         <div className="grid grid-cols-4 gap-1">
           {([0, 1, 2, 3] as const).map((i) => (
             <div key={i} className="flex flex-col items-center gap-0.5">
               <NumberField value={sides[i]} onChange={(v) => onSide(i, v)} min={min} max={max} />
-              <span className="text-[9.5px] uppercase text-muted-foreground/70">{labels[i]}</span>
+              <span className="text-micro text-muted-foreground/70 uppercase">{labels[i]}</span>
             </div>
           ))}
         </div>
@@ -260,7 +260,7 @@ export function ColorField({ value, onChange, fallback = "#ffffff" }: { value: s
       <span className="relative size-8 shrink-0 overflow-hidden rounded-md border shadow-xs" style={{ background: value || fallback }}>
         <input type="color" value={hex} onChange={(e) => onChange(e.target.value)} className="absolute -inset-1 size-[140%] cursor-pointer opacity-0" />
       </span>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="#hex or oklch(…)" className="h-8 font-mono text-[11px]" />
+      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="#hex or oklch(…)" className="h-8 font-mono text-caption" />
     </div>
   );
 }

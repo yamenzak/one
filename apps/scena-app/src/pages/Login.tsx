@@ -44,10 +44,10 @@ function Shell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="rounded-3xl border bg-card/80 p-8 shadow-xl shadow-primary/5 backdrop-blur-sm">{children}</div>
           <p className="mt-6 text-center text-xs text-muted-foreground">Digital signage & live boards, beautifully simple.</p>
-          <p className="mt-2 text-center text-[11px] leading-relaxed text-muted-foreground">
+          <p className="mt-2 text-center text-caption leading-relaxed text-muted-foreground">
             By continuing, you agree to our <LegalLinks onOpen={setDoc} />.
           </p>
-          <p className="mt-1 text-center text-[11px] text-muted-foreground/60">© 2026 Four Degree Labs · Scena</p>
+          <p className="mt-1 text-center text-caption text-muted-foreground/60">© 2026 Four Degree Labs · Scena</p>
         </div>
       </div>
       <LegalDialog doc={doc} onClose={() => setDoc(null)} />

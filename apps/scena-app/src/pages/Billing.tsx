@@ -224,19 +224,19 @@ export function BillingPage() {
                 className={cn("relative flex flex-col rounded-2xl border p-5", current ? "border-primary shadow-sm ring-1 ring-primary" : "bg-card")}
               >
                 {current && (
-                  <span className="absolute right-4 top-4 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">Current</span>
+                  <span className="absolute right-4 top-4 rounded-full bg-primary/10 px-2 py-0.5 text-caption font-semibold text-primary">Current</span>
                 )}
                 <div className="text-sm font-semibold">{p.name}</div>
                 <div className="mt-1.5 flex items-baseline gap-1">
-                  <span className="text-2xl font-bold tracking-tight">{p.price_cents === 0 ? "Free" : dollars(p.price_cents)}</span>
+                  <span className="text-title-2">{p.price_cents === 0 ? "Free" : dollars(p.price_cents)}</span>
                   {p.price_cents > 0 && <span className="text-xs text-muted-foreground">/{p.interval}</span>}
                 </div>
-                <div className="mt-1 flex items-center gap-1 text-[11px] font-medium text-primary">
+                <div className="mt-1 flex items-center gap-1 text-caption font-medium text-primary">
                   <Sparkles className="size-3" /> {planGrantN(p) > 0 ? `${planGrant(p)} AI credits / mo` : "No AI credits"}
                 </div>
                 <ul className="mt-4 flex-1 space-y-1.5">
                   {feats.map((f) => (
-                    <li key={f} className="flex items-start gap-1.5 text-[12.5px] text-muted-foreground">
+                    <li key={f} className="flex items-start gap-1.5 text-caption text-muted-foreground">
                       <Check className="mt-0.5 size-3.5 shrink-0 text-success" /> <span>{f}</span>
                     </li>
                   ))}
@@ -254,7 +254,7 @@ export function BillingPage() {
             );
           })}
         </div>
-        <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mt-3 text-caption leading-relaxed text-muted-foreground">
           Paid plans renew automatically until cancelled; AI credits are consumed at generation time and are non-refundable. By subscribing you agree to our{" "}
           <LegalLinks onOpen={setLegalDoc} />.
         </p>
@@ -398,31 +398,31 @@ function PlanChangeDialog({
     >
       <DialogContent title={`${dir === "up" ? "Upgrade to" : "Switch to"} ${target.name}`} className="sm:max-w-md">
         <div className="flex items-baseline gap-1.5">
-          <span className="text-2xl font-bold tracking-tight">{paid ? dollars(target.price_cents) : "Free"}</span>
+          <span className="text-title-2">{paid ? dollars(target.price_cents) : "Free"}</span>
           {paid && <span className="text-sm text-muted-foreground">/{target.interval}</span>}
         </div>
         <ul className="space-y-1.5">
           {feats.map((f) => (
-            <li key={f} className="flex items-start gap-1.5 text-[13px] text-muted-foreground">
+            <li key={f} className="flex items-start gap-1.5 text-caption text-muted-foreground">
               <Check className="mt-0.5 size-3.5 shrink-0 text-success" /> <span>{f}</span>
             </li>
           ))}
         </ul>
         {blockedNoStripe ? (
-          <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-[12.5px] text-foreground/80">
+          <div className="flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-caption text-foreground/80">
             <Lock className="mt-0.5 size-4 shrink-0 text-warning" />
             Online payments aren't enabled yet. Contact us to move onto a paid plan.
           </div>
         ) : needsPayment ? (
-          <p className="text-[12.5px] text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             You'll be taken to secure checkout (Stripe) to enter payment. Your plan changes once payment succeeds.
           </p>
         ) : dir === "down" ? (
-          <p className="text-[12.5px] text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             You'll move down to {target.name}. If you're using more than it allows, we'll show what to remove first.
           </p>
         ) : (
-          <p className="text-[12.5px] text-muted-foreground">Confirm switching your workspace to {target.name}.</p>
+          <p className="text-caption text-muted-foreground">Confirm switching your workspace to {target.name}.</p>
         )}
         <DialogFooter>
           <Button variant="ghost" onClick={onClose} disabled={busy}>

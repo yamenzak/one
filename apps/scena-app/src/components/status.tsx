@@ -24,7 +24,8 @@ const PILL_SOLID: Record<Tone, string> = {
   success: "bg-success text-success-foreground",
   warning: "bg-warning text-warning-foreground",
   info: "bg-info text-info-foreground",
-  destructive: "bg-destructive text-white",
+  // The comment above says "token bg + token foreground"; this row said `white`.
+  destructive: "bg-destructive text-destructive-foreground",
   primary: "bg-primary text-primary-foreground",
   muted: "bg-muted text-muted-foreground",
 };
@@ -79,7 +80,7 @@ export function StatTile({
 }) {
   return (
     <Card className={className}>
-      <div className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-micro uppercase text-muted-foreground">
         {dot}
         {label}
       </div>

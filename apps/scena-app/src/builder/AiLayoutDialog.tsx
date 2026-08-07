@@ -167,7 +167,7 @@ export function AiLayoutDialog({
               key={ex}
               type="button"
               onClick={() => setPrompt(ex)}
-              className="rounded-full border px-2.5 py-1 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="rounded-full border px-2.5 py-1 text-left text-caption text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               {ex.length > 46 ? ex.slice(0, 44) + "…" : ex}
             </button>
@@ -176,7 +176,7 @@ export function AiLayoutDialog({
 
         {models.length > 0 && (
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-medium text-muted-foreground">Model</span>
+            <span className="text-caption font-medium text-muted-foreground">Model</span>
             <Select
               value={modelId || "__default"}
               onChange={(v) => setModelId(v === "__default" ? "" : v)}
@@ -189,7 +189,7 @@ export function AiLayoutDialog({
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-[11px] text-muted-foreground">Uses AI credits · follows your brand · one undo reverses it.</p>
+          <p className="text-caption text-muted-foreground">Uses AI credits · follows your brand · one undo reverses it.</p>
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
               Cancel
@@ -225,7 +225,7 @@ function ModeCard({ active, onClick, icon, title, desc }: { active: boolean; onC
       <span className={cn("flex items-center gap-1.5 text-sm font-medium", active ? "text-primary" : "")}>
         {icon} {title}
       </span>
-      <span className="text-[11px] leading-snug text-muted-foreground">{desc}</span>
+      <span className="text-caption leading-snug text-muted-foreground">{desc}</span>
     </button>
   );
 }

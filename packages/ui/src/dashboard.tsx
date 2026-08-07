@@ -166,7 +166,7 @@ export function NavSidebar({ navGroups, active, onNavigate, brand, footer, colla
         <nav className="flex flex-col gap-4 py-2">
           {navGroups.map((group) => (
             <div key={group.label} className="flex flex-col gap-1">
-              {!collapsed && <div className="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">{group.label}</div>}
+              {!collapsed && <div className="px-2.5 pb-1 text-micro uppercase text-sidebar-foreground/45">{group.label}</div>}
               {group.items.map((item) => (
                 <NavButton key={item.key} item={item} active={item.key === active} collapsed={collapsed} onClick={() => onNavigate(item.key)} />
               ))}

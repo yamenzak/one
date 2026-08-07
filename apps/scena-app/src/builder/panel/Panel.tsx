@@ -109,7 +109,7 @@ function HtmlContent({ node, onConfig }: { node: WNode; onConfig: (p: Record<str
   const [open, setOpen] = useState(false);
   return (
     <PanelGroup title="HTML">
-      <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
+      <p className="px-1 text-caption leading-relaxed text-muted-foreground">
         Self-contained HTML rendered in a sandboxed iframe scoped to this widget. Write it yourself or let the AI design it — on-brand, animated, no external resources.
       </p>
       <div className="px-1">
@@ -166,13 +166,13 @@ function LogoContent({ node, logos, onConfig }: { node: WNode; logos: BrandLogo[
                     <img src={l.url} alt={l.label} className="max-h-9 max-w-9 object-contain" />
                   </span>
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">{l.label}</span>
-                  {active && <span className="text-[11px] font-semibold text-primary">Selected</span>}
+                  {active && <span className="text-caption font-semibold text-primary">Selected</span>}
                 </button>
               );
             })}
           </div>
         ) : (
-          <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
+          <p className="px-1 text-caption leading-relaxed text-muted-foreground">
             No brand logos yet. Upload your logo (and any variants) under <b>Settings → Brand kit → Brand assets</b>, then pick one here.
           </p>
         )}
@@ -245,7 +245,7 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
         <PanelGroup title="Source">
           <Field label="Source"><SelectField value={str(c.feedId)} onChange={(v) => onConfig({ feedId: v })} options={[{ id: "", label: "— pick a source —" }, ...feeds.map((f) => ({ id: f.id, label: f.name }))]} /></Field>
           {str(c.feedId) ? <SourceColumnField feedId={str(c.feedId)} value={str(c.column, "title")} onChange={(v) => onConfig({ column: v })} hint="Which column scrolls across" />
-            : <p className="text-[10.5px] text-muted-foreground">Any source works — an RSS/Manual headline list, or a column from an API or Google Sheet. Create one on the Sources page.</p>}
+            : <p className="text-caption text-muted-foreground">Any source works — an RSS/Manual headline list, or a column from an API or Google Sheet. Create one on the Sources page.</p>}
         </PanelGroup>
         <PanelGroup title="Layout"><VariantPicker node={node} value={str(c.variant, "scroll")} options={TICKER_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></PanelGroup>
         <PanelGroup title="Separator">
@@ -266,7 +266,7 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
       <>
         <PanelGroup title="Location">
           <Field label="Place"><SelectField value={str(c.sourceId)} onChange={(v) => onConfig({ sourceId: v })} options={[{ id: "", label: "— pick a location —" }, ...weather.map((w) => ({ id: w.id, label: w.label }))]} /></Field>
-          {weather.length === 0 && <p className="text-[10.5px] text-muted-foreground">Add a location in Settings first.</p>}
+          {weather.length === 0 && <p className="text-caption text-muted-foreground">Add a location in Settings first.</p>}
         </PanelGroup>
         <PanelGroup title="Layout"><VariantPicker node={node} value={str(c.variant, "current")} options={opt([["small", "Small"], ["current", "Current"], ["day", "Today"], ["week", "Week"]])} onPick={(v) => onConfig({ variant: v })} /></PanelGroup>
         <PanelGroup title="Units" defaultOpen={false}>
@@ -279,7 +279,7 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
     return (
       <PanelGroup title="Style">
         <VariantPicker node={node} value={str(c.variant, "card")} options={NOWPLAYING_VARIANTS} onPick={(v) => onConfig({ variant: v })} />
-        <p className="text-[10.5px] text-muted-foreground">Shows the channel's current track — art + artist come from the Music page.</p>
+        <p className="text-caption text-muted-foreground">Shows the channel's current track — art + artist come from the Music page.</p>
       </PanelGroup>
     );
   }
@@ -336,7 +336,7 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
           </PanelGroup>
         )}
         <PanelGroup title="Dynamic data" defaultOpen={false}>
-          <p className="text-[10.5px] text-muted-foreground">Pull any field live from an API or Google Sheet source.</p>
+          <p className="text-caption text-muted-foreground">Pull any field live from an API or Google Sheet source.</p>
           <BindControl node={node} field="value" kind="value" label="value" sources={feeds} onConfig={onConfig} />
           <BindControl node={node} field="label" kind="value" label="label" sources={feeds} onConfig={onConfig} />
           <BindControl node={node} field="unit" kind="value" label="unit" sources={feeds} onConfig={onConfig} />
@@ -354,7 +354,7 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
         <PanelGroup title="Layout"><VariantPicker node={node} value={str(c.variant, "rows")} options={MENU_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></PanelGroup>
         <PanelGroup title="Heading"><Field label="Title"><TextField value={str(c.title)} onChange={(v) => onConfig({ title: v })} placeholder="Today's menu" /></Field></PanelGroup>
         <PanelGroup title="Dynamic data" defaultOpen={boundItems}>
-          <p className="text-[10.5px] text-muted-foreground">Fill the rows live from a Google Sheet or API source.</p>
+          <p className="text-caption text-muted-foreground">Fill the rows live from a Google Sheet or API source.</p>
           <BindControl node={node} field="items" kind="list" label="items" sources={feeds} onConfig={onConfig} />
         </PanelGroup>
         {!boundItems && <MenuItemsEditor node={node} onConfig={onConfig} />}
@@ -458,6 +458,9 @@ function StackContent({ node, boards, feeds, weather, logos, onConfig }: { node:
     if (j < 0 || j >= items.length) return;
     const next = [...items]; const t = next[i]!; next[i] = next[j]!; next[j] = t; setItems(next);
   };
+// design-tokens-exempt: the STARTING colour of a new text widget on a
+// slide — content the operator then edits, not app chrome. A token here
+// would put the dashboard's foreground on a television.
   const add = () => setItems([...items, { id: `s${Date.now().toString(36)}`, widget: { type: "text", style: { color: "#ffffff", fontSize: 72, fontWeight: "700", align: "center" }, config: { text: "New slide" } } }]);
   return (
     <>
@@ -502,7 +505,7 @@ function StackItemEditor({ index, total, item, parent, boards, feeds, weather, l
         <button type="button" onClick={() => setOpen((o) => !o)} className="flex flex-1 items-center gap-1.5 text-xs font-medium">
           <ChevronDown className={cnRotate(!open)} />
           Slide {index + 1}
-          <span className="text-[10px] font-normal text-muted-foreground">· {widgetDef(item.widget.type)?.label ?? item.widget.type}</span>
+          <span className="text-caption font-normal text-muted-foreground">· {widgetDef(item.widget.type)?.label ?? item.widget.type}</span>
         </button>
         <Button variant="ghost" size="icon" className="size-6 text-muted-foreground" disabled={index === 0} onClick={() => onMove(-1)}><ChevronUp className="size-3.5" /></Button>
         <Button variant="ghost" size="icon" className="size-6 text-muted-foreground" disabled={index === total - 1} onClick={() => onMove(1)}><ChevronDown className="size-3.5" /></Button>
@@ -630,7 +633,7 @@ function StyleTab({ node, onStyle }: Props) {
         <PanelGroup title="QR code">
           <Field label="Modules" hint="The dark squares"><ColorField value={str(s.color, "#0b0b0f")} onChange={(v) => onStyle({ color: v })} fallback="#0b0b0f" /></Field>
           <Field label="Paper" hint="The code's own background — keep it light so it scans"><ColorField value={str(s.paper, "#ffffff")} onChange={(v) => onStyle({ paper: v })} fallback="#ffffff" /></Field>
-          <div className="pt-1 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">Card (optional)</div>
+          <div className="pt-1 text-micro text-muted-foreground uppercase">Card (optional)</div>
           <SurfaceControl node={node} onStyle={onStyle} />
           <Field label="Padding" hint="Inset the code inside the card"><SliderField value={num(s.pad, 0)} onChange={(v) => onStyle({ pad: v })} min={0} max={24} /></Field>
           <Field label="Corners"><SliderField value={num(s.radius, 0)} onChange={(v) => onStyle({ radius: v })} min={0} max={64} /></Field>
@@ -642,7 +645,7 @@ function StyleTab({ node, onStyle }: Props) {
           <Field label="Accent" hint="Icon + pulse ring colour"><ColorField value={str(s.accent, "oklch(0.72 0.19 300)")} onChange={(v) => onStyle({ accent: v })} fallback="#a855f7" /></Field>
           <Field label="Text"><ColorField value={str(s.color, "#ffffff")} onChange={(v) => onStyle({ color: v })} /></Field>
           <SwitchField label="Animate" value={bool(s.animate, true)} onChange={(v) => onStyle({ animate: v })} />
-          <div className="pt-1 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">Card</div>
+          <div className="pt-1 text-micro text-muted-foreground uppercase">Card</div>
           <SurfaceControl node={node} onStyle={onStyle} />
           <Field label="QR modules"><ColorField value={str(s.qrDark, "#0b0b0f")} onChange={(v) => onStyle({ qrDark: v })} fallback="#0b0b0f" /></Field>
           <Field label="QR paper" hint="Keep light so it scans"><ColorField value={str(s.qrLight, "#ffffff")} onChange={(v) => onStyle({ qrLight: v })} fallback="#ffffff" /></Field>
@@ -805,7 +808,7 @@ function LayoutTab({ node, onGeom }: Props) {
       {SCALEABLE.has(t) && (
         <PanelGroup title="Resize behaviour">
           <SegField value={(node.scaleMode ?? "reflow") as ScaleMode} onChange={(v) => onGeom({ scaleMode: v })} options={opt([["uniform", "Scale content"], ["reflow", "Reflow / fill"]]) as { id: ScaleMode; label: string }[]} />
-          <p className="text-[10.5px] text-muted-foreground">{(node.scaleMode ?? "reflow") === "uniform" ? "Content scales as a unit when resized — never crops." : "Content fills the box and reflows to fit."}</p>
+          <p className="text-caption text-muted-foreground">{(node.scaleMode ?? "reflow") === "uniform" ? "Content scales as a unit when resized — never crops." : "Content fills the box and reflows to fit."}</p>
         </PanelGroup>
       )}
       <DisplayTimeControl display={node.display} onGeom={onGeom} />
@@ -835,7 +838,7 @@ function DisplayTimeControl({ display, onGeom }: { display?: DisplaySchedule; on
           <Field label="Show for (s)" hint="How long it stays on screen each cycle"><SliderField value={showSec} onChange={(v) => patch({ showSec: v })} min={2} max={120} /></Field>
           <Field label="Every (s)" hint="Length of the full on + off cycle"><SliderField value={everySec} onChange={(v) => patch({ everySec: v })} min={5} max={600} /></Field>
           <Field label="Entrance" hint="How it animates on and off — never a hard pop"><SelectField value={anim} onChange={(v) => patch({ anim: v as DisplayAnim })} options={DISPLAY_ANIMS.map((a) => ({ id: a.id, label: a.label }))} /></Field>
-          <p className="text-[10.5px] text-muted-foreground">{displaySummary({ mode: "interval", showSec, everySec })}. Screens stay in sync.</p>
+          <p className="text-caption text-muted-foreground">{displaySummary({ mode: "interval", showSec, everySec })}. Screens stay in sync.</p>
         </>
       )}
     </PanelGroup>

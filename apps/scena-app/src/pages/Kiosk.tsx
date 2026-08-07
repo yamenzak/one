@@ -97,12 +97,12 @@ export function KioskPage() {
           {/* Live now-serving strip */}
           <div className="mb-8 flex items-center gap-6 rounded-2xl border border-border bg-card/50 px-8 py-4">
             <div className="text-center">
-              <div className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">Now serving</div>
+              <div className="text-micro text-muted-foreground uppercase">Now serving</div>
               <div className="font-mono text-4xl font-bold tabular-nums text-primary">{fmt(queue?.prefix ?? "", queue?.serving ?? null)}</div>
             </div>
             <div className="h-10 w-px bg-border" />
             <div className="text-center">
-              <div className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">Waiting</div>
+              <div className="text-micro text-muted-foreground uppercase">Waiting</div>
               <div className="font-mono text-4xl font-bold tabular-nums">{totalWaiting}</div>
             </div>
           </div>
@@ -137,12 +137,12 @@ export function KioskPage() {
         </div>
       ) : (
         <div className="flex flex-col items-center">
-          <div id="ticket" ref={printRef} className="min-w-80 rounded-3xl bg-white px-12 py-9 text-center text-neutral-900">
-            <div className="text-xs uppercase tracking-widest text-neutral-500">{board.name}</div>
+          <div id="ticket" ref={printRef} className="min-w-80 rounded-3xl bg-white px-12 py-9 text-center text-black">
+            <div className="text-xs uppercase tracking-widest text-black/70">{board.name}</div>
             {ticket.label && <div className="mt-1.5 text-lg font-bold">{ticket.label}</div>}
             <div className="my-3 font-mono text-8xl font-extrabold leading-none tabular-nums">{ticket.prefix}{String(ticket.number).padStart(3, "0")}</div>
-            <div className="text-neutral-600">{ticket.ahead === 0 ? "You're next" : `${ticket.ahead} ahead of you`}</div>
-            <div className="mt-4 text-[11px] text-neutral-500">Please keep this ticket and watch the screen.</div>
+            <div className="text-black/70">{ticket.ahead === 0 ? "You're next" : `${ticket.ahead} ahead of you`}</div>
+            <div className="mt-4 text-caption text-black/70">Please keep this ticket and watch the screen.</div>
           </div>
           <div className="mt-7 flex gap-3">
             <Button variant="outline" size="lg" onClick={() => window.print()}><Printer className="h-4 w-4" /> Print again</Button>

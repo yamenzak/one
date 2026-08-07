@@ -385,7 +385,7 @@ function EditableName({ screen, onRenamed }: { screen: Screen; onRenamed: () => 
       className="group/name inline-flex items-center gap-2 rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
       title="Rename device"
     >
-      <span className="truncate text-xl font-semibold tracking-tight md:text-2xl">{screen.name}</span>
+      <span className="truncate text-title-3 md:text-2xl">{screen.name}</span>
       <Pencil className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/name:opacity-70" />
     </button>
   );
@@ -982,7 +982,7 @@ function AddRuleForm({
             type="button"
             onClick={() => toggleDay(d)}
             className={cn(
-              "rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
+              "rounded-md border px-2 py-1 text-caption font-medium transition-colors",
               days.includes(d) ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted",
             )}
           >
@@ -993,16 +993,16 @@ function AddRuleForm({
 
       <div className="flex flex-wrap items-end gap-2.5">
         <div className="flex flex-col gap-1">
-          <Label className="text-[11px] text-muted-foreground">From</Label>
+          <Label className="text-caption text-muted-foreground">From</Label>
           <Input type="time" value={start} onChange={(e) => setStart(e.target.value)} className="w-28 font-mono text-xs" />
         </div>
         <div className="flex flex-col gap-1">
-          <Label className="text-[11px] text-muted-foreground">To</Label>
+          <Label className="text-caption text-muted-foreground">To</Label>
           <Input type="time" value={end} onChange={(e) => setEnd(e.target.value)} className="w-28 font-mono text-xs" />
         </div>
         {track.kind === "channel" && (
           <div className="flex min-w-[140px] flex-1 flex-col gap-1">
-            <Label className="text-[11px] text-muted-foreground">Channel</Label>
+            <Label className="text-caption text-muted-foreground">Channel</Label>
             <Select
               value={channelId}
               onChange={setChannelId}
@@ -1014,7 +1014,7 @@ function AddRuleForm({
         )}
         {track.kind === "channel" && (
           <div className="flex w-20 flex-col gap-1">
-            <Label className="text-[11px] text-muted-foreground">Priority</Label>
+            <Label className="text-caption text-muted-foreground">Priority</Label>
             <Input type="number" value={priority} onChange={(e) => setPriority(e.target.value)} className="h-8 font-mono text-xs" min={1} />
           </div>
         )}
@@ -1023,7 +1023,7 @@ function AddRuleForm({
         </Button>
       </div>
       {track.kind !== "channel" && (
-        <p className="text-[11px] text-muted-foreground">Tip: set From later than To for an overnight window (e.g. 22:00 → 07:00).</p>
+        <p className="text-caption text-muted-foreground">Tip: set From later than To for an overnight window (e.g. 22:00 → 07:00).</p>
       )}
     </div>
   );

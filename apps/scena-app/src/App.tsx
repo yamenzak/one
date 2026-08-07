@@ -123,17 +123,17 @@ function SidebarFooter({
       <div className="flex items-center gap-0.5">
         {emergencyBtn}
         {themeBtn}
-        {emergencyActive && <span className="ml-1 text-[11px] font-medium text-destructive">Takeover active</span>}
+        {emergencyActive && <span className="ml-1 text-caption font-medium text-destructive">Takeover active</span>}
       </div>
       <button onClick={onNavigateBilling} className="w-full rounded-xl bg-sidebar-accent/50 p-3 text-left transition-colors hover:bg-sidebar-accent">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs font-semibold">{planName}</span>
-          <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{bal.toLocaleString()} cr</span>
+          <span className="font-mono text-caption text-muted-foreground tabular-nums">{bal.toLocaleString()} cr</span>
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div className={`h-full rounded-full transition-[width] duration-500 ${low ? "bg-warning" : "bg-primary"}`} style={{ width: `${pct}%` }} />
         </div>
-        <div className={`mt-1.5 text-[11px] ${low ? "text-warning" : "text-muted-foreground"}`}>
+        <div className={`mt-1.5 text-caption ${low ? "text-warning" : "text-muted-foreground"}`}>
           {low ? "Low on AI credits · " : "AI credits · "}
           {grant > 0 ? `${bal.toLocaleString()} / ${grant.toLocaleString()}` : bal.toLocaleString()}
         </div>
@@ -141,8 +141,8 @@ function SidebarFooter({
       <div className="flex items-center gap-2.5 px-1">
         <div className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/15 text-xs font-bold text-primary">{initials}</div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium">{email || "Operator"}</div>
-          <div className="text-[11px] capitalize text-muted-foreground">{role ?? "Owner"}</div>
+          <div className="truncate text-caption font-medium">{email || "Operator"}</div>
+          <div className="text-caption capitalize text-muted-foreground">{role ?? "Owner"}</div>
         </div>
         <Button variant="ghost" size="icon" className="size-8 text-muted-foreground" onClick={onSignOut} title="Sign out" aria-label="Sign out">
           <LogOut className="size-4" />

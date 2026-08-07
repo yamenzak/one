@@ -342,7 +342,7 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
         }
       >
         <div className="mt-3 flex items-center gap-2">
-          {dirty && <Badge className="gap-1 text-[11px]">Unpublished changes</Badge>}
+          {dirty && <Badge className="gap-1 text-caption">Unpublished changes</Badge>}
           {writable && (
             <Button size="sm" onClick={publish} disabled={publishing || !dirty} className="gap-1.5">
               <Rocket className="size-4" /> {publishing ? "Publishing…" : "Publish"}
@@ -384,7 +384,7 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
 
             {slides.length === 0 ? (
               <div className="flex flex-col items-center gap-3 py-6 text-center">
-                <p className="text-[13px] text-muted-foreground">This display has no slides yet.</p>
+                <p className="text-caption text-muted-foreground">This display has no slides yet.</p>
                 {writable && (
                   <div className="flex flex-wrap justify-center gap-2">
                     <Button size="sm" variant="outline" className="gap-1.5" onClick={() => fileRef.current?.click()} disabled={busy}>
@@ -416,11 +416,11 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
                     className={cn("group relative aspect-video overflow-hidden rounded-lg border bg-muted", over === i && "ring-2 ring-primary")}
                   >
                     {s.type === "html" ? (
-                      <div className="flex size-full items-center justify-center text-[10px] font-medium text-muted-foreground">HTML</div>
+                      <div className="flex size-full items-center justify-center text-caption font-medium text-muted-foreground">HTML</div>
                     ) : s.asset_url ? (
                       <img src={assetSrc(s.asset_url)} alt="" className="size-full object-cover" draggable={false} />
                     ) : (
-                      <div className="flex size-full items-center justify-center text-[10px] text-muted-foreground">{s.type}</div>
+                      <div className="flex size-full items-center justify-center text-caption text-muted-foreground">{s.type}</div>
                     )}
                     {writable && (
                       <>
@@ -463,17 +463,17 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
               <input ref={audioRef} type="file" accept="audio/*" multiple hidden onChange={(e) => addAudio(e.target.files)} />
             </div>
             {tracks.length === 0 ? (
-              <p className="py-3 text-center text-[13px] text-muted-foreground">No music yet.{writable ? " Upload tracks to play a bed." : ""}</p>
+              <p className="py-3 text-center text-caption text-muted-foreground">No music yet.{writable ? " Upload tracks to play a bed." : ""}</p>
             ) : (
               <div className="-my-1">
                 {tracks.map((t) => (
                   <div key={t.id} className="group flex items-center gap-3 border-b py-2 last:border-0">
                     <Music className="size-4 shrink-0 text-muted-foreground" />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[13px] font-medium">{t.title}</div>
-                      {t.artist && <div className="truncate text-[11px] text-muted-foreground">{t.artist}</div>}
+                      <div className="truncate text-caption font-medium">{t.title}</div>
+                      {t.artist && <div className="truncate text-caption text-muted-foreground">{t.artist}</div>}
                     </div>
-                    <span className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground">{fmtDur(t.duration_ms)}</span>
+                    <span className="shrink-0 font-mono text-caption tabular-nums text-muted-foreground">{fmtDur(t.duration_ms)}</span>
                     {writable && (
                       <button
                         onClick={() => removeTrack(t.id)}

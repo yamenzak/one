@@ -530,7 +530,7 @@ function RssDetail({ feed, onReload }: { feed: Feed; onReload: () => Promise<voi
         )}
       </div>
       <div>
-        <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="mb-1.5 flex items-center gap-1.5 text-micro uppercase text-muted-foreground">
           <Rss className="size-3.5" /> Headlines
         </div>
         <ItemList feed={feed} />
@@ -582,7 +582,7 @@ function TabularDetail({ feed, onReload }: { feed: Feed; onReload: () => Promise
         )}
       </div>
       <div>
-        <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="mb-1.5 flex items-center gap-1.5 text-micro uppercase text-muted-foreground">
           <Table2 className="size-3.5" /> Data preview
         </div>
         <DatasetTable dataset={feed.dataset ?? { columns: [], rows: [] }} />
@@ -625,7 +625,7 @@ function DatasetTable({ dataset }: { dataset: SourceDataset }) {
         </tbody>
       </table>
       {dataset.rows.length > rows.length && (
-        <div className="border-t px-2.5 py-1.5 text-[11px] text-muted-foreground">
+        <div className="border-t px-2.5 py-1.5 text-caption text-muted-foreground">
           + {dataset.rows.length - rows.length} more row{dataset.rows.length - rows.length === 1 ? "" : "s"}
         </div>
       )}
@@ -676,7 +676,7 @@ function SourceConfigFields({
             className="w-32 text-xs tabular-nums"
             placeholder="30"
           />
-          <p className="text-[10.5px] text-muted-foreground">How many recent headlines to keep. Default 30.</p>
+          <p className="text-caption text-muted-foreground">How many recent headlines to keep. Default 30.</p>
         </div>
       </div>
     );
@@ -693,7 +693,7 @@ function SourceConfigFields({
             Data path <span className="font-normal text-muted-foreground">(optional)</span>
           </Label>
           <Input value={cfg.path} onChange={(e) => set("path")(e.target.value)} className="font-mono text-xs" placeholder="data.items" />
-          <p className="text-[10.5px] text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             Dot/bracket path to the array or object to tabulate, e.g. <code>results[0].rows</code>. Leave blank for the whole response.
           </p>
         </div>
@@ -711,7 +711,7 @@ function SourceConfigFields({
           className="font-mono text-xs"
           placeholder="https://docs.google.com/spreadsheets/d/…"
         />
-        <p className="text-[10.5px] text-muted-foreground">The sheet must be shared as “Anyone with the link”. The first row is used as column headers.</p>
+        <p className="text-caption text-muted-foreground">The sheet must be shared as “Anyone with the link”. The first row is used as column headers.</p>
       </div>
       <div className="space-y-1.5">
         <Label>
@@ -802,7 +802,7 @@ function WeatherWindowFields({ w, setW, perCall }: { w: WeatherWindow; setW: (u:
           />
         </div>
       </div>
-      <p className="rounded-lg border border-dashed px-3 py-2 text-[11px] text-muted-foreground">
+      <p className="rounded-lg border border-dashed px-3 py-2 text-caption text-muted-foreground">
         Refreshes once an hour while open — about{" "}
         <b className="tabular-nums">
           {calls} call{calls === 1 ? "" : "s"}/day
@@ -976,7 +976,7 @@ function NewSourceDialog({
                         <DatasetTable dataset={preview} />
                       </div>
                     )}
-                    {!preview && !previewErr && <p className="mt-2 text-[11px] text-muted-foreground">Fetch once to confirm the columns before saving.</p>}
+                    {!preview && !previewErr && <p className="mt-2 text-caption text-muted-foreground">Fetch once to confirm the columns before saving.</p>}
                   </div>
                 )}
               </>

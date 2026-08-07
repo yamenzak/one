@@ -70,7 +70,10 @@ export function EmergencyModal({
     <Dialog open={open} onOpenChange={(o) => !o && close()}>
       <DialogContent className="overflow-hidden p-0 sm:max-w-xl" dismissible={false}>
         {/* Tone-colored header */}
-        <div className={cn("flex items-center gap-3.5 px-6 py-5 text-white transition-colors", ui.header)}>
+        {/* design-tokens-exempt: painted with the BROADCAST's own gradient, which is
+            content — see `overrides.ts`. White over it is theme-independent for the
+            same reason it is on the screen itself. */}
+        <div className="flex items-center gap-3.5 px-6 py-5 text-white transition-colors" style={{ background: ui.gradient }}>
           <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-white/20">
             <HeaderIcon className="size-5.5" />
           </div>
@@ -88,13 +91,13 @@ export function EmergencyModal({
           )}
 
           {/* Presets */}
-          <Label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Emergency</Label>
+          <Label className="mb-2 block text-micro uppercase text-muted-foreground">Emergency</Label>
           <div className="mb-4 flex flex-wrap gap-1.5">
             {emergency.map((p) => (
               <PresetChip key={p.id} preset={p} active={title === p.title} onClick={() => pickPreset(p)} />
             ))}
           </div>
-          <Label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Notices</Label>
+          <Label className="mb-2 block text-micro uppercase text-muted-foreground">Notices</Label>
           <div className="mb-5 flex flex-wrap gap-1.5">
             {notices.map((p) => (
               <PresetChip key={p.id} preset={p} active={title === p.title} onClick={() => pickPreset(p)} />
@@ -102,12 +105,12 @@ export function EmergencyModal({
           </div>
 
           {/* Message */}
-          <Label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Message</Label>
+          <Label className="mb-2 block text-micro uppercase text-muted-foreground">Message</Label>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Headline" className="mb-2 font-semibold" />
           <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={2} placeholder="Supporting line (optional)" className="mb-4" />
 
           {/* Tone */}
-          <Label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">Look</Label>
+          <Label className="mb-2 block text-micro uppercase text-muted-foreground">Look</Label>
           <div className="mb-4 flex flex-wrap gap-1.5">
             {TONE_ORDER.map((t) => (
               <button
@@ -130,7 +133,7 @@ export function EmergencyModal({
             <div className="flex aspect-[16/6] flex-col items-center justify-center gap-1 px-6 text-center text-white" style={{ background: ui.gradient }}>
               <HeaderIcon className="mb-1 size-6 opacity-95" />
               <div className="text-base font-extrabold leading-tight">{title || "Headline"}</div>
-              {body && <div className="text-[11px] font-medium opacity-90">{body}</div>}
+              {body && <div className="text-caption font-medium opacity-90">{body}</div>}
             </div>
           </div>
 

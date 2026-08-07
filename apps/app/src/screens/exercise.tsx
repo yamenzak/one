@@ -232,15 +232,15 @@ const STRUCTURED = /^\s*(#{1,6}\s|[-*+]\s|\d+[.)]\s)/m;
 export function ExerciseSteps({ md }: { md?: string | null }) {
   const text = (md ?? "").trim();
   if (!text) return <p className="px-1 text-sm text-muted-foreground">No written instructions yet — ask your coach for cues.</p>;
-  if (STRUCTURED.test(text)) return <Markdown className="text-[0.95rem] leading-relaxed text-foreground/90">{text}</Markdown>;
+  if (STRUCTURED.test(text)) return <Markdown className="text-body leading-relaxed text-foreground/90">{text}</Markdown>;
   const steps = text.split(/\n\s*\n/).map((s) => s.trim().replace(/\s*\n\s*/g, " ")).filter(Boolean);
-  if (steps.length < 2) return <p className="px-1 text-[0.95rem] leading-relaxed text-foreground/90">{steps[0] ?? text}</p>;
+  if (steps.length < 2) return <p className="px-1 text-body leading-relaxed text-foreground/90">{steps[0] ?? text}</p>;
   return (
     <ol className="space-y-3">
       {steps.map((s, i) => (
         <li key={i} className="flex gap-3">
           <span className="numeral mt-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-activity-soft text-xs font-bold text-activity">{i + 1}</span>
-          <span className="min-w-0 flex-1 text-[0.95rem] leading-relaxed text-foreground/90">{s}</span>
+          <span className="min-w-0 flex-1 text-body leading-relaxed text-foreground/90">{s}</span>
         </li>
       ))}
     </ol>

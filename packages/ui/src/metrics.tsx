@@ -190,7 +190,7 @@ export function StatCard({ label, value, emptyText, unit, badge, chart, icon: Ic
         {Icon && <Icon className="size-4 shrink-0" style={{ color: toneVar[tone] }} />}
         <span className="truncate">{label}</span>
       </div>
-      <div className={cn("mt-1.5 leading-none", isBlank(value) ? "pt-1" : cn("numeral font-semibold", stack ? "text-[1.65rem]" : "text-[2rem]"))}>
+      <div className={cn("mt-1.5 leading-none", isBlank(value) ? "pt-1" : cn("numeral", stack ? "text-title-2" : "text-title-1"))}>
         {isBlank(value) ? (
           <NoData>{emptyText}</NoData>
         ) : (

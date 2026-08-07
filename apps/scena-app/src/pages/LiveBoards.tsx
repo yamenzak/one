@@ -356,7 +356,7 @@ function ChimeToggle({ boardId, what }: { boardId: string; what: string }) {
   };
   return (
     <div className="flex flex-col gap-2 border-t pt-4">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Sound</div>
+      <div className="text-micro text-muted-foreground uppercase">Sound</div>
       <label className="flex cursor-pointer items-center gap-2 text-xs font-normal text-muted-foreground">
         <Switch checked={on ?? false} onCheckedChange={toggle} disabled={on === null} />
         Play a chime on screens when {what}
@@ -412,7 +412,7 @@ function ScoreManager({ boardId, state, onSaved }: { boardId: string; state: Sco
 
   return (
     <div className="flex flex-col gap-2 border-t pt-4">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Competitors</div>
+      <div className="text-micro text-muted-foreground uppercase">Competitors</div>
       <div className="text-xs text-muted-foreground">Each side gets its own station sign-in to adjust just its score.</div>
       <Input
         value={title}
@@ -520,20 +520,20 @@ function RoomStartDialog({
             >
               <div className="flex items-center justify-between">
                 <div className="text-sm font-semibold">{t.name}</div>
-                <div className="text-[11px] text-muted-foreground">{t.rooms.length ? `${t.rooms.length} rooms` : "empty"}</div>
+                <div className="text-caption text-muted-foreground">{t.rooms.length ? `${t.rooms.length} rooms` : "empty"}</div>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {t.statuses.map((s) => (
                   <span
                     key={s.id}
-                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-neutral-900"
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-caption font-medium text-black"
                     style={{ background: s.color }}
                   >
                     {s.label}
                   </span>
                 ))}
               </div>
-              <div className="text-[11.5px] leading-snug text-muted-foreground">{t.description}</div>
+              <div className="text-caption leading-snug text-muted-foreground">{t.description}</div>
             </button>
           ))}
         </div>
@@ -605,7 +605,7 @@ function BoardBody({ board }: { board: Board }) {
       {isScore && <ScoreManager boardId={board.id} state={board.state as ScoreState | null} onSaved={() => setCredsKey((k) => k + 1)} />}
       {(isRoom || isScore) && <ChimeToggle boardId={board.id} what={isRoom ? "a room changes status" : "the score changes"} />}
 
-      <div className="font-mono text-[11px] text-muted-foreground">bind widgets to · {board.id}</div>
+      <div className="font-mono text-caption text-muted-foreground">bind widgets to · {board.id}</div>
     </>
   );
 }
@@ -620,7 +620,7 @@ function ScorePreview({ state }: { state: ScoreState | null }) {
           <div key={s.id} className="flex items-center gap-4">
             {i > 0 && <span className="text-lg text-muted-foreground">–</span>}
             <div className="text-center">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{s.short || s.name}</div>
+              <div className="text-micro text-muted-foreground uppercase">{s.short || s.name}</div>
               <div className="font-mono text-3xl font-black tabular-nums text-primary">{s.score}</div>
             </div>
           </div>
@@ -666,8 +666,8 @@ function BoardCredentials({ boardId, refreshKey = 0 }: { boardId: string; refres
     <div className="flex flex-col gap-2 border-t pt-4">
       <button className="flex items-center gap-2 text-left" onClick={() => setOpen((v) => !v)}>
         <KeyRound className="size-4 text-muted-foreground" />
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Board logins</span>
-        <span className="text-[11px] text-muted-foreground">{open ? "hide" : "show"}</span>
+        <span className="text-micro text-muted-foreground uppercase">Board logins</span>
+        <span className="text-caption text-muted-foreground">{open ? "hide" : "show"}</span>
       </button>
       {open &&
         (users == null ? (
@@ -709,7 +709,7 @@ function CredentialRow({ u, onRegenerate }: { u: BoardUser; onRegenerate: () => 
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">
           {u.label}
-          {isCoordinator && <span className="ml-1.5 text-[10px] uppercase tracking-wide text-primary">controls all</span>}
+          {isCoordinator && <span className="ml-1.5 text-micro text-primary uppercase">controls all</span>}
         </div>
         <div className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
           <button className="hover:text-foreground" onClick={() => copy(u.username, "Username")} title="Copy username">
@@ -767,7 +767,7 @@ function CounterManager({ boardId, initial, onSaved }: { boardId: string; initia
 
   return (
     <div className="flex flex-col gap-2 border-t pt-4">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Counters / desks</div>
+      <div className="text-micro text-muted-foreground uppercase">Counters / desks</div>
       <div className="text-xs text-muted-foreground">Each counter is called to by number (“proceed to counter 3”) and gets its own station sign-in.</div>
       {counters.map((cnt, i) => {
         const n = numOf(cnt.id, i + 1);
@@ -831,7 +831,7 @@ function CategoryManager({ boardId, initial }: { boardId: string; initial: Queue
   return (
     <div className="flex flex-col gap-2 border-t pt-4">
       <div className="flex items-center">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Services / categories</div>
+        <div className="text-micro text-muted-foreground uppercase">Services / categories</div>
         <div className="flex-1" />
         <Button variant="ghost" size="sm" onClick={openKiosk}>
           <Ticket className="size-4" /> Open kiosk
@@ -922,7 +922,7 @@ function AnnouncePanel({ boardId }: { boardId: string }) {
 
   return (
     <div className="flex flex-col gap-2.5 border-t pt-4">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Voice announcement</div>
+      <div className="text-micro text-muted-foreground uppercase">Voice announcement</div>
       <div className="flex gap-1.5">
         {(["silent", "chime", "voice"] as const).map((m) => (
           <Button key={m} variant={c.mode === m ? "default" : "outline"} size="sm" className="flex-1 capitalize" onClick={() => save({ mode: m })}>
@@ -939,7 +939,7 @@ function AnnouncePanel({ boardId }: { boardId: string }) {
             placeholder="Ticket {ticket}, please proceed to counter {counter}."
             className="font-mono text-xs"
           />
-          <div className="text-[10px] text-muted-foreground">
+          <div className="text-caption text-muted-foreground">
             Write it in the chosen language. {"{ticket}"} and {"{counter}"} are read as natural whole numbers (e.g. “A forty-two”).
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -983,7 +983,7 @@ function AnnouncePanel({ boardId }: { boardId: string }) {
             </Button>
             {msg && <span className="text-xs text-muted-foreground">{msg}</span>}
           </div>
-          <div className="rounded-md bg-muted/50 px-2.5 py-2 text-[10px] leading-relaxed text-muted-foreground">
+          <div className="rounded-md bg-muted/50 px-2.5 py-2 text-caption leading-relaxed text-muted-foreground">
             Announcements are generated by <b className="text-foreground">Gemini native TTS</b>, an external service — the text you enter is sent to Google.
             Audio is credit-metered per character.
           </div>
@@ -1027,10 +1027,10 @@ function RoomPreview({ state }: { state: RoomState | null }) {
           <div
             key={r.id}
             style={st?.color ? { background: st.color } : undefined}
-            className={cn("rounded-lg px-2 py-2.5", st?.color ? "text-neutral-900" : "bg-muted text-foreground")}
+            className={cn("rounded-lg px-2 py-2.5", st?.color ? "text-black" : "bg-muted text-foreground")}
           >
             <div className="text-sm font-extrabold">{r.name}</div>
-            <div className="text-[11px] opacity-80">{st?.label ?? r.status}</div>
+            <div className="text-caption opacity-80">{st?.label ?? r.status}</div>
           </div>
         );
       })}
@@ -1059,6 +1059,9 @@ function RoomManager({ boardId, state, onSaved }: { boardId: string; state: Room
   const asHex = (c: string) => (/^#[0-9a-fA-F]{6}$/.test(c) ? c : "#8b8b95");
 
   const addStatus = () => {
+    // design-tokens-exempt: a new room status's STARTING colour, which the
+    // operator picks next. It is painted on a board in a corridor, so it must
+    // not follow whoever is looking at the dashboard.
     setStatuses([...statuses, { id: `s${Date.now().toString(36)}`, label: "New status", color: "#8b8b95" }]);
     setDirty(true);
   };
@@ -1109,7 +1112,7 @@ function RoomManager({ boardId, state, onSaved }: { boardId: string; state: Room
   return (
     <div className="flex flex-col gap-3 border-t pt-4">
       <div className="flex flex-col gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Statuses</div>
+        <div className="text-micro text-muted-foreground uppercase">Statuses</div>
         <div className="text-xs text-muted-foreground">The states a room can be in — label + colour are yours. Staff flip a room between these.</div>
         {statuses.map((s, i) => (
           <div key={s.id} className="flex items-center gap-2">
@@ -1146,7 +1149,7 @@ function RoomManager({ boardId, state, onSaved }: { boardId: string; state: Room
       </div>
 
       <div className="flex flex-col gap-2">
-        <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Rooms</div>
+        <div className="text-micro text-muted-foreground uppercase">Rooms</div>
         <div className="text-xs text-muted-foreground">Each room is controlled from its own station sign-in (see Board logins).</div>
         {rooms.map((r, i) => (
           <div key={r.id} className="flex items-center gap-2">

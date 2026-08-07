@@ -60,7 +60,7 @@ export function GetStarted({
 
       {/* How it works */}
       <div className="mt-8">
-        <div className="mb-3 text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">How it works</div>
+        <div className="mb-3 text-center text-micro uppercase text-muted-foreground">How it works</div>
         <div className="grid gap-3 sm:grid-cols-3">
           {STEPS.map((s, i) => (
             <div key={s.title} className="relative rounded-xl border bg-card/40 p-4">
@@ -68,7 +68,7 @@ export function GetStarted({
                 <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary [&_svg]:size-4">
                   <s.icon />
                 </span>
-                <span className="text-[11px] font-semibold text-muted-foreground">Step {i + 1}</span>
+                <span className="text-caption font-semibold text-muted-foreground">Step {i + 1}</span>
               </div>
               <div className="text-sm font-semibold">{s.title}</div>
               <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{s.body}</p>
@@ -105,7 +105,7 @@ function ChoiceCard({
         {icon}
       </div>
       <div className="text-base font-bold">{title}</div>
-      <p className="mt-1.5 flex-1 text-[13px] leading-relaxed text-muted-foreground">{body}</p>
+      <p className="mt-1.5 flex-1 text-caption leading-relaxed text-muted-foreground">{body}</p>
       {cta && (
         <Button className="mt-4 w-full" variant={accent ? "default" : "outline"} onClick={cta.onClick} disabled={cta.disabled}>
           {cta.label} <ArrowRight className="size-4" />

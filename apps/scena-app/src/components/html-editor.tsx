@@ -153,7 +153,7 @@ export function HtmlEditorDialog({ open, initialHtml, title, mode = "edit", surf
             </div>
 
             {tab === "preview" ? (
-              <div className="flex flex-1 items-center justify-center overflow-hidden bg-[#0b0b12] p-3">
+              <div className="flex flex-1 items-center justify-center overflow-hidden bg-black p-3">
                 <HtmlThumb html={html} interactive designW={pw} designH={ph} className="w-full rounded-md shadow-lg ring-1 ring-white/10" />
               </div>
             ) : tab === "code" ? (
@@ -200,7 +200,7 @@ export function HtmlEditorDialog({ open, initialHtml, title, mode = "edit", surf
           {/* Right — live preview (desktop; on mobile it's the Preview tab) */}
           <div className="hidden h-[60vh] flex-col overflow-hidden rounded-lg border md:flex">
             <div className="flex items-center gap-1.5 border-b px-3 py-2 text-xs text-muted-foreground"><Eye className="size-3.5" /> Live preview{surface === "widget" && width && height ? <span className="ml-auto font-mono">{width}×{height}</span> : null}</div>
-            <div className="flex flex-1 items-center justify-center bg-[#0b0b12] p-3">
+            <div className="flex flex-1 items-center justify-center bg-black p-3">
               <HtmlThumb html={html} interactive designW={pw} designH={ph} className="w-full rounded-md shadow-lg ring-1 ring-white/10" />
             </div>
           </div>

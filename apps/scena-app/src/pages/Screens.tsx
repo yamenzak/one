@@ -234,7 +234,7 @@ function DeviceCard({ screen, onClick }: { screen: Screen; onClick: () => void }
         <DevicePreview channelId={screen.channel_id} online={online} className="rounded-none ring-0" />
         <span
           className={cn(
-            "absolute left-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium shadow-sm backdrop-blur-md",
+            "absolute left-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-caption font-medium shadow-sm backdrop-blur-md",
             online ? "bg-success/90 text-white" : "bg-black/55 text-white/90",
           )}
         >
@@ -249,16 +249,16 @@ function DeviceCard({ screen, onClick }: { screen: Screen; onClick: () => void }
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {channel ? <Badge className="font-normal">{channel}</Badge> : <Badge className="font-normal text-muted-foreground">Unassigned</Badge>}
-          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-caption font-medium text-muted-foreground">
             {portrait ? <RectangleVertical className="size-3" /> : <RectangleHorizontal className="size-3" />}
             {resolutionLabel(screen)}
           </span>
-          {!online && seen && <span className="text-[11px] text-muted-foreground">· {seen}</span>}
+          {!online && seen && <span className="text-caption text-muted-foreground">· {seen}</span>}
         </div>
         {(screen.tags?.length ?? 0) > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-1">
             {screen.tags!.slice(0, 5).map((t) => (
-              <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">
+              <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-caption font-medium text-secondary-foreground">
                 {t}
               </span>
             ))}

@@ -8,6 +8,8 @@ import { WidgetContent } from "../WidgetView.js";
 import type { WNode } from "../types.js";
 import { cn } from "@4dl/ui";
 
+import { SLIDE_CANVAS } from "../canvas.js";
+
 const PREVIEW_W = 132;
 const PREVIEW_H = 78;
 // Design-space size the preview is rendered at (card aspect), then scaled down.
@@ -45,7 +47,7 @@ export function VariantPicker({
           >
             <div
               className="relative"
-              style={{ width: "100%", height: PREVIEW_H, background: "linear-gradient(135deg, oklch(0.28 0.03 300), oklch(0.19 0.02 300))" }}
+              style={{ width: "100%", height: PREVIEW_H, background: SLIDE_CANVAS }}
             >
               <div style={{ position: "absolute", inset: 0 }}>
                 <div style={{ width: DESIGN_W, height: DESIGN_H, transform: `scale(${scale})`, transformOrigin: "top left" }}>
@@ -53,7 +55,7 @@ export function VariantPicker({
                 </div>
               </div>
             </div>
-            <span className={cn("truncate px-1.5 py-1 text-[10.5px] font-medium", active ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground")}>
+            <span className={cn("truncate px-1.5 py-1 text-caption font-medium", active ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground")}>
               {o.label}
             </span>
           </button>

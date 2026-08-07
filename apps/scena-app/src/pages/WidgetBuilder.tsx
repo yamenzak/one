@@ -75,6 +75,7 @@ import { AiLayoutDialog } from "../builder/AiLayoutDialog.js";
 import { intersects, alignPatches, distributePatches, clampPos, type AlignKind } from "../builder/geometry.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
 import { Badge, Button, cn, EmptyState, LoadError, Separator, Sheet, Skeleton, toast, Tooltip } from "@4dl/ui";
+import { SLIDE_CANVAS } from "../builder/canvas.js";
 
 /** Accept both the flat WNode shape and the manifest rect-tuple shape. */
 function hydrateNode(raw: unknown, i: number): WNode | null {
@@ -630,7 +631,7 @@ function Builder({ profileId }: { profileId: string }) {
         <button
           type="button"
           onClick={() => setLayersOpen((v) => !v)}
-          className="mb-3 flex w-full items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground transition-colors hover:text-foreground"
+          className="mb-3 flex w-full items-center gap-1.5 text-micro uppercase text-muted-foreground transition-colors hover:text-foreground"
           aria-expanded={layersOpen}
         >
           <LayersIcon className="size-3.5" />
@@ -753,7 +754,7 @@ function Builder({ profileId }: { profileId: string }) {
           </Button>
           <div className="mr-1 min-w-0">
             <div className="truncate text-sm font-semibold leading-tight">{name}</div>
-            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-caption text-muted-foreground">
               <span className="tabular-nums">
                 {designW}×{designH}
               </span>
@@ -882,7 +883,7 @@ function Builder({ profileId }: { profileId: string }) {
                       if (e.target === e.currentTarget) onCanvasMouseDown(e);
                     }}
                     className="absolute inset-0 overflow-hidden rounded-lg"
-                    style={{ background: "linear-gradient(135deg, oklch(0.28 0.03 300), oklch(0.19 0.02 300))" }}
+                    style={{ background: SLIDE_CANVAS }}
                   >
                     {showGrid && (
                       <div
@@ -995,7 +996,7 @@ function Builder({ profileId }: { profileId: string }) {
             <div>
               {WIDGET_GROUPS.map((group) => (
                 <div key={group} className="mb-4">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{group}</div>
+                  <div className="mb-2 text-micro uppercase text-muted-foreground">{group}</div>
                   <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                     {WIDGET_REGISTRY.filter((w) => w.group === group).map((w) => {
                       const usable = canUseWidget(w.type);
@@ -1120,7 +1121,7 @@ function MultiPanel({
 
 function SectionLabel({ icon, title }: { icon: React.ReactNode; title: string }) {
   return (
-    <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className="mb-3 flex items-center gap-1.5 text-micro uppercase text-muted-foreground">
       {icon}
       {title}
     </div>

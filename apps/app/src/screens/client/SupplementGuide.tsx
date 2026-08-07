@@ -50,7 +50,7 @@ export function SupplementGuide({ clientId }: { clientId: string }) {
           <AiAvatar className="mt-0.5 size-8 shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">Supplement tips</div>
-            <Markdown className="mt-1 text-[0.95rem] text-foreground/85">{guide}</Markdown>
+            <Markdown className="mt-1 text-body text-foreground/85">{guide}</Markdown>
             <p className="mt-1.5 text-xs text-muted-foreground">General info — ask your coach before starting, stopping, or changing anything.</p>
           </div>
         </motion.div>

@@ -69,7 +69,7 @@ function PermissionGrid({ value, onChange }: { value: Grant; onChange: (g: Grant
                   type="button"
                   onClick={() => toggle(r.resource, a)}
                   className={cn(
-                    "rounded-full border px-2.5 py-0.5 text-[11px] font-medium capitalize transition-colors",
+                    "rounded-full border px-2.5 py-0.5 text-caption font-medium capitalize transition-colors",
                     on ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-accent",
                   )}
                 >
@@ -90,7 +90,7 @@ function PresetRow({ onPick }: { onPick: (role: Role) => void }) {
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="text-xs text-muted-foreground">Start from:</span>
       {(["owner", "operator", "receptionist", "viewer"] as Role[]).map((r) => (
-        <button key={r} type="button" onClick={() => onPick(r)} className="rounded-md border px-2 py-0.5 text-[11px] font-medium capitalize hover:bg-accent">
+        <button key={r} type="button" onClick={() => onPick(r)} className="rounded-md border px-2 py-0.5 text-caption font-medium capitalize hover:bg-accent">
           {r}
         </button>
       ))}
@@ -142,7 +142,28 @@ export function TeamPage() {
       // grant write by MEMBER id (Scena's own table is). Two ids, two routes,
       // deliberately not unified — a member row is per tenant, a user is not.
       await setMemberRole(m.userId, role);
-      await setMemberPermissions(m.memberId, {}).catch(() => {});
+      /*
+        ⚠️ NOT `.catch(() => {})`. This clear is what makes the comment above
+        true. Swallowed, a failure here demotes somebody to `viewer` while they
+        KEEP the custom grant their old role gave them — and the toast says
+        "… is now viewer". The role is the thing on screen; the grant is the
+        thing that decides what they can actually do.
+
+        It throws into the same handler now, and the message names the half that
+        did land, because "could not change role" would be false: the role did
+        change, and the access did not follow it.
+      */
+      try {
+        await setMemberPermissions(m.memberId, {});
+      } catch (e) {
+        reload();
+        toast.error(
+          e instanceof Error
+            ? `${m.name} is now ${role}, but their custom access could not be cleared: ${e.message}`
+            : `${m.name} is now ${role}, but their custom access could not be cleared — open “What they can do” and reset it.`,
+        );
+        return;
+      }
       reload();
       toast.success(`${m.name} is now ${role}.`);
     } catch (e) {

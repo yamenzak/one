@@ -166,7 +166,7 @@ function TransitionPreview({ type, className }: { type: string; className?: stri
   const enter = PREVIEW_ENTER[type] ?? { opacity: 0, transform: "none" };
   return (
     <div className={`relative overflow-hidden rounded-lg ${className ?? ""}`} style={{ aspectRatio: "16 / 9" }}>
-      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-violet-500 to-indigo-600 text-sm font-semibold text-white">
+      <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary to-primary/40 text-sm font-semibold text-white">
         A
       </div>
       <div
@@ -671,7 +671,7 @@ function EditablePlaylistName({ name, onRename }: { name: string; onRename: (n: 
       className="group/n inline-flex items-center gap-2 text-left"
       title="Rename playlist"
     >
-      <span className="truncate text-xl font-semibold tracking-tight md:text-2xl">{name}</span>
+      <span className="truncate text-title-3 md:text-2xl">{name}</span>
       <Pencil className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/n:opacity-70" />
     </button>
   );
@@ -781,7 +781,7 @@ function SlideCard({
         ) : slide.type === "html" ? (
           <button type="button" onClick={onEditHtml} className="relative block size-full">
             <HtmlThumb html={slide.html_body ?? ""} className="size-full" />
-            {canWrite && <span className="absolute inset-x-0 bottom-0 bg-black/55 py-1 text-center text-[10px] font-medium text-white">Tap to edit</span>}
+            {canWrite && <span className="absolute inset-x-0 bottom-0 bg-black/55 py-1 text-center text-caption font-medium text-white">Tap to edit</span>}
           </button>
         ) : (
           <div className="flex size-full items-center justify-center text-muted-foreground">
@@ -793,7 +793,7 @@ function SlideCard({
           {index + 1}
         </span>
         {slide.type === "gif" && (
-          <span className="absolute bottom-2 left-2 rounded bg-background/85 px-1.5 py-0.5 text-[10px] font-semibold shadow-sm">GIF</span>
+          <span className="absolute bottom-2 left-2 rounded bg-background/85 px-1.5 py-0.5 text-caption font-semibold shadow-sm">GIF</span>
         )}
 
         {canWrite && (

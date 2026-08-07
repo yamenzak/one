@@ -75,7 +75,7 @@ export function Markdown({ children, className }: { children: string; className?
       const buf: string[] = [];
       idx++;
       while (idx < lines.length && !/^```\s*$/.test(lines[idx]!.trim())) { buf.push(lines[idx]!); idx++; }
-      blocks.push(<pre key={key++} className="my-4 overflow-x-auto rounded-2xl bg-surface-2 p-4 font-mono text-[0.82rem] leading-relaxed text-foreground/90"><code>{buf.join("\n")}</code></pre>);
+      blocks.push(<pre key={key++} className="my-4 overflow-x-auto rounded-2xl bg-surface-2 p-4 font-mono text-caption leading-relaxed text-foreground/90"><code>{buf.join("\n")}</code></pre>);
       continue;
     }
 

@@ -115,9 +115,23 @@ export const UI_RULES: UiRule[] = [
       { re: /\brounded-\[[^\]]+\]/, use: "a rounded-* step (they resolve to --radius, which branding sets) or rounded-full" },
       { re: /\bshadow-\[[^\]]+\]/, use: "shadow-sm/md/lg (they resolve to --shadow-*, set by the branding elevation preset) or shadow-glow" },
       { re: new RegExp(`\\bborder-(?:${PALETTE})\\b(?:-\\d{2,3})?(?:\\/\\d+)?|\\bborder-\\[[^\\]]+\\]`), use: "border-border (or a semantic token like border-primary/40) so the hairline follows branding" },
-      { re: /(?:borderRadius|boxShadow)\s*:/, use: "a utility class, so radius/elevation resolve through the tokens" },
-      // Arbitrary values match only when they LOOK like a colour, so
-      // `text-[0.95rem]` (a size) and `bg-[url(…)]` are not false-flagged.
+      /*
+        ⚠️ NOT when the value is ALREADY a token. `boxShadow: "var(--shadow-lg)"`
+        is precisely what this rule is asking for, and firing on it told the
+        author to use a token they were using — which is the fastest way to
+        teach somebody that a lint is noise.
+      */
+      /*
+        The optional-quote form (`\s*(?!["\'`]?var\()`) does NOT work here, and
+        the reason is worth writing down: `\s*` and `["\'`]?` both backtrack, so
+        the engine simply retries with the quote unmatched and the lookahead
+        then passes on the quote character itself. An ALTERNATION consumes the
+        quote or asserts there is none, and cannot give it back.
+      */
+      { re: /(?:borderRadius|boxShadow)\s*:\s*(?:["'`](?!var\()|(?!["'`\s])(?!var\())/, use: "a utility class, so radius/elevation resolve through the tokens" },
+      // Arbitrary values match only when they LOOK like a colour, so a size
+      // and `bg-[url(…)]` are not false-flagged HERE — an off-scale size is the
+      // `type-scale` rule's business, and each rule should name one fault.
       { re: new RegExp(`\\b(?:bg|text|from|via|to|ring|divide|decoration|caret|accent|outline|shadow)-(?:${PALETTE})\\b(?:-\\d{2,3})?(?:\\/\\d+)?|\\b(?:bg|text|from|via|to|ring)-\\[(?:#|rgba?\\(|oklch\\(|hsla?\\()`), use: "a token utility (bg-card, bg-surface-2, text-muted-foreground, bg-primary/10…) so the surface follows the brand and its tint" },
       { re: /(?:background|backgroundColor|borderColor|color|fill|stroke)\s*:\s*[`"'][^`"']*(?:#[0-9a-fA-F]{3,8}|rgba?\(|oklch\(|hsla?\()/, use: "a token — var(--card), var(--primary) — instead of a literal colour" },
       { re: /border-radius\s*:\s*(?!var\()[^;]*\d/, use: "var(--radius…) instead of a literal length" },
@@ -136,10 +150,12 @@ export const UI_RULES: UiRule[] = [
         'className="rounded-2xl"',
         'className="shadow-md"',
         'className="border-border"',
+        // Already a token — the rule must not ask for what is there.
+        'style={{ boxShadow: "var(--shadow-lg)" }}',
         'className="bg-surface-2 text-muted-foreground"',
         'style={{ color: "var(--primary)" }}',
         "  border-radius: var(--radius);",
-        // A size, not a colour.
+        // A size, not a colour — `type-scale` is what objects to this one.
         'className="text-[0.95rem]"',
       ],
     },
@@ -157,6 +173,33 @@ export const UI_RULES: UiRule[] = [
       { re: /text-lg\s+font-semibold\s+tracking-tight/, use: "text-body-lg" },
       { re: /text-xl\s+font-bold\s+tracking-tight/, use: "text-title-3" },
       { re: /text-xs\s+font-(?:semibold|medium)\s+uppercase\s+tracking-wide/, use: "text-micro uppercase" },
+      /*
+        An ARBITRARY SIZE is the other way out of the scale, and the quieter
+        one. `text-[11px]` is `micro` spelled so the lint above cannot see it;
+        `text-[10px]` is below every tier the language has, which §12 forbids
+        outright. Scena arrived with 109 of these — 99 of them under the floor —
+        and nothing failed, because it was the one app not running these rules.
+
+        `em` IS ALLOWED, and the distinction is principled rather than a
+        carve-out: `text-[0.72em]` on a unit suffix inside a value, or on a
+        superscript, is PROPORTIONAL to whatever role its parent has — it rides
+        the scale rather than leaving it, and there is no absolute tier that
+        could express "a bit smaller than whatever this is". An absolute
+        px/rem/pt is a size chosen instead of a role, which is the thing the
+        scale exists to prevent.
+
+        `pt` is out for the same reason: it is a PRINT unit. Tessa sets label
+        text at `text-[9pt]` because a sterilisation label is a physical object
+        and 9 points is a physical size — there is no screen role that means
+        that, and forcing one would change what comes out of the printer.
+
+        A non-size arbitrary like `text-[color:var(--x)]` is not matched either
+        — the leading digit is what separates them.
+      */
+      {
+        re: /\btext-\[[\d.]+(?:px|rem)\]/,
+        use: "a role from the scale — display / title-1..3 / body-lg / body / caption / micro. 11px is `micro`, 13px is `caption`, and there is nothing below caption for running text (§12)",
+      },
     ]),
     samples: {
       bad: [
@@ -166,8 +209,11 @@ export const UI_RULES: UiRule[] = [
         'className="text-xl font-bold tracking-tight"',
         'className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"',
         'className="text-xs font-medium uppercase tracking-wide"',
+        'className="text-[11px] text-muted-foreground"',
+        'className="text-[10px] uppercase"',
+        'className="text-[0.95rem]"',
       ],
-      good: ['className="text-title-2"', 'className="text-micro uppercase"', 'className="text-body-lg"'],
+      good: ['className="text-title-2"', 'className="text-micro uppercase"', 'className="text-body-lg"', 'className="text-caption"'],
     },
   },
 

@@ -499,7 +499,7 @@ function OptionCard({ opt, ordinal, targets, foods, mode, nameOf, imageOf, open,
             />
           ))}
           <button onClick={onAddFood} className="flex h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-xs font-medium text-nutrition transition-colors hover:bg-surface-2 [&_svg]:size-4"><Plus /> Add food</button>
-          {opt.foods.length === 0 && <p className="px-1 text-center text-[0.7rem] text-muted-foreground">Search your library — or create a new food from the search if it isn't there yet.</p>}
+          {opt.foods.length === 0 && <p className="px-1 text-center text-caption text-muted-foreground">Search your library — or create a new food from the search if it isn't there yet.</p>}
           {opt.foods.length > 0 && <MealImage mealName={opt.mealName} foodNames={opt.foods.map((mf) => nameOf(mf.foodId))} value={opt.imageUrl} onChange={(url) => onPatch((o) => (o.imageUrl = url))} />}
         </div>
       )}
@@ -639,9 +639,9 @@ function FoodPortionRow({ mf, name, image, food, onQty, onRemove }: { mf: MealFo
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium leading-tight">{name}</div>
           {scaled ? (
-            <MacroInline proteinG={scaled.proteinG} carbsG={scaled.carbsG} fatG={scaled.fatG} className="mt-0.5 text-[0.7rem]" />
+            <MacroInline proteinG={scaled.proteinG} carbsG={scaled.carbsG} fatG={scaled.fatG} className="mt-0.5 text-caption" />
           ) : (
-            <div className="mt-0.5 text-[0.7rem] text-muted-foreground">Macros update after saving</div>
+            <div className="mt-0.5 text-caption text-muted-foreground">Macros update after saving</div>
           )}
         </div>
         {scaled && <div className="numeral shrink-0 text-sm font-semibold text-calories">{fmtEnergy(scaled.calories, units)}</div>}

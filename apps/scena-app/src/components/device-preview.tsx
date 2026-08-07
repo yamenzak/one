@@ -85,7 +85,7 @@ export function DevicePreview({ channelId, online = true, chrome = false, classN
   return (
     <div
       ref={boxRef}
-      className={cn("relative overflow-hidden rounded-lg bg-neutral-950 ring-1 ring-black/10", className)}
+      className={cn("relative overflow-hidden rounded-lg bg-black ring-1 ring-black/10", className)}
       style={{ aspectRatio: `${dims.w} / ${dims.h}` }}
     >
       {/* States: no channel / failed / loading / live frame */}
@@ -94,7 +94,7 @@ export function DevicePreview({ channelId, online = true, chrome = false, classN
       ) : failed ? (
         <Center icon={<ImageOff />} label="No manifest" />
       ) : !manifest ? (
-        <div className="absolute inset-0 animate-pulse bg-neutral-900" />
+        <div className="absolute inset-0 animate-pulse bg-white/5" />
       ) : slide ? (
         <SlideFrame slide={slide} url={url} dims={dims} scale={scale} />
       ) : (
@@ -103,7 +103,7 @@ export function DevicePreview({ channelId, online = true, chrome = false, classN
 
       {/* Offline veil — the frame is what it *should* show; dim it when dark. */}
       {channelId && !online && (
-        <div className="absolute inset-0 grid place-items-center bg-neutral-950/70 text-neutral-400 backdrop-grayscale">
+        <div className="absolute inset-0 grid place-items-center bg-black/70 text-white/60 backdrop-grayscale">
           <div className="flex items-center gap-1.5 text-xs font-medium">
             <MonitorOff className="size-4" /> Offline
           </div>
@@ -116,7 +116,7 @@ export function DevicePreview({ channelId, online = true, chrome = false, classN
           <div className="absolute inset-x-0 bottom-0 h-1 bg-black/40">
             <div className="h-full bg-primary/80 transition-[width] duration-200" style={{ width: `${Math.round(progress * 100)}%` }} />
           </div>
-          <div className="absolute right-2 top-2 rounded-md bg-black/55 px-1.5 py-0.5 font-mono text-[11px] font-medium text-white/90">
+          <div className="absolute right-2 top-2 rounded-md bg-black/55 px-1.5 py-0.5 font-mono text-caption font-medium text-white/90">
             {index + 1}/{count}
           </div>
         </>
@@ -149,8 +149,8 @@ function SlideFrame({ slide, url, dims, scale }: { slide: Slide; url?: string; d
 
 function Center({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="absolute inset-0 grid place-items-center text-neutral-500">
-      <div className="flex flex-col items-center gap-1.5 text-[11px] font-medium capitalize">
+    <div className="absolute inset-0 grid place-items-center text-white/50">
+      <div className="flex flex-col items-center gap-1.5 text-caption font-medium capitalize">
         {icon}
         {label}
       </div>

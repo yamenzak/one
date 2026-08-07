@@ -163,13 +163,13 @@ function Reader({ r, onBack }: { r: Resource; onBack: () => void }) {
           {r.category && <Badge tone="activity">{r.category}</Badge>}
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground [&_svg]:size-3.5"><Clock /> {readMin(r)} min read</span>
         </div>
-        <h1 className="text-[1.7rem] font-bold leading-tight tracking-tight">{r.title}</h1>
+        <h1 className="text-title-2 font-bold leading-tight tracking-tight">{r.title}</h1>
         {r.summary && <p className="text-base leading-relaxed text-muted-foreground">{r.summary}</p>}
         {(r.topics ?? []).length > 0 && (
           <div className="flex flex-wrap gap-1.5">{(r.topics ?? []).map((t) => <span key={t} className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs text-muted-foreground">#{t}</span>)}</div>
         )}
         <div className="h-px bg-gradient-to-r from-border to-transparent" />
-        {r.bodyMd ? <Markdown className="text-[0.95rem] text-foreground/90">{r.bodyMd}</Markdown> : <p className="text-[0.95rem] leading-relaxed text-foreground/90">{r.summary}</p>}
+        {r.bodyMd ? <Markdown className="text-body text-foreground/90">{r.bodyMd}</Markdown> : <p className="text-body leading-relaxed text-foreground/90">{r.summary}</p>}
       </motion.div>
     </Page>
   );

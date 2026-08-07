@@ -16,7 +16,7 @@ import { cn } from "@4dl/ui";
 
 export type Provenance = string | null | undefined;
 
-const BADGE_BASE = "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset";
+const BADGE_BASE = "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-caption font-medium ring-1 ring-inset";
 
 /** A compact badge stating the commercial-use status of an asset. Every
  *  provenance value is badged (uploads included), so an asset's rights are

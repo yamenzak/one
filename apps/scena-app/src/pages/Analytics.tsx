@@ -160,8 +160,8 @@ function DayChart({ days }: { days: { day: string; plays: number }[] }) {
               title={`${d.plays.toLocaleString()} plays`}
             />
           </div>
-          <div className="font-mono text-[11px] tabular-nums text-muted-foreground">{d.plays.toLocaleString()}</div>
-          <div className="text-[10px] text-muted-foreground/70">{label(d.day)}</div>
+          <div className="font-mono text-caption tabular-nums text-muted-foreground">{d.plays.toLocaleString()}</div>
+          <div className="text-caption text-muted-foreground/70">{label(d.day)}</div>
         </div>
       ))}
     </div>
@@ -172,10 +172,10 @@ function Row({ left, right, sub, bar }: { left: string; right: string; sub?: str
   return (
     <div className="border-b py-2.5 last:border-0">
       <div className="flex items-baseline gap-2">
-        <span className="truncate font-mono text-[13px] font-medium">{left}</span>
+        <span className="truncate font-mono text-caption font-medium">{left}</span>
         <div className="flex-1" />
-        <span className="font-mono text-[13px] font-semibold tabular-nums">{right}</span>
-        {sub && <span className="font-mono text-[11px] tabular-nums text-muted-foreground">{sub}</span>}
+        <span className="font-mono text-caption font-semibold tabular-nums">{right}</span>
+        {sub && <span className="font-mono text-caption tabular-nums text-muted-foreground">{sub}</span>}
       </div>
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
         <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(2, bar * 100)}%` }} />

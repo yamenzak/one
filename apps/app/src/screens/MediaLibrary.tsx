@@ -324,7 +324,7 @@ function MediaThumb({ item, size, className }: { item: MediaItem; size?: number;
     >
       <div className="space-y-1 px-2 text-center">
         <Icon className={cn("mx-auto", size ? "size-4" : "size-6")} />
-        {!size && <div className="font-mono text-[0.65rem] uppercase">{item.contentType.split("/").pop()}</div>}
+        {!size && <div className="font-mono text-micro uppercase">{item.contentType.split("/").pop()}</div>}
       </div>
     </div>
   );

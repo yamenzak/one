@@ -10,7 +10,6 @@ import { Siren, TriangleAlert, Info, Megaphone, PartyPopper, type LucideIcon } f
 export interface ToneUi {
   label: string;
   /** Header accent (Tailwind bg-*), used on the modal bar. */
-  header: string;
   /** A CSS gradient that mirrors the player treatment, for the live preview. */
   gradient: string;
   icon: LucideIcon;
@@ -18,12 +17,27 @@ export interface ToneUi {
   urgent: boolean;
 }
 
+/**
+ * ⚠️ THESE COLOURS ARE CONTENT, NOT CHROME, and that is why they are literals.
+ *
+ * An emergency takeover paints a full screen in a building. Red means alarm to
+ * whoever is standing in front of it, and it must NOT follow the workspace's
+ * brand — a studio whose brand is red would broadcast "Positive" in red, and a
+ * pale-branded one would broadcast an alarm nobody reads as one. So the tone is
+ * fixed, like a fire panel is fixed.
+ *
+ * `header` used to be a named Tailwind palette class beside the
+ * gradient that actually ships. Two spellings of one colour, and they did not
+ * match: the modal drew a FLAT header above a RADIAL-GRADIENT preview of the
+ * same tone. There is one value now, and the header is painted from it — so the
+ * preview is the broadcast.
+ */
 export const TONE_UI: Record<OverrideTone, ToneUi> = {
-  alarm: { label: "Alarm", header: "bg-red-600", gradient: "radial-gradient(circle at 50% 40%, #f0483f, #7f1d1d)", icon: Siren, urgent: true },
-  warning: { label: "Warning", header: "bg-amber-500", gradient: "radial-gradient(circle at 50% 40%, #f5a524, #92590e)", icon: TriangleAlert, urgent: true },
-  info: { label: "Info", header: "bg-blue-600", gradient: "radial-gradient(circle at 50% 40%, #4f8cf7, #1e3a8a)", icon: Info, urgent: false },
-  neutral: { label: "Neutral", header: "bg-slate-600", gradient: "radial-gradient(circle at 50% 40%, #55617a, #1e2635)", icon: Megaphone, urgent: false },
-  success: { label: "Positive", header: "bg-emerald-600", gradient: "radial-gradient(circle at 50% 40%, #34c569, #14532d)", icon: PartyPopper, urgent: false },
+  alarm: { label: "Alarm", gradient: "radial-gradient(circle at 50% 40%, #f0483f, #7f1d1d)", icon: Siren, urgent: true },
+  warning: { label: "Warning", gradient: "radial-gradient(circle at 50% 40%, #f5a524, #92590e)", icon: TriangleAlert, urgent: true },
+  info: { label: "Info", gradient: "radial-gradient(circle at 50% 40%, #4f8cf7, #1e3a8a)", icon: Info, urgent: false },
+  neutral: { label: "Neutral", gradient: "radial-gradient(circle at 50% 40%, #55617a, #1e2635)", icon: Megaphone, urgent: false },
+  success: { label: "Positive", gradient: "radial-gradient(circle at 50% 40%, #34c569, #14532d)", icon: PartyPopper, urgent: false },
 };
 
 export const TONE_ORDER: OverrideTone[] = ["alarm", "warning", "info", "neutral", "success"];

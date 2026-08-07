@@ -158,7 +158,7 @@ function ChannelCard({ channel, onOpen }: { channel: ComposedChannel; onOpen: ()
       <div className="p-3.5">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-semibold">{channel.name}</span>
-          <span className="ml-auto shrink-0 text-[11px] tabular-nums text-muted-foreground">
+          <span className="ml-auto shrink-0 text-caption tabular-nums text-muted-foreground">
             {setCount}/{SOURCES.length}
           </span>
           <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-foreground" />
@@ -170,7 +170,7 @@ function ChannelCard({ channel, onOpen }: { channel: ComposedChannel; onOpen: ()
               <span
                 key={key}
                 className={cn(
-                  "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium",
+                  "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-caption font-medium",
                   set ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground/55",
                 )}
               >
@@ -182,7 +182,7 @@ function ChannelCard({ channel, onOpen }: { channel: ComposedChannel; onOpen: ()
         {(channel.tags?.length ?? 0) > 0 && (
           <div className="mt-2 flex flex-wrap items-center gap-1">
             {channel.tags!.slice(0, 5).map((t) => (
-              <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-secondary-foreground">
+              <span key={t} className="rounded bg-secondary px-1.5 py-0.5 text-caption font-medium text-secondary-foreground">
                 {t}
               </span>
             ))}
@@ -552,7 +552,7 @@ function EditableChannelName({ channel, onRenamed }: { channel: ComposedChannel;
       className="group/n inline-flex items-center gap-2 text-left"
       title="Rename channel"
     >
-      <span className="truncate text-xl font-semibold tracking-tight md:text-2xl">{channel.name}</span>
+      <span className="truncate text-title-3 md:text-2xl">{channel.name}</span>
       <Pencil className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/n:opacity-70" />
     </button>
   );

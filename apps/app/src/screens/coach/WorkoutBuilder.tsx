@@ -353,7 +353,7 @@ function DayRail({ days, lib, active, onSelect, onAdd }: {
                 {/* White, not `--tone-foreground`: that token is the ink for a
                     TONE-COLOURED surface and is dark on a light-primary theme,
                     which made this invisible over the scrim. */}
-                <div className="truncate text-[0.65rem] text-white/75">{sub}</div>
+                <div className="truncate text-caption text-white/75">{sub}</div>
               </div>
             </button>
           </RailItem>
@@ -821,7 +821,7 @@ function CopyWeekSheet({ dayCount, onClose, onCopy }: { dayCount: number; onClos
 const CELL = "w-16 shrink-0";
 function SetTableHeader({ mode }: { mode: MeasurementMode }) {
   return (
-    <div aria-hidden className="flex items-center gap-1.5 px-2 text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground/70">
+    <div aria-hidden className="flex items-center gap-1.5 px-2 text-micro text-muted-foreground/70 uppercase">
       <span className="w-5 shrink-0" />
       <span className="w-4 shrink-0 text-center">#</span>
       {MEASURE_COLUMNS[mode].map((c) => <span key={c} className={cn(CELL, "text-center")}>{c}</span>)}

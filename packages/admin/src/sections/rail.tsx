@@ -196,7 +196,7 @@ function Rail() {
                             </Button>
                           </div>
                           {open === e.id && (
-                            <pre className="max-h-64 overflow-auto rounded-lg bg-surface-3 p-2 font-mono text-[11px] leading-relaxed">
+                            <pre className="max-h-64 overflow-auto rounded-lg bg-surface-3 p-2 font-mono text-caption leading-relaxed">
                               {payload[e.id] ?? "(no payload stored)"}
                             </pre>
                           )}

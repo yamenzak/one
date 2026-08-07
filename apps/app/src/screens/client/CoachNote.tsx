@@ -39,7 +39,7 @@ export function CoachNote({ clientId, surface }: { clientId: string; surface: Su
       <AiAvatar className="mt-0.5 size-8 shrink-0" />
       <div className="min-w-0 flex-1">
         <div className="text-xs font-semibold uppercase tracking-[0.08em] text-primary">{ai.name}</div>
-        <Markdown className="mt-1 text-[0.95rem] text-foreground/85">{msg}</Markdown>
+        <Markdown className="mt-1 text-body text-foreground/85">{msg}</Markdown>
         <InsightFeedback className="mt-2" insightType={INSIGHT_TYPE} insightRef={`${surface}:${clientId}`} onMute={() => setMuted(true)} />
       </div>
     </motion.div>

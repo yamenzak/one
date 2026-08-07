@@ -439,7 +439,7 @@ export function MealPlanDrawer({ clientId, onClose, onLogged }: { clientId: stri
                   <div className="truncate text-body-lg">{recipe.title}</div>
                 </div>
               </div>
-              <Markdown className="text-[0.95rem] text-foreground/90">{recipe.text}</Markdown>
+              <Markdown className="text-body text-foreground/90">{recipe.text}</Markdown>
             </div>
           )}
         </Sheet>

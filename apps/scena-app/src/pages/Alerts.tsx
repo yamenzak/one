@@ -101,7 +101,7 @@ export function AlertsPage() {
                     value={new Date(a.at).toLocaleTimeString()}
                     valueSub={
                       open ? (
-                        <Badge tone="danger" className="text-[10px]">
+                        <Badge tone="danger" className="text-caption">
                           OPEN
                         </Badge>
                       ) : recovery ? (
@@ -128,7 +128,7 @@ export function AlertsPage() {
             {rules === null ? (
               <SkeletonList rows={2} />
             ) : rules.length === 0 ? (
-              <p className="py-2 text-[13px] text-muted-foreground">No delivery rules yet — alerts stay in the dashboard. Add a webhook or email below.</p>
+              <p className="py-2 text-caption text-muted-foreground">No delivery rules yet — alerts stay in the dashboard. Add a webhook or email below.</p>
             ) : (
               <Group className="bg-transparent">
                 {rules.map((r) => (

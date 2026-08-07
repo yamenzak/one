@@ -93,7 +93,7 @@ export function PairModal({ open, onClose, onPaired }: { open: boolean; onClose:
         {paired ? (
           <div className="flex flex-col items-center justify-center gap-2 px-8 py-14 text-center">
             <ScenaMascot mood="happy" size={132} />
-            <div className="text-xl font-bold tracking-tight">Paired{name.trim() ? ` · ${name.trim()}` : ""}</div>
+            <div className="text-title-3">Paired{name.trim() ? ` · ${name.trim()}` : ""}</div>
             <p className="text-sm text-muted-foreground">The screen is going live now.</p>
           </div>
         ) : (
@@ -102,7 +102,7 @@ export function PairModal({ open, onClose, onPaired }: { open: boolean; onClose:
               thinking while it pairs, sad if it fails. */}
             <div className="hidden flex-col bg-gradient-to-br from-primary to-primary/80 p-7 text-primary-foreground md:flex">
               <ScenaMascot mood={busy ? "thinking" : error ? "sad" : "searching"} tokens={false} size={76} className="mb-3" />
-              <div className="text-xs font-semibold uppercase tracking-wider opacity-80">Step 1 of 3</div>
+              <div className="text-micro uppercase opacity-80">Step 1 of 3</div>
               <div className="mt-2.5 text-2xl font-extrabold leading-tight tracking-tight">Pair a new screen</div>
               <p className="mt-3 text-sm leading-relaxed opacity-85">
                 Open the <span className="font-semibold">Scena player</span> in the screen's browser — it shows a {CODE_LEN}-character code. Enter it here.
@@ -113,7 +113,9 @@ export function PairModal({ open, onClose, onPaired }: { open: boolean; onClose:
                     <span
                       className={cn(
                         "grid size-6 shrink-0 place-items-center rounded-full text-xs font-bold",
-                        i === 0 ? "bg-white text-primary" : "bg-white/20 text-white",
+                        // The panel behind these is `bg-primary`, so the on-tone colour is its
+                        // foreground token — not `white`, which is only right by coincidence.
+                        i === 0 ? "bg-primary-foreground text-primary" : "bg-primary-foreground/20 text-primary-foreground",
                       )}
                     >
                       {i + 1}
@@ -149,7 +151,7 @@ export function PairModal({ open, onClose, onPaired }: { open: boolean; onClose:
                     className={cn(
                       // Scale to fit the row on any width (min-w-0 + flex-1), capped
                       // at 56px on desktop — so a 6-char code never overflows a phone.
-                      "aspect-square min-w-0 max-w-14 flex-1 rounded-xl border-[1.5px] bg-background text-center font-mono text-xl font-semibold uppercase outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/40 sm:text-2xl",
+                      "aspect-square min-w-0 max-w-14 flex-1 rounded-xl border-2 border-border bg-background text-center font-mono text-xl font-semibold uppercase outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-ring/40 sm:text-2xl",
                       ch ? "border-primary" : "border-input",
                     )}
                   />
@@ -165,7 +167,7 @@ export function PairModal({ open, onClose, onPaired }: { open: boolean; onClose:
                   <Sparkles />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[13px] font-semibold">Start with sample content</span>
+                  <span className="block text-caption font-semibold">Start with sample content</span>
                   <span className="block text-xs text-muted-foreground">Light the screen up now — edit or replace it anytime.</span>
                 </span>
                 <Switch checked={sample} onCheckedChange={setSample} aria-label="Start with sample content" />

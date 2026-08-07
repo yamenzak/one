@@ -324,7 +324,7 @@ export function FoodEditor({ foodId, initial, isStaff, autoScanLabel, onClose, o
                                 announces "Cal kcal" for the field and "Fat g" for
                                 another — abbreviations that don't read as words.
                                 The unit belongs in the name, not just beside it. */}
-                            <input aria-label={`${metric.charAt(0).toUpperCase()}${metric.slice(1)} (${unit})`} inputMode="decimal" value={f[k]} onChange={(e) => set(k, dec(e.target.value))} placeholder="0" className="w-full min-w-0 bg-transparent text-center text-[0.95rem] font-bold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/70 placeholder:font-medium placeholder:text-muted-foreground/50" />
+                            <input aria-label={`${metric.charAt(0).toUpperCase()}${metric.slice(1)} (${unit})`} inputMode="decimal" value={f[k]} onChange={(e) => set(k, dec(e.target.value))} placeholder="0" className="w-full min-w-0 bg-transparent text-center text-body font-bold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/70 placeholder:font-medium placeholder:text-muted-foreground/50" />
                             <span className="shrink-0 text-xs font-medium text-muted-foreground">{unit}</span>
                           </span>
                         </label>

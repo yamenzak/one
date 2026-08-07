@@ -60,7 +60,7 @@ import { studioUrl, useSession } from "../session.js";
 function AddressAnchor({ label, host, sub }: { label: string; host: string; sub?: React.ReactNode }) {
   return (
     <Anchor eyebrow={label} sub={sub} className="pb-4">
-      <span className="block break-all text-title-1 sm:text-[2.5rem] sm:leading-[1.05]">{host}</span>
+      <span className="block break-all text-title-1 sm:text-title-1 sm:leading-[1.05]">{host}</span>
     </Anchor>
   );
 }

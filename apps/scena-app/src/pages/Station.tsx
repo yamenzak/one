@@ -50,7 +50,7 @@ export function QueueControls({
     <>
       {/* NOW SERVING */}
       <Card className="mb-5 border-border/60 bg-card/60">
-        <div className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Now serving</div>
+        <div className="text-micro uppercase text-muted-foreground">Now serving</div>
         <div className="font-mono text-7xl font-bold leading-none tabular-nums">{fmt(state?.prefix ?? "", state?.serving ?? null)}</div>
         <div className="mt-1 text-sm text-muted-foreground">{state?.counter != null ? `Counter ${state.counter}` : "—"}</div>
       </Card>
@@ -180,7 +180,7 @@ function SeriesPanel({
 function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <div className="rounded-lg border bg-muted/30 px-2 py-3">
-      <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="text-micro text-muted-foreground uppercase">{label}</div>
       <div className={`font-mono text-2xl font-bold tabular-nums ${accent ? "text-primary" : ""}`}>{value}</div>
     </div>
   );
@@ -189,7 +189,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
 function RecentStrip({ recent, defaultPrefix }: { recent: QueueState["recent"]; defaultPrefix: string }) {
   return (
     <div className="mt-6">
-      <div className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Recent calls</div>
+      <div className="mb-2 text-micro uppercase text-muted-foreground">Recent calls</div>
       <div className="flex flex-wrap gap-2">
         {recent.slice(0, 8).map((r, i) => (
           <div key={i} className="flex items-center gap-2 rounded-lg border bg-card px-3 py-1.5">
@@ -224,7 +224,7 @@ export function RoomControls({
                 key={st.id}
                 onClick={() => onFlip(room.id, st.id)}
                 style={{ background: st.color }}
-                className={`flex-1 rounded-lg px-3 py-3 text-sm font-bold text-neutral-900 transition ${room.status === st.id ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "opacity-80 hover:opacity-100"}`}
+                className={`flex-1 rounded-lg px-3 py-3 text-sm font-bold text-black transition ${room.status === st.id ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : "opacity-80 hover:opacity-100"}`}
               >
                 {st.label}
               </button>

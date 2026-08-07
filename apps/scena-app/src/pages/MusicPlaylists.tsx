@@ -643,7 +643,7 @@ function EditablePlaylistName({ name, onRename }: { name: string; onRename: (n: 
       className="group/n inline-flex items-center gap-2 text-left"
       title="Rename playlist"
     >
-      <span className="truncate text-xl font-semibold tracking-tight md:text-2xl">{name}</span>
+      <span className="truncate text-title-3 md:text-2xl">{name}</span>
       <Pencil className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/n:opacity-70" />
     </button>
   );

@@ -392,21 +392,21 @@ export function UploadProgress({
             className="grid size-11 place-items-center rounded-full"
             style={{ background: `conic-gradient(var(--primary) ${pct! * 3.6}deg, var(--secondary) 0deg)` }}
           >
-            <span className="numeral grid size-8 place-items-center rounded-full bg-background text-[0.65rem] font-semibold tabular-nums">
+            <span className="numeral grid size-8 place-items-center rounded-full bg-background text-micro tabular-nums">
               {pct}
             </span>
           </div>
         ) : (
           <Spinner className="size-6" />
         )}
-        <span className="text-[0.65rem] font-medium text-muted-foreground">
+        <span className="text-micro normal-case tracking-normal text-muted-foreground">
           {phase === "processing" ? "Processing…" : "Uploading…"}
         </span>
         {onCancel && phase === "sending" && (
           <button
             type="button"
             onClick={onCancel}
-            className="text-[0.65rem] font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+            className="text-micro normal-case tracking-normal text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
           >
             Cancel
           </button>

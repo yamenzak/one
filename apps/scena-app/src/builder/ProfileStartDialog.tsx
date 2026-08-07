@@ -115,7 +115,7 @@ function TemplateCard({ template, selected, onSelect }: { template: Template; se
         {template.accent && <span className="mt-1 size-2.5 shrink-0 rounded-full" style={{ background: template.accent }} />}
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold">{template.name}</div>
-          <div className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-muted-foreground">{template.description}</div>
+          <div className="mt-0.5 line-clamp-2 text-caption leading-snug text-muted-foreground">{template.description}</div>
         </div>
       </div>
     </button>
@@ -290,7 +290,7 @@ export function ProfileStartDialog({
               <div className="space-y-6 px-5 py-4">
                 {groups.map((g) => (
                   <div key={g.category}>
-                    <div className="mb-2.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{g.category}</div>
+                    <div className="mb-2.5 text-micro uppercase text-muted-foreground">{g.category}</div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                       {g.templates.map((t) => (
                         <TemplateCard key={t.id} template={t} selected={picked === t.id} onSelect={() => setPicked(t.id)} />
@@ -346,7 +346,7 @@ export function ProfileStartDialog({
                         key={ex}
                         type="button"
                         onClick={() => setAiPrompt(ex)}
-                        className="rounded-full border px-2.5 py-1 text-left text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                        className="rounded-full border px-2.5 py-1 text-left text-caption text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
                       >
                         {ex}
                       </button>

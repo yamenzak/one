@@ -90,7 +90,7 @@ function SearchBox({ value, onChange, placeholder, className }: { value: string;
 
 /** Section header inside a config card. */
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{children}</div>;
+  return <div className="text-micro uppercase text-muted-foreground">{children}</div>;
 }
 
 function Loading() {
@@ -383,7 +383,7 @@ export function StripeTab() {
               { value: "3.0", label: "3.0 (legacy)" },
             ]}
           />
-          <p className="text-[11px] text-muted-foreground">
+          <p className="text-caption text-muted-foreground">
             Match your key's subscription — a key is subscribed to one version, not both. New OpenWeather keys are 4.0.
           </p>
         </div>
@@ -659,14 +659,14 @@ function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose
                 <SectionLabel>Features</SectionLabel>
                 {FEATURE_GROUPS.map((g) => (
                   <div key={g.cat} className="space-y-1.5">
-                    <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">{g.cat}</div>
+                    <div className="text-micro text-muted-foreground/70 uppercase">{g.cat}</div>
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                       {g.items.map((x) => (
                         <label key={x.key} title={x.description} className="flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm">
                           <span className="flex-1 text-muted-foreground">
                             {x.label}
                             {x.safety && (
-                              <span className="ml-1.5 rounded bg-muted px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                              <span className="ml-1.5 rounded bg-muted px-1 py-0.5 text-micro text-muted-foreground/70 uppercase">
                                 always on
                               </span>
                             )}
@@ -812,7 +812,7 @@ function costBasis(m: AdminModel): React.ReactNode {
     const o = m.output_rate != null ? num(Math.round(m.output_rate)) : "—";
     return (
       <span className="font-mono tabular-nums text-muted-foreground">
-        {i} in · {o} out<span className="ml-1 text-[10px] uppercase">/Mtok</span>
+        {i} in · {o} out<span className="ml-1 text-micro uppercase">/Mtok</span>
       </span>
     );
   }
@@ -821,7 +821,7 @@ function costBasis(m: AdminModel): React.ReactNode {
   return (
     <span className="font-mono tabular-nums text-muted-foreground">
       {r}
-      <span className="ml-1 text-[10px] uppercase">{unit}</span>
+      <span className="ml-1 text-micro uppercase">{unit}</span>
     </span>
   );
 }

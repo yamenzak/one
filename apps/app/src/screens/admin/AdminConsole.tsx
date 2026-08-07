@@ -1324,7 +1324,7 @@ function AiSelfTest({ models }: { models: AiCatalogModel[] }) {
                   {r.excerpt && (
                     <details>
                       <summary className="min-h-6 cursor-pointer text-xs text-muted-foreground">What the model said</summary>
-                      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-surface-1 p-2 text-[11px] leading-relaxed">{r.excerpt}</pre>
+                      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-surface-1 p-2 text-caption leading-relaxed">{r.excerpt}</pre>
                     </details>
                   )}
                 </div>
