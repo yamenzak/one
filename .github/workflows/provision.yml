@@ -137,6 +137,40 @@ jobs:
             printf '%s' "$out" | json_only
           }
 
+          # ── A create that SAYS what went wrong ─────────────────────────────
+          #
+          # Every create was `>/dev/null 2>&1 || fail=1`, so a create that
+          # genuinely failed — a missing scope, a name already taken — and one
+          # that succeeded produced the same next line: "could not read its id
+          # back". Provisioning Scena hit exactly that and the log could not
+          # say which had happened.
+          create_it() {
+            what="$1"; shift
+            if out=$("$@" 2>&1); then return 0; fi
+            echo "::error::Could not create $what."
+            printf '%s\n' "$out" | tail -10
+            return 1
+          }
+
+          # ── …and a read-back that WAITS ───────────────────────────────────
+          #
+          # Cloudflare's list endpoints are eventually consistent: a namespace
+          # created a second ago is not reliably in the next `list`. The
+          # read-back ran once, immediately, and reported a perfectly good
+          # resource as missing. Six tries over ~30s — long enough to settle,
+          # short enough that a real failure still fails this run.
+          d1_id_for()    { pnpm exec wrangler d1 list --json 2>/dev/null | json_only | jq -r --arg n "$1" '.[]? | select(.name == $n) | (.uuid // .id)' | head -1; }
+          kv_id_exact()  { pnpm exec wrangler kv namespace list 2>/dev/null | json_only | jq -r --arg t "$1" '.[]? | select(.title == $t) | .id' | head -1; }
+          kv_id_suffix() { pnpm exec wrangler kv namespace list 2>/dev/null | json_only | jq -r --arg t "$1" '.[]? | select(.title | endswith($t)) | .id' | head -1; }
+          settle() {
+            for _ in 1 2 3 4 5 6; do
+              v=$("$1" "$2")
+              if [ -n "$v" ] && [ "$v" != "null" ]; then printf '%s' "$v"; return 0; fi
+              sleep 5
+            done
+            return 1
+          }
+
           bound=$(node ../../scripts/apps.mjs bound "$APP")
           field() { printf '%s' "$bound" | jq -r ".$1"; }
           fail=0
@@ -169,9 +203,8 @@ jobs:
               D1_ID="$adopt"
             else
               echo "Creating D1 '$D1_NAME'…"
-              pnpm exec wrangler d1 create "$D1_NAME" >/dev/null 2>&1 || fail=1
-              D1_ID=$(pnpm exec wrangler d1 list --json 2>/dev/null | json_only | jq -r --arg n "$D1_NAME" '.[]? | select(.name == $n) | (.uuid // .id)' | head -1)
-              [ -n "$D1_ID" ] || { echo "::error::Created D1 '$D1_NAME' but could not read its id back."; fail=1; }
+              create_it "D1 '$D1_NAME'" pnpm exec wrangler d1 create "$D1_NAME" || fail=1
+              D1_ID=$(settle d1_id_for "$D1_NAME") || { echo "::error::D1 '$D1_NAME' did not appear in the list within 30s. Re-run: a second run adopts it by name."; fail=1; }
             fi
           else
             fail=1
@@ -209,9 +242,8 @@ jobs:
               echo "✓ KV namespace ending in '$KV_TITLE' exists ($KV_ID)."
             else
               echo "Creating KV namespace '$KV_TITLE'…"
-              pnpm exec wrangler kv namespace create "$KV_TITLE" >/dev/null 2>&1 || fail=1
-              KV_ID=$(pnpm exec wrangler kv namespace list 2>/dev/null | json_only | jq -r --arg t "$WANT_KV" '.[]? | select(.title == $t) | .id' | head -1)
-              [ -n "$KV_ID" ] || { echo "::error::Created KV '$KV_TITLE' but could not read its id back."; fail=1; }
+              create_it "KV namespace '$KV_TITLE'" pnpm exec wrangler kv namespace create "$KV_TITLE" || fail=1
+              KV_ID=$(settle kv_id_exact "$WANT_KV") || { echo "::error::KV '$WANT_KV' did not appear in the list within 30s. Re-run: a second run adopts it by title."; fail=1; }
             fi
           else
             fail=1
@@ -245,9 +277,8 @@ jobs:
               echo "✓ Shared config namespace ending in '$SHARED_TITLE' exists ($SHARED_ID) — binding it."
             else
               echo "Creating the shared config namespace '$SHARED_TITLE'…"
-              pnpm exec wrangler kv namespace create "$SHARED_TITLE" >/dev/null 2>&1 || fail=1
-              SHARED_ID=$(pnpm exec wrangler kv namespace list 2>/dev/null | json_only | jq -r --arg t "$SHARED_TITLE" '.[]? | select(.title | endswith($t)) | .id' | head -1)
-              [ -n "$SHARED_ID" ] || { echo "::error::Created '$SHARED_TITLE' but could not read its id back."; fail=1; }
+              create_it "the shared config namespace '$SHARED_TITLE'" pnpm exec wrangler kv namespace create "$SHARED_TITLE" || fail=1
+              SHARED_ID=$(settle kv_id_suffix "$SHARED_TITLE") || { echo "::error::'$SHARED_TITLE' did not appear in the list within 30s. Re-run: a second run adopts it by title."; fail=1; }
             fi
           else
             fail=1
