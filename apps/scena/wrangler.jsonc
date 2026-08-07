@@ -125,7 +125,7 @@
 
   "kv_namespaces": [
     // Pairing code → ScreenDO id, and channel → current manifest version pointer.
-    { "binding": "PAIRING", "id": "0000000000000000000000000000cafe" }
+    { "binding": "PAIRING", "id": "3161af90594d486c8f4893efe44e92b8" }
     /*
       PLATFORM_CONFIG is deliberately NOT bound here yet.
 
@@ -139,13 +139,19 @@
       deploy.yml would silently SKIP it. Unbound, `getConfig` reads this app's
       own `app_config` and nothing changes — which is what wrangler dev and the
       whole test suite run.
-    */
+    */,
+    // The SHARED platform config store — the SAME namespace id in every 4DL
+    // app, holding the credentials the whole platform has in common (the
+    // Google key, the Stripe account, the Cloudflare token, the Turnstile
+    // widget). This app's own `app_config` rows still win. Written here by
+    // provisioning; see packages/core/src/config.ts.
+    { "binding": "PLATFORM_CONFIG", "id": "c851c1a484c444cd91c5be8766d9256d" }
   ],
 
   "d1_databases": [
     // Authoring source of truth. Local `wrangler dev` simulates this; the
     // database_id below is a placeholder only needed for a remote deploy.
-    { "binding": "DB", "database_name": "scena", "database_id": "00000000-0000-0000-0000-0000000000d1" }
+    { "binding": "DB", "database_name": "scena", "database_id": "f43f6ebd-f741-427b-8423-b9e009cfea68" }
   ],
 
   "analytics_engine_datasets": [
