@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router-dom";
-import { Siren, LogOut, Sun, Moon, Scale } from "lucide-react";
+import { Siren, LogOut, Sun, Moon, Scale, Layers, Music, Tv } from "lucide-react";
 import { ScenaMascot } from "./brand.js";
 import { adminUrl, ErrorBoundary } from "@4dl/app-kit";
 import { useHost } from "./host.js";
 import { AdminDoor } from "./pages/AdminDoor.js";
 import { AppShell } from "./components/app-shell.js";
+import { CollectionPane } from "./components/collection-pane.js";
 import type { NavGroup } from "@4dl/ui";
 import { RoleProvider } from "./permissions.js";
 import { EntitlementsProvider } from "./entitlements.js";
@@ -303,20 +304,50 @@ export function App() {
         )}
       >
         <ErrorBoundary resetKey={pathname} homePath="/" art={<ScenaMascot mood="sad" size={104} className="mx-auto mb-2" />}>
-          <div key={pathname} className="">
+          {/* `h-full` so a `Shape` (§11.2) can reach the panel's bounds through
+              this remount key. On every other page the parent is auto-height,
+              which makes `height: 100%` resolve to `auto` — a no-op.
+
+              `@container` so a screen can size itself against the PANEL rather
+              than the window. `Shape`'s column marks itself too and, being
+              nearer, wins inside a two-pane — so one set of `@` variants is
+              correct in both arrangements and below 1100, where there is no
+              pane at all. */}
+          <div key={pathname} className="@container h-full">
             <Routes>
               <Route path="/" element={<ScreensPage key={refreshKey} onPair={() => setPairOpen(true)} />} />
               <Route path="/screens/:id" element={<ScreenDetailPage />} />
               <Route path="/screens/:id/studio" element={<StudioPage mode="screen" />} />
               <Route path="/displays/:channelId" element={<StudioPage mode="display" />} />
               <Route path="/widgets" element={<WidgetBuilderPage />} />
-              <Route path="/channels" element={<ChannelsPage />} />
-              <Route path="/channels/:id" element={<ChannelDetailPage />} />
-              <Route path="/playlists" element={<PlaylistsPage />} />
-              <Route path="/playlists/:id" element={<PlaylistDetailPage />} />
+              {/*
+                THE THREE COLLECTIONS (§11.3). Nested rather than flat, so the
+                list and the record are one destination the shape arranges —
+                two panes at ≥1100, two pages below it. See `CollectionPane`
+                for why the index element must stay the real list page.
+              */}
+              <Route
+                path="/channels"
+                element={<CollectionPane base="/channels" list={<ChannelsPage pane />} icon={Tv} title="Pick a channel" description="Its slides, music and widgets open here — the list stays beside them." />}
+              >
+                <Route index element={<ChannelsPage />} />
+                <Route path=":id" element={<ChannelDetailPage />} />
+              </Route>
+              <Route
+                path="/playlists"
+                element={<CollectionPane base="/playlists" list={<PlaylistsPage pane />} icon={Layers} title="Pick a playlist" description="Its slides open here — the library stays beside them." />}
+              >
+                <Route index element={<PlaylistsPage />} />
+                <Route path=":id" element={<PlaylistDetailPage />} />
+              </Route>
               <Route path="/media" element={<MediaLibraryPage />} />
-              <Route path="/music" element={<MusicPlaylistsPage />} />
-              <Route path="/music/:id" element={<MusicPlaylistDetailPage />} />
+              <Route
+                path="/music"
+                element={<CollectionPane base="/music" list={<MusicPlaylistsPage pane />} icon={Music} title="Pick a playlist" description="Its tracks open here — the library stays beside them." />}
+              >
+                <Route index element={<MusicPlaylistsPage />} />
+                <Route path=":id" element={<MusicPlaylistDetailPage />} />
+              </Route>
               <Route path="/profiles" element={<WidgetProfilesPage />} />
               <Route path="/boards" element={<LiveBoardsPage />} />
               <Route path="/feeds" element={<FeedsPage />} />

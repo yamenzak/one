@@ -87,7 +87,7 @@ function subLine(p: SlidePlaylist): string {
   return parts.join(" · ");
 }
 
-export function PlaylistsPage() {
+export function PlaylistsPage({ pane }: { pane?: boolean } = {}) {
   const can = useCan();
   const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<SlidePlaylist[] | null>(null);
@@ -118,6 +118,7 @@ export function PlaylistsPage() {
   */
   return (
     <PlaylistLibrary
+      pane={pane}
       title="Slide playlists"
       description="The visual loop a channel plays."
       noun="playlists"

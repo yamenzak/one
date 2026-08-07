@@ -87,7 +87,7 @@ const sourceSummary = (c: ComposedChannel) => {
 
 /* ================================ List view ============================== */
 
-export function ChannelsPage() {
+export function ChannelsPage({ pane }: { pane?: boolean } = {}) {
   const navigate = useNavigate();
   const can = useCan();
   const canCreate = can("channel", "create");
@@ -97,6 +97,12 @@ export function ChannelsPage() {
   const [facets, setFacets] = useState<FacetSelection>({ tag: null });
   const [newOpen, setNewOpen] = useState(false);
   const [view, setView] = useCollectionView("scena.channels", "grid");
+  /*
+    A 340px list pane has no room for a 16:9 preview tile, so the pane is always
+    the LIST view — and the toggle goes with it, because a control that offers
+    a shape this width cannot draw is a control that lies.
+  */
+  const paneView = pane ? "list" : view;
 
   const reload = () => {
     setError(null);
@@ -117,11 +123,20 @@ export function ChannelsPage() {
     return channels.filter((c) => (!needle || c.name.toLowerCase().includes(needle)) && (!facets.tag || (c.tags ?? []).includes(facets.tag)));
   }, [channels, q, facets]);
 
-  const newButton = canCreate ? (
+  const labelledButton = canCreate ? (
     <Button onClick={() => setNewOpen(true)}>
       <Plus className="size-4" /> New channel
     </Button>
   ) : undefined;
+  /*
+    In a 340px pane the label is what does not fit: "New channel" beside a
+    search field leaves the field about nine characters wide. The action keeps
+    its 44px target and takes the label as its accessible name. The EMPTY state
+    keeps the words — it has the room, and a bare "+" names no next step.
+  */
+  const newButton = canCreate && pane ? (
+    <Button size="icon" onClick={() => setNewOpen(true)} aria-label="New channel"><Plus className="size-4" /></Button>
+  ) : labelledButton;
 
   return (
     <div>
@@ -135,10 +150,12 @@ export function ChannelsPage() {
         it is the inversion, and it left the page nameless beside every sibling
         list (Screens, Team, Billing) that carries a title.
       */}
-      <PageHeader
-        title="Channels"
-        description={channels ? `${channels.length} channel${channels.length === 1 ? "" : "s"}` : "Compose slides, music and widgets, then publish."}
-      />
+      {!pane && (
+        <PageHeader
+          title="Channels"
+          description={channels ? `${channels.length} channel${channels.length === 1 ? "" : "s"}` : "Compose slides, music and widgets, then publish."}
+        />
+      )}
       {/*
         The same four hand-rolled branches this screen shared with the media
         library, and the same bug in each: a failed load rendered
@@ -153,8 +170,8 @@ export function ChannelsPage() {
         error={error}
         onRetry={() => void reload()}
         noun="channels"
-        view={view}
-        onView={setView}
+        view={paneView}
+        onView={pane ? undefined : setView}
         query={q}
         onQuery={setQ}
         narrowed={Boolean(facets.tag)}
@@ -166,7 +183,7 @@ export function ChannelsPage() {
           icon: Layers,
           title: "No channels yet",
           description: "Create one, pick its slides, music, and widgets, then publish to your screens — it goes live in seconds.",
-          action: newButton,
+          action: labelledButton,
         }}
         /*
           §11: "cards never stretch; columns multiply." `ChannelCard` is a card
@@ -412,7 +429,8 @@ export function ChannelDetailPage() {
     return (
       <div className="space-y-5">
         <Skeleton className="h-8 w-56" />
-        <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+        {/* Same split as the loaded page below, so arrival is a fill. */}
+        <div className="grid gap-5 @4xl:grid-cols-[1fr_360px]">
           <div className="space-y-4">
             {[0, 1, 2].map((i) => (
               <Skeleton key={i} className="h-20 w-full rounded-xl" />
@@ -466,7 +484,16 @@ export function ChannelDetailPage() {
         </div>
       </PageHeader>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
+      {/*
+        `@4xl:` (896px of THIS COLUMN), not `lg:` (a 1024px VIEWPORT). In a
+        two-pane the column is about 850 wide at a 1440 window — but every
+        viewport breakpoint on the screen still answered yes, so the composer
+        was squeezed into ~415px beside a 360px preview and "Slide playlist"
+        broke across two lines. Asked of the column, the split happens when
+        the column can carry it and the preview drops below when it cannot.
+        See `Shape` for why the column is a container.
+      */}
+      <div className="grid gap-5 @4xl:grid-cols-[1fr_360px]">
         {/* Composer */}
         <div className="space-y-3">
           <ComposerRow
@@ -507,8 +534,10 @@ export function ChannelDetailPage() {
           />
         </div>
 
-        {/* Live preview */}
-        <div className="space-y-2">
+        {/* Live preview. Capped when it STACKS: a 16:9 frame across an 800px
+            column is 450px tall and pushes the composer it is meant to
+            illustrate off the fold. Beside the composer it takes its column. */}
+        <div className="max-w-md space-y-2 @4xl:max-w-none">
           <div className="flex items-center justify-between">
             <h2 className="text-body font-semibold">Live preview</h2>
             <span className="text-caption text-muted-foreground">Published output</span>
@@ -660,7 +689,7 @@ function ComposerRow({
         value={value ?? NONE}
         disabled={disabled}
         onChange={(v) => onChange(v === NONE ? null : v)}
-        className="w-full sm:w-56"
+        className="w-full @md:w-56"
         options={[{ value: NONE, label: "None" }, ...options.map((o) => ({ value: o.id, label: o.name }))]}
       />
     </div>

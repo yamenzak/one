@@ -137,6 +137,22 @@ test("the operator's workspace", async () => {
     await shoot(page, project, "channels", { settle: 600 });
   });
 
+  /*
+    THE TWO-PANE WITH SOMETHING OPEN IN IT (§11.2), which is the arrangement
+    the shape exists for and the one nothing photographed. The shot above is
+    the list beside its placeholder — worth having, and not evidence that
+    picking an item leaves the list on screen. This is.
+
+    Clicked rather than deep-linked: navigating straight to a record would also
+    pass with a shape that discards its list, which is exactly the failure the
+    picture is meant to rule out.
+  */
+  await test.step("a channel, beside its list", async () => {
+    await visit(page, `${base}/channels`, inMain(page, LOBBY_SCREEN));
+    await inMain(page, LOBBY_SCREEN).click();
+    await shoot(page, project, "channel", { settle: 900 });
+  });
+
   await test.step("slide playlists", async () => {
     await visit(page, `${base}/playlists`, inMain(page, DEMO_PLAYLIST));
     await shoot(page, project, "playlists", { settle: 600 });

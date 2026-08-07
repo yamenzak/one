@@ -1502,6 +1502,22 @@ navigation surface.
    with pagination dots is how three cards fit on a phone; at 1100 the three
    cards fit side by side and the dots are furniture for a gesture nobody will
    make. Same content, different arrangement — which is rule 1 again.
+8. **Inside a pane, a breakpoint lies. Ask the container.** `lg:` and `sm:` ask
+   the WINDOW, and the window is not the box the content is in. A record built
+   for a full-width panel, dropped into an 850px column at a 1440px viewport,
+   keeps every one of its breakpoints answering yes: Scena's channel detail held
+   its `1fr + 360px` split and its 224px selects, which left about a hundred
+   pixels for the label — "Slide playlist" broke across two lines and its
+   one-line description ran to four. Nothing on the screen was wrong; it was
+   answering a question about the wrong box.
+
+   So `Shape`'s column is a **container**, and a shell marks its own content
+   area as one too. Nested containers resolve to the nearest, so `@md:`/`@4xl:`
+   are correct in a pane, correct in a full-width panel, and correct below 1100
+   where the pane does not exist. **A screen that can appear in a pane sizes
+   itself with `@` variants, not with breakpoints.** Breakpoints stay for what
+   is genuinely about the device — the shell's own shape, and whether there is
+   a pane at all.
 
 ### What a wider viewport must NOT do
 
@@ -1511,6 +1527,11 @@ navigation surface.
 - Show more than one atmosphere per pane.
 - Leave the space beside the column empty and call it breathing room. Below
   1100 that is the design; at 1100 it is a two-pane that was never built.
+- Keep a Back that points at something already on screen. In a two-pane the
+  list is beside the record, so the arrow is a control that appears to do
+  nothing. `Hero`, `SectionSwitcher` and `PageHeader` all drop it from the
+  SHAPE (`useShape`), not from a width — `lg:hidden` would strand a Focus
+  screen's only way back the moment the window passed 1024.
 
 ---
 

@@ -38,6 +38,7 @@ import { ArrowLeft, Circle, Menu, MoreVertical, PanelLeft } from "./lib/icons.js
 import { Button } from "./primitives.js";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Tooltip } from "./overlays.js";
 import { Breadcrumbs, NavDrawer, ScrollArea, type Crumb } from "./shell.js";
+import { useShape } from "./shapes.js";
 
 /* ═══════════════════════ the chrome a page publishes ═══════════════════════ */
 
@@ -356,9 +357,15 @@ export function DashboardShell({ navGroups, active, onNavigate, brand, fallbackC
 
         {/* The content panel is its OWN scroll container. The frame never
             scrolls, so the sidebar and the breadcrumb bar stay put. */}
+        {/* A `Shape` (§11.2) is the one thing that must NOT sit inside this
+            padding, and the panel is already the bounded box it needs: its
+            panes scroll on their own, so the outer scroller stands down and
+            the shape fills the frame edge to edge. `has-[[data-shape]]` is a
+            descendant match rather than a child one because an app's routes
+            wrap their element in at least a remount key. */}
         <main className="min-h-0 flex-1 overflow-hidden rounded-xl bg-background shadow-sm">
-          <div className="h-full overflow-y-auto">
-            <div className="w-full px-5 py-6 sm:px-7 lg:px-8">{children}</div>
+          <div className="h-full overflow-y-auto has-[[data-shape]]:overflow-hidden">
+            <div className="w-full px-5 py-6 has-[[data-shape]]:h-full has-[[data-shape]]:p-0 sm:px-7 lg:px-8">{children}</div>
           </div>
         </main>
       </div>
@@ -382,16 +389,23 @@ export function DashboardShell({ navGroups, active, onNavigate, brand, fallbackC
 export function PageHeader({ title, description, back, actions, className, children }: {
   title: React.ReactNode;
   description?: React.ReactNode;
-  /** Inner-page back link. */
+  /**
+   * Inner-page back link.
+   *
+   * DROPPED inside a `Shape` two-pane (§11.4 rule 3), where the list it returns
+   * to is already on screen — an arrow that appears to do nothing. The caller
+   * passes it unconditionally and the shape decides; see `useShape`.
+   */
   back?: { label?: string; onClick: () => void };
   /** Right-aligned CONTENT controls: search, filters, view toggles. */
   actions?: React.ReactNode;
   className?: string;
   children?: React.ReactNode;
 }) {
+  const { twoPane } = useShape();
   return (
     <div className={cn("mb-6", className)}>
-      {back && (
+      {back && !twoPane && (
         <button
           onClick={back.onClick}
           className="mb-3 inline-flex items-center gap-1.5 rounded-sm text-caption font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50"

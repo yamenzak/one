@@ -71,30 +71,34 @@ describe("Shape: the narrow layout is the one that must not move", () => {
       model, so nothing to collapse.
     */
     expect(SRC).toMatch(/if \(!twoPane && !board\) return <>\{children\}<\/>;/);
-    // And the height it needs on the other branch must not leak onto this one.
+    // And the height model it needs on the other branch must not leak here.
     const paneBranch = SRC.slice(SRC.indexOf("if (!twoPane && !board)"));
-    expect(paneBranch, "the viewport height belongs only to the branch with panes").toContain("100dvh");
-    expect(SRC.slice(0, SRC.indexOf("if (!twoPane && !board)"))).not.toContain("dvh");
+    expect(paneBranch, "the pane branch is the only one that is bounded").toContain("h-full");
+    expect(SRC.slice(0, SRC.indexOf("if (!twoPane && !board)"))).not.toMatch(/h-full|dvh/);
   });
 
-  it("subtracts the chrome above it rather than claiming the whole viewport", () => {
+  it("takes its height from the parent, and never guesses at the chrome", () => {
     /*
-      A bare `h-dvh` was the first spelling. It is wrong by exactly the app bar:
-      the row starts BELOW a sticky header, so a full-viewport row overhangs the
-      fold by the bar's height and the page grows a scrollbar it should not
-      have — and every sticky thing inside a pane then sits at the wrong offset.
-      `--chrome-top` is the shell's answer to "how far down does this scroller
-      start" (tokens.css), and a pane resets it because a pane IS a scroller.
+      Two wrong spellings, both of which put the number here. `h-dvh` overshoots
+      by whatever sits above — a sticky app bar, a breadcrumb row — so the page
+      grows a scrollbar it should not have and everything sticky inside a pane
+      lands at the wrong offset. `100dvh` minus a variable only moves the guess:
+      a dashboard panel inset by a sidebar, a header, a gap AND its own padding
+      is not one length `@4dl/ui` can know.
+
+      `[data-shape]` is the signal each shell answers with its own frame.
     */
-    expect(SRC).toMatch(/h-\[calc\(100dvh-var\(--chrome-top,0px\)\)\]/);
-    const panes = SRC.match(/\[--chrome-top:0px\]/g) ?? [];
-    expect(panes.length, "every pane must reset it — a missed one sticks 64px down").toBe(3);
+    expect(SRC).toMatch(/data-shape=\{board \? "board" : "two-pane"\}/);
+    expect(SRC).toMatch(/"flex h-full w-full items-stretch"/);
+    expect(SRC, "a viewport height here is a guess about someone else's chrome").not.toContain("dvh");
   });
 
-  it("tells the shell to stop centring", () => {
-    // A shell that caps every screen at a 720px column (§2) is right for Focus
-    // and exactly wrong here, where the panes are the layout.
-    expect(SRC).toMatch(/data-shape=\{board \? "board" : "two-pane"\}/);
+  it("resets --chrome-top on every pane, because a pane is its own top", () => {
+    // Sticky content inside a pane offsets from the PANE, not from the page.
+    // Kova's client sub-header used `top-16` and stuck sixty-four pixels down,
+    // floating over its own content and swallowing clicks meant for it.
+    const panes = SRC.match(/\[--chrome-top:0px\]/g) ?? [];
+    expect(panes.length, "list, column and aside — a missed one sticks 64px down").toBe(3);
   });
 
   it("keeps the centred column ONLY when there is no list", () => {
@@ -136,8 +140,10 @@ describe("Shape: what the column knows about what is beside it", () => {
                                   parent already computed, in a package with no
                                   router to derive it from.
   */
-  const HERO = readFileSync(new URL("../src/hero.tsx", import.meta.url), "utf8");
-  const SWITCHER = readFileSync(new URL("../src/section-switcher.tsx", import.meta.url), "utf8");
+  const read = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
+  const HERO = read("hero.tsx");
+  const SWITCHER = read("section-switcher.tsx");
+  const HEADER = read("dashboard.tsx");
   const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
   it("publishes the shape, defaulting to the one that changes nothing", () => {
@@ -152,7 +158,13 @@ describe("Shape: what the column knows about what is beside it", () => {
     expect(SRC.slice(provider - 400, provider)).toContain("min-h-0 flex-1");
   });
 
-  for (const [name, src] of [["Hero", HERO], ["SectionSwitcher", SWITCHER]] as const) {
+  /*
+    All THREE headers, because a back link lives in each and the app that
+    forgets one is the app that ships an arrow pointing at a visible list.
+    `PageHeader` is the one every dashboard record screen uses, and it is why
+    Scena's channel detail still drew "← All channels" beside its own list.
+  */
+  for (const [name, src] of [["Hero", HERO], ["SectionSwitcher", SWITCHER], ["PageHeader", HEADER]] as const) {
     it(`${name} drops its Back from the shape, not from a breakpoint`, () => {
       const c = code(src);
       expect(c, `${name} does not ask`).toMatch(/useShape\(\)/);

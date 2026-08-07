@@ -507,8 +507,15 @@ function TabLayout() {
           the child's `max-width` leaves it inside a 720px parent, so the first
           two-pane rendered a 340px list beside a 380px record and clipped the
           rest off the right edge — the same dead space this replaced, in a
-          different place. The column is what has to stand down. */}
-      <main className="column [--chrome-top:var(--app-bar-h)] has-[>[data-fullbleed]]:max-w-none has-[>[data-shape]]:max-w-none">
+          different place. The column is what has to stand down.
+
+          THE HEIGHT IS THIS SHELL'S ANSWER, not `Shape`'s guess. A shape's
+          panes each scroll on their own, which needs a bounded box, and the
+          only frame that knows how much room is left is the one that drew the
+          chrome above it — here, the viewport minus a sticky app bar.
+          `--chrome-top` says the same thing to whatever is sticky INSIDE
+          (tokens.css); a pane resets it to 0, being its own scroller. */}
+      <main className="column [--chrome-top:var(--app-bar-h)] has-[>[data-fullbleed]]:max-w-none has-[>[data-shape]]:h-[calc(100dvh-var(--app-bar-h))] has-[>[data-shape]]:max-w-none">
         <ErrorBoundary resetKey={loc.pathname}><Outlet /></ErrorBoundary>
       </main>
       </div>

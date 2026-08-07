@@ -79,11 +79,22 @@ export interface PlaylistLibraryProps<T extends PlaylistLike> {
 
   /** The row. `menu` is the ⋮ this component owns; place it in the trailing slot. */
   row: (item: T, menu: ReactNode) => ReactNode;
+
+  /**
+   * Rendered as a `Shape` list pane (§11.2) rather than as the whole page.
+   *
+   * Only the chrome changes: the title comes off, because in a two-pane the
+   * shell's breadcrumb already names the destination and the T1 belongs to the
+   * record on the right. Everything that makes the list a list — the search,
+   * the tag facet, the create button, the rows, all four states — is the same
+   * component either way, which is the point: the pane is not a second list.
+   */
+  pane?: boolean;
 }
 
 export function PlaylistLibrary<T extends PlaylistLike>({
   noun, items, error, reload, perms, create, update, remove, onCreated,
-  createLabel, createTitle, createPlaceholder, defaultName, title, description, empty, deleteDescription, searchText, row,
+  createLabel, createTitle, createPlaceholder, defaultName, title, description, empty, deleteDescription, searchText, row, pane,
 }: PlaylistLibraryProps<T>) {
   const [q, setQ] = useState("");
   const [facets, setFacets] = useState<FacetSelection>({ tag: null });
@@ -106,9 +117,19 @@ export function PlaylistLibrary<T extends PlaylistLike>({
     });
   }, [items, q, facets, searchText]);
 
-  const newButton = perms.create ? (
+  /*
+    IN A PANE THE LABEL COMES OFF, and that is not decoration. "New playlist"
+    beside a search field inside 340px leaves the field about nine characters
+    wide — the first pane shot photographed a searchbox reading "Search play".
+    The label is what does not fit; the action is what matters, so the action
+    keeps its 44px target and takes the label as its accessible name.
+  */
+  const labelledButton = perms.create ? (
     <Button onClick={() => setNewOpen(true)}><Plus className="size-4" /> {createLabel}</Button>
   ) : undefined;
+  const newButton = perms.create && pane ? (
+    <Button size="icon" onClick={() => setNewOpen(true)} aria-label={createLabel}><Plus className="size-4" /></Button>
+  ) : labelledButton;
 
   const menu = (p: T) => (perms.write || perms.delete) ? (
     <DropdownMenu>
@@ -125,7 +146,7 @@ export function PlaylistLibrary<T extends PlaylistLike>({
 
   return (
     <div>
-      <PageHeader title={title} description={items ? `${items.length} ${items.length === 1 ? noun.replace(/s$/, "") : noun}` : description} />
+      {!pane && <PageHeader title={title} description={items ? `${items.length} ${items.length === 1 ? noun.replace(/s$/, "") : noun}` : description} />}
       <Collection
         items={shown}
         itemKey={(p: T) => p.id}
@@ -138,7 +159,9 @@ export function PlaylistLibrary<T extends PlaylistLike>({
         onClearFilters={() => setFacets({ tag: null })}
         filter={<Filters groups={facetGroups} value={facets} onChange={setFacets} />}
         action={newButton}
-        empty={{ ...empty, action: newButton }}
+        // The EMPTY state keeps the words: it has the room, and a bare "+"
+        // under "No playlists yet" names no next step.
+        empty={{ ...empty, action: labelledButton }}
         renderList={(p: T) => row(p, menu(p))}
       />
 

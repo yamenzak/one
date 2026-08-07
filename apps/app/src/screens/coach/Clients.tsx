@@ -194,7 +194,7 @@ export function Clients({ pane = false }: { pane?: boolean } = {}) {
   }, [wantsNew, setParams]);
 
   return (
-    <Page className={pane ? "space-y-3 py-4" : "column space-y-4 p-4 pb-28"}>
+    <Page className={pane ? "space-y-3" : "column space-y-4 p-4 pb-28"}>
       {/* T1 (§1). The roster IS the screen, so the anchor is its size — and the
           sub-line carries the only fact a coach scans for on arrival: how many
           of them want something. Not in the pane: the record beside it is the

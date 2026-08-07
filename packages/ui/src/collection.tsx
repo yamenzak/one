@@ -160,15 +160,37 @@ export function Collection<T>({
    */
   const showSearch = Boolean(onQuery);
 
+  /*
+    THE TOOLBAR WRAPS, AND THE SEARCH KEEPS A FLOOR.
+
+    One `flex` row with `flex-1` on the field means the field absorbs every
+    shortfall: a labelled "New channel" beside a filter and a view toggle at
+    430px left a search box reading "Search cha", and in a 340px `Shape` pane
+    it was worse. `flex-1` is not a minimum — it is "take what is left", and
+    what is left can be nothing.
+
+    So the row wraps and the field declares the width below which wrapping is
+    better than shrinking. `basis-40` (160px) with `flex-wrap` means: sit
+    inline while there is room for a usable field, push what does not fit onto
+    its own line when there is not.
+
+    160 is measured, not chosen: at 192 the field plus a view toggle plus an
+    icon button no longer fit a 340px `Shape` pane, so Kova's roster spent a
+    whole row of the pane on a wrapped "+". 160 fits inline there and still
+    holds a full placeholder — and Scena's 430px narrow, where a LABELLED
+    button genuinely does not fit, wraps that button instead of crushing the
+    field to "Search cha". Nothing is hidden and nothing is truncated at any
+    width.
+  */
   const header = (showSearch || onView || filter || action) && (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {showSearch && (
         <Field
           label={`Search ${noun}`}
           labelHidden
           icon={Search}
           type="search"
-          className="min-w-0 flex-1"
+          className="min-w-0 flex-1 basis-40"
           value={query ?? ""}
           placeholder={`Search ${noun}…`}
           onChange={(e) => onQuery?.(e.target.value)}

@@ -169,24 +169,26 @@ export function Shape({ list, children, aside, placeholder, selected, className 
     page scrolls as one, which looks identical until a long record drags a
     forty-row list up with it.
 
-    THE HEIGHT IS THE VIEWPORT MINUS WHAT IS ABOVE IT. A bare `h-dvh` was the
-    first spelling and it is wrong by exactly the app bar: the row starts below
-    a sticky header, so a full-viewport row overhangs the fold by its height and
-    the page grows a scrollbar it should not have. `--chrome-top` is what the
-    shell publishes for this (tokens.css); 0 where there is no chrome, so a
-    surface with a bare `Shape` is unaffected.
+    THE HEIGHT COMES FROM THE PARENT, and `data-shape` is how the parent knows
+    to give it one. Two spellings were tried and both put the number in the
+    wrong place: `h-dvh` overshoots by whatever chrome sits above (a sticky app
+    bar, a breadcrumb row), and `100dvh` minus a variable only moves the guess
+    here — a dashboard panel inset by a sidebar, a header, a gap and its own
+    padding cannot be described by one length that `@4dl/ui` knows.
 
-    `data-shape` is how a shell knows to stop centring. Kova's `<main>` caps
-    every screen at a 720px column (§2) — correct for Focus and exactly wrong
-    here, where the panes ARE the layout. An attribute rather than a class so
-    any app's shell can release its own width rule the same way.
+    So each shell answers for its own frame, which is the one place that CAN.
+    `[data-shape]` on the root is the signal: Kova's `<main>` releases its 720px
+    column (§2 — correct for Focus, exactly wrong where the panes ARE the
+    layout) and takes a viewport-minus-app-bar height; `DashboardShell`'s panel
+    is already bounded and only drops its padding. `h-full` then means the same
+    thing in both.
   */
   return (
-    <div data-shape={board ? "board" : "two-pane"} className={cn("flex h-[calc(100dvh-var(--chrome-top,0px))] w-full items-stretch", className)}>
+    <div data-shape={board ? "board" : "two-pane"} className={cn("flex h-full w-full items-stretch", className)}>
       {twoPane && (
         /* `[--chrome-top:0px]`: a pane is its own scroller, so for anything
            sticky inside it the top of the world is here. */
-        <ScrollArea mask label="List" className="min-h-0 w-[21.25rem] shrink-0 border-r border-border/40 px-4 [--chrome-top:0px]">
+        <ScrollArea mask label="List" className="min-h-0 w-[21.25rem] shrink-0 border-r border-border/40 px-4 py-5 [--chrome-top:0px]">
           {list}
         </ScrollArea>
       )}
@@ -202,14 +204,31 @@ export function Shape({ list, children, aside, placeholder, selected, className 
         itself — putting it around the whole row would tell the list it was
         sitting next to one.
       */}
-      <ScrollArea mask className={cn("min-h-0 flex-1 px-4 md:px-6 [--chrome-top:0px]", !twoPane && "column")}>
+      {/*
+        `@container`, and it is not a nicety — it is what makes a two-pane
+        SAFE to adopt on an existing screen.
+
+        A breakpoint asks the VIEWPORT. Put a record built for a full-width
+        desk panel into an 850px column at a 1440px viewport and every `lg:`
+        and `sm:` on it still says yes: Scena's channel detail kept its
+        1fr+360px split and its 224px selects, which left about a hundred
+        pixels for the label, so "Slide playlist" broke across two lines and
+        its one-line description ran to four. Nothing was wrong with the
+        screen; it was answering a question about the wrong box.
+
+        A container makes `@md:`/`@4xl:` ask THIS column instead. Nested
+        containers resolve to the nearest, so a shell that marks its own
+        content area keeps answering below 1100, where this pane does not
+        exist at all.
+      */}
+      <ScrollArea mask className={cn("@container min-h-0 flex-1 px-4 py-5 md:px-6 [--chrome-top:0px]", !twoPane && "column")}>
         <ShapeContext.Provider value={{ twoPane }}>
           {twoPane && !selected ? placeholder : children}
         </ShapeContext.Provider>
       </ScrollArea>
 
       {board && (
-        <ScrollArea mask label="More" className="min-h-0 w-80 shrink-0 border-l border-border/40 px-4 [--chrome-top:0px]">
+        <ScrollArea mask label="More" className="min-h-0 w-80 shrink-0 border-l border-border/40 px-4 py-5 [--chrome-top:0px]">
           {aside}
         </ScrollArea>
       )}

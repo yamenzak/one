@@ -102,7 +102,7 @@ function parseGenres(raw: string | null | undefined): string[] {
 
 /* ================================ List view ============================== */
 
-export function MusicPlaylistsPage() {
+export function MusicPlaylistsPage({ pane }: { pane?: boolean } = {}) {
   const can = useCan();
   const navigate = useNavigate();
   const [playlists, setPlaylists] = useState<MusicPlaylist[] | null>(null);
@@ -127,6 +127,7 @@ export function MusicPlaylistsPage() {
   */
   return (
     <PlaylistLibrary
+      pane={pane}
       title="Music playlists"
       description="Background audio a channel plays."
       noun="playlists"
