@@ -31,7 +31,7 @@ import { FONT_FAMILIES } from "@scena/manifest";
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@4dl/ui";
 import { getSourceData, type Board, type Feed, type WeatherLocation, type BrandLogo } from "../../api.js";
 import type { WNode } from "../types.js";
-import { Field, Group, TextField, AreaField, NumberField, SliderField, SelectField, SegField, SwitchField, ColorField, QuadField } from "./fields.js";
+import { Field, PanelGroup, TextField, AreaField, NumberField, SliderField, SelectField, SegField, SwitchField, ColorField, QuadField } from "./fields.js";
 import { VariantPicker } from "./VariantPicker.js";
 import { BindControl } from "./BindControl.js";
 import { HtmlEditorDialog } from "../../components/html-editor.js";
@@ -108,7 +108,7 @@ function HtmlContent({ node, onConfig }: { node: WNode; onConfig: (p: Record<str
   const html = str(node.config.html);
   const [open, setOpen] = useState(false);
   return (
-    <Group title="HTML">
+    <PanelGroup title="HTML">
       <p className="px-1 text-[11px] leading-relaxed text-muted-foreground">
         Self-contained HTML rendered in a sandboxed iframe scoped to this widget. Write it yourself or let the AI design it — on-brand, animated, no external resources.
       </p>
@@ -128,7 +128,7 @@ function HtmlContent({ node, onConfig }: { node: WNode; onConfig: (p: Record<str
         onOpenChange={setOpen}
         onSave={async (h) => { onConfig({ html: h }); }}
       />
-    </Group>
+    </PanelGroup>
   );
 }
 
@@ -153,7 +153,7 @@ function LogoContent({ node, logos, onConfig }: { node: WNode; logos: BrandLogo[
   const url = str(c.url);
   return (
     <>
-      <Group title="Logo">
+      <PanelGroup title="Logo">
         {logos.length > 0 ? (
           <div className="flex flex-col gap-1.5">
             {logos.map((l) => {
@@ -176,11 +176,11 @@ function LogoContent({ node, logos, onConfig }: { node: WNode; logos: BrandLogo[
             No brand logos yet. Upload your logo (and any variants) under <b>Settings → Brand kit → Brand assets</b>, then pick one here.
           </p>
         )}
-      </Group>
-      <Group title="Options" defaultOpen={false}>
+      </PanelGroup>
+      <PanelGroup title="Options" defaultOpen={false}>
         <Field label="Source" hint="A library asset or any image URL"><LibraryUrlField value={url} onChange={(v) => onConfig({ url: v, logoId: "", variant: "" })} /></Field>
         <Field label="Fit"><SelectField value={str(c.fit, "contain")} onChange={(v) => onConfig({ fit: v })} options={opt([["contain", "Contain"], ["cover", "Cover"], ["100% 100%", "Stretch"]])} /></Field>
-      </Group>
+      </PanelGroup>
     </>
   );
 }
@@ -192,13 +192,13 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
   if (t === "text") {
     return (
       <>
-        <Group title="Text">
+        <PanelGroup title="Text">
           <AreaField value={str(c.text)} onChange={(v) => onConfig({ text: v })} rows={4} placeholder="Your text" />
           <BindControl node={node} field="text" kind="value" label="text" sources={feeds} onConfig={onConfig} />
-        </Group>
-        <Group title="Style">
+        </PanelGroup>
+        <PanelGroup title="Style">
           <VariantPicker node={node} value={str(c.variant, "plain")} options={TEXT_VARIANTS} onPick={(v) => onConfig({ variant: v })} />
-        </Group>
+        </PanelGroup>
       </>
     );
   }
@@ -206,34 +206,34 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
     const showDate = bool(c.showDate);
     return (
       <>
-        <Group title="Style"><VariantPicker node={node} value={str(c.variant, "digital")} options={CLOCK_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></Group>
-        <Group title="Options">
+        <PanelGroup title="Style"><VariantPicker node={node} value={str(c.variant, "digital")} options={CLOCK_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></PanelGroup>
+        <PanelGroup title="Options">
           <SwitchField label="12-hour (AM/PM)" value={bool(c.hour12)} onChange={(v) => onConfig({ hour12: v })} />
           <SwitchField label="Show seconds" value={bool(c.seconds, true)} onChange={(v) => onConfig({ seconds: v })} />
           <SwitchField label="Show date" value={showDate} onChange={(v) => onConfig({ showDate: v })} />
           {showDate && <Field label="Date format"><SelectField value={str(c.dateVariant, "medium")} onChange={(v) => onConfig({ dateVariant: v })} options={DATE_VARIANTS} /></Field>}
-        </Group>
-        <Group title="Time zone" defaultOpen={false}>
+        </PanelGroup>
+        <PanelGroup title="Time zone" defaultOpen={false}>
           <Field label="Zone" hint="Show any city's time — great for world clocks"><SelectField value={str(c.tz)} onChange={(v) => onConfig({ tz: v })} options={TZ_OPTIONS} /></Field>
           <Field label="Label"><TextField value={str(c.tzLabel)} onChange={(v) => onConfig({ tzLabel: v })} placeholder="e.g. New York" /></Field>
-        </Group>
+        </PanelGroup>
       </>
     );
   }
   if (t === "date") {
     return (
-      <Group title="Format">
+      <PanelGroup title="Format">
         <VariantPicker node={node} value={str(c.variant, "full")} options={DATE_VARIANTS} onPick={(v) => onConfig({ variant: v })} />
-      </Group>
+      </PanelGroup>
     );
   }
   if (t === "html") return <HtmlContent node={node} onConfig={onConfig} />;
   if (t === "image") {
     return (
-      <Group title="Image">
+      <PanelGroup title="Image">
         <Field label="Source"><LibraryUrlField value={str(c.url)} onChange={(v) => onConfig({ url: v })} /></Field>
         <Field label="Fit"><SelectField value={str(c.fit, "cover")} onChange={(v) => onConfig({ fit: v })} options={opt([["cover", "Cover"], ["contain", "Contain"], ["100% 100%", "Stretch"]])} /></Field>
-      </Group>
+      </PanelGroup>
     );
   }
   if (t === "logo") return <LogoContent node={node} logos={logos ?? []} onConfig={onConfig} />;
@@ -242,45 +242,45 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
     const badge = str(c.badge).trim();
     return (
       <>
-        <Group title="Source">
+        <PanelGroup title="Source">
           <Field label="Source"><SelectField value={str(c.feedId)} onChange={(v) => onConfig({ feedId: v })} options={[{ id: "", label: "— pick a source —" }, ...feeds.map((f) => ({ id: f.id, label: f.name }))]} /></Field>
           {str(c.feedId) ? <SourceColumnField feedId={str(c.feedId)} value={str(c.column, "title")} onChange={(v) => onConfig({ column: v })} hint="Which column scrolls across" />
             : <p className="text-[10.5px] text-muted-foreground">Any source works — an RSS/Manual headline list, or a column from an API or Google Sheet. Create one on the Sources page.</p>}
-        </Group>
-        <Group title="Layout"><VariantPicker node={node} value={str(c.variant, "scroll")} options={TICKER_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></Group>
-        <Group title="Separator">
+        </PanelGroup>
+        <PanelGroup title="Layout"><VariantPicker node={node} value={str(c.variant, "scroll")} options={TICKER_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></PanelGroup>
+        <PanelGroup title="Separator">
           <Field label="Style"><SelectField value={sepKind} onChange={(v) => onConfig({ separatorKind: v })} options={TICKER_SEPARATORS.map((s) => ({ id: s.id, label: s.label }))} /></Field>
           {sepKind === "custom" && <Field label="Text"><TextField value={str(c.separator, "  •  ")} onChange={(v) => onConfig({ separator: v })} /></Field>}
           {sepKind === "image" && <Field label="Image"><LibraryUrlField value={str(c.separatorImage)} onChange={(v) => onConfig({ separatorImage: v })} /></Field>}
-        </Group>
-        <Group title="Badge" defaultOpen={false}>
+        </PanelGroup>
+        <PanelGroup title="Badge" defaultOpen={false}>
           <Field label="Label"><TextField value={str(c.badge)} onChange={(v) => onConfig({ badge: v })} placeholder="e.g. BREAKING" /></Field>
           {badge && <Field label="Fill"><ColorField value={str(c.badgeColor, "oklch(0.55 0.22 25)")} onChange={(v) => onConfig({ badgeColor: v })} fallback="#d63b2f" /></Field>}
           {badge && <Field label="Text"><ColorField value={str(c.badgeTextColor, "#ffffff")} onChange={(v) => onConfig({ badgeTextColor: v })} /></Field>}
-        </Group>
+        </PanelGroup>
       </>
     );
   }
   if (t === "weather") {
     return (
       <>
-        <Group title="Location">
+        <PanelGroup title="Location">
           <Field label="Place"><SelectField value={str(c.sourceId)} onChange={(v) => onConfig({ sourceId: v })} options={[{ id: "", label: "— pick a location —" }, ...weather.map((w) => ({ id: w.id, label: w.label }))]} /></Field>
           {weather.length === 0 && <p className="text-[10.5px] text-muted-foreground">Add a location in Settings first.</p>}
-        </Group>
-        <Group title="Layout"><VariantPicker node={node} value={str(c.variant, "current")} options={opt([["small", "Small"], ["current", "Current"], ["day", "Today"], ["week", "Week"]])} onPick={(v) => onConfig({ variant: v })} /></Group>
-        <Group title="Units" defaultOpen={false}>
+        </PanelGroup>
+        <PanelGroup title="Layout"><VariantPicker node={node} value={str(c.variant, "current")} options={opt([["small", "Small"], ["current", "Current"], ["day", "Today"], ["week", "Week"]])} onPick={(v) => onConfig({ variant: v })} /></PanelGroup>
+        <PanelGroup title="Units" defaultOpen={false}>
           <Field label="Units" hint="Override the location's default"><SegField value={str(c.units) || "default"} onChange={(v) => onConfig({ units: v === "default" ? "" : v })} options={opt([["default", "Default"], ["metric", "°C"], ["imperial", "°F"]])} /></Field>
-        </Group>
+        </PanelGroup>
       </>
     );
   }
   if (t === "nowplaying") {
     return (
-      <Group title="Style">
+      <PanelGroup title="Style">
         <VariantPicker node={node} value={str(c.variant, "card")} options={NOWPLAYING_VARIANTS} onPick={(v) => onConfig({ variant: v })} />
         <p className="text-[10.5px] text-muted-foreground">Shows the channel's current track — art + artist come from the Music page.</p>
-      </Group>
+      </PanelGroup>
     );
   }
   if (t === "queue_caller" || t === "room_board" || t === "room_status" || t === "scoreboard") {
@@ -290,13 +290,13 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
     const rooms = boundBoard && boundBoard.kind === "room" ? (boundBoard.state as RoomState | null)?.rooms ?? [] : [];
     return (
       <>
-        <Group title="Board"><Field label="Board"><SelectField value={str(c.boardId)} onChange={(v) => onConfig({ boardId: v, ...(t === "room_status" ? { roomId: "" } : {}) })} options={[{ id: "", label: `— pick a ${kind} board —` }, ...boards.filter((b) => b.kind === kind).map((b) => ({ id: b.id, label: b.name }))]} /></Field>
+        <PanelGroup title="Board"><Field label="Board"><SelectField value={str(c.boardId)} onChange={(v) => onConfig({ boardId: v, ...(t === "room_status" ? { roomId: "" } : {}) })} options={[{ id: "", label: `— pick a ${kind} board —` }, ...boards.filter((b) => b.kind === kind).map((b) => ({ id: b.id, label: b.name }))]} /></Field>
           {t === "room_status" && (
             <Field label="Room"><SelectField value={str(c.roomId)} onChange={(v) => onConfig({ roomId: v })} options={[{ id: "", label: rooms.length ? "— pick a room —" : "bind a room board first" }, ...rooms.map((r) => ({ id: r.id, label: r.name }))]} /></Field>
           )}
-        </Group>
-        {t === "queue_caller" && <Group title="Style"><VariantPicker node={node} value={str(c.variant, "solo")} options={QUEUE_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></Group>}
-        {t === "scoreboard" && <Group title="Style"><VariantPicker node={node} value={str(c.variant, "classic")} options={SCORE_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></Group>}
+        </PanelGroup>
+        {t === "queue_caller" && <PanelGroup title="Style"><VariantPicker node={node} value={str(c.variant, "solo")} options={QUEUE_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></PanelGroup>}
+        {t === "scoreboard" && <PanelGroup title="Style"><VariantPicker node={node} value={str(c.variant, "classic")} options={SCORE_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></PanelGroup>}
       </>
     );
   }
@@ -304,16 +304,16 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
     const countUp = bool(c.countUp);
     return (
       <>
-        <Group title="Layout">
+        <PanelGroup title="Layout">
           <VariantPicker node={node} value={str(c.variant, "blocks")} options={COUNTDOWN_VARIANTS} onPick={(v) => onConfig({ variant: v })} />
           {str(c.variant, "blocks") === "inline" && <Field label="Separator" hint="Between the units on the inline variant"><TextField value={str(c.separator, " : ")} onChange={(v) => onConfig({ separator: v })} placeholder=" : " /></Field>}
-        </Group>
-        <Group title="Target">
+        </PanelGroup>
+        <PanelGroup title="Target">
           <Field label={countUp ? "Since" : "Target"}><DateTimeField value={str(c.target)} onChange={(v) => onConfig({ target: v })} /></Field>
           <SwitchField label="Count up (elapsed)" value={countUp} onChange={(v) => onConfig({ countUp: v })} />
           <SwitchField label="Show days" value={bool(c.showDays, true)} onChange={(v) => onConfig({ showDays: v })} />
           {!countUp && <Field label="When done" hint="Shown once the target passes"><TextField value={str(c.doneText)} onChange={(v) => onConfig({ doneText: v })} placeholder="e.g. We're live!" /></Field>}
-        </Group>
+        </PanelGroup>
       </>
     );
   }
@@ -321,21 +321,21 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
     const variant = str(c.variant, "card");
     return (
       <>
-        <Group title="Layout"><VariantPicker node={node} value={variant} options={METRIC_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></Group>
-        <Group title="Value">
+        <PanelGroup title="Layout"><VariantPicker node={node} value={variant} options={METRIC_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></PanelGroup>
+        <PanelGroup title="Value">
           <Field label="Value"><TextField value={str(c.value)} onChange={(v) => onConfig({ value: v })} placeholder="1,284" /></Field>
           <Field label="Unit"><TextField value={str(c.unit)} onChange={(v) => onConfig({ unit: v })} placeholder="%, °, kg…" /></Field>
           <Field label="Label"><TextField value={str(c.label)} onChange={(v) => onConfig({ label: v })} placeholder="Visitors today" /></Field>
           {variant === "ring" && <Field label="Ring %"><SliderField value={num(c.percent, 66)} onChange={(v) => onConfig({ percent: v })} min={0} max={100} /></Field>}
-        </Group>
+        </PanelGroup>
         {variant !== "ring" && (
-          <Group title="Trend" defaultOpen={false}>
+          <PanelGroup title="Trend" defaultOpen={false}>
             <Field label="Direction"><SegField value={str(c.trend, "none")} onChange={(v) => onConfig({ trend: v })} options={opt([["up", "▲ Up"], ["flat", "▬ Flat"], ["down", "▼ Down"], ["none", "—"]])} /></Field>
             <Field label="Delta"><TextField value={str(c.delta)} onChange={(v) => onConfig({ delta: v })} placeholder="+7.9%" /></Field>
             <Field label="Caption"><TextField value={str(c.caption)} onChange={(v) => onConfig({ caption: v })} placeholder="vs. yesterday" /></Field>
-          </Group>
+          </PanelGroup>
         )}
-        <Group title="Dynamic data" defaultOpen={false}>
+        <PanelGroup title="Dynamic data" defaultOpen={false}>
           <p className="text-[10.5px] text-muted-foreground">Pull any field live from an API or Google Sheet source.</p>
           <BindControl node={node} field="value" kind="value" label="value" sources={feeds} onConfig={onConfig} />
           <BindControl node={node} field="label" kind="value" label="label" sources={feeds} onConfig={onConfig} />
@@ -343,7 +343,7 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
           <BindControl node={node} field="delta" kind="value" label="delta" sources={feeds} onConfig={onConfig} />
           <BindControl node={node} field="caption" kind="value" label="caption" sources={feeds} onConfig={onConfig} />
           {variant === "ring" && <BindControl node={node} field="percent" kind="value" label="percent" sources={feeds} onConfig={onConfig} />}
-        </Group>
+        </PanelGroup>
       </>
     );
   }
@@ -351,22 +351,22 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
     const boundItems = !!(c.bindings as Record<string, { sourceId?: string }> | undefined)?.items?.sourceId;
     return (
       <>
-        <Group title="Layout"><VariantPicker node={node} value={str(c.variant, "rows")} options={MENU_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></Group>
-        <Group title="Heading"><Field label="Title"><TextField value={str(c.title)} onChange={(v) => onConfig({ title: v })} placeholder="Today's menu" /></Field></Group>
-        <Group title="Dynamic data" defaultOpen={boundItems}>
+        <PanelGroup title="Layout"><VariantPicker node={node} value={str(c.variant, "rows")} options={MENU_VARIANTS} onPick={(v) => onConfig({ variant: v })} /></PanelGroup>
+        <PanelGroup title="Heading"><Field label="Title"><TextField value={str(c.title)} onChange={(v) => onConfig({ title: v })} placeholder="Today's menu" /></Field></PanelGroup>
+        <PanelGroup title="Dynamic data" defaultOpen={boundItems}>
           <p className="text-[10.5px] text-muted-foreground">Fill the rows live from a Google Sheet or API source.</p>
           <BindControl node={node} field="items" kind="list" label="items" sources={feeds} onConfig={onConfig} />
-        </Group>
+        </PanelGroup>
         {!boundItems && <MenuItemsEditor node={node} onConfig={onConfig} />}
       </>
     );
   }
   if (t === "qr") {
     return (
-      <Group title="QR code">
+      <PanelGroup title="QR code">
         <Field label="Link / text" hint="A URL, wifi string, or any text to encode"><AreaField value={str(c.text ?? c.url)} onChange={(v) => onConfig({ text: v })} rows={2} placeholder="https://…" /></Field>
         <Field label="Caption"><TextField value={str(c.caption)} onChange={(v) => onConfig({ caption: v })} placeholder="Scan to visit" /></Field>
-      </Group>
+      </PanelGroup>
     );
   }
   if (t === "cta") {
@@ -374,7 +374,7 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
     const def = ctaDefaults(preset);
     return (
       <>
-        <Group title="Call to action">
+        <PanelGroup title="Call to action">
           <Field label="Type"><SelectField value={preset} onChange={(v) => onConfig({ preset: v })} options={CTA_PRESETS.map((p) => ({ id: p.id, label: p.label }))} /></Field>
           {preset === "wifi" ? (
             <>
@@ -384,13 +384,13 @@ function ContentTab({ node, boards, feeds, weather, logos, onConfig }: Props) {
           ) : (
             <Field label="Link" hint="Where the scan takes people"><AreaField value={str(c.url)} onChange={(v) => onConfig({ url: v })} rows={2} placeholder="https://…" /></Field>
           )}
-        </Group>
-        <Group title="Wording" defaultOpen={false}>
+        </PanelGroup>
+        <PanelGroup title="Wording" defaultOpen={false}>
           <Field label="Eyebrow" hint="Small label above the headline"><TextField value={str(c.eyebrow)} onChange={(v) => onConfig({ eyebrow: v })} placeholder={def.eyebrow} /></Field>
           <Field label="Headline"><TextField value={str(c.headline)} onChange={(v) => onConfig({ headline: v })} placeholder={def.headline} /></Field>
           <Field label="Subtext"><TextField value={str(c.sub)} onChange={(v) => onConfig({ sub: v })} placeholder={def.sub} /></Field>
           <Field label="Scan hint"><TextField value={str(c.hint)} onChange={(v) => onConfig({ hint: v })} placeholder={def.hint} /></Field>
-        </Group>
+        </PanelGroup>
       </>
     );
   }
@@ -428,7 +428,7 @@ function MenuItemsEditor({ node, onConfig }: { node: WNode; onConfig: (p: Record
   const patch = (i: number, p: Partial<MenuItem>) => set(items.map((it, j) => (j === i ? { ...it, ...p } : it)));
   const move = (i: number, dir: -1 | 1) => { const j = i + dir; if (j < 0 || j >= items.length) return; const next = [...items]; const t = next[i]!; next[i] = next[j]!; next[j] = t; set(next); };
   return (
-    <Group title={`Items (${items.length})`}>
+    <PanelGroup title={`Items (${items.length})`}>
       {items.map((it, i) => (
         <div key={i} className="flex flex-col gap-1 rounded-lg border p-1.5">
           <div className="flex items-center gap-1">
@@ -444,7 +444,7 @@ function MenuItemsEditor({ node, onConfig }: { node: WNode; onConfig: (p: Record
         </div>
       ))}
       <Button variant="outline" size="sm" onClick={() => set([...items, { label: "New item", value: "" }])}>+ Add item</Button>
-    </Group>
+    </PanelGroup>
   );
 }
 
@@ -461,7 +461,7 @@ function StackContent({ node, boards, feeds, weather, logos, onConfig }: { node:
   const add = () => setItems([...items, { id: `s${Date.now().toString(36)}`, widget: { type: "text", style: { color: "#ffffff", fontSize: 72, fontWeight: "700", align: "center" }, config: { text: "New slide" } } }]);
   return (
     <>
-      <Group title={`Slides (${items.length})`}>
+      <PanelGroup title={`Slides (${items.length})`}>
         {items.map((it, i) => (
           <StackItemEditor
             key={it.id}
@@ -475,12 +475,12 @@ function StackContent({ node, boards, feeds, weather, logos, onConfig }: { node:
           />
         ))}
         <Button variant="outline" size="sm" onClick={add}>+ Add slide</Button>
-      </Group>
-      <Group title="Playback">
+      </PanelGroup>
+      <PanelGroup title="Playback">
         <Field label="Dwell" hint="Seconds each slide is shown"><NumberField value={num(node.config.dwellMs, 5000) / 1000} onChange={(v) => onConfig({ dwellMs: Math.max(1, v) * 1000 })} min={1} step={0.5} suffix="s" /></Field>
         <Field label="Transition"><SegField value={stackTransition(node.config)} onChange={(v) => onConfig({ transition: v })} options={STACK_TRANSITIONS.map((t) => ({ id: t.id, label: t.label }))} /></Field>
         <SwitchField label="Shuffle order" value={stackShuffle(node.config)} onChange={(v) => onConfig({ shuffle: v })} />
-      </Group>
+      </PanelGroup>
     </>
   );
 }
@@ -538,7 +538,7 @@ function StyleTab({ node, onStyle }: Props) {
   return (
     <div>
       {TEXTY.has(t) && (
-        <Group title="Typography">
+        <PanelGroup title="Typography">
           <Field label="Color"><ColorField value={str(s.color, "#ffffff")} onChange={(v) => onStyle({ color: v })} /></Field>
           <Field label="Font"><SelectField value={str(s.font, t === "clock" ? "mono" : "sans")} onChange={(v) => onStyle({ font: v })} options={FONT_CHOICES} /></Field>
           <Field label="Size"><SliderField value={num(s.fontSize, 48)} onChange={(v) => onStyle({ fontSize: v })} min={12} max={320} /></Field>
@@ -555,21 +555,21 @@ function StyleTab({ node, onStyle }: Props) {
               {num(s.textStrokeW, 0) > 0 && <Field label="Outline col"><ColorField value={str(s.textStrokeColor, "#000000")} onChange={(v) => onStyle({ textStrokeColor: v })} fallback="#000000" /></Field>}
             </>
           )}
-        </Group>
+        </PanelGroup>
       )}
 
       {(t === "clock" || t === "date") && (
-        <Group title="Card" defaultOpen={false}>
+        <PanelGroup title="Card" defaultOpen={false}>
           <SurfaceControl node={node} onStyle={onStyle} />
-        </Group>
+        </PanelGroup>
       )}
 
       {SHAPES.has(t) && (
-        <Group title="Fill"><FillControl node={node} onStyle={onStyle} /></Group>
+        <PanelGroup title="Fill"><FillControl node={node} onStyle={onStyle} /></PanelGroup>
       )}
 
       {t === "line" && (
-        <Group title="Line">
+        <PanelGroup title="Line">
           <Field label="Color"><ColorField value={str(s.fill ?? s.color, "#ffffff")} onChange={(v) => onStyle({ fill: v, color: v })} /></Field>
           <Field label="Style"><SelectField value={str(s.lineStyle, "solid")} onChange={(v) => onStyle({ lineStyle: v })} options={LINE_STYLES.map((l) => ({ id: l.id, label: l.label }))} /></Field>
           {str(s.lineStyle, "solid") === "gradient" && (
@@ -580,65 +580,65 @@ function StyleTab({ node, onStyle }: Props) {
           )}
           <Field label="Thickness"><SliderField value={num(s.thickness, 6)} onChange={(v) => onStyle({ thickness: v })} min={1} max={80} /></Field>
           {str(s.lineStyle, "solid") !== "dashed" && str(s.lineStyle, "solid") !== "dotted" && <Field label="Caps"><SegField value={str(s.lineCap, "round")} onChange={(v) => onStyle({ lineCap: v })} options={opt([["round", "Round"], ["square", "Square"]])} /></Field>}
-        </Group>
+        </PanelGroup>
       )}
 
       {t === "image" && (
-        <Group title="Photo" defaultOpen={false}>
+        <PanelGroup title="Photo" defaultOpen={false}>
           <Field label="Tint" hint="A colour wash over the image (e.g. oklch(0.2 0.05 280 / 0.35))"><ColorField value={str(s.tint)} onChange={(v) => onStyle({ tint: v })} fallback="#00000000" /></Field>
           <Field label="Grayscale"><SliderField value={num(s.grayscale, 0)} onChange={(v) => onStyle({ grayscale: v })} min={0} max={100} /></Field>
           <Field label="Brightness"><SliderField value={num(s.brightness, 100)} onChange={(v) => onStyle({ brightness: v })} min={0} max={200} /></Field>
           <Field label="Contrast"><SliderField value={num(s.contrast, 100)} onChange={(v) => onStyle({ contrast: v })} min={0} max={200} /></Field>
           <Field label="Saturation"><SliderField value={num(s.saturate, 100)} onChange={(v) => onStyle({ saturate: v })} min={0} max={200} /></Field>
           <Field label="Blur"><SliderField value={num(s.imgBlur, 0)} onChange={(v) => onStyle({ imgBlur: v })} min={0} max={40} /></Field>
-        </Group>
+        </PanelGroup>
       )}
 
       {t === "ticker" && <TickerStyle node={node} onStyle={onStyle} />}
 
       {t === "countdown" && (
-        <Group title="Countdown">
+        <PanelGroup title="Countdown">
           <Field label="Content size" hint="Scale the inner content within the box (100% = fit)"><SliderField value={Math.round(num(s.contentScale, 1) * 100)} onChange={(v) => onStyle({ contentScale: v / 100 })} min={40} max={200} /></Field>
           <Field label="Digits"><ColorField value={str(s.color, "#ffffff")} onChange={(v) => onStyle({ color: v })} /></Field>
           <Field label="Block fill" hint="Behind each unit (Blocks variant)"><ColorField value={str(s.accent, "oklch(0.22 0.03 300 / 0.6)")} onChange={(v) => onStyle({ accent: v })} fallback="#241f33" /></Field>
           <Field label="Font"><SelectField value={str(s.font, "sans")} onChange={(v) => onStyle({ font: v })} options={FONT_CHOICES} /></Field>
           <Field label="Weight"><SelectField value={str(s.fontWeight, "800")} onChange={(v) => onStyle({ fontWeight: v })} options={opt([["600", "Semibold"], ["800", "Bold"], ["900", "Black"]])} /></Field>
           <Field label="Panel fill" hint="Optional backdrop for the whole widget"><ColorField value={str(s.panelBg)} onChange={(v) => onStyle({ panelBg: v })} fallback="#00000000" /></Field>
-        </Group>
+        </PanelGroup>
       )}
 
       {t === "metric" && (
-        <Group title="Metric">
+        <PanelGroup title="Metric">
           <Field label="Content size" hint="Scale the inner content within the box (100% = fit)"><SliderField value={Math.round(num(s.contentScale, 1) * 100)} onChange={(v) => onStyle({ contentScale: v / 100 })} min={40} max={200} /></Field>
           <SurfaceControl node={node} onStyle={onStyle} />
           <Field label="Text"><ColorField value={str(s.color, "#ffffff")} onChange={(v) => onStyle({ color: v })} /></Field>
           <Field label="Accent" hint="Ring + up-trend colour"><ColorField value={str(s.accent, "oklch(0.72 0.19 300)")} onChange={(v) => onStyle({ accent: v })} fallback="#a855f7" /></Field>
-        </Group>
+        </PanelGroup>
       )}
 
       {t === "menu" && (
-        <Group title="Menu">
+        <PanelGroup title="Menu">
           <Field label="Content size" hint="Scale the inner text within the box (100% = fit)"><SliderField value={Math.round(num(s.contentScale, 1) * 100)} onChange={(v) => onStyle({ contentScale: v / 100 })} min={40} max={200} /></Field>
           <SurfaceControl node={node} onStyle={onStyle} />
           <Field label="Text"><ColorField value={str(s.color, "#ffffff")} onChange={(v) => onStyle({ color: v })} /></Field>
           <Field label="Accent" hint="Values + title underline"><ColorField value={str(s.accent, "oklch(0.78 0.14 85)")} onChange={(v) => onStyle({ accent: v })} fallback="#e6c15a" /></Field>
           <Field label="Weight"><SelectField value={str(s.fontWeight, "700")} onChange={(v) => onStyle({ fontWeight: v })} options={opt([["500", "Regular"], ["600", "Semibold"], ["700", "Bold"]])} /></Field>
-        </Group>
+        </PanelGroup>
       )}
 
       {t === "qr" && (
-        <Group title="QR code">
+        <PanelGroup title="QR code">
           <Field label="Modules" hint="The dark squares"><ColorField value={str(s.color, "#0b0b0f")} onChange={(v) => onStyle({ color: v })} fallback="#0b0b0f" /></Field>
           <Field label="Paper" hint="The code's own background — keep it light so it scans"><ColorField value={str(s.paper, "#ffffff")} onChange={(v) => onStyle({ paper: v })} fallback="#ffffff" /></Field>
           <div className="pt-1 text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">Card (optional)</div>
           <SurfaceControl node={node} onStyle={onStyle} />
           <Field label="Padding" hint="Inset the code inside the card"><SliderField value={num(s.pad, 0)} onChange={(v) => onStyle({ pad: v })} min={0} max={24} /></Field>
           <Field label="Corners"><SliderField value={num(s.radius, 0)} onChange={(v) => onStyle({ radius: v })} min={0} max={64} /></Field>
-        </Group>
+        </PanelGroup>
       )}
 
       {t === "cta" && (
-        <Group title="Scan card">
+        <PanelGroup title="Scan card">
           <Field label="Accent" hint="Icon + pulse ring colour"><ColorField value={str(s.accent, "oklch(0.72 0.19 300)")} onChange={(v) => onStyle({ accent: v })} fallback="#a855f7" /></Field>
           <Field label="Text"><ColorField value={str(s.color, "#ffffff")} onChange={(v) => onStyle({ color: v })} /></Field>
           <SwitchField label="Animate" value={bool(s.animate, true)} onChange={(v) => onStyle({ animate: v })} />
@@ -646,36 +646,36 @@ function StyleTab({ node, onStyle }: Props) {
           <SurfaceControl node={node} onStyle={onStyle} />
           <Field label="QR modules"><ColorField value={str(s.qrDark, "#0b0b0f")} onChange={(v) => onStyle({ qrDark: v })} fallback="#0b0b0f" /></Field>
           <Field label="QR paper" hint="Keep light so it scans"><ColorField value={str(s.qrLight, "#ffffff")} onChange={(v) => onStyle({ qrLight: v })} fallback="#ffffff" /></Field>
-        </Group>
+        </PanelGroup>
       )}
 
       {t === "nowplaying" && (
-        <Group title="Now Playing">
+        <PanelGroup title="Now Playing">
           <ContentSizeField s={s} onStyle={onStyle} />
           <SurfaceControl node={node} onStyle={onStyle} />
           <Field label="Text"><ColorField value={str(s.color, "#ffffff")} onChange={(v) => onStyle({ color: v })} /></Field>
           <Field label="Accent"><ColorField value={str(s.accent, "oklch(0.72 0.19 300)")} onChange={(v) => onStyle({ accent: v })} fallback="#a855f7" /></Field>
-        </Group>
+        </PanelGroup>
       )}
 
       {t === "room_status" && (
-        <Group title="Room status">
+        <PanelGroup title="Room status">
           <ContentSizeField s={s} onStyle={onStyle} />
           <SurfaceControl node={node} onStyle={onStyle} />
-        </Group>
+        </PanelGroup>
       )}
 
       {(t === "stack" || t === "weather" || t === "queue_caller" || t === "room_board" || t === "scoreboard") && (
-        <Group title="Panel">
+        <PanelGroup title="Panel">
           {t !== "stack" && <ContentSizeField s={s} onStyle={onStyle} />}
           <SurfaceControl node={node} onStyle={onStyle} />
           {(t === "stack" || t === "weather") && <Field label="Text"><ColorField value={str(s.color, "#ffffff")} onChange={(v) => onStyle({ color: v })} /></Field>}
           {t === "stack" && <Field label="Font size"><SliderField value={num(s.fontSize, 64)} onChange={(v) => onStyle({ fontSize: v })} min={16} max={200} /></Field>}
-        </Group>
+        </PanelGroup>
       )}
 
       {showBorder && (
-        <Group title="Border" defaultOpen={false}>
+        <PanelGroup title="Border" defaultOpen={false}>
           <Field label="Style"><SelectField value={str(s.borderStyle, bAll > 0 ? "solid" : "none")} onChange={(v) => onStyle({ borderStyle: v })} options={opt([["none", "None"], ["solid", "Solid"], ["dashed", "Dashed"], ["dotted", "Dotted"], ["double", "Double"]])} /></Field>
           {str(s.borderStyle, bAll > 0 ? "solid" : "none") !== "none" && (
             <>
@@ -687,11 +687,11 @@ function StyleTab({ node, onStyle }: Props) {
               </Field>
             </>
           )}
-        </Group>
+        </PanelGroup>
       )}
 
       {/* Shared appearance — available to every widget */}
-      <Group title="Appearance" defaultOpen={SHAPES.has(t) || t === "line"}>
+      <PanelGroup title="Appearance" defaultOpen={SHAPES.has(t) || t === "line"}>
         {showRadius && (
           <Field label="Radius">
             <QuadField key={`rad-${node.id}`} all={rAll} sides={[num(s.radiusTL, rAll), num(s.radiusTR, rAll), num(s.radiusBR, rAll), num(s.radiusBL, rAll)]} labels={["TL", "TR", "BR", "BL"]}
@@ -702,7 +702,7 @@ function StyleTab({ node, onStyle }: Props) {
         <Field label="Shadow"><SelectField value={shadowId(s.shadow)} onChange={(v) => onStyle({ shadow: v })} options={SHADOW_PRESETS.map((p) => ({ id: p.id, label: p.label }))} /></Field>
         <Field label="Backdrop blur" hint="Frosts whatever is behind the widget"><SliderField value={num(s.blur, 0)} onChange={(v) => onStyle({ blur: v })} min={0} max={40} /></Field>
         <Field label="Opacity"><SliderField value={num(s.opacity, 1) * 100} onChange={(v) => onStyle({ opacity: v / 100 })} min={0} max={100} /></Field>
-      </Group>
+      </PanelGroup>
     </div>
   );
 }
@@ -772,7 +772,7 @@ function FillControl({ node, onStyle, gradientOnly = false }: { node: WNode; onS
 function TickerStyle({ node, onStyle }: { node: WNode; onStyle: (p: Record<string, unknown>) => void }) {
   const s = node.style;
   return (
-    <Group title="Ticker">
+    <PanelGroup title="Ticker">
       <Field label="Backdrop"><SegField value={str(s.bg) === "transparent" || str(s.bg) === "none" ? "none" : "solid"} onChange={(v) => onStyle({ bg: v === "none" ? "transparent" : "oklch(0.15 0.01 300 / 0.72)" })} options={opt([["solid", "Solid"], ["none", "None"]])} /></Field>
       {str(s.bg) !== "transparent" && str(s.bg) !== "none" && <Field label="Backdrop col"><ColorField value={str(s.bg, "oklch(0.15 0.01 300 / 0.72)")} onChange={(v) => onStyle({ bg: v })} fallback="#141018" /></Field>}
       <Field label="Text"><ColorField value={str(s.color, "#ffffff")} onChange={(v) => onStyle({ color: v })} /></Field>
@@ -782,7 +782,7 @@ function TickerStyle({ node, onStyle }: { node: WNode; onStyle: (p: Record<strin
       <Field label="Speed" hint="Crawl speed in pixels per second"><SliderField value={num(s.speed, 90)} onChange={(v) => onStyle({ speed: v })} min={20} max={320} /></Field>
       <Field label="Direction"><SegField value={str(s.direction, "left")} onChange={(v) => onStyle({ direction: v })} options={opt([["left", "← Left"], ["right", "Right →"]])} /></Field>
       <Field label="Item gap" hint="Extra space between items"><SliderField value={num(s.gap, 0)} onChange={(v) => onStyle({ gap: v })} min={0} max={8} step={0.25} /></Field>
-    </Group>
+    </PanelGroup>
   );
 }
 
@@ -792,7 +792,7 @@ function LayoutTab({ node, onGeom }: Props) {
   const t = node.type;
   return (
     <div>
-      <Group title="Position & size">
+      <PanelGroup title="Position & size">
         <div className="grid grid-cols-2 gap-2">
           <Field label="X"><NumberField value={node.x} onChange={(v) => onGeom({ x: v })} /></Field>
           <Field label="Y"><NumberField value={node.y} onChange={(v) => onGeom({ y: v })} /></Field>
@@ -801,12 +801,12 @@ function LayoutTab({ node, onGeom }: Props) {
         </div>
         <Field label="Rotation"><SliderField value={node.rot} onChange={(v) => onGeom({ rot: v })} min={-180} max={180} /></Field>
         <Field label="Layer z"><NumberField value={node.z} onChange={(v) => onGeom({ z: v })} /></Field>
-      </Group>
+      </PanelGroup>
       {SCALEABLE.has(t) && (
-        <Group title="Resize behaviour">
+        <PanelGroup title="Resize behaviour">
           <SegField value={(node.scaleMode ?? "reflow") as ScaleMode} onChange={(v) => onGeom({ scaleMode: v })} options={opt([["uniform", "Scale content"], ["reflow", "Reflow / fill"]]) as { id: ScaleMode; label: string }[]} />
           <p className="text-[10.5px] text-muted-foreground">{(node.scaleMode ?? "reflow") === "uniform" ? "Content scales as a unit when resized — never crops." : "Content fills the box and reflows to fit."}</p>
-        </Group>
+        </PanelGroup>
       )}
       <DisplayTimeControl display={node.display} onGeom={onGeom} />
     </div>
@@ -828,7 +828,7 @@ function DisplayTimeControl({ display, onGeom }: { display?: DisplaySchedule; on
     onGeom({ display: next });
   };
   return (
-    <Group title="Display time">
+    <PanelGroup title="Display time">
       <SegField value={timed ? "timed" : "always"} onChange={(v) => setTimed(v === "timed")} options={opt([["always", "Always on"], ["timed", "Show on a cycle"]])} />
       {timed && (
         <>
@@ -838,6 +838,6 @@ function DisplayTimeControl({ display, onGeom }: { display?: DisplaySchedule; on
           <p className="text-[10.5px] text-muted-foreground">{displaySummary({ mode: "interval", showSec, everySec })}. Screens stay in sync.</p>
         </>
       )}
-    </Group>
+    </PanelGroup>
   );
 }

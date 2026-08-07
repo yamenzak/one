@@ -31,7 +31,6 @@ import {
 } from "lucide-react";
 import { useFeature } from "../entitlements.js";
 import { LockedFeatureCard } from "../components/feature-gate.js";
-import { PageHeader } from "../components/page-header.js";
 import { DevicePreview } from "../components/device-preview.js";
 import {
   getScreen,
@@ -56,14 +55,11 @@ import {
   type DeviceScheduleRule,
   type ScheduleKind,
 } from "../api.js";
-import { ConfirmDialog } from "../components/confirm-dialog.js";
-import { usePageChrome } from "../components/page-chrome.js";
 import { TagEditor } from "../components/tag-editor.js";
 import { useCan } from "../permissions.js";
 import { StatusDot, dimsOf } from "./Screens.js";
 import { Pill } from "../components/status.js";
-import { Badge, Button, cn, Group, Input, Label, LoadError, Row, Select, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger, toast } from "@4dl/ui";
-import { EmptyState } from "../components/empty.js";
+import { Badge, Button, cn, ConfirmDialog, EmptyState, Group, Input, Label, LoadError, PageHeader, Row, Select, Skeleton, Switch, Tabs, TabsContent, TabsList, TabsTrigger, toast, usePageChrome } from "@4dl/ui";
 
 const NONE = "__none__";
 
@@ -293,7 +289,6 @@ export function ScreenDetailPage() {
             title="Unpair this device?"
             description="The screen stops playing and shows a fresh pairing code. You can then re-pair it or remove it."
             confirmLabel="Unpair"
-            busy={busy}
             onConfirm={doUnpair}
           />
           <ConfirmDialog
@@ -303,7 +298,6 @@ export function ScreenDetailPage() {
             description="This permanently deletes the device and its channel assignments. This can't be undone."
             confirmLabel="Remove device"
             destructive
-            busy={busy}
             onConfirm={doRemove}
           />
         </>

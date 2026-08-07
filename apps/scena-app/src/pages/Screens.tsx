@@ -7,14 +7,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, BellRing, ChevronRight, MonitorSpeaker, RectangleHorizontal, RectangleVertical, Sparkles, Wifi, WifiOff } from "lucide-react";
-import { PageHeader } from "../components/page-header.js";
 import { DevicePreview } from "../components/device-preview.js";
-import { usePageChrome } from "../components/page-chrome.js";
 import { StatusDot as SharedStatusDot } from "../components/status.js";
 import { useCan } from "../permissions.js";
 import { listScreens, createDisplay, listAlerts, type Screen } from "../api.js";
 import { GetStarted } from "../components/get-started.js";
-import { Badge, Card, cn, Collection, Filters, GlanceStrip, Row, toast, type FacetSelection, useCollectionView } from "@4dl/ui";
+import { Badge, Card, cn, Collection, Filters, GlanceStrip, PageHeader, Row, toast, type FacetSelection, useCollectionView, usePageChrome } from "@4dl/ui";
 
 /** Compact "last seen" label for offline devices. */
 function lastSeenLabel(ts?: number | null): string | null {

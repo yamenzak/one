@@ -28,10 +28,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { FONT_FAMILIES, DEFAULT_TOKENS } from "@scena/manifest";
 import { Sparkles, Palette, MonitorPlay, Mail, Sliders, RotateCcw, Wand2, ImagePlus, Trash2, Loader2, Type } from "lucide-react";
-import { Card, SectionDetail, Select, SettingsIndex, SettingsPage as SectionFrame, toast, type SettingsEntry } from "@4dl/ui";
+import { Card, PageHeader, SectionDetail, Select, SettingsIndex, SettingsPage as SectionFrame, toast, type SettingsEntry, usePageChrome } from "@4dl/ui";
 import { Badge, Button, Input, Label, Separator, Skeleton, Switch, Textarea } from "@4dl/ui";
-import { PageHeader } from "../components/page-header.js";
-import { usePageChrome } from "../components/page-chrome.js";
 import { useCan } from "../permissions.js";
 import { useFeature } from "../entitlements.js";
 import { FeatureLockBadge } from "../components/feature-gate.js";
@@ -65,7 +63,7 @@ const AI_TASKS: { id: string; label: string; hint: string }[] = [
 
 /* ============================= the page ================================== */
 
-export function SettingsPage() {
+export function WorkspaceSettingsPage() {
   const canManage = useCan()("settings", "manage");
   const [params, setParams] = useSearchParams();
   const section = params.get("s");

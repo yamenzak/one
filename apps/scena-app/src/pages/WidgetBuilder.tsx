@@ -74,8 +74,7 @@ import { TransformBox, GroupBox, SELECT, SELECT_WASH, type Phase } from "../buil
 import { AiLayoutDialog } from "../builder/AiLayoutDialog.js";
 import { intersects, alignPatches, distributePatches, clampPos, type AlignKind } from "../builder/geometry.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
-import { Badge, Button, cn, LoadError, Separator, Sheet, Skeleton, toast, Tooltip } from "@4dl/ui";
-import { EmptyState } from "../components/empty.js";
+import { Badge, Button, cn, EmptyState, LoadError, Separator, Sheet, Skeleton, toast, Tooltip } from "@4dl/ui";
 
 /** Accept both the flat WNode shape and the manifest rect-tuple shape. */
 function hydrateNode(raw: unknown, i: number): WNode | null {

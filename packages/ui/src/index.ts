@@ -23,3 +23,4 @@ export * from "./section-switcher.js";
 export * from "./controls.js";
 export * from "./dates.js";
 export * from "./tiles.js";
+export * from "./dashboard.js";

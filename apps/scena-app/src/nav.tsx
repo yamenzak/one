@@ -1,4 +1,4 @@
-import type { NavGroup } from "./components/app-shell.js";
+import type { NavGroup } from "@4dl/ui";
 import { icons } from "./icons.js";
 import { featureOn } from "./entitlements.js";
 

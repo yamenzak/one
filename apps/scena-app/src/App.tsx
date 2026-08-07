@@ -5,8 +5,8 @@ import { ScenaMascot } from "./brand.js";
 import { adminUrl } from "@4dl/app-kit";
 import { useHost } from "./host.js";
 import { AdminDoor } from "./pages/AdminDoor.js";
-import { AppShell, type NavGroup } from "./components/app-shell.js";
-import { PageChromeProvider } from "./components/page-chrome.js";
+import { AppShell } from "./components/app-shell.js";
+import type { NavGroup } from "@4dl/ui";
 import { RoleProvider } from "./permissions.js";
 import { EntitlementsProvider } from "./entitlements.js";
 import { clearEmergency, getActiveEmergency, getMe, getBilling, getBranding, type ActiveEmergency, type Me, type BillingState } from "./api.js";
@@ -36,9 +36,9 @@ import { BillingPage } from "./pages/Billing.js";
 import { AdsPage, AdProfileDetailPage } from "./pages/Ads.js";
 import { MusicPlaylistsPage, MusicPlaylistDetailPage } from "./pages/MusicPlaylists.js";
 import { WidgetProfilesPage } from "./pages/WidgetProfiles.js";
-import { SettingsPage } from "./pages/Settings.js";
+import { WorkspaceSettingsPage } from "./pages/Settings.js";
 import { PairModal } from "./components/PairModal.js";
-import { Button, cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, toast } from "@4dl/ui";
+import { Button, cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, PageChromeProvider, toast } from "@4dl/ui";
 
 /**
  * Poll `fn` every `ms`, but skip while the tab is hidden and refetch the moment
@@ -319,7 +319,7 @@ export function App() {
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/alerts" element={<AlertsPageComp />} />
               <Route path="/billing" element={<BillingPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/settings" element={<WorkspaceSettingsPage />} />
               <Route path="/team" element={<TeamPage />} />
               <Route path="*" element={<NotFound onHome={() => navigate("/")} />} />
             </Routes>

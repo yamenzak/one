@@ -11,8 +11,6 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Plus, MonitorPlay, Radio, Ticket, Trash2, LayoutGrid, KeyRound, RefreshCw, ShieldUser, Eye, EyeOff, Trophy } from "lucide-react";
 import { ScenaMascot } from "../brand.js";
-import { PageHeader } from "../components/page-header.js";
-import { usePageChrome } from "../components/page-chrome.js";
 import { Pill } from "../components/status.js";
 import {
   listBoards,
@@ -41,7 +39,7 @@ import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { GEMINI_TTS_VOICES } from "@scena/protocol";
 import type { QueueState, RoomState, ScoreState } from "@scena/protocol";
-import { Button, cn, Dialog, DialogContent, Input, LoadError, Select, SettingsIndex, SettingsPage as SectionFrame, SkeletonList, Switch, toast } from "@4dl/ui";
+import { Button, cn, Dialog, DialogContent, Input, LoadError, PageHeader, Select, SettingsIndex, SettingsPage as SectionFrame, SkeletonList, Switch, toast, usePageChrome } from "@4dl/ui";
 
 /** The three board kinds, treated equally in the picker + empty state. */
 const BOARD_TYPES: { kind: BoardKind; label: string; hint: string; icon: typeof Ticket }[] = [

@@ -12,13 +12,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Sparkles, Music, LayoutGrid, ImagePlus, Trash2, Rocket, GripVertical, ExternalLink, Plus } from "lucide-react";
-import { PageHeader } from "../components/page-header.js";
-import { usePageChrome } from "../components/page-chrome.js";
 import { DevicePreview } from "../components/device-preview.js";
 import { assetSrc } from "../components/media-picker.js";
 import { useCan } from "../permissions.js";
-import { Badge, Button, cn, LoadError, Skeleton, toast } from "@4dl/ui";
-import { EmptyState } from "../components/empty.js";
+import { Badge, Button, cn, EmptyState, LoadError, PageHeader, Skeleton, toast, usePageChrome } from "@4dl/ui";
+import { ScenaMascot } from "../brand.js";
 import {
   getScreen,
   getChannel,
@@ -315,7 +313,7 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
           description="Set up this screen's own display to start adding content."
         />
         <EmptyState
-          scena="searching"
+          art={<ScenaMascot mood="searching" size={116} className="mb-1" />}
           title="No display yet"
           description="This screen is showing the built-in demo. Give it its own display — we'll seed a starter scene you can edit."
           action={

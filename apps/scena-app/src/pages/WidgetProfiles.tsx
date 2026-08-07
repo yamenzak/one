@@ -7,14 +7,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Plus, LayoutGrid, Pencil, Trash2, ChevronRight } from "lucide-react";
-import { PageHeader } from "../components/page-header.js";
-import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
 import { ProfileStartDialog } from "../builder/ProfileStartDialog.js";
-import { Badge, Button, Card, Dialog, DialogContent, DialogFooter, Input, Skeleton, toast } from "@4dl/ui";
-import { EmptyState } from "../components/empty.js";
+import { Badge, Button, Card, Dialog, DialogContent, DialogFooter, EmptyState, Input, PageHeader, Skeleton, toast, usePageChrome } from "@4dl/ui";
 import { listWidgetProfiles, updateWidgetProfile, deleteWidgetProfile, type WidgetProfile } from "../api.js";
+import { ScenaMascot } from "../brand.js";
 
 const DEFAULT_W = 1920;
 const DEFAULT_H = 1080;
@@ -101,7 +99,7 @@ export function WidgetProfilesPage() {
         </div>
       ) : profiles.length === 0 ? (
         <EmptyState
-          scena="idle"
+          art={<ScenaMascot mood="idle" size={116} className="mb-1" />}
           title="No widget profiles yet"
           description="Start from a template, a blank canvas, or a copy — then assign it to any channel. Author once, reuse everywhere."
           action={newBtn}

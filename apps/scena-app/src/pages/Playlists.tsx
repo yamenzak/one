@@ -22,9 +22,7 @@ import {
   FileImage,
   Sparkles,
 } from "lucide-react";
-import { PageHeader } from "../components/page-header.js";
 import { TagEditor } from "../components/tag-editor.js";
-import { usePageChrome } from "../components/page-chrome.js";
 import { useCan } from "../permissions.js";
 import { confirmDialog } from "../components/confirm.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
@@ -53,29 +51,7 @@ import {
 import { MediaPicker } from "./MediaLibrary.js";
 import { HtmlEditorDialog, HtmlThumb } from "../components/html-editor.js";
 import { LicenseNote } from "../components/licensing.js";
-import {
-  Badge,
-  Button,
-  Card,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  Input,
-  Label,
-  LoadError,
-  Row,
-  Select,
-  Separator,
-  Skeleton,
-  Switch,
-  Textarea,
-  toast,
-} from "@4dl/ui";
-import { EmptyState } from "../components/empty.js";
+import { Badge, Button, Card, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Input, Label, LoadError, PageHeader, Row, Select, Separator, Skeleton, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
 import { PlaylistLibrary } from "../components/playlist-library.js";
 
 const STARTER_HTML = `<div style="width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;background:linear-gradient(135deg,#6366f1,#312e81);color:#fff;font-family:system-ui,sans-serif;text-align:center;padding:8%">

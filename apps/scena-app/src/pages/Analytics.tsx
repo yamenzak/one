@@ -7,12 +7,9 @@
 
 import { useEffect, useState } from "react";
 import { Download, BarChart3 } from "lucide-react";
-import { PageHeader } from "../components/page-header.js";
 import { StatTile } from "../components/status.js";
-import { Card, LoadError, SectionHeader, Skeleton } from "@4dl/ui";
-import { usePageChrome } from "../components/page-chrome.js";
+import { Card, EmptyState, LoadError, PageHeader, SectionHeader, Skeleton, usePageChrome } from "@4dl/ui";
 import { getAnalytics, analyticsCsvUrl, type AnalyticsSummary } from "../api.js";
-import { EmptyState } from "../components/empty.js";
 
 /** Trigger a CSV download without navigating away from the page. */
 function downloadCsv() {

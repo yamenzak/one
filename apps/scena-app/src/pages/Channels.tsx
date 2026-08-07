@@ -25,30 +25,10 @@ import {
   Check,
   Trash2,
 } from "lucide-react";
-import { PageHeader } from "../components/page-header.js";
 import { DevicePreview } from "../components/device-preview.js";
-import { usePageChrome } from "../components/page-chrome.js";
 import { TagEditor } from "../components/tag-editor.js";
-import { ConfirmDialog } from "../components/confirm-dialog.js";
 import { useCan } from "../permissions.js";
-import {
-  Badge,
-  Button,
-  Card,
-  cn,
-  Collection,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  Filters,
-  Input,
-  Label,
-  Select,
-  Skeleton,
-  toast,
-  type FacetSelection,
-} from "@4dl/ui";
-import { EmptyState } from "../components/empty.js";
+import { Badge, Button, Card, cn, Collection, ConfirmDialog, Dialog, DialogContent, DialogFooter, EmptyState, Filters, Input, Label, PageHeader, Select, Skeleton, toast, type FacetSelection, usePageChrome } from "@4dl/ui";
 import {
   listChannels,
   createChannel,

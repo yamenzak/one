@@ -23,8 +23,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { MoreVertical, Pencil, Plus, Tag as TagIcon, Trash2, type LucideIcon } from "lucide-react";
-import { Button, Collection, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Filters, Input, toast, type FacetSelection } from "@4dl/ui";
-import { ConfirmDialog } from "./confirm-dialog.js";
+import { Button, Collection, ConfirmDialog, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Filters, Input, toast, type FacetSelection } from "@4dl/ui";
 import { TagEditor } from "./tag-editor.js";
 
 /** The shape both playlist kinds share. Everything else is the caller's. */

@@ -10,9 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Play, Pause, Trash2, Megaphone, Clock, Sparkles, Bot, Upload, FolderOpen, Plus, MoreVertical, Pencil, Radio, Link2 } from "lucide-react";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
-import { PageHeader } from "../components/page-header.js";
 import { StatusDot as SharedStatusDot } from "../components/status.js";
-import { usePageChrome } from "../components/page-chrome.js";
 import { useCan } from "../permissions.js";
 import { confirmDialog } from "../components/confirm.js";
 import { offerPublishAffected } from "../components/publish-affected.js";
@@ -37,27 +35,8 @@ import {
 } from "../api.js";
 import { MediaPicker } from "./MediaLibrary.js";
 import { GEMINI_VOICES, AD_STYLE_PRESETS, DEFAULT_GEMINI_VOICE, DEFAULT_AD_STYLE, composeAdSpeech } from "../voices.js";
-import {
-  Badge,
-  Button,
-  Card,
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  Input,
-  Label,
-  LoadError,
-  Select,
-  Skeleton,
-  Switch,
-  Textarea,
-  toast,
-} from "@4dl/ui";
-import { EmptyState } from "../components/empty.js";
+import { Badge, Button, Card, Dialog, DialogContent, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Input, Label, LoadError, PageHeader, Select, Skeleton, Switch, Textarea, toast, usePageChrome } from "@4dl/ui";
+import { ScenaMascot } from "../brand.js";
 
 type Kind = "audio" | "video" | "command";
 const KINDS: { id: Kind; label: string; hint: string }[] = [
@@ -141,7 +120,7 @@ export function AdsPage() {
         </div>
       ) : profiles.length === 0 ? (
         <EmptyState
-          scena="idle"
+          art={<ScenaMascot mood="idle" size={116} className="mb-1" />}
           title="No ad profiles yet"
           description="Create a rotation, fill it with audio/video/command interrupts, then bind it to any channel — author once, reuse everywhere."
           action={

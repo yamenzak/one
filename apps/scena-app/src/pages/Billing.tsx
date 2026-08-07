@@ -16,11 +16,9 @@
  */
 import { useEffect, useState } from "react";
 import { Receipt, Check, Sparkles, ArrowRight, Lock, Loader2 } from "lucide-react";
-import { Button, Card, cn, Dialog, DialogContent, DialogFooter, Group, Input, LoadError, Meter, Row, SectionHeader, Skeleton, toast } from "@4dl/ui";
-import { PageHeader } from "../components/page-header.js";
+import { Button, Card, cn, Dialog, DialogContent, DialogFooter, EmptyState, Group, Input, LoadError, Meter, PageHeader, Row, SectionHeader, Skeleton, toast } from "@4dl/ui";
 import { LegalDialog, LegalLinks, type LegalDoc } from "../legal/content.js";
 import { FEATURE_CATALOG, QUOTA_CATALOG } from "@scena/manifest";
-import { EmptyState } from "../components/empty.js";
 import { getBilling, changePlan, buyPack, redeemPromo, type BillingState, type Plan, type Violation } from "../api.js";
 
 const dollars = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;

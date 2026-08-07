@@ -278,12 +278,36 @@ export function SettingsList({ sections }: { sections: { header: string; rows: S
  * Settles down like everything else (§8); it used to rise 8px with no scale,
  * which was the one entrance in the product that matched nothing around it.
  */
-export function EmptyState({ icon: Icon, title, description, action }: { icon: LucideIcon; title: string; description?: string; action?: ReactNode }) {
+/**
+ * `art` is the FIRST-RUN slot: a mascot, an illustration, a photograph — the
+ * product's voice at the one moment there is nothing else on the screen.
+ *
+ * It is a slot rather than product vocabulary, which is why it belongs here.
+ * Scena kept a whole wrapper component solely to branch between "medallion with
+ * an icon" and "mascot", and that wrapper shadowed this component's name — so
+ * an app had two `EmptyState`s and the diverging one won by import order.
+ *
+ * ⚠️ `art` replaces the medallion entirely and is drawn at its own size, so it
+ * is for FIRST RUN ("create your first channel"), not for every empty list. An
+ * illustration on every zero-state is an illustration nobody sees.
+ */
+export function EmptyState({ icon: Icon, art, title, description, action, className }: {
+  icon?: LucideIcon;
+  art?: ReactNode;
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  className?: string;
+}) {
   return (
-    <motion.div variants={settle} initial="hidden" animate="show" className="flex flex-col items-center px-6 py-14 text-center">
-      <div className="grid size-14 place-items-center rounded-xl bg-surface-2 text-muted-foreground [&_svg]:size-6">
-        <Icon aria-hidden />
-      </div>
+    <motion.div variants={settle} initial="hidden" animate="show" className={cn("flex flex-col items-center px-6 py-14 text-center", className)}>
+      {art ?? (
+        <div className="grid size-14 place-items-center rounded-xl bg-surface-2 text-muted-foreground [&_svg]:size-6">
+          {/* An empty with neither art nor icon would leave the headline
+              floating mid-panel, so the medallion is drawn either way. */}
+          {Icon ? <Icon aria-hidden /> : null}
+        </div>
+      )}
       <h3 className="mt-4 text-title-3">{title}</h3>
       {description && <p className="mt-1.5 max-w-xs text-body text-muted-foreground">{description}</p>}
       {action && <div className="mt-6">{action}</div>}

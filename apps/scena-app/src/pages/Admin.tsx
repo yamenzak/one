@@ -42,25 +42,7 @@ import {
   Pencil,
 } from "lucide-react";
 import { FEATURE_CATALOG, QUOTA_CATALOG, FEATURE_CATEGORIES } from "@scena/manifest";
-import {
-  Badge,
-  Button,
-  Card,
-  cn,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  Input,
-  Label,
-  SectionHeader,
-  Select,
-  Separator,
-  Skeleton,
-  Switch,
-  toast,
-} from "@4dl/ui";
-import { EmptyState } from "../components/empty.js";
+import { Badge, Button, Card, cn, Dialog, DialogContent, DialogDescription, DialogFooter, EmptyState, Input, Label, SectionHeader, Select, Separator, Skeleton, Switch, toast } from "@4dl/ui";
 import {
   getAdminConfig,
   setAdminConfig,

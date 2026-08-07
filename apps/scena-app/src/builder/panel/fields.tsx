@@ -22,7 +22,7 @@ export function Field({ label, children, hint }: { label: string; children: Reac
 }
 
 /** A collapsible titled group. */
-export function Group({
+export function PanelGroup({
   title,
   children,
   defaultOpen = true,

@@ -200,19 +200,66 @@ export function DialogFooter({ children, className }: { children: ReactNode; cla
   );
 }
 
-/** Lightweight confirm step for consequential/destructive actions — a centered
- *  Dialog with a cancel + confirm pair. Confirming runs `onConfirm` and closes. */
-export function ConfirmDialog({ open, onOpenChange, title, description, confirmLabel = "Confirm", cancelLabel = "Cancel", destructive, onConfirm }: {
+/**
+ * Confirm step for a consequential or destructive action.
+ *
+ * ── `onConfirm` MAY BE ASYNC, and that is the whole design ───────────────────
+ *
+ * The dialog closes when the ACTION IS DONE, not when the button is pressed. If
+ * `onConfirm` returns a promise this awaits it: the confirm button says it is
+ * working, both buttons refuse a second press, and Escape and the outside click
+ * are blocked — because a half-finished delete you can dismiss is a delete
+ * whose outcome nobody sees. It closes on resolve and STAYS OPEN on reject,
+ * with the failure shown in place.
+ *
+ * A synchronous `onConfirm` closes immediately, exactly as before.
+ *
+ * This replaces the `busy` prop an app would otherwise have to thread: Scena
+ * kept a whole second `ConfirmDialog` for it, which then shadowed this one.
+ */
+export function ConfirmDialog({ open, onOpenChange, title, description, confirmLabel = "Confirm", cancelLabel = "Cancel", busyLabel = "Working…", destructive, onConfirm }: {
   open: boolean; onOpenChange: (o: boolean) => void; title: string; description?: ReactNode;
-  confirmLabel?: string; cancelLabel?: string; destructive?: boolean; onConfirm: () => void;
+  confirmLabel?: string; cancelLabel?: string; busyLabel?: string; destructive?: boolean;
+  onConfirm: () => void | Promise<void>;
 }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Re-arm on every opening: the same node is reused, so a dialog closed after
+  // a failure would otherwise reopen still wearing the previous error.
+  useEffect(() => { if (!open) { setBusy(false); setError(null); } }, [open]);
+
+  async function run() {
+    setError(null);
+    let result: void | Promise<void>;
+    try {
+      result = onConfirm();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That didn’t work.");
+      return;
+    }
+    if (!(result instanceof Promise)) { onOpenChange(false); return; }
+    setBusy(true);
+    try {
+      await result;
+      onOpenChange(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That didn’t work.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent title={title}>
+    <Dialog open={open} onOpenChange={(o) => !busy && onOpenChange(o)}>
+      <DialogContent title={title} dismissible={!busy}>
         {description && <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>}
+        {error && <p role="alert" className="mt-3 text-sm text-danger">{error}</p>}
         <div className="mt-5 flex gap-3">
-          <Button variant="ghost" className="flex-1" onClick={() => onOpenChange(false)}>{cancelLabel}</Button>
-          <Button variant={destructive ? "destructive" : "default"} className="flex-1" onClick={() => { onConfirm(); onOpenChange(false); }}>{confirmLabel}</Button>
+          <Button variant="ghost" className="flex-1" disabled={busy} onClick={() => onOpenChange(false)}>{cancelLabel}</Button>
+          <Button variant={destructive ? "destructive" : "default"} className="flex-1" disabled={busy} onClick={() => void run()}>
+            {busy ? busyLabel : confirmLabel}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -101,7 +101,6 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<MediaItem | null>(null);
   const [open, setOpen] = useState<MediaItem | null>(null);
-  const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
   const [facets, setFacets] = useState<FacetSelection>({ who: null, kind: null });
   // Photos want a grid, files want a list, and which one you want is a lasting
@@ -127,10 +126,19 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
+  /*
+    Returns the promise, and does NOT swallow a rejection. `ConfirmDialog`
+    awaits it: it holds itself open and disabled while the delete runs, closes
+    on success, and shows the failure in place if it rejects. The `busy` state
+    and the hand-written "Deleting…" label this used to need are the dialog's
+    now — and the bare `finally` they came with meant a refused delete rejected
+    into the app-wide "Something didn't load" toast, twelve inches from the
+    dialog that caused it.
+  */
   const del = async (id: string) => {
-    setBusy(true);
-    try { await api.del(`/api/media-library/${id}`); setToDelete(null); setOpen(null); await load(); }
-    finally { setBusy(false); }
+    await api.del(`/api/media-library/${id}`);
+    setOpen(null);
+    await load();
   };
 
   // A per-client facet appears only when the viewer can see more than one
@@ -286,9 +294,10 @@ export function MediaLibrary({ onBack }: { onBack: () => void }) {
         onOpenChange={(o) => !o && setToDelete(null)}
         title={toDelete ? `Delete this ${labelOf(toDelete).toLowerCase()}?` : "Delete this file?"}
         description="It's removed from storage permanently and unlinked wherever it was used. This can't be undone."
-        confirmLabel={busy ? "Deleting…" : "Delete"}
+        confirmLabel="Delete"
+        busyLabel="Deleting…"
         destructive
-        onConfirm={() => toDelete && void del(toDelete.id)}
+        onConfirm={() => (toDelete ? del(toDelete.id) : undefined)}
       />
     </Page>
   );

@@ -11,31 +11,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, RefreshCw, X, ExternalLink, Rss, Trash2, Inbox, Globe, Sheet, Table2, MoreVertical, CloudSun } from "lucide-react";
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from "../components/ui/table.js";
-import { PageHeader } from "../components/page-header.js";
-import { usePageChrome } from "../components/page-chrome.js";
 import { confirmDialog } from "../components/confirm.js";
 import { useCan } from "../permissions.js";
-import {
-  Badge,
-  Button,
-  Card,
-  cn,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  Input,
-  Label,
-  LoadError,
-  Select,
-  Skeleton,
-  toast,
-} from "@4dl/ui";
-import { EmptyState } from "../components/empty.js";
+import { Badge, Button, Card, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, EmptyState, Input, Label, LoadError, PageHeader, Select, Skeleton, toast, usePageChrome } from "@4dl/ui";
+import { ScenaMascot } from "../brand.js";
 import {
   listFeeds,
   getFeed,
@@ -221,7 +200,7 @@ export function FeedsPage() {
         </div>
       ) : total === 0 ? (
         <EmptyState
-          scena="idle"
+          art={<ScenaMascot mood="idle" size={116} className="mb-1" />}
           title="No sources yet"
           description="Connect a Google Sheet or public API, add a weather location, or curate a manual list — then bind it to a widget in the builder."
           action={

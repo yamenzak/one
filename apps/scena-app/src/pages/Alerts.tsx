@@ -21,12 +21,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Plus, X, Webhook, Mail, Monitor, Wifi, WifiOff, BellRing } from "lucide-react";
-import { Badge, Button, Card, GlanceStrip, Group, Input, LoadError, Row, Section, Select, SkeletonList, toast, useAction } from "@4dl/ui";
-import { PageHeader } from "../components/page-header.js";
-import { usePageChrome } from "../components/page-chrome.js";
+import { Badge, Button, Card, EmptyState, GlanceStrip, Group, Input, LoadError, PageHeader, Row, Section, Select, SkeletonList, toast, useAction, usePageChrome } from "@4dl/ui";
 import { confirmDialog } from "../components/confirm.js";
 import { listAlerts, listAlertRules, addAlertRule, deleteAlertRule, listScreens, type AlertRow, type AlertRule, type Screen } from "../api.js";
-import { EmptyState } from "../components/empty.js";
+import { ScenaMascot } from "../brand.js";
 
 const errorText = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback);
 
@@ -88,7 +86,7 @@ export function AlertsPage() {
           ) : !alerts ? (
             <SkeletonList rows={4} card />
           ) : alerts.length === 0 ? (
-            <EmptyState scena="happy" title="All clear" description="No alerts right now — the fleet is healthy. New offline events will show up here." />
+            <EmptyState art={<ScenaMascot mood="happy" size={116} className="mb-1" />} title="All clear" description="No alerts right now — the fleet is healthy. New offline events will show up here." />
           ) : (
             <Group>
               {alerts.map((a) => {
