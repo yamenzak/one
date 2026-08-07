@@ -22,9 +22,15 @@ import { renderPage, renderNotFound } from "./src/template.mjs";
 
 // The product's real sources (single source of truth). Relative paths so the
 // generator reads them straight from the monorepo — no build output needed.
-import { scenaMascotSvg, scenaIconSvg } from "../../packages/brand/src/mascot.js";
-import { FEATURE_CATALOG, QUOTA_CATALOG, featureDef, quotaDef } from "../../packages/manifest/src/entitlements-catalog.js";
-import { DEFAULT_PLANS } from "../api/src/billing-seed.js";
+// ⚠️ These three imports reach ACROSS the workspace by relative path, and all
+// three still named the layout of the repo Scena was imported from:
+// `packages/brand`, `packages/manifest` and `apps/api` do not exist here (the
+// first is Kova's reserved brand dir, the third is Kova's WORKER). Nothing
+// typechecks this file — it is `.mjs` run by tsx — so the breakage only
+// surfaced as a failed deploy, on the one job that runs it.
+import { scenaMascotSvg, scenaIconSvg } from "../../packages/scena-brand/src/mascot.ts";
+import { FEATURE_CATALOG, QUOTA_CATALOG, featureDef, quotaDef } from "../../packages/scena-manifest/src/entitlements-catalog.ts";
+import { DEFAULT_PLANS } from "../scena/src/billing-seed.ts";
 
 const root = dirname(fileURLToPath(import.meta.url));
 const dist = join(root, "dist");

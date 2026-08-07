@@ -94,12 +94,21 @@
       "deploy": true
     },
     {
+      "$comment": [
+        "`preCommands` is how a marketing site gets its `dist`, and without it",
+        "this app CANNOT deploy: the deploy job builds `spa` and nothing else,",
+        "`spa` is null here (there is no SPA — the generator prewrites HTML),",
+        "and `wrangler deploy` then dies on the missing `assets.directory`.",
+        "Kova's `www` has carried this line since it shipped; Scena arrived",
+        "without it and failed its first deploy on exactly that."
+      ],
       "id": "scena-www",
       "name": "Scena marketing",
       "dir": "apps/scena-www",
       "spa": null,
       "e2e": null,
-      "deploy": true
+      "deploy": true,
+      "preCommands": "pnpm exec tsx build.mjs"
     },
     {
       "id": "www",

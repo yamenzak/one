@@ -97,7 +97,34 @@ jobs:
           filters=$(node scripts/apps.mjs spas | sed 's/^/--filter=/' | tr '\n' ' ')
           pnpm turbo run build $filters
 
-      - run: pnpm turbo run typecheck test
+      # ── The test lane runs SERIALLY, and that is not a style choice ───────
+      #
+      # `pnpm turbo run typecheck test` ran both lanes at turbo's default
+      # concurrency of 10. On a 2-core runner that starts three Workers-pool
+      # suites (Kova, Tessa, Scena) alongside several `tsc` processes, and
+      # Scena's died 10 ms after `Starting single runtime` having printed
+      # NOTHING — no assertion, no stack, no `Shutting down runtimes`, and a
+      # `workerd` left orphaned for the runner to reap. That is the shape of a
+      # process being killed, not of a test failing.
+      #
+      # It is not reproducible on a developer machine with 16 GB and 4 cores,
+      # even when the three suites are started deliberately at once — which is
+      # why it reached main green and failed here. `retry: 1` in each pool
+      # config cannot help: the runtime dies before a test exists to retry.
+      #
+      # So the fix is to stop the contention rather than to raise a timeout.
+      # Typecheck still runs fully parallel; the test lane is serial. Turbo
+      # caches both, so a warm run replays in milliseconds either way and only a
+      # cold run pays — a few minutes for a lane that otherwise fails silently
+      # and blocks every deploy behind it.
+      #
+      # Measured on this repo: the test lane is 2m54s parallel and 6m41s
+      # serial from COLD, and 46 ms either way once turbo's cache is warm — and
+      # CI restores that cache between runs. So the cost lands on the runs that
+      # changed a lot, which are the runs where a silently-killed suite is least
+      # affordable.
+      - run: pnpm turbo run typecheck
+      - run: pnpm turbo run test --concurrency=1
 
       # ── Which Playwright suites does this PR actually need? ───────────────
       #

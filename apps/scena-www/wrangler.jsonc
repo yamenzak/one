@@ -5,14 +5,33 @@
   // there's no runtime rendering. 404s fall back to the English landing page.
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "scena-www",
-  "account_id": "499a9adbf3076e5ff1d3027b8cd72798",
+  /*
+    ⚠️ NO `account_id`. It carried the OLD account's id, hardcoded, left over
+    from the repo Scena was imported from — so a deploy either targeted an
+    account this workspace has no token for, or targeted the wrong one. Every
+    other worker here takes it from `CLOUDFLARE_ACCOUNT_ID`, which is what both
+    workflows already pass, and which is the only value that stays correct when
+    the account changes.
+  */
   "compatibility_date": "2025-07-01",
   "assets": {
     "directory": "./dist",
     "not_found_handling": "404-page"
   },
+  /*
+    ⚠️ This said `scena.fourdegreelabs.com` — a zone on the account Scena came
+    from, which this one cannot bind, so the deploy failed outright.
+
+    It also cannot be `scena.4dl.app`: that hostname is the APP's root door,
+    served by the `scena` worker. Marketing takes the same shape Kova's does —
+    Kova's app is `kova.4dl.app` and its site is `getkova.4dl.app`.
+
+    `custom_domain: true` means wrangler provisions the hostname itself, and
+    `4dl.app` is in this account, so no dashboard step is needed. Change the
+    label here if a different one is wanted; nothing else reads it.
+  */
   "routes": [
-    { "pattern": "scena.fourdegreelabs.com", "custom_domain": true }
+    { "pattern": "getscena.4dl.app", "custom_domain": true }
   ],
   "observability": { "enabled": true }
 }
