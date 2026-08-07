@@ -11,7 +11,7 @@
     "build": "turbo run build",
     "dev": "turbo run dev",
     "test": "pnpm gate && turbo run test",
-    "gate": "node .github/workflows/workflows-parse.test.mjs && node scripts/apps-manifest.test.mjs && node scripts/affected.test.mjs && node scripts/shared-config.test.mjs && node scripts/sender-default.test.mjs && node scripts/email-brand-origin.test.mjs && node scripts/flag-enforcement.test.mjs && node scripts/entitlement-enforcement.test.mjs && node scripts/storage-chokepoint.test.mjs && node scripts/player-api-base.test.mjs && node scripts/ui-ownership.test.mjs",
+    "gate": "node .github/workflows/workflows-parse.test.mjs && node scripts/apps-manifest.test.mjs && node scripts/affected.test.mjs && node scripts/shared-config.test.mjs && node scripts/sender-default.test.mjs && node scripts/email-brand-origin.test.mjs && node scripts/flag-enforcement.test.mjs && node scripts/entitlement-enforcement.test.mjs && node scripts/storage-chokepoint.test.mjs && node scripts/player-api-base.test.mjs && node scripts/motion-config.test.mjs && node scripts/ui-ownership.test.mjs",
     "typecheck": "turbo run typecheck",
     "e2e": "turbo run e2e",
     "shots": "turbo run shots",

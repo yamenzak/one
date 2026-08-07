@@ -31,7 +31,7 @@
 import { useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { LayoutGrid, List, Search, type LucideIcon } from "./lib/icons.js";
-import { contentIn, contentStagger } from "./lib/animation.js";
+import { contentIn, contentStagger, rowIn, rowStagger } from "./lib/animation.js";
 import { Button, Field } from "./primitives.js";
 import { EmptyState } from "./shell.js";
 import { LoadError } from "./patterns.js";
@@ -236,7 +236,19 @@ export function Collection<T>({
           // genuinely re-laid-out, and settling them in reads as a change rather
           // than as a glitch.
           key={view}
-          variants={contentStagger}
+          /*
+            THE LIST GETS THE ROW RHYTHM; THE GRID GETS THE BLOCK RHYTHM.
+
+            Both used `contentStagger`, which meant the SAME rows entered at one
+            speed inside a `Group` (`rowStagger`, tight and quick, because a list
+            is one object arriving) and at another inside a `Collection` (slower,
+            per-block). Nothing named the difference and nothing justified it —
+            it is the kind of drift that only shows up when two screens are
+            photographed side by side, which §16 exists for.
+
+            A grid of cards genuinely is blocks, so it keeps the block rhythm.
+          */
+          variants={grid ? contentStagger : rowStagger}
           initial="hidden"
           animate="show"
           className={grid ? "grid grid-cols-2 gap-3 sm:grid-cols-3" : "overflow-hidden rounded-2xl bg-card"}
@@ -244,7 +256,7 @@ export function Collection<T>({
           {items.map((item, i) => (
             <motion.div
               key={itemKey(item)}
-              variants={contentIn}
+              variants={grid ? contentIn : rowIn}
               className={grid ? undefined : cn(i > 0 && "border-t border-border/50")}
             >
               {grid ? renderGrid!(item) : renderList(item)}
@@ -255,6 +267,25 @@ export function Collection<T>({
     </div>
   );
 }
+
+/**
+ * The collection, waiting — in the view it will arrive in.
+ *
+ * `view` matters: a grid that shimmers as a list, then snaps into tiles, is a
+ * layout change disguised as a load. `Collection` already renders this
+ * internally; it is exported here so a screen that owns its own loading state
+ * (a two-pane list pane, a sheet) reaches the same shape by name.
+ */
+Collection.Skeleton = function CollectionSkeleton({ view = "list", rows = 5, thumb, className }: { view?: "list" | "grid"; rows?: number; thumb?: number; className?: string }) {
+  if (view === "grid") {
+    return (
+      <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-3", className)}>
+        {Array.from({ length: rows }, (_, i) => <SkeletonLine key={i} h="display" className="h-32 rounded-2xl" />)}
+      </div>
+    );
+  }
+  return <SkeletonList rows={rows} thumb={thumb} card className={className} />;
+};
 
 /**
  * List or grid — ONE button, showing where it takes you.

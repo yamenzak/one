@@ -25,7 +25,10 @@ const SRC = readFileSync(new URL("../src/layout.tsx", import.meta.url), "utf8");
 
 /** The `Row` component's body, from its declaration to the next top-level one. */
 function rowSource(): string {
-  const start = SRC.indexOf("export const Row = forwardRef");
+  // `const RowBase =`, not `export const Row =`: `Row` is composed with
+  // `Object.assign` now so it can carry `Row.Skeleton`, which a forward-ref
+  // exotic component has nowhere to hang.
+  const start = SRC.indexOf("const RowBase = forwardRef");
   expect(start, "Row's declaration moved — this test is reading the wrong code").toBeGreaterThan(-1);
   const after = SRC.indexOf("\n/**", start);
   return SRC.slice(start, after > 0 ? after : undefined);

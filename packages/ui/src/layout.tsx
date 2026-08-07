@@ -28,7 +28,8 @@ import { motion, type HTMLMotionProps } from "motion/react";
 import { cn } from "./lib/utils.js";
 import { anchorIn, atmosphereIn, contentIn, contentStagger, pressProps, rowIn, rowStagger, stepPanelVariants } from "./lib/animation.js";
 import { ChevronRight, type LucideIcon } from "./lib/icons.js";
-import { toneVar, type Tone } from "./primitives.js";
+import { Skeleton, toneVar, type Tone } from "./primitives.js";
+import { SkeletonLine, SkeletonList, SkeletonRow } from "./skeleton.js";
 
 // ── T0 · Atmosphere ─────────────────────────────────────────────────────────
 
@@ -236,6 +237,22 @@ export function Anchor({
 }
 
 /**
+ * The anchor, waiting: eyebrow, the display numeral, the sub-line — at the same
+ * sizes and the same centring, so arrival is a FILL rather than a jump. A
+ * generic grey block here moves the one number the screen is about, which is
+ * the most visible reflow a screen can have.
+ */
+Anchor.Skeleton = function AnchorSkeleton({ align = "center", sub = true, className }: { align?: "center" | "start"; sub?: boolean; className?: string }) {
+  return (
+    <div className={cn("space-y-2 py-2", align === "center" && "flex flex-col items-center", className)}>
+      <SkeletonLine w="4.5rem" h="xs" />
+      <SkeletonLine w="9rem" h="display" />
+      {sub && <SkeletonLine w="7rem" h="text" />}
+    </div>
+  );
+};
+
+/**
  * The unit beside an anchor value. Subordinate by construction: ~55% of the
  * value's size and muted, on the same baseline (§5). Rendering a unit at the
  * value's size is the most common way a beautiful number stops being one.
@@ -302,30 +319,77 @@ export function ActionCluster({ items, className }: { items: ActionItem[]; class
  *
  * The trailing `action` is for one quiet affordance — "See all", "Edit". It is
  * never a primary action; those live in the cluster.
+ *
+ * ── ONE SECTION, TWO PROPERTIES (§7) ────────────────────────────────────────
+ *
+ * There is deliberately no `SectionCard`, no `CompactSection`, no `variant`
+ * union. A second section SHAPE is how a screen starts having two kinds of
+ * everything — two paddings, two title sizes, two rhythms — and the drift is
+ * invisible until you photograph two screens side by side.
+ *
+ * What varies is two properties, and neither touches type, tap targets or the
+ * padding inside rows:
+ *
+ *   `emphasis`  plain (default) | carded — whether the BODY sits on the page or
+ *               on a card. For a body that is a different KIND of thing from
+ *               its neighbours: a chart among rows, a form among lists.
+ *   `density`   comfortable (default) | compact — tightens the header→body gap
+ *               for a section whose body is a single control. Nothing else.
+ *
+ * The body itself is already a closed set — a `Group` of rows, a `TileGrid`, a
+ * chart, free content — and a section does not need a variant per body. It
+ * needs to not care.
  */
 export function Section({
   title,
   action,
   children,
+  emphasis = "plain",
+  density = "comfortable",
   className,
 }: {
   title?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
+  /** `carded` puts the BODY on a card. The header stays on the page. */
+  emphasis?: "plain" | "carded";
+  /** `compact` tightens header→body. Never changes type or tap targets. */
+  density?: "comfortable" | "compact";
   className?: string;
 }) {
   return (
     <motion.section variants={contentIn} className={cn("mb-8 last:mb-0", className)}>
       {(title || action) && (
-        <div className="mb-3 flex min-h-8 items-center justify-between gap-3 px-1">
+        <div className={cn("flex min-h-8 items-center justify-between gap-3 px-1", density === "compact" ? "mb-1.5" : "mb-3")}>
           {title && <h2 className="text-title-3">{title}</h2>}
           {action}
         </div>
       )}
-      {children}
+      {emphasis === "carded" ? <div className="rounded-2xl bg-card p-5">{children}</div> : children}
     </motion.section>
   );
 }
+
+/**
+ * THE SKELETON LIVES ON THE COMPONENT, and that is the whole mechanism.
+ *
+ * §7: "a component that fetches ships `Component.Skeleton` beside it". The
+ * shapes themselves already existed as free-standing `Skeleton*` exports — what
+ * did not exist was the BINDING, so every screen picked one by hand. Picking is
+ * how a list of rows comes to shimmer as a chart, and how three screens loading
+ * the same thing each guess differently.
+ *
+ * These are thin on purpose: no new drawing, just one obvious name per
+ * component, reachable from the component you are already looking at.
+ */
+Section.Skeleton = function SectionSkeleton({ title = true, children, className }: { title?: boolean; children?: ReactNode; className?: string }) {
+  return (
+    <div className={cn("mb-8 last:mb-0", className)}>
+      {title && <div className="mb-3 px-1"><SkeletonLine w="9rem" h="title" /></div>}
+      {children ?? <SkeletonList rows={3} card />}
+    </div>
+  );
+};
 
 /**
  * The grouped container that rows live in (§7).
@@ -342,6 +406,11 @@ export function Group({ children, className }: { children: ReactNode; className?
     </motion.div>
   );
 }
+
+/** The same container, the same row heights, waiting. */
+Group.Skeleton = function GroupSkeleton({ rows = 4, thumb, className }: { rows?: number; thumb?: number; className?: string }) {
+  return <SkeletonList rows={rows} thumb={thumb} card className={className} />;
+};
 
 export interface RowProps {
   /** A squircle identity container — what this row is ABOUT (§6). */
@@ -388,7 +457,7 @@ export interface RowProps {
  * whose rows are all slightly different heights never feels engineered no
  * matter how correct the spacing is. The whole row is the tap target.
  */
-export const Row = forwardRef<HTMLElement, RowProps>(function Row(
+const RowBase = forwardRef<HTMLElement, RowProps>(function Row(
   { icon: Icon, iconTone, leading, children, sub, value, valueSub, trailing, onClick, href, chevron, divider = true, tone = "default", disabled, className },
   ref,
 ) {
@@ -520,6 +589,20 @@ export const Row = forwardRef<HTMLElement, RowProps>(function Row(
   return <motion.div ref={ref as never} variants={rowIn} className={cls}>{body}</motion.div>;
 });
 
+/** One row's shape: a thumb, two lines and a trailing slot. */
+function RowSkeleton({ thumb = 44, lines = 2, trailing = true, className }: { thumb?: number; lines?: number; trailing?: boolean; className?: string }) {
+  return <SkeletonRow thumb={thumb} lines={lines} trailing={trailing} className={className} />;
+}
+
+/*
+  `Object.assign` rather than an expando, because `Row` is a `forwardRef` and a
+  forward-ref exotic component has no place to hang one. The alternative — a
+  free-standing `SkeletonRow` that screens import separately — is what this
+  replaces: the pairing has to be reachable from the component, or picking the
+  wrong shape stays as easy as picking the right one.
+*/
+export const Row = Object.assign(RowBase, { Skeleton: RowSkeleton });
+
 /**
  * A square-ish card for a 2-up or 3-up grid — the profile screen's "Your plan" /
  * "Invite friends" pattern.
@@ -565,6 +648,15 @@ export function Tile({
 export function TileGrid({ children, className }: { children: ReactNode; className?: string }) {
   return <motion.div variants={rowStagger} className={cn("grid grid-cols-2 gap-3 md:grid-cols-3", className)}>{children}</motion.div>;
 }
+
+/** Same 2-up / 3-up grid, same 104px tile height, waiting. */
+TileGrid.Skeleton = function TileGridSkeleton({ count = 4, className }: { count?: number; className?: string }) {
+  return (
+    <div className={cn("grid grid-cols-2 gap-3 md:grid-cols-3", className)}>
+      {Array.from({ length: count }, (_, i) => <Skeleton key={i} className="h-[104px] rounded-2xl" />)}
+    </div>
+  );
+};
 
 /**
  * The quiet helper line that sits under a group (§7).

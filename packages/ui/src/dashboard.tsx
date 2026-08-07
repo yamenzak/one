@@ -33,11 +33,14 @@
  */
 
 import * as React from "react";
+import { motion } from "motion/react";
+import { chromeIn, contentIn, contentStagger } from "./lib/animation.js";
 import { cn } from "./lib/utils.js";
 import { ArrowLeft, Circle, Menu, MoreVertical, PanelLeft } from "./lib/icons.js";
 import { Button } from "./primitives.js";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Tooltip } from "./overlays.js";
 import { Breadcrumbs, NavDrawer, ScrollArea, type Crumb } from "./shell.js";
+import { SkeletonHeader } from "./skeleton.js";
 import { useShape } from "./shapes.js";
 
 /* ═══════════════════════ the chrome a page publishes ═══════════════════════ */
@@ -161,7 +164,9 @@ export function NavSidebar({ navGroups, active, onNavigate, brand, footer, colla
   collapsed?: boolean;
 }) {
   return (
-    <div className="flex h-full flex-col">
+    // Chrome enters LAST (§8's tier order) and never has a skeleton — it is not
+    // waiting for data, it is the frame the data arrives into.
+    <motion.div initial="hidden" animate="show" variants={chromeIn} className="flex h-full flex-col">
       {brand && <div className={cn("flex h-14 shrink-0 items-center", collapsed ? "justify-center px-0" : "px-4")}>{brand(collapsed)}</div>}
       {/*
         `mask` is not decoration here. Without it the scroll region ends in a
@@ -187,7 +192,7 @@ export function NavSidebar({ navGroups, active, onNavigate, brand, footer, colla
         </nav>
       </ScrollArea>
       {footer && <div className="shrink-0 p-2">{footer(collapsed)}</div>}
-    </div>
+    </motion.div>
   );
 }
 
@@ -365,7 +370,31 @@ export function DashboardShell({ navGroups, active, onNavigate, brand, fallbackC
             wrap their element in at least a remount key. */}
         <main className="min-h-0 flex-1 overflow-hidden rounded-xl bg-background shadow-sm">
           <div className="h-full overflow-y-auto has-[[data-shape]]:overflow-hidden">
-            <div className="w-full px-5 py-6 has-[[data-shape]]:h-full has-[[data-shape]]:p-0 sm:px-7 lg:px-8">{children}</div>
+              {/*
+              THE PANEL ORCHESTRATES, and until now nothing did.
+
+              §8's entrance choreography is variant-driven: a component declares
+              `contentIn` or `rowIn` and an ANCESTOR hands it the label. Kova's
+              `Page` does that for every screen it wraps. This shell did not, so
+              every screen in a dashboard app rendered with its motion inert —
+              the same `Section`, `Row` and `Collection` components, correctly
+              declaring their variants, and simply never told to show. Two
+              products built from one design system, one of which animated.
+
+              Keyed on the active destination so moving between them re-runs the
+              entrance rather than swapping content in place. It is not keyed on
+              the full route: inside a two-pane, opening a record must not
+              re-animate the list beside it.
+            */}
+            <motion.div
+              key={active}
+              initial="hidden"
+              animate="show"
+              variants={contentStagger}
+              className="w-full px-5 py-6 has-[[data-shape]]:h-full has-[[data-shape]]:p-0 sm:px-7 lg:px-8"
+            >
+              {children}
+            </motion.div>
           </div>
         </main>
       </div>
@@ -404,7 +433,7 @@ export function PageHeader({ title, description, back, actions, className, child
 }) {
   const { twoPane } = useShape();
   return (
-    <div className={cn("mb-6", className)}>
+    <motion.div variants={contentIn} className={cn("mb-6", className)}>
       {back && !twoPane && (
         <button
           onClick={back.onClick}
@@ -421,6 +450,11 @@ export function PageHeader({ title, description, back, actions, className, child
         </div>
         {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
-    </div>
+    </motion.div>
   );
 }
+
+/** Title and description at their real sizes, so arrival is a fill. */
+PageHeader.Skeleton = function PageHeaderSkeleton({ action = false, className }: { action?: boolean; className?: string }) {
+  return <SkeletonHeader action={action} className={className} />;
+};

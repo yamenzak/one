@@ -8,7 +8,8 @@ import type { ReactNode } from "react";
 import { cn } from "./lib/utils.js";
 import { Badge, toneSoft, toneText, toneVar, type Tone } from "./primitives.js";
 import { Check, Minus, TrendingDown, TrendingUp, type LucideIcon } from "./lib/icons.js";
-import { SPRING_SNAP , DUR} from "./lib/animation.js";
+import { SPRING_SNAP, DUR, contentIn } from "./lib/animation.js";
+import { SkeletonCircle, SkeletonLine, SkeletonStat } from "./skeleton.js";
 
 interface MetricPillProps {
   icon: LucideIcon;
@@ -120,7 +121,7 @@ export function GlanceStrip({ items, className }: { items: { icon: LucideIcon; t
     console.warn("GlanceStrip: 1 item. A strip is a comparison — one value is a `Row`. (UI-LANGUAGE §1)");
   }
   return (
-    <div className={cn("flex items-stretch divide-x divide-border/50", className)}>
+    <motion.div variants={contentIn} className={cn("flex items-stretch divide-x divide-border/50", className)}>
       {items.map((it, i) => (
         <div key={i} className="flex flex-1 flex-col items-center gap-1.5 px-2 text-center">
           <it.icon className="size-4 shrink-0" style={{ color: toneVar[it.tone] }} />
@@ -128,6 +129,21 @@ export function GlanceStrip({ items, className }: { items: { icon: LucideIcon; t
             ? <NoData className="text-caption leading-none">Not yet</NoData>
             : <span className="numeral text-title-2 leading-none">{it.value}</span>}
           <span className="text-caption font-medium leading-tight text-muted-foreground">{it.label}</span>
+        </div>
+      ))}
+    </motion.div>
+  );
+}
+
+/** The same divided strip, the same numeral height, waiting. */
+GlanceStrip.Skeleton = function GlanceStripSkeleton({ count = 3, className }: { count?: number; className?: string }) {
+  return (
+    <div className={cn("flex items-stretch divide-x divide-border/50", className)}>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="flex flex-1 flex-col items-center gap-1.5 px-2">
+          <SkeletonCircle size={16} />
+          <SkeletonLine w="2.5rem" h="title" />
+          <SkeletonLine w="3.5rem" h="xs" />
         </div>
       ))}
     </div>
@@ -205,19 +221,24 @@ export function StatCard({ label, value, emptyText, unit, badge, chart, icon: Ic
   );
   if (stack) {
     return (
-      <Comp onClick={onClick} whileTap={onClick ? { scale: 0.99 } : undefined} className={cn("flex w-full flex-col gap-3 rounded-2xl bg-card p-4 text-left", className)}>
+      <Comp variants={contentIn} onClick={onClick} whileTap={onClick ? { scale: 0.99 } : undefined} className={cn("flex w-full flex-col gap-3 rounded-2xl bg-card p-4 text-left", className)}>
         {head}
         {chart && <div className="w-full overflow-hidden">{chart}</div>}
       </Comp>
     );
   }
   return (
-    <Comp onClick={onClick} whileTap={onClick ? { scale: 0.99 } : undefined} className={cn("flex w-full items-center justify-between gap-4 rounded-2xl bg-card p-5 text-left", className)}>
+    <Comp variants={contentIn} onClick={onClick} whileTap={onClick ? { scale: 0.99 } : undefined} className={cn("flex w-full items-center justify-between gap-4 rounded-2xl bg-card p-5 text-left", className)}>
       {head}
       {chart && <div className="shrink-0">{chart}</div>}
     </Comp>
   );
 }
+
+/** Label, numeral and badge at their real sizes. */
+StatCard.Skeleton = function StatCardSkeleton({ stack = true, foot, className }: { stack?: boolean; foot?: boolean; className?: string }) {
+  return <SkeletonStat stack={stack} foot={foot} className={className} />;
+};
 
 // ── Metric coding: consistent chip + macro breakdown ────────────────────────
 

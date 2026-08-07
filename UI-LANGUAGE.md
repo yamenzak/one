@@ -699,15 +699,33 @@ This is the table, and anything not in it is on the general-purpose `settle`.
 | Component | Tier | Entrance | Skeleton |
 |---|---|---|---|
 | `Atmosphere` | T0 | `atmosphereIn` | — |
-| `Anchor`, `Hero` | T1 | `anchorIn` | `SkeletonHero` |
-| `PageHeader` | T1 | `contentIn` | `SkeletonHeader` |
-| `Section`, `Card`, `Tile` | T3 | `contentIn` (inside `contentStagger`) | matches the body |
-| `Row` | T3 | `rowIn` inside `rowStagger` | `SkeletonRow` |
-| `Collection` | T3 | `rowStagger` | `SkeletonList` |
-| `StatCard`, `GlanceStrip` | T3 | `contentIn` | `SkeletonStat` / `SkeletonStatGrid` |
+| `Anchor` | T1 | `anchorIn` | `Anchor.Skeleton` |
+| `Hero` | T1 | `anchorIn` | `Hero.Skeleton` |
+| `PageHeader` | T1 | `contentIn` | `PageHeader.Skeleton` |
+| `Section` | T3 | `contentIn` | `Section.Skeleton` |
+| `Group` | T3 | `rowStagger` | `Group.Skeleton` |
+| `Row` | T3 | `rowIn` | `Row.Skeleton` |
+| `Tile` | T3 | `rowIn` | — the grid's |
+| `TileGrid` | T3 | `rowStagger` | `TileGrid.Skeleton` |
+| `Collection` | T3 | `rowStagger` list · `contentStagger` grid | `Collection.Skeleton` |
+| `StatCard` | T3 | `contentIn` | `StatCard.Skeleton` |
+| `GlanceStrip` | T3 | `contentIn` | `GlanceStrip.Skeleton` |
 | charts | T3 | `contentIn` | `SkeletonChart` |
 | `AppBar`, `BottomTabs`, `NavRail`, `NavSidebar` | T4 | `chromeIn` | never — chrome does not load |
 | sheets, dialogs | overlay | `sheetTransition` / `dialogVariants` | — |
+
+**`Card` is not in this table, and that is the rule.** A card has no entrance of
+its own — whatever wraps it hands it one, which is §9 rule 7 again: a component
+never decides its own importance, its container does. The same card enters as a
+block inside a `Section` and as a row inside a `Collection`'s list, and it is
+the container that knows which.
+
+**An orchestrator is required, and it is the shell's job.** These variants are
+inert on their own: a component declares `contentIn` and an ANCESTOR hands it
+the label `"show"`. `Page` does that for the phone-first shell and
+`DashboardShell`'s content panel does it for the desk shell. A shell that
+forgets renders every screen correct and motionless — which is exactly what
+happened, for months, to every dashboard app.
 
 **Chrome never has a skeleton.** It is not waiting for data; it is the frame the
 data arrives into. A shimmering nav rail says the app is broken.

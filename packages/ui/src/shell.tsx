@@ -47,11 +47,11 @@ export function AppBar({ leading, title, trailing, bare, scrolled }: { leading?:
   return (
     // `--app-bar-h` rather than the literal, so a shell can set `--chrome-top`
     // from the bar's height instead of re-typing it (tokens.css).
-    <header className={cn("sticky top-0 z-30 flex h-[var(--app-bar-h)] items-center justify-between gap-3 px-4 pt-[env(safe-area-inset-top)]", !bare && "border-b border-border/40 bg-background/80 backdrop-blur-xl")}>
+    <motion.header initial="hidden" animate="show" variants={chromeIn} className={cn("sticky top-0 z-30 flex h-[var(--app-bar-h)] items-center justify-between gap-3 px-4 pt-[env(safe-area-inset-top)]", !bare && "border-b border-border/40 bg-background/80 backdrop-blur-xl")}>
       <div className={cn(cluster, "min-w-0 gap-2")}>{leading}</div>
       {title && <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-body-lg">{title}</div>}
       <div className={cn(cluster, "gap-1.5")}>{trailing}</div>
-    </header>
+    </motion.header>
   );
 }
 
