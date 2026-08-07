@@ -159,7 +159,7 @@ export function BillingPage() {
           <SectionHeader title="Current plan" className="mb-4" />
           <div className="flex items-baseline gap-2.5">
             <span className="text-title-2 font-semibold tracking-tight">{plan?.name ?? sub.plan_id}</span>
-            <span className="font-mono text-body tabular-nums text-muted-foreground">
+            <span className="numeral text-body text-muted-foreground">
               {plan ? (plan.price_cents === 0 ? "Free" : `${dollars(plan.price_cents)}/${plan.interval}`) : ""}
             </span>
           </div>
@@ -173,11 +173,11 @@ export function BillingPage() {
             </div>
             <div>
               <div className="text-caption text-muted-foreground">Monthly grant</div>
-              <div className="mt-1 font-mono font-medium tabular-nums">{grant ? num(grant) : "—"}</div>
+              <div className="mt-1 numeral font-medium">{grant ? num(grant) : <NoData>No monthly grant</NoData>}</div>
             </div>
             <div>
               <div className="text-caption text-muted-foreground">Renews</div>
-              <div className="mt-1 font-mono font-medium tabular-nums">{sub.current_period_end ? fmtDate(sub.current_period_end) : "—"}</div>
+              <div className="mt-1 numeral font-medium">{sub.current_period_end ? fmtDate(sub.current_period_end) : <NoData>Does not renew</NoData>}</div>
             </div>
           </div>
         </Card>
@@ -294,7 +294,7 @@ export function BillingPage() {
           </div>
           {packs.map((pk) => (
             <div key={pk.id} className="flex flex-col items-center rounded-xl border p-4 text-center">
-              <div className="font-mono text-title-3 font-semibold tabular-nums">{num(pk.credits)}</div>
+              <div className="numeral text-title-3 font-semibold">{num(pk.credits)}</div>
               <div className="mb-3 text-caption text-muted-foreground">credits</div>
               <Button variant="outline" size="sm" className="w-full" disabled={busy === pk.id} onClick={() => purchase(pk.id)}>
                 {dollars(pk.price_cents)}

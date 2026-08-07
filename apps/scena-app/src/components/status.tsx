@@ -84,7 +84,7 @@ export function StatTile({
         {dot}
         {label}
       </div>
-      <div className={cn("mt-1.5 font-mono text-title-2 font-semibold tabular-nums", valueClassName)}>{value}</div>
+      <div className={cn("numeral mt-1.5 text-title-2 font-semibold", valueClassName)}>{value}</div>
     </Card>
   );
 }

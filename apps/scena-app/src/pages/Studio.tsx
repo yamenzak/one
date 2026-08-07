@@ -473,7 +473,7 @@ export function StudioPage({ mode = "screen" }: { mode?: "screen" | "display" })
                       <div className="truncate text-caption font-medium">{t.title}</div>
                       {t.artist && <div className="truncate text-caption text-muted-foreground">{t.artist}</div>}
                     </div>
-                    <span className="shrink-0 font-mono text-caption tabular-nums text-muted-foreground">{fmtDur(t.duration_ms)}</span>
+                    <span className="numeral shrink-0 text-caption text-muted-foreground">{fmtDur(t.duration_ms)}</span>
                     {writable && (
                       <button
                         onClick={() => removeTrack(t.id)}

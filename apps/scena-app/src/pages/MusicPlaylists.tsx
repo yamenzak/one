@@ -1069,7 +1069,7 @@ function PublicLibraryDialog({
                         <div className="truncate text-body font-medium">{t.title}</div>
                         <div className="truncate text-caption text-muted-foreground">{[t.artist || "Unknown", t.genre, t.vocal].filter(Boolean).join(" · ")}</div>
                       </div>
-                      <span className="shrink-0 font-mono text-caption tabular-nums text-muted-foreground">{mmss(t.duration_ms)}</span>
+                      <span className="numeral shrink-0 text-caption text-muted-foreground">{mmss(t.duration_ms)}</span>
                     </button>
                   );
                 })
