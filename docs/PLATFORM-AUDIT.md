@@ -45,7 +45,7 @@ Eight instances, all found by the same lens:
 |---|---|---|---|
 | 1 | `otpSendGuard` (`@4dl/auth`) | **Kova only** | Tessa & Scena's sign-in has no bot check, no per-IP ceiling, no 30s cooldown, no eligibility check — and tells a user "we sent you a code" when mail is unconfigured |
 | 2 | `Turnstile` widget (`@4dl/app-kit`) | **Kova only** | The bot check is configurable in three consoles, from a **shared** key, and enforced in one app |
-| 3 | `NotificationBell` + `InboxScreen` (`@4dl/app-kit`) | Kova, Tessa | Scena dispatches 13 kinds of notification that nobody can see |
+| 3 | `NotificationBell` + `InboxScreen` (`@4dl/app-kit`) | Kova, Tessa | Scena dispatches 13 kinds of notification that nobody can see — ✅ **closed 2026-08-08**, and mounting it found five dead links |
 | 4 | `MaintenanceBanner` (`@4dl/app-kit`) + a maintenance screen | **Kova only** | An operator closing the deployment gets silent write failures in two of three apps |
 | 5 | The `gate` on `/api/host` | Kova, Tessa (partly) | Scena's SPA re-declares `HostInfo` **without** `gate` or `maintenance` — the exact mistake the route's own comment warns about, on the client side of the wire |
 | 6 | `sharedPanelViolations` (`@4dl/admin/conformance`) | Kova, Tessa | Scena has 2 live violations and no test that would say so |
@@ -222,7 +222,25 @@ which are two product-shaped columns in the package that owns addressing.
 
 ## Tier 1 — capabilities that are wired up and unreachable
 
-### Scena's inbox: complete on the server, invisible in the browser
+### Scena's inbox: complete on the server, invisible in the browser — ✅ FIXED
+
+> **Closed 2026-08-08.** `apps/scena-app/src/Notifications.tsx` mounts the bell
+> and `/inbox`. Mounting it found what only a rendered notification could:
+> **five of the registry's links were dead** — four types pointed at `/screens`,
+> which is not a route (the fleet list is `/`), and one at `/sources`, whose
+> route is `/feeds`. An integration test was asserting `/screens`, so it was
+> pinning the bug and passed for as long as nothing rendered a notification.
+>
+> The first draft of the icon map was wrong in the same direction: three keys
+> named types that do not exist and three real types had no entry, all of which
+> fall back to a generic bell without erroring.
+> `notifications.conformance.test.ts` checks all three edges — every type is
+> coded, no coding is an orphan, every link is a real route — and is
+> mutation-tested. It is the assertion that generalises; the integration test
+> keeps the narrower claim it can own.
+
+The section below is the finding as it was found.
+
 
 ```
 grep -rc "notifyUser\|notifyRole\|dispatchNotification" apps/scena/src   # 13 dispatch sites

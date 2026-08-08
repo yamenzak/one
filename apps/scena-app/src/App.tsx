@@ -11,6 +11,8 @@ import { Shell } from "./Shell.js";
 import { RoleProvider } from "./permissions.js";
 import { EntitlementsProvider } from "./entitlements.js";
 import { clearEmergency, getActiveEmergency, getMe, getBilling, getBranding, setUnauthorizedHandler, type ActiveEmergency, type Me, type BillingState } from "./api.js";
+import { setUnauthorizedHandler as setKitUnauthorizedHandler } from "@4dl/app-kit";
+import { InboxPage } from "./Notifications.js";
 import { clearBrandTheme, type WorkspaceBrand } from "./brand-theme.js";
 import { EmergencyModal } from "./components/EmergencyModal.js";
 import { canAccessKey, PAGE_META } from "./nav.js";
@@ -122,7 +124,20 @@ export function App() {
   */
   useEffect(() => {
     setUnauthorizedHandler(() => { void reloadMe(); });
-    return () => setUnauthorizedHandler(null);
+    /*
+      BOTH FETCH LAYERS, because this app now has two.
+
+      Everything the SPA writes goes through `apiFetch`; the inbox's socket and
+      list go through `@4dl/app-kit`'s own `api`, inside the package. They keep
+      separate handlers, so arming only one leaves a whole surface where an
+      expired session reads as an empty inbox rather than as signed out — which
+      is the exact failure `apiFetch` was introduced to end.
+    */
+    setKitUnauthorizedHandler(() => { void reloadMe(); });
+    return () => {
+      setUnauthorizedHandler(null);
+      setKitUnauthorizedHandler(null);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once; reloadMe is stable enough (it only closes over setState)
   }, []);
   useEffect(() => {
@@ -425,6 +440,10 @@ export function App() {
               </Route>
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/alerts" element={<AlertsPageComp />} />
+              {/* The inbox, behind the bell's "See all". Not in the nav: a
+                  notification is something you are told, not a destination you
+                  visit — the bell is the entry point and this is its overflow. */}
+              <Route path="/inbox" element={<InboxPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/settings" element={<WorkspaceSettingsPage />} />
               <Route path="/team" element={<TeamPage />} />

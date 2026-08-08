@@ -56,6 +56,7 @@ import {
   Image as ImageIcon, MonitorSpeaker, Tv, Layers, LayoutDashboard, BarChart3,
 } from "lucide-react";
 import { adminUrl } from "@4dl/app-kit";
+import { NotificationBell } from "./Notifications.js";
 import { ScenaIcon } from "./brand.js";
 import { useTheme } from "./theme.js";
 import { LegalDialog, type LegalDoc } from "./legal/content.js";
@@ -223,6 +224,13 @@ export function Shell({
                 widths by itself.
               */}
               <ShellActions actions={chrome.actions} />
+              {/*
+                THE BELL, which this app dispatched to for three stages without
+                ever showing anybody. Left of the avatar, as in every other 4DL
+                app — a notification is about the workspace, the avatar menu is
+                about you.
+              */}
+              <NotificationBell />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button

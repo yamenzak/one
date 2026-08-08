@@ -1198,7 +1198,19 @@ describe("the inbox", () => {
     expect(notifications[0]!.type).toBe("screen_offline");
     // Named, not an opaque id — the whole point of the join.
     expect(notifications[0]!.title).toContain("Lobby panel");
-    expect(notifications[0]!.link).toBe("/screens");
+    /*
+      ⚠️ This asserted `/screens`, which is not a route — the fleet list is `/`,
+      and `/screens/:id` is one screen's detail. The test was pinning the bug: it
+      passed for as long as nothing rendered a notification, and the moment the
+      bell landed, tapping "a screen went offline" would have dropped somebody on
+      the SPA's catch-all.
+
+      The dashboard's `notifications.conformance.test.ts` now checks every link
+      in the registry against the real route table, which is the assertion that
+      generalises. This one keeps a narrower claim it can actually own: the
+      notification arrives WITH a destination.
+    */
+    expect(notifications[0]!.link).toBe("/");
   });
 
   it("marks one read, and then all", async () => {

@@ -1106,19 +1106,27 @@ was removed. `apps/scena-app/src/pages/AdminDoor.tsx` is the door;
 `pages/Admin.tsx` is now panels only. The sidebar's Admin item is a full page
 load to the other origin, because that is the console's only address.
 
-⚠️ **The inbox has a server but STILL no BELL — and this is now the oldest
-open gap in Scena, not a scheduled one.** `@4dl/notify` is wired end-to-end:
-schema, `InboxDO` (migration `v5`, class name permanent), the four routes, the
-registry in `notifications.ts`, dispatch from screen alerts, the dunning ladder
-and the emergency takeover. What is missing is the SURFACE — `NotificationBell`
-and `InboxScreen` are `@4dl/app-kit`'s and are mounted in Kova and Tessa but not
-here, so a Scena notification is reachable only at `GET /api/notifications` and
-nobody sees one.
+**The inbox is COMPLETE now, bell included** (2026-08-08). `@4dl/notify` was
+wired end-to-end for three stages — schema, `InboxDO` (migration `v5`, class
+name permanent), the four routes, the registry in `notifications.ts`, and
+sixteen dispatch sites — with no SURFACE, so a Scena notification was reachable
+at `GET /api/notifications` and nowhere a person would look. This note used to
+say the bell "lands with the Stage 7 UI rewrite"; Stage 7 shipped and it did
+not, and the sentence then became a reason not to look.
 
-This note used to say the bell "lands with the Stage 7 UI rewrite". Stage 7
-shipped and it did not, so the sentence became a reason not to look. It is a
-mount plus an `onOpen` handler (the kit is router-free on purpose and hands the
-notification back), and it is the whole job.
+`apps/scena-app/src/Notifications.tsx` is the binding (bell + `/inbox`), and
+mounting it found **five dead links**: four types pointed at `/screens`, which
+is not a route (the fleet list is `/`), and one at `/sources`, whose route is
+`/feeds`. An integration test was asserting `/screens` — it was pinning the bug,
+and it passed for as long as nothing rendered a notification.
+
+⚠️ `notifications.conformance.test.ts` in the dashboard is what stops all of
+that recurring, and it checks three things a runtime never will: every
+dispatched type has an icon and tone (a missing one renders as an anonymous
+bell), no coding survives a renamed type, and **every `link` in the registry
+matches a real route**. All three are mutation-tested. It reads the worker's
+registry as SOURCE rather than importing it — `apps/scena/src` is outside the
+SPA's `rootDir`.
 
 **ONE thing is still Scena's, and the plan names it so nobody "fixes" it
 casually: the billing STORE (`BILLING_SCHEMA`).** Its `plans`, `subscriptions`,
