@@ -1082,12 +1082,19 @@ was removed. `apps/scena-app/src/pages/AdminDoor.tsx` is the door;
 `pages/Admin.tsx` is now panels only. The sidebar's Admin item is a full page
 load to the other origin, because that is the console's only address.
 
-⚠️ **The inbox has a server but no BELL yet.** `@4dl/notify` is wired
-end-to-end — schema, `InboxDO` (migration `v5`, class name permanent), the four
-routes, the registry in `notifications.ts`, dispatch from screen alerts, the
-dunning ladder and the emergency takeover — but `NotificationBell` and
-`InboxScreen` are `@4dl/app-kit`'s and land with the Stage 7 UI rewrite. Until
-then a notification is reachable only at `GET /api/notifications`.
+⚠️ **The inbox has a server but STILL no BELL — and this is now the oldest
+open gap in Scena, not a scheduled one.** `@4dl/notify` is wired end-to-end:
+schema, `InboxDO` (migration `v5`, class name permanent), the four routes, the
+registry in `notifications.ts`, dispatch from screen alerts, the dunning ladder
+and the emergency takeover. What is missing is the SURFACE — `NotificationBell`
+and `InboxScreen` are `@4dl/app-kit`'s and are mounted in Kova and Tessa but not
+here, so a Scena notification is reachable only at `GET /api/notifications` and
+nobody sees one.
+
+This note used to say the bell "lands with the Stage 7 UI rewrite". Stage 7
+shipped and it did not, so the sentence became a reason not to look. It is a
+mount plus an `onOpen` handler (the kit is router-free on purpose and hands the
+notification back), and it is the whole job.
 
 **ONE thing is still Scena's, and the plan names it so nobody "fixes" it
 casually: the billing STORE (`BILLING_SCHEMA`).** Its `plans`, `subscriptions`,
