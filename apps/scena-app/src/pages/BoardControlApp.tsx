@@ -29,7 +29,7 @@ import {
 } from "../api.js";
 import { signOut } from "../auth-client.js";
 import { applyBrandTheme } from "../brand-theme.js";
-import { useForcedDark } from "../theme.js";
+import { useForcedDark } from "@4dl/app-kit";
 import type { QueueState, RoomState, ScoreState } from "@scena/protocol";
 import { QueueControls, RoomControls } from "./Station.js";
 

@@ -130,7 +130,8 @@ export function Shell({
 }) {
   const nav = useNavigate();
   const loc = useLocation();
-  const { isDark, toggle } = useTheme();
+  const { mode, toggleMode } = useTheme();
+  const isDark = mode === "dark";
   const [legalDoc, setLegalDoc] = useState<LegalDoc | null>(null);
   const chrome = useChrome();
   const current = destinationFor(loc.pathname);
@@ -269,7 +270,7 @@ export function Shell({
                     <Siren className={cn("size-4", emergencyActive && "text-destructive")} />
                     {emergencyActive ? "Clear takeover" : "Screen takeover"}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={toggle}>
+                  <DropdownMenuItem onSelect={toggleMode}>
                     {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />} {isDark ? "Light mode" : "Dark mode"}
                   </DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => setLegalDoc("terms")}><Scale className="size-4" /> Terms &amp; privacy</DropdownMenuItem>

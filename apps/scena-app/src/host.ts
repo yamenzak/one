@@ -17,7 +17,7 @@
 import { useEffect, useState } from "react";
 import { appStorage, readBootBrand, writeBootBrand } from "@4dl/app-kit";
 import { API_BASE } from "./api.js";
-import { applyBrandTheme, clearBrandTheme, type WorkspaceBrand } from "./brand-theme.js";
+import { applyBrandTheme, type WorkspaceBrand } from "./brand-theme.js";
 
 /** The five doors `@4dl/tenancy` classifies into, plus the device door. */
 export type DoorRole = "root" | "setup" | "admin" | "device" | "tenant" | "custom";
@@ -57,10 +57,21 @@ export interface HostInfo {
 */
 const brandStore = appStorage("scena");
 
+/**
+ * This hostname's brand as of the last visit — read at MODULE LOAD.
+ *
+ * Both halves have to happen this early. The read has to precede the first
+ * render so `ThemeProvider` can be handed something rather than `null` (which it
+ * would apply, clearing the paint below). The `applyBrandTheme` has to precede
+ * the first PAINT, and an effect runs after it — which would put the flash back,
+ * one frame shorter.
+ */
+export const bootBrand =
+  typeof localStorage === "undefined" ? null : readBootBrand<WorkspaceBrand>(brandStore, location.hostname);
+
 /** Paint the remembered brand for this hostname. Called once, before render. */
 export function applyBootBrand(): void {
-  const cached = readBootBrand<WorkspaceBrand>(brandStore, location.hostname);
-  if (cached?.branding) applyBrandTheme(cached.branding);
+  if (bootBrand?.branding) applyBrandTheme(bootBrand.branding);
 }
 
 /**
@@ -90,12 +101,19 @@ export function useHost(): HostInfo | null {
       .then((h) => {
         if (!live || !h) return;
         setHost(h);
+        /*
+          REMEMBER, do not apply. `ThemeProvider` owns the paint now — App hands
+          it `host.tenant.branding` and it applies on change, which is also what
+          makes a door with no workspace CLEAR the style elements rather than
+          leave the previous workspace's colours up.
+
+          The write still happens here, because this is where the server's answer
+          arrives. A door with no workspace behind it stores `null` rather than
+          skipping: skipping would leave the last workspace's colours in the cache
+          and the next boot on that hostname would paint them, which looks
+          deliberate and is worse than the flash it replaces.
+        */
         const branding = h.tenant?.branding ?? null;
-        if (branding) applyBrandTheme(branding);
-        // A door with no workspace behind it forgets, rather than skipping —
-        // see the note on `applyBootBrand`. `clearBrandTheme` undoes a stale
-        // cache we may already have painted this boot.
-        else if (h.tenant === null) clearBrandTheme();
         writeBootBrand<WorkspaceBrand>(
           brandStore,
           h.tenant ? { host: location.hostname, name: h.tenant.name, branding } : null,

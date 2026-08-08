@@ -34,9 +34,23 @@
 
 import { applyBranding, configureTheme, type Branding } from "@4dl/ui";
 import { widgetTokens, widgetTokensCss, deriveTokens, THEME_TOKENS, type ThemeMaps } from "@scena/manifest";
-import { THEME_STORAGE_KEY } from "./theme.js";
 
 export { deriveTokens, THEME_TOKENS, type ThemeMaps };
+
+/**
+ * Where a person's light / dark / follow-system choice lives.
+ *
+ * Declared HERE, in the leaf, and imported by `theme.tsx` — not the other way
+ * round. `theme.tsx` imports `applyBrandTheme` from this file to hand to the
+ * shared provider, so the constant living there made a module cycle whose
+ * failure mode is a `configureTheme` call reading `undefined` depending on
+ * evaluation order: the app would boot with the design system's default key and
+ * silently lose everybody's stored preference.
+ *
+ * Load-bearing beyond that: it is the one thing a preference survives a sign-out
+ * in, so renaming it after launch resets every device.
+ */
+export const THEME_STORAGE_KEY = "scena.theme";
 
 /**
  * The stored kit: `@4dl/ui`'s `Branding` plus Scena's own four fields.
@@ -58,6 +72,18 @@ export interface BrandLogoRef {
   url: string;
   mime?: string;
 }
+
+/**
+ * What the applier accepts: the platform's `Branding`, with Scena's four fields
+ * optional.
+ *
+ * Wider than `WorkspaceBrand` because `ThemeProvider`'s `applyBrand` seam is
+ * typed on the SHARED shape — it has no way to know about `bodyFont` — so the
+ * boot brand from `/api/host` arrives as a plain `Branding`. Optional rather than
+ * required is also the honest reading: a workspace that never picked a font has
+ * no font, and the fallbacks below are the answer.
+ */
+export type BrandLike = Branding & Partial<Pick<WorkspaceBrand, "brandName" | "headingFont" | "bodyFont" | "logos">>;
 
 /** The shape a brand-less caller can still hand to `applyBrandTheme`. */
 export const EMPTY_BRAND: WorkspaceBrand = {
@@ -94,16 +120,16 @@ const EXTRAS_ID = "scena-brand-extras";
  * `manifestBrand`, and for the same reason: one radius, two units, converted at
  * the boundary rather than stored twice.
  */
-function forManifest(brand: WorkspaceBrand): { theme: ThemeMaps; radius: number; bodyFont: string } {
+function forManifest(brand: BrandLike): { theme: ThemeMaps; radius: number; bodyFont: string } {
   return {
     theme: { light: brand.tokens?.light ?? {}, dark: brand.tokens?.dark ?? {} },
     radius: Math.round((brand.radius ?? 1) * 16),
-    bodyFont: brand.bodyFont,
+    bodyFont: brand.bodyFont ?? "",
   };
 }
 
 /** Scena's own half of the stylesheet: the fonts and the widget theme. */
-export function brandExtrasCss(brand: WorkspaceBrand): string {
+export function brandExtrasCss(brand: BrandLike): string {
   const root: string[] = [];
   // A font name lands inside a CSS string literal, so anything that could close
   // it or the rule is dropped rather than escaped — the picker only ever offers
@@ -122,8 +148,12 @@ export function brandExtrasCss(brand: WorkspaceBrand): string {
 }
 
 /** Inject (or refresh) the brand — the platform's half and Scena's. */
-export function applyBrandTheme(brand: WorkspaceBrand): void {
+export function applyBrandTheme(brand: BrandLike | null): void {
   if (typeof document === "undefined") return;
+  // `null` is a real state — the sign-in screen, and a door with no workspace
+  // behind it. Both style elements go, so the shipped default shows through
+  // rather than the last workspace's colours.
+  if (!brand) return clearBrandTheme();
   applyBranding(brand);
   let el = document.getElementById(EXTRAS_ID) as HTMLStyleElement | null;
   if (!el) {

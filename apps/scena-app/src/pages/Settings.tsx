@@ -27,10 +27,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { FONT_FAMILIES, DEFAULT_TOKENS } from "@scena/manifest";
-import { Sparkles, Palette, MonitorPlay, Mail, ImagePlus, Trash2, Loader2, Type, DoorOpen } from "lucide-react";
+import { Sparkles, Palette, MonitorPlay, Mail, ImagePlus, Trash2, Loader2, Type, DoorOpen, Sun } from "lucide-react";
 import { BrandingEditor, Card, PageHeader, Select, SettingsIndex, SettingsPage as SectionFrame, SkeletonLine, Stagger, toast, useConfirmedState, type SettingsEntry, usePageChrome } from "@4dl/ui";
 import { Avatar, Badge, Button, Input, KeyRound, Label, Separator, Skeleton, Switch } from "@4dl/ui";
-import { AccountExitRows, CloseTenantCard, PasskeysCard } from "@4dl/app-kit";
+import { AccountExitRows, AppearancePicker, CloseTenantCard, PasskeysCard, useAppearanceSummary } from "@4dl/app-kit";
 import { signOut } from "../auth-client.js";
 import { useCan } from "../permissions.js";
 import { useFeature } from "../entitlements.js";
@@ -126,6 +126,8 @@ export function WorkspaceSettingsPage() {
     beat late is invisible; it appearing and then vanishing would not be.
   */
   const isOwner = me?.role === "owner";
+  // The mode is a DEVICE preference, so it saves nothing and the section says so.
+  const appearance = useAppearanceSummary();
   const [models, setModels] = useState<AiModel[] | null>(null);
 
   /*
@@ -268,6 +270,23 @@ export function WorkspaceSettingsPage() {
       onClick: () => open("security"),
     },
     /*
+      APPEARANCE — the third mode state, reachable.
+
+      It has been a one-press toggle in the account menu, which can express two
+      of the three: pressing it always lands on an explicit light or dark, so
+      "follow my system" was a state a person could START in and never return to.
+      A three-way choice needs a place to be read as well as set, and that place
+      is settings.
+    */
+    appearance: {
+      key: "appearance",
+      icon: Sun,
+      tone: "warning",
+      label: "Appearance",
+      sub: appearance,
+      onClick: () => open("appearance"),
+    },
+    /*
       CLOSING THE WORKSPACE — owner only, and it did not exist.
 
       `route-guard.ts` has said since it was written that "paying must be A way
@@ -326,7 +345,7 @@ export function WorkspaceSettingsPage() {
               // from the route, which is a worse way to learn it is not theirs.
               rows: isOwner ? [rows.brand!, rows.playback!, rows.ai!, rows.danger!] : [rows.brand!, rows.playback!, rows.ai!],
             },
-            { header: "You", rows: [rows.signin!, rows.security!] },
+            { header: "You", rows: [rows.signin!, rows.security!, rows.appearance!] },
           ]}
         />
         {/*
@@ -481,6 +500,16 @@ export function WorkspaceSettingsPage() {
               </p>
             )}
           </Card>
+        </SectionFrame>
+      )}
+
+      {section === "appearance" && (
+        <SectionFrame
+          title="Appearance"
+          description="Per device, not per workspace — your colleagues keep their own. Nothing to save."
+          onBack={back}
+        >
+          <Card><AppearancePicker /></Card>
         </SectionFrame>
       )}
 

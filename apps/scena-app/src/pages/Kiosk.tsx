@@ -17,7 +17,7 @@ import { Loader2, Printer, Ticket, ArrowRight, Users } from "lucide-react";
 import { Button } from "@4dl/ui";
 import { getBoardLive, issueTicket, type Board } from "../api.js";
 import { applyBrandTheme } from "../brand-theme.js";
-import { useForcedDark } from "../theme.js";
+import { useForcedDark } from "@4dl/app-kit";
 import type { QueueState } from "@scena/protocol";
 
 interface Issued { prefix: string; number: number; label: string | null; ahead: number }

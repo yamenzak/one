@@ -9,7 +9,23 @@
 
 import type { MarkStyle } from "./mark.js";
 
+/**
+ * The mode actually being PAINTED. Always one of two, because every consumer
+ * needs a concrete side: `tokens[mode]`, `brandMark(b, mode)`, the theme-color
+ * meta. "Follow the system" is not a colour and cannot appear here.
+ */
 export type ThemeMode = "dark" | "light";
+
+/**
+ * What the user CHOSE, which is a different question — a person can ask for
+ * light, for dark, or to be left alone and tracked.
+ *
+ * Scena had this third state and the platform did not, so Scena carried its own
+ * theme module: ~70 lines duplicating `applyMode` in order to add one option.
+ * Two implementations of "which palette is showing" is how one of them comes to
+ * be wrong, and one of them WAS — see SCENA.md §13.
+ */
+export type ThemeChoice = ThemeMode | "system";
 
 export interface BrandPreset {
   id: string;
@@ -489,9 +505,24 @@ export interface ThemeNames {
   storageKey: string;
   /** `id` of the injected `<style>` element carrying tenant branding. */
   styleId: string;
+  /**
+   * What "the user has never chosen" means for this product.
+   *
+   * ⚠️ INJECTED RATHER THAN DECIDED HERE, because the two answers were already
+   * shipped and both are defensible. Kova and Tessa fell back to the tenant's
+   * `defaultMode` and then to dark, so a user on a light OS got a dark app until
+   * they said otherwise. Scena followed the OS. Picking one for everybody would
+   * have silently reskinned a live product on upgrade — which is a worse thing
+   * to do than carry a parameter.
+   *
+   * `"system"` still yields to a tenant's `defaultMode` when one is set: a studio
+   * that chose how it looks has made a decision about its own brand, and the OS
+   * is not a party to that.
+   */
+  defaultChoice: ThemeChoice;
 }
 
-let names: ThemeNames = { storageKey: "ui-theme", styleId: "ui-branding" };
+let names: ThemeNames = { storageKey: "ui-theme", styleId: "ui-branding", defaultChoice: "dark" };
 
 /** Bind the app's theme names once, before anything renders. */
 export function configureTheme(next: Partial<ThemeNames>): void {
@@ -506,24 +537,140 @@ export function applyBranding(branding: Branding | null | undefined): void {
   el.textContent = brandingCss(branding);
 }
 
-/** Read the user's mode preference (falls back to tenant default, else dark). */
-export function resolveMode(tenantDefault?: ThemeMode | null): ThemeMode {
-  if (typeof localStorage !== "undefined") {
-    const saved = localStorage.getItem(names.storageKey);
-    if (saved === "light" || saved === "dark") return saved;
-  }
-  return tenantDefault ?? "dark";
+/* ────────────────────────── the mode, in three states ──────────────────────── */
+
+/**
+ * What the OS is asking for right now. `false` when the browser will not say —
+ * an old engine, or a server render — which is not the same as "light", so the
+ * caller's own default decides.
+ */
+export function systemPrefersDark(): boolean {
+  return typeof matchMedia !== "undefined" && matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
+/**
+ * Read what the user CHOSE, which is not the same question as what to paint.
+ *
+ * `"system"` is a real, storable choice and not merely the absence of one — that
+ * distinction is the whole reason this exists. Somebody who has been on dark and
+ * then picks "follow my system" is making a decision, and storing it as "nothing
+ * stored" would make it indistinguishable from a fresh install, so a product
+ * whose `defaultChoice` is `"dark"` would quietly ignore it.
+ */
+export function readModeChoice(): ThemeChoice | null {
+  if (typeof localStorage === "undefined") return null;
+  const saved = localStorage.getItem(names.storageKey);
+  return saved === "light" || saved === "dark" || saved === "system" ? saved : null;
+}
+
+/**
+ * What to SHOW as selected when nobody has chosen — the app's `defaultChoice`.
+ *
+ * Separate from `readModeChoice` because "never chosen" and "chose the thing the
+ * app defaults to" are different facts and only one of them is a preference. A
+ * settings picker needs something highlighted either way, which is what this is
+ * for; `resolveChoice` keeps the distinction, because a tenant's `defaultMode`
+ * beats an app's floor and must not beat a person's choice.
+ */
+export function displayedModeChoice(): ThemeChoice {
+  return readModeChoice() ?? names.defaultChoice;
+}
+
+/** Persist a choice. Never throws — private mode has no storage. */
+export function writeModeChoice(choice: ThemeChoice): void {
+  try {
+    localStorage.setItem(names.storageKey, choice);
+  } catch {
+    /* private mode */
+  }
+}
+
+/**
+ * A choice plus the tenant's default → the mode to actually paint.
+ *
+ * ── The order, and why each step is where it is ──────────────────────────────
+ *
+ *  1. AN EXPLICIT light/dark, because the person said so. Nothing outranks that.
+ *  2. THE TENANT'S `defaultMode`. A studio that chose how it looks has decided
+ *     something about its own brand, and the operating system of whoever happens
+ *     to be looking is not a party to that.
+ *  3. THE OS, if the choice was `"system"` or the app's floor is.
+ *  4. Dark, which is what `:root` already holds — so agreeing with it is what
+ *     makes `initMode` invisible rather than a flash.
+ *
+ * ⚠️ STEP 2 SITS ABOVE THE APP'S FLOOR, and getting that wrong is a live
+ * regression rather than a nicety. This used to be `saved ?? tenantDefault ??
+ * "dark"`; folding the app's floor into the "saved" slot made an unset preference
+ * outrank the studio's own default, so every studio that had chosen light would
+ * have gone dark for every user who had never touched the toggle. Caught by
+ * `resolveMode`'s "unchanged for every existing caller" test, which is why that
+ * test exists.
+ */
+export function resolveChoice(choice: ThemeChoice | null, tenantDefault?: ThemeMode | null): ThemeMode {
+  if (choice === "light" || choice === "dark") return choice;
+  if (tenantDefault) return tenantDefault;
+  // `null` means nobody chose, so the app's floor decides — and it is allowed to
+  // BE "system", which is the whole reason it is injected.
+  const effective = choice ?? names.defaultChoice;
+  if (effective === "light" || effective === "dark") return effective;
+  return systemPrefersDark() ? "dark" : "light";
+}
+
+/**
+ * The mode to paint, from storage. Unchanged in name and meaning for every
+ * existing caller — it is `resolveChoice(readModeChoice(), …)`, and with the
+ * default `defaultChoice: "dark"` it returns exactly what it always did.
+ */
+export function resolveMode(tenantDefault?: ThemeMode | null): ThemeMode {
+  return resolveChoice(readModeChoice(), tenantDefault);
+}
+
+/**
+ * Paint a mode. Sets an ATTRIBUTE, never a class — the tokens are dark-first, so
+ * dark is the ABSENCE of `data-theme` and light is `:root[data-theme="light"]`.
+ * A `.dark` class means nothing to any component in this package.
+ *
+ * ⚠️ IT NO LONGER PERSISTS. It used to write the resolved mode to storage, which
+ * made "follow the system" unrepresentable: the first paint under `system`
+ * immediately stored `dark` or `light`, so the choice erased itself on load and
+ * the app stopped following the OS after one render. Persisting is
+ * `writeModeChoice`'s job now, and the caller does it when the USER picks —
+ * which is the only time a preference has actually been expressed.
+ */
 export function applyMode(mode: ThemeMode): void {
   if (typeof document === "undefined") return;
   if (mode === "light") document.documentElement.dataset.theme = "light";
   else delete document.documentElement.dataset.theme;
-  try {
-    localStorage.setItem(names.storageKey, mode);
-  } catch {
-    /* ignore */
-  }
+}
+
+/**
+ * Paint the stored choice BEFORE the first frame. Call at module load.
+ *
+ * `ThemeProvider` also applies the mode, but from an effect — which runs after
+ * the first paint, so a product whose `defaultChoice` is `"system"` on a light OS
+ * flashes the dark palette for one frame on every cold start. Dark-defaulting
+ * apps never saw it, because `:root` already holds dark and the effect agreed
+ * with what was already on screen.
+ *
+ * Idempotent, and safe to call before anything else: it reads storage and sets
+ * one attribute.
+ */
+export function initMode(tenantDefault?: ThemeMode | null): void {
+  applyMode(resolveMode(tenantDefault));
+}
+
+/**
+ * Call `fn` whenever the OS preference changes. Returns an unsubscribe.
+ *
+ * Only meaningful while the choice is `"system"`; the caller is responsible for
+ * not subscribing otherwise, because a listener that fires under an explicit
+ * choice would fight the person who made it.
+ */
+export function watchSystemMode(fn: () => void): () => void {
+  if (typeof matchMedia === "undefined") return () => undefined;
+  const mq = matchMedia("(prefers-color-scheme: dark)");
+  mq.addEventListener("change", fn);
+  return () => mq.removeEventListener("change", fn);
 }
 
 // ── Color conversion (sRGB ⇄ OKLCH) ─────────────────────────────────────────

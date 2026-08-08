@@ -57,6 +57,7 @@ import {
   CreditCard,
   Globe,
   KeyRound,
+  Sun,
   LogIn,
   Palette,
   Trash2,
@@ -66,14 +67,14 @@ import {
   type Branding,
   type SettingsGroup,
 } from "@4dl/ui";
-import { AccountExitRows, CloseTenantCard, PasskeysCard } from "@4dl/app-kit";
+import { AccountExitRows, AppearancePicker, CloseTenantCard, PasskeysCard, useAppearanceSummary } from "@4dl/app-kit";
 import { billing as billingApi, fmt, settings as settingsApi, type AiSettings, type PublicBranding } from "../data.js";
 import { useI18n, useT } from "../i18n.js";
 import { useTheme } from "../theme.js";
 import { useSession } from "../session.js";
 import { StaffSection } from "./Staff.js";
 
-type View = "brand" | "ai" | "plan" | "staff" | "security" | "language" | "danger";
+type View = "brand" | "ai" | "plan" | "staff" | "security" | "language" | "appearance" | "danger";
 
 /**
  * Closing a section POPS the entry that opening it pushed.
@@ -107,6 +108,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
   const load = useCallback(() => settingsApi.read(), []);
   const { data, error, reload } = useLoad(load, t("settings.title"), fmt);
 
+  const appearanceSummary = useAppearanceSummary();
   const isOwner = ctx?.active?.role === "owner";
 
   /* ── the section pages ─────────────────────────────────────────────────── */
@@ -114,6 +116,24 @@ export function Settings({ onBack }: { onBack: () => void }) {
   if (view === "staff") return <Screen><StaffSection onBack={closeSection} /></Screen>;
   if (view === "plan") return <Screen><PlanSection onBack={closeSection} /></Screen>;
   if (view === "language") return <Screen><LanguageSection onBack={closeSection} /></Screen>;
+  /*
+    APPEARANCE — a device preference, beside the LANGUAGE one, which is also per
+    device and also saves nothing. Both belong in "You" for the same reason.
+
+    The picker is `@4dl/app-kit`'s, so this is the same control Kova and Scena
+    show. Its three options are English strings inside the package: the mode
+    names are not Tessa's vocabulary the way "Freigabe" is, and translating them
+    would mean the dictionary owning a shared component's copy.
+  */
+  if (view === "appearance") {
+    return (
+      <Screen>
+        <SettingsPage title={t("settings.appearance")} description={t("settings.appearance.intro")} onBack={closeSection}>
+          <Card className="p-4"><AppearancePicker /></Card>
+        </SettingsPage>
+      </Screen>
+    );
+  }
   if (view === "security") {
     return (
       <Screen>
@@ -201,6 +221,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
       rows: [
         { key: "security", label: t("settings.security"), icon: KeyRound, tone: "primary", sub: t("settings.security.sub"), onClick: () => go("security") },
         { key: "language", label: t("settings.language"), icon: Globe, tone: "neutral", sub: t("settings.language.sub"), onClick: () => go("language") },
+        { key: "appearance", label: t("settings.appearance"), icon: Sun, tone: "warning", sub: appearanceSummary, onClick: () => go("appearance") },
       ],
     },
     // Owner-only, and its own named group. Kova learned this the hard way: an

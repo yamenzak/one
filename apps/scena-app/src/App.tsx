@@ -1,20 +1,20 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router-dom";
 import { Siren, LogOut, Sun, Moon, Scale, Layers, Music, Tv, Rss, Megaphone } from "lucide-react";
 import { ScenaMascot } from "./brand.js";
 import { adminUrl, ErrorBoundary } from "@4dl/app-kit";
-import { useHost } from "./host.js";
+import { bootBrand, useHost } from "./host.js";
 import { AdminDoor } from "./pages/AdminDoor.js";
 import { CollectionPane } from "./components/collection-pane.js";
 import { Shell } from "./Shell.js";
 import { RoleProvider } from "./permissions.js";
 import { EntitlementsProvider } from "./entitlements.js";
 import { clearEmergency, getActiveEmergency, getMe, getBilling, getBranding, setUnauthorizedHandler, type ActiveEmergency, type Me, type BillingState } from "./api.js";
-import { applyBrandTheme, clearBrandTheme } from "./brand-theme.js";
+import { clearBrandTheme, type WorkspaceBrand } from "./brand-theme.js";
 import { EmergencyModal } from "./components/EmergencyModal.js";
 import { canAccessKey, PAGE_META } from "./nav.js";
 import { signOut, authClient } from "./auth-client.js";
-import { useTheme } from "./theme.js";
+import { ThemeProvider } from "./theme.js";
 import { LoginScreen, OrgOnboard } from "./pages/Login.js";
 import { LegalDialog, type LegalDoc } from "./legal/content.js";
 import { BoardControlApp } from "./pages/BoardControlApp.js";
@@ -64,6 +64,16 @@ export function App() {
   const [me, setMe] = useState<Me | null>(null);
   const [meLoaded, setMeLoaded] = useState(false);
   const [billing, setBilling] = useState<BillingState | null>(null);
+  /*
+    THE BRAND, RESOLVED — and `ThemeProvider` applies it, not this component.
+
+    Three sources, most authoritative last: the remembered one for this hostname
+    (already painted at module load, so it seeds the state rather than causing a
+    second paint), the PUBLIC one `/api/host` carries to a pre-auth visitor, and
+    the authenticated read below. Seeding from the boot cache is what stops the
+    provider's first `applyBrand(null)` wiping the paint that beat it there.
+  */
+  const [brand, setBrand] = useState<WorkspaceBrand | null>(bootBrand?.branding ?? null);
   const reloadMe = () => getMe().then(setMe).catch(() => setMe(null)).finally(() => setMeLoaded(true));
 
   // Poll the active override so the header reflects a fleet-wide takeover. A rare
@@ -122,7 +132,7 @@ export function App() {
   */
   useEffect(() => {
     if (!me?.authenticated || !me.tenantId) return;
-    getBranding().then(applyBrandTheme).catch(() => {});
+    getBranding().then(setBrand).catch(() => {});
   }, [me?.authenticated, me?.tenantId]);
 
   // Role-aware sidebar (receptionist → boards only, viewer → read-only, …),
@@ -136,6 +146,20 @@ export function App() {
 
   const active = usePageKey();
   const { pathname } = useLocation();
+
+  /*
+    The PUBLIC brand, for the sign-in screen. It arrives with the door, so it is
+    already correct before anybody has a session — which is the whole reason the
+    kit moved into `tenant_settings.branding_json`. The authenticated read above
+    supersedes it (the host payload is served through the tenancy cache, so a kit
+    saved a moment ago can still be the previous one there), and a door with no
+    workspace resolves to `null`, which the provider applies as "clear".
+  */
+  useEffect(() => {
+    if (!host || brand) return;
+    setBrand(host.tenant?.branding ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seeds once, when the door lands; the authenticated read owns it after that
+  }, [host]);
 
   // The take-a-ticket kiosk is a scoped, public mini-app — full-screen, outside
   // the operator Shell (no sidebar, no account chrome). Board *control* now lives
@@ -165,6 +189,20 @@ export function App() {
     every host but this one, so a console reachable from inside a workspace is a
     console that 404s on every call. `/admin` was exactly that until now.
   */
+  /*
+    THE MODE CONTEXT WRAPS EVERY OUTCOME BELOW.
+
+    `body()` is a plain function, not a component — it holds the door/auth cascade
+    unchanged, and it contains no hooks (`usePageKey` and `useLocation` are called
+    above it), so calling it inline is not a rules-of-hooks violation. The
+    alternative was repeating the provider at each of the eight early returns.
+
+    ⚠️ The KIOSK is deliberately OUTSIDE this, returned before it. It pins itself
+    dark for its whole life (`useForcedDark`), has no account chrome and nothing
+    in it reads the mode — and it is the one surface that must not inherit
+    whatever theme an operator once chose on that tablet.
+  */
+  const body = (): ReactNode => {
   if (!host) return <Splash />;
   if (host.role === "admin") {
     if (!meLoaded) return <Splash />;
@@ -343,6 +381,9 @@ export function App() {
     </EntitlementsProvider>
     </RoleProvider>
   );
+  };
+
+  return <ThemeProvider branding={brand}>{body()}</ThemeProvider>;
 }
 
 /**

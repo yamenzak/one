@@ -61,17 +61,50 @@ describe("the theme is an attribute, not a class", () => {
     expect(offenders.map((f) => f.slice(SRC.length))).toEqual([]);
   });
 
-  it("keeps `useForcedDark` as the way a surface pins itself dark", () => {
-    // If this disappears, the two customer-facing surfaces have gone back to
-    // inheriting the operator's theme — which is what the class used to hide.
-    const theme = readFileSync(join(SRC, "theme.tsx"), "utf8");
-    expect(theme).toContain("export function useForcedDark");
-    expect(theme).toContain('removeAttribute("data-theme")');
+  /*
+    ⚠️ `useForcedDark` LIVES IN `@4dl/app-kit` NOW, not in this app.
 
-    const callers = files.filter((f) => /useForcedDark\(\)/.test(readFileSync(f, "utf8")) && !f.endsWith("theme.tsx"));
+    It is a DOM hook with no product vocabulary — "pin this surface dark while it
+    is mounted" is true of any customer-facing screen — and it moved with the
+    three-state mode model. This test therefore checks the two things that are
+    still Scena's: that the hook is REACHED from the platform, and that exactly
+    the two surfaces which need it call it.
+
+    Asserting on the implementation here would have been the wrong guard anyway:
+    it would pass while both call sites had been deleted, which is the failure
+    that actually happened (a `className="dark"` that did nothing).
+  */
+  it("pins the two customer-facing surfaces dark, through the platform's hook", () => {
+    const callers = files.filter((f) => /useForcedDark\(\)/.test(readFileSync(f, "utf8")));
     expect(callers.map((f) => f.slice(SRC.length)).sort()).toEqual([
       "pages/BoardControlApp.tsx",
       "pages/Kiosk.tsx",
     ]);
+    // …and from the package, not a local re-implementation. A second copy is how
+    // the two drift apart, and this one is four lines — exactly the size that
+    // gets re-typed rather than imported.
+    for (const f of callers) {
+      expect(readFileSync(f, "utf8"), `${f} must import useForcedDark, not define it`).not.toContain("function useForcedDark");
+    }
+    expect(readFileSync(join(SRC, "theme.tsx"), "utf8")).toContain('from "@4dl/app-kit"');
+  });
+
+  /*
+    THE THIRD MODE STATE IS THE PLATFORM'S, and this app must not grow its own
+    again.
+
+    Scena carried ~110 lines of theme module for one feature `@4dl/ui` lacked
+    ("follow the system"), and the cost was not the duplication: it meant Scena
+    could not mount `ThemeProvider` at all, so it silently went without the
+    browser-chrome white-labelling and the theme-color meta the other two apps
+    have. `@4dl/ui` has `ThemeChoice` now. A re-grown local `matchMedia` listener
+    or `localStorage` mode read is the beginning of the same divergence.
+  */
+  it("reads the mode from the platform, not from the browser directly", () => {
+    const offenders = files
+      .map((f) => [f, stripComments(readFileSync(f, "utf8"))] as const)
+      .filter(([, src]) => /prefers-color-scheme/.test(src) || /localStorage\.(get|set)Item\(\s*THEME_STORAGE_KEY/.test(src))
+      .map(([f]) => f.slice(SRC.length));
+    expect(offenders).toEqual([]);
   });
 });

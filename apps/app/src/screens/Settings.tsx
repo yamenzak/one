@@ -29,7 +29,7 @@ import { PreferencesEditorCard } from "./PreferencesEditor.js";
 import { INSIGHT_LABELS, mutedInsights, unmuteInsight } from "./client/InsightFeedback.js";
 import { useTheme } from "../theme.js";
 import { api, errorText, uploadMedia } from "../api.js";
-import { AccountExitRows, CloseTenantCard, PasskeysCard, useUpload } from "@4dl/app-kit";
+import { AccountExitRows, AppearancePicker, CloseTenantCard, PasskeysCard, useAppearanceSummary, useUpload } from "@4dl/app-kit";
 import { usePasskey } from "../PasskeyPrompt.js";
 import { AiConfigSection } from "./AiSettings.js";
 import { SectionSplit } from "./SectionSplit.js";
@@ -227,7 +227,7 @@ export function Settings({ onBack, view = "studio" }: { onBack: () => void; view
  * plumbing, then the two ways out. The old routes still work — each opens the
  * merged surface at its section.
  */
-type PersonalTab = "profile" | "preferences" | "notifications" | "units" | "security";
+type PersonalTab = "profile" | "preferences" | "notifications" | "units" | "appearance" | "security";
 
 function PersonalSettings({ clientId, initialTab, onBack, onSaved }: {
   clientId: string | null;
@@ -240,6 +240,9 @@ function PersonalSettings({ clientId, initialTab, onBack, onSaved }: {
   const closeSection = useCloseSection();
   const openKey = (params.get("s") ?? initialTab ?? null) as PersonalTab | null;
   const role = ctx?.active?.role ?? "member";
+  // The index row states the CURRENT value, and "Dark" alone cannot say whether
+  // it was chosen or inherited from the OS — so the summary names both.
+  const appearanceSummary = useAppearanceSummary();
 
   const sections = [
     {
@@ -256,6 +259,16 @@ function PersonalSettings({ clientId, initialTab, onBack, onSaved }: {
     },
     { value: "notifications", label: "Notifications", icon: Bell, tone: "activity", show: true, blurb: "What you hear about, and where", intro: "Pick a channel per kind of update. Nothing here emails anyone else.", body: () => <NotificationsSection /> },
     { value: "units", label: "Units", icon: Scale, tone: "sleep", show: true, blurb: "Metric or imperial", intro: "Mix and match freely — these apply everywhere you see a number, for you only.", body: () => <UnitsSection /> },
+    /*
+      APPEARANCE IS BACK, and the note below this array explains why it left.
+
+      It went because "dark mode is one tap away in the account menu", which was
+      true of TWO states and is not true of three: the tap always lands on an
+      explicit light or dark, so "follow my system" was a state a client could
+      arrive in and never return to. `AppearancePicker` is `@4dl/app-kit`'s, so
+      all three products offer the same control.
+    */
+    { value: "appearance", label: "Appearance", icon: Sun, tone: "activity", show: true, blurb: appearanceSummary, intro: "Per device, not per studio — your coach keeps their own. Nothing to save.", body: () => <Stagger><Card><AppearancePicker /></Card></Stagger> },
     { value: "security", label: "Passkeys & security", icon: KeyRound, tone: "supplement", show: true, blurb: "How you sign in on this device", intro: "A passkey signs you in with your face, fingerprint or screen lock — no code to wait for.", body: () => <SecuritySection /> },
   ] as const satisfies readonly { value: PersonalTab; label: string; blurb: string; intro: string; icon: LucideIcon; tone: Tone; show: boolean; body: () => ReactNode }[];
   const shown = sections.filter((x) => x.show);
@@ -921,11 +934,15 @@ function MutedInsightsSection() {
   );
 }
 
-// The personal "Appearance" tab is gone. It held three toggles; two of them
-// (tinted nav, ambient wash) turned out to be studio decisions rather than
-// personal ones and moved into Studio → Branding, and the third — dark mode —
-// is one tap away in the account menu in the app bar. What was left was a tab
-// containing a control that already exists somewhere better.
+// The personal "Appearance" tab held THREE toggles once. Two of them (tinted
+// nav, ambient wash) turned out to be studio decisions rather than personal ones
+// and moved into Studio → Branding. The third — dark mode — was said to be "one
+// tap away in the account menu", so the tab was deleted.
+//
+// That reasoning was correct for two states and stopped being correct at three:
+// the tap resolves to an explicit light or dark, so "follow my system" became
+// reachable only by never having chosen. The tab is back above, holding exactly
+// one control, which is `@4dl/app-kit`'s so it is the same one in all three apps.
 
 function ToggleRow({ icon: Icon, title, desc, checked, onChange }: { icon: LucideIcon; title: string; desc: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
