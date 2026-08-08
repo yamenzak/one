@@ -103,12 +103,29 @@ function neutralTint(kind: string, brandHue: number): { hue: number; c: number }
 
 /* ---------------------------- shadcn token names -------------------------- */
 
-/** Every shadcn token the brand theme may set (an allowlist for validation). */
+/**
+ * Every shadcn token the brand theme may set — an allowlist for validation.
+ *
+ * ⚠️ IT MUST BE A SUPERSET OF WHAT `@4dl/ui`'s BRAND EDITOR CAN WRITE, and that
+ * is not a style rule. The server validates a saved kit against this list and
+ * drops anything absent, silently — so a token the shared editor offers and this
+ * list omits is a field a person can fill in, save, and watch do nothing. The
+ * platform's `surface-2`, `surface-3`, `scrim` and the three `*-soft` status
+ * tints are here for exactly that reason; nothing in this package resolves them,
+ * and nothing needs to.
+ *
+ * The reverse is fine and expected: `chart-*`, `sidebar-*`, `info` and the
+ * `*-foreground` pairs are Scena's own, read by the widget derivation and the AI
+ * brief, and the shared grid simply does not list them.
+ */
 export const THEME_TOKENS = [
   "background", "foreground", "card", "card-foreground", "popover", "popover-foreground",
+  "surface-2", "surface-3", "scrim",
   "primary", "primary-foreground", "secondary", "secondary-foreground", "muted", "muted-foreground",
   "accent", "accent-foreground", "destructive", "destructive-foreground",
-  "success", "success-foreground", "warning", "warning-foreground", "info", "info-foreground",
+  "success", "success-foreground", "success-soft",
+  "warning", "warning-foreground", "warning-soft",
+  "danger", "danger-soft", "info", "info-foreground",
   "border", "input", "ring",
   "chart-1", "chart-2", "chart-3", "chart-4", "chart-5",
   "sidebar", "sidebar-foreground", "sidebar-primary", "sidebar-primary-foreground",
@@ -136,8 +153,30 @@ export const DEFAULT_TOKENS: ThemeMaps = {
 
 /** Resolve a brand theme's tokens for a mode over the shipped defaults. */
 export function resolveTokens(theme: ThemeMaps | undefined, mode: "light" | "dark"): Record<string, string> {
-  return { ...DEFAULT_TOKENS[mode], ...(theme?.[mode] ?? {}) };
+  return { ...DEFAULT_TOKENS[mode], ...strip(theme?.[mode]) };
 }
+
+/**
+ * ACCEPT BOTH KEY CONVENTIONS — `primary` and `--primary`.
+ *
+ * Scena's brand kit predates the platform and stored bare token names, adding
+ * the `--` when it wrote CSS. `@4dl/ui`'s `BrandTokens` — the shape every other
+ * app stores, and the one the shared `BrandingEditor` produces — stores them
+ * prefixed, because that is what `applyBranding` sets on the element.
+ *
+ * Normalising on READ rather than migrating the stored blobs is what makes the
+ * move safe: this function is what the manifest COMPILER calls, so a workspace
+ * whose brand was written by the old editor and a workspace whose brand was
+ * written by the new one both compile to the same `--w-*` block, and no screen
+ * anywhere has to be republished for the change. The player never sees either
+ * convention — it receives the rendered CSS string.
+ */
+const strip = (m: Record<string, string> | undefined | null): Record<string, string> => {
+  if (!m) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(m)) out[k.startsWith("--") ? k.slice(2) : k] = v;
+  return out;
+};
 
 /* ------------------------ shadcn palette generator ------------------------ */
 
@@ -233,7 +272,24 @@ export function widgetTokens(brand: { theme?: ThemeMaps; radius: number; bodyFon
   // neutral tint); the accent follows the vivid --primary.
   const nH = parseColor(dark.background)?.H ?? p.H;
   const accentL = clamp(Math.max(p.L, 0.6), 0.6, 0.74);
-  const font = (brand.bodyFont || "Hanken Grotesk").replace(/["\\]/g, "");
+  /*
+    ⚠️ A FONT NAME LANDS IN A CSS RULE, ON A TELEVISION.
+
+    This used to strip `"` and `\` only, which reads like enough and is not: a
+    name carrying `;` or `}` closes the declaration and then the block, so the
+    rest of `--w-*` is dropped and whatever followed is parsed as new rules.
+    `widgetThemeCss` is what the compiler bakes into `manifest.theme` and the
+    player injects verbatim into a bare document with no framework between —
+    there is nothing downstream that would catch it.
+
+    So it is an ALLOWLIST, not a blocklist: letters, digits, spaces, hyphens and
+    dots are every character a real family name needs, and anything else falls
+    back to the shipped face rather than being escaped. The picker only ever
+    offers names from a fixed list, so a value outside this set is a bug or an
+    attack, never a preference worth honouring.
+  */
+  const raw = brand.bodyFont || "";
+  const font = /^[\w \-.]{1,60}$/.test(raw) ? raw : "Hanken Grotesk";
   return {
     "w-surface": ok(0.18, 0.02, nH, 0.62),
     "w-surface-2": "oklch(1 0 0 / 0.06)",

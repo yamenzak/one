@@ -1116,6 +1116,28 @@ describe("erasing a workspace clears every table its schema declares", () => {
     expect(await survivors()).toEqual([]);
   });
 
+  /*
+    `app_config` holds a workspace's settings with the tenancy glued onto the
+    KEY (`playback.freeRun:<tenantId>`), so there is no column for the derived
+    cascade to match on and every one of those rows outlived the erasure. Same
+    hole as the hand-written table list, in the one table the derivation cannot
+    reach — which is why it needs its own assertion rather than a declaration.
+  */
+  it("does not leave the workspace's app_config rows behind", async () => {
+    const { cookie, slug, door } = await newWorkspace("purge-cfg");
+    const org = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>();
+    const tenantId = org!.id;
+
+    // A real per-workspace setting, written through the route that owns it.
+    await SELF.fetch(`${door}/api/playback`, { method: "PUT", headers: json(door, cookie), body: JSON.stringify({ freeRun: true }) });
+    const rows = async () =>
+      (await db().prepare("SELECT COUNT(*) AS n FROM app_config WHERE key LIKE '%:' || ?").bind(tenantId).first<{ n: number }>())?.n ?? 0;
+    expect(await rows(), "the fixture did not land").toBeGreaterThan(0);
+
+    await purgeTenant(env as unknown as Parameters<typeof purgeTenant>[0], tenantId);
+    expect(await rows()).toBe(0);
+  });
+
   it("keeps bytes another workspace still references, and releases the quota anyway", async () => {
     const a = await newWorkspace("purge-a");
     const b = await newWorkspace("purge-b");

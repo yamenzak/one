@@ -311,6 +311,60 @@ suite whose whole job is that neither can come back:
   the dark theme.** Both halves compiled and rendered; only the colours
   disagreed.
 
+That second one is gone at the root now: **`brandCss` no longer exists.**
+Applying a workspace's palette is `@4dl/ui`'s `applyBranding`, on the same
+`<style id="scena-brand">` element, with the same selectors — see §13a.
+
+## 13a. The brand kit is `@4dl/ui`'s `Branding`, stored where the platform keeps it
+
+Scena's kit predates the platform and was the last thing in the app still
+answering to its own vocabulary. Two changes, and both are the same idea:
+
+**The SHAPE.** `theme` with bare token names (`primary`) and a radius in PIXELS
+became **`tokens` with prefixed names (`--primary`) and a radius in REM** —
+`@4dl/ui`'s `Branding`, field for field, plus four that are genuinely Scena's
+(`brandName`, `headingFont`, `bodyFont`, `logos`). Three generations of stored
+blob are converted on read by `migrate()` in `branding-store.ts`; nothing has to
+be republished, because `@scena/manifest`'s `resolveTokens` accepts **both** key
+conventions. The px→rem conversion discriminates on the value (`> 4` is pixels),
+which is safe with room to spare: no legitimate rem is above 4 and no legitimate
+pixel radius is below it.
+
+**The PLACE.** The kit moved out of `app_config['brand.json:<tenantId>']` — a
+global key-value table with the tenancy glued onto the key, which is how it once
+leaked between tenants — and into **`tenant_settings.branding_json`**, which
+`@4dl/tenancy` owns and `/api/host` already ships to the pre-auth client. That is
+not tidiness: it is what removes the flash of shipped violet on every cold start.
+`host.ts` paints the brand the moment the door resolves and remembers it against
+the hostname, so the visit after the first paints before the request is sent.
+
+**The EDITOR is `@4dl/ui`'s `BrandingEditor`**, the same one Kova and Tessa use.
+Scena's Settings passes two `extras` — the brand **name and font pair**, and the
+**logo variant list** — and nothing else: colour, shape, elevation, border weight
+and the token grid are the shared editor's. Roughly four hundred lines of
+slightly-different reimplementation went with it, and with them the missing
+elevation preset, the missing border control, and the three-different-save-
+semantics-in-three-adjacent-cards problem.
+
+Two seams this created, both silent if broken, both pinned by
+`apps/scena-app/src/brand-theme.test.ts`:
+
+- **`@scena/manifest`'s `THEME_TOKENS` must be a SUPERSET of what the shared
+  editor writes.** The server validates against it and drops the rest without a
+  word, so a token the grid offers and the list omits is a field a person fills
+  in, saves, and watches do nothing.
+- **Scena's own CSS lives in a SECOND style element** (`scena-brand-extras`:
+  `--font-sans` and the `--w-*` widget block). `applyBranding` rewrites its
+  element wholesale on every preview keystroke, so anything appended there
+  survives until the next drag.
+
+⚠️ A font family name reaches a CSS rule **on a television** — `--w-font` inside
+`manifest.theme`, injected verbatim by the player into a bare document. It is
+allowlisted (`[\w \-.]{1,60}`) in three places on purpose: the store, so it never
+lands in the database; `widgetTokens`, so it never reaches a screen; and
+`brandExtrasCss`, so it never reaches the dashboard. The old filter stripped `"`
+and `\` only, which let `;` and `}` close the declaration and then the block.
+
 ## 14. A failed poll is only shown while there is nothing to show
 
 The rule the UI rewrite produced, and the one every polling screen now follows.
@@ -373,7 +427,12 @@ Every surface, mapped to the file that draws it. Routes are declared in
 | `/analytics` | Analytics | `apps/scena-app/src/pages/Analytics.tsx` |
 | `/alerts` | Alerts | `apps/scena-app/src/pages/Alerts.tsx` |
 | `/billing` | Billing | `apps/scena-app/src/pages/Billing.tsx` |
-| `/settings` | Settings | `apps/scena-app/src/pages/Settings.tsx` |
+| `/settings` | Settings — the index | `apps/scena-app/src/pages/Settings.tsx` |
+| `/settings?s=brand` | Brand kit — the sub-index | `apps/scena-app/src/pages/Settings.tsx` (`BrandKitSections`) → `@4dl/ui` `BrandingEditor` |
+| `/settings?s=brand&sub=identity` | Name & fonts | `apps/scena-app/src/pages/Settings.tsx` (`BrandIdentity`) |
+| `/settings?s=brand&sub=assets` | Brand assets | `apps/scena-app/src/pages/Settings.tsx` (`BrandAssets`) |
+| `/settings?s=brand&sub=colour` / `shape` / `advanced` | Colour · Shape & depth · Fine-tune tokens | `packages/ui/src/branding-editor.tsx` |
+| `/settings?s=playback` / `ai` / `signin` / `security` | Playback · Default AI models · Sign-in · Passkeys | `apps/scena-app/src/pages/Settings.tsx` |
 | `/team` | Team | `apps/scena-app/src/pages/Team.tsx` |
 | anything else | Not found | `apps/scena-app/src/App.tsx` (`NotFound`) |
 

@@ -29,6 +29,7 @@
  */
 
 import type { HasDb, HasPlatformConfig } from "@4dl/core";
+import type { Branding as StoredBranding } from "./branding-store.js";
 import {
   DEFAULT_DEVICE_LABEL,
   canonicalHost as tCanonicalHost,
@@ -47,8 +48,18 @@ import {
 export { hostnameOf, invalidateHostCache, isPlatformDoor, resolveSlugTenant } from "@4dl/tenancy";
 export { DEFAULT_DEVICE_LABEL };
 
-/** Scena's brand kit, as stored in `tenant_settings.branding_json`. */
-export type Branding = { primary?: string; logoUrl?: string; name?: string } | null;
+/**
+ * Scena's brand kit, as stored in `tenant_settings.branding_json` — the SAME
+ * blob `branding-store.ts` reads and writes.
+ *
+ * It used to be a third, disagreeing shape (`{primary, logoUrl, name}`) that
+ * nothing ever wrote, because the kit lived in `app_config` instead. So
+ * `host.tenant.branding` was permanently null and the pre-auth client had
+ * nothing to paint with — hence the flash of default violet before the
+ * authenticated `/api/branding` read landed. One home, one type, and the boot
+ * paint is correct for free.
+ */
+export type Branding = StoredBranding | null;
 export type AppHostTenant = HostTenant<Branding>;
 export type AppHostContext = HostContext<Branding>;
 export type { AppHostTenant as HostTenant, AppHostContext as HostContext };

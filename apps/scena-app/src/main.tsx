@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router-dom";
 import "./index.css";
 import { App } from "./App.js";
 import { initTheme } from "./theme.js";
+import { applyBootBrand } from "./host.js";
 import { fontFaceCss } from "@scena/manifest";
 import { MotionConfig } from "motion/react";
 import { ConfirmHost, Toaster } from "@4dl/ui";
@@ -11,6 +12,11 @@ import { ConfirmHost, Toaster } from "@4dl/ui";
 // Stamp the theme before first paint (system pref or stored override) so there's
 // no flash of the wrong theme.
 initTheme();
+
+// …and the workspace's own palette with it, from the last visit to this
+// hostname. `/api/host` refreshes it a moment later; this is what removes the
+// flash of the shipped violet on every cold start. See `applyBootBrand`.
+applyBootBrand();
 
 // Make the bundled slide fonts available to the dashboard UI too, so the
 // branding preview + font pickers render in real type.

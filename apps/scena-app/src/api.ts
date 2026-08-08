@@ -593,29 +593,21 @@ export async function uploadAsset(file: File): Promise<{ hash: string; url: stri
 
 /* --------------------------------- branding ------------------------------ */
 
-export interface ThemeMaps {
-  light: Record<string, string>;
-  dark: Record<string, string>;
-}
-
 /** A brand logo variant (uploaded to the media library, referenced by URL). */
-export interface BrandLogo {
-  id: string;
-  label: string;
-  url: string;
-  mime?: string;
-}
+export type { BrandLogoRef as BrandLogo } from "./brand-theme.js";
 
-export interface WorkspaceBrand {
-  brandName: string;
-  radius: number;
-  headingFont: string;
-  bodyFont: string;
-  /** The shadcn design tokens (light + dark) — the single source of truth. */
-  theme: ThemeMaps;
-  /** Uploaded brand logos (variants). */
-  logos: BrandLogo[];
-}
+/*
+  THE WIRE TYPE IS `brand-theme.ts`'s, and it is `@4dl/ui`'s `Branding` plus
+  Scena's four fields.
+
+  It used to be declared here as a fourth, disagreeing shape — `theme` where the
+  platform says `tokens`, bare token keys where the platform prefixes them, a
+  radius in pixels where the platform uses rem, and no shadow, border weight or
+  marks at all. Re-exported rather than re-declared so there is one definition
+  the editor, the applier and the server all answer to.
+*/
+import type { WorkspaceBrand } from "./brand-theme.js";
+export type { WorkspaceBrand };
 
 export async function getBranding(): Promise<WorkspaceBrand> {
   return ((await (await fetch(`${API_BASE}/api/branding`)).json()) as { branding: WorkspaceBrand }).branding;

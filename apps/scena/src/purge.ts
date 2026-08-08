@@ -163,6 +163,27 @@ async function purgeKv(env: Env, tenantId: string): Promise<number> {
 }
 
 /**
+ * The workspace's rows in `app_config`, which the derived cascade cannot see.
+ *
+ * `app_config` is a global key-value table: a per-workspace setting lives there
+ * as `<setting>:<tenantId>`, with the tenancy glued onto the KEY rather than
+ * held in a column. `tenantCascade` works from a `scoped` declaration naming a
+ * column, so there is nothing for it to match on and the rows survive an
+ * erasure that reports success — the same shape of hole the hand-written table
+ * list was.
+ *
+ * A suffix match is the only handle there is, and it is exact: `LIKE '%:' || ?`
+ * with no wildcard after the id, so `tenant_a` cannot take `tenant_ab`'s rows
+ * with it. Today that is the playback preference, the per-task AI model pin and
+ * a pre-platform brand kit that has not been re-saved yet; tomorrow it is
+ * whatever else gets keyed this way, which is the point of sweeping the shape
+ * rather than a list.
+ */
+async function purgeConfigRows(env: Env, tenantId: string): Promise<void> {
+  await run(env.DB, "DELETE FROM app_config WHERE key LIKE '%:' || ?", tenantId);
+}
+
+/**
  * Erase a workspace's data. Destructive and irreversible.
  *
  * Billing rows are DELIBERATELY not exempt any more, and that is a change worth
@@ -179,6 +200,7 @@ export async function purgeTenant(env: Env, tenantId: string): Promise<PurgeResu
   const { objects, bytesFreed } = await releaseMedia(env, tenantId);
 
   await applyCascade(TENANT_CASCADE, tenantId, (sql, id) => run(env.DB, sql, id));
+  await purgeConfigRows(env, tenantId);
 
   // The credit balance lives in a Durable Object, which no D1 delete reaches —
   // and a DO cannot be enumerated, so if this is not called here it is never

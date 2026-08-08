@@ -83,8 +83,17 @@ export function App() {
     return pollWhileVisible(() => getBilling().then(setBilling).catch(() => {}), 60000);
   }, [refreshKey, me?.authenticated, me?.tenantId]);
 
-  // Brand kit → the whole dashboard follows the tenant's colours/radius/font
-  // (§6). Fetched once per active tenant; the Brand kit tab applies edits live.
+  /*
+    Brand kit → the whole dashboard follows the workspace's colours, shape and
+    font (§6). Fetched once per active tenant; the Brand kit section applies
+    edits live.
+
+    ⚠️ NOT redundant with the boot brand, which `host.ts` now paints from
+    `/api/host` before this component exists. That one is the PUBLIC read and it
+    is served through the tenancy host cache, so a kit saved a moment ago can
+    still be the previous one there. This is the authoritative refresh, and it is
+    what makes a save you just made correct on the next screen you open.
+  */
   useEffect(() => {
     if (!me?.authenticated || !me.tenantId) return;
     getBranding().then(applyBrandTheme).catch(() => {});
@@ -184,12 +193,20 @@ export function App() {
             from the width cap alone. Same two escapes Kova's `<main>` offers,
             and Scena was missing this one.
 
-            THE GUTTER, which this app did not have. `.column` centres and caps
-            but adds no padding — Kova's screens each carry their own `px-4` and
-            Scena's never did, so every phone screenshot showed the title, the
-            search field and the cards running off both edges of the device. One
-            place, not forty. A `Shape` stands down: its panes already pad
-            themselves and the divider between them has to reach the frame.
+            THE GUTTER, which this app did not have — in BOTH directions.
+
+            `.column` centres and caps but adds no padding. Kova's screens each
+            carry their own (`Page` is `p-4 pb-28`, `Screen` is `pt-6 pb-16`) and
+            Scena's carried none, so every phone screenshot showed the title, the
+            search field and the cards running off both edges of the device — and
+            on every width the first heading sat hard against the bottom of the
+            app bar with no air at all. That last one is the "it is not quite
+            Kova" you can see and cannot name.
+
+            One place, not forty, because `<main>` is the only element every
+            screen passes through. A `Shape` stands down on both axes: its panes
+            already pad themselves and the divider between them has to reach the
+            frame.
 
             `--chrome-top` says how far below the viewport top this scroller
             starts (tokens.css); a `Shape` pane resets it to 0, being its own.
@@ -200,7 +217,7 @@ export function App() {
           */}
           <main
             key={pathname}
-            className="@container column px-4 [--chrome-top:var(--app-bar-h)] has-[>[data-fullbleed]]:max-w-none has-[>[data-shape]]:h-[calc(100dvh-var(--app-bar-h))] has-[>[data-shape]]:max-w-none has-[>[data-shape]]:px-0 md:px-6"
+            className="@container column px-4 pb-16 pt-6 [--chrome-top:var(--app-bar-h)] has-[>[data-fullbleed]]:max-w-none has-[>[data-shape]]:h-[calc(100dvh-var(--app-bar-h))] has-[>[data-shape]]:max-w-none has-[>[data-shape]]:p-0 md:px-6"
           >
             <Routes>
               <Route path="/" element={<ScreensPage key={refreshKey} onPair={() => setPairOpen(true)} />} />

@@ -27,14 +27,14 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { FONT_FAMILIES, DEFAULT_TOKENS } from "@scena/manifest";
-import { Sparkles, Palette, MonitorPlay, Mail, Sliders, RotateCcw, Wand2, ImagePlus, Trash2, Loader2, Type } from "lucide-react";
-import { Card, PageHeader, SaveBar, SectionDetail, Select, SettingsIndex, SettingsPage as SectionFrame, SkeletonLine, Stagger, toast, useAction, useConfirmedState, type SettingsEntry, usePageChrome } from "@4dl/ui";
-import { Avatar, Badge, Button, Input, KeyRound, Label, Separator, Skeleton, Switch, Textarea } from "@4dl/ui";
+import { Sparkles, Palette, MonitorPlay, Mail, ImagePlus, Trash2, Loader2, Type } from "lucide-react";
+import { BrandingEditor, Card, PageHeader, Select, SettingsIndex, SettingsPage as SectionFrame, SkeletonLine, Stagger, toast, useConfirmedState, type SettingsEntry, usePageChrome } from "@4dl/ui";
+import { Avatar, Badge, Button, Input, KeyRound, Label, Separator, Skeleton, Switch } from "@4dl/ui";
 import { PasskeysCard } from "@4dl/app-kit";
 import { useCan } from "../permissions.js";
 import { useFeature } from "../entitlements.js";
 import { FeatureLockBadge } from "../components/feature-gate.js";
-import { applyBrandTheme, deriveTokens, parseThemeCss, THEME_TOKENS } from "../brand-theme.js";
+import { applyBrandTheme } from "../brand-theme.js";
 import { assetStoreUrl } from "../components/media-picker.js";
 import {
   listAiModels,
@@ -187,7 +187,7 @@ export function WorkspaceSettingsPage() {
   /* ── the index ─────────────────────────────────────────────────────────── */
 
   const aiSetCount = defaults ? AI_TASKS.filter((t) => defaults[t.id]).length : null;
-  const tokenCount = brand.b ? Object.keys(brand.b.theme?.light ?? {}).length + Object.keys(brand.b.theme?.dark ?? {}).length : null;
+  const tokenCount = brand.b ? Object.keys(brand.b.tokens?.light ?? {}).length + Object.keys(brand.b.tokens?.dark ?? {}).length : null;
 
   /**
    * A SUB-LINE THAT IS NOT KNOWN YET IS A SKELETON, not the word "Loading…".
@@ -452,15 +452,33 @@ export function WorkspaceSettingsPage() {
 
 /* ============================ the brand kit ============================== */
 
-const NEUTRAL_TINTS = [
-  { id: "brand", label: "Brand-tinted" },
-  { id: "gray", label: "Neutral gray" },
-  { id: "cool", label: "Cool" },
-  { id: "warm", label: "Warm" },
-];
+/*
+  THE EDITOR IS `@4dl/ui`'s NOW, and what is left here is what is actually
+  Scena's.
 
-/** Quick-start brand colours for the palette generator. */
-const PRESET_COLORS = ["#6366f1", "#0ea5e9", "#10b981", "#f43f5e", "#f59e0b", "#8b5cf6", "#14b8a6", "#ef4444"];
+  This file used to carry four sub-pages of it: a palette generator with its own
+  colour swatches and neutral-tint picker, a corner-radius slider, a
+  paste-a-shadcn-theme box, and a 38-row token grid — roughly four hundred lines
+  reimplementing, slightly differently, the editor Kova and Tessa already share.
+  "Slightly differently" is the cost: Scena's version had no elevation preset, no
+  border weight, no live on-colour derivation for a hand-edited fill, and its
+  radius was in pixels while every other app's is in rem.
+
+  `BrandingEditor` owns colour, shape & depth, and the token grid. Scena passes
+  two `extras` — the two things the platform genuinely has no opinion about:
+
+    IDENTITY  the workspace's brand NAME and its FONT pair. The fonts come from
+              a prepackaged set the player can serve to a television offline,
+              which is why they are a Select over a fixed list rather than a
+              free field.
+    ASSETS    the logo VARIANTS. Not the app-chrome mark `@4dl/ui` knows about —
+              a list a person names ("White", "Mark", "Wordmark") that feeds the
+              Company-logo widget and the AI generators.
+
+  Both save through the SAME form and the SAME Save button as the palette, which
+  is the other thing the rewrite bought: the old page had three save semantics in
+  three adjacent cards and nothing on screen said which was which.
+*/
 
 /**
  * The brand kit's state, lifted out of the section that edits it.
@@ -501,50 +519,25 @@ function useBrandKit() {
       return next;
     });
 
-  /** Set one token (blank clears it → falls back to the shipped default). */
-  const setToken = (mode: "light" | "dark", token: string, value: string) =>
-    setB((cur) => {
-      if (!cur) return cur;
-      const side = { ...(cur.theme?.[mode] ?? {}) };
-      if (value.trim()) side[token] = value.trim();
-      else delete side[token];
-      const next = { ...cur, theme: { ...cur.theme, [mode]: side } };
-      applyBrandTheme(next);
-      return next;
-    });
-
-  /*
-    THE SAVE GOES THROUGH `useAction`, and the outcome is rendered next to the
-    button rather than thrown at a corner of the screen.
-
-    `setSaving(true) / try / toast / finally` is the shape `save-lifecycle`
-    exists to replace. It is not wrong here — it does catch — but it reports
-    into a toast, which on a form is the wrong PLACE: the toast has gone by the
-    time the eye returns to the button, and the button itself never says whether
-    the last press landed. `SaveBar` puts the outcome directly above the control
-    that produced it, and disables while saving AND while nothing has changed,
-    so "did that save?" is answered by the control instead of by pressing again.
-  */
-  const act = useAction(errText);
-
-  async function save() {
-    if (!b) return;
-    await act.run(
-      "brand",
-      async () => {
-        const fresh = await setBranding(b);
-        setB(fresh);
-        savedRef.current = fresh;
-        applyBrandTheme(fresh);
-        return "Brand saved — the whole workspace now follows it.";
-      },
-      "Couldn’t save the brand — nothing was changed.",
-    );
+  /**
+   * Persist the whole kit — the editor's theme fields spread over Scena's own.
+   *
+   * It throws on failure rather than reporting, because the caller is
+   * `BrandingEditor`'s `onSave`, and the editor's `useAction` is what turns a
+   * rejection into the line above its Save button. Catching here would swallow
+   * the outcome and leave the bar saying nothing.
+   */
+  async function save(patch: Partial<WorkspaceBrand>): Promise<void> {
+    const merged = { ...(b as WorkspaceBrand), ...patch };
+    const fresh = await setBranding(merged);
+    setB(fresh);
+    savedRef.current = fresh;
+    applyBrandTheme(fresh);
   }
 
   /*
     ⚠️ THIS ONE WAS A LYING OPTIMISTIC WRITE, and it is the reason the two
-    switches above moved to `useConfirmedState`.
+    switches on the index moved to `useConfirmedState`.
 
     It applied `next` to the state AND to `savedRef` — the snapshot the screen
     restores on unmount — and then, on a refused save, only toasted. So a
@@ -553,7 +546,9 @@ function useBrandKit() {
     rollback was also the one that corrupted the rollback target.
 
     `savedRef` now moves only after the server has agreed, and the state snaps
-    back when it has not.
+    back when it has not. It stays an INSTANT write (no Save button) because by
+    the time you see a logo it has already been uploaded — asking to confirm
+    the thing that has happened is the wrong question.
   */
   async function saveLogos(logos: BrandLogo[]) {
     if (!b) return;
@@ -569,10 +564,30 @@ function useBrandKit() {
     }
   }
 
-  return { b, setB, save, update, setToken, saveLogos, savedRef, act };
+  return { b, setB, save, update, saveLogos, savedRef };
 }
 
 type BrandKit = ReturnType<typeof useBrandKit>;
+
+/**
+ * The two token vocabularies, reconciled.
+ *
+ * The grid lists what `@scena/manifest` can actually resolve — its `chart-*`
+ * feed the widget theme and the AI brief, and the platform's grid does not know
+ * about them. The placeholders come from Scena's own `DEFAULT_TOKENS`, re-keyed
+ * with the `--` prefix the editor speaks.
+ */
+const SCENA_TOKEN_GROUPS: { label: string; tokens: string[] }[] = [
+  { label: "Surfaces", tokens: ["background", "foreground", "card", "card-foreground", "surface-2", "surface-3", "popover", "popover-foreground"] },
+  { label: "Brand & UI", tokens: ["primary", "primary-foreground", "secondary", "secondary-foreground", "muted", "muted-foreground", "accent", "accent-foreground", "border", "input", "ring"] },
+  { label: "Status", tokens: ["destructive", "destructive-foreground", "success", "success-foreground", "warning", "warning-foreground", "info", "info-foreground"] },
+  { label: "On screen", tokens: ["chart-1", "chart-2", "chart-3", "chart-4", "chart-5"] },
+];
+
+const prefixed = (m: Record<string, string>): Record<string, string> =>
+  Object.fromEntries(Object.entries(m).map(([k, v]) => [`--${k}`, v]));
+
+const SCENA_DEFAULT_TOKENS = { light: prefixed(DEFAULT_TOKENS.light), dark: prefixed(DEFAULT_TOKENS.dark) };
 
 function BrandKitSections({
   brand,
@@ -585,7 +600,7 @@ function BrandKitSections({
   openKey: string | null;
   onOpen: (key: string | null) => void;
 }) {
-  const { b } = brand;
+  const { b, update, save, saveLogos } = brand;
   if (!b)
     return (
       <div className="flex flex-col gap-4">
@@ -594,95 +609,64 @@ function BrandKitSections({
       </div>
     );
 
-  const tokenCount = Object.keys(b.theme?.light ?? {}).length + Object.keys(b.theme?.dark ?? {}).length;
   const logoCount = (b.logos ?? []).length;
 
-  /*
-   * Four sub-pages, and each one saves on its own terms — which is why there is
-   * no shared `footer` here. Identity is a form with a Save; the palette
-   * generator writes into that same unsaved form (and says so); assets upload
-   * immediately because an upload has already happened by the time you see it;
-   * tokens are part of identity's form. `SectionDetail`'s footer is for
-   * sub-pages that must submit together, and these must not.
-   */
-  const subs: (SettingsEntry & { render: () => ReactNode })[] = [
-    {
-      key: "identity",
-      icon: Type,
-      label: "Name, fonts & shape",
-      sub: `${b.brandName || "No brand name"} · ${b.headingFont} · ${b.radius}px corners`,
-      render: () => <BrandIdentity brand={brand} canManage={canManage} />,
-    },
-    {
-      key: "palette",
-      icon: Wand2,
-      label: "Palette",
-      sub: tokenCount ? `${tokenCount} token${tokenCount === 1 ? "" : "s"} overridden` : "Shipped defaults",
-      disabled: !canManage,
-      render: () => <BrandPalette brand={brand} />,
-    },
-    {
-      key: "assets",
-      icon: ImagePlus,
-      label: "Brand assets",
-      sub: logoCount ? `${logoCount} logo${logoCount === 1 ? "" : "s"}` : "No logos yet",
-      disabled: !canManage,
-      render: () => <BrandAssets brand={brand} />,
-    },
-    {
-      key: "tokens",
-      icon: Sliders,
-      label: "shadcn tokens",
-      sub: `${THEME_TOKENS.length} tokens · ${tokenCount} overridden`,
-      disabled: !canManage,
-      render: () => <BrandTokens brand={brand} />,
-    },
-  ];
-
-  return <SectionDetail subs={subs} openKey={openKey} onOpen={onOpen} />;
+  return (
+    <BrandingEditor
+      initial={b}
+      tokenGroups={SCENA_TOKEN_GROUPS}
+      defaultTokens={SCENA_DEFAULT_TOKENS}
+      // Live preview goes through Scena's own applier, so the `--w-*` widget
+      // block and the font follow the drag too — the builder canvas is a preview
+      // of a television, and a palette that moved everywhere except there is a
+      // preview of nothing in particular.
+      onPreview={(theme) => update((theme ?? {}) as Partial<WorkspaceBrand>)}
+      onSave={(theme) => save(theme as Partial<WorkspaceBrand>)}
+      openSub={openKey}
+      onOpenSub={onOpen}
+      format={errText}
+      extras={() => [
+        {
+          key: "identity",
+          label: "Name & fonts",
+          icon: Type,
+          tone: "channel",
+          value: `${b.brandName || "No brand name"} · ${b.bodyFont}`,
+          block: <BrandIdentity brand={brand} canManage={canManage} />,
+        },
+        {
+          key: "assets",
+          label: "Brand assets",
+          icon: ImagePlus,
+          tone: "warning",
+          value: logoCount ? `${logoCount} logo${logoCount === 1 ? "" : "s"}` : "No logos yet",
+          block: <BrandAssets b={b} setB={brand.setB} saveLogos={saveLogos} savedRef={brand.savedRef} />,
+        },
+      ]}
+    />
+  );
 }
 
 function BrandIdentity({ brand, canManage }: { brand: BrandKit; canManage: boolean }) {
-  const { b, update, save, act } = brand;
+  const { b, update } = brand;
   if (!b) return null;
   return (
-    <Card>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-caption text-muted-foreground">Brand name</Label>
-          <Input
-            value={b.brandName}
-            disabled={!canManage}
-            onChange={(e) => update({ brandName: e.target.value })}
-            placeholder="e.g. Acme Clinic"
-            maxLength={80}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-caption text-muted-foreground">Corner radius · {b.radius}px</Label>
-          <input
-            type="range"
-            min={0}
-            max={32}
-            value={b.radius}
-            disabled={!canManage}
-            onChange={(e) => update({ radius: +e.target.value })}
-            className="mt-2 w-full accent-primary"
-          />
-        </div>
+    <>
+      <div className="flex flex-col gap-1.5">
+        <Label className="text-caption text-muted-foreground">Brand name</Label>
+        <Input
+          value={b.brandName}
+          disabled={!canManage}
+          onChange={(e) => update({ brandName: e.target.value })}
+          placeholder="e.g. Acme Clinic"
+          maxLength={80}
+        />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-caption text-muted-foreground">Heading font</Label>
-          <Select
-            value={b.headingFont}
-            onChange={(v) => update({ headingFont: v })}
-            disabled={!canManage}
-            className="w-full"
-            options={[...FONTS.map((f) => ({ value: f, label: f }))]}
-          />
-        </div>
+      {/* `items-end`, so the two controls line up when one label wraps and the
+          other does not — which is what happens at every width between the
+          breakpoint and about 900px. */}
+      <div className="grid items-end gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label className="text-caption text-muted-foreground">Body font · drives all UI text</Label>
           <Select
@@ -693,125 +677,45 @@ function BrandIdentity({ brand, canManage }: { brand: BrandKit; canManage: boole
             options={[...FONTS.map((f) => ({ value: f, label: f }))]}
           />
         </div>
+        <div className="flex flex-col gap-1.5">
+          {/*
+            ⚠️ THE LABEL SAYS WHERE IT LANDS, because it does not land here.
+
+            No token in `@4dl/ui` reads a heading font, so this never changed a
+            single character of the dashboard — it was a picker that appeared to
+            work. It is a real setting with a real effect, just not this one: it
+            reaches the AI brief, so generated slides and posters are set in it.
+          */}
+          <Label className="text-caption text-muted-foreground">Heading font · generated slides</Label>
+          <Select
+            value={b.headingFont}
+            onChange={(v) => update({ headingFont: v })}
+            disabled={!canManage}
+            className="w-full"
+            options={[...FONTS.map((f) => ({ value: f, label: f }))]}
+          />
+        </div>
       </div>
 
       <UiSampler brandName={b.brandName} />
-
-      {canManage && (
-        <SaveBar label="Save brand" saving={act.busy === "brand"} msg={act.msg} err={act.err} onSave={() => void save()} />
-      )}
-    </Card>
+    </>
   );
 }
 
-function BrandPalette({ brand }: { brand: BrandKit }) {
-  const { b, update, save, act } = brand;
-  // A starting colour is not a stored field — the generated TOKENS are what get
-  // saved. These only seed them.
-  const [genColor, setGenColor] = useState("#6366f1");
-  const [genAccent, setGenAccent] = useState("#f59e0b");
-  const [genNeutral, setGenNeutral] = useState("brand");
-  const [pasted, setPasted] = useState("");
-  if (!b) return null;
-
-  const tokenCount = Object.keys(b.theme?.light ?? {}).length + Object.keys(b.theme?.dark ?? {}).length;
-
-  function generate() {
-    update({ theme: deriveTokens({ primary: genColor, secondary: genAccent, neutral: genNeutral }) });
-    toast.success("Palette generated — it is previewing live. Save to keep it.");
-  }
-
-  function applyPastedTheme() {
-    if (!b) return;
-    const parsed = parseThemeCss(pasted);
-    const n = Object.keys(parsed.light).length + Object.keys(parsed.dark).length;
-    if (!n) {
-      toast.error("No shadcn tokens found — paste a :root { … } / .dark { … } theme.");
-      return;
-    }
-    update({ theme: { light: { ...b.theme.light, ...parsed.light }, dark: { ...b.theme.dark, ...parsed.dark } } });
-    setPasted("");
-    toast.success(`Imported ${n} token${n === 1 ? "" : "s"}. Save to keep.`);
-  }
-
-  return (
-    <Card>
-      <div className="mb-4">
-        <p className="text-caption text-muted-foreground">
-          Generate a coherent shadcn palette from a brand colour, or paste one you already have. Either way it previews across the whole workspace immediately
-          and is <b>not saved until you press Save</b> — leaving Settings puts the last saved kit back.
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {PRESET_COLORS.map((c) => (
-          <button
-            key={c}
-            onClick={() => setGenColor(c)}
-            title={c}
-            aria-label={`Use ${c}`}
-            className={`size-7 rounded-full ring-2 ring-offset-2 ring-offset-background transition ${genColor.toLowerCase() === c ? "ring-foreground" : "ring-transparent hover:ring-border"}`}
-            style={{ background: c }}
-          />
-        ))}
-      </div>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <ColorField label="Brand colour" value={genColor} onChange={setGenColor} />
-        <ColorField label="Accent" value={genAccent} onChange={setGenAccent} />
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-caption text-muted-foreground">Neutral tint</Label>
-          <Select value={genNeutral} onChange={setGenNeutral} className="w-full" options={[...NEUTRAL_TINTS.map((n) => ({ value: n.id, label: n.label }))]} />
-        </div>
-        <div className="flex items-end">
-          <Button className="w-full" onClick={generate}>
-            <Wand2 className="size-4" /> Generate
-          </Button>
-        </div>
-      </div>
-
-      <Separator />
-      <div className="flex flex-col gap-1.5">
-        <Label className="text-caption text-muted-foreground">Paste a shadcn theme</Label>
-        <Textarea
-          value={pasted}
-          onChange={(e) => setPasted(e.target.value)}
-          placeholder={":root { --primary: oklch(…); … }\n.dark { … }"}
-          className="h-24 font-mono text-caption"
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" disabled={!pasted.trim()} onClick={applyPastedTheme}>
-            Import tokens
-          </Button>
-          {tokenCount > 0 && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-muted-foreground"
-              onClick={() => {
-                update({ theme: { light: {}, dark: {} } });
-                toast.success("Theme reset to the shipped defaults.");
-              }}
-            >
-              <RotateCcw className="size-3.5" /> Reset to defaults
-            </Button>
-          )}
-          {/* The generator used to leave the only Save button one card away,
-                which is how a generated palette got previewed and abandoned. */}
-          <Button size="sm" className="ml-auto" onClick={() => void save()} disabled={act.busy === "brand"}>
-            {act.busy === "brand" ? "Saving…" : "Save brand"}
-          </Button>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function BrandAssets({ brand }: { brand: BrandKit }) {
-  const { b, setB, saveLogos, savedRef } = brand;
+function BrandAssets({
+  b,
+  setB,
+  saveLogos,
+  savedRef,
+}: {
+  b: WorkspaceBrand;
+  setB: (v: WorkspaceBrand) => void;
+  saveLogos: (logos: BrandLogo[]) => Promise<void>;
+  savedRef: { current: WorkspaceBrand | null };
+}) {
   const [uploading, setUploading] = useState(false);
-  if (!b) return null;
 
   async function addLogo(file: File) {
-    if (!b) return;
     setUploading(true);
     try {
       const { url } = await uploadToLibrary(file);
@@ -825,20 +729,18 @@ function BrandAssets({ brand }: { brand: BrandKit }) {
       savedRef.current = next;
       toast.success("Logo added.");
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Upload failed");
+      toast.error(errText(e, "Upload failed"));
     } finally {
       setUploading(false);
     }
   }
 
   return (
-    <Card>
-      <div className="mb-4">
-        <p className="text-caption text-muted-foreground">
-          Your logo and any variants (dark, light, mark, wordmark…). They are saved to the media library and available to the <b>Company logo</b> widget and the
-          AI generators. Unlike the palette, these save as soon as you add or remove one.
-        </p>
-      </div>
+    <>
+      <p className="text-caption text-muted-foreground">
+        Your logo and any variants (dark, light, mark, wordmark…). They are saved to the media library and available to the <b>Company logo</b> widget and the
+        AI generators. Unlike the palette, these save as soon as you add or remove one.
+      </p>
       {(b.logos ?? []).length > 0 && (
         <div className="grid gap-2 sm:grid-cols-2">
           {b.logos.map((l) => (
@@ -849,7 +751,7 @@ function BrandAssets({ brand }: { brand: BrandKit }) {
               <Input
                 value={l.label}
                 onChange={(e) => setB({ ...b, logos: (b.logos ?? []).map((x) => (x.id === l.id ? { ...x, label: e.target.value } : x)) })}
-                onBlur={() => saveLogos(b.logos)}
+                onBlur={() => void saveLogos(b.logos)}
                 className="h-8 flex-1 text-body"
                 maxLength={40}
                 placeholder="Variant name"
@@ -889,106 +791,6 @@ function BrandAssets({ brand }: { brand: BrandKit }) {
           }}
         />
       </label>
-    </Card>
-  );
-}
-
-function BrandTokens({ brand }: { brand: BrandKit }) {
-  const { b, setToken, save, act } = brand;
-  if (!b) return null;
-  return (
-    <Card>
-      <div className="mb-4">
-        <p className="text-caption text-muted-foreground">
-          The single source of truth. Set any token; blank fields fall back to the shipped default. Accepts any CSS colour (hex, <code>oklch()</code>,{" "}
-          <code>hsl()</code>).
-        </p>
-      </div>
-      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-3 gap-y-1.5 text-caption">
-        <span className="font-semibold uppercase tracking-wider text-muted-foreground">Token</span>
-        <span className="w-32 text-center font-semibold uppercase tracking-wider text-muted-foreground">Light</span>
-        <span className="w-32 text-center font-semibold uppercase tracking-wider text-muted-foreground">Dark</span>
-        {THEME_TOKENS.map((t) => (
-          <TokenRow
-            key={t}
-            token={t}
-            light={b.theme?.light?.[t] ?? ""}
-            dark={b.theme?.dark?.[t] ?? ""}
-            lightDefault={DEFAULT_TOKENS.light[t] ?? ""}
-            darkDefault={DEFAULT_TOKENS.dark[t] ?? ""}
-            onChange={setToken}
-          />
-        ))}
-      </div>
-      <div className="flex justify-end">
-        <Button onClick={() => void save()} disabled={act.busy === "brand"}>
-          {act.busy === "brand" ? "Saving…" : "Save brand"}
-        </Button>
-      </div>
-    </Card>
-  );
-}
-
-/** A hex colour swatch + text field (shared by the palette generator inputs). */
-function ColorField({ label, value, disabled, onChange }: { label: string; value: string; disabled?: boolean; onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label className="text-caption text-muted-foreground">{label}</Label>
-      <div className="flex items-center gap-2 rounded-lg border p-1.5">
-        <input
-          type="color"
-          value={value}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
-          className="size-8 shrink-0 cursor-pointer rounded border-0 bg-transparent p-0"
-          aria-label={label}
-        />
-        <input
-          value={value}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-full bg-transparent font-mono text-caption uppercase outline-none"
-          maxLength={7}
-          aria-label={`${label} hex`}
-        />
-      </div>
-    </div>
-  );
-}
-
-/** One token row: label + light/dark inputs with swatches (placeholder = default). */
-function TokenRow({
-  token,
-  light,
-  dark,
-  lightDefault,
-  darkDefault,
-  onChange,
-}: {
-  token: string;
-  light: string;
-  dark: string;
-  lightDefault: string;
-  darkDefault: string;
-  onChange: (mode: "light" | "dark", token: string, value: string) => void;
-}) {
-  const cell = (mode: "light" | "dark", value: string, defaultVal: string) => (
-    <div className="flex w-32 items-center gap-1.5 rounded-md border px-1.5 py-1">
-      <span className="size-4 shrink-0 rounded-sm border" style={{ background: value || defaultVal }} />
-      <input
-        value={value}
-        onChange={(e) => onChange(mode, token, e.target.value)}
-        placeholder={defaultVal.replace(/oklch\(|\)/g, "")}
-        aria-label={`--${token} ${mode}`}
-        className="w-full bg-transparent font-mono text-caption outline-none placeholder:text-muted-foreground/50"
-      />
-    </div>
-  );
-  return (
-    <>
-      <code className="truncate text-caption text-muted-foreground">--{token}</code>
-      {cell("light", light, lightDefault)}
-      {cell("dark", dark, darkDefault)}
     </>
   );
 }

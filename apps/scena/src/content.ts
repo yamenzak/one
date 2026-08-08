@@ -9,7 +9,7 @@
  */
 
 import { parseManifest, widgetThemeCss, type Manifest } from "@scena/manifest";
-import { getBranding } from "./branding-store.js";
+import { getBranding, manifestBrand } from "./branding-store.js";
 import { ensureSchema, DEMO_TENANT, sanitizeDurationMs } from "./db.js";
 import { DEMO_CHANNEL_ID, DEMO_SLIDES, DEFAULT_WIDGETS } from "./demo.js";
 import { loadWidgets, getVersion } from "./channels.js";
@@ -299,7 +299,7 @@ export async function compileManifest(env: Env, channelId: string, origin: strin
   const soloScreen = loneChannel || !ent.features.multiScreenSync || (await getConfigValue(env.DB, playbackFreeRunKey(channel.tenant_id))) === "1";
   // Brand widget-theme (§6): the `--w-*` token block the player injects so
   // widgets follow the tenant's brand on screen.
-  const theme = widgetThemeCss(await getBranding(env.DB, channel.tenant_id));
+  const theme = widgetThemeCss(manifestBrand(await getBranding(env.DB, channel.tenant_id)));
 
   // Guard: an empty channel has no timeline — surface it as a single placeholder.
   if (items.length === 0) {

@@ -57,4 +57,53 @@ describe("resolveTokens", () => {
     expect(r.primary).toBe("oklch(0.7 0.1 120)"); // overridden
     expect(r.background).toBe(DEFAULT_TOKENS.dark.background); // default kept
   });
+
+  /*
+    BOTH KEY CONVENTIONS, and this is the load-bearing part of the branding move.
+
+    Scena's own brand kit stores bare token names (`primary`); `@4dl/ui`'s
+    `BrandTokens` — what the shared BrandingEditor writes, and what every other
+    app already stores — stores them prefixed (`--primary`). Normalising here
+    means a workspace branded before the move and one branded after it compile
+    to the SAME `--w-*` block, so nothing has to be republished.
+
+    If this tolerance is removed, the failure is silent: a `--primary` key never
+    matches the `primary` lookup, `widgetTokens` falls through to the shipped
+    violet, and every screen in the fleet quietly loses the tenant's brand while
+    the dashboard still shows it correctly.
+  */
+  it("accepts prefixed token keys and bare ones alike", () => {
+    const bare = resolveTokens({ light: {}, dark: { primary: "oklch(0.7 0.1 120)" } }, "dark");
+    const prefixed = resolveTokens({ light: {}, dark: { "--primary": "oklch(0.7 0.1 120)" } }, "dark");
+    expect(prefixed).toEqual(bare);
+    expect(prefixed["--primary"]).toBeUndefined(); // normalised away, not carried
+  });
+
+  it("derives the widget accent from a prefixed brand token", () => {
+    const w = widgetTokens({ theme: { light: {}, dark: { "--primary": "oklch(0.7 0.18 30)" } }, radius: 20, bodyFont: "Inter" });
+    expect(parseColor(w["w-accent"])!.H).toBeCloseTo(30, 0);
+  });
+});
+
+/*
+  ⚠️ A FONT NAME REACHES A TELEVISION AS CSS.
+
+  `widgetThemeCss` is baked into `manifest.theme` and injected verbatim by the
+  player into a bare document — no framework, no sanitizer, nothing downstream.
+  The old filter stripped `"` and `\` only, so a name carrying `;` or `}` closed
+  the declaration and then the block: the rest of `--w-*` was dropped and
+  whatever followed was parsed as new rules.
+*/
+describe("widgetTokens — the font name is allowlisted, not escaped", () => {
+  it("keeps a real family name", () => {
+    expect(widgetTokens({ theme: { light: {}, dark: {} }, radius: 18, bodyFont: "Hanken Grotesk" })["w-font"]).toContain("Hanken Grotesk");
+    expect(widgetTokens({ theme: { light: {}, dark: {} }, radius: 18, bodyFont: "PT Sans-Narrow" })["w-font"]).toContain("PT Sans-Narrow");
+  });
+
+  it("refuses one that could close the rule, and falls back", () => {
+    const w = widgetTokens({ theme: { light: {}, dark: {} }, radius: 18, bodyFont: 'Evil", x: y; } body { display: none' });
+    expect(w["w-font"]).not.toContain("Evil");
+    expect(w["w-font"]).not.toContain("display");
+    expect(w["w-font"]).toContain("Hanken Grotesk");
+  });
 });

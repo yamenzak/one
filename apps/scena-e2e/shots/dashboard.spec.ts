@@ -228,7 +228,7 @@ test("the operator's workspace", async () => {
     // The SUB-page's own heading, not the parent's: once a sub-page is open the
     // brand frame stands down so there is only one header and one back button
     // (Settings.tsx says why), so "Brand kit" is not on screen here.
-    await visit(page, `${base}/settings?s=brand&sub=identity`, page.getByRole("main").getByRole("heading", { name: "Name, fonts & shape" }));
+    await visit(page, `${base}/settings?s=brand&sub=identity`, page.getByRole("main").getByRole("heading", { name: "Name & fonts" }));
     await shoot(page, project, "settings-brand", { settle: 600 });
   });
 

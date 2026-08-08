@@ -15,7 +15,9 @@
  */
 
 import { useEffect, useState } from "react";
+import { appStorage, readBootBrand, writeBootBrand } from "@4dl/app-kit";
 import { API_BASE } from "./api.js";
+import { applyBrandTheme, clearBrandTheme, type WorkspaceBrand } from "./brand-theme.js";
 
 /** The five doors `@4dl/tenancy` classifies into, plus the device door. */
 export type DoorRole = "root" | "setup" | "admin" | "device" | "tenant" | "custom";
@@ -24,7 +26,41 @@ export interface HostInfo {
   role: DoorRole;
   rootDomain: string;
   setupUrl: string;
-  tenant: { tenantId: string; name: string; slug: string } | null;
+  tenant: { tenantId: string; name: string; slug: string; branding?: WorkspaceBrand | null } | null;
+}
+
+/*
+  THE BRAND ARRIVES WITH THE DOOR, AND IS REMEMBERED FOR THE NEXT BOOT.
+
+  Scena used to fetch the brand kit only after sign-in, from `/api/branding`,
+  because it was stored in `app_config` where nothing public could reach it —
+  so every operator watched the shipped violet for one authenticated round trip
+  before their own colours arrived, on every cold start. `/api/host` is the ONE
+  public read the pre-auth client already makes and it has always carried
+  `tenant.branding`; the kit just was not there to carry.
+
+  Now it is, and the two halves are:
+
+    THIS BOOT   apply what `/api/host` returns the moment it lands — before the
+                session, before any screen mounts.
+    NEXT BOOT   remember it against the hostname, and paint from the cache
+                before the request is even sent.
+
+  ⚠️ The cache is keyed by HOSTNAME and CLEARED on a door with no workspace
+  behind it. One browser visits several workspaces and the operator console;
+  skipping the write on a brand-less door would leave the last workspace's
+  colours painted over the next one, which looks deliberate and is worse than
+  the flash it replaces.
+
+  It is a UI convenience and never an authorization decision — it holds exactly
+  what an unauthenticated visitor to that hostname is already shown.
+*/
+const brandStore = appStorage("scena");
+
+/** Paint the remembered brand for this hostname. Called once, before render. */
+export function applyBootBrand(): void {
+  const cached = readBootBrand<WorkspaceBrand>(brandStore, location.hostname);
+  if (cached?.branding) applyBrandTheme(cached.branding);
 }
 
 /**
@@ -45,6 +81,16 @@ export function useHost(): HostInfo | null {
       .then((h) => {
         if (!live || !h) return;
         setHost(h);
+        const branding = h.tenant?.branding ?? null;
+        if (branding) applyBrandTheme(branding);
+        // A door with no workspace behind it forgets, rather than skipping —
+        // see the note on `applyBootBrand`. `clearBrandTheme` undoes a stale
+        // cache we may already have painted this boot.
+        else if (h.tenant === null) clearBrandTheme();
+        writeBootBrand<WorkspaceBrand>(
+          brandStore,
+          h.tenant ? { host: location.hostname, name: h.tenant.name, branding } : null,
+        );
       })
       // A failed probe leaves the door unknown rather than guessing one. The
       // app-wide error boundary is what says so; guessing "tenant" here would
