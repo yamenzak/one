@@ -39,7 +39,7 @@ not:
 > boundary holds, the typecheck is green. The capability is just not there, and
 > the only way to see it is to line the apps up next to each other.
 
-Seven instances, all found by the same lens:
+Eight instances, all found by the same lens:
 
 | # | Shared thing that exists | Apps that mount it | Consequence where it is missing |
 |---|---|---|---|
@@ -50,9 +50,14 @@ Seven instances, all found by the same lens:
 | 5 | The `gate` on `/api/host` | Kova, Tessa (partly) | Scena's SPA re-declares `HostInfo` **without** `gate` or `maintenance` — the exact mistake the route's own comment warns about, on the client side of the wire |
 | 6 | `sharedPanelViolations` (`@4dl/admin/conformance`) | Kova, Tessa | Scena has 2 live violations and no test that would say so |
 | 7 | `checkActorDailyBudget` (`@4dl/ai`) | **Kova only** | In Tessa & Scena, one user can burn the tenant's whole credit balance in an afternoon |
+| 8 | `syncStripeSubscription` (`@4dl/billing/webhook`) | Kova, Tessa | Scena wrote its own reconciler: no ladder guard, no stale-sub guard, no refund reversal. See "The money path" below — this one is money |
 
-**And one structural finding that outranks all seven**, because it is why there
-will be an eighth: `apps/_template` **has no SPA**. It is a 1,230-line worker
+**And one that is not a missing mount but a missing panel:** `@4dl/admin` ships
+eight sections and **none of them is the plan catalog** — so Kova and Scena wrote
+one each and Tessa has none at all. Trial length is not editable in any of them.
+
+**And one structural finding that outranks all eight**, because it is why there
+will be a ninth: `apps/_template` **has no SPA**. It is a 1,230-line worker
 and nothing else. Every browser surface a new app needs — shell, session, host
 probe, theme, admin console, doors, conformance tests, vite/tailwind/PWA config
 — is hand-built per app today. That is where roughly two thirds of an app's
@@ -259,6 +264,99 @@ were all in the half that had no second reader.
 `modelForTask`, `perActorDailyCreditCap` and `checkActorDailyBudget`. Scena
 uses none of them and has no equivalent of the last two — **there is no
 per-actor daily credit cap in Scena at all.**
+
+### The money path: one rail, one catalog shape — and three reconcilers
+
+This is the deepest divergence in the repo and the one with real money behind
+it, so it gets its own accounting. **Everything up to the webhook is shared and
+in good shape:**
+
+| stage | where it lives | all three apps? |
+|---|---|---|
+| Stripe credentials (`stripe.mode`, both lanes' secret + publishable keys) | `SHARED_CONFIG_KEYS` — set once from any `admin.` console | ✅ |
+| the per-endpoint `stripe.*.webhook_secret` | deliberately **excluded** from sharing | ✅ |
+| test/live lane flip, with catalog-id stash & restore | `@4dl/billing/stripe.ts` (`swapCatalogLane`) | ✅ |
+| catalog → Stripe products/prices, and the **price-change id null-out** | `syncCatalog` | ✅ |
+| catalog seeding, version-stamped; plan/pack reads; `tenantEntitlements`; `withinQuota` | `bindBillingStore` | Kova, Tessa (Scena pending the column reconciliation) |
+| `trialDays` → `trialPeriodDays()` clamped to Stripe's 1..730 | `@4dl/billing/entitlements.ts` | ✅ |
+| "selecting a plan never grants it" — `pending_plan_id` only | each app's onboarding | ✅ |
+| signature verify once → attribute → park what it cannot | `@4dl/billing-rail` `dispatchEvent` | ✅ |
+| idempotency (`firstSeen` claims, `unmarkSeen` releases on throw) | `@4dl/billing/webhook.ts` | ✅ |
+
+**And then the reconciler forks.** `syncStripeSubscription` is `@4dl/billing`'s
+answer to "what does this event mean for the row we hold". Kova and Tessa call
+it. Scena wrote its own `handleWebhook`. Counting the event types each app
+actually handles:
+
+```
+grep -oE 'case "[a-z_.]+":' apps/api/src/stripe-routes.ts apps/tessa/src/billing-routes.ts apps/scena/src/stripe.ts
+   Kova 10 · Tessa 6 · Scena 5
+```
+
+| behaviour the shared reconciler has | Kova | Tessa | Scena |
+|---|---|---|---|
+| `LADDER_OWNED` guard — a payment event may not stamp over `suspended` / `blocked` / `canceled` / **`closing`** | ✅ | ✅ | ❌ |
+| stale-subscription guard — only the tenant's *current* sub reconciles | ✅ | ✅ | ❌ |
+| card-less `trialing` is refused, not entitled | ✅ | ✅ | ❌ |
+| `charge.refunded` / `charge.dispute.created` → proportional, idempotent credit reversal | ✅ | ❌ | ❌ |
+| `customer.subscription.trial_will_end` | ✅ | ❌ | ❌ |
+
+Three of those are worth stating plainly, because each is money or state and
+none of them fails visibly:
+
+**Nobody but Kova reverses a refund.** All three apps sell the same four credit
+packs (1k/5.5k/30k/130k). Refund one in Tessa or Scena and the credits stay in
+the balance — there is no `charge.refunded` case to hear it. Kova's handling is
+the non-obvious kind: Stripe fires the event for every *partial* refund carrying
+a **cumulative** `amount_refunded`, so a naive handler double-reverses; the
+shared code keys the reversal off the charge id and reads back what it already
+took (`creditsAlreadyReversed`).
+
+**Scena's `invoice.paid` can resurrect a closed workspace.** It writes
+`status: "active"` unconditionally. `@4dl/billing`'s version excludes
+`LADDER_OWNED` and comments on exactly this: a `closing` row stopped matching
+`WHERE status = 'closing'` and *"a studio the owner had asked to close quietly
+came back to life."* Scena has the `closing` rung — it is a documented feature
+of SCENA.md §12a — and nothing protecting it from a late invoice.
+
+**Scena stamps a card-less trial as `trialing` and grants the plan.** Its own
+Checkout collects a card, so the ordinary path is safe; the exposure is a
+subscription created from the Stripe dashboard with a trial and no payment
+method. In Kova this exact shape once granted a free paid tier plus 3,000
+credits, which is why the guard exists.
+
+### Trials: a real mechanism with no operator surface
+
+```
+grep -c "trialDays" apps/app/src/screens/admin/AdminConsole.tsx    # 0
+```
+
+`trialDays` is a first-class member of `EntitlementShape`, clamped for Stripe by
+the package, and reaches `trial_period_days` in all three apps. Shipped values:
+Kova 30 days on Starter/Light and 0 above; Tessa 14; Scena 30 on Starter.
+
+Kova's console section is labelled *"Plans — price, limits and **trials** owners
+buy"*, and `PATCH /admin/plans/:id` accepts `entitlements.trialDays`. The editor
+renders `EntitlementFields` from `featureKeys` + `quotaKeys` plus a field for
+`aiCredits.monthlyGrant` — **every top-level key of `EntitlementShape` except
+`trialDays`**. So the one screen that claims to set trial length is the one
+place you cannot; it is an API call or a redeploy.
+
+### The plan catalog editor is written twice and missing once
+
+| app | plan catalog surface |
+|---|---|
+| Kova | `PlansConfig` — on-sale / retired split, per-plan tenant counts, a grandfathering warning, generic quota + feature fields driven by the server's key list |
+| Scena | `PlansTab` — its own, over `PUT /api/admin/plans/:id` (Kova's is `PATCH`) |
+| Tessa | **none.** No `/admin/plans` route, no panel. Changing a price, a limit or the trial is a code edit, a deploy and a catalog sync |
+
+`@4dl/admin` ships eight panels and a plans panel is not one of them, even
+though `@4dl/billing`'s store already owns `listPlans`, the entitlement
+resolution and the grandfathering snapshot, and even though the *shape* of the
+editor is entirely generic — the server hands over `featureKeys`/`quotaKeys` and
+their labels, which is precisely the registry-injection seam the platform uses
+everywhere else. This is the next instance of the pattern in the pipeline, and
+it is the one an operator meets on day one.
 
 ### The billing STORE and the dunning LADDER
 
@@ -590,6 +688,26 @@ Two halves, and the second is the big one:
   admin console binding, the conformance tests and the build config — with the
   product vocabulary removed. This is the single change that most affects how
   fast the next app ships and how much it looks like the last one.
+
+### 4b. The money path — *do the reconciler before the code move*
+
+Independent of the `BILLING_SCHEMA` reconciliation in step 5, and higher
+priority than it, because these are the findings with money behind them:
+
+1. **Add `charge.refunded` + `charge.dispute.created` to Tessa and Scena.**
+   `resolveReversal` / `creditsAlreadyReversed` are already in `@4dl/billing`
+   and already handle the cumulative-amount trap. Both apps sell the same four
+   credit packs; today a refund in either leaves the credits granted.
+2. **Put Scena's reconciler on `syncStripeSubscription`**, or — if the column
+   shapes make that a step too far before (5) — at minimum add the
+   `LADDER_OWNED` exclusion and the stale-sub guard to `handleWebhook`. A late
+   `invoice.paid` reviving a `closing` workspace is a bug with a paper trail
+   already written in the shared code's comments.
+3. **Ship a plans panel in `@4dl/admin`**, over the generic
+   `featureKeys`/`quotaKeys` payload the server already returns — with a
+   `trialDays` field, which no app can edit today and Kova's section blurb
+   advertises. Kova's `PlansConfig` is the right shape to move; Scena's
+   `PlansTab` and Tessa's absence both resolve into it.
 
 ### 5. Retire Scena's duplicated paths — *largest code win, lowest urgency*
 

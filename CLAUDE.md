@@ -755,7 +755,7 @@ and it is open work.** `docs/PLATFORM-GAPS.md` was the two-app one and every
 item on it is closed; this is the sequel, and the question changed. That audit
 found *a mechanism with no surface*. This one finds the surface shipped, shared
 and good — and **an app that does not mount it**, which fails nothing anywhere.
-Seven instances, the sharpest being that `otpSendGuard` — the one gate in front of
+Eight instances, the sharpest being that `otpSendGuard` — the one gate in front of
 the emailed sign-in code, carrying the bot check, the per-IP ceiling and the
 deliverability pre-flight — is mounted by Kova and by neither other app. Read it
 before assuming a shared capability reaches every product, and before adding an
