@@ -6,15 +6,96 @@
 // point at a separate origin if needed.
 export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 
+/**
+ * ONE DOOR OUT OF THIS MODULE, and the reason it exists is a 401.
+ *
+ * Every call in this file went through a bare `fetch`, which is what an app
+ * written before the platform looks like. `@4dl/app-kit`'s `api` has a hook for
+ * an expired session — `setUnauthorizedHandler`, which `SessionProvider`
+ * installs in Kova and Tessa so a dead cookie drops the person back on the sign-in
+ * screen. Scena had no equivalent, so an expired session did not LOOK expired:
+ * every screen rendered its empty state, every save failed with a toast, and
+ * nothing anywhere said "sign in again". The app was indistinguishable from an
+ * app whose data had been deleted.
+ *
+ * The fix is a chokepoint rather than 167 rewritten call sites, deliberately.
+ * `apiFetch` is `fetch`-shaped — same arguments, same Response — so adopting it
+ * was a rename, and a rename is reviewable in a way 167 hand-edited calls are
+ * not. What it buys beyond the hook is that there is now ONE place to put the
+ * next cross-cutting concern, which is what the kit's `api` is for the other two
+ * apps. Moving the rest of the way (typed `api.get`/`api.post`, `ApiError` with
+ * its status and body) is mechanical from here and no longer urgent.
+ *
+ * ⚠️ `scripts/scena-fetch-chokepoint.test.mjs` fails on a bare `fetch` anywhere
+ * in this SPA outside the two places that must have one. Without it the next
+ * endpoint somebody adds goes back to bypassing the hook, silently, and the
+ * symptom is a signed-out person looking at an empty dashboard.
+ */
+type UnauthorizedHandler = () => void;
+let onUnauthorized: UnauthorizedHandler | null = null;
+
+/**
+ * Called when any request comes back 401 — App.tsx installs a handler that
+ * re-reads the session, which drops to the sign-in screen.
+ *
+ * Registered rather than imported so this module stays free of React: it is
+ * imported by the worker-facing tests and by `brand-theme.ts`, and a component
+ * import here would drag the whole tree into both.
+ */
+export function setUnauthorizedHandler(fn: UnauthorizedHandler | null): void {
+  onUnauthorized = fn;
+}
+
+/**
+ * The two lanes a 401 must NOT be reported on.
+ *
+ * `/api/auth/*` — Better Auth's own endpoints self-report 401: a wrong OTP, a
+ * sign-in before there is a session. That is an ANSWER, not an expiry, and
+ * firing the global re-auth on it would reload the session on the login screen
+ * on every mistyped code, forever.
+ *
+ * `/api/me` — ⚠️ THE RE-ENTRANCY GUARD. The handler's whole job is to re-read
+ * the session, so it calls `getMe`, which comes back through here. Scena's route
+ * guard makes `/api/me` public (it answers `{authenticated: false}` with a 200),
+ * so today that terminates — but the loop it would otherwise be is unbounded and
+ * self-inflicted, and one line in `route-guard.ts` is all that stands between
+ * this and a browser tab spinning until it is closed. The handler must not be
+ * able to trigger itself, whatever the server decides to answer.
+ */
+const isAuthPath = (url: string): boolean => url.includes("/api/auth/") || new URL(url, "http://x").pathname === "/api/me";
+
+/**
+ * The transport. Identical to `fetch` except that a 401 tells the app.
+ *
+ * It does not throw on a non-2xx: the call sites in this file each decide what a
+ * failure means (`apiError` for the ones with a server message worth showing, a
+ * bare status for the ones without), and changing that alongside the transport
+ * would have made this a rewrite instead of a rename.
+ */
+export async function apiFetch(input: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, init);
+  if (res.status === 401 && !isAuthPath(input)) onUnauthorized?.();
+  return res;
+}
+
 /** Build an Error from a failed response, preferring the server's `{ error }`
  *  body (e.g. a plan-limit or validation message) over a bare status code, so
  *  callers can `toast.error(e.message)` and show something a human understands. */
 export async function apiError(res: Response, fallback: string): Promise<Error> {
-  try {
-    const body = (await res.clone().json()) as { error?: string };
-    if (body?.error) return new Error(body.error);
-  } catch { /* non-JSON body — fall through */ }
-  return new Error(`${fallback} (${res.status})`);
+  const err = await (async () => {
+    try {
+      const body = (await res.clone().json()) as { error?: string };
+      if (body?.error) return new Error(body.error);
+    } catch { /* non-JSON body — fall through */ }
+    return new Error(`${fallback} (${res.status})`);
+  })();
+  /*
+    THE STATUS RIDES ALONG. `@4dl/app-kit`'s `ApiError` carries it, and the exit
+    cards branch on it (409 = "you own a workspace, close it first"); a Scena
+    caller that wants to tell 402 from 403 had nothing but the message text to
+    match on, which is a translation away from breaking.
+  */
+  return Object.assign(err, { status: res.status });
 }
 
 /**
@@ -45,7 +126,7 @@ export type CommandAction = "mute" | "unmute" | "refresh" | "screensaver.on" | "
 
 /** Send a remote command to a screen (§11); `at` (epoch ms) schedules it. */
 export async function sendCommand(screenId: string, action: CommandAction, at?: number): Promise<{ id: string; scheduled: boolean }> {
-  const res = await fetch(`${API_BASE}/api/screens/${screenId}/command`, {
+  const res = await apiFetch(`${API_BASE}/api/screens/${screenId}/command`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ action, at }),
@@ -71,26 +152,26 @@ export interface Screen {
 }
 /** Set a device's tags. */
 export async function setScreenTags(id: string, tags: string[]): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/screens/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify({ tags }) });
+  const res = await apiFetch(`${API_BASE}/api/screens/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify({ tags }) });
   if (!res.ok) throw new Error(`update failed (${res.status})`);
 }
 
 /** Fetch a channel's compiled manifest (the published snapshot the screens run).
  *  Unauthenticated/device-facing, so a relative fetch works same-origin. */
 export async function getManifest(channelId: string): Promise<import("@scena/manifest").Manifest> {
-  const res = await fetch(`${API_BASE}/api/manifest/${channelId}`);
+  const res = await apiFetch(`${API_BASE}/api/manifest/${channelId}`);
   if (!res.ok) throw new Error(`manifest ${res.status}`);
   return (await res.json()) as import("@scena/manifest").Manifest;
 }
 
 export async function listScreens(): Promise<Screen[]> {
-  const res = await fetch(`${API_BASE}/api/screens`);
+  const res = await apiFetch(`${API_BASE}/api/screens`);
   if (!res.ok) throw new Error(`listScreens ${res.status}`);
   return ((await res.json()) as { screens: Screen[] }).screens;
 }
 
 export async function getScreen(id: string): Promise<Screen> {
-  const res = await fetch(`${API_BASE}/api/screens/${id}`);
+  const res = await apiFetch(`${API_BASE}/api/screens/${id}`);
   if (!res.ok) throw new Error(`getScreen ${res.status}`);
   return (await res.json()) as Screen;
 }
@@ -125,7 +206,7 @@ export interface Board {
 }
 
 export async function createBoard(kind: BoardKind, name: string, config: unknown = {}): Promise<{ id: string; kind: string; name: string }> {
-  const res = await fetch(`${API_BASE}/api/boards`, {
+  const res = await apiFetch(`${API_BASE}/api/boards`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ kind, name, config }),
@@ -135,20 +216,20 @@ export async function createBoard(kind: BoardKind, name: string, config: unknown
 }
 
 export async function listBoards(): Promise<Board[]> {
-  const res = await fetch(`${API_BASE}/api/boards`);
+  const res = await apiFetch(`${API_BASE}/api/boards`);
   if (!res.ok) throw new Error(`listBoards ${res.status}`);
   return ((await res.json()) as { boards: Board[] }).boards;
 }
 
 export async function getBoard(id: string): Promise<Board> {
-  const res = await fetch(`${API_BASE}/api/boards/${id}`);
+  const res = await apiFetch(`${API_BASE}/api/boards/${id}`);
   if (!res.ok) throw new Error(`getBoard ${res.status}`);
   return (await res.json()) as Board;
 }
 
 /** Public, token-gated live read for the kiosk + board surfaces (no session). */
 export async function getBoardLive(id: string, token: string): Promise<Board> {
-  const res = await fetch(`${API_BASE}/api/boards/${id}/live?token=${encodeURIComponent(token)}`);
+  const res = await apiFetch(`${API_BASE}/api/boards/${id}/live?token=${encodeURIComponent(token)}`);
   if (!res.ok) throw new Error(`getBoardLive ${res.status}`);
   return (await res.json()) as Board;
 }
@@ -172,24 +253,24 @@ export interface BoardAnnounce {
 }
 
 export async function getBoardAnnounce(boardId: string): Promise<BoardAnnounce | null> {
-  const res = await fetch(`${API_BASE}/api/boards/${boardId}/announce`);
+  const res = await apiFetch(`${API_BASE}/api/boards/${boardId}/announce`);
   if (!res.ok) return null;
   return (await res.json()) as BoardAnnounce;
 }
 
 export async function setBoardAnnounce(boardId: string, patch: Partial<AnnounceConfig>): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/boards/${boardId}/announce`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
+  const res = await apiFetch(`${API_BASE}/api/boards/${boardId}/announce`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
   if (!res.ok) throw await apiError(res, "setBoardAnnounce");
 }
 
 /** Generate a sample announcement in the current settings (returns a clip URL). */
 export async function previewBoardAnnounce(boardId: string): Promise<{ ok?: boolean; url?: string; credits?: number; cached?: boolean; error?: string; detail?: string }> {
-  const res = await fetch(`${API_BASE}/api/boards/${boardId}/announce/preview`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/boards/${boardId}/announce/preview`, { method: "POST" });
   return (await res.json().catch(() => ({}))) as { ok?: boolean; url?: string; credits?: number; cached?: boolean; error?: string; detail?: string };
 }
 
 async function stationAction(boardId: string, action: string, body: Record<string, unknown>): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/boards/${boardId}/${action}`, {
+  const res = await apiFetch(`${API_BASE}/api/boards/${boardId}/${action}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -213,17 +294,17 @@ export const setScorePeriodSession = (boardId: string, period: string) => statio
 export interface BoardUser { id: string; kind: "coordinator" | "station"; stationId: string | null; label: string; username: string; password: string }
 
 export async function getBoardUsers(boardId: string): Promise<BoardUser[]> {
-  const res = await fetch(`${API_BASE}/api/boards/${boardId}/users`);
+  const res = await apiFetch(`${API_BASE}/api/boards/${boardId}/users`);
   if (!res.ok) return [];
   return ((await res.json()) as { users: BoardUser[] }).users ?? [];
 }
 export async function regenerateBoardUser(boardId: string, rid: string): Promise<string | null> {
-  const res = await fetch(`${API_BASE}/api/boards/${boardId}/users/${rid}/regenerate`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/boards/${boardId}/users/${rid}/regenerate`, { method: "POST" });
   if (!res.ok) return null;
   return ((await res.json()) as { password?: string }).password ?? null;
 }
 export async function deleteBoard(boardId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/boards/${boardId}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/boards/${boardId}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`deleteBoard ${res.status}`);
 }
 
@@ -233,27 +314,27 @@ export interface QueueCategory { id: string; name: string; prefix: string }
 
 /** Kiosk: issue a ticket in a category (kiosk-token gated). */
 export async function issueTicket(boardId: string, token: string, categoryId?: string): Promise<{ ticket?: { prefix: string; number: number; label: string | null; ahead: number }; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/boards/${boardId}/issue`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, categoryId }) });
+  const res = await apiFetch(`${API_BASE}/api/boards/${boardId}/issue`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ token, categoryId }) });
   return (await res.json().catch(() => ({}))) as { ticket?: { prefix: string; number: number; label: string | null; ahead: number }; error?: string };
 }
 
 /** Operator: mint a kiosk (issue-only) link for a queue board. */
 export async function mintKiosk(boardId: string): Promise<{ token: string; kioskPath: string }> {
-  const res = await fetch(`${API_BASE}/api/boards/${boardId}/kiosk`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/boards/${boardId}/kiosk`, { method: "POST" });
   if (!res.ok) throw new Error(`mintKiosk ${res.status}`);
   return (await res.json()) as { token: string; kioskPath: string };
 }
 
 /** Operator: set a queue board's service categories. */
 export async function setBoardCategories(boardId: string, categories: QueueCategory[], prefix?: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/boards/${boardId}/categories`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ categories, prefix }) });
+  const res = await apiFetch(`${API_BASE}/api/boards/${boardId}/categories`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ categories, prefix }) });
   if (!res.ok) throw await apiError(res, "setBoardCategories");
 }
 
 /** Set a queue board's counters (service desks). Returns the normalized counters
  *  and the refreshed logins (a new counter gets its own station sign-in). */
 export async function setBoardCounters(boardId: string, counters: QueueCounter[]): Promise<{ counters: QueueCounter[]; users: BoardUser[] }> {
-  const res = await fetch(`${API_BASE}/api/boards/${boardId}/counters`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ counters }) });
+  const res = await apiFetch(`${API_BASE}/api/boards/${boardId}/counters`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ counters }) });
   if (!res.ok) throw await apiError(res, "setBoardCounters");
   return (await res.json()) as { counters: QueueCounter[]; users: BoardUser[] };
 }
@@ -265,7 +346,7 @@ export async function setBoardRooms(
   rooms: RoomState["rooms"],
   statuses: RoomState["statuses"],
 ): Promise<{ state: RoomState; users: BoardUser[] }> {
-  const res = await fetch(`${API_BASE}/api/boards/${boardId}/rooms`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ rooms, statuses }) });
+  const res = await apiFetch(`${API_BASE}/api/boards/${boardId}/rooms`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ rooms, statuses }) });
   if (!res.ok) throw await apiError(res, "setBoardRooms");
   return (await res.json()) as { state: RoomState; users: BoardUser[] };
 }
@@ -277,7 +358,7 @@ export async function setBoardSides(
   sides: { id: string; name: string; short: string; color: string }[],
   title?: string,
 ): Promise<{ state: ScoreState; users: BoardUser[] }> {
-  const res = await fetch(`${API_BASE}/api/boards/${boardId}/sides`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sides, title }) });
+  const res = await apiFetch(`${API_BASE}/api/boards/${boardId}/sides`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ sides, title }) });
   if (!res.ok) throw await apiError(res, "setBoardSides");
   return (await res.json()) as { state: ScoreState; users: BoardUser[] };
 }
@@ -291,7 +372,7 @@ export interface AnalyticsSummary {
 }
 
 export async function getAnalytics(): Promise<AnalyticsSummary> {
-  const res = await fetch(`${API_BASE}/api/analytics/summary`);
+  const res = await apiFetch(`${API_BASE}/api/analytics/summary`);
   if (!res.ok) throw new Error(`getAnalytics ${res.status}`);
   return (await res.json()) as AnalyticsSummary;
 }
@@ -327,18 +408,18 @@ export interface Channel {
 /** One channel with its composition refs (and legacy inline slides). Used by the
  *  display studio to resolve a screen's slide/music/widget building blocks. */
 export async function getChannel(id: string): Promise<Channel> {
-  const res = await fetch(`${API_BASE}/api/channels/${id}`);
+  const res = await apiFetch(`${API_BASE}/api/channels/${id}`);
   if (!res.ok) throw new Error(`getChannel ${res.status}`);
   return (await res.json()) as Channel;
 }
 /** Rename a channel and/or set its tags. */
 export async function updateChannel(id: string, patch: { name?: string; tags?: string[] }): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/channels/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
+  const res = await apiFetch(`${API_BASE}/api/channels/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
   if (!res.ok) throw new Error(`update failed (${res.status})`);
 }
 /** Delete a channel; the API also unassigns it from every device that used it. */
 export async function deleteChannel(id: string): Promise<{ unassigned?: number }> {
-  const res = await fetch(`${API_BASE}/api/channels/${id}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/channels/${id}`, { method: "DELETE" });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error || `delete failed (${res.status})`);
@@ -347,19 +428,19 @@ export async function deleteChannel(id: string): Promise<{ unassigned?: number }
 }
 /** Whether a channel has unpublished changes (content diff vs the live version). */
 export async function getChannelPublishState(id: string): Promise<{ dirty: boolean; liveVersion: number | null }> {
-  const res = await fetch(`${API_BASE}/api/channels/${id}/publish-state`);
+  const res = await apiFetch(`${API_BASE}/api/channels/${id}/publish-state`);
   if (!res.ok) return { dirty: false, liveVersion: null };
   return (await res.json()) as { dirty: boolean; liveVersion: number | null };
 }
 /** Set/clear the human label on a published version. */
 export async function setVersionNote(id: string, version: number, note: string): Promise<void> {
-  await fetch(`${API_BASE}/api/channels/${id}/versions/${version}`, { method: "PUT", headers: jhead, body: JSON.stringify({ note }) });
+  await apiFetch(`${API_BASE}/api/channels/${id}/versions/${version}`, { method: "PUT", headers: jhead, body: JSON.stringify({ note }) });
 }
 
 export const assetUrl = (url: string) => (url.startsWith("http") ? url : `${API_BASE}${url}`);
 
 export async function listChannels(): Promise<Channel[]> {
-  const res = await fetch(`${API_BASE}/api/channels`);
+  const res = await apiFetch(`${API_BASE}/api/channels`);
   if (!res.ok) throw new Error(`listChannels ${res.status}`);
   return ((await res.json()) as { channels: Channel[] }).channels;
 }
@@ -392,35 +473,35 @@ export interface PlaylistSlide {
 const jhead = { "content-type": "application/json" };
 
 export async function listSlidePlaylists(): Promise<SlidePlaylist[]> {
-  return ((await (await fetch(`${API_BASE}/api/slide-playlists`)).json()) as { playlists: SlidePlaylist[] }).playlists;
+  return ((await (await apiFetch(`${API_BASE}/api/slide-playlists`)).json()) as { playlists: SlidePlaylist[] }).playlists;
 }
 export async function createSlidePlaylist(name: string): Promise<string> {
-  return ((await (await fetch(`${API_BASE}/api/slide-playlists`, { method: "POST", headers: jhead, body: JSON.stringify({ name }) })).json()) as { id: string }).id;
+  return ((await (await apiFetch(`${API_BASE}/api/slide-playlists`, { method: "POST", headers: jhead, body: JSON.stringify({ name }) })).json()) as { id: string }).id;
 }
 export async function getSlidePlaylist(id: string): Promise<SlidePlaylist & { slides: PlaylistSlide[] }> {
-  return (await (await fetch(`${API_BASE}/api/slide-playlists/${id}`)).json()) as SlidePlaylist & { slides: PlaylistSlide[] };
+  return (await (await apiFetch(`${API_BASE}/api/slide-playlists/${id}`)).json()) as SlidePlaylist & { slides: PlaylistSlide[] };
 }
 export async function updateSlidePlaylist(id: string, patch: { name?: string; defaultDurationMs?: number; transition?: string; tags?: string[] }): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/slide-playlists/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
+  const res = await apiFetch(`${API_BASE}/api/slide-playlists/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
   if (!res.ok) throw new Error(`update failed (${res.status})`);
 }
 export async function deleteSlidePlaylist(id: string, alsoDeleteMedia = false): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/slide-playlists/${id}${alsoDeleteMedia ? "?media=1" : ""}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/slide-playlists/${id}${alsoDeleteMedia ? "?media=1" : ""}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`delete failed (${res.status})`);
 }
 export async function addPlaylistSlide(id: string, slide: { type: string; assetHash?: string; assetUrl?: string; htmlBody?: string; durationMs?: number; fit?: string }): Promise<string> {
-  return ((await (await fetch(`${API_BASE}/api/slide-playlists/${id}/slides`, { method: "POST", headers: jhead, body: JSON.stringify(slide) })).json()) as { id: string }).id;
+  return ((await (await apiFetch(`${API_BASE}/api/slide-playlists/${id}/slides`, { method: "POST", headers: jhead, body: JSON.stringify(slide) })).json()) as { id: string }).id;
 }
 export async function updatePlaylistSlide(id: string, slideId: string, patch: { durationMs?: number | null; fit?: string; htmlBody?: string; clipStartMs?: number | null; loop?: boolean }): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/slide-playlists/${id}/slides/${slideId}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
+  const res = await apiFetch(`${API_BASE}/api/slide-playlists/${id}/slides/${slideId}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
   if (!res.ok) throw new Error(`update failed (${res.status})`);
 }
 export async function deletePlaylistSlide(id: string, slideId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/slide-playlists/${id}/slides/${slideId}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/slide-playlists/${id}/slides/${slideId}`, { method: "DELETE" });
   if (!res.ok) throw await apiError(res, "deletePlaylistSlide");
 }
 export async function reorderPlaylistSlidesApi(id: string, order: string[]): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/slide-playlists/${id}/reorder`, { method: "POST", headers: jhead, body: JSON.stringify({ order }) });
+  const res = await apiFetch(`${API_BASE}/api/slide-playlists/${id}/reorder`, { method: "POST", headers: jhead, body: JSON.stringify({ order }) });
   if (!res.ok) throw await apiError(res, "reorderPlaylistSlidesApi");
 }
 
@@ -438,40 +519,40 @@ export interface PlaylistTrack {
 }
 
 export async function listMusicPlaylists(): Promise<MusicPlaylist[]> {
-  return ((await (await fetch(`${API_BASE}/api/music-playlists`)).json()) as { playlists: MusicPlaylist[] }).playlists;
+  return ((await (await apiFetch(`${API_BASE}/api/music-playlists`)).json()) as { playlists: MusicPlaylist[] }).playlists;
 }
 export async function createMusicPlaylist(name: string): Promise<string> {
-  return ((await (await fetch(`${API_BASE}/api/music-playlists`, { method: "POST", headers: jhead, body: JSON.stringify({ name }) })).json()) as { id: string }).id;
+  return ((await (await apiFetch(`${API_BASE}/api/music-playlists`, { method: "POST", headers: jhead, body: JSON.stringify({ name }) })).json()) as { id: string }).id;
 }
 export async function getMusicPlaylist(id: string): Promise<MusicPlaylist & { tracks: PlaylistTrack[] }> {
-  return (await (await fetch(`${API_BASE}/api/music-playlists/${id}`)).json()) as MusicPlaylist & { tracks: PlaylistTrack[] };
+  return (await (await apiFetch(`${API_BASE}/api/music-playlists/${id}`)).json()) as MusicPlaylist & { tracks: PlaylistTrack[] };
 }
 export async function updateMusicPlaylist(id: string, patch: { name?: string; shuffle?: boolean; tags?: string[] }): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/music-playlists/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
+  const res = await apiFetch(`${API_BASE}/api/music-playlists/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
   if (!res.ok) throw new Error(`update failed (${res.status})`);
 }
 export async function deleteMusicPlaylist(id: string, alsoDeleteMedia = false): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/music-playlists/${id}${alsoDeleteMedia ? "?media=1" : ""}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/music-playlists/${id}${alsoDeleteMedia ? "?media=1" : ""}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`delete failed (${res.status})`);
 }
 export async function addPlaylistTrack(id: string, t: { title: string; assetHash: string; assetUrl: string; durationMs: number; artist?: string; album?: string; artHash?: string; artUrl?: string; genres?: string[]; vocal?: string; mediaId?: string }): Promise<string> {
-  return ((await (await fetch(`${API_BASE}/api/music-playlists/${id}/tracks`, { method: "POST", headers: jhead, body: JSON.stringify(t) })).json()) as { id: string }).id;
+  return ((await (await apiFetch(`${API_BASE}/api/music-playlists/${id}/tracks`, { method: "POST", headers: jhead, body: JSON.stringify(t) })).json()) as { id: string }).id;
 }
 export async function updatePlaylistTrack(id: string, trackId: string, patch: { title?: string; artist?: string; album?: string; genres?: string[]; vocal?: string | null; artHash?: string | null; artUrl?: string | null }): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/music-playlists/${id}/tracks/${trackId}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
+  const res = await apiFetch(`${API_BASE}/api/music-playlists/${id}/tracks/${trackId}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
   if (!res.ok) throw new Error(`update failed (${res.status})`);
 }
 export async function deletePlaylistTrack(id: string, trackId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/music-playlists/${id}/tracks/${trackId}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/music-playlists/${id}/tracks/${trackId}`, { method: "DELETE" });
   if (!res.ok) throw await apiError(res, "deletePlaylistTrack");
 }
 export async function reorderPlaylistTracksApi(id: string, order: string[]): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/music-playlists/${id}/reorder`, { method: "POST", headers: jhead, body: JSON.stringify({ order }) });
+  const res = await apiFetch(`${API_BASE}/api/music-playlists/${id}/reorder`, { method: "POST", headers: jhead, body: JSON.stringify({ order }) });
   if (!res.ok) throw await apiError(res, "reorderPlaylistTracksApi");
 }
 /** Add a public-library track into a music playlist by reference (quota-enforced). */
 export async function addPublicTrackToPlaylist(id: string, libraryId: string): Promise<{ id?: string; mediaId?: string; error?: string; limit?: number; used?: number }> {
-  const res = await fetch(`${API_BASE}/api/music-playlists/${id}/library/${libraryId}`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/music-playlists/${id}/library/${libraryId}`, { method: "POST" });
   return (await res.json().catch(() => ({}))) as { id?: string; mediaId?: string; error?: string; limit?: number; used?: number };
 }
 
@@ -480,50 +561,50 @@ export async function addPublicTrackToPlaylist(id: string, libraryId: string): P
 export interface WidgetProfile { id: string; name: string; design_w: number | null; design_h: number | null; created_at: number; }
 
 export async function listWidgetProfiles(): Promise<WidgetProfile[]> {
-  return ((await (await fetch(`${API_BASE}/api/profiles`)).json()) as { profiles: WidgetProfile[] }).profiles;
+  return ((await (await apiFetch(`${API_BASE}/api/profiles`)).json()) as { profiles: WidgetProfile[] }).profiles;
 }
 export async function createWidgetProfile(name: string, opts: { designW?: number; designH?: number } = {}): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/profiles`, { method: "POST", headers: jhead, body: JSON.stringify({ name, ...opts }) });
+  const res = await apiFetch(`${API_BASE}/api/profiles`, { method: "POST", headers: jhead, body: JSON.stringify({ name, ...opts }) });
   if (!res.ok) throw await apiError(res, "createWidgetProfile");
   return ((await res.json()) as { id: string }).id;
 }
 export async function getWidgetProfile(id: string): Promise<WidgetProfile & { widgets: unknown[] }> {
-  return (await (await fetch(`${API_BASE}/api/profiles/${id}`)).json()) as WidgetProfile & { widgets: unknown[] };
+  return (await (await apiFetch(`${API_BASE}/api/profiles/${id}`)).json()) as WidgetProfile & { widgets: unknown[] };
 }
 export async function updateWidgetProfile(id: string, patch: { name?: string; designW?: number; designH?: number }): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/profiles/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
+  const res = await apiFetch(`${API_BASE}/api/profiles/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
   if (!res.ok) throw await apiError(res, "updateWidgetProfile");
 }
 export async function saveProfileWidgets(id: string, widgets: unknown[]): Promise<void> {
   // Surface failures — a silently-swallowed save let the builder believe a layout
   // was persisted when it wasn't (and a later save could then wipe good data).
-  const res = await fetch(`${API_BASE}/api/profiles/${id}/widgets`, { method: "PUT", headers: jhead, body: JSON.stringify({ widgets }) });
+  const res = await apiFetch(`${API_BASE}/api/profiles/${id}/widgets`, { method: "PUT", headers: jhead, body: JSON.stringify({ widgets }) });
   if (!res.ok) throw await apiError(res, "saveProfileWidgets");
 }
 export async function deleteWidgetProfile(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/profiles/${id}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/profiles/${id}`, { method: "DELETE" });
   if (!res.ok) throw await apiError(res, "deleteWidgetProfile");
 }
 
 /* --------------------- channel composition + devices --------------------- */
 
 export async function setChannelComposition(channelId: string, refs: { slidePlaylistId?: string | null; musicPlaylistId?: string | null; widgetProfileId?: string | null; adProfileId?: string | null }): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/channels/${channelId}/composition`, { method: "PUT", headers: jhead, body: JSON.stringify(refs) });
+  const res = await apiFetch(`${API_BASE}/api/channels/${channelId}/composition`, { method: "PUT", headers: jhead, body: JSON.stringify(refs) });
   if (!res.ok) throw await apiError(res, "setChannelComposition");
 }
 export async function setDeviceDimensions(id: string, dims: { width: number; height: number; orientation?: string }): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/screens/${id}/dimensions`, { method: "PUT", headers: jhead, body: JSON.stringify(dims) });
+  const res = await apiFetch(`${API_BASE}/api/screens/${id}/dimensions`, { method: "PUT", headers: jhead, body: JSON.stringify(dims) });
   if (!res.ok) throw await apiError(res, "setDeviceDimensions");
 }
 export async function setDeviceActiveChannel(id: string, channelId: string | null): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/screens/${id}/channel`, { method: "PUT", headers: jhead, body: JSON.stringify({ channelId }) });
+  const res = await apiFetch(`${API_BASE}/api/screens/${id}/channel`, { method: "PUT", headers: jhead, body: JSON.stringify({ channelId }) });
   if (!res.ok) throw await apiError(res, "setDeviceActiveChannel");
 }
 export async function getDeviceChannels(id: string): Promise<string[]> {
-  return ((await (await fetch(`${API_BASE}/api/screens/${id}/channels`)).json()) as { channelIds: string[] }).channelIds;
+  return ((await (await apiFetch(`${API_BASE}/api/screens/${id}/channels`)).json()) as { channelIds: string[] }).channelIds;
 }
 export async function setDeviceChannels(id: string, channelIds: string[]): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/screens/${id}/channels`, { method: "PUT", headers: jhead, body: JSON.stringify({ channelIds }) });
+  const res = await apiFetch(`${API_BASE}/api/screens/${id}/channels`, { method: "PUT", headers: jhead, body: JSON.stringify({ channelIds }) });
   if (!res.ok) throw await apiError(res, "setDeviceChannels");
 }
 
@@ -547,7 +628,7 @@ export interface DeviceScheduleData {
 }
 
 export async function getDeviceSchedule(id: string): Promise<DeviceScheduleData> {
-  const res = await fetch(`${API_BASE}/api/screens/${id}/schedule`);
+  const res = await apiFetch(`${API_BASE}/api/screens/${id}/schedule`);
   if (!res.ok) throw new Error(`getDeviceSchedule ${res.status}`);
   return (await res.json()) as DeviceScheduleData;
 }
@@ -555,29 +636,29 @@ export async function addDeviceScheduleRule(
   id: string,
   rule: { kind: ScheduleKind; days: number[]; startMin: number; endMin: number; channelId?: string | null; priority?: number },
 ): Promise<{ id?: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/screens/${id}/schedule/rules`, { method: "POST", headers: jhead, body: JSON.stringify(rule) });
+  const res = await apiFetch(`${API_BASE}/api/screens/${id}/schedule/rules`, { method: "POST", headers: jhead, body: JSON.stringify(rule) });
   return (await res.json().catch(() => ({}))) as { id?: string; error?: string };
 }
 export async function deleteDeviceScheduleRule(id: string, ruleId: string): Promise<void> {
-  await fetch(`${API_BASE}/api/screens/${id}/schedule/rules/${ruleId}`, { method: "DELETE" });
+  await apiFetch(`${API_BASE}/api/screens/${id}/schedule/rules/${ruleId}`, { method: "DELETE" });
 }
 export async function setDeviceScheduleTz(id: string, tz: string): Promise<void> {
-  await fetch(`${API_BASE}/api/screens/${id}/schedule`, { method: "PATCH", headers: jhead, body: JSON.stringify({ tz }) });
+  await apiFetch(`${API_BASE}/api/screens/${id}/schedule`, { method: "PATCH", headers: jhead, body: JSON.stringify({ tz }) });
 }
 /** Rename a device. */
 export async function renameScreen(id: string, name: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/screens/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify({ name }) });
+  const res = await apiFetch(`${API_BASE}/api/screens/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify({ name }) });
   if (!res.ok) throw new Error(`rename failed (${res.status})`);
 }
 /** Unpair a device: it stops playing and returns to a fresh pairing code. */
 export async function unpairScreen(id: string): Promise<{ ok: boolean; code?: string }> {
-  const res = await fetch(`${API_BASE}/api/screens/${id}/unpair`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/screens/${id}/unpair`, { method: "POST" });
   if (!res.ok) throw new Error(`unpair failed (${res.status})`);
   return (await res.json()) as { ok: boolean; code?: string };
 }
 /** Permanently remove a device. The API rejects this unless it's unpaired. */
 export async function removeScreen(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/screens/${id}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/screens/${id}`, { method: "DELETE" });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
     throw new Error(body.error || `remove failed (${res.status})`);
@@ -586,7 +667,7 @@ export async function removeScreen(id: string): Promise<void> {
 
 /** Upload media to R2 (content-addressed) and return its hash + url. */
 export async function uploadAsset(file: File): Promise<{ hash: string; url: string }> {
-  const res = await fetch(`${API_BASE}/api/assets`, { method: "PUT", headers: { "content-type": file.type || "application/octet-stream" }, body: file });
+  const res = await apiFetch(`${API_BASE}/api/assets`, { method: "PUT", headers: { "content-type": file.type || "application/octet-stream" }, body: file });
   if (!res.ok) throw new Error(`upload failed (${res.status})`);
   return (await res.json()) as { hash: string; url: string };
 }
@@ -610,10 +691,10 @@ import type { WorkspaceBrand } from "./brand-theme.js";
 export type { WorkspaceBrand };
 
 export async function getBranding(): Promise<WorkspaceBrand> {
-  return ((await (await fetch(`${API_BASE}/api/branding`)).json()) as { branding: WorkspaceBrand }).branding;
+  return ((await (await apiFetch(`${API_BASE}/api/branding`)).json()) as { branding: WorkspaceBrand }).branding;
 }
 export async function setBranding(patch: Partial<WorkspaceBrand>): Promise<WorkspaceBrand> {
-  const res = await fetch(`${API_BASE}/api/branding`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
+  const res = await apiFetch(`${API_BASE}/api/branding`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
   if (!res.ok) throw new Error(`save failed (${res.status})`);
   return ((await res.json()) as { branding: WorkspaceBrand }).branding;
 }
@@ -731,13 +812,13 @@ export function parseGifDurationMs(buf: ArrayBuffer): number {
 
 /** Fetch a GIF and return its single-loop duration in ms (0 if unknown). */
 export async function fetchGifDurationMs(url: string): Promise<number> {
-  try { return parseGifDurationMs(await (await fetch(url)).arrayBuffer()); }
+  try { return parseGifDurationMs(await (await apiFetch(url)).arrayBuffer()); }
   catch { return 0; }
 }
 
 export async function listMedia(kind?: string): Promise<Media[]> {
   const q = kind ? `?kind=${encodeURIComponent(kind)}` : "";
-  return ((await (await fetch(`${API_BASE}/api/media${q}`)).json()) as { media: Media[] }).media;
+  return ((await (await apiFetch(`${API_BASE}/api/media${q}`)).json()) as { media: Media[] }).media;
 }
 export interface MediaMetaInput {
   kind: string; name?: string; assetHash?: string; assetUrl?: string; htmlBody?: string; mime?: string; bytes?: number;
@@ -745,16 +826,16 @@ export interface MediaMetaInput {
   artist?: string; album?: string; genres?: string[]; vocal?: string; artHash?: string; artUrl?: string; source?: MediaSource;
 }
 export async function registerMedia(m: MediaMetaInput): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/media`, { method: "POST", headers: jhead, body: JSON.stringify(m) });
+  const res = await apiFetch(`${API_BASE}/api/media`, { method: "POST", headers: jhead, body: JSON.stringify(m) });
   if (!res.ok) throw new Error(`register failed (${res.status})`);
   return ((await res.json()) as { id: string }).id;
 }
 export async function updateMedia(id: string, patch: { name?: string; tags?: string[]; htmlBody?: string; artist?: string; album?: string; genres?: string[]; vocal?: string | null; artHash?: string | null; artUrl?: string | null }): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/media/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
+  const res = await apiFetch(`${API_BASE}/api/media/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
   if (!res.ok) throw new Error(`update failed (${res.status})`);
 }
 export async function deleteMedia(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/media/${id}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/media/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`delete failed (${res.status})`);
 }
 
@@ -768,13 +849,13 @@ export async function uploadToLibrary(file: File): Promise<{ id: string; kind: "
 }
 
 export async function removeSlide(channelId: string, slideId: string): Promise<void> {
-  await fetch(`${API_BASE}/api/channels/${channelId}/slides/${slideId}`, { method: "DELETE" });
+  await apiFetch(`${API_BASE}/api/channels/${channelId}/slides/${slideId}`, { method: "DELETE" });
 }
 export async function reorderSlides(channelId: string, order: string[]): Promise<void> {
-  await fetch(`${API_BASE}/api/channels/${channelId}/reorder`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ order }) });
+  await apiFetch(`${API_BASE}/api/channels/${channelId}/reorder`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ order }) });
 }
 export async function publishChannel(channelId: string): Promise<{ nudged: number; version?: number }> {
-  const res = await fetch(`${API_BASE}/api/channels/${channelId}/publish`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/channels/${channelId}/publish`, { method: "POST" });
   if (!res.ok) throw await apiError(res, "publish");
   return (await res.json()) as { nudged: number; version?: number };
 }
@@ -785,13 +866,13 @@ export async function channelsUsingPlaylist(
   kind: "slide" | "music" | "widget" | "ad",
   id: string,
 ): Promise<{ id: string; name: string }[]> {
-  const res = await fetch(`${API_BASE}/api/playlists/${kind}/${id}/channels`);
+  const res = await apiFetch(`${API_BASE}/api/playlists/${kind}/${id}/channels`);
   if (!res.ok) return [];
   return ((await res.json()) as { channels?: { id: string; name: string }[] }).channels ?? [];
 }
 
 export async function createChannel(name: string): Promise<{ id: string }> {
-  const res = await fetch(`${API_BASE}/api/channels`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) });
+  const res = await apiFetch(`${API_BASE}/api/channels`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) });
   if (!res.ok) throw await apiError(res, "createChannel");
   return (await res.json()) as { id: string };
 }
@@ -821,30 +902,30 @@ export interface Feed {
 }
 
 export async function listFeeds(): Promise<Feed[]> {
-  return ((await (await fetch(`${API_BASE}/api/feeds`)).json()) as { feeds: Feed[] }).feeds;
+  return ((await (await apiFetch(`${API_BASE}/api/feeds`)).json()) as { feeds: Feed[] }).feeds;
 }
 export async function getFeed(id: string): Promise<Feed> {
-  return (await (await fetch(`${API_BASE}/api/feeds/${id}`)).json()) as Feed;
+  return (await (await apiFetch(`${API_BASE}/api/feeds/${id}`)).json()) as Feed;
 }
 /** The normalized dataset a source produces (for a bound widget's preview). */
 export async function getSourceData(id: string): Promise<SourceDataset> {
-  const res = await fetch(`${API_BASE}/api/feeds/${id}/data`);
+  const res = await apiFetch(`${API_BASE}/api/feeds/${id}/data`);
   if (!res.ok) return { columns: [], rows: [] };
   return ((await res.json()) as { dataset: SourceDataset }).dataset ?? { columns: [], rows: [] };
 }
 /** Dry-run a source's config (fetch + normalize) without saving — for the mapping UI. */
 export async function previewSource(provider: SourceProvider, config: unknown): Promise<{ dataset?: SourceDataset; rowCount?: number; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/feeds/preview`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider, config }) });
+  const res = await apiFetch(`${API_BASE}/api/feeds/preview`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ provider, config }) });
   return (await res.json()) as { dataset?: SourceDataset; rowCount?: number; error?: string };
 }
 /** Create a source of any provider with its full config + fetch frequency. */
 export async function createSource(input: { name: string; provider: SourceProvider; config?: unknown; refreshSec?: number }): Promise<{ id: string }> {
-  const res = await fetch(`${API_BASE}/api/feeds`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+  const res = await apiFetch(`${API_BASE}/api/feeds`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
   if (!res.ok) throw await apiError(res, "createSource");
   return (await res.json()) as { id: string };
 }
 export async function updateSource(id: string, patch: { name?: string; config?: unknown; refreshSec?: number }): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/feeds/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
+  const res = await apiFetch(`${API_BASE}/api/feeds/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
   if (!res.ok) throw await apiError(res, "updateSource");
 }
 /** Legacy helper kept for the manual/rss quick-create path. */
@@ -852,18 +933,18 @@ export async function createFeed(name: string, provider: "manual" | "rss", url?:
   return createSource({ name, provider, config: url ? { url } : {} });
 }
 export async function addFeedItem(id: string, title: string, link?: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/feeds/${id}/items`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, link }) });
+  const res = await apiFetch(`${API_BASE}/api/feeds/${id}/items`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title, link }) });
   if (!res.ok) throw await apiError(res, "addFeedItem");
 }
 export async function deleteFeedItem(id: string, itemId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/feeds/${id}/items/${itemId}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/feeds/${id}/items/${itemId}`, { method: "DELETE" });
   if (!res.ok) throw await apiError(res, "deleteFeedItem");
 }
 export async function refreshFeed(id: string): Promise<{ count?: number; error?: string }> {
-  return (await (await fetch(`${API_BASE}/api/feeds/${id}/refresh`, { method: "POST" })).json()) as { count?: number; error?: string };
+  return (await (await apiFetch(`${API_BASE}/api/feeds/${id}/refresh`, { method: "POST" })).json()) as { count?: number; error?: string };
 }
 export async function deleteFeed(id: string): Promise<void> {
-  await fetch(`${API_BASE}/api/feeds/${id}`, { method: "DELETE" });
+  await apiFetch(`${API_BASE}/api/feeds/${id}`, { method: "DELETE" });
 }
 
 /* --------------------------------- alerts --------------------------------- */
@@ -887,16 +968,16 @@ export interface AlertRule {
 }
 
 export async function listAlerts(): Promise<AlertRow[]> {
-  return ((await (await fetch(`${API_BASE}/api/alerts`)).json()) as { alerts: AlertRow[] }).alerts;
+  return ((await (await apiFetch(`${API_BASE}/api/alerts`)).json()) as { alerts: AlertRow[] }).alerts;
 }
 export async function listAlertRules(): Promise<AlertRule[]> {
-  return ((await (await fetch(`${API_BASE}/api/alerts/rules`)).json()) as { rules: AlertRule[] }).rules;
+  return ((await (await apiFetch(`${API_BASE}/api/alerts/rules`)).json()) as { rules: AlertRule[] }).rules;
 }
 export async function addAlertRule(rule: { type: string; thresholdSec: number; channel: string; target?: string }): Promise<void> {
-  await fetch(`${API_BASE}/api/alerts/rules`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(rule) });
+  await apiFetch(`${API_BASE}/api/alerts/rules`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(rule) });
 }
 export async function deleteAlertRule(id: string): Promise<void> {
-  await fetch(`${API_BASE}/api/alerts/rules/${id}`, { method: "DELETE" });
+  await apiFetch(`${API_BASE}/api/alerts/rules/${id}`, { method: "DELETE" });
 }
 
 export type OverrideTone = "alarm" | "warning" | "info" | "neutral" | "success";
@@ -913,7 +994,7 @@ export interface ActiveEmergency {
 /** Broadcast a full-screen takeover to the tenant's screens (§12) — an emergency
  *  or an everyday notice, depending on the tone. */
 export async function broadcastEmergency(title: string, body: string, tone: OverrideTone = "alarm"): Promise<{ overrideId: string; count: number }> {
-  const res = await fetch(`${API_BASE}/api/emergency`, {
+  const res = await apiFetch(`${API_BASE}/api/emergency`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ title, body, tone }),
@@ -923,13 +1004,13 @@ export async function broadcastEmergency(title: string, body: string, tone: Over
 }
 
 export async function clearEmergency(): Promise<{ cleared: number }> {
-  const res = await fetch(`${API_BASE}/api/emergency/clear`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/emergency/clear`, { method: "POST" });
   if (!res.ok) throw new Error(`clear failed (${res.status})`);
   return (await res.json()) as { cleared: number };
 }
 
 export async function getActiveEmergency(): Promise<ActiveEmergency | null> {
-  const res = await fetch(`${API_BASE}/api/emergency/active`);
+  const res = await apiFetch(`${API_BASE}/api/emergency/active`);
   if (!res.ok) return null;
   return ((await res.json()) as { active: ActiveEmergency | null }).active;
 }
@@ -937,7 +1018,7 @@ export async function getActiveEmergency(): Promise<ActiveEmergency | null> {
 /** Claim a pairing code (§6). A new device is auto-provisioned its own editable
  *  display; pass `sample` to also seed a starter scene so it lights up at once. */
 export async function claimScreen(code: string, name: string, sample = false): Promise<ClaimResult> {
-  const res = await fetch(`${API_BASE}/api/pair/claim`, {
+  const res = await apiFetch(`${API_BASE}/api/pair/claim`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ code, name, sample }),
@@ -949,7 +1030,7 @@ export async function claimScreen(code: string, name: string, sample = false): P
 
 /** One-click "load a sample display" onto a screen (§ onboarding). */
 export async function seedSampleDisplay(screenId: string): Promise<{ channelId: string | null }> {
-  const res = await fetch(`${API_BASE}/api/screens/${screenId}/seed-sample`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/screens/${screenId}/seed-sample`, { method: "POST" });
   if (!res.ok) throw await apiError(res, "seedSampleDisplay");
   return (await res.json()) as { channelId: string | null };
 }
@@ -957,14 +1038,14 @@ export async function seedSampleDisplay(screenId: string): Promise<{ channelId: 
 /** Create a display (channel + composed blocks) not yet bound to a screen — prep
  *  content ahead of pairing, then assign it as a screen's channel later. */
 export async function createDisplay(name?: string, sample = false): Promise<{ channelId: string }> {
-  const res = await fetch(`${API_BASE}/api/displays`, { method: "POST", headers: jhead, body: JSON.stringify({ name, sample }) });
+  const res = await apiFetch(`${API_BASE}/api/displays`, { method: "POST", headers: jhead, body: JSON.stringify({ name, sample }) });
   if (!res.ok) throw await apiError(res, "createDisplay");
   return (await res.json()) as { channelId: string };
 }
 
 /** Load a sample scene onto a display by channel (for a display not bound to a screen). */
 export async function seedDisplayChannel(channelId: string): Promise<{ ok: boolean }> {
-  const res = await fetch(`${API_BASE}/api/channels/${channelId}/seed-sample`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/channels/${channelId}/seed-sample`, { method: "POST" });
   if (!res.ok) throw await apiError(res, "seedDisplayChannel");
   return (await res.json()) as { ok: boolean };
 }
@@ -992,7 +1073,7 @@ export interface Me {
 }
 
 export async function getMe(): Promise<Me> {
-  const res = await fetch(`${API_BASE}/api/me`);
+  const res = await apiFetch(`${API_BASE}/api/me`);
   if (!res.ok) throw new Error(`getMe ${res.status}`);
   return (await res.json()) as Me;
 }
@@ -1026,7 +1107,7 @@ export interface TeamState {
 }
 
 export async function getTeam(): Promise<TeamState> {
-  const res = await fetch(`${API_BASE}/api/members`);
+  const res = await apiFetch(`${API_BASE}/api/members`);
   if (!res.ok) throw new Error(`getTeam ${res.status}`);
   return (await res.json()) as TeamState;
 }
@@ -1058,7 +1139,7 @@ export interface StaffState {
 }
 
 export async function getStaff(): Promise<StaffState> {
-  const res = await fetch(`${API_BASE}/api/staff`);
+  const res = await apiFetch(`${API_BASE}/api/staff`);
   if (!res.ok) throw new Error(`getStaff ${res.status}`);
   return (await res.json()) as StaffState;
 }
@@ -1071,24 +1152,24 @@ export async function getStaff(): Promise<StaffState> {
  * invitation survive a misconfigured mailer: the owner can pass the link on.
  */
 export async function inviteStaff(input: { email: string; role: Role }): Promise<{ id: string; url: string; emailed: boolean; emailError: string | null }> {
-  const res = await fetch(`${API_BASE}/api/staff/invite`, { method: "POST", headers: jhead, body: JSON.stringify(input) });
+  const res = await apiFetch(`${API_BASE}/api/staff/invite`, { method: "POST", headers: jhead, body: JSON.stringify(input) });
   const body = (await res.json()) as { id?: string; url?: string; emailed?: boolean; emailError?: string | null; error?: string };
   if (!res.ok) throw new Error(body.error ?? "Could not send the invitation");
   return { id: body.id ?? "", url: body.url ?? "", emailed: body.emailed ?? false, emailError: body.emailError ?? null };
 }
 
 export async function cancelInvitation(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/staff/invitations/${id}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/staff/invitations/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Could not cancel the invitation");
 }
 
 export async function setMemberRole(userId: string, role: Role): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/staff/${userId}/role`, { method: "PATCH", headers: jhead, body: JSON.stringify({ role }) });
+  const res = await apiFetch(`${API_BASE}/api/staff/${userId}/role`, { method: "PATCH", headers: jhead, body: JSON.stringify({ role }) });
   if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Could not change role");
 }
 
 export async function revokeMember(userId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/staff/${userId}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/staff/${userId}`, { method: "DELETE" });
   if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Could not remove them");
 }
 
@@ -1100,13 +1181,13 @@ export async function revokeMember(userId: string): Promise<void> {
  * error and is not applied; it simply resolves to nothing.
  */
 export async function setMemberPermissions(memberId: string, permissions: Record<string, string[]>): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/members/${memberId}/permissions`, { method: "POST", headers: jhead, body: JSON.stringify({ permissions }) });
+  const res = await apiFetch(`${API_BASE}/api/members/${memberId}/permissions`, { method: "POST", headers: jhead, body: JSON.stringify({ permissions }) });
   if (!res.ok) throw new Error(((await res.json()) as { error?: string }).error ?? "Could not update permissions");
 }
 
 /** Public: resolve a typed workspace (slug or name) to its canonical login slug. */
 export async function resolveWorkspace(q: string): Promise<{ slug: string; name: string } | null> {
-  const res = await fetch(`${API_BASE}/api/org/resolve?q=${encodeURIComponent(q)}`);
+  const res = await apiFetch(`${API_BASE}/api/org/resolve?q=${encodeURIComponent(q)}`);
   if (!res.ok) return null;
   return (await res.json()) as { slug: string; name: string };
 }
@@ -1114,12 +1195,12 @@ export async function resolveWorkspace(q: string): Promise<{ slug: string; name:
 /* ------------------------ admin: factory reset (nuke) --------------------- */
 /** Email the admin a factory-reset code. */
 export async function nukeRequest(): Promise<{ ok?: boolean; sentTo?: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/admin/nuke/request`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/admin/nuke/request`, { method: "POST" });
   return (await res.json().catch(() => ({}))) as { ok?: boolean; sentTo?: string; error?: string };
 }
 /** Confirm the code + phrase → WIPES EVERYTHING. Returns wipe counts or an error. */
 export async function nukeConfirm(otp: string, phrase: string): Promise<{ ok?: boolean; error?: string; tables?: number; kvKeys?: number; objects?: number }> {
-  const res = await fetch(`${API_BASE}/api/admin/nuke/confirm`, { method: "POST", headers: jhead, body: JSON.stringify({ otp, phrase }) });
+  const res = await apiFetch(`${API_BASE}/api/admin/nuke/confirm`, { method: "POST", headers: jhead, body: JSON.stringify({ otp, phrase }) });
   return (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; tables?: number; kvKeys?: number; objects?: number };
 }
 
@@ -1190,7 +1271,7 @@ export interface BillingState {
 }
 
 export async function getBilling(): Promise<BillingState> {
-  const res = await fetch(`${API_BASE}/api/billing`);
+  const res = await apiFetch(`${API_BASE}/api/billing`);
   if (!res.ok) throw new Error(`getBilling ${res.status}`);
   return (await res.json()) as BillingState;
 }
@@ -1212,7 +1293,7 @@ export interface DowngradeCheck {
 }
 
 export async function checkDowngrade(planId: string): Promise<DowngradeCheck> {
-  const res = await fetch(`${API_BASE}/api/billing/downgrade/check`, {
+  const res = await apiFetch(`${API_BASE}/api/billing/downgrade/check`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ planId }),
@@ -1222,7 +1303,7 @@ export async function checkDowngrade(planId: string): Promise<DowngradeCheck> {
 }
 
 export async function changePlan(planId: string): Promise<{ ok?: boolean; checkoutUrl?: string; blocked?: boolean; violations?: Violation[]; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/billing/change-plan`, {
+  const res = await apiFetch(`${API_BASE}/api/billing/change-plan`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ planId }),
@@ -1236,7 +1317,7 @@ export async function changePlan(planId: string): Promise<{ ok?: boolean; checko
 }
 
 export async function buyPack(packId: string): Promise<{ checkoutUrl?: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/billing/checkout/pack`, {
+  const res = await apiFetch(`${API_BASE}/api/billing/checkout/pack`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ packId }),
@@ -1245,7 +1326,7 @@ export async function buyPack(packId: string): Promise<{ checkoutUrl?: string; e
 }
 
 export async function redeemPromo(code: string): Promise<{ ok?: boolean; kind?: string; credits?: number; planId?: string; balance?: Balance; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/billing/promo`, {
+  const res = await apiFetch(`${API_BASE}/api/billing/promo`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ code }),
@@ -1263,7 +1344,7 @@ export interface AiModel {
 }
 
 export async function listAiModels(): Promise<AiModel[]> {
-  const res = await fetch(`${API_BASE}/api/ai/models`);
+  const res = await apiFetch(`${API_BASE}/api/ai/models`);
   if (!res.ok) throw new Error(`listAiModels ${res.status}`);
   return ((await res.json()) as { models: AiModel[] }).models;
 }
@@ -1296,7 +1377,7 @@ const AI_TIMEOUT_MS = 210_000;
 
 async function aiPost(path: string, req: unknown, task: string): Promise<GenerateResult> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
+    const res = await apiFetch(`${API_BASE}${path}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(req),
@@ -1333,26 +1414,26 @@ export async function aiLayout(req: { prompt: string; widgets?: unknown[]; desig
 export type AiDefaults = Record<string, string>;
 
 export async function getAiDefaults(): Promise<AiDefaults> {
-  const res = await fetch(`${API_BASE}/api/ai/defaults`);
+  const res = await apiFetch(`${API_BASE}/api/ai/defaults`);
   if (!res.ok) return {};
   return ((await res.json()) as { defaults: AiDefaults }).defaults ?? {};
 }
 
 export async function setAiDefaults(defaults: AiDefaults): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/ai/defaults`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(defaults) });
+  const res = await apiFetch(`${API_BASE}/api/ai/defaults`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(defaults) });
   if (!res.ok) throw await apiError(res, "setAiDefaults");
 }
 
 /* ------------------------------- admin ----------------------------------- */
 
 export async function getAdminConfig(): Promise<Record<string, string>> {
-  const res = await fetch(`${API_BASE}/api/admin/config`);
+  const res = await apiFetch(`${API_BASE}/api/admin/config`);
   if (!res.ok) throw new Error(`getAdminConfig ${res.status}`);
   return ((await res.json()) as { config: Record<string, string> }).config;
 }
 
 export async function setAdminConfig(config: Record<string, string>): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/admin/config`, {
+  const res = await apiFetch(`${API_BASE}/api/admin/config`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ config }),
@@ -1361,20 +1442,20 @@ export async function setAdminConfig(config: Record<string, string>): Promise<vo
 }
 
 export async function stripePing(): Promise<{ ok: boolean; account?: string; error?: string }> {
-  return (await (await fetch(`${API_BASE}/api/admin/stripe/ping`)).json()) as { ok: boolean; account?: string; error?: string };
+  return (await (await apiFetch(`${API_BASE}/api/admin/stripe/ping`)).json()) as { ok: boolean; account?: string; error?: string };
 }
 
 export async function stripeSync(): Promise<{ ok?: boolean; error?: string; plans?: unknown[]; packs?: unknown[] }> {
-  const res = await fetch(`${API_BASE}/api/admin/stripe/sync`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/admin/stripe/sync`, { method: "POST" });
   return (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; plans?: unknown[]; packs?: unknown[] };
 }
 
 export async function adminListPlans(): Promise<Plan[]> {
-  return ((await (await fetch(`${API_BASE}/api/admin/plans`)).json()) as { plans: Plan[] }).plans;
+  return ((await (await apiFetch(`${API_BASE}/api/admin/plans`)).json()) as { plans: Plan[] }).plans;
 }
 
 export async function adminSavePlan(id: string, patch: Partial<Plan>): Promise<void> {
-  await fetch(`${API_BASE}/api/admin/plans/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
+  await apiFetch(`${API_BASE}/api/admin/plans/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
 }
 
 export interface AdminModel {
@@ -1392,11 +1473,11 @@ export interface AdminModel {
 }
 
 export async function adminListModels(): Promise<AdminModel[]> {
-  return ((await (await fetch(`${API_BASE}/api/admin/models`)).json()) as { models: AdminModel[] }).models;
+  return ((await (await apiFetch(`${API_BASE}/api/admin/models`)).json()) as { models: AdminModel[] }).models;
 }
 
 export async function adminSaveModel(id: string, patch: Partial<AdminModel>): Promise<void> {
-  await fetch(`${API_BASE}/api/admin/models/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
+  await apiFetch(`${API_BASE}/api/admin/models/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
 }
 
 /** What one provider's pricing page produced. `ok: false` means it was not read
@@ -1430,7 +1511,7 @@ export interface ResyncResult {
 }
 
 export async function adminResyncModels(): Promise<ResyncResult> {
-  const res = await fetch(`${API_BASE}/api/admin/models/resync`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/admin/models/resync`, { method: "POST" });
   if (!res.ok) throw new Error(`resync failed (${res.status})`);
   return (await res.json()) as ResyncResult;
 }
@@ -1450,16 +1531,16 @@ export interface PromoCode {
 }
 
 export async function adminListPromos(): Promise<PromoCode[]> {
-  return ((await (await fetch(`${API_BASE}/api/admin/promos`)).json()) as { promos: PromoCode[] }).promos;
+  return ((await (await apiFetch(`${API_BASE}/api/admin/promos`)).json()) as { promos: PromoCode[] }).promos;
 }
 
 export async function adminCreatePromo(input: { code: string; kind: string; credits?: number; planId?: string; planMonths?: number; maxRedemptions?: number | null; perTenantLimit?: number | null; note?: string }): Promise<{ ok?: boolean; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/admin/promos`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+  const res = await apiFetch(`${API_BASE}/api/admin/promos`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
   return (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
 }
 
 export async function adminTogglePromo(code: string): Promise<void> {
-  await fetch(`${API_BASE}/api/admin/promos/${code}/toggle`, { method: "POST" });
+  await apiFetch(`${API_BASE}/api/admin/promos/${code}/toggle`, { method: "POST" });
 }
 
 export interface AdminTenant extends Subscription {
@@ -1467,7 +1548,7 @@ export interface AdminTenant extends Subscription {
 }
 
 export async function adminListTenants(): Promise<AdminTenant[]> {
-  return ((await (await fetch(`${API_BASE}/api/admin/tenants`)).json()) as { tenants: AdminTenant[] }).tenants;
+  return ((await (await apiFetch(`${API_BASE}/api/admin/tenants`)).json()) as { tenants: AdminTenant[] }).tenants;
 }
 
 export interface EntitlementsShape {
@@ -1483,23 +1564,23 @@ export interface TenantEntitlements {
 }
 
 export async function adminGetTenantEntitlements(tenantId: string): Promise<TenantEntitlements> {
-  return (await (await fetch(`${API_BASE}/api/admin/tenants/${tenantId}/entitlements`)).json()) as TenantEntitlements;
+  return (await (await apiFetch(`${API_BASE}/api/admin/tenants/${tenantId}/entitlements`)).json()) as TenantEntitlements;
 }
 
 export async function adminSetTenantOverrides(tenantId: string, overrides: TenantEntitlements["overrides"]): Promise<void> {
-  await fetch(`${API_BASE}/api/admin/tenants/${tenantId}/overrides`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ overrides }) });
+  await apiFetch(`${API_BASE}/api/admin/tenants/${tenantId}/overrides`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ overrides }) });
 }
 
 export async function adminAdjustCredits(tenantId: string, mode: "add" | "set", credits: number): Promise<void> {
-  await fetch(`${API_BASE}/api/admin/tenants/${tenantId}/credits`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode, credits }) });
+  await apiFetch(`${API_BASE}/api/admin/tenants/${tenantId}/credits`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode, credits }) });
 }
 
 export async function adminTenantLifecycle(tenantId: string, action: "suspend" | "reactivate" | "delete"): Promise<void> {
-  await fetch(`${API_BASE}/api/admin/tenants/${tenantId}/lifecycle`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action }) });
+  await apiFetch(`${API_BASE}/api/admin/tenants/${tenantId}/lifecycle`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action }) });
 }
 
 export async function adminSweep(): Promise<{ actions: { tenantId: string; from: string; to: string }[] }> {
-  return (await (await fetch(`${API_BASE}/api/admin/lifecycle/sweep`, { method: "POST" })).json()) as { actions: { tenantId: string; from: string; to: string }[] };
+  return (await (await apiFetch(`${API_BASE}/api/admin/lifecycle/sweep`, { method: "POST" })).json()) as { actions: { tenantId: string; from: string; to: string }[] };
 }
 
 /* --------------------------------- ads (§21) ----------------------------- */
@@ -1529,26 +1610,26 @@ export interface Ad {
 }
 
 export async function listAdProfiles(): Promise<AdProfile[]> {
-  return ((await (await fetch(`${API_BASE}/api/ad-profiles`)).json()) as { profiles: AdProfile[] }).profiles;
+  return ((await (await apiFetch(`${API_BASE}/api/ad-profiles`)).json()) as { profiles: AdProfile[] }).profiles;
 }
 
 export async function createAdProfile(name: string): Promise<string> {
-  return ((await (await fetch(`${API_BASE}/api/ad-profiles`, { method: "POST", headers: jhead, body: JSON.stringify({ name }) })).json()) as { id: string }).id;
+  return ((await (await apiFetch(`${API_BASE}/api/ad-profiles`, { method: "POST", headers: jhead, body: JSON.stringify({ name }) })).json()) as { id: string }).id;
 }
 
 export async function getAdProfile(id: string): Promise<AdProfile & { ads: Ad[] }> {
-  const res = await fetch(`${API_BASE}/api/ad-profiles/${id}`);
+  const res = await apiFetch(`${API_BASE}/api/ad-profiles/${id}`);
   if (!res.ok) throw new Error(`getAdProfile ${res.status}`);
   return (await res.json()) as AdProfile & { ads: Ad[] };
 }
 
 export async function updateAdProfile(id: string, patch: { name?: string; tags?: string[] }): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/ad-profiles/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
+  const res = await apiFetch(`${API_BASE}/api/ad-profiles/${id}`, { method: "PUT", headers: jhead, body: JSON.stringify(patch) });
   if (!res.ok) throw new Error(`update failed (${res.status})`);
 }
 
 export async function deleteAdProfile(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/ad-profiles/${id}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/ad-profiles/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`delete failed (${res.status})`);
 }
 
@@ -1556,7 +1637,7 @@ export async function createAd(
   profileId: string,
   body: { name: string; kind: string; audioUrl?: string; videoUrl?: string; html?: string; durationMs: number; everyMin: number; hideBadge?: boolean; companionUrl?: string },
 ): Promise<{ id?: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/ad-profiles/${profileId}/ads`, {
+  const res = await apiFetch(`${API_BASE}/api/ad-profiles/${profileId}/ads`, {
     method: "POST",
     headers: jhead,
     body: JSON.stringify(body),
@@ -1565,15 +1646,15 @@ export async function createAd(
 }
 
 export async function toggleAd(adId: string): Promise<void> {
-  await fetch(`${API_BASE}/api/ads/${adId}/toggle`, { method: "POST" });
+  await apiFetch(`${API_BASE}/api/ads/${adId}/toggle`, { method: "POST" });
 }
 
 export async function deleteAd(adId: string): Promise<void> {
-  await fetch(`${API_BASE}/api/ads/${adId}`, { method: "DELETE" });
+  await apiFetch(`${API_BASE}/api/ads/${adId}`, { method: "DELETE" });
 }
 
 export async function playAd(adId: string): Promise<{ ok: boolean; screens: number; channels?: number }> {
-  return (await (await fetch(`${API_BASE}/api/ads/${adId}/play`, { method: "POST" })).json()) as { ok: boolean; screens: number; channels?: number };
+  return (await (await apiFetch(`${API_BASE}/api/ads/${adId}/play`, { method: "POST" })).json()) as { ok: boolean; screens: number; channels?: number };
 }
 
 /* -------------------------------- music (§16) ---------------------------- */
@@ -1593,13 +1674,13 @@ export interface Track {
 }
 
 export async function listTracks(channelId: string): Promise<Track[]> {
-  const res = await fetch(`${API_BASE}/api/channels/${channelId}/tracks`);
+  const res = await apiFetch(`${API_BASE}/api/channels/${channelId}/tracks`);
   if (!res.ok) throw new Error(`listTracks ${res.status}`);
   return ((await res.json()) as { tracks: Track[] }).tracks;
 }
 
 export async function addTrack(channelId: string, body: { title: string; assetHash: string; assetUrl: string; durationMs: number; artist?: string; artHash?: string; artUrl?: string }): Promise<{ id?: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/channels/${channelId}/tracks`, {
+  const res = await apiFetch(`${API_BASE}/api/channels/${channelId}/tracks`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -1608,12 +1689,12 @@ export async function addTrack(channelId: string, body: { title: string; assetHa
 }
 
 export async function deleteTrack(channelId: string, trackId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/channels/${channelId}/tracks/${trackId}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/channels/${channelId}/tracks/${trackId}`, { method: "DELETE" });
   if (!res.ok) throw await apiError(res, "deleteTrack");
 }
 
 export async function reorderTracks(channelId: string, order: string[]): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/channels/${channelId}/tracks/reorder`, {
+  const res = await apiFetch(`${API_BASE}/api/channels/${channelId}/tracks/reorder`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ order }),
@@ -1649,30 +1730,30 @@ export interface LibraryBrowse {
 
 /** Tenant: browse the licensed library (optionally by genre) + gating info. */
 export async function browseLibrary(genre?: string): Promise<LibraryBrowse> {
-  const res = await fetch(`${API_BASE}/api/library${genre ? `?genre=${encodeURIComponent(genre)}` : ""}`);
+  const res = await apiFetch(`${API_BASE}/api/library${genre ? `?genre=${encodeURIComponent(genre)}` : ""}`);
   if (!res.ok) return { enabled: false, limit: 0, used: 0, genres: [], tracks: [] };
   return (await res.json()) as LibraryBrowse;
 }
 
 /** Admin: the global catalog + genres. */
 export async function adminListLibrary(): Promise<{ tracks: LibraryTrack[]; genres: LibraryGenre[] }> {
-  const res = await fetch(`${API_BASE}/api/admin/library`);
+  const res = await apiFetch(`${API_BASE}/api/admin/library`);
   if (!res.ok) return { tracks: [], genres: [] };
   return (await res.json()) as { tracks: LibraryTrack[]; genres: LibraryGenre[] };
 }
 
 export async function adminAddLibraryTrack(body: { genre: string; title: string; artist: string; assetHash: string; assetUrl: string; durationMs: number; artHash?: string; artUrl?: string; vocal?: string }): Promise<{ id?: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/admin/library`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const res = await apiFetch(`${API_BASE}/api/admin/library`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   return (await res.json().catch(() => ({}))) as { id?: string; error?: string };
 }
 
 export async function adminUpdateLibraryTrack(id: string, patch: { genre?: string; title?: string; artist?: string; vocal?: string | null; artHash?: string | null; artUrl?: string | null }): Promise<{ ok?: boolean; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/admin/library/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
+  const res = await apiFetch(`${API_BASE}/api/admin/library/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
   return (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
 }
 
 export async function adminDeleteLibraryTrack(id: string): Promise<void> {
-  await fetch(`${API_BASE}/api/admin/library/${id}`, { method: "DELETE" });
+  await apiFetch(`${API_BASE}/api/admin/library/${id}`, { method: "DELETE" });
 }
 
 /* --------------------------- versions & rollback (§10) ------------------- */
@@ -1688,13 +1769,13 @@ export interface Version {
 }
 
 export async function listVersions(channelId: string): Promise<{ versions: Version[]; current: number | null }> {
-  const res = await fetch(`${API_BASE}/api/channels/${channelId}/versions`);
+  const res = await apiFetch(`${API_BASE}/api/channels/${channelId}/versions`);
   if (!res.ok) throw new Error(`listVersions ${res.status}`);
   return (await res.json()) as { versions: Version[]; current: number | null };
 }
 
 export async function rollbackVersion(channelId: string, version: number): Promise<{ ok: boolean; nudged?: number }> {
-  const res = await fetch(`${API_BASE}/api/channels/${channelId}/rollback`, {
+  const res = await apiFetch(`${API_BASE}/api/channels/${channelId}/rollback`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ version }),
@@ -1703,7 +1784,7 @@ export async function rollbackVersion(channelId: string, version: number): Promi
 }
 
 export async function publishChannelNote(channelId: string, note: string): Promise<{ version?: number; nudged?: number }> {
-  const res = await fetch(`${API_BASE}/api/channels/${channelId}/publish`, {
+  const res = await apiFetch(`${API_BASE}/api/channels/${channelId}/publish`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ note }),
@@ -1714,7 +1795,7 @@ export async function publishChannelNote(channelId: string, note: string): Promi
 /* ------------------------------- email (§23/§25) ------------------------- */
 
 export async function sendTestEmail(): Promise<{ to: string; ok: boolean; mocked?: boolean; skipped?: boolean; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/admin/email/test`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/admin/email/test`, { method: "POST" });
   return (await res.json().catch(() => ({ ok: false }))) as { to: string; ok: boolean; mocked?: boolean; skipped?: boolean; error?: string };
 }
 
@@ -1754,14 +1835,14 @@ export interface WeatherLocation {
 
 /** Single-screen playback mode (§7): free-run instead of multi-screen sync. */
 export async function getPlayback(): Promise<{ freeRun: boolean }> {
-  return (await (await fetch(`${API_BASE}/api/playback`)).json()) as { freeRun: boolean };
+  return (await (await apiFetch(`${API_BASE}/api/playback`)).json()) as { freeRun: boolean };
 }
 export async function setPlayback(freeRun: boolean): Promise<void> {
-  await fetch(`${API_BASE}/api/playback`, { method: "PUT", headers: jhead, body: JSON.stringify({ freeRun }) });
+  await apiFetch(`${API_BASE}/api/playback`, { method: "PUT", headers: jhead, body: JSON.stringify({ freeRun }) });
 }
 
 export async function listWeatherLocations(): Promise<{ locations: WeatherLocation[]; creditsPerCall: number }> {
-  return (await (await fetch(`${API_BASE}/api/weather`)).json()) as { locations: WeatherLocation[]; creditsPerCall: number };
+  return (await (await apiFetch(`${API_BASE}/api/weather`)).json()) as { locations: WeatherLocation[]; creditsPerCall: number };
 }
 
 export interface WeatherLocationInput {
@@ -1776,21 +1857,21 @@ export interface WeatherLocationInput {
 }
 
 export async function addWeatherLocation(body: WeatherLocationInput): Promise<{ id?: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/api/weather`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const res = await apiFetch(`${API_BASE}/api/weather`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   return (await res.json().catch(() => ({}))) as { id?: string; error?: string };
 }
 
 export async function updateWeatherLocation(id: string, body: { label?: string; openHour?: number; closeHour?: number; tz?: string; units?: string }): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/weather/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const res = await apiFetch(`${API_BASE}/api/weather/${id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   if (!res.ok) throw await apiError(res, "updateWeatherLocation");
 }
 
 export async function deleteWeatherLocation(id: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/weather/${id}`, { method: "DELETE" });
+  const res = await apiFetch(`${API_BASE}/api/weather/${id}`, { method: "DELETE" });
   if (!res.ok) throw await apiError(res, "deleteWeatherLocation");
 }
 
 export async function refreshWeatherLocation(id: string): Promise<WeatherCurrent | null> {
-  const res = await fetch(`${API_BASE}/api/weather/${id}/refresh`, { method: "POST" });
+  const res = await apiFetch(`${API_BASE}/api/weather/${id}/refresh`, { method: "POST" });
   return ((await res.json().catch(() => ({}))) as { current?: WeatherCurrent }).current ?? null;
 }

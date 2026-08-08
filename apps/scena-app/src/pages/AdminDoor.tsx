@@ -54,7 +54,7 @@ import {
 } from "@4dl/admin";
 import { Button, Card } from "@4dl/ui";
 import { AlertTriangle, CreditCard, Globe, Mail, Music, Package, ShieldCheck, Sparkles, Tag, Users, Wallet, Wrench } from "lucide-react";
-import { API_BASE, apiError } from "../api.js";
+import { API_BASE, apiError, apiFetch } from "../api.js";
 import { DangerTab, LibraryTab, ModelsTab, PlansTab, PromosTab, StripeTab, TenantsTab } from "./Admin.js";
 
 /**
@@ -65,7 +65,10 @@ import { DangerTab, LibraryTab, ModelsTab, PlansTab, PromosTab, StripeTab, Tenan
  * shared panel that assumed one could not be consumed by an app with another.
  */
 const send = async <T,>(method: string, path: string, body?: unknown): Promise<T> => {
-  const res = await fetch(`${API_BASE}/api${path}`, {
+  // `apiFetch`, not `fetch` — the operator console is the surface most likely to
+  // be left open on a second monitor overnight, so it is the one where an
+  // expired session most needs to say so rather than render every panel empty.
+  const res = await apiFetch(`${API_BASE}/api${path}`, {
     method,
     ...(body === undefined ? {} : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   });

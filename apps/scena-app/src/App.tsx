@@ -9,7 +9,7 @@ import { CollectionPane } from "./components/collection-pane.js";
 import { Shell } from "./Shell.js";
 import { RoleProvider } from "./permissions.js";
 import { EntitlementsProvider } from "./entitlements.js";
-import { clearEmergency, getActiveEmergency, getMe, getBilling, getBranding, type ActiveEmergency, type Me, type BillingState } from "./api.js";
+import { clearEmergency, getActiveEmergency, getMe, getBilling, getBranding, setUnauthorizedHandler, type ActiveEmergency, type Me, type BillingState } from "./api.js";
 import { applyBrandTheme, clearBrandTheme } from "./brand-theme.js";
 import { EmergencyModal } from "./components/EmergencyModal.js";
 import { canAccessKey, PAGE_META } from "./nav.js";
@@ -76,6 +76,32 @@ export function App() {
   useEffect(() => {
     reloadMe();
   }, [refreshKey]);
+
+  /*
+    AN EXPIRED SESSION HAS TO LOOK EXPIRED.
+
+    Every call in `api.ts` goes through `apiFetch`, which reports a 401 here.
+    Without this the cookie could die and nothing would say so: `getMe` is read
+    once at boot, so the Shell stayed mounted, every screen rendered the empty
+    state its failed poll produced, and every save failed into a toast. The app
+    was indistinguishable from one whose workspace had been deleted — which is
+    the shape of bug this whole app has been audited for, in the one place it
+    could not be seen from a screenshot.
+
+    Re-reading the session rather than clearing it: the answer is the SERVER's.
+    `getMe` returns `{authenticated: false}` and the gate below draws the sign-in
+    screen, which is also correct if the 401 was a fluke and the cookie is fine.
+
+    `setMe(null)` is deliberately NOT called first. It would blank the Shell for
+    the length of the round trip on any single 401 — including the ones that are
+    a per-route refusal rather than an expiry — and a screen that empties and
+    refills is worse than one that waits.
+  */
+  useEffect(() => {
+    setUnauthorizedHandler(() => { void reloadMe(); });
+    return () => setUnauthorizedHandler(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once; reloadMe is stable enough (it only closes over setState)
+  }, []);
   useEffect(() => {
     if (!me?.authenticated || !me.tenantId) return;
     // Credits/plan change slowly; a lazy, visibility-gated poll keeps the card

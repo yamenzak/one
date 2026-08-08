@@ -1098,3 +1098,40 @@ anywhere offering the other answer.
 Settings has a Danger zone now (`@4dl/app-kit`'s `CloseTenantCard`), and Sign
 out / Delete my account below the index (`AccountExitRows`) — the same ceremony
 and the same three words as Kova and Tessa. SCENA.md §12a has the model.
+
+## 7i · One door to the API
+
+The last layer still speaking Scena's own language, and the only entry in this
+record whose defect a screenshot could not show.
+
+`api.ts` was 167 bare `fetch` calls. Kova and Tessa go through
+`@4dl/app-kit`'s `api`, which has a hook for an expired session; Scena had none,
+so **a dead cookie did not look dead**: `getMe` is read once at boot, the Shell
+stayed mounted, every screen rendered whatever empty state its failed poll
+produced, and every save failed into a toast. That is the §14 shape exactly — a
+confident fact standing in for a failure — except the confident fact was the
+whole application, and the person looking at it had been signed out.
+
+`apiFetch` is the chokepoint. It is `fetch`-shaped, so adopting it was a rename
+rather than 167 hand-edited calls, and it does not throw on a non-2xx: each call
+site still decides what its own failure means, which kept this a change of
+transport instead of a rewrite. `App.tsx` installs the handler.
+
+Three things are new and each is load-bearing:
+
+- **`scripts/scena-fetch-chokepoint.test.mjs`** fails on a bare `fetch` in the
+  SPA outside two stated exceptions, AND on the hook being uninstalled or no
+  longer fired. A chokepoint whose door does nothing is worse than none, because
+  it reads as done. Mutation-tested four ways.
+- **`apps/scena-app/src/api.test.ts`** — the behaviour the structural guard
+  cannot see. Three of its five transport cases are about a request that must NOT
+  fire the hook.
+- **`/api/me` is exempt, as the re-entrancy guard.** The handler re-reads the
+  session, so it calls that route, which comes back through the same door. It
+  answers 200 today; one line in `route-guard.ts` is all that stands between this
+  and a tab spinning until it is closed.
+
+`apiError` also carries the status now. `@4dl/app-kit`'s `ApiError` has always
+had it and the exit cards branch on it (409 = "close your workspace first"); a
+Scena caller wanting to tell 402 from 403 had nothing but the message text to
+match on, which is a translation away from breaking.

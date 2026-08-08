@@ -76,6 +76,15 @@ export function useHost(): HostInfo | null {
   const [host, setHost] = useState<HostInfo | null>(null);
   useEffect(() => {
     let live = true;
+    /*
+      A BARE `fetch`, and the one place in this SPA that should stay one.
+
+      `/api/host` is the PUBLIC probe every boot makes before there is a session
+      — a 401 here is not an expiry, and routing it through `apiFetch`'s
+      unauthorized hook would fire the re-auth on a request whose whole purpose
+      is to run without auth. `scripts/scena-fetch-chokepoint.test.mjs` names
+      this file for that reason.
+    */
     fetch(`${API_BASE}/api/host`)
       .then((r) => (r.ok ? (r.json() as Promise<HostInfo>) : null))
       .then((h) => {

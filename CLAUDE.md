@@ -728,12 +728,12 @@ moves. **Measured 2026-08-08** from `pnpm turbo run test --force`, per package:
 **632 kova/api (+31 skipped) + 237 kova/domain + 223 scena/api + 146 tessa/api +
 133 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 75 ai + 63 commerce +
 61 scena/widgets + 45 billing + 45 billing-rail + 44 core + 40 scena/timeline +
-35 auth + 24 notify + 23 scena/manifest + 21 scena/app + 18 scena/protocol +
+35 auth + 29 scena/app + 24 notify + 23 scena/manifest + 18 scena/protocol +
 18 storage + 18 app-kit + 17 kova/protocol + 17 template + 14 tessa/app +
-14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,288 passing,
+14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,296 passing,
 31 skipped**, all green.
 
-Scena's 429 (223 api + 21 app + 185 across its five pure packages) were never in
+Scena's 437 (223 api + 29 app + 185 across its five pure packages) were never in
 the older figure at all; nor were Tessa's. `@scena/timeline`'s 40 are the ones
 that matter most per line — they prove
 `position(t) = (t − T0) mod cycleLength`, which is the whole product.
@@ -1057,3 +1057,22 @@ Scena shipped three paths that fabricated output in production and billed for
 it — `ai.mock = "on"` from the console, a missing `AI` binding, and a provider
 failure falling back in `"auto"` — and all three typechecked and passed every
 test, because the suites run in development where mocking is correct.
+
+⚠️ **The dashboard has ONE door to the API: `apiFetch` in `apps/scena-app/src/api.ts`.**
+It was 167 bare `fetch` calls, which is what an app written before the platform
+looks like — and the consequence was not style. Kova and Tessa go through
+`@4dl/app-kit`'s `api`, which has a hook for an expired session; Scena had none,
+so a dead cookie did not LOOK dead: `getMe` is read once at boot, the Shell stayed
+mounted, every screen rendered whatever empty state its failed poll produced, and
+every save failed into a toast. An expired session was indistinguishable from a
+deleted workspace. `apiFetch` is `fetch`-shaped, so adopting it was a rename
+rather than 167 hand-edited calls, and `App.tsx` installs the handler.
+`scripts/scena-fetch-chokepoint.test.mjs` (in `pnpm gate`) fails on a bare
+`fetch` anywhere in the SPA outside two stated exceptions — the definition
+itself, and `host.ts`'s public `/api/host` probe, which runs before there is a
+session and where a 401 is not an expiry. The 401 exemptions are `/api/auth/*`
+(Better Auth self-reports 401 for a wrong OTP) and **`/api/me`, which is the
+re-entrancy guard** — the handler re-reads the session, so without it one line in
+`route-guard.ts` stands between this and a tab spinning until it is closed.
+Moving the rest of the way to the kit's typed `api.get`/`api.post` is mechanical
+from here and no longer urgent.

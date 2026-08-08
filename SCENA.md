@@ -419,6 +419,8 @@ deleted record.
   `apps/scena-app`'s conformance tests. Build the SPA first; `turbo.json`
   declares the `@4dl/scena#test` → `@scena/app#build` edge so anything going
   through turbo does it for you.
+- **`scripts/scena-fetch-chokepoint.test.mjs`** (in `pnpm gate`) — no bare
+  `fetch` in the SPA outside two stated exceptions. See §16.
 - **`pnpm --filter @scena/e2e e2e`** — the launch gate, on :8789 (+ :8790 for the
   player). Runs against **the authorization the product ships**.
 - **`pnpm --filter @scena/e2e wall`** — the two-screens spec. Needs a paid plan,
@@ -433,6 +435,45 @@ Ports are not taste: Kova owns 8787, Tessa 8788, Scena 8789 + 8790. Sharing one
 makes whichever suite runs second drive another product's worker, and it fails
 as "element not found" rather than as a conflict. The same is true of wrangler's
 default devtools inspector on 9229, so Scena pins 9231 and 9232.
+
+## 16. One door to the API, and it exists because of a 401
+
+`apiFetch` in `apps/scena-app/src/api.ts` is the only way out of the dashboard.
+It was 167 bare `fetch` calls — what an app written before the platform looks
+like — and the consequence was not style. Kova and Tessa go through
+`@4dl/app-kit`'s `api`, which has a hook for an expired session
+(`setUnauthorizedHandler`); Scena had none, so **a dead cookie did not look
+dead.** `getMe` is read once at boot, so the Shell stayed mounted, every screen
+rendered whatever empty state its failed poll produced, and every save failed
+into a toast. An expired session was indistinguishable from a deleted workspace —
+the same "a confident fact where a failure belongs" shape as §14, in the one
+place a screenshot cannot show it.
+
+`apiFetch` is `fetch`-shaped on purpose: adopting it was a rename, and a rename
+is reviewable in a way 167 hand-edited calls are not. It does not throw on a
+non-2xx — each call site still decides what its failure means — so this was a
+change of transport, not of contract. `App.tsx` installs a handler that re-reads
+the session, which draws the sign-in screen if the server agrees the cookie is
+gone.
+
+Two files may hold a bare `fetch`, and `scripts/scena-fetch-chokepoint.test.mjs`
+(in `pnpm gate`) fails on a third: `api.ts`, which defines it, and `host.ts`,
+whose `/api/host` probe runs before there is a session and where a 401 is not an
+expiry. The guard also asserts the hook is installed and still fired — a
+chokepoint whose door does nothing is worse than no chokepoint, because it reads
+as done.
+
+⚠️ **Two exemptions inside `apiFetch`, and the second is not merely defensive.**
+`/api/auth/*` because Better Auth self-reports 401 for a wrong OTP, so reporting
+it would reload the session on the login screen on every mistyped code. And
+**`/api/me`, which is the re-entrancy guard**: the handler's job is to re-read the
+session, so it calls that route, which comes back through here. Scena's route
+guard makes it public and it answers 200 — so one line in `route-guard.ts` is all
+that stands between this and a tab spinning until it is closed.
+
+Moving the rest of the way to the kit's typed `api.get`/`api.post` (and its
+`ApiError` with status and body) is mechanical from here and no longer urgent.
+`apiError` already carries the status, which was the half callers actually needed.
 
 ---
 
