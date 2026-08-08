@@ -483,7 +483,7 @@ deleted record.
   `apps/scena-app`'s conformance tests. Build the SPA first; `turbo.json`
   declares the `@4dl/scena#test` → `@scena/app#build` edge so anything going
   through turbo does it for you.
-- **`scripts/scena-fetch-chokepoint.test.mjs`** (in `pnpm gate`) — no bare
+- **`scripts/api-door.test.mjs`** (in `pnpm gate`) — no bare
   `fetch` in the SPA outside two stated exceptions. See §16.
 - **`pnpm --filter @scena/e2e e2e`** — the launch gate, on :8789 (+ :8790 for the
   player). Runs against **the authorization the product ships**.
@@ -520,7 +520,7 @@ change of transport, not of contract. `App.tsx` installs a handler that re-reads
 the session, which draws the sign-in screen if the server agrees the cookie is
 gone.
 
-Two files may hold a bare `fetch`, and `scripts/scena-fetch-chokepoint.test.mjs`
+Two files may hold a bare `fetch`, and `scripts/api-door.test.mjs`
 (in `pnpm gate`) fails on a third: `api.ts`, which defines it, and `host.ts`,
 whose `/api/host` probe runs before there is a session and where a 401 is not an
 expiry. The guard also asserts the hook is installed and still fired — a

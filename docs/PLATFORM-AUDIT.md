@@ -597,32 +597,62 @@ grep -oE "apps/[a-z_-]+" scripts/*.test.mjs | sort -u
 
 `apps.json` exists because *"every deployment problem in this repo so far was a
 per-app step somebody forgot to duplicate"*, and CI, deploys and provisioning
-all derive their app list from it. **Eight of the thirteen `pnpm gate` guards do
-not.**
+all derive their app list from it. **Eight of the thirteen `pnpm gate` guards did
+not** — four of them for reasons that turned out to be hiding real defects.
 
 | guard | derives its app list | covers |
 |---|---|---|
 | `ui-ownership` | ✅ from `apps.json` | every app — and it is the model for the rest |
 | `motion-config` | ✅ | every SPA |
 | `apps-manifest`, `affected`, `workflows-parse`, `shared-config`, `sender-default`, `email-brand-origin` | ✅ n/a — repo-level | — |
-| `entitlement-enforcement` | ❌ hardcoded | **`apps/api` only** |
-| `flag-enforcement` | ❌ hardcoded | **`apps/api` only** |
-| `storage-chokepoint` | ❌ hardcoded | `apps/api`, `apps/scena` — not Tessa, not the template |
-| `scena-fetch-chokepoint` | ❌ hardcoded | `apps/scena-app` only |
+| `entitlement-enforcement` | ✅ **fixed** | every app with a D1 |
+| `flag-enforcement` | ✅ **fixed** | every app — and it now *reports* which have no customer rail |
+| `storage-chokepoint` | ✅ **fixed** | every app with an R2 bucket, every app with an `ai.ts` |
+| `api-door` (was `scena-fetch-chokepoint`) | ✅ **fixed** | every registered SPA |
 | `player-api-base` | ❌ by nature | Scena's player (correctly single-app) |
 
-The two that matter most are `entitlement-enforcement` and `flag-enforcement`.
+The two that mattered most were `entitlement-enforcement` and `flag-enforcement`.
 Their job is *"every live entitlement is named by a gate, every quota is counted
 against, and the reserved list is pinned so it cannot grow to cover an
 oversight"* — the check that a capability a plan **sells** is actually
-**enforced by a route**. Kova has it. Tessa and Scena sell entitlements with no
+**enforced by a route**. Kova had it. Tessa and Scena sold entitlements with no
 such check. That is the same class of hole `/api/progress` was, and it was found
 in Kova only because Kova had the guard.
 
-`scena-fetch-chokepoint` is the mirror image: a rule that is genuinely
-platform-wide — *one door to the API, so an expired session says so* — written
-against one app's file paths. Kova and Tessa satisfy it today by going through
-`@4dl/app-kit`'s `api`; nothing stops the fourth app from not.
+### What running them across three apps found — ✅ **DONE (2026-08-08)**
+
+Kova came out clean. The other two did not, and every one of these was sold on a
+plan page with nothing enforcing it:
+
+| app | key | what it means |
+|---|---|---|
+| tessa | `catalogItems` | 50 free / unlimited paid, no count before the insert |
+| scena | `tickerAdvanced` | `gateWidgets` checks `ticker` and never this — the advanced config a paid tier buys works on any tier with a ticker |
+| scena | `boardsPerStation` | 1/2/6 per tier, no count when a board is attached |
+| scena | `resyncIntervalSec` | **the number IS the product** — a paid workspace's screens are meant to re-fetch sooner, and the quota never reaches the player's fetch loop |
+| scena | `screenSaver`, `emergencyOverride` | `true` on every tier, so no tier withholds them — a registry question, not a route one. `emergencyOverride` is deliberate and documented; `screenSaver` looks like the same decision without the argument |
+
+They are carried in `KNOWN_UNENFORCED` with a reason each, and **the list can
+only shrink**: an entry that becomes enforced fails the guard until it is
+deleted, so it cannot rot into a permanent exemption. Fixing them is product work
+in each app — counting rows before a write, plumbing a number to a device — and
+doing five of those inside the commit that widened a test script is how a diff
+becomes unreviewable.
+
+Two more holes closed on the way. **Tessa's R2 bucket was never checked** by
+`storage-chokepoint`: it provisions `tessa-media`, it has a `storage.ts`, and a
+bare `MEDIA.put` anywhere in it would have passed in silence. And Tessa's `ai.ts`
+was in neither the deciders nor the delegates list, so nothing checked that it
+kept delegating the mock decision.
+
+`api-door` is the mirror image of the first two: a rule that is genuinely
+platform-wide — *one door to the API, so an expired session says so* — that was
+written against one app's file paths. Kova's and Tessa's SPAs satisfy it today,
+and **that is exactly why nobody noticed**: a check that passes because of a habit
+rather than because of a rule is one refactor away from meaning nothing. An
+unrecognised SPA is now a failure rather than a silent skip, and `@scena/player`
+is exempt *in writing* — a paired device with no session has no 401 for a hook to
+catch.
 
 ---
 
@@ -837,14 +867,37 @@ Stripe panel needed endpoints Scena did not have, which is how the three
 entry above for the table and for Tessa's live-switch payments outage. They are
 `@4dl/billing`'s `stripeAdminRoutes` now.
 
-### 3. Make the guards derive their app list — *stops finding #7*
+### 3. Make the guards derive their app list — ✅ **DONE (2026-08-08)**
 
-`ui-ownership.test.mjs` already reads `apps.json` and is the template. Port
-`entitlement-enforcement` and `flag-enforcement` to it first: they are the
-checks that a sold capability is an enforced one, and two apps currently sell
-without them. Expect them to fail on first run — that is the finding, not a
-regression. Then widen `storage-chokepoint` to every app and generalise
-`scena-fetch-chokepoint` into "one API door per SPA".
+All four ported, and they did fail on first run — see the Tier 3 findings table
+above for the six unenforced keys and the two uncovered Tessa surfaces.
+
+What each one derives, and the seam it hangs on:
+
+- `entitlement-enforcement` — the app list from `apps.json` (`provision.d1`: an
+  app with no database sells nothing), and the registry inside each app from the
+  one call every one of them makes, `bindEntitlements<T>(BASELINE)`. Kova's is in
+  `packages/domain`, the other two keep theirs in `src/`, and following each
+  app's workspace dependencies finds both without naming either.
+- `flag-enforcement` — the customer rail is **detected**, not assumed. An app
+  declaring a `clientFlag` is checked; an app declaring none is *reported* as
+  having no customer rail, which is the fact the old hardcoded path left
+  unstated. If NO app declares one, that is a failure: it is far more likely the
+  parser stopped finding the registry than that every rail was removed.
+- `storage-chokepoint` — R2 owners from `provision.r2`, and every product app's
+  `ai.ts` in the deciders list or the delegates list, so a fourth app is in one
+  or the other the day it exists.
+- `api-door` — every `spa` in the registry, with an explicit per-SPA rule; an
+  unrecognised one fails.
+
+Two lessons worth keeping. **The narrow check is the one that gets waived**:
+matching Kova's five gate shapes reported eight of Scena's entitlements as
+ungated and every one of them was gated — a destructured `Features` object and a
+dynamic `features[needed]` lookup are invisible to call-shape matching, and a
+guard that cries wolf eight times is off within a day. And **a widened guard
+finds bugs in itself first**: two of the first failures were the parser's, not
+the apps' — Kova passes a second argument to `bindEntitlements`, and Tessa writes
+its whole baseline on one line.
 
 ### 4. Finish the template — *this is what makes app #5 cheap*
 

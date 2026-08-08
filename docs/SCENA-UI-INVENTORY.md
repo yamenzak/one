@@ -1119,7 +1119,7 @@ transport instead of a rewrite. `App.tsx` installs the handler.
 
 Three things are new and each is load-bearing:
 
-- **`scripts/scena-fetch-chokepoint.test.mjs`** fails on a bare `fetch` in the
+- **`scripts/api-door.test.mjs`** fails on a bare `fetch` in the
   SPA outside two stated exceptions, AND on the hook being uninstalled or no
   longer fired. A chokepoint whose door does nothing is worse than none, because
   it reads as done. Mutation-tested four ways.

@@ -247,6 +247,28 @@ a broken workflow does not *fail*, it does not *run*, and GitHub lists it by
 filename with nothing saying why. Both guard failures that are silent rather than
 loud, which is the only kind this repo has actually had.
 
+**And every OTHER `pnpm gate` guard derives its app list from the registry too,
+as of 2026-08-08.** Four of them did not, and each was hiding something:
+`entitlement-enforcement` and `flag-enforcement` checked `apps/api` only — so
+Tessa and Scena sold entitlements with nothing asserting a route enforced them,
+and running the widened guard found six such keys (the sharpest being Scena's
+`resyncIntervalSec`, where the number a paid tier buys never reaches the
+player's fetch loop). `storage-chokepoint` named two apps by hand, so **Tessa's
+R2 bucket and its `ai.ts` were unchecked**. `scena-fetch-chokepoint` is
+`api-door.test.mjs` now and covers every registered SPA, with `@scena/player`
+exempt in writing — a paired device has no session, so it has no 401 for a hook
+to catch.
+
+Two things that came out of widening them are worth knowing before writing the
+next guard. **The narrow check is the one that gets waived:** matching Kova's
+five gate shapes reported eight of Scena's entitlements as ungated and every one
+of them was gated, because a destructured `Features` object and a dynamic
+`features[needed]` lookup are invisible to call-shape matching. And **a widened
+guard finds bugs in itself first** — two of the first failures were the parser's,
+not the apps'. The unenforced keys are carried in `KNOWN_UNENFORCED` with a
+reason each, and that list can only SHRINK: an entry that becomes enforced fails
+the guard until it is deleted, so it cannot rot into a permanent exemption.
+
 ## Commands
 
 - `pnpm dev` — turbo: api (`wrangler dev` on :8787) + app (vite on :5173, proxies /api)
@@ -513,7 +535,12 @@ remote bindings without editing the config (this is what the E2E suite does).
     tenant sells a client, `scripts/entitlement-enforcement.test.mjs` for what
     Kova sells a tenant — every live entitlement named by a gate, every quota
     counted against, and the reserved list pinned so it cannot grow to cover an
-    oversight.
+    oversight. **Both read `apps.json` now**, so the same question is asked of
+    every product: the entitlement guard finds each app's registry by the one
+    call all of them make (`bindEntitlements<T>(BASELINE)`), and the flag guard
+    DETECTS whether an app has a customer rail at all rather than assuming one —
+    Tessa and Scena have none, and it re-derives that on every run instead of
+    inheriting it as a silence.
   - **A capability a package SELLS must be checked by a route, and hiding a tab
     is not checking it.** The package builder auto-renders a toggle for every
     entry in `SELLABLE_CLIENT_FLAG_KEYS`, so adding a flag is one line and
@@ -1226,7 +1253,7 @@ mounted, every screen rendered whatever empty state its failed poll produced, an
 every save failed into a toast. An expired session was indistinguishable from a
 deleted workspace. `apiFetch` is `fetch`-shaped, so adopting it was a rename
 rather than 167 hand-edited calls, and `App.tsx` installs the handler.
-`scripts/scena-fetch-chokepoint.test.mjs` (in `pnpm gate`) fails on a bare
+`scripts/api-door.test.mjs` (in `pnpm gate`) fails on a bare
 `fetch` anywhere in the SPA outside two stated exceptions — the definition
 itself, and `host.ts`'s public `/api/host` probe, which runs before there is a
 session and where a 401 is not an expiry. The 401 exemptions are `/api/auth/*`
