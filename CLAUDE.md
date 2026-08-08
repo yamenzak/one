@@ -1019,9 +1019,14 @@ all, purely so it RE-RUNS after the drop (a module already at its declared
 version does not run, and the drop without the rebuild is strictly worse than the
 bug). **Never bump `AI_LEGACY_RESET`'s version** — that would drop a live catalog
 to fix nothing. A future migration needing the same treatment gets a new id.
-`schema-module.test.ts` pins the adjacency, in both directions. Its resource ids
-are deliberately placeholders (the old account's real ids were replaced), so
-`deploy.yml` skips it until the Provision workflow runs.
+`schema-module.test.ts` pins the adjacency, in both directions.
+
+**All four workers bind REAL resource ids.** `node scripts/apps.mjs ready <id>`
+reports `kova`, `tessa`, `scena` and `scena-player` all provisioned (measured
+2026-08-08), so `deploy.yml` ships every one of them. This paragraph used to say
+Scena's were still placeholders and that `deploy.yml` skipped it; that stopped
+being true when the Provision workflow ran. Settle it with the command, not with
+this sentence.
 
 **The UI rewrite is done, and `docs/SCENA-UI-INVENTORY.md` is its record** —
 one section per sub-stage, each naming the defects it closed rather than the

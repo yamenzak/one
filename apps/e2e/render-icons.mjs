@@ -8,8 +8,18 @@
  */
 import { chromium } from "@playwright/test";
 import { writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
-const OUT = "/home/user/mossa/apps/app/public";
+/**
+ * Resolved from THIS FILE, not from an absolute path.
+ *
+ * It was hardcoded to `/home/user/mossa/apps/app/public` — the checkout
+ * directory of the machine it was written on. That is wrong on every other
+ * machine, and it became wrong here the moment the repository was renamed: a
+ * fresh clone lands somewhere else, `writeFileSync` throws ENOENT, and the
+ * failure names a directory nobody recognises.
+ */
+const OUT = fileURLToPath(new URL("../app/public", import.meta.url));
 const BG = "#0b0c0e";
 const RING = "#262a30";
 const ACCENT = "#25c891"; // Kova's --primary in dark, oklch(0.74 0.15 164)
