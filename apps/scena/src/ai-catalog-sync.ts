@@ -18,14 +18,32 @@
  *
  * ── Why this is not simply `syncModelCatalog` ───────────────────────────────
  *
- * `@4dl/ai` ships the whole thing, and Scena cannot call it yet for one
- * structural reason: the two tables key differently. The shared `ai_models.id`
- * IS the provider path (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) with a
- * `provider` column naming the lane; Scena's `id` is a short slug
- * (`llama-3.3-70b`) and the path lives in `cf_model`. Adopting the shared row
- * shape means changing every model id Scena has — which reaches `ai_defaults`,
- * the per-tenant pinned model, the generation cache and ~70 call sites. Worth
- * doing, and a migration rather than a wiring change.
+ * `@4dl/ai` ships the whole thing, and ONE structural reason is left: the two
+ * tables key differently. The shared `ai_models.id` IS the provider path
+ * (`@cf/meta/llama-3.3-70b-instruct-fp8-fast`) with a `provider` column naming
+ * the lane; Scena's `id` is a short slug (`llama-3.3-70b`) and the path lives in
+ * `cf_model`. Adopting the shared row shape means changing every model id Scena
+ * has — 34 `cf_model` references across eight files, plus the `ai_defaults`
+ * config values, the per-tenant pinned model and the generation cache's `model`
+ * column. Mechanical, but on the metering path.
+ *
+ * ⚠️ TWO OTHER BLOCKERS THIS HEADER USED TO NAME ARE GONE, and the note is here
+ * so nobody re-derives them:
+ *
+ *   • THE UNIT KINDS ALREADY MATCH. `@4dl/billing`'s `credits.ts` meters
+ *     `tile`, `chars_1k`, `audio_sec`, `audio_min` and `image` — every unit
+ *     Scena's image, voice and music lanes are priced in. `ModelSeed.unitKind`
+ *     listed only three of the five; it lists all five now.
+ *   • THE LANES ARE THE APP'S. `configureAiLanes` replaced a constant that held
+ *     Kova's five, so Scena's `music` lane exists and its Workers AI voices are
+ *     no longer catalogued disabled.
+ *
+ * `ai_cache` still collides: Scena's columns are `(hash, task, model, output,
+ * asset_hash, neurons, created_at)` against the shared `(prompt_hash, feature,
+ * output_json, at)`. Scena's caches an ASSET and its neuron cost, which the
+ * shared one does not model, so adopting `AI_SCHEMA` means renaming Scena's
+ * first — a `CREATE TABLE IF NOT EXISTS` is won by whichever module runs first
+ * and the loser's columns silently never exist.
  *
  * What is portable TODAY is the part that actually breaks: the PARSERS. Reading
  * two pricing pages written for humans, in Markdown that changes shape without

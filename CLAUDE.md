@@ -1028,16 +1028,28 @@ dunning ladder and the emergency takeover — but `NotificationBell` and
 `InboxScreen` are `@4dl/app-kit`'s and land with the Stage 7 UI rewrite. Until
 then a notification is reachable only at `GET /api/notifications`.
 
-Two things are DELIBERATELY still Scena's, both for the same reason, and the
-plan names them so nobody "fixes" them casually: the billing STORE
-(`BILLING_SCHEMA`) and the `ai_models` CATALOG (`AI_SCHEMA`). Both packages'
-tables share a NAME with Scena's and differ in COLUMNS — `price_cents` +
-`currency` + `interval` against `price_usd_month`, a `cf_model` column against
-an `id` that IS the provider id. A `CREATE TABLE IF NOT EXISTS` is won by
-whichever module runs first and the loser's columns silently never exist, which
-is exactly how a fresh Stage 1 deployment ended up unable to save any setting
-(`app_config.updated_at`). Adopting either means reconciling the shapes first,
-which is a data change rather than a wiring one.
+Two things are still Scena's, both for the same reason, and the plan names them
+so nobody "fixes" them casually: the billing STORE (`BILLING_SCHEMA`) and the
+`ai_models` CATALOG (`AI_SCHEMA`). Both packages' tables share a NAME with
+Scena's and differ in COLUMNS — `price_cents` + `currency` + `interval` against
+`price_usd_month`, a `cf_model` column against an `id` that IS the provider id.
+A `CREATE TABLE IF NOT EXISTS` is won by whichever module runs first and the
+loser's columns silently never exist, which is exactly how a fresh Stage 1
+deployment ended up unable to save any setting (`app_config.updated_at`).
+Adopting either means reconciling the shapes first, which is a data change rather
+than a wiring one.
+
+⚠️ **The AI half is now DOWN TO the id scheme.** Two of the three blockers this
+section used to imply are closed: `@4dl/billing`'s `credits.ts` already meters
+every unit Scena's image, voice and music lanes are priced in (`ModelSeed`
+listed three of the five it handles), and `configureAiLanes` replaced the
+constant that hard-coded Kova's five lanes — which had been catalogueing every
+Workers AI VOICE as disabled on any app that runs one, and had no `music` lane
+at all. What is left is `id` = the provider path (34 `cf_model` references across
+eight files, plus the `ai_defaults` values and the cache's `model` column), and
+renaming Scena's `ai_cache`, whose columns model an ASSET and its neuron cost
+that the shared one does not. `apps/scena/src/ai-catalog-sync.ts`'s header is the
+live checklist, and that file is what the migration DELETES.
 
 ⚠️ **Scena's R2 key is the CONTENT HASH, and that is not a detail to tidy.** The
 compiled manifest references an asset by hash, the player caches
