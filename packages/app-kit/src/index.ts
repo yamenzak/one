@@ -14,6 +14,7 @@ export { RootSignpost, NoTenant, WrongDoor, type RootSignpostProps, type NoTenan
 export * from "./stripe.js";
 export * from "./hard-refresh.js";
 export * from "./RefreshNote.js";
+export { MaintenanceScreen } from "./MaintenanceScreen.js";
 export * from "./Turnstile.js";
 export * from "./ErrorBoundary.js";
 export * from "./PaymentSheet.js";

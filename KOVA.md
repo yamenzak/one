@@ -1174,7 +1174,7 @@ the tenancy".
 | Trigger | Who | File | What it is |
 | --- | --- | --- | --- |
 | session resolving | all | `main.tsx:35` `BootSplash` | Branded boot splash |
-| platform maintenance = `full` | all | `screens/Maintenance.tsx:42` | Deployment closed; outranks every door but `admin.` |
+| platform maintenance = `full` | all | `packages/app-kit/src/MaintenanceScreen.tsx:52` | Deployment closed; outranks every door but `admin.`. SHARED — all three apps render it |
 | host = root | anon | `screens/Doors.tsx:74` `RootSignpost` | Signpost to setup / admin / a studio |
 | host = tenant, no such tenant | anon | `screens/Doors.tsx:172` `NoStudio` | "No studio at this address" |
 | host = invalid | anon | `screens/Doors.tsx:207` `WrongDoor` | Unrecognised hostname |

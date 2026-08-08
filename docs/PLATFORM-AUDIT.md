@@ -46,7 +46,7 @@ Eight instances, all found by the same lens:
 | 1 | `otpSendGuard` (`@4dl/auth`) | **Kova only** | Tessa & Scena's sign-in has no bot check, no per-IP ceiling, no 30s cooldown, no eligibility check — and tells a user "we sent you a code" when mail is unconfigured |
 | 2 | `Turnstile` widget (`@4dl/app-kit`) | **Kova only** | The bot check is configurable in three consoles, from a **shared** key, and enforced in one app |
 | 3 | `NotificationBell` + `InboxScreen` (`@4dl/app-kit`) | Kova, Tessa | Scena dispatches 13 kinds of notification that nobody can see — ✅ **closed 2026-08-08**, and mounting it found five dead links |
-| 4 | `MaintenanceBanner` (`@4dl/app-kit`) + a maintenance screen | **Kova only** | An operator closing the deployment gets silent write failures in two of three apps |
+| 4 | `MaintenanceBanner` (`@4dl/app-kit`) + a maintenance screen | **Kova only** | An operator closing the deployment gets silent write failures in two of three apps — ✅ **closed 2026-08-08** |
 | 5 | The `gate` on `/api/host` | Kova, Tessa (partly) | Scena's SPA re-declares `HostInfo` **without** `gate` or `maintenance` — the exact mistake the route's own comment warns about, on the client side of the wire |
 | 6 | `sharedPanelViolations` (`@4dl/admin/conformance`) | Kova, Tessa | Scena has 2 live violations and no test that would say so |
 | 7 | `checkActorDailyBudget` (`@4dl/ai`) | **Kova only** | In Tessa & Scena, one user can burn the tenant's whole credit balance in an afternoon |
@@ -293,6 +293,24 @@ comment lists, as item 5 of what came across from Kova, *"The standing and
 maintenance banners ABOVE the bar."* There is no such code in the file. This is
 the same failure mode as the bell note CLAUDE.md already had to correct: a
 comment describing intent becomes a reason for the next reader not to look.
+
+> ### ✅ Rows 4 and 5 closed (2026-08-08)
+>
+> Kova's `Maintenance.tsx` was 71 lines whose own comment reads "This is about
+> US. Nobody reading it did anything, nobody can pay to end it" — nothing
+> product-specific in it but the name over the door. It is `@4dl/app-kit`'s
+> `MaintenanceScreen` now, and all three apps render it.
+>
+> Tessa gained a `blocked` screen and the maintenance banner; Scena gained both
+> banners (the ones its Shell header had claimed for three stages), a
+> `WorkspaceBlocked` screen, and the `full`-maintenance branch.
+>
+> **`pickScreen` moved out of `main.tsx` to be testable at all.** It sat beside
+> a `createRoot(document…)` call, so importing it outside a browser threw —
+> which is a large part of why two of its inputs were declared and never read.
+> Nine tests now pin the order, including that maintenance outranks a centre's
+> own standing (telling somebody to settle an invoice during OUR outage sends
+> them to fix the wrong thing) and that `readOnly` still serves the app.
 
 **Tessa renders a `readOnly` badge, and its comment promises the rest.** It reads
 `gate.readOnly` into a `<Badge>`, beside this:

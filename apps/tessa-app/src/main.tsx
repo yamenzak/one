@@ -29,7 +29,10 @@ import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
 import { ThemeProvider } from "./theme.js";
 import { I18nProvider } from "./i18n.js";
+import { MaintenanceScreen } from "@4dl/app-kit";
+import { pickScreen, type ScreenName } from "./screen.js";
 import { Shell } from "./Shell.js";
+import { CentreBlocked } from "./screens/CentreBlocked.js";
 import { Login } from "./screens/Login.js";
 import { NoStudio, RootSignpost, Start, WrongDoor } from "./screens/Doors.js";
 import { AcceptInvite } from "./screens/AcceptInvite.js";
@@ -38,44 +41,6 @@ import { Labels } from "./screens/Labels.js";
 import { Settings } from "./screens/Settings.js";
 import { InboxPage } from "./Notifications.js";
 import { Recall } from "./screens/Recall.js";
-
-export type ScreenName = "boot" | "login" | "signpost" | "nostudio" | "wrongdoor" | "start" | "admin" | "shell";
-
-export function pickScreen(
-  loading: boolean,
-  ctx: { active: unknown } | null,
-  host: { role: string; tenant: unknown } | null,
-): ScreenName {
-  // Both are needed before anything can be chosen. Guessing flashes the wrong
-  // screen, which on this set of doors means flashing a login at someone who has
-  // no centre to log in to.
-  if (loading || !host) return "boot";
-  switch (host.role) {
-    case "invalid":
-      return "wrongdoor";
-    case "root":
-      return "signpost";
-    case "setup":
-      return ctx ? "start" : "login";
-    /**
-     * The OPERATOR door. It has no tenant by construction, so without this case
-     * it fell into `default` below, failed `!host.tenant`, and rendered "no
-     * centre at this address" — while `/api/admin/*` answered underneath it.
-     * Signed out, it shows the sign-in form: this is a platform door and the
-     * server will issue a code for it.
-     */
-    case "admin":
-      return ctx ? "admin" : "login";
-    default: {
-      if (!host.tenant) return "nostudio";
-      if (!ctx) return "login";
-      // Signed in, but not a member of THIS centre. The setup door is where a
-      // centre is made; here there is nothing to show them.
-      if (!(ctx as { active: unknown }).active) return "nostudio";
-      return "shell";
-    }
-  }
-}
 
 function Boot() {
   return (
@@ -110,6 +75,8 @@ function App() {
     return (
       <>
         {screen === "boot" && <Boot />}
+        {screen === "maintenance" && <MaintenanceScreen state={host!.maintenance!} brandName={host?.tenant ? (host.tenant as { name?: string }).name : null} />}
+        {screen === "blocked" && <CentreBlocked />}
         {screen === "signpost" && <RootSignpost />}
         {screen === "nostudio" && <NoStudio />}
         {screen === "wrongdoor" && <WrongDoor />}

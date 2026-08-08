@@ -775,6 +775,15 @@ registry leaves a `Card` with a parameter), and the Stripe **route trees**, whos
 handlers are woven through Kova's notification registry, entitlement gates and
 `requireClientAccess`. Only the reconciliation logic moved.
 
+⚠️ **The MAINTENANCE screen was on that list and should not have been.** It is
+`@4dl/app-kit`'s `MaintenanceScreen` as of 2026-08-08. Its own header comment is
+the argument — *"This is about US. Nobody reading it did anything, nobody can pay
+to end it"* — so the only variable is the name over the door, and it sat in one
+app while `platform.maintenance` closed all of them. The line above still holds
+for the standing banners, which name a product's own arrears and say different
+things per app; it did not hold for this one, and "presentation stays in the app"
+is a rule that has to be re-argued per case rather than applied.
+
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
 moves. **Measured 2026-08-08** from one `pnpm test`, per package:
 **632 kova/api (+31 skipped) + 243 scena/api + 237 kova/domain + 152 tessa/api +
@@ -782,7 +791,7 @@ moves. **Measured 2026-08-08** from one `pnpm test`, per package:
 63 commerce + 61 scena/widgets + 45 billing-rail + 44 core + 40 scena/timeline +
 35 auth + 30 scena/app + 24 notify + 23 scena/manifest + 18 scena/protocol +
 18 storage + 18 app-kit + 17 kova/protocol + 17 template + 14 tessa/app +
-14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,389 passing,
+14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,402 passing,
 31 skipped**, 58 turbo tasks, all green.
 
 Per-package figures above predate the last two commits; the TOTAL is current.

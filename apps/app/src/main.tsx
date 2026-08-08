@@ -11,7 +11,8 @@ import { Start } from "./screens/Start.js";
 import { Shell } from "./Shell.js";
 import { AcceptInvite } from "./screens/AcceptInvite.js";
 import { NoStudio, RootSignpost, WrongDoor } from "./screens/Doors.js";
-import { Maintenance } from "./screens/Maintenance.js";
+
+import { MaintenanceScreen } from "@4dl/app-kit";
 import { AdminDoor } from "./screens/AdminDoor.js";
 import { ONBOARDING_PATH } from "./screens/onboarding/paths.js";
 import { PasskeyProvider } from "./PasskeyPrompt.js";
@@ -276,7 +277,7 @@ function App() {
       <AnimatePresence mode="wait">
         <motion.div key={screen} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: DUR.base }}>
           {screen === "boot" && <BootSplash />}
-          {screen === "maintenance" && <Maintenance state={host!.maintenance!} brandName={host?.tenant?.name ?? null} />}
+          {screen === "maintenance" && <MaintenanceScreen state={host!.maintenance!} brandName={host?.tenant?.name ?? null} />}
           {screen === "signpost" && <RootSignpost />}
           {screen === "nostudio" && <NoStudio />}
           {screen === "wrongdoor" && <WrongDoor />}
