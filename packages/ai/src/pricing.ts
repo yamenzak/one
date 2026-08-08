@@ -23,17 +23,69 @@
 import { NEURON_COST_USD } from "@4dl/billing/model";
 
 /**
- * A catalog lane. The first five are lanes the product can actually execute
- * (`ai.ts` generate / generateImage / generateSpeech); the rest are priced,
- * discovered, and inert — nothing in Kova runs an embedding, a transcription,
- * a Workers AI TTS voice or a classifier, so they land in the catalog disabled
- * rather than offered to a tenant as a pickable model that fails at call time.
+ * A catalog lane — what a model DOES, independent of whether this app can drive
+ * it. Which of these the app has a code path for is `configureAiLanes` below;
+ * a lane the app cannot run lands in the catalog DISABLED rather than being
+ * offered to a tenant as a pickable model that fails at call time.
+ *
+ * `speech` and `tts` are both here and they are the same capability, which is
+ * not a design — it is the shape the two pricing pages arrive in (Cloudflare
+ * lists a character rate, Google lists an id containing "tts") and renaming
+ * either would silently retire every row already stored under the other. They
+ * are unified at the point that matters: an app that runs text-to-speech
+ * declares BOTH runnable, and `LANE_ALIASES` below says so once rather than at
+ * each call site.
  */
-export type SeedTask = "text" | "text-small" | "vision" | "image" | "speech" | "embedding" | "transcribe" | "tts" | "classify";
+export type SeedTask =
+  | "text" | "text-small" | "vision" | "image" | "speech" | "music"
+  | "embedding" | "transcribe" | "tts" | "classify";
 
-/** Lanes `ai.ts` has a code path for. Everything else is catalog-only. */
-const RUNNABLE_TASKS = new Set<SeedTask>(["text", "text-small", "vision", "image", "speech"]);
-export const isRunnableTask = (t: SeedTask): boolean => RUNNABLE_TASKS.has(t);
+/**
+ * WHICH LANES THIS APP CAN EXECUTE — the app's fact, not the package's.
+ *
+ * ⚠️ IT USED TO BE A CONSTANT HERE, and that made the catalog wrong for any app
+ * whose lanes differ from Kova's. The set was
+ * `["text","text-small","vision","image","speech"]`, so:
+ *
+ *   • A WORKERS AI TTS VOICE was catalogued as `tts` and left DISABLED, because
+ *     Kova only runs Gemini's. Scena runs Deepgram Aura for its announcements —
+ *     Workers AI — so on Scena's catalog every voice it actually sells arrived
+ *     switched off, priced, and listed in the operator console as a model a
+ *     tenant could pick and never use.
+ *   • `music` did not exist at all, so Lyria and MiniMax were unclassifiable.
+ *
+ * Runnability was never a property of the LANE; it is a property of the app's
+ * code paths, which is exactly the kind of thing `enabled` and `is_default`
+ * already are. So the app declares it, once, at startup.
+ *
+ * The default is Kova's five, so an app that says nothing behaves as before.
+ */
+let runnableTasks = new Set<SeedTask>(["text", "text-small", "vision", "image", "speech"]);
+
+/** Bind the lanes this app has a code path for. Call once, before any sync. */
+export function configureAiLanes(tasks: readonly SeedTask[]): void {
+  const out = new Set<SeedTask>();
+  for (const t of tasks) for (const alias of LANE_ALIASES[t] ?? [t]) out.add(alias);
+  runnableTasks = out;
+}
+
+/**
+ * Lanes that are the SAME CAPABILITY under two names, so declaring one declares
+ * both.
+ *
+ * Text-to-speech arrives as `speech` from Google's catalog (the id contains
+ * "tts") and as `tts` from Cloudflare's (a per-character rate). Neither name can
+ * be dropped without retiring every row already stored under the other, and an
+ * app that runs text-to-speech runs it whichever page priced the model — so the
+ * pairing is stated here once instead of at every `configureAiLanes` call, where
+ * forgetting the second name silently disables half the voices.
+ */
+const LANE_ALIASES: Partial<Record<SeedTask, readonly SeedTask[]>> = {
+  speech: ["speech", "tts"],
+  tts: ["speech", "tts"],
+};
+
+export const isRunnableTask = (t: SeedTask): boolean => runnableTasks.has(t);
 
 export interface ModelSeed {
   id: string;
@@ -43,7 +95,13 @@ export interface ModelSeed {
   inputRate: number | null; // neurons per 1M input tokens
   outputRate: number | null; // neurons per 1M output tokens
   unitRate: number | null; // neurons per unit (e.g. per generated image)
-  unitKind: "image" | "chars_1k" | "audio_min" | null;
+  /*
+    Every unit `@4dl/billing`'s `credits.ts` can meter. It listed three while the
+    metering handled five, so a `tile` or `audio_sec` rate — the units Scena's
+    image and music lanes are priced in — could not be expressed by a seed even
+    though the credit math would have charged it correctly.
+  */
+  unitKind: "image" | "tile" | "chars_1k" | "audio_min" | "audio_sec" | null;
   /**
    * The day the provider says this model stops answering (`YYYY-MM-DD`), when
    * the page announces one that has not arrived yet. Null for a model with no
@@ -85,6 +143,17 @@ export interface ParsedCatalog {
    */
   retired: SkippedModel[];
 }
+
+/**
+ * The clip ceiling a per-song music price buys.
+ *
+ * Google's Lyria list price is "per song", defined as a clip of up to 30
+ * seconds. Shared rather than inlined because BOTH halves have to agree: the
+ * pricing parser divides by it to store a per-second rate, and every caller
+ * multiplies back up to it when metering. Two copies of this number drifting
+ * apart is a money bug in whichever direction they drift.
+ */
+export const MUSIC_CLIP_SECONDS = 30;
 
 /** USD → neuron-equivalents (so Gemini meters identically to Workers AI). */
 export const usdPerMToNeurons = (usdPerM: number): number => Math.round(usdPerM / 1_000_000 / NEURON_COST_USD * 1_000_000);
@@ -248,9 +317,25 @@ function shutdownDate(block: string): string | null {
   return `${m[3]}-${String(month + 1).padStart(2, "0")}-${String(Number(m[2])).padStart(2, "0")}`;
 }
 
-/** Which Kova lane a Gemini id belongs to, or a refusal reason. */
+/** Which lane a Gemini id belongs to, or a refusal reason. */
 function geminiLane(id: string): { task: SeedTask } | { skip: string } {
-  if (/^(imagen|veo|lyria)/i.test(id)) return { skip: "a different Google API surface (predict / long-running ops); the app's generateContent path cannot drive it" };
+  /*
+    LYRIA IS A LANE NOW, not a skip.
+
+    It was refused as "a different Google API surface (predict / long-running
+    ops); the app's generateContent path cannot drive it" — true of Kova, whose
+    only Google path is `generateContent`, and false of the platform: Scena drives
+    Lyria for its background music beds through the predict surface. A shared
+    catalog that refuses to PRICE a model because one app cannot run it is the
+    same mistake `configureAiLanes` above fixes — pricing is the catalog's job,
+    dispatch is the app's, and `isRunnableTask` already keeps an unrunnable lane
+    disabled rather than offered.
+
+    `imagen` and `veo` stay skipped: no app here drives either, so pricing them
+    would put rows in every operator console that nothing can ever select.
+  */
+  if (/^lyria/i.test(id)) return { task: "music" };
+  if (/^(imagen|veo)/i.test(id)) return { skip: "a different Google API surface (predict / long-running ops) that no app here drives" };
   if (/\blive\b|native-audio/i.test(id)) return { skip: "Live API (bidirectional audio streaming); no lane here speaks that protocol" };
   if (/tts/i.test(id)) return { task: "speech" };
   if (/embedding/i.test(id)) return { task: "embedding" };
@@ -314,6 +399,32 @@ export function parseGeminiCatalog(md: string, now: number = Date.now()): Parsed
         const perImage = /\$([0-9.]+)\s*per image/i.exec(outputLine)?.[1];
         if (!perImage) { skipped.push({ id, reason: "image output is priced per resolution tier (0.5K / 1K / 2K / 4K), not a single per-image rate" }); continue; }
         models.push({ id, label: prettyId(id), provider: "google", task: "image", inputRate: inUsd != null ? usdPerMToNeurons(inUsd) : null, outputRate: null, unitRate: usdToNeurons(Number(perImage)), unitKind: "image", retiresAt: ends });
+        continue;
+      }
+      if (lane.task === "music") {
+        /*
+          MUSIC IS PRICED PER SONG, and stored per SECOND.
+
+          Google bills a flat price for a clip of up to 30 seconds ("$0.04 per
+          song"), and `@4dl/billing`'s `credits.ts` has no per-song unit — it
+          multiplies `unitRate` by `usage.audioSec`. So the rate is divided by the
+          clip ceiling, and the CALLER is responsible for billing a whole clip
+          rather than the seconds it asked for.
+
+          ⚠️ THAT DIVISION IS A FLOOR, NOT AN AVERAGE. A caller that meters the
+          real duration of a 10-second bed charges a third of what the platform
+          paid, because the provider charged for the whole song either way. Scena
+          rounds every clip up to `MUSIC_CLIP_SECONDS`; any app adding a music
+          lane has to do the same, and the constant is shared for that reason.
+        */
+        const perSong = /\$([0-9.]+)\s*per\s+song/i.exec(outputLine) ?? /\$([0-9.]+)\s*per\s+song/i.exec(inputLine);
+        if (!perSong) { skipped.push({ id, reason: "music output has no single per-song price on the page" }); continue; }
+        models.push({
+          id, label: prettyId(id), provider: "google", task: "music",
+          inputRate: null, outputRate: null,
+          unitRate: Math.round(usdToNeurons(Number(perSong[1])) / MUSIC_CLIP_SECONDS),
+          unitKind: "audio_sec", retiresAt: ends,
+        });
         continue;
       }
       if (lane.task === "embedding") {

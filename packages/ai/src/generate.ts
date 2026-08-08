@@ -22,7 +22,7 @@
 import { type BalanceView, creditsForUsage, creditsPerMillionTokens, creditsPerUnit, referenceCredits, REFERENCE_USAGE, type ModelRate, type Usage } from "@4dl/billing/model";
 import type { HasAi, HasDb, HasEnvironment, HasPlatformConfig } from "@4dl/core";
 import { getConfig, newId, nowMs } from "@4dl/core";
-import { isRunnableTask } from "./pricing.js";
+import { isRunnableTask, type SeedTask } from "./pricing.js";
 import { readSharedCatalog } from "./shared-catalog.js";
 import { shouldUseMockLane } from "./mock-lane.js";
 import { aiRegistry, type AiTone, type TenantAiConfig } from "./registry.js";
@@ -100,7 +100,13 @@ export interface AiModelRow {
 export const DEFAULT_SEED_MARKUP = 3;
 
 /** Seed text models (Workers AI rates in neurons per 1M tokens, markup 3). */
-const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
+/*
+  `task` narrowed to `SeedTask` rather than the row's `string`, so a typo'd lane
+  in this list is a COMPILE error instead of a row that seeds, prices, and is
+  never selectable — `AiModelRow` has to stay loose because it models whatever is
+  in the database, and a seed is not that.
+*/
+const DEFAULT_MODELS: (Omit<AiModelRow, "enabled" | "is_default" | "task"> & { task: SeedTask })[] = [
   {
     id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     task: "text",
@@ -253,6 +259,34 @@ const DEFAULT_MODELS: Omit<AiModelRow, "enabled" | "is_default">[] = [
     unit_kind: null,
     markup: 3,
   },
+  {
+    /*
+      LYRIA — Google's music generation, and the platform's first `music` row.
+
+      Priced PER SONG, not per second: Google bills a flat $0.04 for a clip of up
+      to 30 seconds. Stored as neurons per second (121 × 30s = $0.04 at
+      $0.011/1k) so it meters through the same `audio_sec` math as every other
+      unit-priced model — but a caller MUST bill a whole clip rather than the
+      seconds it actually asked for, or a 10-second bed costs the platform the
+      full song price and charges a third of it. `@4dl/billing`'s `credits.ts`
+      multiplies `unitRate` by `usage.audioSec`, so the clip-rounding is the
+      caller's, and Scena's `ai.ts` does exactly that.
+
+      It arrives on the predict surface rather than `generateContent`, which is
+      why `geminiLane` used to refuse to price it at all — pricing is the
+      catalog's job, dispatch is the app's, and `configureAiLanes` is what keeps
+      an app that cannot drive it from offering it.
+    */
+    id: "lyria-002",
+    task: "music",
+    label: "Lyria 2 (music bed)",
+    provider: "google",
+    input_rate: null,
+    output_rate: null,
+    unit_rate: 121, // $0.04 per ≤30s clip ÷ 30s ÷ $0.000011
+    unit_kind: "audio_sec",
+    markup: 3,
+  },
 ];
 
 /** Idempotent catalog seed (INSERT OR IGNORE by id). No module-level guard (so
@@ -296,7 +330,7 @@ export async function seedAiModels(db: D1Database, env?: HasPlatformConfig): Pro
     // Elect a default per lane; without one, `modelForTask` orders by
     // `is_default DESC` across rows that are all zero and picks arbitrarily.
     if (ok) {
-      for (const task of ["text", "text-small", "vision", "image", "speech"]) {
+      for (const task of ["text", "text-small", "vision", "image", "speech", "music"]) {
         const clause = task === "vision" ? " AND provider = 'google'" : "";
         await db
           .prepare(`UPDATE ai_models SET is_default = 1 WHERE id = (SELECT id FROM ai_models WHERE task = ? AND enabled = 1${clause} ORDER BY output_rate ASC, unit_rate ASC LIMIT 1)`)
@@ -310,14 +344,29 @@ export async function seedAiModels(db: D1Database, env?: HasPlatformConfig): Pro
     // the table empty — an app with no models cannot meter anything at all.
   }
 
+  /*
+    ⚠️ `enabled` FOLLOWS RUNNABILITY HERE TOO, and it did not.
+
+    This floor hardcoded `enabled = 1` for every row while the shared-catalog
+    path above gates on `isRunnableTask` — two rules for one column, in the same
+    function. It went unnoticed because every row in `DEFAULT_MODELS` happened to
+    be in a lane Kova runs, so the two agreed by coincidence.
+
+    Adding Lyria broke the coincidence and the symptom was not subtle: a `music`
+    model arrived ENABLED in a product with no music feature, so Kova's tenant AI
+    picker offered an owner a model quoting 0 credits for every lane it lists
+    (Lyria has no token rates at all). Caught by `ai-selftest.test.ts`'s "quote
+    every model in credits, per lane", which exists for exactly that — a 0 reads
+    as "this model costs nothing".
+  */
   await db
     .batch(
       DEFAULT_MODELS.map((m, i) =>
         db
           .prepare(
-            "INSERT OR IGNORE INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
+            "INSERT OR IGNORE INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           )
-          .bind(m.id, m.task, m.label, m.provider, m.input_rate, m.output_rate, m.unit_rate, m.unit_kind, m.markup, i === 0 ? 1 : 0),
+          .bind(m.id, m.task, m.label, m.provider, m.input_rate, m.output_rate, m.unit_rate, m.unit_kind, m.markup, isRunnableTask(m.task) ? 1 : 0, i === 0 ? 1 : 0),
       ),
     )
     .catch(() => undefined);

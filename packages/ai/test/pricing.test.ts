@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { parseWorkersAiPricing, parseGeminiPricing, usdPerMToNeurons, usdToNeurons } from "../src/pricing.js";
+import { afterEach, describe, expect, it } from "vitest";
+import { configureAiLanes, isRunnableTask, MUSIC_CLIP_SECONDS, parseGeminiCatalog, parseWorkersAiPricing, parseGeminiPricing, usdPerMToNeurons, usdToNeurons } from "../src/pricing.js";
 
 // Real-format snippets from the Cloudflare Workers AI pricing markdown.
 const CF_MD = `
@@ -83,5 +83,102 @@ describe("parseGeminiPricing", () => {
     const nano = byId.get("gemini-2.5-flash-image")!;
     expect(nano).toMatchObject({ task: "image", unitKind: "image", unitRate: usdToNeurons(0.039) });
     expect(byId.has("gemini-2.5-flash-preview-tts")).toBe(false); // TTS skipped
+  });
+});
+
+/*
+  THE LANE VOCABULARY — the app's fact, not the package's.
+
+  `RUNNABLE_TASKS` used to be a constant here holding Kova's five lanes, and the
+  consequence was a catalog that was wrong for any app whose code paths differ.
+  Every Workers AI voice arrived DISABLED on Scena — which runs Deepgram Aura for
+  its announcements — so the models it actually sells were priced, listed in the
+  operator console, and unselectable. `music` did not exist at all.
+
+  All three cases below are silent when broken: a disabled row looks like an
+  operator's choice, and a skipped row looks like a model the provider does not
+  offer.
+*/
+describe("configureAiLanes", () => {
+  const KOVA = ["text", "text-small", "vision", "image", "speech"] as const;
+
+  afterEach(() => configureAiLanes(KOVA));
+
+  it("defaults to Kova's five, so an app that says nothing is unaffected", () => {
+    for (const t of KOVA) expect(isRunnableTask(t), t).toBe(true);
+    for (const t of ["embedding", "transcribe", "classify"] as const) expect(isRunnableTask(t), t).toBe(false);
+  });
+
+  /*
+    ⚠️ DECLARING `speech` DECLARES `tts`. They are one capability under two names
+    — Google's catalog yields `speech` (the id contains "tts"), Cloudflare's
+    yields `tts` (a per-character rate) — and an app that runs text-to-speech runs
+    it whichever page priced the model. Forgetting the second name is exactly how
+    half a catalog's voices end up switched off.
+  */
+  it("treats speech and tts as one capability", () => {
+    configureAiLanes(["speech"]);
+    expect(isRunnableTask("speech")).toBe(true);
+    expect(isRunnableTask("tts")).toBe(true);
+    configureAiLanes(["tts"]);
+    expect(isRunnableTask("speech")).toBe(true);
+    expect(isRunnableTask("tts")).toBe(true);
+  });
+
+  it("lets an app declare music, which no lane set had before", () => {
+    expect(isRunnableTask("music")).toBe(false);
+    configureAiLanes(["text", "image", "tts", "music"]);
+    expect(isRunnableTask("music")).toBe(true);
+    // …and narrowing really narrows: a lane left out is catalog-only.
+    expect(isRunnableTask("vision")).toBe(false);
+  });
+});
+
+/*
+  LYRIA IS PRICED NOW. It was refused as "a different Google API surface … the
+  app's generateContent path cannot drive it" — true of Kova and false of the
+  platform, since Scena drives it for background music beds. Pricing is the
+  catalog's job; dispatch is the app's, and `configureAiLanes` is what keeps an
+  app that cannot drive a model from offering it.
+*/
+describe("the Gemini catalog classifies music", () => {
+  const LYRIA_MD = `
+## Lyria 2
+
+*\`lyria-002\`*
+
+|   | Free Tier | Paid Tier, per 1M tokens in USD |
+| Input price | Free of charge | $0.04 per song |
+`;
+
+  it("prices Lyria into the music lane instead of skipping it", () => {
+    const { models, skipped } = parseGeminiCatalog(LYRIA_MD);
+    expect(skipped.map((s) => s.id)).not.toContain("lyria-002");
+    const lyria = models.find((m) => m.id === "lyria-002");
+    expect(lyria, "Lyria must be priced, not refused for being Lyria").toBeTruthy();
+    expect(lyria!.task).toBe("music");
+    /*
+      ⚠️ PER SONG IN, PER SECOND OUT. `credits.ts` has no per-song unit — it
+      multiplies `unitRate` by `usage.audioSec` — so the page's flat clip price is
+      divided by the 30-second ceiling it buys. $0.04 ÷ $0.000011 ÷ 30 ≈ 121.
+      The caller must then bill a WHOLE clip: metering the real 10 seconds of a
+      short bed charges a third of what the provider took.
+    */
+    expect(lyria!.unitKind).toBe("audio_sec");
+    expect(lyria!.unitRate).toBe(Math.round(usdToNeurons(0.04) / MUSIC_CLIP_SECONDS));
+    expect(lyria!.unitRate).toBeCloseTo(121, 0);
+  });
+
+  it("still refuses Imagen and Veo, which nothing here drives", () => {
+    const md = `
+## Imagen 4
+
+*\`imagen-4.0-generate-001\`*
+
+|   | Free Tier | Paid Tier, per 1M tokens in USD |
+| Input price | Free of charge | $0.04 |
+`;
+    const { skipped } = parseGeminiCatalog(md);
+    expect(skipped.some((s) => s.id.startsWith("imagen"))).toBe(true);
   });
 });
