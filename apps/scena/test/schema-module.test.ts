@@ -11,6 +11,7 @@
 
 import { describe, expect, it } from "vitest";
 import { schemaStatements } from "@4dl/core";
+import { AI_SCHEMA } from "@4dl/ai";
 import { SCENA_SCHEMA } from "../src/schema.js";
 import { SCHEMA_MODULES } from "../src/db.js";
 
@@ -63,8 +64,14 @@ describe("the Scena schema module", () => {
     // tables now and `username` did not come back — see schema.ts's header for
     // why, including the ordering bug that made that index unrunnable on a fresh
     // database.
+    //
+    // And THREE more left when Scena adopted `@4dl/ai`'s model catalog:
+    // `ai_models`, `ai_cache` and `ai_generations`. All three used to be declared
+    // here with different columns from the shared ones, which is precisely why
+    // they could not both exist — a `CREATE TABLE IF NOT EXISTS` is won by
+    // whichever module runs first and the loser's columns silently never exist.
     const ddl = schemaStatements(SCENA_SCHEMA);
-    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(35);
+    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(32);
     expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(10);
     expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(0);
     expect(SCENA_SCHEMA.alters ?? []).toHaveLength(52);
@@ -107,15 +114,38 @@ describe("erasure is derivable from the declaration", () => {
     // Shared across every tenant. Deleting one tenant must not touch them, and
     // the failure here would be catastrophic and silent: the first erasure
     // takes the plan catalog with it.
-    for (const t of ["plans", "credit_packs", "promo_codes", "ai_models", "library_tracks", "app_config"]) {
+    // `ai_models` is the same kind of thing and is `@4dl/ai`'s table now —
+    // asserted against ITS module below, not this one.
+    for (const t of ["plans", "credit_packs", "promo_codes", "library_tracks", "app_config"]) {
       expect(SCENA_SCHEMA.scoped?.tenantTables ?? [], `${t} is platform-owned`).not.toContain(t);
     }
+    expect(AI_SCHEMA.scoped?.tenantTables ?? [], "ai_models is platform-owned").not.toContain("ai_models");
   });
 
   it("keeps caches keyed by something other than a tenant out of it", () => {
-    for (const t of ["ai_cache", "weather_cache"]) {
-      expect(SCENA_SCHEMA.scoped?.tenantTables ?? []).not.toContain(t);
-    }
+    expect(SCENA_SCHEMA.scoped?.tenantTables ?? []).not.toContain("weather_cache");
+    // `ai_cache` is keyed by prompt hash and is `@4dl/ai`'s now.
+    expect(AI_SCHEMA.scoped?.tenantTables ?? []).not.toContain("ai_cache");
+  });
+
+  /*
+    THE THREE AI TABLES MUST NOT COME BACK HERE, and a test is the only thing
+    that can say so.
+
+    Re-declaring one is not a conflict anything reports: the runner applies both
+    modules, the second `CREATE TABLE IF NOT EXISTS` finds a table already there
+    and does nothing at all — including nothing about the columns it names. What
+    fails is a query, later, against a column that silently never existed. That
+    is the shape of the `app_config.updated_at` regression this schema already
+    carries a scar from, and re-adding a local `ai_models` would reproduce it on
+    the metering path.
+  */
+  it("declares none of `@4dl/ai`'s tables", () => {
+    const aiTables = schemaStatements(AI_SCHEMA)
+      .filter((s) => s.startsWith("CREATE TABLE"))
+      .map((s) => /CREATE TABLE IF NOT EXISTS "?(\w+)"?/.exec(s)?.[1] ?? "");
+    expect(aiTables).toContain("ai_models");
+    expect([...created].filter((t) => aiTables.includes(t))).toEqual([]);
   });
 
   it("does not try to cascade the tenant row itself", () => {
@@ -139,8 +169,8 @@ describe("erasure is derivable from the declaration", () => {
       Stripe's next retry of an already-applied event apply it again.
     */
     const platform = new Set([
-      "plans", "credit_packs", "promo_codes", "ai_models", "library_tracks",
-      "app_config", "ai_cache", "weather_cache", "tenants", "stripe_events",
+      "plans", "credit_packs", "promo_codes", "library_tracks",
+      "app_config", "weather_cache", "tenants", "stripe_events",
     ]);
     // Better Auth's tables left in Stage 2 — this module does not create them
     // any more, so nothing here can be one of them.

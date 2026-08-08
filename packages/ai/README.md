@@ -16,6 +16,14 @@ resolve model → RESERVE a worst-case hold → run (Workers AI | Gemini | mock)
 | `media.ts` | Where a generated image goes. |
 | `schema.ts` | `ai_models`, `ai_generations`, `ai_cache`, `insight_feedback`. |
 
+⚠️ **`ai_models.id` IS THE PROVIDER PATH** — `@cf/deepgram/aura-1`,
+`gemini-2.5-flash` — with `provider` naming the lane. A short slug beside a
+separate "real" id is the shape Scena had, and it is what kept it off this catalog
+for three stages: two tables named `ai_models` keying differently cannot be the
+same table, and a `CREATE TABLE IF NOT EXISTS` silently gives you whichever ran
+first. One column, no mapping, and a model's identity is the same fact in every
+app — which is what makes a shared catalog and a cross-app broadcast mean anything.
+
 ## The catalog is the platform's; the selection is the app's
 
 `ai_models` holds two different kinds of thing, and only one of them is any
@@ -44,6 +52,49 @@ platform store (`shared-catalog.ts`), and two things follow:
 `enabled` and `is_default` never cross by default. One product reads food
 photos, another reads sterilisation labels, and a third has no use for the
 speech lane at all.
+
+### Two things the APP declares, at module load
+
+Both were constants in this package, and both were wrong for the second app that
+needed them. Set once, before anything can seed:
+
+| | What it binds | What it cost to be a constant |
+|---|---|---|
+| `configureAiLanes(lanes)` | which lanes this app has a CODE PATH for. A lane it cannot execute is catalogued `enabled = 0` rather than offered as a pickable model that fails at call time. | The set was Kova's five. So on Scena's catalog every text-to-speech VOICE it actually sells — Deepgram Aura, Workers AI — arrived priced, listed and switched OFF, and `music` did not exist at all, so Lyria and MiniMax were unclassifiable. |
+| `configureAiFloor(rows)` | the rows `seedAiModels` writes when `ai_models` is EMPTY and no shared catalog is available. | `DEFAULT_MODELS` here is eleven rows chosen for Kova, with no Workers AI voice, poster or music model in it. Seeding Scena from it left three of its four lanes with nothing pickable on a fresh database — i.e. the product did not work until an operator remembered a button. |
+
+Not calling either keeps this package's own defaults, which is what Kova, Tessa
+and the template do.
+
+### `lanesFor` — one capability, two lane names
+
+`speech` and `tts` are the same thing, and both are in `SeedTask` because that is
+the shape the two pricing pages arrive in: Cloudflare lists a per-character rate
+under `tts`, Google's ids contain "tts" and parse as `speech`. Renaming either
+would retire every row already stored under the other.
+
+The consequence is that a catalog with both providers in it holds text-to-speech
+under **both names, in one table**, with nothing in the row to say which page it
+came from. So:
+
+- `configureAiLanes` unifies them for **runnability** — declaring one declares
+  both, via `LANE_ALIASES`.
+- `lanesFor(task)` unifies them for **selection**, and that is the half that
+  decides what a tenant is offered. `WHERE task = 'tts'` cannot see a single
+  Gemini voice; `WHERE task IN (…lanesFor('tts'))` can.
+
+It returns `[task]` for every lane with no second name, so a call site can always
+use `IN (…)` without special-casing.
+
+### `electLaneDefaults` — one default per lane, elected by price
+
+`modelForTask` breaks ties on `is_default DESC` alone, so a lane with no default
+picks a model by whatever order the database returns — an answer stable enough to
+look deliberate with nothing behind it. This gives every runnable lane the
+cheapest enabled model in it, and it is called from all three places that can
+leave a lane defaultless: the floor seed, the shared-catalog seed, and the end of
+every sync. There were two implementations of that rule in this package, naming
+different lane sets; now there is one, driven by `configureAiLanes`.
 
 ### "Apply to every app" is a broadcast, not a shared default
 

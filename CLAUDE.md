@@ -725,15 +725,15 @@ handlers are woven through Kova's notification registry, entitlement gates and
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
 moves. **Measured 2026-08-08** from `pnpm turbo run test --force`, per package:
-**632 kova/api (+31 skipped) + 237 kova/domain + 223 scena/api + 146 tessa/api +
-133 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 75 ai + 63 commerce +
+**632 kova/api (+31 skipped) + 237 kova/domain + 226 scena/api + 146 tessa/api +
+145 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 80 ai + 63 commerce +
 61 scena/widgets + 45 billing + 45 billing-rail + 44 core + 40 scena/timeline +
-35 auth + 29 scena/app + 24 notify + 23 scena/manifest + 18 scena/protocol +
+35 auth + 30 scena/app + 24 notify + 23 scena/manifest + 18 scena/protocol +
 18 storage + 18 app-kit + 17 kova/protocol + 17 template + 14 tessa/app +
-14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,296 passing,
+14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,317 passing,
 31 skipped**, all green.
 
-Scena's 437 (223 api + 29 app + 185 across its five pure packages) were never in
+Scena's 441 (226 api + 30 app + 185 across its five pure packages) were never in
 the older figure at all; nor were Tessa's. `@scena/timeline`'s 40 are the ones
 that matter most per line — they prove
 `position(t) = (t − T0) mod cycleLength`, which is the whole product.
@@ -957,13 +957,18 @@ its own — the owner's decision, cancellable for seven days, reversed by
 cancelling rather than by paying — and it shares the sweep's erasure branch with
 `suspended` so the two purge paths cannot drift.
 `SCHEMA_MODULES` in
-`apps/scena/src/db.ts` is the migration's progress bar — six entries now
+`apps/scena/src/db.ts` is the migration's progress bar — seven entries now
 (`AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_RAIL_SCHEMA`, `STORAGE_SCHEMA`,
-`NOTIFY_SCHEMA`, `SCENA_SCHEMA`), and the diff that removes a table from Scena's
-module is the same diff that adds its package there. **Order in that list IS
-dependency order**: `NOTIFY_SCHEMA` ALTERs `tenant_settings`, which
+`NOTIFY_SCHEMA`, `AI_SCHEMA`, `SCENA_SCHEMA`), and the diff that removes a table
+from Scena's module is the same diff that adds its package there. **Order in that
+list IS dependency order**: `NOTIFY_SCHEMA` ALTERs `tenant_settings`, which
 `@4dl/tenancy` creates, and a wrong order does not fail — the runner swallows
-the ALTER and an owner's email veto silently never persists. Its resource ids
+the ALTER and an owner's email veto silently never persists. `AI_SCHEMA` sits
+before `SCENA_SCHEMA` for the mirror-image reason: the app's module used to
+declare `ai_models`/`ai_cache`/`ai_generations` itself, and a `CREATE TABLE IF
+NOT EXISTS` is won by whichever module runs first.
+`apps/scena/test/schema-module.test.ts` fails if any of the three is declared
+locally again. Its resource ids
 are deliberately placeholders (the old account's real ids were replaced), so
 `deploy.yml` skips it until the Provision workflow runs.
 
@@ -984,7 +989,7 @@ which made `className="dark"` inert (the kiosk and the counter tablet stopped
 being dark) and — worse — left `brandCss` emitting `:root { …light… }` /
 `.dark { …dark… }`, so **a tenant's dark tokens applied nowhere and their light
 tokens were injected into the dark theme.** `apps/scena-app` has a test suite
-now (19 tests, its first) whose whole job is that neither can come back.
+now whose whole job is that neither can come back.
 
 ⚠️ **`scripts/player-api-base.test.mjs` (in `pnpm gate`) exists because that
 constant ships un-reviewed and has been wrong twice.** It asserts the fallback
@@ -1028,28 +1033,46 @@ dunning ladder and the emergency takeover — but `NotificationBell` and
 `InboxScreen` are `@4dl/app-kit`'s and land with the Stage 7 UI rewrite. Until
 then a notification is reachable only at `GET /api/notifications`.
 
-Two things are still Scena's, both for the same reason, and the plan names them
-so nobody "fixes" them casually: the billing STORE (`BILLING_SCHEMA`) and the
-`ai_models` CATALOG (`AI_SCHEMA`). Both packages' tables share a NAME with
-Scena's and differ in COLUMNS — `price_cents` + `currency` + `interval` against
-`price_usd_month`, a `cf_model` column against an `id` that IS the provider id.
-A `CREATE TABLE IF NOT EXISTS` is won by whichever module runs first and the
-loser's columns silently never exist, which is exactly how a fresh Stage 1
-deployment ended up unable to save any setting (`app_config.updated_at`).
-Adopting either means reconciling the shapes first, which is a data change rather
-than a wiring one.
+**ONE thing is still Scena's, and the plan names it so nobody "fixes" it
+casually: the billing STORE (`BILLING_SCHEMA`).** Its `plans`, `subscriptions`,
+`credit_packs` and `credit_ledger` share a NAME with Scena's and differ in
+COLUMNS — `price_cents` + `currency` + `interval` against `price_usd_month`, `at`
+against `created_at`, TEXT timestamps against INTEGER. A `CREATE TABLE IF NOT
+EXISTS` is won by whichever module runs first and the loser's columns silently
+never exist, which is exactly how a fresh Stage 1 deployment ended up unable to
+save any setting (`app_config.updated_at`). Adopting it means reconciling the
+shapes first — a data change, not a wiring one.
 
-⚠️ **The AI half is now DOWN TO the id scheme.** Two of the three blockers this
-section used to imply are closed: `@4dl/billing`'s `credits.ts` already meters
-every unit Scena's image, voice and music lanes are priced in (`ModelSeed`
-listed three of the five it handles), and `configureAiLanes` replaced the
-constant that hard-coded Kova's five lanes — which had been catalogueing every
-Workers AI VOICE as disabled on any app that runs one, and had no `music` lane
-at all. What is left is `id` = the provider path (34 `cf_model` references across
-eight files, plus the `ai_defaults` values and the cache's `model` column), and
-renaming Scena's `ai_cache`, whose columns model an ASSET and its neuron cost
-that the shared one does not. `apps/scena/src/ai-catalog-sync.ts`'s header is the
-live checklist, and that file is what the migration DELETES.
+**The `ai_models` CATALOG is `@4dl/ai`'s now** (`AI_SCHEMA` is entry six of seven
+in `SCHEMA_MODULES`), and the reconciliation it needed is done:
+
+- **`ai_models.id` IS the provider path** (`@cf/deepgram/aura-1`,
+  `gemini-2.5-flash`), with `provider` naming the lane. Scena keyed on a short
+  slug with the path in a `cf_model` column, and that one difference is what kept
+  it off the shared catalog for three stages. `cf_model` is gone from all eight
+  files; `apps/scena/src/ai-catalog-sync.ts` (the bespoke ~200-line syncer) is
+  DELETED in favour of `syncModelCatalog`.
+- **`ai_cache` and `ai_generations` moved too.** The shared cache gained
+  `asset_hash` + `neurons` as alters — a cached generation may be an OBJECT in R2
+  with a cost, which is true of any app generating images or audio. The audit row
+  lost Scena's `prompt` and `output_ref`: nothing ever read either, so what they
+  amounted to was a permanent record of what every workspace typed.
+- **`configureAiFloor` is the seam that made it possible.** `@4dl/ai`'s own floor
+  is eleven rows chosen for Kova with no Workers AI voice, poster or music model
+  in it, so seeding Scena from it would leave three of its four lanes with
+  nothing pickable. The app hands over its forty curated rows and keeps the whole
+  mechanism — shared-catalog preference, runnability-gated `enabled`, lane
+  election, retirement sweep.
+- **`lanesFor` is the one to know about.** A catalog carrying both providers holds
+  text-to-speech under TWO lane names — `tts` from Cloudflare's page, `speech`
+  from Google's — so `WHERE task = 'tts'` silently cannot see any Gemini voice.
+  Every selection path goes through it (`ai.ts`'s model match,
+  `defaultModelForTask`, `PUT /api/ai/defaults`).
+- Two latent defects went with it: `lyria-3-clip` was an id Google has never
+  answered to (every music generation on that row 404'd), and
+  `syncGeminiFromGoogle` priced each newly-discovered model by LANE — flash-tier
+  rates for a Pro model, i.e. a reserve that under-estimates and a platform that
+  eats the difference at settle time.
 
 ⚠️ **Scena's R2 key is the CONTENT HASH, and that is not a detail to tidy.** The
 compiled manifest references an asset by hash, the player caches

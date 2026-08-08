@@ -1458,18 +1458,30 @@ export async function adminSavePlan(id: string, patch: Partial<Plan>): Promise<v
   await apiFetch(`${API_BASE}/api/admin/plans/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
 }
 
+/**
+ * One row of the AI model catalog.
+ *
+ * ⚠️ `id` IS THE PROVIDER PATH (`@cf/deepgram/aura-1`, `gemini-2.5-flash`) since
+ * Scena adopted `@4dl/ai`'s catalog. There used to be a short slug here with the
+ * real path in a `cf_model` field beside it; `provider` names the lane now, which
+ * is the column the server filters and groups on.
+ */
 export interface AdminModel {
   id: string;
   label: string;
   task: string;
-  cf_model: string;
+  provider: string;
   input_rate: number | null;
   output_rate: number | null;
   unit_rate: number | null;
   unit_kind: string | null;
-  markup: number;
+  markup: number | null;
   enabled: number;
-  sort: number;
+  is_default: number;
+  /** `YYYY-MM-DD` the provider says it stops answering, or null. */
+  retires_at: string | null;
+  /** Curated display order. Null for a row the pricing-page sync discovered. */
+  sort: number | null;
 }
 
 export async function adminListModels(): Promise<AdminModel[]> {
@@ -1480,40 +1492,70 @@ export async function adminSaveModel(id: string, patch: Partial<AdminModel>): Pr
   await apiFetch(`${API_BASE}/api/admin/models/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
 }
 
-/** What one provider's pricing page produced. `ok: false` means it was not read
- *  at all and that lane's rates were deliberately left alone. */
+/**
+ * What ONE provider's sync produced — `@4dl/ai`'s `ProviderSyncReport`.
+ *
+ * `ok: false` means that provider's page was not read at all and every one of
+ * its rows was deliberately left exactly as it was. Reported per provider
+ * because a Cloudflare outage must never touch a Gemini rate, and a half-failed
+ * run has to be able to say which half.
+ */
 export interface RateSyncProvider {
   provider: "workers-ai" | "google";
   source: string;
   ok: boolean;
+  /** Models priced from the page. */
   parsed: number;
-  repriced: number;
-  retired: string[];
-  delisted: string[];
-  unchanged: number;
+  added: number;
+  addedIds: string[];
+  updated: number;
+  /** Enabled ids that vanished from the page and were switched off. */
+  disabled: number;
+  disabledIds: string[];
+  /** Rows the page lists that cannot be priced exactly, and why. */
+  unpriceable: { id: string; reason: string }[];
+  /** Rows the page still prices but the provider has already SHUT DOWN. */
+  retired: { id: string; reason: string }[];
+  retiredDisabled: number;
+  /** The provider's own page, or a catalog another 4DL app already parsed. */
+  from: "pricing page" | "shared catalog";
   error: string | null;
 }
 
+/**
+ * `@4dl/ai`'s `SyncReport`, minus the parsed rows.
+ *
+ * ⚠️ THERE IS NO `added`/`updated` AT THE TOP LEVEL ANY MORE, and its absence is
+ * the point. Those two counted rows a HARDCODED catalog re-wrote — on a settled
+ * deployment, every row, every time, with identical values — so "17 updated" read
+ * as "rates refreshed from Cloudflare" when nothing had been fetched. Every count
+ * here belongs to a provider whose page was actually read.
+ */
 export interface ResyncResult {
-  added: number;
-  updated: number;
-  /**
-   * What the live PRICING PAGES said, separately from what the built-in seed
-   * re-wrote.
-   *
-   * The two used to be one number, and it was misleading: `updated` counts rows
-   * the hardcoded catalog touched, which on a settled deployment is every row,
-   * every time, with the same values. An operator read "17 updated" as "rates
-   * refreshed from Cloudflare" and nothing had been fetched.
-   */
-  rates: { ok: boolean; repriced: number; retired: string[]; delisted: string[]; providers: RateSyncProvider[] };
-  gemini: { error?: string; added?: number; updated?: number };
+  ok: boolean;
+  providers: RateSyncProvider[];
+  /** Rows in the catalog after the sync. */
+  total: number;
+  errors: string[];
+  /** Whether the parsed catalog reached the shared platform store, so the other
+   *  4DL apps seed from it. False on a deployment with no shared store bound. */
+  published: boolean;
 }
 
 export async function adminResyncModels(): Promise<ResyncResult> {
   const res = await apiFetch(`${API_BASE}/api/admin/models/resync`, { method: "POST" });
-  if (!res.ok) throw new Error(`resync failed (${res.status})`);
-  return (await res.json()) as ResyncResult;
+  /*
+    A 502 STILL CARRIES A REPORT, and it is the only place that says why.
+
+    The server answers 502 when neither pricing page produced a usable parse and
+    no shared catalog could stand in — and the body holds each provider's own
+    error. Throwing on `!res.ok` would replace "couldn't fetch the Cloudflare
+    pricing page (HTTP 503)" with "resync failed (502)", which tells an operator
+    nothing they can act on.
+  */
+  const body = (await res.json().catch(() => null)) as ResyncResult | null;
+  if (!body) throw new Error(`resync failed (${res.status})`);
+  return body;
 }
 
 export interface PromoCode {

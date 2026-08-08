@@ -497,13 +497,29 @@ Workers-pool test can change the binding it would need to observe.
   wants. What genuinely was shared — the mock decision and the credit meter —
   moved; the prompts, the providers and the task vocabulary are Scena's, exactly
   as the original plan said.
-- **The `ai_models` CATALOG stays Scena's**, for the `BILLING_SCHEMA` reason
-  again: Scena's table has a `cf_model` column (the provider id, separate from a
-  friendly `id`) and a `sort`, where `AI_SCHEMA`'s `id` IS the provider id and it
-  carries `provider`/`is_default`. Same `CREATE TABLE IF NOT EXISTS` collision,
-  same silent outcome. Adopting it means reconciling the column shapes first, and
-  that is a data change, not a wiring one. The cost of waiting is that Scena's
-  rates are hand-maintained rather than synced from the two pricing pages.
+- ~~**The `ai_models` CATALOG stays Scena's**~~ — **DONE.** `AI_SCHEMA` is entry
+  six of seven in `SCHEMA_MODULES`, and the column reconciliation it was waiting
+  on is what the migration was: `id` IS the provider path with `provider` naming
+  the lane (`cf_model` gone from all eight files), `sort` moved to an alter on the
+  shared module, and `ai_cache`/`ai_generations` came along too — the cache
+  gaining `asset_hash` + `neurons` (a cached generation may be an OBJECT in R2
+  with a cost, true of any app generating media), the audit row LOSING Scena's
+  `prompt` and `output_ref`, which nothing ever read.
+
+  Three seams in `@4dl/ai` carried it: `configureAiFloor` (the package's eleven
+  Kova-shaped rows would have left three of Scena's four lanes with nothing
+  pickable, so the app hands over its forty and keeps the mechanism),
+  `configureAiLanes` (the default set had no `music` and not Cloudflare's `tts`,
+  so every voice Scena sells was catalogued DISABLED) and `lanesFor` (a catalog
+  with both providers holds text-to-speech under `tts` AND `speech`, so an exact
+  match cannot see a single Gemini voice).
+
+  `apps/scena/src/ai-catalog-sync.ts` — the local ~200-line syncer this file's
+  earlier note predicted would be deleted — is deleted, along with
+  `syncGeminiFromGoogle`, whose per-LANE default rates priced a Pro model at
+  flash-tier and made the platform eat the difference at settle time. Also fixed
+  on the way through: `lyria-3-clip`, an id Google has never answered to, so every
+  music generation on that row 404'd.
 - **`@4dl/storage`'s `mediaRoutes` are not adopted.** They authenticate the READ,
   and a paired screen fetches its slides with no session at all. Scena's read
   stays public — the hash is the capability, which is the same bargain the

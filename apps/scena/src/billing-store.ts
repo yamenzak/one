@@ -7,8 +7,12 @@
  */
 
 import { getConfig as coreGetConfig, type ConfigSource } from "@4dl/core";
+import { DEFAULT_SEED_MARKUP, lanesFor, seedAiModels, type AiModelRow } from "@4dl/ai";
 import { ensureSchema, DEMO_TENANT } from "./db.js";
-import { DEFAULT_PLANS, DEFAULT_PACKS, DEFAULT_MODELS, CONFIG_DEFAULTS } from "./billing-seed.js";
+// `billing-seed.js` is imported for the plan/pack/config seeds AND for its
+// module-load side effect: it is where Scena hands `@4dl/ai` its lanes and its
+// curated floor, and `seedAiModels` below reads both.
+import { DEFAULT_PLANS, DEFAULT_PACKS, CONFIG_DEFAULTS } from "./billing-seed.js";
 import { resolveEntitlements, mergeOverrides, clampForStatus, type Entitlements } from "./entitlements.js";
 
 export interface PlanRow {
@@ -53,19 +57,23 @@ export interface PackRow {
   active: number;
 }
 
-export interface ModelRow {
-  id: string;
-  label: string;
-  task: string;
-  cf_model: string;
-  input_rate: number | null;
-  output_rate: number | null;
-  unit_rate: number | null;
-  unit_kind: string | null;
-  markup: number;
-  enabled: number;
-  sort: number;
-}
+/**
+ * A row of `@4dl/ai`'s `ai_models`.
+ *
+ * ⚠️ `id` IS THE PROVIDER PATH (`@cf/deepgram/aura-1`, `gemini-2.5-flash`), not
+ * a slug. There used to be a `cf_model` column holding the path beside a short
+ * `id`, and that one difference is what kept Scena off the shared catalog: two
+ * tables named `ai_models` keying differently cannot be the same table, and a
+ * `CREATE TABLE IF NOT EXISTS` silently gives you whichever shape ran first.
+ *
+ * Re-exported as `AiModelRow` from `@4dl/ai` — declared here as an alias rather
+ * than a second interface so a column added to the package's row cannot go
+ * missing from this app's view of it.
+ */
+export type ModelRow = AiModelRow & {
+  /** The order an operator reads the catalog in. Null for a synced row. */
+  sort: number | null;
+};
 
 export interface PromoRow {
   code: string;
@@ -124,15 +132,6 @@ async function seed(db: D1Database): Promise<void> {
         .bind(pk.id, pk.name, pk.credits, pk.priceCents, pk.sort),
     );
   }
-  for (const m of DEFAULT_MODELS) {
-    stmts.push(
-      db
-        .prepare(
-          "INSERT OR IGNORE INTO ai_models (id, label, task, cf_model, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, sort) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
-        )
-        .bind(m.id, m.label, m.task, m.cfModel, m.inputRate, m.outputRate, m.unitRate, m.unitKind, m.markup, m.sort),
-    );
-  }
   for (const [key, value] of Object.entries(CONFIG_DEFAULTS)) {
     stmts.push(db.prepare("INSERT OR IGNORE INTO app_config (key, value, updated_at) VALUES (?, ?, ?)").bind(key, value, now));
   }
@@ -147,6 +146,27 @@ async function seed(db: D1Database): Promise<void> {
       .bind(DEMO_TENANT, now),
   );
   await db.batch(stmts);
+  /*
+    THE MODEL CATALOG IS `@4dl/ai`'s SEED, NOT A LOOP HERE.
+
+    This used to be one more `INSERT OR IGNORE` per row, with `enabled` hardcoded
+    to 1. Two things came free with the swap and neither is cosmetic:
+
+      • `enabled` follows RUNNABILITY. A lane the app has no code path for is
+        catalogued off instead of being offered to a workspace as a pickable
+        model that fails at call time.
+      • a lane gets an ELECTED default — the cheapest enabled model in it —
+        rather than none at all, which is what forty rows with `is_default = 0`
+        gave `defaultModelForTask` to break ties on.
+
+    And it prefers a catalog the platform has already parsed from the two pricing
+    pages over the floor, when a shared config store is bound. `ensureBilling`
+    has only the database, so that path opens on the first admin visit or sync
+    (both of which pass `env`); the floor is what a fresh deployment meters
+    against until then. Deliberately last: the batch above is what creates the
+    demo subscription the AI features are gated on.
+  */
+  await seedAiModels(db);
 }
 
 /* ------------------------------- config ---------------------------------- */
@@ -364,8 +384,17 @@ export async function setPackStripe(db: D1Database, id: string, productId: strin
 
 export async function listModels(db: D1Database, onlyEnabled = false): Promise<ModelRow[]> {
   await ensureBilling(db);
-  const sql = onlyEnabled ? "SELECT * FROM ai_models WHERE enabled = 1 ORDER BY sort" : "SELECT * FROM ai_models ORDER BY sort";
-  const res = await db.prepare(sql).all<ModelRow>();
+  /*
+    `COALESCE(sort, 9999)`, not `ORDER BY sort`.
+
+    The curated floor ranks its forty rows; a row the pricing-page sync
+    discovers has no `sort` at all, and SQLite sorts a NULL FIRST in ASC — so a
+    bare `ORDER BY sort` puts every newly-discovered model above the whole
+    curated catalog, which is exactly backwards from what an operator scanning
+    this list wants.
+  */
+  const where = onlyEnabled ? " WHERE enabled = 1" : "";
+  const res = await db.prepare(`SELECT * FROM ai_models${where} ORDER BY COALESCE(sort, 9999), task, label`).all<ModelRow>();
   return res.results ?? [];
 }
 
@@ -375,60 +404,69 @@ export async function getModel(db: D1Database, id: string): Promise<ModelRow | n
 }
 
 /**
- * The tenant's default model for a task. Prefers the tenant's own override
- * (`ai.default_model.<task>:<tenantId>`), then the platform default
- * (`ai.default_model.<task>`, admin-set), and validates it's still an enabled
- * model for that task; otherwise falls back to the first enabled model (by sort)
- * so a disabled/removed default never wedges a generator. The per-tenant key
- * keeps one workspace's model choice from silently changing another's. Returns
- * null only when the catalog has nothing for the task.
+ * The workspace's default model for a lane.
+ *
+ * Prefers the workspace's own override (`ai.default_model.<task>:<tenantId>`),
+ * then the platform default (`ai.default_model.<task>`, operator-set), then the
+ * lane's ELECTED default (`is_default`, the cheapest enabled model in the lane),
+ * and only then the first row by sort. The per-tenant key keeps one workspace's
+ * choice from silently changing another's. Returns null only when the catalog
+ * has nothing for the lane.
+ *
+ * ⚠️ TWO THINGS HERE ARE NOT OPTIONAL, and both were wrong before the catalog
+ * moved to `@4dl/ai`:
+ *
+ *   `lanesFor` — a catalog holding both providers stores text-to-speech under
+ *   `tts` (Cloudflare's page) AND `speech` (Google's). Filtering on one name
+ *   made every Gemini voice invisible to a `tts` request, which surfaces as
+ *   "the model I picked in settings is not being used" and nothing else.
+ *
+ *   `is_default` — the fallback used to be "the first enabled row by sort",
+ *   which ignored the election entirely. So the operator console could show one
+ *   model as a lane's default while the generator used another, with no
+ *   disagreement visible anywhere.
  */
 export async function defaultModelForTask(db: D1Database, task: string, tenantId?: string): Promise<ModelRow | null> {
-  const enabled = (await listModels(db, true)).filter((m) => m.task === task);
+  const lanes = new Set(lanesFor(task));
+  const enabled = (await listModels(db, true)).filter((m) => lanes.has(m.task));
   if (enabled.length === 0) return null;
   const cfg = await getConfig(db);
   const pref = (tenantId ? cfg[`ai.default_model.${task}:${tenantId}`] : "") || cfg[`ai.default_model.${task}`] || "";
-  return enabled.find((m) => m.id === pref) ?? enabled[0]!;
+  return enabled.find((m) => m.id === pref) ?? enabled.find((m) => m.is_default === 1) ?? enabled[0]!;
 }
 
+/**
+ * Operator edit of one catalog row.
+ *
+ * RATES, LABEL, LANE, MARKUP, ON/OFF AND ORDER — never `id`, because the id is
+ * the string the provider answers to. A row whose id could be edited would be a
+ * row that stops resolving at the provider and starts looking, from the console,
+ * exactly like a model that is merely broken.
+ */
 export async function upsertModel(db: D1Database, m: Partial<ModelRow> & { id: string }): Promise<void> {
   await ensureBilling(db);
   const cur = await getModel(db, m.id);
   if (cur) {
     await db
-      .prepare("UPDATE ai_models SET label = ?, task = ?, cf_model = ?, input_rate = ?, output_rate = ?, unit_rate = ?, unit_kind = ?, markup = ?, enabled = ?, sort = ? WHERE id = ?")
-      .bind(m.label ?? cur.label, m.task ?? cur.task, m.cf_model ?? cur.cf_model, m.input_rate ?? cur.input_rate, m.output_rate ?? cur.output_rate, m.unit_rate ?? cur.unit_rate, m.unit_kind ?? cur.unit_kind, m.markup ?? cur.markup, m.enabled ?? cur.enabled, m.sort ?? cur.sort, m.id)
+      .prepare("UPDATE ai_models SET label = ?, task = ?, provider = ?, input_rate = ?, output_rate = ?, unit_rate = ?, unit_kind = ?, markup = ?, enabled = ?, is_default = ?, sort = ? WHERE id = ?")
+      .bind(m.label ?? cur.label, m.task ?? cur.task, m.provider ?? cur.provider, m.input_rate ?? cur.input_rate, m.output_rate ?? cur.output_rate, m.unit_rate ?? cur.unit_rate, m.unit_kind ?? cur.unit_kind, m.markup ?? cur.markup, m.enabled ?? cur.enabled, m.is_default ?? cur.is_default, m.sort ?? cur.sort, m.id)
       .run();
   } else {
     await db
-      .prepare("INSERT INTO ai_models (id, label, task, cf_model, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, sort) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .bind(m.id, m.label ?? m.id, m.task ?? "text", m.cf_model ?? "", m.input_rate ?? null, m.output_rate ?? null, m.unit_rate ?? null, m.unit_kind ?? null, m.markup ?? 3, m.enabled ?? 1, m.sort ?? 99)
+      .prepare("INSERT INTO ai_models (id, label, task, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default, sort) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(m.id, m.label ?? m.id, m.task ?? "text", m.provider ?? providerOf(m.id), m.input_rate ?? null, m.output_rate ?? null, m.unit_rate ?? null, m.unit_kind ?? null, m.markup ?? DEFAULT_SEED_MARKUP, m.enabled ?? 1, m.is_default ?? 0, m.sort ?? null)
       .run();
   }
 }
 
 /**
- * Re-sync the built-in catalog: upsert every DEFAULT_MODELS entry so new models
- * appear and existing rates/labels refresh — while preserving each model's
- * enabled flag (never re-enable something an admin turned off). Returns how many
- * rows were newly added vs updated.
+ * Which provider answers to an id, from the id itself.
+ *
+ * A last resort for an insert that did not say. Only Workers AI paths start
+ * `@cf/`, and everything else in this catalog is Google's — a rule that holds
+ * because the id IS the provider path, which is the point of the migration.
  */
-export async function resyncModels(db: D1Database): Promise<{ added: number; updated: number }> {
-  await ensureBilling(db);
-  let added = 0, updated = 0;
-  for (const m of DEFAULT_MODELS) {
-    const existed = await getModel(db, m.id);
-    await upsertModel(db, {
-      id: m.id, label: m.label, task: m.task, cf_model: m.cfModel,
-      input_rate: m.inputRate, output_rate: m.outputRate, unit_rate: m.unitRate, unit_kind: m.unitKind,
-      markup: m.markup, sort: m.sort,
-      // new models come in enabled; existing keep whatever the admin set
-      ...(existed ? {} : { enabled: 1 }),
-    });
-    existed ? updated++ : added++;
-  }
-  return { added, updated };
-}
+export const providerOf = (id: string): string => (id.startsWith("@cf/") ? "workers-ai" : "google");
 
 /* ------------------------------ ledger ----------------------------------- */
 

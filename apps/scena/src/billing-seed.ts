@@ -7,6 +7,7 @@
  * pricing page and are admin-tunable, because Cloudflare updates them.
  */
 
+import { configureAiFloor, configureAiLanes, type FloorModel } from "@4dl/ai";
 import type { Entitlements } from "./entitlements.js";
 
 /**
@@ -22,8 +23,9 @@ import type { Entitlements } from "./entitlements.js";
  * mailer closes the loop, and at module-init time the import resolves to
  * `undefined`. That is not a type error and not a crash on boot: it surfaces
  * later as `D1_TYPE_ERROR: Type 'undefined' not supported`, from the seed, on a
- * fresh database, which reads as a database problem. This file imports only a
- * TYPE, so it is a leaf and cannot be in a cycle.
+ * fresh database, which reads as a database problem. This file imports nothing
+ * from this app but a TYPE, so it is a leaf and cannot be in a cycle — the
+ * `@4dl/ai` import below is a package, which by construction cannot import back.
  */
 export const PLATFORM_FROM_DEFAULT = "Scena <noreply@4dl.app>";
 
@@ -217,90 +219,137 @@ export const DEFAULT_PACKS: PackSeed[] = [
   { id: "pack_100k", name: "130,000 credits", credits: 130000, priceCents: 10000, sort: 3 },
 ];
 
-export interface ModelSeed {
-  id: string;
-  label: string;
-  task: "text" | "tts" | "image" | "music";
-  cfModel: string;
-  inputRate: number | null;
-  outputRate: number | null;
-  unitRate: number | null;
-  unitKind: string | null;
-  markup: number;
-  sort: number;
-}
-
 /**
- * Workers AI catalog with published neuron rates (July 2026). Text models
- * generate HTML slides/widgets; TTS models render announcements; image models
- * produce poster slides. Rates are neurons per 1M tokens (text) / per 1k chars
- * (tts) / per 512² tile (image). Admin-editable — Cloudflare updates these.
+ * SCENA'S CURATED AI CATALOG — the floor `@4dl/ai` seeds when the table is empty.
+ *
+ * ── The id IS the provider path now, and that is the whole migration ─────────
+ *
+ * These rows used to carry a short slug (`llama-3.3-70b`) with the real path in
+ * a `cf_model` column of Scena's own `ai_models` table — a shape `@4dl/ai` does
+ * not have, and the one structural reason Scena could not adopt the shared
+ * catalog. Two tables named `ai_models` keying differently meant Scena also went
+ * without everything that catalog has grown since: the live pricing-page sync,
+ * the retirement sweep, the shared publication a new app seeds from, and the
+ * "apply to every 4DL app" broadcast. It had a hand-written syncer instead,
+ * behind a button that for a while reported "17 updated" having fetched nothing.
+ *
+ * So `id` is the string the provider answers to. One column, no mapping, and a
+ * model's identity is the same fact in every app — which is what makes a shared
+ * catalog and a broadcast mean anything at all.
+ *
+ * ── Two lane names for one capability, and both are correct ──────────────────
+ *
+ * Cloudflare's pricing page yields `tts`; Google's yields `speech` (the id
+ * contains "tts"). A catalog with both providers in it therefore holds
+ * text-to-speech under BOTH names, so the Google voices below are tagged
+ * `speech` — what a sync will call them — and every selection goes through
+ * `lanesFor()` so asking for one name cannot silently hide the other half.
+ *
+ * `markup` is omitted: `DEFAULT_SEED_MARKUP` is the platform's 3×, and repeating
+ * it forty times is forty places for it to drift.
  */
-export const DEFAULT_MODELS: ModelSeed[] = [
+export const SCENA_MODEL_FLOOR: FloorModel[] = [
   // --- Text → HTML slide / widget generation (input,output = neurons per 1M tokens) ---
-  { id: "llama-3.3-70b", label: "Llama 3.3 70B (balanced default)", task: "text", cfModel: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", inputRate: 26668, outputRate: 204805, unitRate: null, unitKind: null, markup: 3, sort: 0 },
-  { id: "kimi-k2-code", label: "Kimi K2.7 Code (best design)", task: "text", cfModel: "@cf/moonshotai/kimi-k2.7-code", inputRate: 86364, outputRate: 363636, unitRate: null, unitKind: null, markup: 3, sort: 1 },
-  { id: "glm-5.2", label: "GLM 5.2 (flagship)", task: "text", cfModel: "@cf/zai-org/glm-5.2", inputRate: 127273, outputRate: 400000, unitRate: null, unitKind: null, markup: 3, sort: 2 },
-  { id: "qwen-2.5-coder-32b", label: "Qwen2.5 Coder 32B (code)", task: "text", cfModel: "@cf/qwen/qwen2.5-coder-32b-instruct", inputRate: 60000, outputRate: 90909, unitRate: null, unitKind: null, markup: 3, sort: 3 },
-  { id: "gpt-oss-120b", label: "GPT-OSS 120B", task: "text", cfModel: "@cf/openai/gpt-oss-120b", inputRate: 31818, outputRate: 68182, unitRate: null, unitKind: null, markup: 3, sort: 4 },
-  { id: "gpt-oss-20b", label: "GPT-OSS 20B (fast)", task: "text", cfModel: "@cf/openai/gpt-oss-20b", inputRate: 18182, outputRate: 27273, unitRate: null, unitKind: null, markup: 3, sort: 5 },
-  { id: "llama-4-scout-17b", label: "Llama 4 Scout 17B", task: "text", cfModel: "@cf/meta/llama-4-scout-17b-16e-instruct", inputRate: 24545, outputRate: 77273, unitRate: null, unitKind: null, markup: 3, sort: 6 },
-  { id: "nemotron-3-120b", label: "Nemotron 3 120B", task: "text", cfModel: "@cf/nvidia/nemotron-3-120b-a12b", inputRate: 45455, outputRate: 136364, unitRate: null, unitKind: null, markup: 3, sort: 7 },
-  { id: "mistral-small-3.1-24b", label: "Mistral Small 3.1 24B", task: "text", cfModel: "@cf/mistralai/mistral-small-3.1-24b-instruct", inputRate: 31876, outputRate: 50488, unitRate: null, unitKind: null, markup: 3, sort: 8 },
-  { id: "gemma-4-26b", label: "Gemma 4 26B (reasoning)", task: "text", cfModel: "@cf/google/gemma-4-26b-a4b-it", inputRate: 9091, outputRate: 27273, unitRate: null, unitKind: null, markup: 3, sort: 10 },
-  { id: "qwq-32b", label: "QwQ 32B (reasoning)", task: "text", cfModel: "@cf/qwen/qwq-32b", inputRate: 60000, outputRate: 90909, unitRate: null, unitKind: null, markup: 3, sort: 11 },
-  { id: "deepseek-r1-32b", label: "DeepSeek R1 Distill 32B", task: "text", cfModel: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", inputRate: 45170, outputRate: 443756, unitRate: null, unitKind: null, markup: 3, sort: 12 },
-  { id: "glm-4.7-flash", label: "GLM 4.7 Flash (fast)", task: "text", cfModel: "@cf/zai-org/glm-4.7-flash", inputRate: 5500, outputRate: 36400, unitRate: null, unitKind: null, markup: 3, sort: 13 },
-  { id: "llama-3.1-8b", label: "Llama 3.1 8B (fast)", task: "text", cfModel: "@cf/meta/llama-3.1-8b-instruct-fp8-fast", inputRate: 4119, outputRate: 34868, unitRate: null, unitKind: null, markup: 3, sort: 14 },
-  { id: "llama-3.2-3b", label: "Llama 3.2 3B (cheap)", task: "text", cfModel: "@cf/meta/llama-3.2-3b-instruct", inputRate: 4625, outputRate: 30475, unitRate: null, unitKind: null, markup: 3, sort: 15 },
-  { id: "llama-3.2-1b", label: "Llama 3.2 1B (cheapest)", task: "text", cfModel: "@cf/meta/llama-3.2-1b-instruct", inputRate: 2457, outputRate: 18252, unitRate: null, unitKind: null, markup: 3, sort: 16 },
-  { id: "granite-4-micro", label: "Granite 4.0 Micro", task: "text", cfModel: "@cf/ibm-granite/granite-4.0-h-micro", inputRate: 1542, outputRate: 10158, unitRate: null, unitKind: null, markup: 3, sort: 17 },
+  { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", label: "Llama 3.3 70B (balanced default)", task: "text", provider: "workers-ai", input_rate: 26668, output_rate: 204805, unit_rate: null, unit_kind: null, sort: 0 },
+  { id: "@cf/moonshotai/kimi-k2.7-code", label: "Kimi K2.7 Code (best design)", task: "text", provider: "workers-ai", input_rate: 86364, output_rate: 363636, unit_rate: null, unit_kind: null, sort: 1 },
+  { id: "@cf/zai-org/glm-5.2", label: "GLM 5.2 (flagship)", task: "text", provider: "workers-ai", input_rate: 127273, output_rate: 400000, unit_rate: null, unit_kind: null, sort: 2 },
+  { id: "@cf/qwen/qwen2.5-coder-32b-instruct", label: "Qwen2.5 Coder 32B (code)", task: "text", provider: "workers-ai", input_rate: 60000, output_rate: 90909, unit_rate: null, unit_kind: null, sort: 3 },
+  { id: "@cf/openai/gpt-oss-120b", label: "GPT-OSS 120B", task: "text", provider: "workers-ai", input_rate: 31818, output_rate: 68182, unit_rate: null, unit_kind: null, sort: 4 },
+  { id: "@cf/openai/gpt-oss-20b", label: "GPT-OSS 20B (fast)", task: "text", provider: "workers-ai", input_rate: 18182, output_rate: 27273, unit_rate: null, unit_kind: null, sort: 5 },
+  { id: "@cf/meta/llama-4-scout-17b-16e-instruct", label: "Llama 4 Scout 17B", task: "text", provider: "workers-ai", input_rate: 24545, output_rate: 77273, unit_rate: null, unit_kind: null, sort: 6 },
+  { id: "@cf/nvidia/nemotron-3-120b-a12b", label: "Nemotron 3 120B", task: "text", provider: "workers-ai", input_rate: 45455, output_rate: 136364, unit_rate: null, unit_kind: null, sort: 7 },
+  { id: "@cf/mistralai/mistral-small-3.1-24b-instruct", label: "Mistral Small 3.1 24B", task: "text", provider: "workers-ai", input_rate: 31876, output_rate: 50488, unit_rate: null, unit_kind: null, sort: 8 },
+  { id: "@cf/google/gemma-4-26b-a4b-it", label: "Gemma 4 26B (reasoning)", task: "text", provider: "workers-ai", input_rate: 9091, output_rate: 27273, unit_rate: null, unit_kind: null, sort: 10 },
+  { id: "@cf/qwen/qwq-32b", label: "QwQ 32B (reasoning)", task: "text", provider: "workers-ai", input_rate: 60000, output_rate: 90909, unit_rate: null, unit_kind: null, sort: 11 },
+  { id: "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b", label: "DeepSeek R1 Distill 32B", task: "text", provider: "workers-ai", input_rate: 45170, output_rate: 443756, unit_rate: null, unit_kind: null, sort: 12 },
+  { id: "@cf/zai-org/glm-4.7-flash", label: "GLM 4.7 Flash (fast)", task: "text", provider: "workers-ai", input_rate: 5500, output_rate: 36400, unit_rate: null, unit_kind: null, sort: 13 },
+  { id: "@cf/meta/llama-3.1-8b-instruct-fp8-fast", label: "Llama 3.1 8B (fast)", task: "text", provider: "workers-ai", input_rate: 4119, output_rate: 34868, unit_rate: null, unit_kind: null, sort: 14 },
+  { id: "@cf/meta/llama-3.2-3b-instruct", label: "Llama 3.2 3B (cheap)", task: "text", provider: "workers-ai", input_rate: 4625, output_rate: 30475, unit_rate: null, unit_kind: null, sort: 15 },
+  { id: "@cf/meta/llama-3.2-1b-instruct", label: "Llama 3.2 1B (cheapest)", task: "text", provider: "workers-ai", input_rate: 2457, output_rate: 18252, unit_rate: null, unit_kind: null, sort: 16 },
+  { id: "@cf/ibm-granite/granite-4.0-h-micro", label: "Granite 4.0 Micro", task: "text", provider: "workers-ai", input_rate: 1542, output_rate: 10158, unit_rate: null, unit_kind: null, sort: 17 },
   // --- Image → poster slide generation (unit = neurons per 512×512 tile) ---
-  { id: "flux-schnell", label: "FLUX.1 Schnell (fast default)", task: "image", cfModel: "@cf/black-forest-labs/flux-1-schnell", inputRate: null, outputRate: null, unitRate: 4.8, unitKind: "tile", markup: 3, sort: 20 },
-  { id: "flux-2-dev", label: "FLUX.2 Dev (best quality)", task: "image", cfModel: "@cf/black-forest-labs/flux-2-dev", inputRate: null, outputRate: null, unitRate: 37.5, unitKind: "tile", markup: 3, sort: 21 },
-  { id: "flux-2-klein-4b", label: "FLUX.2 Klein 4B", task: "image", cfModel: "@cf/black-forest-labs/flux-2-klein-4b", inputRate: null, outputRate: null, unitRate: 26.05, unitKind: "tile", markup: 3, sort: 22 },
-  { id: "flux-2-klein-9b", label: "FLUX.2 Klein 9B", task: "image", cfModel: "@cf/black-forest-labs/flux-2-klein-9b", inputRate: null, outputRate: null, unitRate: 341, unitKind: "tile", markup: 3, sort: 23 },
-  { id: "lucid-origin", label: "Leonardo Lucid Origin", task: "image", cfModel: "@cf/leonardo/lucid-origin", inputRate: null, outputRate: null, unitRate: 636, unitKind: "tile", markup: 3, sort: 24 },
-  { id: "phoenix-1", label: "Leonardo Phoenix 1.0", task: "image", cfModel: "@cf/leonardo/phoenix-1.0", inputRate: null, outputRate: null, unitRate: 530, unitKind: "tile", markup: 3, sort: 25 },
-  // --- TTS → announcement audio (unit = neurons per 1k characters) ---
-  { id: "aura-1", label: "Deepgram Aura-1", task: "tts", cfModel: "@cf/deepgram/aura-1", inputRate: null, outputRate: null, unitRate: 1363.64, unitKind: "chars_1k", markup: 3, sort: 30 },
-  { id: "aura-2-en", label: "Deepgram Aura-2 (English)", task: "tts", cfModel: "@cf/deepgram/aura-2-en", inputRate: null, outputRate: null, unitRate: 2727.27, unitKind: "chars_1k", markup: 3, sort: 31 },
-  { id: "melotts", label: "MeloTTS", task: "tts", cfModel: "@cf/myshell-ai/melotts", inputRate: null, outputRate: null, unitRate: 1000, unitKind: "chars_1k", markup: 3, sort: 32 },
+  { id: "@cf/black-forest-labs/flux-1-schnell", label: "FLUX.1 Schnell (fast default)", task: "image", provider: "workers-ai", input_rate: null, output_rate: null, unit_rate: 4.8, unit_kind: "tile", sort: 20 },
+  { id: "@cf/black-forest-labs/flux-2-dev", label: "FLUX.2 Dev (best quality)", task: "image", provider: "workers-ai", input_rate: null, output_rate: null, unit_rate: 37.5, unit_kind: "tile", sort: 21 },
+  { id: "@cf/black-forest-labs/flux-2-klein-4b", label: "FLUX.2 Klein 4B", task: "image", provider: "workers-ai", input_rate: null, output_rate: null, unit_rate: 26.05, unit_kind: "tile", sort: 22 },
+  { id: "@cf/black-forest-labs/flux-2-klein-9b", label: "FLUX.2 Klein 9B", task: "image", provider: "workers-ai", input_rate: null, output_rate: null, unit_rate: 341, unit_kind: "tile", sort: 23 },
+  { id: "@cf/leonardo/lucid-origin", label: "Leonardo Lucid Origin", task: "image", provider: "workers-ai", input_rate: null, output_rate: null, unit_rate: 636, unit_kind: "tile", sort: 24 },
+  { id: "@cf/leonardo/phoenix-1.0", label: "Leonardo Phoenix 1.0", task: "image", provider: "workers-ai", input_rate: null, output_rate: null, unit_rate: 530, unit_kind: "tile", sort: 25 },
+  // --- Voice → announcement audio (unit = neurons per 1k characters) ---
+  { id: "@cf/deepgram/aura-1", label: "Deepgram Aura-1", task: "tts", provider: "workers-ai", input_rate: null, output_rate: null, unit_rate: 1363.64, unit_kind: "chars_1k", sort: 30 },
+  { id: "@cf/deepgram/aura-2-en", label: "Deepgram Aura-2 (English)", task: "tts", provider: "workers-ai", input_rate: null, output_rate: null, unit_rate: 2727.27, unit_kind: "chars_1k", sort: 31 },
+  { id: "@cf/myshell-ai/melotts", label: "MeloTTS", task: "tts", provider: "workers-ai", input_rate: null, output_rate: null, unit_rate: 1000, unit_kind: "chars_1k", sort: 32 },
   // --- Music → background bed generation (unit = neurons per second of audio) ---
-  { id: "musicgen", label: "MiniMax Music (bed)", task: "music", cfModel: "@cf/minimax/music-01", inputRate: null, outputRate: null, unitRate: 500, unitKind: "audio_sec", markup: 3, sort: 40 },
+  { id: "@cf/minimax/music-01", label: "MiniMax Music (bed)", task: "music", provider: "workers-ai", input_rate: null, output_rate: null, unit_rate: 500, unit_kind: "audio_sec", sort: 40 },
 
   // ── Google Gemini (company-provided) ────────────────────────────────────
   // These run against Google's Generative Language API on Scena's *platform*
   // key — there is no BYO key. Each generation is metered at Google's list price
   // expressed as neuron-equivalents (Google USD price ÷ $0.000011) times the
   // markup, exactly like Workers AI: text = neurons per 1M tokens, image = per
-  // generated image, tts = per 1k chars, music = per second. Admin-tunable.
+  // generated image, speech = per 1k chars, music = per second. Admin-tunable.
   // Text → HTML slide generation ($/1M tokens → neurons/1M: ÷0.000011).
-  { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite", task: "text", cfModel: "gemini-2.5-flash-lite", inputRate: 9091, outputRate: 36364, unitRate: null, unitKind: null, markup: 3, sort: 50 },
-  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", task: "text", cfModel: "gemini-2.5-flash", inputRate: 27273, outputRate: 227273, unitRate: null, unitKind: null, markup: 3, sort: 51 },
-  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", task: "text", cfModel: "gemini-2.5-pro", inputRate: 113636, outputRate: 909091, unitRate: null, unitKind: null, markup: 3, sort: 52 },
+  { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite", task: "text", provider: "google", input_rate: 9091, output_rate: 36364, unit_rate: null, unit_kind: null, sort: 50 },
+  { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", task: "text", provider: "google", input_rate: 27273, output_rate: 227273, unit_rate: null, unit_kind: null, sort: 51 },
+  { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", task: "text", provider: "google", input_rate: 113636, output_rate: 909091, unit_rate: null, unit_kind: null, sort: 52 },
   // Priced at the 3-series flash tier (≥ 2.5 Flash) so we never underprice a
   // newer/dearer "3 Flash" than we assume — admin-tunable down if it's cheaper.
-  { id: "gemini-3-flash", label: "Gemini 3 Flash", task: "text", cfModel: "gemini-3-flash", inputRate: 136364, outputRate: 818182, unitRate: null, unitKind: null, markup: 3, sort: 53 },
-  { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", task: "text", cfModel: "gemini-3.5-flash", inputRate: 136364, outputRate: 818182, unitRate: null, unitKind: null, markup: 3, sort: 54 },
+  { id: "gemini-3-flash", label: "Gemini 3 Flash", task: "text", provider: "google", input_rate: 136364, output_rate: 818182, unit_rate: null, unit_kind: null, sort: 53 },
+  { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", task: "text", provider: "google", input_rate: 136364, output_rate: 818182, unit_rate: null, unit_kind: null, sort: 54 },
   // Voice → expressive, prompt-steerable ad/announcement speech (native Gemini
   // TTS). Google bills audio *output per token* ($10/1M flash, $20/1M pro @ ~25
   // tokens/sec ≈ $0.017/$0.034 per 1k spoken chars). We meter per 1k characters
   // at a rate whose 3× markup ($0.048/$0.090 per 1k chars charged) covers the
   // per-token cost even under slow, expressive delivery. Admin-tunable.
-  { id: "gemini-2.5-flash-tts", label: "Gemini 2.5 Flash TTS", task: "tts", cfModel: "gemini-2.5-flash-preview-tts", inputRate: null, outputRate: null, unitRate: 1455, unitKind: "chars_1k", markup: 3, sort: 55 },
-  { id: "gemini-2.5-pro-tts", label: "Gemini 2.5 Pro TTS", task: "tts", cfModel: "gemini-2.5-pro-preview-tts", inputRate: null, outputRate: null, unitRate: 2727, unitKind: "chars_1k", markup: 3, sort: 56 },
+  { id: "gemini-2.5-flash-preview-tts", label: "Gemini 2.5 Flash TTS", task: "speech", provider: "google", input_rate: null, output_rate: null, unit_rate: 1455, unit_kind: "chars_1k", sort: 55 },
+  { id: "gemini-2.5-pro-preview-tts", label: "Gemini 2.5 Pro TTS", task: "speech", provider: "google", input_rate: null, output_rate: null, unit_rate: 2727, unit_kind: "chars_1k", sort: 56 },
   // Image → poster slide generation (Nano Banana family). Priced per generated
   // image ($0.039 → 3545 neurons; $0.134 → 12182 neurons).
-  { id: "gemini-2.5-flash-image", label: "Gemini 2.5 Flash Image · Nano Banana", task: "image", cfModel: "gemini-2.5-flash-image", inputRate: null, outputRate: null, unitRate: 3545, unitKind: "image", markup: 3, sort: 60 },
-  { id: "gemini-3-pro-image", label: "Gemini 3 Pro Image · Nano Banana Pro", task: "image", cfModel: "gemini-3-pro-image", inputRate: null, outputRate: null, unitRate: 12182, unitKind: "image", markup: 3, sort: 61 },
-  // Music → background bed generation (Lyria). Google bills a flat price *per
-  // song* ($0.04 per ≤30s clip), NOT per second, so ai.ts meters every Lyria
-  // clip as one whole 30s clip (121 neurons/sec × 30s = $0.04 cost basis → 3×
-  // markup) — a short bed can never cost us the full-song price yet bill a
-  // fraction of it.
-  { id: "lyria-3-clip", label: "Lyria 3 Clip", task: "music", cfModel: "lyria-3-clip", inputRate: null, outputRate: null, unitRate: 121, unitKind: "audio_sec", markup: 3, sort: 70 },
+  { id: "gemini-2.5-flash-image", label: "Gemini 2.5 Flash Image · Nano Banana", task: "image", provider: "google", input_rate: null, output_rate: null, unit_rate: 3545, unit_kind: "image", sort: 60 },
+  { id: "gemini-3-pro-image", label: "Gemini 3 Pro Image · Nano Banana Pro", task: "image", provider: "google", input_rate: null, output_rate: null, unit_rate: 12182, unit_kind: "image", sort: 61 },
+  /*
+    Music → background bed generation (Lyria).
+
+    ⚠️ THE ID WAS `lyria-3-clip`, WHICH GOOGLE HAS NEVER ANSWERED TO. Scena's
+    slug and its `cf_model` were the same invented string, and `cf_model` is what
+    `gemini.ts` puts in the URL — so every music generation on this row 404'd at
+    the provider and surfaced as "generation failed". It is `lyria-002`, the id
+    Google publishes and the one `@4dl/ai`'s own floor carries, so the two apps
+    now name the same model the same way.
+
+    Google bills a flat price *per song* ($0.04 per ≤30s clip), NOT per second,
+    so `ai.ts` meters every Lyria clip as one whole 30s clip (121 neurons/sec ×
+    30s = $0.04 cost basis → 3× markup) — a short bed can never cost us the
+    full-song price yet bill a fraction of it.
+  */
+  { id: "lyria-002", label: "Lyria 2 (music bed)", task: "music", provider: "google", input_rate: null, output_rate: null, unit_rate: 121, unit_kind: "audio_sec", sort: 70 },
 ];
+
+/**
+ * HAND THE CATALOG'S TWO APP-OWNED FACTS TO `@4dl/ai`, AT MODULE LOAD.
+ *
+ * A module-load side effect rather than a call from an entry point, and the
+ * timing is why: `ensureBilling` seeds the catalog on the first request that
+ * touches billing, `syncModelCatalog` seeds it again, and both read these two
+ * settings. Anything later than "when the module that defines them is loaded"
+ * leaves a window in which the first seed of a fresh database uses Kova's five
+ * lanes and Kova's eleven rows — and `seedAiModels` only ever runs once, so the
+ * window does not close. `billing-store.ts` imports this file to read the floor,
+ * which is what guarantees it is loaded before anything can seed.
+ *
+ *   THE LANES     what Scena has a code path for (`ai.ts`). A lane the app
+ *                 cannot execute is catalogued DISABLED — and the default was
+ *                 Kova's, which does not include `music` and catalogues
+ *                 Cloudflare's `tts` voices off, i.e. every voice Scena sells.
+ *                 `speech` comes along with `tts` automatically (`LANE_ALIASES`);
+ *                 declaring one name and not the other is the mistake the alias
+ *                 table exists to prevent.
+ *   THE FLOOR     the forty rows above. `@4dl/ai`'s own floor is eleven chosen
+ *                 for Kova, with no Workers AI voice, poster or music model in
+ *                 it at all, so seeding Scena from it would leave three of its
+ *                 four lanes with nothing pickable on a fresh database.
+ */
+configureAiLanes(["text", "image", "tts", "music"]);
+configureAiFloor(SCENA_MODEL_FLOOR);
 
 /** Config defaults (admin-editable in app_config). */
 export const CONFIG_DEFAULTS: Record<string, string> = {
@@ -313,10 +362,22 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   "billing.delete_days": "30", // suspension → deletion window
   "ai.default_markup": "3",
   "ai.mock": "auto", // auto | on | off — stub AI when no Workers AI binding
-  "ai.default_model.text": "llama-3.3-70b", // per-task default the generators reach for
-  "ai.default_model.image": "flux-schnell",
-  "ai.default_model.tts": "aura-1",
-  "ai.default_model.music": "musicgen",
+  /*
+    THE PER-LANE DEFAULT THE GENERATORS REACH FOR — a PROVIDER PATH now, because
+    that is what `ai_models.id` is since Scena adopted `@4dl/ai`'s catalog.
+
+    These were slugs (`llama-3.3-70b`, `flux-schnell`, `aura-1`, `musicgen`)
+    naming rows that no longer exist under those keys. `defaultModelForTask`
+    validates the stored value against the catalog and falls back to the lane's
+    elected default when it does not match, so a stale slug would not have
+    broken generation — it would have silently ignored the platform default and
+    used whatever the election picked, which is the kind of wrong that never
+    reports itself.
+  */
+  "ai.default_model.text": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  "ai.default_model.image": "@cf/black-forest-labs/flux-1-schnell",
+  "ai.default_model.tts": "@cf/deepgram/aura-1",
+  "ai.default_model.music": "@cf/minimax/music-01",
   /*
     disabled | mock | cloudflare (env.EMAIL binding).
 

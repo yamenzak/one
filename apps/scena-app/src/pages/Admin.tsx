@@ -702,20 +702,36 @@ function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose
 }
 
 /* -------------------------------- Models --------------------------------- */
-/** Neutral tier + tone from the underlying model id — vendor-agnostic so the
- *  admin table reads as capability tiers, not provider jargon. */
-function modelProvider(cf: string): { label: string; tone: Tone } {
-  if (/^@cf\//.test(cf)) return { label: "Standard", tone: "neutral" };
-  if (/gemini|lyria/i.test(cf)) return { label: "Advanced", tone: "primary" };
+/**
+ * Neutral tier + tone from the model's PROVIDER COLUMN.
+ *
+ * Vendor-agnostic on purpose, so the catalog reads as capability tiers rather
+ * than provider jargon. It used to pattern-match the model id (`/^@cf\//`,
+ * `/gemini|lyria/i`) because there was nothing else to read; the column is the
+ * fact now, and it cannot be wrong about a model whose name does not match the
+ * family it belongs to.
+ */
+function modelProvider(provider: string): { label: string; tone: Tone } {
+  if (provider === "workers-ai") return { label: "Standard", tone: "neutral" };
+  if (provider === "google") return { label: "Advanced", tone: "primary" };
   return { label: "External", tone: "neutral" };
 }
 
-const TASK_FILTERS: { id: string; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "text", label: "Text" },
-  { id: "image", label: "Image" },
-  { id: "tts", label: "Speech" },
-  { id: "music", label: "Music" },
+/**
+ * ⚠️ THE SPEECH FILTER MATCHES TWO LANE NAMES, and it has to.
+ *
+ * A catalog carrying both providers stores text-to-speech under `tts`
+ * (Cloudflare's pricing page prices per character) AND `speech` (Google's ids
+ * contain "tts"). `@4dl/ai`'s `LANE_ALIASES` unifies them on the server; this is
+ * the one place the browser needs to know, and matching one name would hide
+ * every Gemini voice behind a filter labelled "Speech".
+ */
+const TASK_FILTERS: { id: string; label: string; lanes: string[] }[] = [
+  { id: "all", label: "All", lanes: [] },
+  { id: "text", label: "Text", lanes: ["text", "text-small"] },
+  { id: "image", label: "Image", lanes: ["image"] },
+  { id: "tts", label: "Speech", lanes: ["tts", "speech"] },
+  { id: "music", label: "Music", lanes: ["music"] },
 ];
 
 export function ModelsTab() {
@@ -736,32 +752,44 @@ export function ModelsTab() {
     await reload();
   }
   /**
-   * REPORT WHAT THE PAGES SAID, not what the seed re-wrote.
+   * REPORT WHAT THE PAGES SAID, not what a seed re-wrote.
    *
-   * This said `${added} added, ${updated} updated` — both counted from the
+   * This once said `${added} added, ${updated} updated` — both counted from a
    * hardcoded catalog, so a settled deployment saw "17 updated" on every press
    * while no rate had moved and no page had been read. The number was real and
    * the sentence it implied was not.
    *
-   * Now: repricings first (the thing you pressed the button for), then the two
-   * kinds of switching-off, and a WARNING rather than a success when a pricing
-   * page could not be read — because that run left rates untouched on purpose
-   * and reporting it green would be the same lie in a smaller font.
+   * Every figure below now comes from a provider whose page was actually read:
+   * refreshed rates first (the thing you pressed the button for), then new rows,
+   * then the two kinds of switching-off — retired (the provider has shut the
+   * model down) counted separately from delisted (it left the page), because the
+   * first means a model may have been failing calls already.
+   *
+   * A provider that could not be read is a WARNING, not a success: that run left
+   * its rates untouched on purpose, and reporting it green is the same lie in a
+   * smaller font.
    */
   async function resync() {
     setSyncing(true);
     try {
       const r = await adminResyncModels();
-      const off = r.rates.retired.length + r.rates.delisted.length;
+      const read = r.providers.filter((p) => p.ok);
+      const sum = (f: (p: (typeof r.providers)[number]) => number) => read.reduce((n, p) => n + f(p), 0);
+      const off = sum((p) => p.disabled) + sum((p) => p.retiredDisabled);
       const parts = [
-        `${r.rates.repriced} repriced`,
+        `${sum((p) => p.updated)} rates refreshed`,
+        sum((p) => p.added) ? `${sum((p) => p.added)} added` : null,
         off ? `${off} switched off` : null,
-        r.added ? `${r.added} added` : null,
+        // Where the rows came from, when it was NOT the live pages — a fallback
+        // to another app's published catalog is a materially different claim.
+        read.some((p) => p.from === "shared catalog") ? "from the shared catalog" : null,
+        r.published ? "published to the platform" : null,
       ].filter(Boolean);
-      if (r.rates.ok) toast.success(`Rates synced · ${parts.join(", ")}`);
+      if (r.ok && read.length === r.providers.length) toast.success(`Catalog synced · ${parts.join(", ")}`);
       else {
-        const why = r.rates.providers.filter((p) => !p.ok).map((p) => `${p.provider}: ${p.error ?? "unavailable"}`);
-        toast.error(`Partly synced (${parts.join(", ")}). ${why.join(" · ")}`);
+        const why = r.providers.filter((p) => !p.ok).map((p) => `${p.provider}: ${p.error ?? "unavailable"}`);
+        const did = parts.length ? `(${parts.join(", ")}) ` : "";
+        toast.error(`${r.ok ? "Partly synced" : "Not synced"} ${did}${why.join(" · ")}`);
       }
       await reload();
     } catch (e) {
@@ -774,8 +802,13 @@ export function ModelsTab() {
   const filtered = useMemo(() => {
     if (!models) return null;
     const needle = q.trim().toLowerCase();
+    const lanes = TASK_FILTERS.find((t) => t.id === task)?.lanes ?? [];
     return models.filter(
-      (m) => (task === "all" || m.task === task) && (!needle || m.label.toLowerCase().includes(needle) || m.cf_model.toLowerCase().includes(needle)),
+      (m) =>
+        (task === "all" || lanes.includes(m.task)) &&
+        // The id IS the provider path now, so searching it is how an operator
+        // finds "the flux one" or every `@cf/deepgram/*` voice.
+        (!needle || m.label.toLowerCase().includes(needle) || m.id.toLowerCase().includes(needle)),
     );
   }, [models, q, task]);
 
@@ -826,9 +859,12 @@ export function ModelsTab() {
   );
 }
 
-/** Format a model's cost basis: text → in/out per Mtok; else the unit rate. */
+/** Format a model's cost basis: token-metered → in/out per Mtok; else the unit
+ *  rate. Keyed on whether the row HAS token rates rather than on the lane name,
+ *  so a `text-small` row the pricing-page sync discovered is not silently
+ *  rendered as "— unit". */
 function costBasis(m: AdminModel): React.ReactNode {
-  if (m.task === "text") {
+  if (m.input_rate != null || m.output_rate != null) {
     const i = m.input_rate != null ? num(Math.round(m.input_rate)) : "—";
     const o = m.output_rate != null ? num(Math.round(m.output_rate)) : "—";
     return (
@@ -857,8 +893,8 @@ function costBasis(m: AdminModel): React.ReactNode {
  * which read better as a line and a cluster.
  */
 function ModelRow({ model, onSave, last }: { model: AdminModel; onSave: (m: AdminModel, patch: Partial<AdminModel>) => void; last: boolean }) {
-  const [markup, setMarkup] = useState(String(model.markup));
-  const prov = modelProvider(model.cf_model);
+  const [markup, setMarkup] = useState(String(model.markup ?? ""));
+  const prov = modelProvider(model.provider);
   return (
     <Row
       divider={!last}
@@ -867,7 +903,12 @@ function ModelRow({ model, onSave, last }: { model: AdminModel; onSave: (m: Admi
         <span className="flex items-center gap-1.5">
           <Badge tone={prov.tone}>{prov.label}</Badge>
           <span className="capitalize">{model.task}</span>
-          <span className="truncate font-mono">· {model.cf_model}</span>
+          {model.is_default === 1 && <Badge tone="primary">Lane default</Badge>}
+          {/* An announced shutdown, while it is still in the future. Worth a badge
+              rather than a note: this row keeps working right up to the date and
+              then stops, and the sweep switches it off on the morning it lands. */}
+          {model.retires_at && <Badge tone="warning">Retires {model.retires_at}</Badge>}
+          <span className="truncate font-mono">· {model.id}</span>
         </span>
       }
       trailing={

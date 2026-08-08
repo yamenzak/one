@@ -87,6 +87,28 @@ const LANE_ALIASES: Partial<Record<SeedTask, readonly SeedTask[]>> = {
 
 export const isRunnableTask = (t: SeedTask): boolean => runnableTasks.has(t);
 
+/** Every lane this app declared runnable. Ordered, so a caller that elects a
+ *  default per lane iterates deterministically. */
+export const runnableLanes = (): SeedTask[] => [...runnableTasks];
+
+/**
+ * Every stored lane name that means the SAME capability as `task`.
+ *
+ * ⚠️ A QUERY THAT MATCHES ONE NAME MISSES HALF THE MODELS. Cloudflare's pricing
+ * page yields `tts` (a per-character rate) and Google's yields `speech` (an id
+ * containing "tts"), so a catalog with both providers in it holds text-to-speech
+ * models under BOTH names — in the same table, with no way to tell from the row
+ * which page it came from. An app asking for its `tts` models with
+ * `WHERE task = 'tts'` therefore silently cannot see any Gemini voice, and one
+ * asking for `speech` cannot see any Deepgram one.
+ *
+ * `configureAiLanes` already unifies them for RUNNABILITY. This unifies them for
+ * SELECTION, which is the other half and the half that decides what a tenant is
+ * offered. Returns `[task]` for every lane that has no second name, so a call
+ * site can always use `IN (…)` without special-casing.
+ */
+export const lanesFor = (task: string): string[] => [...(LANE_ALIASES[task as SeedTask] ?? [task as SeedTask])];
+
 export interface ModelSeed {
   id: string;
   label: string;

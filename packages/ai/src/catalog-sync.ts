@@ -14,7 +14,7 @@
 
 import type { ModelSeed, ParsedCatalog, SkippedModel } from "./pricing.js";
 import { isRunnableTask, parseGeminiCatalog, parseWorkersAiCatalog } from "./pricing.js";
-import { listModels, seedAiModels } from "./generate.js";
+import { electLaneDefaults, listModels, seedAiModels } from "./generate.js";
 
 
 export const PRICING_SOURCES = {
@@ -259,21 +259,24 @@ export async function syncModelCatalog(db: D1Database, opts: SyncOptions): Promi
     if (google) google.retiredDisabled += sweptRetired.length;
   }
 
-  // Guarantee a default per generation task (cheapest output among enabled).
-  // Runs AFTER reconciliation so a task whose default was just switched off
-  // immediately re-elects instead of leaving the lane defaultless.
-  //
-  // The vision lane is Gemini-only (`modelSupportsTask`), so its election is
-  // constrained to Google rows. Unconstrained, this loop would happily crown the
-  // cheapest vision-tagged row whatever its provider — and a Workers-AI one
-  // fails every call with "model cannot read images", i.e. the sync itself could
-  // break the lane. The `db.ts` migration retags those rows, but the election
-  // must not be able to recreate the situation from a hand-edited catalog.
-  for (const task of ["text", "text-small", "vision"]) {
-    const providerClause = task === "vision" ? " AND provider = 'google'" : "";
-    const has = await db.prepare(`SELECT 1 x FROM ai_models WHERE task = ? AND enabled = 1 AND is_default = 1${providerClause}`).bind(task).first();
-    if (!has) await db.prepare(`UPDATE ai_models SET is_default = 1 WHERE id = (SELECT id FROM ai_models WHERE task = ? AND enabled = 1${providerClause} ORDER BY output_rate ASC LIMIT 1)`).bind(task).run();
-  }
+  /*
+    Guarantee a default per RUNNABLE lane. Runs AFTER reconciliation so a lane
+    whose default was just switched off re-elects in the same pass instead of
+    being left defaultless.
+
+    ⚠️ THIS USED TO NAME THREE LANES — `text`, `text-small`, `vision`, i.e.
+    Kova's — while the shared-catalog seed a hundred lines away elected over six.
+    Two implementations of "which model does this lane run on", disagreeing, in
+    one package. An app whose lanes are image / speech / music therefore came out
+    of a sync with no default in any of them, and `modelForTask` breaks ties on
+    `is_default DESC` alone: the generator picked a row by database order while
+    the operator console showed no default at all.
+
+    `electLaneDefaults` is the one answer, driven by `configureAiLanes` — so an
+    app that declares a lane gets an elected default in it, and one that does not
+    is not given a default for something it cannot run.
+  */
+  await electLaneDefaults(db);
 
   return { parsedModels, ok: providers.some((p) => p.ok), providers, total: (await listModels(db)).length, errors };
 }

@@ -260,26 +260,64 @@ inbox — the DO comes up empty and nothing says why.
 
 ## 11. The schema, and why its order matters
 
-`SCHEMA_MODULES` in `apps/scena/src/db.ts` is the migration's progress bar. Six
+`SCHEMA_MODULES` in `apps/scena/src/db.ts` is the migration's progress bar. Seven
 entries today: `AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_RAIL_SCHEMA`,
-`STORAGE_SCHEMA`, `NOTIFY_SCHEMA`, `SCENA_SCHEMA`. **The diff that removes a
-table from Scena's own module is the same diff that adds its package here.**
+`STORAGE_SCHEMA`, `NOTIFY_SCHEMA`, `AI_SCHEMA`, `SCENA_SCHEMA`. **The diff that
+removes a table from Scena's own module is the same diff that adds its package
+here.**
 
 ⚠️ **Order in that list IS dependency order, and a wrong order does not fail.**
 `NOTIFY_SCHEMA` ALTERs `tenant_settings`, which `@4dl/tenancy` creates. Run
 first, the ALTER hits a table that does not exist, the composed runner swallows
 it, and an owner's email veto silently never persists.
 
-Two modules are **deliberately still Scena's**, both for the same reason, and
-the plan names them so nobody "fixes" them casually: the billing STORE
-(`BILLING_SCHEMA`) and the `ai_models` CATALOG (`AI_SCHEMA`). Both packages'
-tables share a NAME with Scena's and differ in COLUMNS — `price_cents` +
-`currency` + `interval` against `price_usd_month`, a `cf_model` column against
-an `id` that IS the provider id. A `CREATE TABLE IF NOT EXISTS` is won by
-whichever module runs first and the loser's columns silently never exist, which
-is exactly how a fresh Stage 1 deployment ended up unable to save any setting.
-Adopting either means reconciling the shapes first — a data change, not a wiring
-one.
+`AI_SCHEMA` sits before `SCENA_SCHEMA` for the mirror-image reason. Scena's own
+module used to declare `ai_models`, `ai_cache` and `ai_generations` with
+DIFFERENT columns from the shared ones, and a `CREATE TABLE IF NOT EXISTS` is won
+by whichever module runs first — the loser's columns then silently never exist,
+which is exactly how a fresh Stage 1 deployment ended up unable to save any
+setting (`app_config.updated_at`). The local declarations are gone, which is what
+makes the order safe rather than merely conventional;
+`apps/scena/test/schema-module.test.ts` fails if any of the three comes back.
+
+**One module is deliberately still Scena's**, and the plan names it so nobody
+"fixes" it casually: the billing STORE (`BILLING_SCHEMA`). Its `plans`,
+`subscriptions`, `credit_packs` and `credit_ledger` share a NAME with Scena's and
+differ in COLUMNS — `price_cents` + `currency` + `interval` against
+`price_usd_month`, `at` against `created_at`, TEXT timestamps against INTEGER.
+Adopting it means reconciling the shapes first — a data change, not a wiring one.
+
+### The AI catalog, and what adopting it took
+
+`ai_models.id` **IS the provider path** now (`@cf/deepgram/aura-1`,
+`gemini-2.5-flash`), with `provider` naming the lane. Scena keyed on a short slug
+(`aura-1`) with the path in a `cf_model` column, and that single difference is
+what kept it off the shared catalog — along with everything that catalog has
+grown since: the live pricing-page sync, the retirement sweep, the shared
+publication a new app seeds from, the cross-app selection broadcast. In their
+place was a ~200-line local syncer behind a button that once reported
+"17 updated" having fetched nothing at all.
+
+Three things in `@4dl/ai` made the adoption possible, and each is worth knowing:
+
+| | |
+|---|---|
+| `configureAiFloor` | The package's own floor is eleven rows chosen for Kova, with no Workers AI voice, poster or music model in it. Seeding Scena from it would leave three of its four lanes with nothing pickable on a fresh database, so the app hands over its forty curated rows and keeps the whole mechanism. |
+| `configureAiLanes` | Which lanes the app can EXECUTE. The default was Kova's five — no `music`, and Cloudflare's `tts` absent — so every voice Scena sells arrived priced, listed and switched OFF. |
+| `lanesFor` | A catalog with both providers holds text-to-speech under TWO names: `tts` from Cloudflare's page, `speech` from Google's. `WHERE task = 'tts'` therefore cannot see a single Gemini voice, which reads as "the model I chose in settings is being ignored". Every selection path goes through it. |
+
+`ai_cache` gained `asset_hash` + `neurons` as alters on the shared module — a
+cached generation may be an OBJECT in R2 with a cost, which is true of any app
+generating images or audio. `ai_generations` LOST Scena's `prompt` and
+`output_ref`: nothing ever read either column, so what they amounted to was a
+permanent record of what every workspace typed.
+
+Two latent defects went with the migration. `lyria-3-clip` was an id Google has
+never answered to — the slug and the `cf_model` were the same invented string, and
+`cf_model` is what went into the request URL, so every music generation on that
+row 404'd and surfaced as "generation failed". And `syncGeminiFromGoogle` priced
+each newly-discovered model BY LANE (flash-tier rates for a Pro model), so the
+reserve under-estimated and the platform ate the difference at settle time.
 
 ## 12. Erasure is DERIVED
 
@@ -578,8 +616,8 @@ forever — which names the wrong subsystem entirely.
 all run. Stage 9 (this file, `apps/scena/DEPLOY.md`, the CLAUDE.md section) is
 the last of the plan.
 
-**Deliberately not adopted yet**, each for a stated reason: the billing STORE and
-the `ai_models` catalog (§11 — a column collision, not a wiring gap), and the
+**Deliberately not adopted yet**, each for a stated reason: the billing STORE
+(§11 — a column collision, not a wiring gap) and the
 `NotificationBell` / `InboxScreen` surfaces from `@4dl/app-kit` (the server side
 of the inbox is wired end to end; until the bell lands, a notification is
 reachable at `GET /api/notifications`).

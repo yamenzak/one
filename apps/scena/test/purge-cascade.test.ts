@@ -29,7 +29,8 @@ import { SCHEMA_MODULES } from "../src/db.js";
  */
 const EXEMPT: readonly string[] = [
   // EMPTY. Scena's platform-wide rows — `plans`, `credit_packs`, `promo_codes`,
-  // `ai_models`, `ai_cache`, `library_tracks`, `weather_cache`, `stripe_events`,
+  // `library_tracks`, `weather_cache`, `stripe_events` (and `@4dl/ai`'s `ai_models`
+  // + `ai_cache`),
   // `rail_parked_events` — need no exemption, because none of them carries a
   // scope column at all. They are keyed on their own id, so there was never a
   // cascade to opt out of.

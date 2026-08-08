@@ -12,27 +12,30 @@
  * Three capabilities are wired: text → HTML slides (generateContent), image →
  * poster slides (generateContent with an IMAGE modality → inlineData), and
  * music → short beds (Lyria :predict). All return content-addressed assets like
- * any other generation, and route here purely off the model id prefix.
+ * any other generation, and calls reach here off `ai_models.provider`, not off
+ * what the model id happens to look like.
  */
 import type { Env } from "./env.js";
-import { getConfigValue, getModel, upsertModel } from "./billing-store.js";
+import { getConfigValue } from "./billing-store.js";
 
 const GLA_BASE = "https://generativelanguage.googleapis.com/v1beta";
 
-/** A Gemini text/image model id (the value stored in ai_models.cf_model). */
-export function isGeminiModel(cfModel: string): boolean {
-  return cfModel.startsWith("gemini-");
-}
+/*
+  ── NO id PREFIX TESTS LEFT, and that is the point ──────────────────────────
 
-/** A Lyria music model id. */
-export function isLyriaModel(cfModel: string): boolean {
-  return cfModel.startsWith("lyria-");
-}
+  `isGeminiModel`, `isLyriaModel` and `isGoogleGenModel` all asked "which
+  provider is this?" of a STRING, because before `ai_models` carried a `provider`
+  column there was nothing else to ask. Every caller reads the column now:
+  `ai.ts` routes on `model.provider === "google"`, `/api/ai/models` hides Google
+  rows on the same test, and the ENDPOINT within Google is chosen by the request's
+  `task` (music → Lyria's `:predict`, everything else → `:generateContent`) rather
+  than by what the id looks like.
 
-/** Any Google Generative Language model (Gemini or Lyria) — company-provided. */
-export function isGoogleGenModel(cfModel: string): boolean {
-  return isGeminiModel(cfModel) || isLyriaModel(cfModel);
-}
+  Guessing a provider from an id is right until a provider ships a model whose
+  name does not match the pattern — at which point a Google model is dispatched to
+  Workers AI and fails with something unrelated to the actual cause. `lyria-002`
+  was already an id that did not begin with "gemini-".
+*/
 
 /** Resolve the API key — always Scena's platform key (no per-tenant BYO). */
 async function resolveKey(env: Env, _tenantId: string): Promise<string> {
@@ -211,116 +214,26 @@ export async function geminiGenerateMusic(env: Env, tenantId: string, model: str
   return { bytes: b64ToBytes(b64), mime: pred?.mimeType || "audio/wav" };
 }
 
-/* ---------------------------- live model list ---------------------------- */
+/*
+  ── THE LIVE MODEL LIST AND ITS GUESSED RATES ARE GONE ──────────────────────
 
-export interface GeminiCatalogEntry {
-  id: string; // bare model id, e.g. "gemini-2.5-flash"
-  displayName: string;
-  description: string;
-  methods: string[]; // supportedGenerationMethods
-}
+  `fetchGeminiModels` + `classifyGemini` + `defaultGeminiRate` +
+  `syncGeminiFromGoogle` (~110 lines) listed every model the platform key can
+  reach and upserted each one at a rate looked up BY LANE: flash-tier prices for
+  any text model, Nano-Banana's price for any image model, and so on.
 
-/**
- * Fetch the live model list the key can access (the admin "sync" button). Only
- * models that actually generate content are returned (chat/image/music); embed &
- * legacy models are filtered out so the catalog stays relevant.
- */
-export async function fetchGeminiModels(env: Env, tenantId = ""): Promise<GeminiCatalogEntry[]> {
-  const key = await resolveKey(env, tenantId);
-  if (!key) throw new Error("gemini_key_missing");
-  const out: GeminiCatalogEntry[] = [];
-  let pageToken = "";
-  // Paginate defensively (the list can span a couple of pages).
-  for (let i = 0; i < 5; i++) {
-    const url = `${GLA_BASE}/models?pageSize=200&key=${encodeURIComponent(key)}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`gemini_list_${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
-    const json = (await res.json()) as {
-      models?: Array<{ name?: string; displayName?: string; description?: string; supportedGenerationMethods?: string[] }>;
-      nextPageToken?: string;
-    };
-    for (const m of json.models ?? []) {
-      const id = (m.name ?? "").replace(/^models\//, "");
-      if (!id) continue;
-      const methods = m.supportedGenerationMethods ?? [];
-      const usable = methods.includes("generateContent") || methods.includes("predict");
-      if (!usable) continue;
-      out.push({ id, displayName: m.displayName ?? id, description: m.description ?? "", methods });
-    }
-    pageToken = json.nextPageToken ?? "";
-    if (!pageToken) break;
-  }
-  return out;
-}
+  That is a money bug, not a coverage gap. Discovering `gemini-3-pro` and pricing
+  it at 2.5 Flash's $0.30/1M input means the reserve under-estimates by roughly
+  4x and the platform eats the difference at settle time — silently, on every
+  call, with the console reporting a successful sync. A seed rate must be an
+  UPPER bound (AGENTS §5), and a rate guessed from a lane cannot be one.
 
-/**
- * Classify a live Gemini model id into a Scena generation task (or null to skip
- * non-generative models like embeddings, live-streaming, AQA, TTS, Imagen/Veo).
- */
-function classifyGemini(id: string): "text" | "image" | "music" | "tts" | null {
-  if (id.startsWith("lyria-")) return "music";
-  if (!id.startsWith("gemini-")) return null;
-  if (/embedding|aqa|-live|imagen|veo|learnlm/.test(id)) return null;
-  if (id.includes("-tts")) return "tts";
-  if (id.includes("-image")) return "image";
-  return "text";
-}
-
-/** Task → default neuron-equivalent rates (Google list price ÷ $0.000011),
- *  applied to any newly-synced live model whose exact price we don't seed. Flash
- *  tier for text, Nano-Banana for image, native-TTS per-char, Lyria per-second. */
-function defaultGeminiRate(task: "text" | "image" | "music" | "tts"): {
-  input_rate: number | null;
-  output_rate: number | null;
-  unit_rate: number | null;
-  unit_kind: "chars_1k" | "image" | "audio_sec" | null;
-} {
-  if (task === "text") return { input_rate: 27273, output_rate: 227273, unit_rate: null, unit_kind: null };
-  if (task === "image") return { input_rate: null, output_rate: null, unit_rate: 3545, unit_kind: "image" };
-  if (task === "tts") return { input_rate: null, output_rate: null, unit_rate: 1455, unit_kind: "chars_1k" };
-  return { input_rate: null, output_rate: null, unit_rate: 121, unit_kind: "audio_sec" }; // music (Lyria)
-}
-
-/**
- * The admin "sync" button (models registry): fetch the live model list the
- * platform Gemini key can access, and upsert every generative model into
- * ai_models metered at Google's list price (neuron-equivalents) under the
- * standard markup. Existing rows keep their tuned rates + enabled flag (never
- * clobber an admin's edits); new rows come in enabled with the task's default
- * rate. Returns counts + a soft error if no key / the fetch failed (the caller
- * still reports the curated-catalog resync).
- */
-export async function syncGeminiFromGoogle(env: Env): Promise<{ added: number; updated: number; error?: string }> {
-  let live: GeminiCatalogEntry[];
-  try {
-    live = await fetchGeminiModels(env);
-  } catch (e) {
-    return { added: 0, updated: 0, error: e instanceof Error ? e.message : String(e) };
-  }
-  let added = 0;
-  let updated = 0;
-  for (const m of live) {
-    const task = classifyGemini(m.id);
-    if (!task) continue;
-    const existing = await getModel(env.DB, m.id);
-    const def = defaultGeminiRate(task);
-    await upsertModel(env.DB, {
-      id: m.id,
-      label: m.displayName || m.id,
-      task,
-      cf_model: m.id,
-      input_rate: existing?.input_rate ?? def.input_rate,
-      output_rate: existing?.output_rate ?? def.output_rate,
-      unit_rate: existing?.unit_rate ?? def.unit_rate,
-      unit_kind: existing?.unit_kind ?? def.unit_kind,
-      markup: existing?.markup ?? 3,
-      // new models arrive enabled + sorted just after the curated Gemini block
-      ...(existing ? {} : { enabled: 1, sort: 80 }),
-    });
-    existing ? updated++ : added++;
-  }
-  return { added, updated };
-}
+  `syncModelCatalog` (`@4dl/ai`) reads Google's own pricing page and prices each
+  row from the number printed against its name, refusing loudly — into
+  `unpriceable` — anything it cannot price exactly. What is lost is the "can this
+  key reach it" signal, which the pricing page does not carry; what is gained is
+  that no row is ever priced by resemblance.
+*/
 
 /* -------------------------------- helpers -------------------------------- */
 

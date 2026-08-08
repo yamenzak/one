@@ -22,7 +22,7 @@
 import { type BalanceView, creditsForUsage, creditsPerMillionTokens, creditsPerUnit, referenceCredits, REFERENCE_USAGE, type ModelRate, type Usage } from "@4dl/billing/model";
 import type { HasAi, HasDb, HasEnvironment, HasPlatformConfig } from "@4dl/core";
 import { getConfig, newId, nowMs } from "@4dl/core";
-import { isRunnableTask, type SeedTask } from "./pricing.js";
+import { isRunnableTask, runnableLanes, type SeedTask } from "./pricing.js";
 import { readSharedCatalog } from "./shared-catalog.js";
 import { shouldUseMockLane } from "./mock-lane.js";
 import { aiRegistry, type AiTone, type TenantAiConfig } from "./registry.js";
@@ -99,6 +99,53 @@ export interface AiModelRow {
  */
 export const DEFAULT_SEED_MARKUP = 3;
 
+/**
+ * A row an app's own curated floor may carry.
+ *
+ * The same shape the parsers produce, plus the two columns a hand-written seed
+ * has an opinion about and a pricing page does not: where the row sits in the
+ * console (`sort`) and what it is marked up by.
+ */
+export interface FloorModel {
+  id: string;
+  label: string;
+  provider: "workers-ai" | "google";
+  task: SeedTask;
+  input_rate: number | null;
+  output_rate: number | null;
+  unit_rate: number | null;
+  unit_kind: string | null;
+  markup?: number;
+  sort?: number;
+}
+
+/**
+ * THE FLOOR IS THE APP'S; THE MECHANISM IS THIS PACKAGE'S.
+ *
+ * `DEFAULT_MODELS` below is eleven rows chosen for Kova — two text lanes, one
+ * image model, one voice, one music bed. It exists so a deployment can meter
+ * SOMETHING before anybody presses Sync, and for Kova that is enough.
+ *
+ * It is NOT enough for an app whose lanes differ. Scena sells announcements
+ * voiced by Deepgram Aura, poster slides from FLUX and music beds from MiniMax —
+ * three Workers AI families with no row in that list at all — so seeding Scena
+ * from the package floor would leave its voice and music features with no
+ * pickable model on a fresh database, and the product simply would not work
+ * until an operator remembered a button.
+ *
+ * Copying the whole seeding mechanism into the app to fix that is what Scena
+ * actually did, and it cost it the shared catalog, the runnability rule, the
+ * lane election and the retirement sweep — every improvement this package has
+ * made since. So the app hands over its rows and keeps all of it.
+ *
+ * Call once at module load, before anything can seed. Not calling it keeps the
+ * package floor, which is what Kova, Tessa and the template do.
+ */
+let floorModels: readonly FloorModel[] | null = null;
+export function configureAiFloor(models: readonly FloorModel[]): void {
+  floorModels = models.length ? models : null;
+}
+
 /** Seed text models (Workers AI rates in neurons per 1M tokens, markup 3). */
 /*
   `task` narrowed to `SeedTask` rather than the row's `string`, so a typo'd lane
@@ -106,7 +153,7 @@ export const DEFAULT_SEED_MARKUP = 3;
   never selectable — `AiModelRow` has to stay loose because it models whatever is
   in the database, and a seed is not that.
 */
-const DEFAULT_MODELS: (Omit<AiModelRow, "enabled" | "is_default" | "task"> & { task: SeedTask })[] = [
+const DEFAULT_MODELS: (Omit<AiModelRow, "enabled" | "is_default" | "task" | "provider"> & { task: SeedTask; provider: "workers-ai" | "google" })[] = [
   {
     id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     task: "text",
@@ -315,14 +362,38 @@ export async function seedAiModels(db: D1Database, env?: HasPlatformConfig): Pro
    */
   const shared = env ? await readSharedCatalog(env) : null;
   if (shared) {
+    /*
+      The app's curated `sort` survives a shared-catalog seed.
+
+      A published catalog is parsed from two pricing pages and carries no
+      presentation order at all, so seeding from it used to flatten a forty-row
+      console into whatever `ORDER BY task, label` produced. The floor is the
+      one place that order is stated, and the ids match — so it is read here as
+      a ranking rather than as rows.
+    */
+    const rank = new Map((floorModels ?? []).map((m) => [m.id, m.sort ?? null]));
+    /*
+      …and so does its per-lane PICK. Same reason: a published catalog is parsed
+      from pricing pages and has no opinion about which model a lane should use,
+      so without this a shared-catalog seed would hand every lane to whatever is
+      cheapest — silently overruling the choice a curated floor states by ordering
+      itself, and the choice the app's own `ai.default_model.*` config names.
+    */
+    const pick = new Set<string>();
+    const laneChosen = new Set<string>();
+    for (const m of floorModels ?? []) {
+      if (laneChosen.has(m.task) || !isRunnableTask(m.task)) continue;
+      laneChosen.add(m.task);
+      pick.add(m.id);
+    }
     const ok = await db
       .batch(
         shared.models.map((m) =>
           db
             .prepare(
-              "INSERT OR IGNORE INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)",
+              "INSERT OR IGNORE INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default, sort) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             )
-            .bind(m.id, m.task, m.label, m.provider, m.inputRate, m.outputRate, m.unitRate, m.unitKind, DEFAULT_SEED_MARKUP, isRunnableTask(m.task) ? 1 : 0),
+            .bind(m.id, m.task, m.label, m.provider, m.inputRate, m.outputRate, m.unitRate, m.unitKind, DEFAULT_SEED_MARKUP, isRunnableTask(m.task) ? 1 : 0, pick.has(m.id) ? 1 : 0, rank.get(m.id) ?? null),
         ),
       )
       .then(() => true)
@@ -330,14 +401,7 @@ export async function seedAiModels(db: D1Database, env?: HasPlatformConfig): Pro
     // Elect a default per lane; without one, `modelForTask` orders by
     // `is_default DESC` across rows that are all zero and picks arbitrarily.
     if (ok) {
-      for (const task of ["text", "text-small", "vision", "image", "speech", "music"]) {
-        const clause = task === "vision" ? " AND provider = 'google'" : "";
-        await db
-          .prepare(`UPDATE ai_models SET is_default = 1 WHERE id = (SELECT id FROM ai_models WHERE task = ? AND enabled = 1${clause} ORDER BY output_rate ASC, unit_rate ASC LIMIT 1)`)
-          .bind(task)
-          .run()
-          .catch(() => undefined);
-      }
+      await electLaneDefaults(db);
       return;
     }
     // A failed batch falls through to the hardcoded floor rather than leaving
@@ -359,17 +423,90 @@ export async function seedAiModels(db: D1Database, env?: HasPlatformConfig): Pro
     every model in credits, per lane", which exists for exactly that — a 0 reads
     as "this model costs nothing".
   */
+  const floor: readonly FloorModel[] = floorModels ?? DEFAULT_MODELS.map((m) => ({ ...m, markup: m.markup ?? DEFAULT_SEED_MARKUP }));
+  /*
+    THE FLOOR'S FIRST ROW IN EACH LANE IS THAT LANE'S DEFAULT.
+
+    ⚠️ It used to be `i === 0 ? 1 : 0` — row zero of the whole list and nothing
+    else. So every lane but the first had no default at all, and `modelForTask`
+    breaks ties on `is_default DESC` with no tiebreaker: an arbitrary row per
+    lane, picked by whatever order D1 returned. Harmless-looking while the floor
+    was eleven rows in a fixed order; not harmless for a floor covering six lanes
+    and forty rows, where "arbitrary" means the operator console shows one
+    default and the generator quietly uses another.
+
+    Per-lane FIRST rather than cheapest, because a curated floor is ordered on
+    purpose — Kova's opens with "Llama 3.3 70B (balanced default)" and Scena's
+    with FLUX.1 Schnell and Deepgram Aura-1, which are also exactly what their
+    `ai.default_model.*` config seeds name. `electLaneDefaults` below then fills
+    any lane the floor said nothing about, so the two rules never compete: the
+    curated pick wins where there is one, price decides where there is not.
+  */
+  const laneSeen = new Set<string>();
   await db
     .batch(
-      DEFAULT_MODELS.map((m, i) =>
-        db
+      floor.map((m) => {
+        const first = !laneSeen.has(m.task);
+        laneSeen.add(m.task);
+        return db
           .prepare(
-            "INSERT OR IGNORE INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO ai_models (id, task, label, provider, input_rate, output_rate, unit_rate, unit_kind, markup, enabled, is_default, sort) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
           )
-          .bind(m.id, m.task, m.label, m.provider, m.input_rate, m.output_rate, m.unit_rate, m.unit_kind, m.markup, isRunnableTask(m.task) ? 1 : 0, i === 0 ? 1 : 0),
-      ),
+          .bind(
+            m.id, m.task, m.label, m.provider, m.input_rate, m.output_rate, m.unit_rate, m.unit_kind,
+            m.markup ?? DEFAULT_SEED_MARKUP,
+            isRunnableTask(m.task) ? 1 : 0,
+            // Never crown a row in a lane this app cannot run: `modelForTask`
+            // filters on `enabled = 1`, so a default there is invisible, and the
+            // console would show a default for a lane it lists as unavailable.
+            first && isRunnableTask(m.task) ? 1 : 0,
+            m.sort ?? null,
+          );
+      }),
     )
     .catch(() => undefined);
+  await electLaneDefaults(db);
+}
+
+/**
+ * Give every runnable lane a default, when it has none: the cheapest enabled
+ * model in it.
+ *
+ * A FILLER, not an authority. A curated floor states its own per-lane pick and
+ * this leaves it alone (the `has` check below) — what it exists for is the lane
+ * nobody chose for: one seeded from a shared catalog parsed off two pricing pages
+ * (which carries no opinion about defaults at all), and one whose default was
+ * just switched off by a retirement or a delisting.
+ *
+ * Idempotent, and called from all three of those places, because the consequence
+ * of a defaultless lane is the same in each: `modelForTask` breaks ties on
+ * `is_default DESC` alone, so the model is chosen by database order.
+ *
+ * `output_rate ASC, unit_rate ASC` covers both pricing shapes in one ORDER BY —
+ * token-metered rows carry an output rate and a NULL unit rate, unit-metered
+ * rows the reverse, and SQLite sorts NULLs first in ASC so each kind is ranked
+ * by the column it actually has.
+ *
+ * The vision lane is constrained to Google, because it is Gemini-only
+ * (`modelSupportsTask`): crowning a Workers AI row there would break every call
+ * in the lane with "model cannot read images", i.e. the election itself would be
+ * the outage.
+ */
+export async function electLaneDefaults(db: D1Database): Promise<void> {
+  for (const task of runnableLanes()) {
+    const clause = task === "vision" ? " AND provider = 'google'" : "";
+    const has = await db
+      .prepare(`SELECT 1 AS x FROM ai_models WHERE task = ? AND enabled = 1 AND is_default = 1${clause}`)
+      .bind(task)
+      .first()
+      .catch(() => null);
+    if (has) continue;
+    await db
+      .prepare(`UPDATE ai_models SET is_default = 1 WHERE id = (SELECT id FROM ai_models WHERE task = ? AND enabled = 1${clause} ORDER BY output_rate ASC, unit_rate ASC LIMIT 1)`)
+      .bind(task)
+      .run()
+      .catch(() => undefined);
+  }
 }
 
 export async function modelForTask(db: D1Database, task: string): Promise<AiModelRow | null> {
@@ -470,7 +607,10 @@ export async function modelById(db: D1Database, id: string): Promise<AiModelRow 
 /** All models offered in the catalog (for the settings picker). */
 export async function listModels(db: D1Database): Promise<AiModelRow[]> {
   await seedAiModels(db);
-  const rows = await db.prepare("SELECT * FROM ai_models WHERE enabled = 1 ORDER BY task, label").all<AiModelRow>();
+  // `COALESCE(sort, …)`: a curated floor states the order an operator wants to
+  // read; a synced row has none and must land after the ranked ones rather than
+  // first, which is where SQLite puts a NULL in ASC.
+  const rows = await db.prepare("SELECT * FROM ai_models WHERE enabled = 1 ORDER BY COALESCE(sort, 9999), task, label").all<AiModelRow>();
   return rows.results ?? [];
 }
 

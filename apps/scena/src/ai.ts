@@ -27,8 +27,8 @@ import { getBranding, brandBrief, brandImageHint } from "./branding-store.js";
 // figure the provider might report). Importing it back deletes the fork and
 // picks up the guards.
 import { neuronsForUsage, creditsForNeurons, type Usage, type ModelRate } from "@4dl/billing/model";
-import { shouldUseMockLane } from "@4dl/ai";
-import { isGoogleGenModel, geminiGenerateText, geminiGenerateImage, geminiGenerateMusic, geminiGenerateSpeech } from "./gemini.js";
+import { DEFAULT_SEED_MARKUP, lanesFor, MUSIC_CLIP_SECONDS, shouldUseMockLane } from "@4dl/ai";
+import { geminiGenerateText, geminiGenerateImage, geminiGenerateMusic, geminiGenerateSpeech } from "./gemini.js";
 import { createMedia } from "./media-store.js";
 import { storeAsset, StorageQuotaError } from "./storage.js";
 
@@ -85,12 +85,17 @@ export interface GenerateError {
   limitBytes?: number;
 }
 
+/** A catalog row's markup, with the platform's 3× standing in for a null.
+ *  Never null in practice — every seed and every sync writes one — but the
+ *  column is nullable and `creditsForNeurons(n, null)` is a free generation. */
+const markupOf = (m: ModelRow): number => m.markup ?? DEFAULT_SEED_MARKUP;
+
 const rateOf = (m: ModelRow): ModelRate => ({
   inputRate: m.input_rate ?? undefined,
   outputRate: m.output_rate ?? undefined,
   unitRate: m.unit_rate ?? undefined,
   unitKind: (m.unit_kind as ModelRate["unitKind"]) ?? undefined,
-  markup: m.markup,
+  markup: markupOf(m),
 });
 
 /** Estimate the worst-case usage for the reserve, before we know real usage. */
@@ -120,11 +125,19 @@ function musicSeconds(opt: GenerateRequest["options"]): number {
   return Math.min(30, Math.max(5, Math.round(opt?.durationSec ?? 15)));
 }
 
-/** Google/Lyria prices music per *song* (a ≤30s clip = one flat charge), not per
- *  second. We therefore meter every Gemini/Lyria clip as one whole clip so a
- *  short bed can never cost us the full-song price while billing a fraction of
- *  it. Workers AI music stays genuinely per-second (Cloudflare's real basis). */
-const LYRIA_CLIP_SEC = 30;
+/**
+ * Google/Lyria prices music per *song* (a ≤30s clip = one flat charge), not per
+ * second. We therefore meter every Gemini/Lyria clip as one whole clip so a
+ * short bed can never cost us the full-song price while billing a fraction of
+ * it. Workers AI music stays genuinely per-second (Cloudflare's real basis).
+ *
+ * ⚠️ IT IS `@4dl/ai`'s CONSTANT, not a local 30. The parser DIVIDES Google's
+ * per-song price by it to store a per-second `unit_rate`, and this multiplies it
+ * back — two halves of one figure, in two packages. A local copy that drifted
+ * would not fail anywhere: it would just charge the wrong amount, quietly, for
+ * every music generation.
+ */
+const LYRIA_CLIP_SEC = MUSIC_CLIP_SECONDS;
 
 /** Hard ceiling for a single model call. Under the client's request timeout so a
  *  stalled model returns a clean error before the connection is reset. */
@@ -199,7 +212,18 @@ export async function generate(env: Env, req: GenerateRequest): Promise<Generate
   const model = await getModel(env.DB, req.modelId);
   // The layout designer is a text-in/JSON-out task, so it runs on `text` models.
   const modelTask = req.task === "layout" ? "text" : req.task;
-  if (!model || model.enabled !== 1 || model.task !== modelTask) return { ok: false, error: "unknown_model" };
+  /*
+    ⚠️ `lanesFor`, NOT `model.task !== modelTask`.
+
+    A catalog carrying both providers stores text-to-speech under TWO lane names:
+    Cloudflare's pricing page yields `tts` (a per-character rate) and Google's
+    yields `speech` (an id containing "tts"). So an exact comparison refused
+    every Gemini voice for a `tts` request with `unknown_model` — a 400 that
+    reads as "you sent a bad model id" about a model the operator console lists,
+    has enabled, and may have set as the lane default.
+  */
+  const lanes = lanesFor(modelTask);
+  if (!model || model.enabled !== 1 || !lanes.includes(model.task)) return { ok: false, error: "unknown_model" };
   const rate = rateOf(model);
 
   // Image prompts: enrich for creativity/quality + fold in the brand palette,
@@ -210,19 +234,23 @@ export async function generate(env: Env, req: GenerateRequest): Promise<Generate
 
   // Cache hit → free (already paid once). Serve without touching the balance.
   const hash = await promptHash(req);
-  const cached = await env.DB.prepare("SELECT * FROM ai_cache WHERE hash = ?").bind(hash).first<{ output: string; asset_hash: string | null; neurons: number }>();
+  // `@4dl/ai`'s columns: `prompt_hash` / `feature` / `output_json` / `at`, plus
+  // the two Scena's cache needs and the shared one gained as alters —
+  // `asset_hash` (the generation IS an object in R2) and `neurons` (what the
+  // original run cost, so a free re-serve can still report a cost basis).
+  const cached = await env.DB.prepare("SELECT * FROM ai_cache WHERE prompt_hash = ?").bind(hash).first<{ output_json: string | null; asset_hash: string | null; neurons: number | null }>();
   if (cached) {
-    return finalize(env, req, model, cached.output, cached.asset_hash, cached.neurons, 0, true);
+    return finalize(env, req, model, cached.output_json ?? "", cached.asset_hash, cached.neurons ?? 0, 0, true);
   }
 
   // Gemini/Lyria run on Scena's *platform* Google key (company-provided, no BYO).
   // They're metered exactly like Workers AI: Google's list price is expressed as
   // neuron-equivalents in the model rate, so the same neurons→credits×markup path
   // applies. The only difference is they run against Google, never the mock.
-  const gemini = isGoogleGenModel(model.cf_model);
+  const gemini = model.provider === "google";
 
   // Reserve a worst-case estimate so a concurrent burst can't overspend.
-  const estimate = creditsForNeurons(neuronsForUsage(estimateUsage(req.task, req.prompt, req.options, gemini), rate), model.markup);
+  const estimate = creditsForNeurons(neuronsForUsage(estimateUsage(req.task, req.prompt, req.options, gemini), rate), markupOf(model));
   const billing = env.BILLING.get(env.BILLING.idFromName(tenantId));
   await billing.bind(tenantId);
   const held = await billing.reserve(estimate);
@@ -252,7 +280,7 @@ export async function generate(env: Env, req: GenerateRequest): Promise<Generate
         const run = gemini ? runGemini(env, req, model, brief) : runReal(env, req, model, brief);
         out = await withTimeout(run, RUN_TIMEOUT_MS, `model ${model.id}`);
       } catch (err) {
-        console.error(`ai.run failed (model=${model.id} cf=${model.cf_model}): ${err instanceof Error ? err.message : String(err)}`);
+        console.error(`ai.run failed (model=${model.id}): ${err instanceof Error ? err.message : String(err)}`);
         // A timeout is a genuine failure — surface it rather than masking it with
         // a mock render. Also never silently mock an external provider, and never
         // mock at all outside development (`mock` is false there by construction).
@@ -275,20 +303,34 @@ export async function generate(env: Env, req: GenerateRequest): Promise<Generate
       return { ok: false, error: "storage_full", usedBytes: err.usedBytes, limitBytes: err.limitBytes, detail: "media storage is full" };
     }
     const detail = err instanceof Error ? err.message : String(err);
-    console.error(`ai.generate failed (task=${req.task} model=${model.id} cf=${model.cf_model}): ${detail}`);
+    console.error(`ai.generate failed (task=${req.task} model=${model.id}): ${detail}`);
     return { ok: false, error: "generation_failed", detail };
   }
 
   // Settle the exact charge from real usage — Google list-price neurons for
   // Gemini, Cloudflare neurons for Workers AI — both under the model's markup.
   const neurons = neuronsForUsage(out.usage, rate);
-  const credits = creditsForNeurons(neurons, model.markup);
+  const credits = creditsForNeurons(neurons, markupOf(model));
   await billing.settle(held.hold, credits, `ai.${req.task}`, model.id);
 
   // Cache + audit.
   await env.DB.batch([
-    env.DB.prepare("INSERT OR IGNORE INTO ai_cache (hash, task, model, output, asset_hash, neurons, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(hash, req.task, model.id, out.output ?? "", out.assetHash ?? null, neurons, Date.now()),
-    env.DB.prepare("INSERT INTO ai_generations (id, tenant_id, task, model, prompt, neurons, credits, output_ref, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(`gen_${rndHex(10)}`, tenantId, req.task, model.id, req.prompt.slice(0, 500), neurons, credits, out.assetHash ?? null, Date.now()),
+    env.DB.prepare("INSERT OR IGNORE INTO ai_cache (prompt_hash, feature, output_json, asset_hash, neurons, at) VALUES (?, ?, ?, ?, ?, ?)").bind(hash, req.task, out.output ?? "", out.assetHash ?? null, neurons, Date.now()),
+    /*
+      THE AUDIT ROW NO LONGER KEEPS THE PROMPT.
+
+      Scena's own `ai_generations` had `prompt TEXT` and `output_ref TEXT`, and
+      wrote 500 characters of every prompt into both a tenant-scoped table and,
+      on this same path, a cache row. Nothing ever read either column — no route,
+      no screen, no report — so what they amounted to was a permanent record of
+      what every workspace typed, retained for the life of the tenant, in service
+      of nothing. `@4dl/ai`'s row is who / which feature / which model / what it
+      cost, which is what makes a bill explainable, and that is the whole job.
+
+      `ok` is 1 because a failure returns before reaching here: the hold is
+      released and no row is written at all.
+    */
+    env.DB.prepare("INSERT INTO ai_generations (id, tenant_id, actor_user_id, subject_id, feature, model, neurons, credits, ok, error, at) VALUES (?, ?, NULL, NULL, ?, ?, ?, ?, 1, NULL, ?)").bind(`gen_${rndHex(10)}`, tenantId, req.task, model.id, neurons, credits, Date.now()),
   ]);
 
   return finalize(env, req, model, out.output ?? "", out.assetHash ?? null, neurons, credits, false, out.mime, out.durationMs);
@@ -350,7 +392,7 @@ function mediaName(req: GenerateRequest): string {
 
 /* ------------------------------ real models ------------------------------ */
 
-/** Loose view of the Workers AI binding — `cf_model` is a dynamic string, not a
+/** Loose view of the Workers AI binding — the model id is a dynamic string, not a
  *  statically-known model key, so we call through a widened signature. */
 type LooseAi = { run(model: string, inputs: Record<string, unknown>): Promise<unknown> };
 
@@ -404,7 +446,7 @@ async function runGemini(env: Env, req: GenerateRequest, model: ModelRow, brief 
   if (req.task === "text" || req.task === "layout") {
     const layout = req.task === "layout";
     const sys = systemPrompt(req, brief);
-    const r = await geminiGenerateText(env, tenantId, model.cf_model, sys, layout ? layoutUserPrompt(req) : req.prompt, {
+    const r = await geminiGenerateText(env, tenantId, model.id, sys, layout ? layoutUserPrompt(req) : req.prompt, {
       // A full animated slide can be long; with thinking disabled the whole
       // budget goes to the HTML, so give it real room (was 8192 → truncation).
       maxTokens: req.options?.maxTokens ?? (layout ? 8192 : 32768),
@@ -423,18 +465,18 @@ async function runGemini(env: Env, req: GenerateRequest, model: ModelRow, brief 
     // options.voice is a Gemini prebuilt voice name. Google bills audio output
     // per token, but we meter per character — the rate's 3× markup covers the
     // per-token cost even for slow delivery (see billing-seed Gemini TTS note).
-    const r = await geminiGenerateSpeech(env, tenantId, model.cf_model, req.prompt, req.options?.voice ?? "");
+    const r = await geminiGenerateSpeech(env, tenantId, model.id, req.prompt, req.options?.voice ?? "");
     const assetHash = await storeGenerated(env, req, r.bytes, r.mime);
     return { output: "", assetHash, mime: r.mime, usage: { chars: req.prompt.length } };
   }
   if (req.task === "image") {
-    const r = await geminiGenerateImage(env, tenantId, model.cf_model, req.prompt);
+    const r = await geminiGenerateImage(env, tenantId, model.id, req.prompt);
     const assetHash = await storeGenerated(env, req, r.bytes, r.mime);
     return { output: "", assetHash, mime: r.mime, usage: { images: 1 } };
   }
   if (req.task === "music") {
     const secs = musicSeconds(req.options);
-    const r = await geminiGenerateMusic(env, tenantId, model.cf_model, req.prompt, secs);
+    const r = await geminiGenerateMusic(env, tenantId, model.id, req.prompt, secs);
     const assetHash = await storeGenerated(env, req, r.bytes, r.mime);
     // Lyria bills a flat per-song price, so meter a whole clip (never per-second):
     // a 5s bed and a 30s bed both cost Google the same, so both charge the same.
@@ -452,7 +494,7 @@ async function runReal(env: Env, req: GenerateRequest, model: ModelRow, brief = 
     const userContent = layout ? layoutUserPrompt(req) : req.prompt;
     // Gemma models on Workers AI don't accept a `system` role — fold it into the
     // user turn. Other models use a proper system message.
-    const noSystemRole = /gemma/i.test(model.cf_model);
+    const noSystemRole = /gemma/i.test(model.id);
     const messages = noSystemRole
       ? [{ role: "user", content: `${sys}\n\n----\n\nRequest:\n${userContent}` }]
       : [{ role: "system", content: sys }, { role: "user", content: userContent }];
@@ -465,7 +507,7 @@ async function runReal(env: Env, req: GenerateRequest, model: ModelRow, brief = 
     // Stream the response: Cloudflare recommends streaming for long generations —
     // it keeps the connection alive (tokens flow as SSE) instead of buffering a
     // large response, which is what stalled big models into a dropped request.
-    const res = (await ai.run(model.cf_model, {
+    const res = (await ai.run(model.id, {
       messages,
       max_tokens: budget,
       max_completion_tokens: budget,
@@ -509,14 +551,14 @@ async function runReal(env: Env, req: GenerateRequest, model: ModelRow, brief = 
     return { output: html, usage: { inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens } };
   }
   if (req.task === "tts") {
-    const res = (await ai.run(model.cf_model, { text: req.prompt, speaker: req.options?.voice })) as ReadableStream | ArrayBuffer | { audio?: string };
+    const res = (await ai.run(model.id, { text: req.prompt, speaker: req.options?.voice })) as ReadableStream | ArrayBuffer | { audio?: string };
     const bytes = await toBytes(res);
     const assetHash = await storeGenerated(env, req, bytes, "audio/mpeg");
     return { output: "", assetHash, mime: "audio/mpeg", usage: { chars: req.prompt.length } };
   }
   if (req.task === "music") {
     const secs = musicSeconds(req.options);
-    const res = (await ai.run(model.cf_model, { prompt: req.prompt, duration: secs })) as ReadableStream | ArrayBuffer | { audio?: string };
+    const res = (await ai.run(model.id, { prompt: req.prompt, duration: secs })) as ReadableStream | ArrayBuffer | { audio?: string };
     const bytes = await toBytes(res);
     const assetHash = await storeGenerated(env, req, bytes, "audio/mpeg");
     return { output: "", assetHash, mime: "audio/mpeg", usage: { audioSec: secs }, durationMs: secs * 1000 };
@@ -524,7 +566,7 @@ async function runReal(env: Env, req: GenerateRequest, model: ModelRow, brief = 
   // image
   const w = req.options?.width ?? 1024;
   const h = req.options?.height ?? 1024;
-  const res = (await ai.run(model.cf_model, { prompt: req.prompt, width: w, height: h, num_steps: req.options?.steps ?? 4 })) as { image?: string } | ReadableStream | ArrayBuffer;
+  const res = (await ai.run(model.id, { prompt: req.prompt, width: w, height: h, num_steps: req.options?.steps ?? 4 })) as { image?: string } | ReadableStream | ArrayBuffer;
   const bytes = typeof res === "object" && res !== null && "image" in res && res.image ? b64ToBytes(res.image) : await toBytes(res);
   const assetHash = await storeGenerated(env, req, bytes, "image/png");
   const tiles = Math.ceil(w / 512) * Math.ceil(h / 512) * (req.options?.steps ?? 4);

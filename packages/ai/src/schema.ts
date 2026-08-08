@@ -17,7 +17,7 @@ import type { SchemaModule } from "@4dl/core";
 
 export const AI_SCHEMA: SchemaModule = {
   id: "ai",
-  version: "2",
+  version: "3",
   ddl: [
     "CREATE TABLE IF NOT EXISTS ai_models (id TEXT PRIMARY KEY, task TEXT, label TEXT, provider TEXT, input_rate REAL, output_rate REAL, unit_rate REAL, unit_kind TEXT, markup REAL, enabled INTEGER DEFAULT 1, is_default INTEGER DEFAULT 0);",
     "CREATE TABLE IF NOT EXISTS ai_generations (id TEXT PRIMARY KEY, tenant_id TEXT, actor_user_id TEXT, subject_id TEXT, feature TEXT, model TEXT, neurons REAL, credits INTEGER, ok INTEGER, error TEXT, at INTEGER);",
@@ -36,6 +36,36 @@ export const AI_SCHEMA: SchemaModule = {
      * announced end, which is almost all of them.
      */
     "ALTER TABLE ai_models ADD COLUMN retires_at TEXT;",
+    /**
+     * The order an operator wants to READ the catalog in.
+     *
+     * Not a rate and not a capability, which is why it took a second app to
+     * need it: a curated seed groups its rows by lane and by "the one you
+     * probably want first", and `ORDER BY task, label` throws that away — a
+     * console listing forty models alphabetically is a list nobody scans.
+     *
+     * Null for every row a sync discovers, because a pricing page has no
+     * opinion about presentation. Read with a COALESCE so a discovered row
+     * lands after the curated ones instead of sorting first (SQLite puts NULLs
+     * first in ASC, which would put the unranked rows at the top).
+     */
+    "ALTER TABLE ai_models ADD COLUMN sort INTEGER;",
+    /**
+     * A cached generation may be a STORED OBJECT rather than a JSON answer, and
+     * it cost something.
+     *
+     * `output_json` alone models a text/JSON result. It cannot express the other
+     * two thirds of what a generation can be — an image, a voice clip, a music
+     * bed — all of which live in R2 under a content hash, with `output_json`
+     * empty. And a cache hit has to know the NEURONS the original run cost, or
+     * the audit row it writes for the free re-serve reports a charge of zero
+     * against a model whose real cost basis is unrecorded.
+     *
+     * Both null for an app that only caches text, which is why they are alters
+     * rather than a second table.
+     */
+    "ALTER TABLE ai_cache ADD COLUMN asset_hash TEXT;",
+    "ALTER TABLE ai_cache ADD COLUMN neurons REAL;",
   ],
   backfills: [
     /**

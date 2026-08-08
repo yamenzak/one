@@ -1,4 +1,5 @@
 import { schemaGate, type SchemaModule } from "@4dl/core";
+import { AI_SCHEMA } from "@4dl/ai";
 import { AUTH_SCHEMA } from "@4dl/auth";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
 import { BILLING_RAIL_SCHEMA } from "@4dl/billing-rail/schema";
@@ -92,6 +93,23 @@ export const SCHEMA_MODULES: readonly SchemaModule[] = [
     persists. Ordering in this list IS dependency order.
   */
   NOTIFY_SCHEMA,
+  /*
+    `ai_models`, `ai_cache`, `ai_generations`, `insight_feedback`.
+
+    ⚠️ IT MUST RUN BEFORE `SCENA_SCHEMA`, and the reason is the one this list has
+    a scar from. Scena declared the first three itself with different columns, and
+    a `CREATE TABLE IF NOT EXISTS` is won by whichever module runs first — so on a
+    database created before this migration the OLD shape is already there and the
+    shared statements do nothing, including nothing about the columns the shared
+    queries name. Scena's declarations are gone (see `schema.ts`), which is what
+    makes the order safe rather than merely conventional; the position keeps it
+    true if anybody ever adds an AI table back to the app's module by mistake.
+
+    `insight_feedback` arrives unused — Scena collects no thumbs on generated
+    output today. It is four columns and it comes with the module rather than
+    needing to be remembered when the feature lands.
+  */
+  AI_SCHEMA,
   SCENA_SCHEMA,
 ];
 

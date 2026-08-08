@@ -176,7 +176,7 @@ export function aiCatalogAdminRoutes<E extends AiRouteEnv = AiRouteEnv>(deps: Ai
       // sync. Same reason as the line above: an operator looking at this screen
       // must not be shown a model as available when it has stopped answering.
       await disableRetiredModels(c.env.DB).catch(() => undefined);
-      const rows = await c.env.DB.prepare("SELECT * FROM ai_models ORDER BY provider, task, label").all<AiModelRow>();
+      const rows = await c.env.DB.prepare("SELECT * FROM ai_models ORDER BY COALESCE(sort, 9999), provider, task, label").all<AiModelRow>();
       // Every row carries its price in CREDITS as well as its neuron rate card.
       // Neurons are the cost basis and stay useful, but they are not the currency
       // anyone spends — without the conversion the catalog cannot answer "is this

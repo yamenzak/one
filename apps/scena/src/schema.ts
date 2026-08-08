@@ -34,12 +34,14 @@
  * wrongly is a GDPR bug and a table left out is an orphan that outlives its
  * tenant forever. Two groups are deliberately absent from `tenantTables`:
  *
- *   THE PLATFORM CATALOG — `plans`, `credit_packs`, `promo_codes`, `ai_models`,
+ *   THE PLATFORM CATALOG — `plans`, `credit_packs`, `promo_codes`,
  *   `library_tracks`, `app_config`. Shared across every tenant; deleting one
- *   tenant must not touch them.
+ *   tenant must not touch them. (`ai_models` is the same kind of thing and is
+ *   `@4dl/ai`'s table now, absent from ITS cascade for the same reason.)
  *
- *   CACHES keyed by something other than a tenant — `ai_cache` (prompt hash),
- *   `weather_cache` (source id). They expire on their own.
+ *   CACHES keyed by something other than a tenant — `weather_cache` (source id).
+ *   They expire on their own. (`ai_cache` is keyed by prompt hash and is also
+ *   `@4dl/ai`'s.)
  *
  * `tenants` is absent too: the row IS the tenant, and the runner's caller
  * deletes it last, after the cascade.
@@ -76,7 +78,7 @@ export const DEMO_TENANT = "tenant_demo";
 
 export const SCENA_SCHEMA: SchemaModule = {
   id: "scena",
-  version: "2026-08-06e",
+  version: "2026-08-08a",
   ddl: [
     "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, email TEXT, name TEXT, created_at INTEGER);",
     // Devices (screens). channel_id is the active/default channel; a device
@@ -164,11 +166,37 @@ export const SCENA_SCHEMA: SchemaModule = {
       queries do; the idempotency cannot wait for that.
     */
     "CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, at INTEGER);",
-    // Workers AI catalog + markup (§24), admin-editable neuron rate table.
-    "CREATE TABLE IF NOT EXISTS ai_models (id TEXT PRIMARY KEY, label TEXT, task TEXT, cf_model TEXT, input_rate REAL, output_rate REAL, unit_rate REAL, unit_kind TEXT, markup REAL, enabled INTEGER, sort INTEGER);",
-    // AI generation cache (by prompt hash) + audit log.
-    "CREATE TABLE IF NOT EXISTS ai_cache (hash TEXT PRIMARY KEY, task TEXT, model TEXT, output TEXT, asset_hash TEXT, neurons REAL, created_at INTEGER);",
-    "CREATE TABLE IF NOT EXISTS ai_generations (id TEXT PRIMARY KEY, tenant_id TEXT, task TEXT, model TEXT, prompt TEXT, neurons REAL, credits INTEGER, output_ref TEXT, created_at INTEGER);",
+    /*
+      ⚠️ `ai_models`, `ai_cache` AND `ai_generations` ARE `@4dl/ai`'s TABLES NOW.
+
+      All three used to be declared here, with different columns from the shared
+      ones, and that difference was the entire reason Scena could not adopt the
+      shared catalog: a `CREATE TABLE IF NOT EXISTS` is won by whichever module
+      runs first, and the loser's columns silently never exist. What Scena paid
+      for keeping them was everything `@4dl/ai`'s catalog has grown — the live
+      pricing-page sync, the retirement sweep, the shared publication a new app
+      seeds from, the cross-app selection broadcast — replaced by a hand-written
+      syncer behind a button that once reported "17 updated" having fetched
+      nothing at all.
+
+      Reconciled rather than dropped, column by column:
+        ai_models        `id` was a slug with the provider path in `cf_model`;
+                         it IS the path now, with `provider` naming the lane.
+                         `sort` moved to an alter on `AI_SCHEMA`.
+        ai_cache         `hash`/`task`/`output`/`created_at` → the shared
+                         `prompt_hash`/`feature`/`output_json`/`at`.
+                         `asset_hash` + `neurons` moved to alters, because a
+                         cached generation being a STORED OBJECT with a cost is
+                         true of any app that generates images or audio.
+        ai_generations   `task` → `feature`, `created_at` → `at`. `prompt` and
+                         `output_ref` are gone: nothing ever read either, and an
+                         audit trail that keeps 500 characters of every prompt
+                         is a privacy liability nobody asked for.
+
+      `AI_SCHEMA` also declares `ai_generations` in its own tenant cascade, so it
+      is absent from `scoped.tenantTables` below — see `db.ts` for the ordering
+      rule that makes that safe.
+    */
     // Admin-editable key/value config (Stripe keys, dunning windows, markup).
     /*
       ⚠️ `app_config` IS `@4dl/core`'s TABLE, and this line cannot widen it.
@@ -370,7 +398,9 @@ export const SCENA_SCHEMA: SchemaModule = {
       "slide_playlists", "media", "music_playlists", "widget_profiles",
       "slides", "device_channels", "device_schedule_rules", "manifest_versions",
       "feeds", "feed_items", "weather_sources", "alert_rules", "alerts",
-      "subscriptions", "credit_ledger", "promo_redemptions", "ai_generations",
+      // `ai_generations` is deliberately absent: `AI_SCHEMA` declares it, and
+      // naming it twice would make `@4dl/purge` emit two identical deletes.
+      "subscriptions", "credit_ledger", "promo_redemptions",
       "ads", "ad_profiles", "tracks",
     ],
   },

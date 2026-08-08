@@ -12,7 +12,20 @@
 
 import type { Context, Hono } from "hono";
 import type { Env } from "./env.js";
-import { mockModeSettable, type AiMockMode } from "@4dl/ai";
+import {
+  applySharedSelection,
+  disableRetiredModels,
+  fetchPricingDoc,
+  globalMarkup,
+  lanesFor,
+  mockModeSettable,
+  publishSharedCatalog,
+  readSharedCatalog,
+  seedAiModels,
+  syncModelCatalog,
+  type AiMockMode,
+} from "@4dl/ai";
+import { nowIso } from "@4dl/core";
 import { storageUsage } from "./storage.js";
 import { DEMO_TENANT } from "./db.js";
 import {
@@ -27,13 +40,12 @@ import {
   listPacks,
   listModels,
   upsertModel,
-  resyncModels,
   defaultModelForTask,
   listLedger,
   tenantEntitlements,
   setTenantOverrides,
 } from "./billing-store.js";
-import { syncGeminiFromGoogle, hasGeminiKey, isGoogleGenModel } from "./gemini.js";
+import { hasGeminiKey } from "./gemini.js";
 import { checkDowngrade, type Usage } from "./entitlements.js";
 import { countScreens } from "./db.js";
 import { listChannels } from "./content.js";
@@ -46,7 +58,6 @@ import { listLibrary, listGenres, createLibraryTrack, updateLibraryTrack, delete
 import { generate, type AiTask } from "./ai.js";
 import { addSlide } from "./content.js";
 import { grantForTenant, lifecycleSweep, deleteTenantData } from "./billing-service.js";
-import { syncScenaModelRates } from "./ai-catalog-sync.js";
 import { stripeCfg, stripeEnabled, syncCatalog, subscriptionCheckout, packCheckout, stripePing, handleWebhook } from "./stripe.js";
 import { dispatchEvent } from "@4dl/billing-rail";
 import { firstSeen, unmarkSeen } from "@4dl/billing";
@@ -307,7 +318,10 @@ export function registerBilling(app: App): void {
     // Gemini/Lyria models only appear once the platform Gemini key is configured
     // — otherwise they'd fail at generation with no key.
     const geminiReady = await hasGeminiKey(c.env, tenantOf(c));
-    const visible = models.filter((m) => (isGoogleGenModel(m.cf_model) ? geminiReady : true));
+    // The `provider` COLUMN, not a prefix test on the id. Same answer today and
+    // still the right one when Google ships a model whose name does not begin
+    // with "gemini-" — which `lyria-002`, already in the catalog, does not.
+    const visible = models.filter((m) => (m.provider === "google" ? geminiReady : true));
     return c.json({ models: visible.map((m) => ({ id: m.id, label: m.label, task: m.task, markup: m.markup })) });
   });
 
@@ -331,7 +345,13 @@ export function registerBilling(app: App): void {
       const id = body[task];
       // Per-tenant override key — a tenant's default model choice must not
       // overwrite the global (admin) default or leak into other tenants.
-      if (typeof id === "string" && models.some((m) => m.id === id && m.task === task)) entries[`ai.default_model.${task}:${t}`] = id;
+      //
+      // `lanesFor`, because the catalog stores text-to-speech under both `tts`
+      // (Cloudflare's page) and `speech` (Google's): an exact `task` comparison
+      // silently DISCARDED a workspace's choice of any Gemini voice, and this
+      // route answers `{ok: true}` either way.
+      const lanes = lanesFor(task);
+      if (typeof id === "string" && models.some((m) => m.id === id && lanes.includes(m.task))) entries[`ai.default_model.${task}:${t}`] = id;
     }
     if (Object.keys(entries).length) await setConfig(c.env.DB, entries);
     return c.json({ ok: true });
@@ -504,6 +524,28 @@ export function registerBilling(app: App): void {
   app.get("/api/admin/models", async (c) => {
     const deny = await requireAdmin(c);
     if (deny) return deny;
+    /*
+      THREE THINGS BEFORE THE READ, all of them `@4dl/ai`'s and all idempotent.
+
+      `seedAiModels(DB, env)` — WITH the env, unlike `ensureBilling`'s call. That
+      is what lets a fresh deployment arrive with the whole priced catalog the
+      platform has already parsed from the two pricing pages, instead of living
+      on the curated floor until somebody presses Sync.
+
+      `applySharedSelection` — whatever another 4DL app broadcast with "apply to
+      every app" and this one has not seen yet. Applied here so an operator who
+      goes looking sees the effect immediately.
+
+      `disableRetiredModels` — anything whose announced shutdown date came true
+      since the last sync. A console that shows a model as available when the
+      provider has stopped answering is worse than one that shows nothing.
+
+      All three swallow their errors: this is a READ, and none of them failing is
+      a reason an operator cannot see the catalog.
+    */
+    await seedAiModels(c.env.DB, c.env).catch(() => undefined);
+    await applySharedSelection(c.env).catch(() => undefined);
+    await disableRetiredModels(c.env.DB).catch(() => undefined);
     return c.json({ models: await listModels(c.env.DB) });
   });
 
@@ -515,51 +557,58 @@ export function registerBilling(app: App): void {
     return c.json({ ok: true });
   });
 
-  /*
-    RE-SYNC THE CATALOG — and until now this button lied.
-
-    It called `resyncModels`, which upserts every row of the hardcoded
-    `DEFAULT_MODELS` list and returns how many rows it touched. So an operator
-    pressed "Sync", read "17 updated", and reasonably concluded the rates had
-    been refreshed from Cloudflare. Nothing was fetched; the same constants were
-    written back over themselves, and Scena went on metering real credits
-    against whatever they said on the day somebody typed them.
-
-    Three steps now, in this order and for these reasons:
-
-      SEED    `resyncModels` still runs FIRST, because it is what puts a row in
-              the table at all — a model Scena curates but has never inserted
-              cannot be repriced. It is the seed, not the sync.
-      REPRICE `syncScenaModelRates` reads the two live pricing pages through
-              `@4dl/ai`'s parsers and moves the rates, retiring what the
-              provider has shut down and disabling what the page no longer
-              lists. This is the part that was missing.
-      EXTEND  `syncGeminiFromGoogle` folds in models Google's API lists that the
-              curated set does not carry, when a key is configured.
-
-    The response reports the repricing separately from the seeding, because
-    "17 updated" meaning "17 rows rewritten with the same numbers" is what made
-    the old one misleading.
-  */
+  /**
+   * RE-SYNC THE CATALOG AGAINST THE PROVIDERS' OWN PRICING PAGES.
+   *
+   * ── What this replaces, twice over ─────────────────────────────────────────
+   *
+   * First it called `resyncModels`, which upserted every row of a hardcoded list
+   * and returned how many rows it touched. An operator pressed "Sync", read
+   * "17 updated", and reasonably concluded the rates had been refreshed from
+   * Cloudflare. Nothing was fetched; the same constants were written back over
+   * themselves, and Scena went on metering real credits against whatever they
+   * said on the day somebody typed them.
+   *
+   * Then it grew a hand-written `syncScenaModelRates` + `syncGeminiFromGoogle`
+   * beside it — ~200 lines reimplementing what `@4dl/ai` already did, because
+   * Scena's `ai_models` keyed differently and could not use the shared syncer.
+   * That is fixed at the schema now, so this is the shared path, and it brings
+   * three things the local pair never had:
+   *
+   *   PUBLISHES  a successful sync writes what it parsed to the shared platform
+   *              store, so a brand-new 4DL app seeds its whole priced catalog on
+   *              first boot instead of living on eleven hardcoded rows.
+   *   FALLS BACK when both pages fail — a doc-format change, a provider having a
+   *              bad day — it applies the LAST published catalog rather than
+   *              reporting total failure and applying nothing.
+   *   RE-ELECTS  a lane whose default was just retired or delisted gets the
+   *              cheapest surviving model in the same pass.
+   *
+   * 502 only when NEITHER provider produced a usable parse AND no shared catalog
+   * could stand in. A one-sided failure did real work and must report it.
+   */
   app.post("/api/admin/models/resync", async (c) => {
     const deny = await requireAdmin(c);
     if (deny) return deny;
-    const curated = await resyncModels(c.env.DB);
-    const rates = await syncScenaModelRates(c.env.DB);
-    const gemini = await syncGeminiFromGoogle(c.env);
-    return c.json({
-      added: curated.added + gemini.added,
-      updated: curated.updated + gemini.updated,
-      /** What the PAGES said, as opposed to what the seed re-wrote. */
-      rates: {
-        ok: rates.ok,
-        repriced: rates.providers.reduce((n, p) => n + p.repriced, 0),
-        retired: rates.providers.flatMap((p) => p.retired),
-        delisted: rates.providers.flatMap((p) => p.delisted),
-        providers: rates.providers,
-      },
-      gemini: gemini.error ? { error: gemini.error } : { added: gemini.added, updated: gemini.updated },
-    });
+    // The MERGED config: a markup set once for the platform reaches the rows this
+    // sync inserts. It is the default for NEW rows only — an existing row keeps
+    // its own column, which is what the per-model control edits.
+    const cfg = await getConfig(c.env);
+    const markup = globalMarkup(cfg);
+
+    let report = await syncModelCatalog(c.env.DB, { markup, fetchMd: fetchPricingDoc });
+    let published = false;
+    if (report.ok) {
+      published = await publishSharedCatalog(c.env, report.parsedModels, "Scena", nowIso());
+    } else {
+      const shared = await readSharedCatalog(c.env);
+      if (shared) report = await syncModelCatalog(c.env.DB, { markup, fetchMd: fetchPricingDoc, from: shared.models });
+    }
+
+    // `parsedModels` is the input to the publication above, not something an
+    // operator screen has any use for — dropped before serialising.
+    const { parsedModels: _dropped, ...body } = report;
+    return c.json({ ...body, published }, report.ok ? 200 : 502);
   });
 
   // Licensed music library (§16 ext) — the global, admin-curated catalog.
