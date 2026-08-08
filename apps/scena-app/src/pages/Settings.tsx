@@ -339,7 +339,8 @@ export function WorkspaceSettingsPage() {
         <AccountExitRows
           email={email}
           ownsTenant={isOwner}
-          closeFirstHint="the workspace settings"
+          noun="workspace"
+          closeFirstHint="Settings → Danger zone"
           onSignOut={() => void signOut()}
           onDeleted={() => void signOut()}
         />

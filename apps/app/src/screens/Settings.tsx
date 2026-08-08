@@ -1317,6 +1317,7 @@ function DeleteAccountSection() {
     <AccountExitRows
       email={ctx?.user.email ?? null}
       ownsTenant={ctx?.active?.role === "owner"}
+      noun="studio"
       closeFirstHint="Studio settings → Danger zone"
       onSignOut={() => void signOut()}
       onDeleted={() => void signOut()}

@@ -235,6 +235,10 @@ export function Settings({ onBack }: { onBack: () => void }) {
         <AccountExitRows
           email={ctx?.user?.email ?? null}
           ownsTenant={isOwner}
+          // The NOUN, which the dictionary has had all along ("centre" /
+          // "Praxis") — the row was deriving one from `closeFirstHint` and
+          // shipping "Close your danger first".
+          noun={t("settings.danger.noun")}
           closeFirstHint={t("settings.danger")}
           onSignOut={() => void signOut()}
           onDeleted={() => void signOut()}

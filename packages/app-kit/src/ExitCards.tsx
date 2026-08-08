@@ -233,6 +233,22 @@ export interface AccountExitRowsProps {
    * failure than the refusal that produces it.
    */
   ownsTenant?: boolean;
+  /**
+   * What this product calls a tenant — "studio", "centre", "workspace".
+   *
+   * ⚠️ AN EXPLICIT NOUN, because deriving one from `closeFirstHint` did not
+   * work and could not. It used to be `closeFirstHint.split(" ")[0]`, which
+   * assumes the hint is a phrase whose FIRST WORD is the noun — true of Kova's
+   * "Studio settings → Danger zone" by luck, and false of both the others:
+   * Tessa passed "Danger zone" and shipped **"Close your danger first"**, Scena
+   * passed "the workspace settings" and got **"Close your the first"**. Two of
+   * three wrong, and the one that worked did so by accident.
+   *
+   * The two facts were never the same fact. This one is a NOUN; the hint below
+   * is a PLACE. Splitting them is also what makes the sentence translatable —
+   * Tessa's noun comes out of its dictionary.
+   */
+  noun?: string;
   /** Where an owner has to go first — "Studio settings → Danger zone". */
   closeFirstHint?: string;
   onSignOut: () => void | Promise<void>;
@@ -255,11 +271,13 @@ export interface AccountExitRowsProps {
  * Contrast `CloseTenantCard`, which IS a card: it is the only thing on its own
  * danger-zone page, and it has a second resting state to report.
  */
-export function AccountExitRows({ email, ownsTenant = false, closeFirstHint, onSignOut, onDeleted, header = "Account" }: AccountExitRowsProps) {
+export function AccountExitRows({ email, ownsTenant = false, noun = "workspace", closeFirstHint, onSignOut, onDeleted, header = "Account" }: AccountExitRowsProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  /** "Close your studio first" — one sentence, three places, one noun. */
+  const closeFirst = `Close your ${noun} first`;
   const blocked = ownsTenant
     ? `You own one — close it first${closeFirstHint ? ` in ${closeFirstHint}` : ""}.`
     : null;
@@ -267,7 +285,7 @@ export function AccountExitRows({ email, ownsTenant = false, closeFirstHint, onS
   const sendCode = async (): Promise<boolean> => {
     setBusy(true); setErr(null);
     try { await api.post("/api/me/delete/request-otp"); return true; }
-    catch (e) { setErr(statusOf(e) === 409 ? (blocked ?? "Close your workspace first.") : "Couldn't send the code. Try again."); return false; }
+    catch (e) { setErr(statusOf(e) === 409 ? (blocked ?? `${closeFirst}.`) : "Couldn't send the code. Try again."); return false; }
     finally { setBusy(false); }
   };
   const confirm = async (code: string) => {
@@ -275,7 +293,7 @@ export function AccountExitRows({ email, ownsTenant = false, closeFirstHint, onS
     try { await api.post("/api/me/delete", { code }); await onDeleted(); }
     catch (e) {
       const s = statusOf(e);
-      setErr(s === 403 ? "That code is wrong or has expired." : s === 409 ? (blocked ?? "Close your workspace first.") : "Couldn't delete your account. Try again.");
+      setErr(s === 403 ? "That code is wrong or has expired." : s === 409 ? (blocked ?? `${closeFirst}.`) : "Couldn't delete your account. Try again.");
       setBusy(false);
     }
   };
@@ -292,7 +310,7 @@ export function AccountExitRows({ email, ownsTenant = false, closeFirstHint, onS
               icon: Trash2,
               label: "Delete my account",
               destructive: true,
-              sub: ownsTenant ? (closeFirstHint ? `Close your ${closeFirstHint.split(" ")[0]?.toLowerCase() ?? "workspace"} first` : "Close your workspace first") : "Erases everything, permanently",
+              sub: ownsTenant ? closeFirst : "Erases everything, permanently",
               disabled: ownsTenant,
               onClick: () => { setErr(null); setOpen(true); },
             },
