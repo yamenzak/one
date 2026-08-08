@@ -24,9 +24,10 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { MotionConfig } from "motion/react";
 import { Screen, Spinner, Toaster } from "@4dl/ui";
-import { ErrorBoundary, ThemeProvider } from "@4dl/app-kit";
+import { ErrorBoundary } from "@4dl/app-kit";
 import "./styles.css";
 import { SessionProvider, useSession } from "./session.js";
+import { ThemeProvider } from "./theme.js";
 import { I18nProvider } from "./i18n.js";
 import { Shell } from "./Shell.js";
 import { Login } from "./screens/Login.js";
@@ -149,7 +150,7 @@ createRoot(document.getElementById("root")!).render(
     <MotionConfig reducedMotion="user">
       <BrowserRouter>
         <SessionProvider>
-          <ThemeProvider branding={null}>
+          <ThemeProvider>
             {/* Inside the session so a future per-centre default locale can read
                 it, and outside the app so every screen has `t` from first paint
                 — a screen that renders once in English and then swaps is worse

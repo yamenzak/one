@@ -11,6 +11,7 @@
  */
 
 import { appStorage, createSession } from "@4dl/app-kit";
+import type { Branding } from "@4dl/ui";
 
 /** What `/api/context` sends. Kept in step with `context-routes.ts` by hand —
  *  there is no shared protocol package for Tessa yet. */
@@ -39,7 +40,20 @@ export interface TessaContext {
   workspaces: Workspace[];
   active: ActiveWorkspace | null;
   isPlatformAdmin: boolean;
-  branding: { name?: string; logoUrl?: string; iconUrl?: string } | null;
+  /**
+   * The centre's brand, as `@4dl/ui` understands it — the SAME type the theme
+   * applies, on purpose.
+   *
+   * This was declared as `{ name?, logoUrl?, iconUrl? }`, which is a third
+   * shape: the server sends whatever is in `tenant_settings.branding_json`
+   * (`primary`, `logoUrl`, `headline`, `subtext`), `host-context.ts` narrows it
+   * to `{ primary?, logoUrl? }`, and the client called it something else again.
+   * Three disagreeing descriptions of one blob, none of them checked against
+   * the consumer — which is how `<ThemeProvider branding={null}>` sat in
+   * `main.tsx` for the life of the app without anything noticing that the value
+   * it discarded was the one the settings screen exists to produce.
+   */
+  branding: Branding | null;
 }
 
 /**

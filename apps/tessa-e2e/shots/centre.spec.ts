@@ -28,7 +28,7 @@
 
 import { test } from "@playwright/test";
 import { shoot, visit } from "../src/shoot.js";
-import { createCentre, newParty, signIn, uniqueEmail } from "../src/app.js";
+import { api, createCentre, newParty, signIn, uniqueEmail } from "../src/app.js";
 import { centreUrl } from "../src/env.js";
 
 const CENTRE = "Praxis Nord";
@@ -76,6 +76,37 @@ test("the centre", async ({ browser }, info) => {
   await test.step("settings", async () => {
     await visit(page, `${base}/settings`);
     await shoot(page, project, "settings", { settle: 600 });
+  });
+
+  /*
+    THE CENTRE'S OWN COLOUR, applied — and this step exists because it was not.
+
+    `main.tsx` mounted `<ThemeProvider branding={null}>`, so the accent a centre
+    picks in Settings → Look and feel was stored, cached, shipped to the browser
+    and then discarded. The form saved and nothing changed. Every layer had a
+    test and every layer passed; the defect lived in the one argument nobody
+    asserted on, which is exactly the class of bug a photograph catches and a
+    diff does not.
+
+    So the sweep now SETS a brand colour through the real settings route and
+    photographs the app wearing it. A regression here is a picture in Tessa's
+    green where the picture should be violet — visible at a glance, in the
+    review, without reading a line of code.
+  */
+  await test.step("a branded centre", async () => {
+    /*
+      Through the page, not `context.request`: the driver process does its own
+      DNS and cannot see this suite's `.localhost` resolver (`api` in src/app.ts
+      says so at length). It also THROWS on a refusal rather than swallowing it
+      — a seed that failed quietly would produce a perfectly plausible
+      photograph of the unbranded app filed under the id that promises
+      otherwise, which is the trap this file's own header describes.
+    */
+    await visit(page, `${base}/`, shell);
+    await api(page, "PATCH", "/api/settings", { branding: { primary: "#7c5cff" } });
+    await page.reload();
+    await visit(page, `${base}/`, shell);
+    await shoot(page, project, "branded", { settle: 700 });
   });
 
   await context.close();

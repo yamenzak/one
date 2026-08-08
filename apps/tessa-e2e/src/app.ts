@@ -90,7 +90,7 @@ export async function createCentre(context: BrowserContext, page: Page, name = "
  * UI is chosen deliberately and stated in its own comments; everything else is
  * arranged through the same HTTP surface the UI uses, with the same cookie.
  */
-export async function api<T>(page: Page, method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+export async function api<T>(page: Page, method: "GET" | "POST" | "PATCH", path: string, body?: unknown): Promise<T> {
   /**
    * Run the fetch INSIDE the page, not through `page.request`.
    *
