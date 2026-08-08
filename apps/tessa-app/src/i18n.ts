@@ -32,9 +32,29 @@ export const en = {
   // ── Doors and identity ───────────────────────────────────────────────────
   "app.name": "Tessa",
   "app.tagline": "Scan it, count it, prove it. Sterile-supply and consumable traceability for medical centres.",
+  /*
+    THE DOOR SCREENS, which are `@4dl/app-kit`'s now.
+    Tessa's were three centred `<div>`s with no address, no list of the centres
+    you belong to and no way out of a stale service worker. The shared ones have
+    all three; these strings are what makes them Tessa's, in both languages.
+  */
   "door.root.hint": "Your centre has its own address. Open the link your centre gave you.",
+  "door.root.signedInAt": "You're signed in at",
+  "door.root.arrivedAt": "You've arrived at",
+  "door.root.pickOne": "Pick a centre to continue",
+  "door.root.yourCentre": "Your centre",
+  "door.root.yourCentres": "Your centres",
+  "door.root.signInWorks": "Your sign-in works across all of them.",
+  "door.root.joining": "Joining a centre?",
+  "door.root.joiningSub": "Use the link your centre sent you",
+  "door.root.create": "Set up a centre",
+  "door.root.startAnother": "Set up another centre",
+  "door.none.at": "No centre at",
+  "door.none.check": "Check the link you were sent",
   "door.none.title": "Nothing here",
   "door.none.body": "No centre uses this address. Check the link — a mistyped subdomain looks exactly like this.",
+  "door.none.moved": "Changed your address?",
+  "door.none.movedSub": "The old one stops working straight away",
   "door.wrong.title": "Wrong address",
   "door.wrong.body": "This isn't a Tessa address.",
 
@@ -436,8 +456,22 @@ export const de: Translation<TessaDict> = {
   "app.name": "Tessa",
   "app.tagline": "Scannen, zählen, nachweisen. Rückverfolgbarkeit für Sterilgut und Verbrauchsmaterial.",
   "door.root.hint": "Ihr Zentrum hat eine eigene Adresse. Öffnen Sie den Link, den Ihr Zentrum Ihnen gegeben hat.",
+  "door.root.signedInAt": "Sie sind angemeldet bei",
+  "door.root.arrivedAt": "Sie sind hier gelandet:",
+  "door.root.pickOne": "Wählen Sie ein Zentrum",
+  "door.root.yourCentre": "Ihr Zentrum",
+  "door.root.yourCentres": "Ihre Zentren",
+  "door.root.signInWorks": "Ihre Anmeldung gilt für alle.",
+  "door.root.joining": "Einem Zentrum beitreten?",
+  "door.root.joiningSub": "Nutzen Sie den Link, den Ihr Zentrum Ihnen gesendet hat",
+  "door.root.create": "Zentrum einrichten",
+  "door.root.startAnother": "Weiteres Zentrum einrichten",
+  "door.none.at": "Kein Zentrum unter",
+  "door.none.check": "Prüfen Sie den Link, den Sie erhalten haben",
   "door.none.title": "Nichts hier",
   "door.none.body": "Kein Zentrum nutzt diese Adresse. Prüfen Sie den Link — eine vertippte Subdomain sieht genau so aus.",
+  "door.none.moved": "Adresse geändert?",
+  "door.none.movedSub": "Die alte funktioniert sofort nicht mehr",
   "door.wrong.title": "Falsche Adresse",
   "door.wrong.body": "Das ist keine Tessa-Adresse.",
 

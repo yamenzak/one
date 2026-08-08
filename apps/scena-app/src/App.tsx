@@ -4,6 +4,7 @@ import { Siren, LogOut, Sun, Moon, Scale, Layers, Music, Tv, Rss, Megaphone } fr
 import { ScenaMascot } from "./brand.js";
 import { adminUrl, ErrorBoundary } from "@4dl/app-kit";
 import { bootBrand, useHost } from "./host.js";
+import { ScenaNoWorkspace, ScenaRootSignpost, ScenaWrongDoor } from "./pages/Doors.js";
 import { AdminDoor } from "./pages/AdminDoor.js";
 import { CollectionPane } from "./components/collection-pane.js";
 import { Shell } from "./Shell.js";
@@ -76,11 +77,22 @@ export function App() {
   const [brand, setBrand] = useState<WorkspaceBrand | null>(bootBrand?.branding ?? null);
   const reloadMe = () => getMe().then(setMe).catch(() => setMe(null)).finally(() => setMeLoaded(true));
 
-  // Poll the active override so the header reflects a fleet-wide takeover. A rare
-  // event, so poll lazily — and never while the tab is hidden (refetch on focus).
+  /*
+    Poll the active override so the header reflects a fleet-wide takeover. A rare
+    event, so poll lazily — and never while the tab is hidden (refetch on focus).
+
+    ⚠️ GATED ON THE DOOR HAVING A WORKSPACE, because this is a workspace-scoped
+    route. Ungated it fired on the root and the operator console too, where the
+    guard correctly refuses it — a 404 every thirty seconds, on a door that
+    renders a signpost. It was the last of the four calls that made the root look
+    like a broken app; the other three stopped once `@4dl/auth` stopped lending
+    the session's organization to a door with no tenant of its own.
+  */
+  const inWorkspace = Boolean(host?.tenant);
   useEffect(() => {
+    if (!inWorkspace) return;
     return pollWhileVisible(() => getActiveEmergency().then(setEmergency).catch(() => {}), 30000);
-  }, []);
+  }, [inWorkspace]);
 
   // Identity (auth + role + admin gate) + billing state (for the sidebar card).
   useEffect(() => {
@@ -204,11 +216,67 @@ export function App() {
   */
   const body = (): ReactNode => {
   if (!host) return <Splash />;
-  if (host.role === "admin") {
-    if (!meLoaded) return <Splash />;
-    if (!me?.authenticated) return <LoginScreen onDone={reloadMe} />;
-    return <AdminDoor isAdmin={Boolean(me.isAdmin)} />;
-  }
+
+  /*
+    ⚠️ THE DOOR DECIDES WHETHER THE APP MOUNTS AT ALL, AND IT DID NOT.
+
+    This handled `admin` and then fell through to the workspace Shell for every
+    other role. On `scena.4dl.app` — the ROOT, a signpost that is nobody's
+    workspace — the entire app therefore mounted: `/api/me` answers on the root
+    door and reports the session's ACTIVE ORGANIZATION as `tenantId`, so the
+    Shell believed it had a tenancy. The route guard, correctly, answers six
+    paths on the root and refuses the rest, so every screen drew and then
+    `/api/channels`, `/api/billing`, `/api/branding` and `/api/emergency/active`
+    all 404'd. A whole app, signed in, in which nothing worked.
+
+    The session's active org is a fact about the PERSON; the door is a fact about
+    the ADDRESS. On the root they disagree, and the address is the one the server
+    enforces — so the address decides.
+
+    EXHAUSTIVE, with no `default`: `DoorRole` is a closed union, so a door added
+    later fails to compile here instead of silently falling through to the Shell,
+    which is precisely how this happened.
+  */
+  const doorScreen = ((): ReactNode | null => {
+    switch (host.role) {
+      case "root":
+        return <ScenaRootSignpost host={host} />;
+      /*
+        `play.` is a DEVICE door — a screen's pinned origin, served by a different
+        worker entirely. A browser that lands here typed it by hand and there is
+        no dashboard behind it, so it gets the same nothing as a reserved label.
+      */
+      case "device":
+      case "invalid":
+        return <ScenaWrongDoor />;
+      case "admin":
+        if (!meLoaded) return <Splash />;
+        if (!me?.authenticated) return <LoginScreen onDone={reloadMe} />;
+        return <AdminDoor isAdmin={Boolean(me.isAdmin)} />;
+      case "tenant":
+      case "custom":
+        // A well-formed workspace address that no workspace owns. NOT a login: a
+        // sign-in form here invites somebody into a place that does not exist.
+        return host.tenant ? null : <ScenaNoWorkspace host={host} />;
+      case "setup":
+        // The create-a-workspace lane. Falls through to the auth gate below.
+        return null;
+      default: {
+        /*
+          ⚠️ THIS IS WHAT MAKES THE CASCADE EXHAUSTIVE, and a `switch` with
+          `break`s would NOT have been — TypeScript only demands every case when
+          every branch returns. Assigning the role to `never` is the check: add a
+          door to `HostRole` and this file stops compiling, instead of quietly
+          falling through to the workspace Shell on the new door. That fall-through
+          is the whole bug, so the guard has to be a compile error rather than a
+          comment asking the next person to remember.
+        */
+        const unanswered: never = host.role;
+        return unanswered;
+      }
+    }
+  })();
+  if (doorScreen) return doorScreen;
 
   // Auth gate: not-loaded → spinner, unauthenticated → login, no active org →
   // onboarding, else the operator app.

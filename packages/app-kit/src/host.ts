@@ -16,7 +16,22 @@
 
 import type { HostGate, Maintenance } from "@4dl/tenancy/model";
 
-export type HostRole = "root" | "setup" | "admin" | "tenant" | "custom" | "invalid";
+/**
+ * Every door `@4dl/tenancy` can classify a hostname into — the SAME union the
+ * server sends on `/api/host`, which is why it is stated once, here.
+ *
+ * ⚠️ `device` is the sixth, and leaving it out was a real gap. It is opt-in per
+ * app (`@4dl/tenancy`'s `DEFAULT_DEVICE_LABEL`, `play.` — Scena's screens), so
+ * this type omitted it and Scena declared its own six-member copy WITHOUT
+ * `invalid` instead. Two unions, each missing a different member, and an
+ * `switch` written against either one is exhaustive over a shape the server does
+ * not have. That is not hypothetical: Scena's cascade fell through to the
+ * workspace Shell for every role it did not name, which is how the root door
+ * came to render the whole app with every data call 404ing.
+ *
+ * An app that does not declare the device door simply never receives that role.
+ */
+export type HostRole = "root" | "setup" | "admin" | "device" | "tenant" | "custom" | "invalid";
 
 /**
  * The tenant behind a door, as far as the BROWSER needs to know it.

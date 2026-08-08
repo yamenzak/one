@@ -87,6 +87,19 @@ export const APP_RESERVED_LABELS: ReadonlySet<string> = new Set([
   // Scena's own vocabulary, which a workspace at that address would shadow.
   "screen", "screens", "player", "players", "display", "displays", "signage",
   "board", "boards", "kiosk", "kiosks", "station", "stations", "channel", "channels",
+  /*
+    `tv` is the one a person actually types.
+
+    The player BUNDLE is served at `tv.4dl.app` — a label on the zone apex, not
+    under this root, so a workspace at `tv.<root>` collides with nothing
+    technically. It is reserved because of what it would look like: the address a
+    screen is pointed at and the address a workspace is served at differing only
+    by which domain they sit under is a support call waiting to happen, and
+    somebody typing `tv.` expecting a player would get somebody's dashboard.
+    `cast` and `wall` for the same reason — both are words a signage operator
+    reaches for, and neither is a name a workspace needs.
+  */
+  "tv", "cast", "wall",
 ]);
 
 /**

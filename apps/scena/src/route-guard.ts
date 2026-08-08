@@ -211,6 +211,14 @@ const allowedOnRoot = (path: string): boolean =>
   path === "/health" ||
   path.startsWith("/api/auth/") ||
   path === "/api/me" ||
+  /*
+    The signpost's list. The root is not a workspace, so the one useful thing it
+    can do for a signed-in visitor is hand them theirs — without this it is a
+    dead end for exactly the people who have somewhere to be, and the installed
+    PWA's `start_url` is `/`. Scoped to the caller's OWN memberships and empty
+    for a visitor with no session.
+  */
+  path === "/api/me/workspaces" ||
   path === "/api/org/resolve" ||
   path === "/api/stripe/webhook";
 
@@ -227,6 +235,23 @@ const allowedOnRoot = (path: string): boolean =>
  * here" instead of a sign-in form on an unclaimed subdomain.
  */
 const allowedWithoutTenant = (path: string): boolean => path === "/api/host";
+
+/**
+ * PERSONAL surfaces — they belong to the PERSON, not to a workspace, so they
+ * answer for any signed-in caller before (or without) a tenancy.
+ *
+ * ⚠️ Scena declared none, and it got away with it only because the tenancy was
+ * being BORROWED. `@4dl/auth` used to fall back to the session's active
+ * organization on any door with no tenant of its own, so on the root every
+ * caller looked tenanted and the tenant gate below never fired. Closing that
+ * fallback (it is what made `scena.4dl.app` render a whole workspace app that
+ * 404'd on every call) left the genuinely personal routes refused with a 401.
+ *
+ * `/api/me/*` is the whole set today: the signpost's workspace list, and the
+ * account-erasure lane. Neither has a workspace to be scoped to — that is what
+ * makes them personal rather than an exception.
+ */
+const isPersonal = (path: string): boolean => path === "/api/me" || path.startsWith("/api/me/");
 
 /**
  * Writes that must survive a lapsed workspace.
@@ -280,6 +305,7 @@ export const routeGuard: MiddlewareHandler<AuthEnv<Env, Auth, Branding>> = build
   allowedOnRoot,
   allowedWithoutTenant,
   allowedWhileReadOnly,
+  isPersonal,
   maintenanceExempt,
   isPlatformAdmin: (c) => isPlatformAdmin(c as unknown as AppContext),
   /*

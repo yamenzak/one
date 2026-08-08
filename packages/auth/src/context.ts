@@ -122,7 +122,34 @@ export function sessionMiddleware<E extends object, A, B>(cfg: SessionConfig<E, 
         const u = s.user;
         c.set("user", { id: u.id, email: u.email, name: u.name, image: u.image });
         const sessionOrg = (s.session as { activeOrganizationId?: string } | undefined)?.activeOrganizationId ?? null;
-        const orgId = host.tenant ? host.tenant.tenantId : sessionOrg;
+        /*
+          ⚠️ THE SESSION'S ACTIVE ORG ONLY STANDS IN WHERE A TENANCY IS USABLE.
+
+          This was `host.tenant ? host.tenant.tenantId : sessionOrg` — the
+          session's org on EVERY door without one. Two of those doors cannot
+          honour a tenancy at all, and the result was a request that reported a
+          workspace no route would accept:
+
+            ROOT      `/api/me` answered with the caller's active org, so Scena's
+                      SPA mounted its whole workspace app on `scena.4dl.app` and
+                      then 404'd on `/api/channels`, `/api/billing`,
+                      `/api/branding` and `/api/emergency/active`. Reported from
+                      production as "the whole app is 404".
+            DEVICE    a screen's pinned origin. Its tenant arrives from the
+                      pairing claim; a browser session's org is not it.
+
+          And one door where it is worse than useless: a `tenant` or `custom`
+          hostname that NO workspace owns. There the fallback handed a signed-in
+          visitor their OWN workspace's tenancy on somebody else's unclaimed
+          address — the app would render as if that slug were theirs.
+
+          `setup` and `admin` keep it, and they are the reason it exists: the
+          wizard creates an organization and immediately needs it active, and an
+          operator acts on a tenant no hostname names. Everywhere else the DOOR
+          is the tenancy, and a door with no tenant has none.
+        */
+        const doorMayBorrowSession = host.shape.role === "setup" || host.shape.role === "admin";
+        const orgId = host.tenant ? host.tenant.tenantId : doorMayBorrowSession ? sessionOrg : null;
         if (orgId) {
           const row = await cfg
             .db(env)

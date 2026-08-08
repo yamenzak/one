@@ -15,15 +15,23 @@
  */
 
 import { useEffect, useState } from "react";
-import { appStorage, readBootBrand, writeBootBrand } from "@4dl/app-kit";
+import { appStorage, readBootBrand, writeBootBrand, type HostRole } from "@4dl/app-kit";
 import { API_BASE } from "./api.js";
 import { applyBrandTheme, type WorkspaceBrand } from "./brand-theme.js";
 
-/** The five doors `@4dl/tenancy` classifies into, plus the device door. */
-export type DoorRole = "root" | "setup" | "admin" | "device" | "tenant" | "custom";
+/**
+ * The doors, from `@4dl/app-kit` — NOT restated here.
+ *
+ * ⚠️ This was a local six-member union that omitted `invalid` while the kit's
+ * omitted `device`, so each was exhaustive over a shape the server does not
+ * send. A `switch` over the wrong union is the bug that made `scena.4dl.app`
+ * render the whole app: the cascade named the roles it knew and fell through for
+ * the rest. One union, one source, and `App.tsx`'s switch can be trusted.
+ */
+export type { HostRole as DoorRole };
 
 export interface HostInfo {
-  role: DoorRole;
+  role: HostRole;
   rootDomain: string;
   setupUrl: string;
   tenant: { tenantId: string; name: string; slug: string; branding?: WorkspaceBrand | null } | null;

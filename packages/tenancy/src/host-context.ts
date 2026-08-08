@@ -200,6 +200,40 @@ export async function resolveSlugTenant<B = unknown>(db: D1Database, slug: strin
   return resolveTenantDoor<B>(db, { slug });
 }
 
+/**
+ * Every tenant this PERSON belongs to — the signpost's whole reason to exist.
+ *
+ * The root door is not anybody's workspace, but the session cookie covers the
+ * whole root, so a signed-in visitor who guessed the address (or opened the
+ * installed PWA, whose `start_url` is `/`) can be handed their workspaces
+ * instead of a dead end. That turns the root from a 404 into the one page that
+ * always knows where you belong.
+ *
+ * Here rather than in `@4dl/auth` because it is the same `organization` ⋈
+ * `tenant_settings` join every other lookup in this file makes, and it has to
+ * return BRANDING — a mark and a name, so the list reads as places rather than
+ * as slugs. Auth owns who you are; tenancy owns which addresses that entitles
+ * you to.
+ *
+ * Ordered by name so the list is stable between renders. An app that wants more
+ * per row (Kova attaches a client record and an avatar) joins its own tables on
+ * top of this rather than reimplementing the join.
+ */
+export async function listUserTenants<B = unknown>(db: D1Database, userId: string): Promise<HostTenant<B>[]> {
+  if (!userId) return [];
+  const rows = await db
+    .prepare(
+      `SELECT ${TENANT_COLS} FROM "member" m ` +
+        'JOIN "organization" o ON o.id = m.organizationId ' +
+        "LEFT JOIN tenant_settings ts ON ts.tenant_id = o.id " +
+        "WHERE m.userId = ? ORDER BY o.name",
+    )
+    .bind(userId)
+    .all<TenantRow>()
+    .catch(() => ({ results: [] as TenantRow[] }));
+  return (rows.results ?? []).map((r) => toHostTenant<B>(r));
+}
+
 /** Resolve the tenant that has ACTIVATED this custom hostname. Only `active` rows
  *  route: a pending or errored domain must not take over serving. */
 async function resolveCustomDomainTenant<B>(db: D1Database, hostname: string): Promise<HostTenant<B> | null> {

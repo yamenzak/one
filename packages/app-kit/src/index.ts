@@ -10,6 +10,7 @@ export * from "./passkey.js";
 export * from "./install.js";
 export { PasskeysCard, type PasskeysCardProps } from "./PasskeysCard.js";
 export { CloseTenantCard, AccountExitRows, type CloseTenantCardProps, type AccountExitRowsProps } from "./ExitCards.js";
+export { RootSignpost, NoTenant, WrongDoor, type RootSignpostProps, type NoTenantProps, type DoorDestination } from "./Doors.js";
 export * from "./stripe.js";
 export * from "./hard-refresh.js";
 export * from "./RefreshNote.js";

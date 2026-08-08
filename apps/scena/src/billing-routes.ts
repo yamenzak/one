@@ -26,6 +26,8 @@ import {
   type AiMockMode,
 } from "@4dl/ai";
 import { nowIso } from "@4dl/core";
+import { listUserTenants } from "@4dl/tenancy";
+import type { Branding as WorkspaceBranding } from "./branding-store.js";
 import { storageUsage } from "./storage.js";
 import { DEMO_TENANT } from "./db.js";
 import {
@@ -181,6 +183,40 @@ export function registerBilling(app: App): void {
       // The caller's effective permission grant — the client mirrors it in useCan.
       permissions: c.get("perms"),
       authenticated: Boolean(user),
+    });
+  });
+
+  /**
+   * EVERY WORKSPACE THIS PERSON BELONGS TO — the signpost's list.
+   *
+   * Answers on the ROOT door, which is the only place it matters: the root is
+   * not anybody's workspace, so the one useful thing it can do for a signed-in
+   * visitor is hand them theirs. Without this the root is a dead end for exactly
+   * the people who have somewhere to be — and the installed PWA's `start_url` is
+   * `/`, so that is not a rare arrival.
+   *
+   * Separate from `/api/me` rather than folded into it, because `/api/me` runs on
+   * every door on every boot and this is a two-table join that only one screen
+   * reads.
+   *
+   * Safe on the root: it is scoped to the CALLER's own memberships, returns only
+   * what the signpost draws (name, address, mark), and a visitor with no session
+   * gets an empty list rather than a 401 — there is nothing here to refuse.
+   */
+  app.get("/api/me/workspaces", async (c) => {
+    const user = c.get("user");
+    if (!user) return c.json({ workspaces: [] });
+    const mine = await listUserTenants<WorkspaceBranding>(c.env.DB, user.id);
+    return c.json({
+      workspaces: mine.map((t) => ({
+        tenantId: t.tenantId,
+        tenantName: t.name,
+        tenantSlug: t.slug,
+        logoUrl: t.branding?.logoUrl ?? null,
+        iconUrl: t.branding?.iconUrl ?? null,
+        logoUrlLight: t.branding?.logoUrlLight ?? null,
+        iconUrlLight: t.branding?.iconUrlLight ?? null,
+      })),
     });
   });
 
