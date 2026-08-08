@@ -170,7 +170,22 @@ export function ScreensPage({ onPair }: { onPair: () => void }) {
   }
 
   return (
-    <div>
+    /*
+      THE FLEET IS A WALL, NOT A DOCUMENT — so it opts out of the 720px column.
+
+      §2's column is for content that is READ, and the reason wider viewports get
+      more columns rather than a wider one. This screen's content is forty live
+      device previews: the whole point is seeing what every screen in the
+      building is showing right now, and at 1440 the cap drew three previews in
+      the middle of the window with 700px of nothing beside them — which is the
+      column being applied to the one destination it does not describe.
+
+      `data-fullbleed` releases the width and NOTHING else (App.tsx's `<main>`),
+      so `Collection`'s grid then multiplies to five columns against its own box.
+      The first-run panel above keeps the column deliberately: `GetStarted` is
+      two choice cards and a three-step explainer, which is prose.
+    */
+    <div data-fullbleed>
       <PageHeader
         title="Screens"
         description={screens ? `${screens.length} device${screens.length === 1 ? "" : "s"} · ${online} online` : "Your paired screens, live."}
@@ -179,7 +194,11 @@ export function ScreensPage({ onPair }: { onPair: () => void }) {
       {/* Four boxed stat cards became one strip — they are a comparison, and on
           a phone four half-empty boxes is not one. `null` while the first poll
           is in flight, never a confident 0. */}
-      <div className="mb-5 rounded-2xl bg-card py-4">
+      {/* `max-w-3xl` because the page is full-bleed and the strip is not:
+          `GlanceStrip` caps itself at 768, so an uncapped plate around it is a
+          1300px card with a 768px strip floating in the middle of it. The plate
+          is the strip's background, so it takes the strip's width. */}
+      <div className="mb-5 max-w-3xl rounded-2xl bg-card py-4">
         <GlanceStrip
           items={[
             { icon: MonitorSpeaker, tone: "neutral", value: screens?.length ?? null, label: "Screens" },

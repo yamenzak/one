@@ -121,7 +121,15 @@ export function GlanceStrip({ items, className }: { items: { icon: LucideIcon; t
     console.warn("GlanceStrip: 1 item. A strip is a comparison — one value is a `Row`. (UI-LANGUAGE §1)");
   }
   return (
-    <motion.div variants={contentIn} className={cn("flex items-stretch divide-x divide-border/50", className)}>
+    /*
+      THE STRIP HAS A CEILING, because a comparison you scan across is not one.
+      Each cell is `flex-1`, so with nothing stopping it the strip takes whatever
+      it is given: Scena's fleet summary went full-bleed and drew four numbers
+      768px apart, which is four separate facts wearing one divider. 768 is where
+      the 720 column already sat, so nothing that ships today moves — this only
+      catches the widths the column used to hide.
+    */
+    <motion.div variants={contentIn} className={cn("mx-auto flex w-full max-w-3xl items-stretch divide-x divide-border/50", className)}>
       {items.map((it, i) => (
         <div key={i} className="flex flex-1 flex-col items-center gap-1.5 px-2 text-center">
           <it.icon className="size-4 shrink-0" style={{ color: toneVar[it.tone] }} />
@@ -138,7 +146,7 @@ export function GlanceStrip({ items, className }: { items: { icon: LucideIcon; t
 /** The same divided strip, the same numeral height, waiting. */
 GlanceStrip.Skeleton = function GlanceStripSkeleton({ count = 3, className }: { count?: number; className?: string }) {
   return (
-    <div className={cn("flex items-stretch divide-x divide-border/50", className)}>
+    <div className={cn("mx-auto flex w-full max-w-3xl items-stretch divide-x divide-border/50", className)}>
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="flex flex-1 flex-col items-center gap-1.5 px-2">
           <SkeletonCircle size={16} />

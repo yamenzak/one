@@ -178,7 +178,18 @@ export function App() {
             which is also why a card can be designed once and be correct at any
             width. A `Shape` in one of its pane arrangements publishes
             `data-shape` and is released from BOTH the width cap and the
-            document's height, because there the panes ARE the layout.
+            document's height, because there the panes ARE the layout. A screen
+            that is a WALL rather than a document — the fleet, where the content
+            is forty live previews — publishes `data-fullbleed` and is released
+            from the width cap alone. Same two escapes Kova's `<main>` offers,
+            and Scena was missing this one.
+
+            THE GUTTER, which this app did not have. `.column` centres and caps
+            but adds no padding — Kova's screens each carry their own `px-4` and
+            Scena's never did, so every phone screenshot showed the title, the
+            search field and the cards running off both edges of the device. One
+            place, not forty. A `Shape` stands down: its panes already pad
+            themselves and the divider between them has to reach the frame.
 
             `--chrome-top` says how far below the viewport top this scroller
             starts (tokens.css); a `Shape` pane resets it to 0, being its own.
@@ -189,7 +200,7 @@ export function App() {
           */}
           <main
             key={pathname}
-            className="@container column [--chrome-top:var(--app-bar-h)] has-[>[data-shape]]:h-[calc(100dvh-var(--app-bar-h))] has-[>[data-shape]]:max-w-none"
+            className="@container column px-4 [--chrome-top:var(--app-bar-h)] has-[>[data-fullbleed]]:max-w-none has-[>[data-shape]]:h-[calc(100dvh-var(--app-bar-h))] has-[>[data-shape]]:max-w-none has-[>[data-shape]]:px-0 md:px-6"
           >
             <Routes>
               <Route path="/" element={<ScreensPage key={refreshKey} onPair={() => setPairOpen(true)} />} />

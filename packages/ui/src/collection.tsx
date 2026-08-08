@@ -41,6 +41,35 @@ import { cn } from "./lib/utils.js";
 export type CollectionView = "list" | "grid";
 
 /**
+ * THE GRID'S COLUMNS — measured against the collection's own box, and they
+ * keep multiplying.
+ *
+ * Two faults in the string this replaces (`grid-cols-2 gap-3 sm:grid-cols-3`),
+ * and the second is the one that shows up in a photograph.
+ *
+ *   IT WAS A VIEWPORT BREAKPOINT. `sm:` asks how wide the WINDOW is, and a
+ *   collection does not always get the window: inside a `Shape`'s 340px list
+ *   pane at a 1440 desktop, `sm:grid-cols-3` is true and three columns are
+ *   113px each. §11 states the rule this breaks — a breakpoint lies inside a
+ *   pane — and container queries are the whole reason `Shape` marks its content
+ *   pane `@container`. This one measures itself, so the same collection is
+ *   honest in a pane, in a column and full-bleed.
+ *
+ *   IT STOPPED AT THREE. "Cards never stretch; columns multiply" (§11) is only
+ *   half-kept by a ceiling: past ~900px the tiles simply grew, so Scena's fleet
+ *   at 1440 drew two device previews the size of a laptop screen and left the
+ *   rest of the row empty. Five columns is where a 56px-thumb card stops
+ *   gaining from more room.
+ *
+ * ⚠️ Tailwind has to SEE these literals, so this is a `const` — not a builder,
+ * not a template string. The three places that render a grid (the items, the
+ * exported skeleton, the internal one) all read it, which is the point: they
+ * were three copies and the skeleton could disagree with the thing it was
+ * standing in for.
+ */
+const GRID = "grid grid-cols-2 gap-3 @md:grid-cols-3 @3xl:grid-cols-4 @5xl:grid-cols-5";
+
+/**
  * Remember which view this collection was last shown in.
  *
  * PER COLLECTION and per device. Two decisions are load-bearing:
@@ -190,7 +219,14 @@ export function Collection<T>({
           labelHidden
           icon={Search}
           type="search"
-          className="min-w-0 flex-1 basis-40"
+          /* `max-w-2xl` is the OTHER end of the same argument as `basis-40`.
+             That one stops the field being crushed; this one stops it being
+             stretched. `flex-1` means "take what is left", and on a full-bleed
+             screen what is left is 1176px — a search box wider than the content
+             it searches, with its filter and view controls exiled to the far
+             right of the window. 672 is above anything the 720 column can hand
+             it, so no collection that ships today moves. */
+          className="min-w-0 max-w-2xl flex-1 basis-40"
           value={query ?? ""}
           placeholder={`Search ${noun}…`}
           onChange={(e) => onQuery?.(e.target.value)}
@@ -203,7 +239,8 @@ export function Collection<T>({
   );
 
   return (
-    <div className={cn("space-y-3", className)}>
+    // `@container` so `GRID` below measures THIS box. See its comment.
+    <div className={cn("@container space-y-3", className)}>
       {header}
       {error ? (
         <LoadError what={noun} error={error} onRetry={onRetry ?? (() => undefined)} />
@@ -251,7 +288,7 @@ export function Collection<T>({
           variants={grid ? contentStagger : rowStagger}
           initial="hidden"
           animate="show"
-          className={grid ? "grid grid-cols-2 gap-3 sm:grid-cols-3" : "overflow-hidden rounded-2xl bg-card"}
+          className={grid ? GRID : "overflow-hidden rounded-2xl bg-card"}
         >
           {items.map((item, i) => (
             <motion.div
@@ -279,7 +316,7 @@ export function Collection<T>({
 Collection.Skeleton = function CollectionSkeleton({ view = "list", rows = 5, thumb, className }: { view?: "list" | "grid"; rows?: number; thumb?: number; className?: string }) {
   if (view === "grid") {
     return (
-      <div className={cn("grid grid-cols-2 gap-3 sm:grid-cols-3", className)}>
+      <div className={cn(GRID, className)}>
         {Array.from({ length: rows }, (_, i) => <SkeletonLine key={i} h="display" className="h-32 rounded-2xl" />)}
       </div>
     );
@@ -324,7 +361,7 @@ export function ViewToggle({ value, onChange, noun }: {
 /** The grid's own loading geometry — tiles, not rows. */
 function GridSkeleton({ tiles = 6 }: { tiles?: number }) {
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <div className={GRID}>
       {Array.from({ length: tiles }).map((_, i) => (
         <div key={i} className="space-y-2.5 rounded-2xl bg-card p-3">
           {/* The tile's own geometry: the image square, then the two lines
