@@ -42,6 +42,9 @@ const PAGES: [string, string][] = [
   ["/settings?s=brand", "settings · brand"],
   ["/settings?s=playback", "settings · playback"],
   ["/settings?s=ai", "settings · AI"],
+  // The exit reads `/api/tenant/close/status` on mount, which is a route that
+  // did not exist until it did — exactly the shape this audit is for.
+  ["/settings?s=danger", "settings · danger zone"],
 ];
 
 test("no page asks for something that is not there", async ({ browser }) => {

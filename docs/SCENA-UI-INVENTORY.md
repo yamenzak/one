@@ -1023,3 +1023,78 @@ waived: Scena's `Branding` (the workspace's brand record) → `WorkspaceBrand`,
 Tessa's (its public page's look) → `PublicBranding`. Neither is the platform's
 `Branding`, which is the theme knobs `applyBranding` consumes — three different
 things wearing one word.
+
+---
+
+## 7g · The brand kit was the last thing speaking Scena's own language
+
+The renames at the end of §7f were the honest answer at the time and they are
+now out of date, deliberately: **Scena's `WorkspaceBrand` IS `@4dl/ui`'s
+`Branding`** — the platform's type, extended by the four fields that are
+genuinely Scena's (`brandName`, `headingFont`, `bodyFont`, `logos`). Three
+different things wearing one word became two, and the remaining pair
+(Tessa's `PublicBranding`, which is a public page's look) really is a different
+thing.
+
+That is the whole of this sub-stage. What made it possible was noticing that the
+player never sees a brand at all — it receives `manifest.theme`, a pre-rendered
+CSS string — so changing how the dashboard STORES a brand cannot reach a
+television. Everything downstream of that is bookkeeping.
+
+### What the app stopped owning
+
+Four sub-pages of brand editor: a palette generator with its own swatches and
+neutral-tint picker, a corner-radius slider, a paste-a-shadcn-theme box, and a
+38-row token grid. Roughly four hundred lines reimplementing, slightly
+differently, the editor Kova and Tessa already shared. "Slightly differently" is
+the cost, and it was itemisable: no elevation preset, no border-weight control,
+no on-colour derivation for a hand-edited fill, and a radius in PIXELS where
+every other app's is in rem.
+
+`brandCss` is gone too. It built the whole stylesheet by hand — the `:root`
+block, the `[data-theme="light"]` block, the radius — which is exactly what
+`applyBranding` does everywhere else, and it is the function that emitted the
+wrong selectors for five sub-stages (§7a). Two implementations of "put the
+tenant's palette on the page" is how one of them comes to be wrong.
+
+### Three defects the move surfaced
+
+- **A font name reached a CSS rule on a television.** `widgetTokens` stripped
+  `"` and `\` only, so a name carrying `;` or `}` closed the declaration and
+  then the block — and `widgetThemeCss` is baked into `manifest.theme` and
+  injected verbatim by the player into a bare document with nothing downstream
+  to catch it. Allowlisted now, in three places, each of which is a different
+  boundary: the store (never in the database), `widgetTokens` (never on a
+  screen), `brandExtrasCss` (never on the dashboard).
+- **`@scena/manifest`'s `THEME_TOKENS` was not a superset of what the shared
+  editor writes.** The server validates against it and drops the rest silently,
+  so `surface-2`, `scrim` and the three `*-soft` tints would have been fields a
+  person fills in, saves, and watches do nothing. The two lists live in packages
+  with no dependency between them, so a test in `apps/scena-app` is the only
+  thing that can notice.
+- **A workspace's `app_config` rows outlived its erasure.** Unrelated to the UI,
+  found by asking where the brand had been living: the tenancy is in the KEY
+  there (`playback.freeRun:<tenantId>`), so the derived cascade has no column to
+  match on.
+
+### And the flash of violet
+
+The kit moved from `app_config` to `tenant_settings.branding_json` — the column
+`@4dl/tenancy` owns and `/api/host` already shipped to the pre-auth client. It
+was shipping `null`, because nothing wrote there. Now the brand arrives with the
+door, before the session, and is remembered against the hostname for the next
+cold start. Every operator had watched the shipped violet for one authenticated
+round trip, on every load, since the app existed.
+
+## 7h · A way out
+
+Not a UI defect, and in this record because it is the same shape as every other
+entry: a surface that stated something and did not do it. `route-guard.ts` said
+paying must be A way out and not the ONLY way out, and exempted billing and auth
+and nothing else — because `/api/tenant/close` did not exist. A suspended
+workspace had every write refused, copy telling it to settle up, and no screen
+anywhere offering the other answer.
+
+Settings has a Danger zone now (`@4dl/app-kit`'s `CloseTenantCard`), and Sign
+out / Delete my account below the index (`AccountExitRows`) — the same ceremony
+and the same three words as Kova and Tessa. SCENA.md §12a has the model.

@@ -724,16 +724,16 @@ handlers are woven through Kova's notification registry, entitlement gates and
 `requireClientAccess`. Only the reconciliation logic moved.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. **Measured 2026-08-07** from one `pnpm test`, per package: **632 kova/api
-(+31 skipped) + 237 kova/domain + 204 scena/api + 146 tessa/api + 107 tenancy +
-99 kova/app + 87 tessa/domain + 78 ui + 75 ai + 63 commerce + 61 scena/widgets +
-45 billing + 45 billing-rail + 44 core + 40 scena/timeline + 35 auth +
-24 notify + 19 scena/manifest + 19 scena/app + 18 scena/protocol + 18 storage +
-17 kova/protocol + 17 template + 17 app-kit + 14 tessa/app + 14 purge +
-9 email + 7 i18n + 6 scena/brand + 4 admin** — **2,201 passing, 31 skipped**,
-57 turbo tasks, all green.
+moves. **Measured 2026-08-08** from `pnpm turbo run test --force`, per package:
+**632 kova/api (+31 skipped) + 237 kova/domain + 223 scena/api + 146 tessa/api +
+133 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 75 ai + 63 commerce +
+61 scena/widgets + 45 billing + 45 billing-rail + 44 core + 40 scena/timeline +
+35 auth + 24 notify + 23 scena/manifest + 21 scena/app + 18 scena/protocol +
+18 storage + 18 app-kit + 17 kova/protocol + 17 template + 14 tessa/app +
+14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,288 passing,
+31 skipped**, all green.
 
-Scena's 407 (204 api + 19 app + 184 across its five pure packages) were never in
+Scena's 429 (223 api + 21 app + 185 across its five pure packages) were never in
 the older figure at all; nor were Tessa's. `@scena/timeline`'s 40 are the ones
 that matter most per line — they prove
 `position(t) = (t − T0) mod cycleLength`, which is the whole product.
@@ -935,8 +935,27 @@ by the size of the fleet. Stage 3 added the `device` door to `@4dl/tenancy` for
 exactly this (`play.` — opt-in per app, because `play` is a slug a Kova studio
 can hold today); the player worker still binds no D1 or R2 of its own.
 
-**Status: Stages 0–9 done.** The E2E gate, the wall spec, the screenshot suite
-and the docs (`SCENA.md`, `apps/scena/DEPLOY.md`, this section) all landed.
+**Status: Stages 0–9 done, plus the two readaptation sweeps below.** The E2E
+gate, the wall spec, the screenshot suite and the docs (`SCENA.md`,
+`apps/scena/DEPLOY.md`, this section) all landed.
+
+**The BRAND KIT is `@4dl/ui`'s `Branding` now** (SCENA.md §13a), in
+`tenant_settings.branding_json` where `@4dl/tenancy` keeps it — so `/api/host`
+carries it to the pre-auth client and there is no flash of shipped violet on a
+cold start. The editor is the shared `BrandingEditor`; Scena passes two extras
+(name & fonts, logo variants) and nothing else. Two seams to know about, both
+silent if broken and both pinned by `apps/scena-app/src/brand-theme.test.ts`:
+`@scena/manifest`'s `THEME_TOKENS` must be a SUPERSET of what the shared editor
+writes (the server drops the rest without a word), and Scena's own CSS lives in
+a SECOND style element because `applyBranding` rewrites its own wholesale on
+every preview keystroke.
+
+**And Scena can be LEFT** (SCENA.md §12a). `/api/tenant/close*` and
+`/api/me/delete*` did not exist while `route-guard.ts` claimed paying was not
+the only way out, so a suspended workspace was in a trap. `closing` is a rung of
+its own — the owner's decision, cancellable for seven days, reversed by
+cancelling rather than by paying — and it shares the sweep's erasure branch with
+`suspended` so the two purge paths cannot drift.
 `SCHEMA_MODULES` in
 `apps/scena/src/db.ts` is the migration's progress bar — six entries now
 (`AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_RAIL_SCHEMA`, `STORAGE_SCHEMA`,

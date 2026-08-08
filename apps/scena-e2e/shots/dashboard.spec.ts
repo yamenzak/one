@@ -241,7 +241,7 @@ test("the operator's workspace", async () => {
     this" is a question the images should be able to answer.
   */
   await test.step("closing the workspace", async () => {
-    await visit(page, `${base}/settings?s=danger`, page.getByRole("main").getByRole("heading", { name: "Close this workspace" }));
+    await visit(page, `${base}/settings?s=danger`, page.getByRole("main").getByRole("heading", { name: "Danger zone" }));
     await shoot(page, project, "settings-danger", { settle: 400 });
   });
 

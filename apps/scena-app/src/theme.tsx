@@ -16,7 +16,21 @@
  */
 import { useEffect, useState, useCallback } from "react";
 
-const KEY = "scena.theme"; // "light" | "dark" | absent = follow system
+/**
+ * Where a person's light/dark choice lives. "light" | "dark" | absent = follow
+ * the system.
+ *
+ * Exported because `brand-theme.ts` hands it to `@4dl/ui`'s `configureTheme` —
+ * Scena does not use the platform's two-state mode helpers (this module has a
+ * third state, "system", which is genuinely richer), but the design system must
+ * not be left holding a DIFFERENT key: two keys for one preference is how a
+ * future `applyMode` call silently resets everyone's choice.
+ *
+ * It is load-bearing beyond that: this is the one thing a preference survives a
+ * sign-out in, so renaming it after launch resets every device.
+ */
+export const THEME_STORAGE_KEY = "scena.theme";
+const KEY = THEME_STORAGE_KEY;
 type Choice = "light" | "dark" | "system";
 
 function systemDark(): boolean {

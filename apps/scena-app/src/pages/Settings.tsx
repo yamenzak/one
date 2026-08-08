@@ -500,12 +500,16 @@ export function WorkspaceSettingsPage() {
         list of what goes — because "your screens go dark" is a sentence only
         this product can write.
       */}
+      {/*
+        ⚠️ The frame is titled "Danger zone", NOT "Close this workspace" — the
+        card carries that heading itself, and a page whose title repeats its only
+        card's title is the four-levels-of-intro problem `SettingsPage` exists to
+        avoid (it was photographed that way once). The row says what is inside,
+        the page says where you are, the card names the act. No description here
+        for the same reason: the card's first paragraph IS the description.
+      */}
       {section === "danger" && (
-        <SectionFrame
-          title="Close this workspace"
-          description="Ends the subscription and erases everything, after a seven-day window in which you can change your mind."
-          onBack={back}
-        >
+        <SectionFrame title="Danger zone" onBack={back}>
           <CloseTenantCard
             noun="workspace"
             erases="every screen, channel, playlist, board, media file and analytics record"

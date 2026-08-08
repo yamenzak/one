@@ -34,6 +34,7 @@
 
 import { applyBranding, configureTheme, type Branding } from "@4dl/ui";
 import { widgetTokens, widgetTokensCss, deriveTokens, THEME_TOKENS, type ThemeMaps } from "@scena/manifest";
+import { THEME_STORAGE_KEY } from "./theme.js";
 
 export { deriveTokens, THEME_TOKENS, type ThemeMaps };
 
@@ -77,13 +78,13 @@ export const EMPTY_BRAND: WorkspaceBrand = {
 /*
   The element `applyBranding` writes and the key the mode preference lives under.
 
-  Both are Scena's, not the design system's, and the storage key is load-bearing:
-  it is the one thing a person's light/dark choice survives a sign-out in, so
-  changing it silently resets everyone's preference. `theme.tsx` reads the same
-  constant — see there for why Scena keeps its own three-state (system) mode
-  module rather than using the platform's two-state one.
+  Both are Scena's, not the design system's, and the storage key is IMPORTED
+  rather than restated — `theme.tsx` owns it. Scena keeps its own three-state
+  (light / dark / follow-system) mode module because the platform's is two-state,
+  but leaving `@4dl/ui` holding a different key is how a future `applyMode` call
+  silently resets everybody's preference.
 */
-configureTheme({ styleId: "scena-brand", storageKey: "scena.theme" });
+configureTheme({ styleId: "scena-brand", storageKey: THEME_STORAGE_KEY });
 
 const EXTRAS_ID = "scena-brand-extras";
 
