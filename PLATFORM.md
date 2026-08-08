@@ -20,7 +20,15 @@ It typechecks and its tests pass in this workspace, so it cannot rot.
 > is the two-app assessment: what is still an app's that should be here, measured
 > rather than guessed, with the commands to re-check every claim. Read it before
 > proposing a new package — most of what looks missing is already listed there,
-> and some of what looks extractable is argued against.
+> and some of what looks extractable is argued against. Everything on it is now
+> closed.
+>
+> **Where the next ADOPTION is.** [docs/PLATFORM-AUDIT.md](docs/PLATFORM-AUDIT.md)
+> is the three-app assessment, and it asks a different question. The two-app
+> audit found *mechanisms with no surface*; with three apps the surfaces exist
+> and are good, and the finding is that **an app simply does not mount one** —
+> which fails nothing, anywhere. Read it before adding an app, and before
+> assuming a shared capability is reaching every product.
 
 
 ## The packages

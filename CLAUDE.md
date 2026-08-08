@@ -750,6 +750,18 @@ new app. The staged extraction plan, the three pre-release audits and the
 billing/notifications/registry design plans are finished work and live in git
 history.
 
+**[docs/PLATFORM-AUDIT.md](docs/PLATFORM-AUDIT.md) is the THREE-APP assessment,
+and it is open work.** `docs/PLATFORM-GAPS.md` was the two-app one and every
+item on it is closed; this is the sequel, and the question changed. That audit
+found *a mechanism with no surface*. This one finds the surface shipped, shared
+and good — and **an app that does not mount it**, which fails nothing anywhere.
+Seven instances, the sharpest being that `otpSendGuard` — the one gate in front of
+the emailed sign-in code, carrying the bot check, the per-IP ceiling and the
+deliverability pre-flight — is mounted by Kova and by neither other app. Read it
+before assuming a shared capability reaches every product, and before adding an
+app: `apps/_template` has **no SPA**, which is why every UI divergence in this
+repo happened where it did.
+
 Three things are still Kova's on purpose, and each README says why: `Shell.tsx`
 (role-adaptive nav is a product decision, extraction plan §3.2), the presentation
 halves of `StudioPausedBanner`/`NotificationBell`/`StudioSwitcher`/`FeatureLock`
