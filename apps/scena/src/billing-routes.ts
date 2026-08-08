@@ -12,20 +12,7 @@
 
 import type { Context, Hono } from "hono";
 import type { Env } from "./env.js";
-import {
-  applySharedSelection,
-  disableRetiredModels,
-  fetchPricingDoc,
-  globalMarkup,
-  lanesFor,
-  mockModeSettable,
-  publishSharedCatalog,
-  readSharedCatalog,
-  seedAiModels,
-  syncModelCatalog,
-  type AiMockMode,
-} from "@4dl/ai";
-import { nowIso } from "@4dl/core";
+import { lanesFor, mockModeSettable, type AiMockMode } from "@4dl/ai";
 import { listUserTenants } from "@4dl/tenancy";
 import type { Branding as WorkspaceBranding } from "./branding-store.js";
 import { storageUsage } from "./storage.js";
@@ -41,7 +28,6 @@ import {
   listSubscriptions,
   listPacks,
   listModels,
-  upsertModel,
   defaultModelForTask,
   listLedger,
   tenantEntitlements,
@@ -64,7 +50,7 @@ import { generate, type AiTask } from "./ai.js";
 import { checkActorDailyBudget } from "@4dl/ai";
 import { addSlide } from "./content.js";
 import { grantForTenant, lifecycleSweep, deleteTenantData } from "./billing-service.js";
-import { stripeCfg, stripeEnabled, syncCatalog, subscriptionCheckout, packCheckout, stripePing, handleWebhook, SCENA_METADATA_PREFIX } from "./stripe.js";
+import { stripeCfg, stripeEnabled, subscriptionCheckout, packCheckout, handleWebhook, SCENA_METADATA_PREFIX } from "./stripe.js";
 import { dispatchEvent } from "@4dl/billing-rail";
 import { firstSeen, unmarkSeen } from "@4dl/billing";
 
@@ -143,11 +129,36 @@ async function gatherUsage(env: Env, tenantId = DEMO_TENANT): Promise<Usage> {
  *
  * Refused with a reason rather than dropped, because a silently ignored field
  * is how a config screen comes to lie about the state it displays.
+ *
+ * ── A STRIPE CREDENTIAL HAS ITS OWN DOOR NOW ───────────────────────────────
+ *
+ * This endpoint stores whatever string it is handed. That was the only way to
+ * configure Stripe here, so it accepted a live secret key filed under a `test`
+ * mode, a publishable key in the secret slot, and a signing secret in either —
+ * all saved, none reported, each one a payment path that is dead or dangerous
+ * with nothing on screen saying so.
+ *
+ * `@4dl/billing`'s `stripeAdminRoutes` is the door: it keeps both lanes, checks
+ * every prefix against the slot AND the lane, and refuses a mode whose resulting
+ * active keys belong to the other lane. Leaving this one open beside it would
+ * mean two ways in, one of which has no checks — which is not a fallback, it is
+ * the bug with a longer name.
+ *
+ * The MODE is refused too. It looks harmless and it is the sharpest of the four:
+ * flipping `stripe.mode` here would skip the per-lane catalog swap, leaving every
+ * plan pointing at the outgoing lane's price id and every checkout failing with
+ * "No such price".
  */
+const STRIPE_CREDENTIAL_KEYS = ["stripe.mode", "stripe.secret_key", "stripe.publishable_key", "stripe.webhook_secret"];
+
 export function configWriteRefusal(config: Record<string, string>, isDevelopment: boolean): string | null {
   const mode = config["ai.mock"];
   if (mode !== undefined && !mockModeSettable(mode as AiMockMode, isDevelopment)) {
     return "ai.mock=on is a development-only setting";
+  }
+  const stripeKey = STRIPE_CREDENTIAL_KEYS.find((k) => config[k] !== undefined);
+  if (stripeKey) {
+    return `${stripeKey} is set from the Stripe panel, which validates the key against its lane`;
   }
   return null;
 }
@@ -579,21 +590,19 @@ export function registerBilling(app: App): void {
     }
   });
 
-  app.get("/api/admin/stripe/ping", async (c) => {
-    const deny = await requireAdmin(c);
-    if (deny) return deny;
-    return c.json(await stripePing(c.env));
-  });
+  /*
+    `/admin/stripe/status`, `/admin/stripe/config` and `/admin/stripe/sync` are
+    `@4dl/billing`'s `stripeAdminRoutes`, mounted in `index.ts`.
 
-  app.post("/api/admin/stripe/sync", async (c) => {
-    const deny = await requireAdmin(c);
-    if (deny) return deny;
-    try {
-      return c.json({ ok: true, ...(await syncCatalog(c.env)) });
-    } catch (e) {
-      return c.json({ error: e instanceof Error ? e.message : "sync failed" }, 502);
-    }
-  });
+    Scena had ONLY a `sync`, answering a shape nothing rendered, and no way at
+    all to see or set the keys from the console — its "Stripe" tab wrote
+    `stripe.secret_key` through the generic `/api/admin/config` form, which
+    stores whatever it is handed: a live key filed under a `test` mode, a
+    publishable key in the secret slot, a signing secret in either, all saved
+    without a word. The shared routes refuse each of those at the door, keep
+    both lanes at once so going live is a switch rather than a re-paste, and
+    swap the catalog's per-lane price ids when the switch is pressed.
+  */
 
   /**
    * THE PLAN CATALOG, on `@4dl/admin`'s contract.
@@ -692,95 +701,20 @@ export function registerBilling(app: App): void {
     return c.json({ ok: true, grandfathered, stripeResyncRequired: repriced });
   });
 
-  app.get("/api/admin/models", async (c) => {
-    const deny = await requireAdmin(c);
-    if (deny) return deny;
-    /*
-      THREE THINGS BEFORE THE READ, all of them `@4dl/ai`'s and all idempotent.
+  /*
+    THE AI CATALOG'S ADMIN ROUTES ARE `@4dl/ai`'s NOW — `aiCatalogAdminRoutes`,
+    mounted in index.ts beside the other package route trees.
 
-      `seedAiModels(DB, env)` — WITH the env, unlike `ensureBilling`'s call. That
-      is what lets a fresh deployment arrive with the whole priced catalog the
-      platform has already parsed from the two pricing pages, instead of living
-      on the curated floor until somebody presses Sync.
+    Three handlers lived here over `ai_models`, which became `@4dl/ai`'s table at
+    the AI_SCHEMA migration — so what was left was a second, thinner API over the
+    same rows. Thinner in ways that cost: the shared reader seeds from the
+    PLATFORM's published catalog, applies another app's "apply to every app"
+    broadcast, disables models whose announced shutdown date has passed, and
+    returns each row's price in CREDITS as well as its neuron rate. Its PATCH
+    carries the `allApps` broadcast, which this screen previously could neither
+    send nor receive.
+  */
 
-      `applySharedSelection` — whatever another 4DL app broadcast with "apply to
-      every app" and this one has not seen yet. Applied here so an operator who
-      goes looking sees the effect immediately.
-
-      `disableRetiredModels` — anything whose announced shutdown date came true
-      since the last sync. A console that shows a model as available when the
-      provider has stopped answering is worse than one that shows nothing.
-
-      All three swallow their errors: this is a READ, and none of them failing is
-      a reason an operator cannot see the catalog.
-    */
-    await seedAiModels(c.env.DB, c.env).catch(() => undefined);
-    await applySharedSelection(c.env).catch(() => undefined);
-    await disableRetiredModels(c.env.DB).catch(() => undefined);
-    return c.json({ models: await listModels(c.env.DB) });
-  });
-
-  app.put("/api/admin/models/:id", async (c) => {
-    const deny = await requireAdmin(c);
-    if (deny) return deny;
-    const body = await c.req.json<Record<string, unknown>>().catch(() => ({}));
-    await upsertModel(c.env.DB, { id: c.req.param("id"), ...body });
-    return c.json({ ok: true });
-  });
-
-  /**
-   * RE-SYNC THE CATALOG AGAINST THE PROVIDERS' OWN PRICING PAGES.
-   *
-   * ── What this replaces, twice over ─────────────────────────────────────────
-   *
-   * First it called `resyncModels`, which upserted every row of a hardcoded list
-   * and returned how many rows it touched. An operator pressed "Sync", read
-   * "17 updated", and reasonably concluded the rates had been refreshed from
-   * Cloudflare. Nothing was fetched; the same constants were written back over
-   * themselves, and Scena went on metering real credits against whatever they
-   * said on the day somebody typed them.
-   *
-   * Then it grew a hand-written `syncScenaModelRates` + `syncGeminiFromGoogle`
-   * beside it — ~200 lines reimplementing what `@4dl/ai` already did, because
-   * Scena's `ai_models` keyed differently and could not use the shared syncer.
-   * That is fixed at the schema now, so this is the shared path, and it brings
-   * three things the local pair never had:
-   *
-   *   PUBLISHES  a successful sync writes what it parsed to the shared platform
-   *              store, so a brand-new 4DL app seeds its whole priced catalog on
-   *              first boot instead of living on eleven hardcoded rows.
-   *   FALLS BACK when both pages fail — a doc-format change, a provider having a
-   *              bad day — it applies the LAST published catalog rather than
-   *              reporting total failure and applying nothing.
-   *   RE-ELECTS  a lane whose default was just retired or delisted gets the
-   *              cheapest surviving model in the same pass.
-   *
-   * 502 only when NEITHER provider produced a usable parse AND no shared catalog
-   * could stand in. A one-sided failure did real work and must report it.
-   */
-  app.post("/api/admin/models/resync", async (c) => {
-    const deny = await requireAdmin(c);
-    if (deny) return deny;
-    // The MERGED config: a markup set once for the platform reaches the rows this
-    // sync inserts. It is the default for NEW rows only — an existing row keeps
-    // its own column, which is what the per-model control edits.
-    const cfg = await getConfig(c.env);
-    const markup = globalMarkup(cfg);
-
-    let report = await syncModelCatalog(c.env.DB, { markup, fetchMd: fetchPricingDoc });
-    let published = false;
-    if (report.ok) {
-      published = await publishSharedCatalog(c.env, report.parsedModels, "Scena", nowIso());
-    } else {
-      const shared = await readSharedCatalog(c.env);
-      if (shared) report = await syncModelCatalog(c.env.DB, { markup, fetchMd: fetchPricingDoc, from: shared.models });
-    }
-
-    // `parsedModels` is the input to the publication above, not something an
-    // operator screen has any use for — dropped before serialising.
-    const { parsedModels: _dropped, ...body } = report;
-    return c.json({ ...body, published }, report.ok ? 200 : 502);
-  });
 
   // Licensed music library (§16 ext) — the global, admin-curated catalog.
   app.get("/api/admin/library", async (c) => {

@@ -12,7 +12,7 @@
  */
 
 import type { ConfigSource } from "@4dl/core";
-import { hasPaymentMethod, reverseChargedCredits } from "@4dl/billing";
+import { hasPaymentMethod, resolveStripeConfig, reverseChargedCredits } from "@4dl/billing";
 import type { Env } from "./env.js";
 import { DEMO_TENANT } from "./db.js";
 import {
@@ -50,24 +50,28 @@ export interface StripeCfg {
 }
 
 /**
- * ONE STRIPE ACCOUNT, MANY APPS.
+ * ONE STRIPE ACCOUNT, MANY APPS — and TWO LANES within it.
  *
  * `src` is a `ConfigSource` so this reads the shared store: the account keys and
  * the mode are the platform's, and only `stripe.webhook_secret` is per-endpoint
  * (hence per-app) — which is exactly how `SHARED_CONFIG_KEYS` is drawn.
  *
- * Stage 4 moves this onto `@4dl/billing-rail`, which adds event→app attribution
- * so a webhook for Kova cannot be answered by Scena. Until then the shared keys
- * are the useful half.
+ * ⚠️ **It resolves the LANE, and that is not cosmetic.** This used to read
+ * `stripe.secret_key` — one flat, unscoped key — while the operator console now
+ * writes `stripe.test.*` and `stripe.live.*` through `@4dl/billing`'s
+ * `stripeAdminRoutes`. Left as it was, every key an operator pasted would have
+ * been stored correctly, reported as set by the console, and read by NOTHING:
+ * `stripeEnabled` would answer false, checkout would degrade to "billing
+ * pending", and the screen would say Stripe was not configured while the panel
+ * beside it said it was.
+ *
+ * `resolveStripeConfig` reads the active lane first and falls back to the legacy
+ * unscoped key per credential, so a deployment configured before the lanes
+ * existed keeps working untouched.
  */
 export async function stripeCfg(src: ConfigSource): Promise<StripeCfg> {
-  const cfg = await getConfig(src);
-  return {
-    mode: cfg["stripe.mode"] ?? "disabled",
-    secretKey: cfg["stripe.secret_key"] ?? "",
-    publishableKey: cfg["stripe.publishable_key"] ?? "",
-    webhookSecret: cfg["stripe.webhook_secret"] ?? "",
-  };
+  const { mode, secretKey, publishableKey, webhookSecret } = resolveStripeConfig(await getConfig(src));
+  return { mode, secretKey, publishableKey, webhookSecret };
 }
 
 export function stripeEnabled(cfg: StripeCfg): boolean {
@@ -111,8 +115,18 @@ export interface SyncSummary {
  * plan and a product + one-time price per credit pack, storing their ids back
  * in D1. Idempotent — skips anything that already has a `stripe_price_id`.
  */
-export async function syncCatalog(env: Env): Promise<SyncSummary> {
-  const cfg = await stripeCfg(env);
+export async function syncCatalog(env: Env, secretKey?: string): Promise<SyncSummary> {
+  /*
+    `secretKey` is the seam `@4dl/billing`'s `stripeAdminRoutes` needs.
+
+    The shared route tree has ALREADY resolved the active lane's key — that is
+    the whole of what the two-lane model does — and re-reading it here would
+    resolve it a second time, from a config map that may have been written
+    microseconds earlier in the same request. One resolution, passed down.
+    Every other caller still hands nothing and gets the old behaviour.
+  */
+  const base = await stripeCfg(env);
+  const cfg = secretKey ? { ...base, secretKey } : base;
   if (!stripeEnabled(cfg)) throw new Error("stripe not configured");
   const out: SyncSummary = { plans: [], packs: [] };
 
@@ -463,16 +477,18 @@ function metaOf(obj: Record<string, unknown>): Record<string, unknown> {
   return (obj["metadata"] as Record<string, unknown>) ?? {};
 }
 
-/** Exposed for the admin "test connection" button. */
-export async function stripePing(env: Env): Promise<{ ok: boolean; account?: string; error?: string }> {
-  const cfg = await stripeCfg(env);
-  if (!stripeEnabled(cfg)) return { ok: false, error: "not configured" };
-  try {
-    const acct = await stripeApi<{ id: string }>(cfg, "account", "GET");
-    return { ok: true, account: acct.id };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "failed" };
-  }
-}
+/*
+  `stripePing` — a live `GET /v1/account` behind `/api/admin/stripe/ping` — was
+  DELETED with the console panel that called it, rather than kept.
+
+  It was a good idea with no caller, which is the exact defect
+  `docs/PLATFORM-AUDIT.md` is a catalogue of, and keeping it with a comment
+  explaining its value would have made this file one more instance. The idea is
+  worth having: `status` reports what is STORED and never touches the network, so
+  a key that is present, in the right lane and REVOKED looks identical to a
+  working one in every field it returns. But the place for it is
+  `@4dl/billing`'s `stripeAdminRoutes` with a button in `@4dl/admin`'s panel,
+  where all three apps get it — not here, where none of them did.
+*/
 
 export type { PlanRow };

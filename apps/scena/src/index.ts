@@ -74,6 +74,9 @@ import { emailAdminRoutes } from "@4dl/email/admin-routes";
 import { sharedConfigRoutes } from "@4dl/core/admin-routes";
 import { railAdminRoutes } from "@4dl/billing-rail/admin-routes";
 import { maintenanceAdminRoutes } from "@4dl/tenancy";
+import { aiCatalogAdminRoutes } from "@4dl/ai";
+import { stripeAdminRoutes } from "@4dl/billing";
+import { syncCatalog } from "./stripe.js";
 import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
 // Importing the delivery binding also installs the notification REGISTRY
 // (`notifications.ts` calls `configureNotify` at module scope), so this import
@@ -307,6 +310,74 @@ app.route("/api", railAdminRoutes({
   // `isPlatformAdmin` checks against ADMIN_EMAILS, so it names whoever the
   // allowlist let in.
   operatorRef: (c) => (c as unknown as AppContext).get("user")?.email ?? "operator",
+}) as unknown as Hono<AppEnv>);
+
+/**
+ * THE STRIPE LANE'S OPERATOR ROUTES — `@4dl/billing`'s, and Scena had none.
+ *
+ * `@4dl/admin`'s `PlatformStripeSection` speaks `/admin/stripe/status`,
+ * `/admin/stripe/config` and `/admin/stripe/sync`. Scena answered only the
+ * third, in a shape nothing rendered, so its console configured Stripe through
+ * the GENERIC `/api/admin/config` form — which stores whatever string it is
+ * handed. A live secret key filed under a `test` mode, a publishable key in the
+ * secret slot, a signing secret in either: all saved, none reported, and each
+ * one a payment path that is dead or dangerous in a way no screen said.
+ *
+ * `syncCatalog` and the rebuild are injected because Scena's `plans` and
+ * `credit_packs` are still its own tables — `price_cents` + `currency` +
+ * `interval` where the shared store has `price_usd_month`. That reconciliation
+ * is a data migration; this is a wiring change, and the two are deliberately
+ * not the same commit.
+ */
+app.route("/api", stripeAdminRoutes({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  // Scena's seed is idempotent and runs on every `ensureBilling`, so there is
+  // nothing extra to do before a sync.
+  syncCatalog: async (db, secretKey) => {
+    const out = await syncCatalog({ DB: db } as Env, secretKey);
+    // The shared contract is COUNTS. Scena's returns the rows it touched, and
+    // the panel renders "N plans, M packs".
+    return { plans: out.plans.length, packs: out.packs.length };
+  },
+  /*
+    The rebuild repair, which Scena had no path to at all. An ordinary sync
+    skips any row already holding a `stripe_price_id`, so a row whose Stripe
+    price drifted — edited in the dashboard, deleted by hand, half-written by an
+    interrupted sync — reported "0 synced" while every checkout failed with "No
+    such price". Nulling the ids lets the sync recreate them at the current
+    price; anyone already subscribed keeps their old price until they
+    re-subscribe, which is why the panel puts this behind a confirmation.
+  */
+  clearCatalogIds: async (db) => {
+    const plans = await db
+      .prepare("UPDATE plans SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)")
+      .run();
+    const packs = await db
+      .prepare("UPDATE credit_packs SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)")
+      .run();
+    return { cleared: plans.meta?.changes ?? 0, clearedPacks: packs.meta?.changes ?? 0 };
+  },
+}) as unknown as Hono<AppEnv>);
+
+/**
+ * THE AI CATALOG'S OPERATOR ROUTES — `@4dl/ai`'s, replacing Scena's own.
+ *
+ * `/api/admin/models*` was three hand-written handlers over `ai_models`. The
+ * catalog itself became `@4dl/ai`'s at the AI_SCHEMA migration, so what was left
+ * here was a second, thinner API over the same table — and thinner in ways that
+ * cost: the shared reader seeds from the PLATFORM's published catalog (a fresh
+ * app arrives priced rather than on the twelve-row floor), applies whatever
+ * another 4DL app broadcast with "apply to every app", disables models whose
+ * announced shutdown date has passed, and returns each row's price in CREDITS
+ * beside its neuron rate card. Scena's returned rows.
+ *
+ * The PATCH carries the `allApps` broadcast, which is the whole reason the
+ * shared selection exists and which Scena had no way to send or receive from
+ * this screen.
+ */
+app.route("/api", aiCatalogAdminRoutes({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  appName: "Scena",
 }) as unknown as Hono<AppEnv>);
 
 /**

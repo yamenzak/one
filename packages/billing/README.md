@@ -11,6 +11,7 @@ What the platform charges a tenant, and what that buys them.
 | `dunning.ts` | The ladder: 7 days → read-only, 30 → blocked, 37 → purged. |
 | `store.ts` | The catalog STORE: version-stamped seeding, the plan/pack reads, subscription resolution and the two ceilings. The catalog's *contents* are injected. |
 | `plan-admin-routes.ts` | The plan catalog's OPERATOR routes — read the catalog with its key registry, edit a plan. `@4dl/admin`'s `PlatformPlansSection` is the surface. |
+| `stripe-admin-routes.ts` | The Stripe lane's OPERATOR routes — status, credentials, catalog sync + the price rebuild. `@4dl/admin`'s `PlatformStripeSection` is the surface. The catalog TABLES are the app's, so `syncCatalog` and `clearCatalogIds` are injected. |
 | `schema.ts` | `plans`, `subscriptions`, `credit_packs`, `credit_ledger`, `stripe_events`. |
 
 Two entry points: **`@4dl/billing`** for the worker, **`@4dl/billing/model`** for
@@ -130,11 +131,36 @@ and shows them the finish-setting-up gate. A 500 is visible and retried.
 
 ## What has NOT moved
 
-The **route trees** — `stripe-routes.ts`, `billing-routes.ts`,
-`downgrade-routes.ts` — are still each app's. Their handlers are woven through
-product authorization and the app's notification registry; only the
-reconciliation logic moved (`webhook.ts`, below). See PLATFORM.md's contribution
-rules before moving one.
+The **customer-facing route trees** — checkout, the webhook listener, the
+downgrade flow — are still each app's. Their handlers are woven through product
+authorization and the app's notification registry; only the reconciliation logic
+moved (`webhook.ts`, below). See PLATFORM.md's contribution rules before moving
+one.
+
+The **OPERATOR** routes are a different case and both have now moved
+(`plan-admin-routes.ts`, `stripe-admin-routes.ts`). The test is whether the
+handler reads a product registry. A plan editor and a Stripe credential form
+read neither — they speak `@4dl/admin`'s wire contract, which is identical in
+every app — and leaving them behind is what produced three copies that had
+drifted: one with a mode-flip catalog swap and two without, one with a price
+rebuild and two without, one app with no credential screen at all. What each app
+still supplies is the part a package cannot know: which TABLES hold its catalog.
+
+## Stripe's operator routes, and the one thing they cannot own
+
+`stripeAdminRoutes` owns the credential model whole — two lanes stored at once,
+prefix validation per slot, the refusal of a mode whose active keys belong to the
+other lane, the per-lane catalog swap on a flip. Those are facts about Stripe.
+
+`syncCatalog` and `clearCatalogIds` are injected because the catalog TABLE is the
+app's: `store.ts` reads `price_usd_month`, and Scena's `plans` still reads
+`price_cents` + `currency` + `interval`. Reconciling those is a data migration
+(CLAUDE.md's note on `BILLING_SCHEMA`), so the seam exists to let an app adopt the
+routes years before it adopts the store.
+
+`clearCatalogIds` is **optional, and its absence is a refusal** — a rebuild
+request in an app with no rebuild path answers 400 rather than reporting "0
+rebuilt", which an operator would read as "nothing needed rebuilding".
 
 ## Boundary
 

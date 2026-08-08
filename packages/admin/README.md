@@ -160,9 +160,9 @@ shared package should know how to do.
 
 ## The rule is enforced, not documented
 
-`@4dl/admin/conformance` exports `sharedPanelViolations(srcDir)`, and both apps
-assert it is empty. An app that calls `/api/admin/stripe/…` itself fails its own
-test suite, naming the section it should have used.
+`@4dl/admin/conformance` exports `sharedPanelViolations(srcDir)`, and **all three**
+apps assert it is empty. An app that calls `/api/admin/stripe/…` itself fails its
+own test suite, naming the section it should have used.
 
 This exists because the honour system failed exactly once and that was enough.
 Kova built good surfaces over three shared endpoints; Tessa, facing the same
@@ -170,6 +170,21 @@ three, shipped `<pre>{JSON.stringify(data, null, 2)}</pre>` plus three text boxe
 over one and nothing at all over the other two. Neither app could see the problem
 from the inside — it only became visible with a second app to compare against,
 which is precisely what a conformance test is for.
+
+⚠️ **The two AI entries name the ROUTES, not the prefix**
+(`/api/admin/ai/models`, `/api/admin/ai/config`), and that precision is
+load-bearing. An app may legitimately mount its own routes under the same prefix
+— Kova's `/api/admin/ai/selftest` runs Kova's prompts through Kova's parsers, and
+its `/feedback` reads Kova's own table; both ride into this panel through
+`extraSub` / `extraBelowCatalog`. A blanket prefix entry would flag those two as
+violations, and a checker that cries wolf gets waived.
+
+**The console's endpoints were only half the duplication.** Scena's own AI and
+Stripe panels were the visible half; underneath, three apps each carried their
+own `/admin/stripe/status|config|sync` handlers, and mounting `PlatformStripeSection`
+in Scena was blocked because two of the three did not exist there at all. Those
+route trees are `@4dl/billing`'s `stripeAdminRoutes` now — see that package's
+README, and PLATFORM.md's "An operator route tree is not a product route tree".
 
 **If a shared section is missing something you need, add it to the section.** The
 tempting alternative — one more local copy, just for this app — is how the two

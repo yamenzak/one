@@ -38,7 +38,7 @@ It typechecks and its tests pass in this workspace, so it cannot rot.
 | [`@4dl/core`](packages/core/README.md) | ids, defensive JSON, the **bindings contract**, the **composed schema runner**, `app_config` + the **shared platform-config store**, the boundary checker | its `SchemaModule`s |
 | [`@4dl/tenancy`](packages/tenancy/README.md) | the five doors, host→tenant + KV cache, custom domains (CF for SaaS + DCV), the standing/gate model, the deployment-wide maintenance switch, the tenant-CLOSE routes | root domain, reserved labels, `statusOf`, the close transition |
 | [`@4dl/auth`](packages/auth/README.md) | passwordless identity (OTP + passkeys), the request identity, the **five-gate route guard**, the grant algebra, staff seats + the staff ROUTES, step-up codes + the self-DELETE route | the RBAC registry, the route table, brand, seat quota, the role copy, the invite email, the purge |
-| [`@4dl/billing`](packages/billing/README.md) | the entitlement engine, the catalog STORE (seeding, plan/pack reads, quota + feature gates), credit metering, `CreditLedgerDO`, the Stripe client, the dunning ladder | quota + feature keys, and the catalog's CONTENTS |
+| [`@4dl/billing`](packages/billing/README.md) | the entitlement engine, the catalog STORE (seeding, plan/pack reads, quota + feature gates), credit metering, `CreditLedgerDO`, the Stripe client, the dunning ladder, and the two OPERATOR route trees (plan catalog, Stripe lane) | quota + feature keys, the catalog's CONTENTS, and which tables hold it (`syncCatalog`) |
 | [`@4dl/commerce`](packages/commerce/README.md) | what a tenant sells its own customers: budgets (queue, never sum), the customer-lapse ladder, discount codes | the scope list, the lapse copy |
 | [`@4dl/ai`](packages/ai/README.md) | the metered path: reserve → run → settle, the model catalog, pricing parsers, the dev-only mock lane | the feature registry (prompts), where images go |
 | [`@4dl/storage`](packages/storage/README.md) | R2 + the media ledger + the quota gate + the three media ROUTES (upload, meter, authed read) | the quota resolver, the closed `purpose` set, the scope check |
@@ -217,6 +217,26 @@ At the binding site you will need `c as never` — the seam is structural but Ho
 `Context` is invariant. That cast is the house idiom; threading a type parameter
 through every handler would force each call site to name the app's full env, which
 is the coupling the seam exists to avoid.
+
+### An OPERATOR route tree is not a product route tree
+
+The rule that kept the console's handlers in three apps for too long was "route
+trees are the app's", and it is right about the wrong half. A checkout route
+reads a product registry: what a plan grants, which notification to dispatch, who
+may buy. A **plan editor** and a **Stripe credential form** read neither — they
+speak `@4dl/admin`'s wire contract, which is identical in every app, because
+`@4dl/admin` ships the panel that calls them.
+
+The test: **would two apps' versions of this handler differ for a reason a user
+could name?** If not, one of them is going to be worse, and the drift is silent.
+That is exactly what happened — three copies of `/admin/stripe/*`, one with a
+mode-flip catalog swap and two without (so one app's live switch was a payments
+outage), one with a price rebuild and two without, one app with no credential
+screen at all.
+
+What the app still supplies is which TABLES hold its catalog: `syncCatalog`,
+`seed`, `clearCatalogIds`. That seam is what lets an app adopt the routes long
+before it adopts the store.
 
 ### What must NOT move, and why
 

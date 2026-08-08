@@ -602,7 +602,7 @@ and grants, and `PAGE_META` carries each key's title and subtitle.
 | setup | Sign in (email code) | `apps/scena-app/src/pages/Login.tsx` |
 | setup, signed in | The three-step wizard | `apps/scena-app/src/pages/Onboarding.tsx` |
 | `<slug>`, unclaimed | No workspace at this address | `apps/scena-app/src/pages/Doors.tsx` (`ScenaNoWorkspace`) |
-| admin | The operator console | `apps/scena-app/src/pages/AdminDoor.tsx` → `pages/Admin.tsx` for Scena's own panels, `@4dl/admin`'s `sections/*` for the rest (plans, email, shared config, domains, Turnstile, rail, maintenance) |
+| admin | The operator console | `apps/scena-app/src/pages/AdminDoor.tsx` → `pages/Admin.tsx` for Scena's own five (library, promos, workspaces, Scena settings, danger zone), `@4dl/admin`'s `sections/*` for the other eight (plans, **Stripe**, **AI models**, email, shared config, domains, Turnstile, rail, maintenance) |
 | device (`play.`) | The screen itself | `apps/scena-player/src/main.ts` |
 
 ⚠️ **A workspace is created in exactly one place, and it is not the sign-in
@@ -625,6 +625,24 @@ operator door only since Stage 3 — so in production it drew the whole console 
 404'd on every call, exactly as Kova's did before that route was removed. The
 sidebar's Admin item is a **full page load** to the other origin, because that is
 the console's only address.
+
+⚠️ **Stripe is configured through `@4dl/billing`'s routes now, not through the
+generic config form** — and the difference is a class of silent misconfiguration.
+The old "Stripe & config" tab wrote `stripe.secret_key` through
+`PUT /api/admin/config`, which stores whatever string it is handed: a live secret
+key filed under a `test` mode, a publishable key in the secret slot, a signing
+secret in either. All saved, none reported, each one a payment path that is dead
+or dangerous with nothing on screen saying so. `stripeAdminRoutes` keeps both
+lanes at once (so going live is a switch, not a re-paste), refuses a key whose
+prefix contradicts the lane it is being stored in, refuses a mode whose resulting
+active keys belong to the other lane, and **swaps the catalog's per-lane price
+ids when the mode flips** — without which every plan would keep pointing at the
+outgoing lane's price and every checkout would fail with "No such price".
+
+`syncCatalog` and the price rebuild are still Scena's, injected: `plans` and
+`credit_packs` here are `price_cents` + `currency` + `interval` where the shared
+store is `price_usd_month`, and reconciling that is the `BILLING_SCHEMA` data
+migration, not this wiring change.
 
 ## Token-gated surfaces
 

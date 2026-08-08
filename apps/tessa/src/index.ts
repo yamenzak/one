@@ -46,7 +46,7 @@ import { railAdminRoutes } from "@4dl/billing-rail/admin-routes";
 import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
 import { DUNNING_DAYS, planAdminRoutes } from "@4dl/billing";
 import { periodKey } from "@4dl/core";
-import { billingAdminRoutes, billingRoutes, stripeWebhookRoutes } from "./billing-routes.js";
+import { billingAdminRoutes, billingRoutes, stripeConsoleRoutes, stripeWebhookRoutes } from "./billing-routes.js";
 import { onboardingRoutes } from "./onboarding-routes.js";
 import { aiAdminRoutes, aiRoutes } from "./ai-routes.js";
 import { aiCatalogAdminRoutes, applySharedSelection, disableRetiredModels } from "@4dl/ai";
@@ -233,6 +233,8 @@ app.route("/api", accountRoutes);
 app.route("/api", insightRoutes);
 app.route("/api", aiRoutes);
 app.route("/api", stripeWebhookRoutes);
+// `@4dl/billing`'s Stripe console routes, then Tessa's own operator lane.
+app.route("/api", stripeConsoleRoutes);
 app.route("/api", billingAdminRoutes);
 /**
  * The PLAN CATALOG's operator routes — `@4dl/billing`'s.

@@ -15,30 +15,19 @@ import { z } from "zod";
 import { dispatchEvent } from "@4dl/billing-rail";
 import { resolveEntitlements, trialPeriodDays, buildBudgetsForPurchase, mergeAddOnBalances, type Budget, type AddOnBalance } from "@kova/domain";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
-import { getSubscription, listPacks, listPlans, seedBilling, getConfig, getPlan } from "./billing-store.js";
+import { getSubscription, listPacks, listPlans, seedBilling, getPlan } from "./billing-store.js";
 import { gateFeature } from "./client-flags.js";
 import { requireClientAccess } from "./clients.js";
 import { notify, notifyOwners } from "./notify.js";
 import {
-  credentialLane,
   ensureCustomer,
-  laneForMode,
-  resolveStripeConfig,
   stripeCall,
   stripeConfig,
   stripeEnabled,
-  stripeLaneConfigKey,
-  stripeLaneMismatch,
-  stripeStatus,
-  swapCatalogLane,
   syncCatalog,
   verifyWebhook,
-  setConfig,
-  STRIPE_CREDENTIALS,
   STRIPE_BRANDING,
   KOVA_APP,
-  type StripeCredential,
-  type StripeLane,
 } from "./stripe.js";
 import { newId, nowIso, nowMs, periodKey } from "./ids.js";
 import { parseJson, j } from "./db.js";
@@ -54,6 +43,7 @@ import {
   hasPaymentMethod,
   invoiceSubscriptionId,
   reverseChargedCredits as reverseCredits,
+  stripeAdminRoutes as stripeAdminRoutes_,
   stripeId,
   supersedePlatformSub,
   syncStripeSubscription,
@@ -343,193 +333,51 @@ export const stripeRoutes = new Hono<AppEnv>()
       cfg.webhookSecret,
     );
     return c.json(outcome.body, outcome.status as 200);
-  })
-
-
-
-
-
-
-/** Per-credential paste validation. The prefix rules are Stripe's own, so a
- *  wrong-slot paste (publishable key into the secret field, platform signing
- *  secret into a key field) is refused at the door rather than discovered as a
- *  dead payment path. */
-const CREDENTIAL_SHAPE: Record<StripeCredential, { prefix: RegExp; label: string; expect: string }> = {
-  secretKey: { prefix: /^sk_/, label: "Secret key", expect: "sk_…" },
-  publishableKey: { prefix: /^pk_/, label: "Publishable key", expect: "pk_…" },
-  webhookSecret: { prefix: /^whsec_/, label: "Platform webhook secret", expect: "whsec_…" },
-};
-
-const CredentialBody = z.object({
-  secretKey: z.string().max(400).optional(),
-  publishableKey: z.string().max(400).optional(),
-  webhookSecret: z.string().max(400).optional(),
-});
-
-/** Admin Stripe config + catalog sync (platform-admin lane). */
-export const stripeAdminRoutes = new Hono<AppEnv>()
-  /**
-   * The same handler `stripeRoutes` has, for the same reason — and its absence
-   * here was a real hole.
-   *
-   * These are the OPERATOR's routes: config, catalog sync, status. Every one of
-   * them calls Stripe, and `stripeCall` throws `new Error(stripe's own message)`
-   * — "No such product", "No such price", "Invalid API Key provided". Without a
-   * handler each of those became a bare HTTP 500 with an empty body, so the
-   * operator pressing **Sync catalog** saw "HTTP 500" and had nothing whatsoever
-   * to act on: not which object, not which lane, not whether it was their key.
-   *
-   * 502 rather than 500 for the same reason as the other router: the upstream
-   * refused, we did not break. The messages are Stripe's own and are safe to
-   * show a platform admin — they are the text Stripe puts in its own dashboard.
-   */
-  .onError((err, c) => {
-    console.error(`[stripe-admin] ${c.req.method} ${new URL(c.req.url).pathname}:`, err);
-    return c.json({ error: err instanceof Error ? err.message : "stripe request failed" }, 502);
-  })
-  /**
-   * Write Stripe credentials into a LANE (`stripe.<lane>.*`), so test and live
-   * can both be stored and flipping between them is a `mode` change with no
-   * re-paste. Shapes accepted:
-   *   • `{ lanes: { test: {...}, live: {...} } }` — both lanes at once.
-   *   • flat `{ secretKey, … }` — targets `lane`, else the lane of the `mode`
-   *     being set, else the currently active lane. (This is the pre-lane request
-   *     shape; it now lands in a lane, which takes precedence over the legacy
-   *     unscoped key of the same name.)
-   * A blank/absent field always preserves what is stored — keys are write-only.
-   *
-   * Refusals (400, nothing written): a value whose prefix contradicts the lane
-   * it is being stored in, and a `mode` whose resulting active secret/publishable
-   * key really belongs to the other lane. That is the guard that makes
-   * `stripe.mode` honest: live keys can no longer be filed under a test label.
-   * We refuse rather than "correct" the mode, because silently relabelling what
-   * an operator typed is how a live key ends up active by accident.
-   */
-  .post("/admin/stripe/config", async (c) => {
-    const body = CredentialBody.extend({
-      mode: z.enum(["disabled", "test", "live"]).optional(),
-      /** Lane the flat credential fields target. */
-      lane: z.enum(["test", "live"]).optional(),
-      lanes: z.object({ test: CredentialBody.optional(), live: CredentialBody.optional() }).optional(),
-      /** Platform application fee on client→tenant purchases, in basis points
-       *  (0–10000 = 0–100%). Default 0 = tenant keeps everything. */
-      platformFeeBps: z.number().int().min(0).max(10000).optional(),
-    }).safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid body" }, 400);
-    const d = body.data;
-    const raw = await getConfig(c.env.DB);
-    const current = resolveStripeConfig(raw);
-    const flatLane: StripeLane = d.lane ?? laneForMode(d.mode ?? current.mode) ?? current.lane;
-
-    // Collect every (lane, credential) write first, validate the whole set, and
-    // only then commit — a half-applied save is exactly the half-swap this
-    // feature exists to prevent.
-    const pending = new Map<string, string>();
-    const perLane: { lane: StripeLane; fields: z.infer<typeof CredentialBody> }[] = [
-      { lane: flatLane, fields: { secretKey: d.secretKey, publishableKey: d.publishableKey, webhookSecret: d.webhookSecret} },
-      ...(d.lanes?.test ? [{ lane: "test" as StripeLane, fields: d.lanes.test }] : []),
-      ...(d.lanes?.live ? [{ lane: "live" as StripeLane, fields: d.lanes.live }] : []),
-    ];
-    for (const { lane, fields } of perLane) {
-      for (const cred of STRIPE_CREDENTIALS) {
-        const value = (fields[cred] ?? "").trim();
-        if (!value) continue; // blank preserves the stored value
-        const shape = CREDENTIAL_SHAPE[cred];
-        if (!shape.prefix.test(value)) return c.json({ error: `${shape.label} must start with ${shape.expect}`, code: "invalid_prefix" }, 400);
-        const belongs = credentialLane(value);
-        if (belongs && belongs !== lane) {
-          return c.json({ error: `That ${shape.label.toLowerCase()} is a ${belongs}-mode key — it can't be stored in the ${lane} lane.`, code: "lane_mismatch" }, 400);
-        }
-        pending.set(stripeLaneConfigKey(lane, cred), value);
-      }
-    }
-
-    // Would the resulting active lane run keys that belong to the other lane?
-    // (Includes the pre-lane case: legacy live keys + a `test` mode.)
-    const merged: Record<string, string> = { ...raw };
-    for (const [k, v] of pending) merged[k] = v;
-    if (d.mode) merged["stripe.mode"] = d.mode;
-    const next = resolveStripeConfig(merged);
-    if (stripeLaneMismatch(next)) {
-      const real = credentialLane(next.secretKey) ?? credentialLane(next.publishableKey);
-      return c.json(
-        {
-          error: `The keys that would be active in ${next.mode} mode are ${real}-mode keys. Paste ${next.mode}-mode keys into the ${next.mode} lane first (or select ${real} mode).`,
-          code: "mode_key_mismatch",
-        },
-        400,
-      );
-    }
-
-    for (const [k, v] of pending) await setConfig(c.env.DB, k, v);
-    // Stripe product/price ids are per-lane objects: park the old lane's ids and
-    // restore the new lane's BEFORE the mode moves, so no window exists where the
-    // active lane is pointing at the other lane's price ids.
-    let catalogSwapped = false;
-    if (d.mode && d.mode !== current.mode) {
-      const from = laneForMode(current.mode);
-      const to = laneForMode(d.mode);
-      if (from && to && from !== to) {
-        await swapCatalogLane(c.env.DB, from, to);
-        catalogSwapped = true;
-      }
-      await setConfig(c.env.DB, "stripe.mode", d.mode);
-    }
-    if (d.platformFeeBps !== undefined) await setConfig(c.env.DB, "stripe.platform_fee_bps", String(d.platformFeeBps));
-    return c.json({ ok: true, catalogSwapped, status: stripeStatus(await getConfig(c.env.DB)) });
-  })
-
-  // Push plans + packs to Stripe as products + prices.
-  //
-  // `syncCatalog` creates what is missing and RECONCILES the name of what is
-  // already there. The second half matters because a rename does not move the
-  // price, so it never invalidates the stored ids — without it a plan renamed in
-  // the catalog keeps its old name on every checkout page and invoice.
-  //
-  // The PRICE is the other half: `syncCatalog` skips any row that already carries
-  // a `stripe_price_id`, so a repriced plan would otherwise never reach Stripe
-  // and checkout would keep charging the old amount. The catalog migration and the plan editor both null
-  // the id pair when a price moves; `{ resyncPrices: true }` is the manual escape
-  // hatch for a row whose Stripe price drifted some other way (a price edited in
-  // the Stripe dashboard, a half-finished sync). It drops the stored ids for the
-  // ACTIVE plans and lets the sync below recreate them at the current price.
-  // Orphaned Stripe prices are left alone on purpose — tenants already
-  // subscribed on one keep that price until they re-subscribe.
-  .post("/admin/stripe/sync", async (c) => {
-    const cfg = await stripeConfig(c.env);
-    if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
-    const body = z.object({ resyncPrices: z.boolean().default(false) }).safeParse(await c.req.json().catch(() => ({})));
-    await seedBilling(c.env.DB);
-    let cleared = 0;
-    let clearedPacks = 0;
-    if (body.success && body.data.resyncPrices) {
-      const r = await c.env.DB.prepare(
-        "UPDATE plans SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)",
-      ).run();
-      cleared = r.meta?.changes ?? 0;
-      // CREDIT PACKS TOO. This cleared plans only, which left packs with no
-      // repair path at all: `syncCatalog` skips any row that already holds a
-      // `stripe_price_id`, and nothing else ever nulled a pack's. So a pack whose
-      // price had gone stale — dangling in Stripe, created under a different
-      // account, or half-written by an interrupted sync — was permanently broken.
-      // Sync reported "0 packs" because it believed them done, and every top-up
-      // checkout failed with "No such price", with no way out of the admin UI.
-      const rp = await c.env.DB.prepare(
-        "UPDATE credit_packs SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)",
-      ).run();
-      clearedPacks = rp.meta?.changes ?? 0;
-    }
-    const result = await syncCatalog(c.env.DB, cfg.secretKey);
-    return c.json({ ok: true, cleared, clearedPacks, ...result });
-  })
-
-  /** "What is Kova actually on right now?" — presence + provenance + the lane
-   *  the active key really belongs to. No secret material is ever returned:
-   *  booleans, a last-4 hint, and prefix-derived lanes only. */
-  .get("/admin/stripe/status", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    return c.json(stripeStatus(await getConfig(c.env.DB)));
   });
+
+
+
+/**
+ * KOVA'S BINDING OF THE SHARED STRIPE CONSOLE ROUTES.
+ *
+ * The three handlers that were here — status, config, sync — are
+ * `@4dl/billing`'s `stripeAdminRoutes` now. They were the reference copy, and
+ * moving them is what let the other two apps stop being worse: Tessa's had no
+ * mode-flip catalog swap (so pressing its console's live switch pointed the
+ * catalog at test-lane price ids and every checkout failed with "No such
+ * price"), and Scena had no `status`/`config` at all, so `@4dl/admin`'s panel
+ * could not be mounted there.
+ *
+ * What Kova still supplies is the part a shared package cannot know: which
+ * tables hold the catalog. `syncCatalog` here is the branding-bound wrapper in
+ * `stripe.ts`; `clearCatalogIds` is the rebuild repair over Kova's own `plans`
+ * and `credit_packs`.
+ */
+export const stripeAdminRoutes = stripeAdminRoutes_({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as unknown as Parameters<typeof isPlatformAdmin>[0]),
+  seed: seedBilling,
+  syncCatalog,
+  /*
+    CREDIT PACKS TOO, and their absence was a real hole for as long as this was
+    plans-only. `syncCatalog` skips any row that already holds a
+    `stripe_price_id`, and nothing else ever nulled a PACK's — so a pack whose
+    price had gone stale was permanently broken: sync reported "0 packs"
+    because it believed them done, and every top-up checkout failed with "No
+    such price", with no way out of the console.
+
+    Orphaned Stripe prices are left alone on purpose: tenants already
+    subscribed on one keep that price until they re-subscribe.
+  */
+  clearCatalogIds: async (db) => {
+    const plans = await db
+      .prepare("UPDATE plans SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)")
+      .run();
+    const packs = await db
+      .prepare("UPDATE credit_packs SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)")
+      .run();
+    return { cleared: plans.meta?.changes ?? 0, clearedPacks: packs.meta?.changes ?? 0 };
+  },
+}) as unknown as Hono<AppEnv>;
 
 // ── Webhook handlers ───────────────────────────────────────────────────────
 async function handlePlatformEvent(

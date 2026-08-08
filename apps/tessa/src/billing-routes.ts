@@ -37,36 +37,29 @@ import { entitlements } from "./entitlements.js";
 import { notifyRole } from "./notify.js";
 import {
   ensureSubscription,
-  getConfig,
   getSubscription,
   listPacks,
   listPlans,
   seedBilling,
-  setConfig,
   tenantEntitlements,
 } from "./billing-store.js";
 import {
-  credentialLane,
   ensureCustomer,
   firstSeen,
   hasPaymentMethod,
   invoiceSubscriptionId,
-  laneForMode,
   reverseChargedCredits,
+  stripeAdminRoutes,
   stripeCall,
   stripeConfig,
   stripeEnabled,
-  stripeLaneConfigKey,
-  stripeStatus,
   supersedePlatformSub,
   syncCatalog,
   syncStripeSubscription,
   tenantByCustomer,
   unmarkSeen,
-  STRIPE_CREDENTIALS,
   STRIPE_BRANDING,
   TESSA_APP,
-  type StripeCredential,
 } from "./stripe.js";
 
 const meta = (obj: Record<string, unknown>): Record<string, string> =>
@@ -442,72 +435,35 @@ async function handleEvent(
 // ── The operator's Stripe lane ──────────────────────────────────────────────
 
 /**
- * Per-credential paste validation. The prefix rules are Stripe's own, so a
- * wrong-slot paste — a publishable key in the secret field, a signing secret in
- * a key field — is refused at the door rather than discovered later as a dead
- * payment path.
+ * TESSA'S BINDING OF THE SHARED STRIPE CONSOLE ROUTES.
+ *
+ * `/admin/stripe/status`, `/admin/stripe/config` and `/admin/stripe/sync` were
+ * here, as a thinner copy of Kova's — and thinner in a way that mattered. This
+ * one wrote ONE lane and never swapped the catalog on a mode flip, so pressing
+ * the console's live switch left every plan and pack pointing at its test-lane
+ * price id: checkout failed with "No such price", produced by the switch the
+ * console offers, with no repair path because there was no `resyncPrices`
+ * either. They are `@4dl/billing`'s `stripeAdminRoutes` now.
  */
-const CREDENTIAL_SHAPE: Record<StripeCredential, { prefix: RegExp; label: string; expect: string }> = {
-  secretKey: { prefix: /^sk_/, label: "Secret key", expect: "sk_…" },
-  publishableKey: { prefix: /^pk_/, label: "Publishable key", expect: "pk_…" },
-  webhookSecret: { prefix: /^whsec_/, label: "Webhook signing secret", expect: "whsec_…" },
-};
+export const stripeConsoleRoutes = stripeAdminRoutes({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as unknown as Parameters<typeof isPlatformAdmin>[0]),
+  seed: seedBilling,
+  syncCatalog,
+  clearCatalogIds: async (db) => {
+    const plans = await db
+      .prepare("UPDATE plans SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)")
+      .run();
+    const packs = await db
+      .prepare("UPDATE credit_packs SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)")
+      .run();
+    return { cleared: plans.meta?.changes ?? 0, clearedPacks: packs.meta?.changes ?? 0 };
+  },
+}) as unknown as Hono<AppEnv>;
 
 export const billingAdminRoutes = new Hono<AppEnv>()
   .onError((err, c) => {
     console.error(`[billing-admin] ${c.req.method} ${new URL(c.req.url).pathname}:`, err);
     return c.json({ error: err instanceof Error ? err.message : "stripe request failed" }, 502);
-  })
-
-  .get("/admin/stripe/status", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    return c.json(stripeStatus(await getConfig(c.env.DB)));
-  })
-
-  .post("/admin/stripe/config", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const body = z
-      .object({
-        mode: z.enum(["disabled", "test", "live"]).optional(),
-        secretKey: z.string().max(400).optional(),
-        publishableKey: z.string().max(400).optional(),
-        webhookSecret: z.string().max(400).optional(),
-      })
-      .safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid body" }, 400);
-
-    const raw = await getConfig(c.env.DB);
-    const mode = body.data.mode ?? (raw["stripe.mode"] as "disabled" | "test" | "live" | undefined) ?? "disabled";
-    const lane = laneForMode(mode) ?? "test";
-
-    for (const cred of STRIPE_CREDENTIALS) {
-      const value = body.data[cred]?.trim();
-      // A blank field PRESERVES what is stored — keys are write-only, so the
-      // console can render "set" without ever reading one back.
-      if (!value) continue;
-      const shape = CREDENTIAL_SHAPE[cred];
-      if (!shape.prefix.test(value)) {
-        return c.json({ error: `${shape.label} should start with ${shape.expect}` }, 400);
-      }
-      // A test key stored in the live lane is a dead payment path that looks
-      // configured. Refuse it here rather than at the first charge.
-      const keyLane = credentialLane(value);
-      if (keyLane && keyLane !== lane) {
-        return c.json({ error: `That ${shape.label.toLowerCase()} is a ${keyLane} key, but you are configuring the ${lane} lane.` }, 400);
-      }
-      await setConfig(c.env.DB, stripeLaneConfigKey(lane, cred), value);
-    }
-    if (body.data.mode) await setConfig(c.env.DB, "stripe.mode", body.data.mode);
-    return c.json(stripeStatus(await getConfig(c.env.DB)));
-  })
-
-  /** Create the Stripe products + prices for every plan and pack that has none. */
-  .post("/admin/stripe/sync", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const cfg = await stripeConfig(c.env);
-    if (!stripeEnabled(cfg)) return c.json({ error: "stripe not configured" }, 400);
-    await seedBilling(c.env.DB);
-    return c.json(await syncCatalog(c.env.DB, cfg.secretKey));
   })
 
   /** Every centre, what it is on, and what it owes. */

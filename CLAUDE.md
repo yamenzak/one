@@ -75,10 +75,13 @@ packages/
              # reads, subscription resolution, the two ceilings — the catalog's
              # CONTENTS are the app's), credit metering, the per-tenant credit
              # Durable Object (CreditLedgerDO — the class NAME is load-bearing),
-             # the Stripe client, the dunning ladder, the PLAN-CATALOG operator
-             # routes, and the refund/dispute CREDIT REVERSAL (proportional,
-             # clamped, and incremental against Stripe's cumulative
-             # `amount_refunded`). See its README.
+             # the Stripe client, the dunning ladder, BOTH OPERATOR route trees
+             # (the plan catalog, and the Stripe lane — status/credentials/sync,
+             # two lanes, the mode-flip catalog swap and the price rebuild; the
+             # catalog TABLES stay the app's, so `syncCatalog` is injected), and
+             # the refund/dispute CREDIT REVERSAL (proportional, clamped, and
+             # incremental against Stripe's cumulative `amount_refunded`).
+             # See its README.
   storage/   # @4dl/storage — R2 + the media ledger + the quota gate (resolver
              # injected, so it does not depend on billing), plus the three media
              # ROUTES: upload, the storage meter, the authed read. The closed
@@ -408,6 +411,20 @@ remote bindings without editing the config (this is what the E2E suite does).
   `claims` is `tenantByCustomer`, which is load-bearing: `invoice.paid` often
   carries no Kova metadata at all. Credits stay in `TenantBillingDO` per app —
   routing crosses workers, a metered reserve→settle must not.
+- **The Stripe CONSOLE routes are the platform's, and the two lanes are the
+  reason.** `@4dl/billing`'s `stripeAdminRoutes` answers `/admin/stripe/status`,
+  `/admin/stripe/config` and `/admin/stripe/sync` in all three apps — the surface
+  above them (`@4dl/admin`'s `PlatformStripeSection`) had already moved, and
+  leaving the handlers behind produced three copies that drifted. Test and live
+  keys are stored SEPARATELY and both at once, so going live is a mode change
+  rather than a re-paste; a key whose prefix contradicts its lane is refused at
+  the door; and **the mode flip SWAPS the catalog's per-lane Stripe ids**, which
+  Tessa's copy did not do — pressing its own console's live switch left every
+  plan pointing at the test lane's price and every checkout failed with "No such
+  price". A mismatch is REPORTED, never corrected: relabelling what an operator
+  typed is how a live key ends up active by accident. `syncCatalog` / `seed` /
+  `clearCatalogIds` stay injected, because the catalog TABLE is still the app's
+  (Scena's `price_cents` against the shared store's `price_usd_month`).
 - **Credits**: `TenantBillingDO` (`billing-do.ts`) is the authoritative balance;
   AI goes through `@4dl/ai` `generate()` = reserve → run (Workers AI | Gemini |
   the dev-only mock) → settle; `apps/api/src/ai.ts` binds Kova's feature registry
@@ -785,21 +802,24 @@ things per app; it did not hold for this one, and "presentation stays in the app
 is a rule that has to be re-argued per case rather than applied.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. **Measured 2026-08-08** from one `pnpm test`, per package:
-**632 kova/api (+31 skipped) + 243 scena/api + 237 kova/domain + 152 tessa/api +
-145 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 80 ai + 68 billing +
+moves. **Measured 2026-08-08** from one `pnpm turbo run test --force` (uncached,
+so every figure below is from that run), per package:
+**632 kova/api (+31 skipped) + 261 scena/api + 237 kova/domain + 163 tessa/api +
+145 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 87 billing + 80 ai +
 63 commerce + 61 scena/widgets + 45 billing-rail + 44 core + 40 scena/timeline +
-35 auth + 30 scena/app + 24 notify + 23 scena/manifest + 18 scena/protocol +
-18 storage + 18 app-kit + 17 kova/protocol + 17 template + 14 tessa/app +
-14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,402 passing,
+35 auth + 35 scena/app + 24 notify + 23 scena/manifest + 23 tessa/app +
+18 scena/protocol + 18 storage + 18 app-kit + 17 kova/protocol + 17 template +
+14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,425 passing,
 31 skipped**, 58 turbo tasks, all green.
 
-Per-package figures above predate the last two commits; the TOTAL is current.
-The +58 across them is `@4dl/billing` 45 → 68 (the refund/dispute reversal and
-the plan-catalog routes, both moved out of an app), `@4dl/scena` 234 → 258 (the
-webhook guards, the OTP gate and the per-actor budget) and `@4dl/tessa`
-152 → 163 (the OTP gate and the AI-column regression). A split moves tests;
-these are new coverage over behaviour that was previously in one app or in none.
+The +81 since the earlier figure on the same day is all new coverage over
+behaviour that was previously in one app or in none: `@4dl/billing` 45 → 87 (the
+refund/dispute reversal, the plan-catalog routes and the Stripe console routes,
+all three moved out of an app), `@4dl/scena` 234 → 261 (the webhook guards, the
+OTP gate, the per-actor budget and the config-write refusal) and `@4dl/tessa`
+152 → 163 (the OTP gate and the AI-column regression). A split moves tests; it
+does not add any — so where a count went up, something is being checked that
+was not.
 
 Scena's 449 (234 api + 30 app + 185 across its five pure packages) were never in
 the older figure at all; nor were Tessa's. `@scena/timeline`'s 40 are the ones

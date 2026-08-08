@@ -1271,7 +1271,27 @@ describe("the operator console answers on its door and nowhere else", () => {
     // `@4dl/admin`'s contract, so the panel is the shared one and this list is
     // where "the panel renders and 404s on its first read" gets caught.
     "/api/admin/plans",
+    /*
+      THE STRIPE LANE. `PlatformStripeSection` opens on `status` and cannot
+      render at all without it — and Scena answered only `sync`, in a shape
+      nothing read, so the panel could not be mounted here until the route tree
+      became `@4dl/billing`'s. `config` is the write; both are listed because a
+      console that reads and cannot save is its own kind of broken.
+    */
+    "/api/admin/stripe/status",
+    // The AI catalog. `@4dl/ai`'s routes, replacing Scena's own `/admin/models`
+    // — and `config` is the one that carries the shared-store read, which is
+    // what stops the panel reporting "no key" over a key set platform-wide.
+    "/api/admin/ai/models",
+    "/api/admin/ai/config",
   ];
+
+  /**
+   * The WRITE halves, which a GET cannot probe — Hono answers 404 for a path
+   * that exists on another method, so listing them above would fail for the
+   * wrong reason and read as "not mounted".
+   */
+  const ADMIN_WRITE_SURFACES = ["/api/admin/stripe/config"];
 
   it("registers every endpoint the console's shared panels call", async () => {
     const { cookie, door } = await newWorkspace("console");
@@ -1280,6 +1300,10 @@ describe("the operator console answers on its door and nowhere else", () => {
       // 404 here means the route was never mounted — a panel that renders and
       // then fails on its first read. Anything else (200, 403, 503) means the
       // surface exists and the guard is doing its job.
+      expect(res.status, `${path} is not mounted`).not.toBe(404);
+    }
+    for (const path of ADMIN_WRITE_SURFACES) {
+      const res = await SELF.fetch(`${door}${path}`, { method: "POST", headers: { cookie, "content-type": "application/json" }, body: "{}" });
       expect(res.status, `${path} is not mounted`).not.toBe(404);
     }
   });

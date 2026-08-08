@@ -511,27 +511,60 @@ different products' answers to a question the platform has already answered
 once, and a customer who buys two 4DL products gets two different arrears
 experiences.
 
-### The operator console: Scena rebuilt two panels the package ships
+### The operator console: Scena rebuilt two panels the package ships — ✅ FIXED
 
 ```
 node -e "…sharedPanelViolations…"   # app: 0 · tessa-app: 0 · scena-app: 2
 ```
 
-Scena's console mounts six of `@4dl/admin`'s eight panels — email, shared
+Scena's console mounted six of `@4dl/admin`'s eight panels — email, shared
 config, domains, Turnstile, rail, maintenance — which is genuinely good adoption.
-It then renders its **own** `StripeTab` and `ModelsTab` over
+It then rendered its **own** `StripeTab` and `ModelsTab` over
 `/api/admin/stripe/*`, `/api/admin/email/test` and its own `/api/admin/models`,
 instead of `PlatformStripeSection` and `PlatformAiSection`.
 
-`sharedPanelViolations` exists to catch exactly this and reports **2 violations**
-in `apps/scena-app/src/api.ts`. Scena is the only SPA with no
-`admin-panels.conformance.test.ts`, so nothing runs it.
+`sharedPanelViolations` exists to catch exactly this and reported **2 violations**
+in `apps/scena-app/src/api.ts`. Scena was the only SPA with no
+`admin-panels.conformance.test.ts`, so nothing ran it.
 
 The AI panel is the more expensive of the two: `PlatformAiSection` is where
 `@4dl/ai`'s catalog sync, the per-lane default picker, the markup column and —
 critically — the **"Apply to every 4DL app"** broadcast live. Scena's local
-`ModelsTab` over `/api/admin/models` cannot participate in the shared selection
-at all.
+`ModelsTab` over `/api/admin/models` could not participate in the shared
+selection at all.
+
+**What fixing it turned up, which is the part worth reading.** `StripeTab` was
+three panels wearing one coat, and the middle one was the finding: an EMAIL form
+writing the same `app_config` rows as `PlatformEmailSection`, which this console
+already mounted three sections below it. Two screens answering "what is the
+sender", with no rule about which wins.
+
+And mounting `PlatformStripeSection` was blocked, because **Scena had no
+`/admin/stripe/status` or `/admin/stripe/config` at all** — its console
+configured Stripe through the generic `/api/admin/config` form, which stores
+whatever string it is handed. A live secret key filed under a `test` mode, a
+publishable key in the secret slot, a signing secret in either: all saved, none
+reported.
+
+So the route trees moved too, and they were the deeper duplication —
+`@4dl/billing`'s `stripeAdminRoutes` now, bound by all three apps (18 new tests):
+
+| | lanes stored | mode-flip catalog swap | price rebuild | credential screen |
+|---|---|---|---|---|
+| Kova (was) | both | ✅ | ✅ | ✅ |
+| Tessa (was) | one | ❌ | ❌ | ✅ |
+| Scena (was) | — | — | ❌ | ❌ |
+
+Tessa's missing swap is the one that cost real money: Stripe products and prices
+are per-lane objects, so pressing its own console's **live** switch left every
+plan pointing at its test-lane price id, and every checkout after that failed
+with "No such price" — a payments outage produced by the button the console
+offers, with no repair path because there was no rebuild either.
+
+`syncCatalog` / `seed` / `clearCatalogIds` stay injected: the catalog TABLE is
+still the app's (`price_cents` here, `price_usd_month` in the shared store), and
+that seam is what let Scena adopt the routes without the store migration. See
+PLATFORM.md's new **"An operator route tree is not a product route tree"**.
 
 ### Platform-scope promo codes: two tables, same name, different semantics
 
@@ -780,18 +813,29 @@ While you are in each app's AI binding, add `checkActorDailyBudget` — it is on
 call on the generation path and it is the difference between a runaway user
 costing a tenant a day's credits and costing them everything.
 
-### 2. Give Scena the three missing surfaces — *the app is otherwise done*
+### 2. Give Scena the three missing surfaces — ✅ **DONE (2026-08-08)**
 
-- **The bell.** `NotificationBell` + `InboxScreen` from `@4dl/app-kit`, plus an
-  `onOpen` handler and a per-type icon map. The server side is complete.
-- **The gate.** Add `gate` and `maintenance` to `HostInfo` by **spreading**, then
-  render `MaintenanceBanner`, a standing banner and a blocked screen — the three
-  Kova already has. Delete or fulfil `Shell.tsx`'s §5 comment.
-- **The console.** Swap `StripeTab`/`ModelsTab` for `PlatformStripeSection`/
-  `PlatformAiSection`, and add `admin-panels.conformance.test.ts` so it stays
-  swapped. This is also what puts Scena on the shared-selection broadcast.
+- ~~**The bell.**~~ `NotificationBell` + `InboxScreen` bound in
+  `apps/scena-app/src/Notifications.tsx`, with a per-type icon map and a
+  conformance test that checks it against the server registry **in both
+  directions** and checks every `link` against the real route table. Which is how
+  five dead links turned up: four types pointed at `/screens`, and the fleet
+  lives at `/`.
+- ~~**The gate.**~~ `HostInfo` is `KitHostInfo<WorkspaceBrand>` now instead of a
+  four-field re-declaration that silently dropped `gate` and `maintenance`;
+  `Shell.tsx` renders `MaintenanceBanner` + `WorkspacePausedBanner`, and
+  `WorkspaceBlocked` replaces the app on the blocked rung. Tessa got the same
+  through `pickScreen`, extracted to `screen.ts` and unit-tested.
+- ~~**The console.**~~ `PlatformStripeSection` + `PlatformAiSection` + a new
+  `ScenaSettingsTab` for what is genuinely Scena's, with
+  `admin-panels.conformance.test.ts` so it stays swapped — and two new entries in
+  `SHARED_ADMIN_ENDPOINTS` for the AI catalog routes, mutation-tested.
 
-Tessa needs the maintenance banner and a `blocked` screen from the same list.
+**It cost more than a swap, and the overrun is the finding.** Mounting the shared
+Stripe panel needed endpoints Scena did not have, which is how the three
+`/admin/stripe/*` route trees came to be compared side by side — see the Tier 2
+entry above for the table and for Tessa's live-switch payments outage. They are
+`@4dl/billing`'s `stripeAdminRoutes` now.
 
 ### 3. Make the guards derive their app list — *stops finding #7*
 
@@ -890,6 +934,16 @@ In this order, because each unblocks the next:
   remain product work, not platform work, and half-doing it is worse than not.
   Scena is the cheaper of the two and would make the package's seam real.
 - **`@4dl/i18n` has no boundary test** — the only `@4dl/*` package without one.
+- **A LIVE Stripe key check.** `/admin/stripe/status` reports what is stored and
+  deliberately never touches the network, so a key that is present, in the right
+  lane and **revoked** looks identical to a working one in every field it
+  returns. Scena had a `GET /v1/account` ping for exactly this; it was deleted
+  with the panel that called it rather than kept, because an endpoint with no
+  caller is the defect this document catalogues, not an exception to it. The idea
+  belongs in `stripeAdminRoutes` with a button in `PlatformStripeSection`, where
+  all three apps would get it — roughly 25 lines, and the only reason it is on
+  this list rather than in the diff is that it is a new capability rather than a
+  consolidation.
 
 ---
 
