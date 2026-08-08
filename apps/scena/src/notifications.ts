@@ -106,6 +106,13 @@ export const NOTIF_TYPES: Record<string, TypeMeta> = {
   billing_deleted: { category: "billing", to: "owner", title: "Workspace data deleted", link: "/billing" },
   credits_purchased: { category: "billing", to: "owner", link: "/billing" },
   credits_low: { category: "billing", to: "owner", link: "/billing" },
+  /**
+   * Money went back, so the credits did too — and the owner has to be told
+   * either way. A plan-level refund carries no credit count, so there is
+   * nothing to reverse and still something to reconcile.
+   */
+  payment_refunded: { category: "billing", to: "owner", title: "A payment was refunded", link: "/billing" },
+  payment_disputed: { category: "billing", to: "owner", title: "A payment was disputed", link: "/billing" },
 };
 
 /**

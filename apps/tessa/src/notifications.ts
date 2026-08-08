@@ -90,6 +90,13 @@ export const NOTIF_TYPES: Record<string, TypeMeta> = {
   },
   billing_canceled: { category: "billing", to: "owner", title: "Your subscription was cancelled", link: "/settings/billing" },
   billing_trial_ending: { category: "billing", to: "owner", title: "Your trial ends soon", link: "/settings/billing" },
+  /**
+   * Money went back, so the credits did too — and the centre has to be told
+   * either way. A plan-level refund carries no credit count, so there is
+   * nothing to reverse and still something an owner needs to reconcile.
+   */
+  payment_refunded: { category: "billing", to: "owner", title: "A payment was refunded", link: "/settings/billing" },
+  payment_disputed: { category: "billing", to: "owner", title: "A payment was disputed", link: "/settings/billing" },
 };
 
 configureNotify({

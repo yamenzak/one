@@ -46,6 +46,7 @@ import {
   PlatformEmailSection,
   PlatformMaintenanceSection,
   PlatformRailSection,
+  PlatformPlansSection,
   PlatformSharedConfigSection,
   PlatformTurnstileSection,
   useConsoleSection,
@@ -55,7 +56,7 @@ import {
 import { Button, Card } from "@4dl/ui";
 import { AlertTriangle, CreditCard, Globe, Mail, Music, Package, ShieldCheck, Sparkles, Tag, Users, Wallet, Wrench } from "lucide-react";
 import { API_BASE, apiError, apiFetch } from "../api.js";
-import { DangerTab, LibraryTab, ModelsTab, PlansTab, PromosTab, StripeTab, TenantsTab } from "./Admin.js";
+import { DangerTab, LibraryTab, ModelsTab, PromosTab, StripeTab, TenantsTab } from "./Admin.js";
 
 /**
  * The three verbs `@4dl/admin`'s panels need, over Scena's fetch conventions.
@@ -107,11 +108,20 @@ function sections(): ConsoleSection[] {
       render: () => <StripeTab />,
     },
     {
+      /*
+        `@4dl/admin`'s panel now, not Scena's.
+
+        The one it replaces edited two numbers inline and opened a modal for the
+        rest, and it had no GRANDFATHERING: tightening a tier took the capability
+        away from every workspace already on it, immediately, and the help text
+        said so as though it were the design. It also could not edit the free
+        TRIAL, which is what actually replaced the free tier here.
+      */
       key: "plans",
       label: "Plans",
-      blurb: "The four tiers, their quotas, features and monthly credit grant",
+      blurb: "The four tiers — price, quotas, features, the credit grant and the trial",
       icon: Package,
-      render: () => <PlansTab />,
+      render: () => <PlatformPlansSection {...deps} tenantNoun="workspace" />,
     },
     {
       key: "models",

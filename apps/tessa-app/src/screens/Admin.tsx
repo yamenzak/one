@@ -30,12 +30,13 @@ import {
   PlatformTurnstileSection,
   PlatformSharedConfigSection,
   PlatformRailSection,
+  PlatformPlansSection,
   useConsoleSection,
   type ConsoleSection,
 } from "@4dl/admin";
 import { api, errorText } from "@4dl/app-kit";
 import {
-  Badge, Building2, Button, Card, CreditCard, Field, Globe, Group, LoadError, Mail, Reveal, Row, SaveBar,
+  Badge, Building2, Button, Card, CreditCard, Field, Globe, Group, LayoutGrid, LoadError, Mail, Reveal, Row, SaveBar,
   ShieldCheck, Skeleton, SkeletonLine, Spinner, Wallet, Wand2, Wrench, useAction, useLoad,
 } from "@4dl/ui";
 import { useSession } from "../session.js";
@@ -85,6 +86,10 @@ export function AdminDoor() {
  */
 const SECTIONS: ConsoleSection[] = [
   { group: "Centres & money", key: "centres", label: "Centres", blurb: "Every practice, its plan, credits and standing", icon: Building2, tone: "primary", render: () => <Centres /> },
+  /* NEW. Tessa had no plan editor: a price, a limit or the trial could only be
+     changed by editing `DEFAULT_PLANS`, deploying, and running a catalog sync.
+     Selling one plan is why nobody noticed, and no reason for it to be true. */
+  { group: "Centres & money", key: "plans", label: "Plans", blurb: "Price, limits, the credit grant and the free trial", icon: LayoutGrid, tone: "cycle", render: () => <PlatformPlansSection api={api} errorText={errorText} tenantNoun="centre" /> },
   { group: "Centres & money", key: "stripe", label: "Stripe", blurb: "Keys, the active lane, and syncing the catalog", icon: CreditCard, tone: "soiled", render: () => <PlatformStripeSection api={api} errorText={errorText} platformName="Tessa" /> },
   /* Without `google.gemini_key` the vision model is unreachable, so reading a
      label — the feature most likely to be why a centre bought the plan — fails

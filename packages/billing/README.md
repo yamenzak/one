@@ -10,6 +10,7 @@ What the platform charges a tenant, and what that buys them.
 | `stripe.ts` | Lane config (test/live + mismatch detection), webhook signature verification, catalog sync, customer creation. |
 | `dunning.ts` | The ladder: 7 days → read-only, 30 → blocked, 37 → purged. |
 | `store.ts` | The catalog STORE: version-stamped seeding, the plan/pack reads, subscription resolution and the two ceilings. The catalog's *contents* are injected. |
+| `plan-admin-routes.ts` | The plan catalog's OPERATOR routes — read the catalog with its key registry, edit a plan. `@4dl/admin`'s `PlatformPlansSection` is the surface. |
 | `schema.ts` | `plans`, `subscriptions`, `credit_packs`, `credit_ledger`, `stripe_events`. |
 
 Two entry points: **`@4dl/billing`** for the worker, **`@4dl/billing/model`** for
@@ -169,9 +170,31 @@ rungs. Writing that unconditionally overwrote `suspended`, the ladder stalled at
 read-only forever, and it failed SAFE and therefore silently. Read its comment
 before touching the status switch.
 
-**The route trees did NOT move.** Both rails' handlers are woven through the
+`reverseChargedCredits` is the other half of the money path, and it was in one
+app out of three. A refunded credit pack must have its credits clawed back, and
+three things make that harder than subtracting the pack: a PARTIAL refund is
+proportional and clamped, every event carries the CUMULATIVE `amount_refunded`
+(so the obvious implementation double-charges on the second partial refund —
+`creditsAlreadyReversed` reads the ledger back by charge id and takes only the
+difference), and a DISPUTE is not a charge (no customer, empty metadata, so the
+underlying charge is fetched first — and that lookup throws rather than
+returning empty, which is what makes an unattributable chargeback redelivered
+rather than silently dropped). It returns the outcome instead of notifying,
+because the sentence an owner reads is the app's registry.
+
+**The subscription route trees did NOT move.** Both rails' handlers are woven through the
 app's notification registry, its entitlement gates and its row-level scope
 (`requireClientAccess`), and the `@4dl/tenancy` route seam would carry them only
 after each of those became an injection too. That is a larger design job than
 this one, on the one path where a mistake costs real money, and it is not started
 rather than half-done.
+
+The PLAN CATALOG's admin routes are the exception, and the exception proves the
+rule: they touch no notification registry, no entitlement gate and no row-level
+scope — only the console gate, which is already an injection everywhere else.
+Three rules travelled with them, each invisible until it costs something: the
+Stripe-id null-out on a reprice, the `snapshotDowngrade` grandfathering, and an
+omitted `trialDays` meaning "leave it alone". Before the move, one app had all
+three, one had none of them because it had no plan editor at all, and one had an
+editor without the grandfathering — so tightening a tier stripped capability
+from every live tenant on it.

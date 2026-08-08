@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Platform billing: the entitlement engine (quotas, feature gates, credit grants), credit metering, the per-tenant credit Durable Object, the Stripe client, and the dunning ladder. No product vocabulary \u2014 see README.md.",
+  "description": "Platform billing: the entitlement engine (quotas, feature gates, credit grants), credit metering, the per-tenant credit Durable Object, the Stripe client, and the dunning ladder. No product vocabulary — see README.md.",
   "exports": {
     ".": "./src/index.ts",
     "./model": "./src/model.ts",
@@ -18,7 +18,8 @@
     "clean": "rm -rf .turbo *.tsbuildinfo"
   },
   "dependencies": {
-    "@4dl/core": "workspace:*"
+    "@4dl/core": "workspace:*",
+    "hono": "^4.9.10"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251001.0",

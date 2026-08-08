@@ -34,6 +34,7 @@ import { dispatchEvent } from "@4dl/billing-rail";
 import { type AppEnv, requireTenant, isPlatformAdmin } from "./auth-context.js";
 import type { Env } from "./env.js";
 import { entitlements } from "./entitlements.js";
+import { notifyRole } from "./notify.js";
 import {
   ensureSubscription,
   getConfig,
@@ -51,6 +52,7 @@ import {
   hasPaymentMethod,
   invoiceSubscriptionId,
   laneForMode,
+  reverseChargedCredits,
   stripeCall,
   stripeConfig,
   stripeEnabled,
@@ -348,6 +350,45 @@ async function handleEvent(
         .prepare("UPDATE subscriptions SET stripe_sub_id = COALESCE(?, stripe_sub_id), current_period_end = COALESCE(?, current_period_end), updated_at = ? WHERE tenant_id = ?")
         .bind(stampSub, cpe, nowIso(), tenantId)
         .run();
+      break;
+    }
+
+    /**
+     * MONEY WENT BACK, SO THE CREDITS HAVE TO.
+     *
+     * Tessa sells the same four credit packs as every other app here and had no
+     * handler for either event, so a refunded pack left its credits spendable —
+     * the centre kept the goods and the money, and nothing reported a problem.
+     *
+     * The maths is `@4dl/billing`'s: proportional to the refunded share, clamped
+     * to the pack, and incremental against the CUMULATIVE `amount_refunded`
+     * Stripe re-sends on every partial refund. The notice is Tessa's, and it is
+     * sent whatever the maths did — a plan-level refund carries no credit count,
+     * so there is nothing to reverse and still something to reconcile.
+     */
+    case "charge.refunded":
+    case "charge.dispute.created": {
+      const outcome = await reverseChargedCredits(
+        {
+          db,
+          secretKey,
+          metadataPrefix: STRIPE_BRANDING.metadataPrefix,
+          authority: async (tenantId) => {
+            const stub = env.BILLING.get(env.BILLING.idFromName(tenantId));
+            await stub.bind(tenantId);
+            return stub;
+          },
+        },
+        event,
+      );
+      if (!outcome) break;
+      await notifyRole(env, outcome.tenantId, "owner", {
+        type: outcome.disputed ? "payment_disputed" : "payment_refunded",
+        message: outcome.disputed
+          ? "A payment on this centre's account was disputed. Any credits it granted may be reversed — check the balance."
+          : "A payment on this centre's account was refunded. Credits from a refunded pack have been reversed from the balance.",
+        dedupeKey: typeof obj.id === "string" ? `${event.type}_${obj.id}` : event.id,
+      }).catch(() => undefined);
       break;
     }
 

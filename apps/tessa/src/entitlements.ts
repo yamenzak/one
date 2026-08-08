@@ -71,3 +71,24 @@ export const entitlements = bindEntitlements<AppEntitlements>(FREE);
  * they read — `tenantEntitlements`, `hasFeature`, `withinQuota`. This file is
  * the REGISTRY only: the keys, and what a tenant gets with no plan at all.
  */
+
+/**
+ * WHAT EACH KEY IS CALLED, for the operator console's plan editor.
+ *
+ * Copy, and therefore the app's — `@4dl/billing`'s `planAdminRoutes` ships the
+ * key LIST (it comes off the engine) and this ships the words. A key with no
+ * entry here still renders, spelled as its raw key and labelled as new, because
+ * an unlabelled setting is a nuisance and an invisible one is a setting nobody
+ * knows is there.
+ */
+export const QUOTA_META: Record<string, { label: string; hint: string; unit?: string }> = {
+  staffSeats: { label: "Staff seats", hint: "Everyone who signs in. Tessa has no customer role, so every member takes one." },
+  locations: { label: "Locations", hint: "Rooms, stores and theatres in the locations tree." },
+  catalogItems: { label: "Catalog items", hint: "Distinct types of instrument or consumable — not the stock on hand." },
+  storageMb: { label: "Media storage", hint: "Cycle evidence and label photos.", unit: "MB" },
+};
+
+export const FEATURE_META: Record<string, { label: string; hint: string; reserved?: boolean }> = {
+  customDomain: { label: "Custom domain", hint: "The centre reaches Tessa at its own address instead of a subdomain." },
+  ai: { label: "AI suite", hint: "Label reading and the insight lanes. Metered against the credit balance." },
+};

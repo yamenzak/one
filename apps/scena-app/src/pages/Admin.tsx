@@ -46,7 +46,6 @@ import {
   stripePing,
   stripeSync,
   adminListPlans,
-  adminSavePlan,
   adminListModels,
   adminSaveModel,
   adminResyncModels,
@@ -67,7 +66,7 @@ import {
   adminDeleteLibraryTrack,
   nukeRequest,
   nukeConfirm,
-  type Plan,
+  type AdminPlanRef,
   type AdminModel,
   type PromoCode,
   type AdminTenant,
@@ -416,290 +415,21 @@ export function StripeTab() {
 }
 
 /* --------------------------------- Plans --------------------------------- */
-export function PlansTab() {
-  const [plans, setPlans] = useState<Plan[] | null>(null);
-  const [editing, setEditing] = useState<Plan | null>(null);
-  const reload = () =>
-    adminListPlans()
-      .then(setPlans)
-      .catch(() => {});
-  useEffect(() => {
-    reload();
-  }, []);
-  if (!plans) return <Loading />;
-
-  async function savePrice(p: Plan, cents: number) {
-    await adminSavePlan(p.id, { price_cents: cents });
-    toast.success(`Updated ${p.name} price.`);
-    await reload();
-  }
-  async function saveGrant(p: Plan, grant: number) {
-    try {
-      const ent = JSON.parse(p.entitlements_json) as { aiCredits?: { monthlyGrant?: number } };
-      ent.aiCredits = { ...(ent.aiCredits ?? {}), monthlyGrant: grant };
-      await adminSavePlan(p.id, { entitlements_json: JSON.stringify(ent) });
-      toast.success(`Updated ${p.name} grant.`);
-      await reload();
-    } catch {
-      /* ignore */
-    }
-  }
-
-  return (
-    <Card>
-      <div className="mb-4">
-        <h3 className="text-title-3">Plans &amp; entitlements</h3>
-        <p className="text-body text-muted-foreground">
-          Edit price/grant inline and click away to save. <b>Configure</b> opens the full entitlements editor — changes apply to{" "}
-          <b>every current and future tenant</b> on the plan (per-tenant overrides in the Tenants tab still win).
-        </p>
-      </div>
-      <div className="overflow-x-auto">
-        <Group>
-          {plans.map((p, i) => (
-            <PlanRow key={p.id} plan={p} onPrice={savePrice} onGrant={saveGrant} onConfigure={() => setEditing(p)} last={i === plans.length - 1} />
-          ))}
-        </Group>
-      </div>
-      {editing && (
-        <PlanEntitlementsModal
-          plan={editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            reload();
-          }}
-        />
-      )}
-    </Card>
-  );
-}
-
-/**
- * One plan — a `Row`, and the two editable numbers live in `trailing`.
- *
- * The grid this replaces put Price and Grant in their own columns because a
- * table needs one shape per row. But nobody compares four plans' prices by
- * scanning a column here; they open the console to CHANGE one. So the numbers
- * sit together where the hand is, each with its own label, and the plan's
- * identity and standing read as a sentence on the left.
- */
-function PlanRow({
-  plan,
-  onPrice,
-  onGrant,
-  onConfigure,
-  last,
-}: {
-  plan: Plan;
-  onPrice: (p: Plan, c: number) => void;
-  onGrant: (p: Plan, g: number) => void;
-  onConfigure: () => void;
-  last: boolean;
-}) {
-  const grant = (() => {
-    try {
-      return (JSON.parse(plan.entitlements_json) as { aiCredits?: { monthlyGrant?: number } }).aiCredits?.monthlyGrant ?? 0;
-    } catch {
-      return 0;
-    }
-  })();
-  const [price, setPrice] = useState(String(plan.price_cents));
-  const [g, setG] = useState(String(grant));
-  return (
-    <Row
-      divider={!last}
-      sub={
-        <span className="flex items-center gap-2">
-          <span className="font-mono">{plan.id}</span>
-          <StatusDot tone={plan.active ? "success" : "neutral"} />
-          {plan.active ? "Active" : "Off"}
-          {plan.stripe_price_id ? " · Stripe synced" : " · not in Stripe"}
-        </span>
-      }
-      trailing={
-        <span className="flex shrink-0 items-center gap-3">
-          <label className="flex flex-col items-end gap-1">
-            <span className="text-micro uppercase text-muted-foreground">¢ / mo</span>
-            <Input
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              onBlur={() => onPrice(plan, Number(price) || 0)}
-              aria-label={`${plan.name} price in cents per month`}
-              className="h-9 w-24 font-mono tabular-nums"
-            />
-          </label>
-          <label className="flex flex-col items-end gap-1">
-            <span className="text-micro uppercase text-muted-foreground">cr / mo</span>
-            <Input
-              value={g}
-              onChange={(e) => setG(e.target.value)}
-              onBlur={() => onGrant(plan, Number(g) || 0)}
-              aria-label={`${plan.name} monthly credit grant`}
-              className="h-9 w-24 font-mono tabular-nums"
-            />
-          </label>
-          <Button size="sm" variant="outline" onClick={onConfigure}>
-            Configure
-          </Button>
-        </span>
-      }
-    >
-      {plan.name}
-    </Row>
-  );
-}
-
-/* ---------------------- Per-plan entitlements editor ---------------------- */
-// Editing a plan's entitlements_json applies live to every tenant on the plan
-// (tenantEntitlements resolves the plan row per request). Per-tenant overrides
-// still take precedence. -1 = unlimited on any quota.
-//
-// The quota + feature rows are derived from the shared catalog (@scena/manifest)
-// so every entitlement the plan shape supports appears here automatically — add
-// a feature to the catalog and it shows up in this editor, the tenant overrides,
-// the billing cards, and the dashboard gates at once (no drifting hand lists).
-const PLAN_QUOTAS = QUOTA_CATALOG;
 /*
-  EVERY FEATURE IS A BOOLEAN NOW. Four used to be variant allow-lists (`ticker`,
-  `clock`, `weather`, `alerting`); Stage 4 flattened them into booleans, and the
-  two "Variant & channel allow-lists" editors that rendered them are gone with
-  the `kind` field they filtered on.
+  THE PLAN CATALOG EDITOR IS `@4dl/admin`'s NOW — `PlatformPlansSection`,
+  mounted from `AdminDoor.tsx`.
+
+  What was here: an inline price/grant editor plus a modal for the rest, over a
+  `PUT` where the other apps used a `PATCH`, and with no GRANDFATHERING at all —
+  so tightening a tier took the capability away from every workspace already on
+  it, and the help text described that as the design. It also could not edit the
+  free TRIAL, which is the thing that replaced the free tier here.
+
+  The rows are still derived from `@scena/manifest`'s catalogs, which is what
+  made the move cheap: the server hands the panel `quotaKeys`/`featureKeys` and
+  their labels (see `entitlements.ts`'s `PLAN_*_META`), so a feature added to the
+  catalog still appears in the editor on its own.
 */
-const PLAN_BOOL_FEATURES = FEATURE_CATALOG;
-/** Features grouped by catalog category, in category order, for a tidy editor. */
-const FEATURE_GROUPS = FEATURE_CATEGORIES.map((cat) => ({ cat, items: PLAN_BOOL_FEATURES.filter((f) => f.category === cat) })).filter(
-  (g) => g.items.length > 0,
-);
-
-type PlanEnt = {
-  quotas: Record<string, number>;
-  features: Record<string, unknown>;
-  aiCredits: { monthlyGrant?: number };
-  [k: string]: unknown;
-};
-
-function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose: () => void; onSaved: () => void }) {
-  const [ent, setEnt] = useState<PlanEnt | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    let parsed: PlanEnt;
-    try {
-      parsed = JSON.parse(plan.entitlements_json) as PlanEnt;
-    } catch {
-      parsed = { quotas: {}, features: {}, aiCredits: {} };
-    }
-    parsed.quotas ??= {};
-    parsed.features ??= {};
-    parsed.aiCredits ??= {};
-    setEnt(parsed);
-  }, [plan]);
-
-  const setQuota = (k: string, v: string) =>
-    setEnt((e) => e && { ...e, quotas: { ...e.quotas, [k]: v.trim() === "" || v.trim() === "-" ? 0 : Math.trunc(Number(v)) || 0 } });
-  const setBool = (k: string, v: boolean) => setEnt((e) => e && { ...e, features: { ...e.features, [k]: v } });
-  const toggleList = (k: string, opt: string) =>
-    setEnt((e) => {
-      if (!e) return e;
-      const cur = Array.isArray(e.features[k]) ? (e.features[k] as string[]) : [];
-      const next = cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt];
-      return { ...e, features: { ...e.features, [k]: next } };
-    });
-
-  async function save() {
-    if (!ent) return;
-    setSaving(true);
-    try {
-      await adminSavePlan(plan.id, { entitlements_json: JSON.stringify(ent) });
-      toast.success(`Updated ${plan.name} entitlements — applied to all ${plan.name} tenants.`);
-      onSaved();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save entitlements");
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog
-      open
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
-      <DialogContent title={<>{plan.name} — entitlements</>} className="flex max-h-[88dvh] flex-col overflow-hidden sm:max-w-3xl">
-        <DialogDescription>
-          Applies to <b>every current and future tenant</b> on <span className="font-mono">{plan.id}</span> (per-tenant overrides still win). <b>-1</b> =
-          unlimited on any quota.
-        </DialogDescription>
-        {!ent ? (
-          <Loading />
-        ) : (
-          <>
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
-              <div className="space-y-2">
-                <SectionLabel>Quotas</SectionLabel>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {PLAN_QUOTAS.map((x) => (
-                    <label key={x.key} className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-body text-muted-foreground">
-                      <span className="flex-1">{x.label}</span>
-                      <Input
-                        value={String(ent.quotas[x.key] ?? 0)}
-                        onChange={(e) => setQuota(x.key, e.target.value)}
-                        className="h-8 w-20 text-right font-mono tabular-nums"
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <SectionLabel>Features</SectionLabel>
-                {FEATURE_GROUPS.map((g) => (
-                  <div key={g.cat} className="space-y-1.5">
-                    <div className="text-micro text-muted-foreground/70 uppercase">{g.cat}</div>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {g.items.map((x) => (
-                        <label key={x.key} title={x.description} className="flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-body">
-                          <span className="flex-1 text-muted-foreground">
-                            {x.label}
-                            {x.safety && (
-                              <span className="ml-1.5 rounded bg-muted px-1 py-0.5 text-micro text-muted-foreground/70 uppercase">
-                                always on
-                              </span>
-                            )}
-                          </span>
-                          <Switch checked={Boolean(ent.features[x.key])} onCheckedChange={(v) => setBool(x.key, v)} />
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-body text-muted-foreground">
-                <span className="flex-1">Monthly AI credit grant</span>
-                <Input
-                  value={String(ent.aiCredits.monthlyGrant ?? 0)}
-                  onChange={(e) => setEnt((s) => s && { ...s, aiCredits: { ...s.aiCredits, monthlyGrant: Math.trunc(Number(e.target.value)) || 0 } })}
-                  className="h-8 w-24 text-right font-mono tabular-nums"
-                />
-              </label>
-            </div>
-            <DialogFooter className="border-t pt-3">
-              <Button variant="ghost" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button disabled={saving} onClick={save}>
-                {saving ? "Saving…" : "Save entitlements"}
-              </Button>
-            </DialogFooter>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 /* -------------------------------- Models --------------------------------- */
 /**
@@ -1243,7 +973,7 @@ function audioFileDuration(file: File): Promise<number> {
 /* -------------------------------- Promos --------------------------------- */
 export function PromosTab() {
   const [promos, setPromos] = useState<PromoCode[] | null>(null);
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plans, setPlans] = useState<AdminPlanRef[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const reload = () =>
     adminListPromos()
@@ -1336,7 +1066,7 @@ export function PromosTab() {
 }
 
 /** Create a promo code (credit top-up or comped plan). */
-function PromoDialog({ open, plans, onClose, onSaved }: { open: boolean; plans: Plan[]; onClose: () => void; onSaved: () => void }) {
+function PromoDialog({ open, plans, onClose, onSaved }: { open: boolean; plans: AdminPlanRef[]; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({ code: "", kind: "credits", credits: "1000", planId: "pro", planMonths: "12", maxRedemptions: "", note: "" });
   const [busy, setBusy] = useState(false);
   useEffect(() => {

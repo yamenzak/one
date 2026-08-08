@@ -1254,6 +1254,11 @@ describe("the operator console answers on its door and nowhere else", () => {
     "/api/admin/rail/parked",
     "/api/admin/domains/config",
     "/api/admin/turnstile/config",
+    // The plan catalog. Scena's handler is still hand-written (its `plans` table
+    // is `price_cents`, not the shared `price_usd_month`) but it answers
+    // `@4dl/admin`'s contract, so the panel is the shared one and this list is
+    // where "the panel renders and 404s on its first read" gets caught.
+    "/api/admin/plans",
   ];
 
   it("registers every endpoint the console's shared panels call", async () => {

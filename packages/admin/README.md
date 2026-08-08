@@ -17,6 +17,7 @@ The operator console every 4DL app puts on its `admin.` door.
 | `sections/ai.tsx` | Provider key, mock lane, credit markup, catalog sync, and the per-lane default-model picker. |
 | `sections/shared-config.tsx` | **The shared platform store** — the keys every 4DL app reads, set once instead of once per product. |
 | `sections/rail.tsx` | **Unattributed payments** — Stripe events the rail could not match to any app. Money in, nothing granted. |
+| `sections/plans.tsx` | **The plan catalog** — price, limits, features, the credit grant and the free TRIAL. |
 
 ## The sections are the app's; the frame is not
 
@@ -98,7 +99,7 @@ nobody knows is set.
 
 ## What a panel may live here
 
-Only configuration a **shared package already owns**. Seven qualify today:
+Only configuration a **shared package already owns**. Eight qualify today:
 
 - **Email delivery** — `email.provider`, `email.from`, `email.platform_from` and
   `email.credits_per_email` are `@4dl/email`'s keys, read by nothing else, and
@@ -126,6 +127,24 @@ Only configuration a **shared package already owns**. Seven qualify today:
 - **Turnstile** — `@4dl/auth`'s. A secret stored with no site key locks *every*
   4DL app out of its own sign-in, so the warning belongs with the package that
   owns the check, not with whoever remembers to write it.
+- **The plan catalog** — over `@4dl/billing`'s `planAdminRoutes`. The three
+  rules it carries are the argument for it being here rather than in each app,
+  because each is invisible until it costs something: a price change must NULL
+  the plan's Stripe id pair (or `syncCatalog` skips the row and every subscriber
+  keeps paying the old amount), lowering a limit must GRANDFATHER whoever is
+  already on the tier, and an omitted `trialDays` means "leave it alone" rather
+  than "no trial". Written three times, this went: all three in one app, none in
+  a second that had no plan editor at all, and the middle one missing in a third
+  — whose help text described stripping live tenants as the design.
+
+  What the app supplies is the CONTENTS (`DEFAULT_PLANS`) and the key LABELS.
+  The key LIST comes off the bound entitlement engine, so a limit added
+  server-side appears in the editor with no client release.
+
+  ⚠️ The conformance entry is `/api/admin/plans/` **with the trailing slash** —
+  the EDIT. The bare list read stays allowed, because a promo dialog needs the
+  plan names for a dropdown and refusing that would push an app into inventing a
+  second endpoint over the same rows.
 - **AI** — over `@4dl/ai`'s `aiCatalogAdminRoutes`. An app's own pieces ride in
   as slots: `extraSub` for a live self-test (which needs the product's prompts)
   and `extraBelowCatalog` for whatever it does with user feedback. `extraSub`'s

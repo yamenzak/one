@@ -12,6 +12,7 @@
  */
 
 import type { ConfigSource } from "@4dl/core";
+import { hasPaymentMethod, reverseChargedCredits } from "@4dl/billing";
 import type { Env } from "./env.js";
 import { DEMO_TENANT } from "./db.js";
 import {
@@ -28,6 +29,18 @@ import {
 } from "./billing-store.js";
 import { grantForTenant } from "./billing-service.js";
 import { notifyRole } from "./notify.js";
+
+/**
+ * ⚠️ THIS IS LIVE DATA, not a naming choice.
+ *
+ * `metadata[scena_tenant]` is stamped on every Stripe customer, subscription,
+ * price and checkout session Scena has ever created, and the webhook reads it
+ * back to decide whose workspace an event is about. Changing it orphans
+ * everything already sold — and on a shared Stripe account it also un-attributes
+ * the events, so they park instead of applying. The literals below (`scena_pack`,
+ * `scena_plan`, `scena_credits`) share the prefix and are the same promise.
+ */
+export const SCENA_METADATA_PREFIX = "scena";
 
 export interface StripeCfg {
   mode: string; // disabled | test | live
@@ -268,6 +281,21 @@ async function tenantOfEvent(env: Env, obj: Record<string, unknown>): Promise<st
   throw new Error(`stripe event carries no resolvable tenant (customer=${customer ?? "none"})`);
 }
 
+/**
+ * Is this event about the subscription we currently hold for the workspace?
+ *
+ * A mid-cycle upgrade creates a SECOND Stripe subscription, and the old one
+ * keeps emitting `updated` and `deleted` events with its own metadata for a
+ * while afterwards. Acting on those moves the live plan's status or drops a
+ * paying workspace to `free`. No stored id means nothing to contradict — a
+ * fresh subscription is let through so it can be adopted.
+ */
+async function isCurrentSub(env: Env, tenantId: string, obj: Record<string, unknown>): Promise<boolean> {
+  const subId = typeof obj["id"] === "string" ? obj["id"] : null;
+  const cur = await getSubscription(env.DB, tenantId);
+  return !cur?.stripe_sub_id || !subId || cur.stripe_sub_id === subId;
+}
+
 export async function handleWebhook(env: Env, event: StripeEvent): Promise<void> {
   const obj = event.data.object;
   const tenantId = await tenantOfEvent(env, obj);
@@ -313,21 +341,83 @@ export async function handleWebhook(env: Env, event: StripeEvent): Promise<void>
       const periodEnd = Number((obj["lines"] as { data?: { period?: { end?: number } }[] } | undefined)?.data?.[0]?.period?.end ?? 0) * 1000 || null;
       const sub = await getSubscription(env.DB, tenantId);
       const nextPlan = sub.pending_plan_id ?? sub.plan_id;
-      await updateSubscription(env.DB, tenantId, {
-        plan_id: nextPlan,
-        pending_plan_id: null,
-        status: "active",
-        current_period_end: periodEnd,
-        past_due_at: null,
-        suspend_at: null,
-        delete_at: null,
-      });
+      /*
+        ⚠️ `unlessLadderOwned` — this wrote `active` unconditionally.
+
+        A late or duplicate `invoice.paid` therefore pulled a workspace back out
+        of `suspended` (stalling the ladder, which selects on the previous rung)
+        and out of `closing` (undoing a deletion the owner asked for, since
+        `scheduleTenantClose` cancels the Stripe subscription and Stripe answers
+        with events of its own). Both fail SAFE, so neither reports anything.
+
+        Paying IS the way out of `past_due`, and that is unaffected: `past_due`
+        is not on the list. Coming back from `suspended` is an operator action,
+        not a webhook's.
+      */
+      await updateSubscription(
+        env.DB,
+        tenantId,
+        {
+          plan_id: nextPlan,
+          pending_plan_id: null,
+          status: "active",
+          current_period_end: periodEnd,
+          past_due_at: null,
+          suspend_at: null,
+          delete_at: null,
+        },
+        { unlessLadderOwned: true },
+      );
       await grantForTenant(env, tenantId);
+      break;
+    }
+    /**
+     * MONEY WENT BACK, SO THE CREDITS HAVE TO.
+     *
+     * Scena sells four credit packs and had no handler for either event, so a
+     * refunded pack left its credits spendable — the workspace kept the goods
+     * and the money, and nothing reported a problem.
+     *
+     * The maths is `@4dl/billing`'s: proportional to the refunded share, clamped
+     * to the pack, and incremental against the CUMULATIVE `amount_refunded`
+     * Stripe re-sends on every partial refund. A dispute carries no customer and
+     * empty metadata, so the underlying charge is fetched first — and that
+     * lookup THROWS rather than returning empty, which is what makes an
+     * unattributable chargeback redelivered rather than quietly dropped.
+     */
+    case "charge.refunded":
+    case "charge.dispute.created": {
+      const cfg = await stripeCfg(env);
+      const outcome = await reverseChargedCredits(
+        {
+          db: env.DB,
+          secretKey: cfg.secretKey,
+          metadataPrefix: SCENA_METADATA_PREFIX,
+          authority: async (id) => {
+            const billing = env.BILLING.get(env.BILLING.idFromName(id));
+            await billing.bind(id);
+            return billing;
+          },
+        },
+        event,
+      );
+      if (!outcome) break;
+      // Sent whatever the maths did: a plan-level refund carries no credit count,
+      // so there is nothing to reverse and still something an owner must know.
+      await notifyRole(env, outcome.tenantId, "owner", {
+        type: outcome.disputed ? "payment_disputed" : "payment_refunded",
+        message: outcome.disputed
+          ? "A payment on this workspace was disputed. Any credits it granted may be reversed — check the balance."
+          : "A payment on this workspace was refunded. Credits from a refunded pack have been reversed from the balance.",
+        dedupeKey: `${event.type}:${String(obj["id"] ?? "")}`,
+      }).catch(() => undefined);
       break;
     }
     case "invoice.payment_failed": {
       // Enter dunning: mark past_due; the lifecycle cron schedules suspend/delete.
-      await updateSubscription(env.DB, tenantId, { status: "past_due", past_due_at: Date.now() });
+      // Guarded for the same reason `invoice.paid` is — a failed invoice on a
+      // workspace already suspended must not reset it to the first rung.
+      await updateSubscription(env.DB, tenantId, { status: "past_due", past_due_at: Date.now() }, { unlessLadderOwned: true });
       await notifyRole(env, tenantId, "owner", {
         type: "billing_past_due",
         message: "We couldn't process your latest payment. Update your card to keep your screens live — after a grace period the workspace is suspended.",
@@ -338,13 +428,32 @@ export async function handleWebhook(env: Env, event: StripeEvent): Promise<void>
       break;
     }
     case "customer.subscription.deleted": {
-      await updateSubscription(env.DB, tenantId, { status: "canceled", plan_id: "free", stripe_sub_id: null });
+      // Only if the DELETED subscription is the one we hold. A stale sub being
+      // cleaned up after an upgrade must not drop a workspace whose new
+      // subscription is live and paying.
+      if (!(await isCurrentSub(env, tenantId, obj))) break;
+      await updateSubscription(env.DB, tenantId, { status: "canceled", plan_id: "free", stripe_sub_id: null }, { unlessLadderOwned: true });
       break;
     }
     case "customer.subscription.updated": {
+      if (!(await isCurrentSub(env, tenantId, obj))) break;
       const status = String(obj["status"] ?? "");
+      /*
+        ⚠️ `trialing` ALONE IS NOT A PAID-FOR PLAN.
+
+        Stripe reports `trialing` for a trial with no card attached — a
+        subscription created from the dashboard, or one whose card confirmation
+        has not landed yet. Stamping it granted the plan's full entitlements for
+        the length of the trial to somebody who had paid nothing and could not
+        be charged at the end of it. The same shape, in Kova, handed out a paid
+        tier plus its whole monthly credit grant before the guard existed.
+
+        Scena's own Checkout collects a card, so the ordinary path is unchanged:
+        `hasPaymentMethod` is true and this reads exactly as it did.
+      */
+      if (status === "trialing" && !hasPaymentMethod(obj)) break;
       const map: Record<string, string> = { active: "active", past_due: "past_due", canceled: "canceled", unpaid: "past_due", trialing: "trialing" };
-      if (map[status]) await updateSubscription(env.DB, tenantId, { status: map[status] });
+      if (map[status]) await updateSubscription(env.DB, tenantId, { status: map[status] }, { unlessLadderOwned: true });
       break;
     }
   }

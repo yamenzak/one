@@ -334,80 +334,20 @@ export const adminRoutes = new Hono<AppEnv>()
     return c.json(view);
   })
 
-  // ── Plan builder: edit any plan's full entitlement matrix ──────────────────
-  .get("/admin/plans", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    await seedBilling(c.env.DB);
-    const rows = await c.env.DB.prepare("SELECT * FROM plans ORDER BY ord").all<{ id: string; name: string; price_usd_month: number; entitlements_json: string | null; active: number; ord: number }>();
-    const counts = await c.env.DB.prepare("SELECT plan_id, COUNT(*) AS n FROM subscriptions WHERE status = 'active' GROUP BY plan_id").all<{ plan_id: string; n: number }>();
-    const countMap = new Map((counts.results ?? []).map((r) => [r.plan_id, r.n]));
-    return c.json({
-      plans: (rows.results ?? []).map((p) => ({ id: p.id, name: p.name, priceUsdMonth: p.price_usd_month, active: p.active, ord: p.ord, entitlements: resolveEntitlements(p.entitlements_json), tenantCount: countMap.get(p.id) ?? 0 })),
-      featureKeys: FEATURE_KEYS, quotaKeys: QUOTA_KEYS, featureMeta: FEATURE_META, quotaMeta: QUOTA_META,
-    });
-  })
+  /*
+    THE PLAN CATALOG IS `@4dl/billing`'s NOW — `planAdminRoutes`, mounted in
+    index.ts beside the other package route trees.
 
-  // Edit a plan. Lowering a limit / disabling a feature grandfathers existing
-  // tenants (snapshot the old level into their grant-only override); new tenants
-  // get the new plan. Raising / enabling auto-applies to everyone at read time.
-  .patch("/admin/plans/:id", async (c) => {
-    if (!isPlatformAdmin(c)) return c.json({ error: "forbidden" }, 403);
-    const body = z
-      .object({
-        name: z.string().max(60).optional(),
-        priceUsdMonth: z.number().min(0).optional(),
-        active: z.boolean().optional(),
-        entitlements: z.object({
-          quotas: z.record(z.string(), z.number()).default({}),
-          features: z.record(z.string(), z.boolean()).default({}),
-          aiCredits: z.object({ monthlyGrant: z.number().min(0) }).default({ monthlyGrant: 0 }),
-          // Declared so zod doesn't STRIP it: without this key an edit through
-          // the plan builder would silently wipe a plan's free trial.
-          trialDays: z.number().int().min(0).max(730).optional(),
-        }).optional(),
-      })
-      .safeParse(await c.req.json().catch(() => null));
-    if (!body.success) return c.json({ error: "invalid body" }, 400);
-    await seedBilling(c.env.DB);
-    const id = c.req.param("id");
-    const plan = await c.env.DB.prepare("SELECT entitlements_json, price_usd_month FROM plans WHERE id = ?").bind(id).first<{ entitlements_json: string | null; price_usd_month: number | null }>();
-    if (!plan) return c.json({ error: "unknown plan" }, 404);
+    Both endpoints were here, and their absence in a second app and their
+    divergence in a third is the whole argument: changing a price in Tessa meant
+    a code edit and a deploy, and Scena's editor had no grandfathering at all, so
+    tightening a tier silently stripped capability from every live workspace.
 
-    let entJson = plan.entitlements_json;
-    let grandfathered = 0;
-    if (body.data.entitlements) {
-      const oldEnt = resolveEntitlements(plan.entitlements_json);
-      // An omitted `trialDays` means "leave it alone", not "no trial" — the admin
-      // console posts back the matrix it rendered, and a client that predates the
-      // field must not silently retire the plan's trial.
-      const incoming = { ...body.data.entitlements, trialDays: body.data.entitlements.trialDays ?? oldEnt.trialDays };
-      const newEnt = resolveEntitlements(JSON.stringify(incoming));
-      entJson = JSON.stringify(newEnt);
-      const grants = snapshotDowngrade(oldEnt, newEnt);
-      if (Object.keys(grants).length) {
-        const subs = await c.env.DB.prepare("SELECT tenant_id, overrides_json FROM subscriptions WHERE plan_id = ? AND status = 'active'").bind(id).all<{ tenant_id: string; overrides_json: string | null }>();
-        const stmts = (subs.results ?? []).map((s) =>
-          c.env.DB.prepare("UPDATE subscriptions SET overrides_json = ?, updated_at = ? WHERE tenant_id = ?").bind(raiseOverride(s.overrides_json, grants), nowIso(), s.tenant_id),
-        );
-        if (stmts.length) await c.env.DB.batch(stmts);
-        grandfathered = stmts.length;
-      }
-    }
-    const sets: string[] = ["entitlements_json = ?"]; const binds: unknown[] = [entJson];
-    if (body.data.name !== undefined) (sets.push("name = ?"), binds.push(body.data.name));
-    if (body.data.priceUsdMonth !== undefined) (sets.push("price_usd_month = ?"), binds.push(body.data.priceUsdMonth));
-    if (body.data.active !== undefined) (sets.push("active = ?"), binds.push(body.data.active ? 1 : 0));
-    // A PRICE change invalidates the plan's Stripe price id. `syncCatalog` skips
-    // any row that already has one, so leaving it in place means every future
-    // checkout keeps charging the OLD amount — silently, with a 200 back. Null
-    // the pair so the next "Sync catalog" recreates product + price at the new
-    // amount. (The old Stripe price object survives, which is what we want:
-    // tenants already subscribed on it keep their price until they re-subscribe.)
-    const repriced = body.data.priceUsdMonth !== undefined && body.data.priceUsdMonth !== plan.price_usd_month;
-    if (repriced) sets.push("stripe_product_id = NULL", "stripe_price_id = NULL");
-    await c.env.DB.prepare(`UPDATE plans SET ${sets.join(", ")} WHERE id = ?`).bind(...binds, id).run();
-    return c.json({ ok: true, grandfathered, stripeResyncRequired: repriced });
-  })
+    What moved is the SHAPE — the Stripe-id null-out on a reprice, the
+    `snapshotDowngrade` grandfathering, and the rule that an omitted `trialDays`
+    means "leave it alone". What stays Kova's is the CONTENTS, which is
+    `DEFAULT_PLANS` in billing-store.ts, and the key LABELS in `@kova/domain`.
+  */
 
   // ── Per-tenant gifting (grant-only): raise limits / unlock features ─────────
   .get("/admin/tenants/:id/entitlements", async (c) => {

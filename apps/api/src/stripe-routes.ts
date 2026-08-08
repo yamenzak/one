@@ -50,11 +50,10 @@ import { parseJson, j } from "./db.js";
  * either reads Kova's registries or answers an HTTP route.
  */
 import {
-  creditsAlreadyReversed,
   firstSeen,
   hasPaymentMethod,
   invoiceSubscriptionId,
-  resolveReversal,
+  reverseChargedCredits as reverseCredits,
   stripeId,
   supersedePlatformSub,
   syncStripeSubscription,
@@ -748,50 +747,42 @@ async function activatePlan(db: D1Database, billing: AppEnv["Bindings"]["BILLING
 
 
 /**
- * Money-safe reversal on the PLATFORM rail (the Connect rail only surfaces
- * refunds — budget days are not safely clawable). A refunded or disputed
- * credit-pack purchase must not leave the granted credits spendable, but it must
- * be reversed PROPORTIONALLY: `charge.refunded` fires for PARTIAL refunds too,
- * so a $5 goodwill refund on a $100 / 130,000-credit pack used to revoke all
- * 130,000 — and two partial refunds revoked that twice. We reverse
- * `round(credits × amount_refunded / amount)` minus whatever this charge has
- * already had reversed, and always notify so a human can reconcile what we
- * can't auto-reverse (e.g. a plan-level refund with no credit count).
+ * A refunded or disputed pack, on Kova's registry.
+ *
+ * The reversal MATHS is `@4dl/billing`'s now — proportional to the refunded
+ * share, clamped to the pack, and incremental against the cumulative total
+ * Stripe re-sends on every partial refund. Two of the three apps here shipped
+ * without any of it, which is why it moved.
+ *
+ * What stays Kova's is the sentence the owner reads, and the fact that we send
+ * one WHATEVER the maths did: a plan-level refund carries no credit count, so
+ * there is nothing to reverse and still something a human must reconcile.
  */
 async function reverseChargedCredits(
   env: AppEnv["Bindings"],
   event: { type: string; id?: string; data: { object: Record<string, unknown> } },
   secretKey: string,
 ): Promise<void> {
-  const db = env.DB;
-  const obj = event.data.object;
-  const disputed = event.type === "charge.dispute.created";
-  const r = await resolveReversal(obj, event.type, secretKey);
-  const tenantId = r.meta.kova_tenant ?? (await tenantByCustomer(db, r.customer));
-  if (!tenantId) return;
-
-  const packCredits = Number(r.meta.kova_credits ?? 0);
-  if (Number.isFinite(packCredits) && packCredits > 0 && r.amountCents > 0) {
-    // Proportional, clamped to the pack. A FULL refund (reversed === amount)
-    // reverses exactly `packCredits`.
-    const share = Math.min(1, Math.max(0, r.reversedCents / r.amountCents));
-    const owed = Math.min(packCredits, Math.round(packCredits * share));
-    const already = await creditsAlreadyReversed(db, tenantId, r.chargeId);
-    const take = owed - already;
-    if (take > 0) {
-      const dobj = env.BILLING.get(env.BILLING.idFromName(tenantId));
-      await dobj.bind(tenantId);
-      // `ref` = the charge id (not the pack id) so the ledger doubles as the
-      // per-charge reversal total read back above.
-      await dobj.revokePurchased(take, disputed ? "pack.dispute" : "pack.refund", r.chargeId ?? undefined);
-    }
-  }
-  await notifyOwners(env, tenantId, {
-    type: disputed ? "payment_disputed" : "payment_refunded",
-    message: disputed
+  const outcome = await reverseCredits(
+    {
+      db: env.DB,
+      secretKey,
+      metadataPrefix: STRIPE_BRANDING.metadataPrefix,
+      authority: async (tenantId) => {
+        const dobj = env.BILLING.get(env.BILLING.idFromName(tenantId));
+        await dobj.bind(tenantId);
+        return dobj;
+      },
+    },
+    event,
+  );
+  if (!outcome) return;
+  await notifyOwners(env, outcome.tenantId, {
+    type: outcome.disputed ? "payment_disputed" : "payment_refunded",
+    message: outcome.disputed
       ? "A payment on your Kova account was disputed. Any credits it granted may be reversed — review your balance."
       : "A payment on your Kova account was refunded. Credits from a refunded pack were reversed from your balance.",
-    dedupeKey: typeof obj.id === "string" ? `${event.type}_${obj.id}` : event.id,
+    dedupeKey: typeof event.data.object.id === "string" ? `${event.type}_${event.data.object.id}` : event.id,
   });
 }
 

@@ -56,6 +56,31 @@ Eight instances, all found by the same lens:
 eight sections and **none of them is the plan catalog** — so Kova and Scena wrote
 one each and Tessa has none at all. Trial length is not editable in any of them.
 
+> ### ✅ Step 4b is DONE (2026-08-08)
+>
+> Rows 7 and 8 above and the plan-catalog paragraph are the shape of the problem
+> as it was found; three of them are now closed. What landed:
+>
+> - **`reverseChargedCredits` is `@4dl/billing`'s**, and Kova, Tessa and Scena
+>   all call it. A refunded or disputed credit pack now has its credits clawed
+>   back proportionally and incrementally in every app; before this it happened
+>   in one. 9 tests.
+> - **Scena's reconciler gained the three guards** — the `LADDER_OWNED` clamp
+>   (as a SQL condition on `updateSubscription`, so it cannot race the sweep),
+>   the stale-subscription guard, and the card-less-trial refusal. 9 tests
+>   against a real D1, including that paying still clears `past_due`.
+> - **`PlatformPlansSection` + `planAdminRoutes` ship**, mounted in all three
+>   consoles. Kova's editor moved into the package, Tessa gained a plan editor it
+>   never had, Scena's was replaced — and gained the grandfathering it lacked,
+>   which is the one that was actively taking capability away from live
+>   workspaces. **`trialDays` is editable for the first time anywhere.** 14 tests.
+> - `/api/admin/plans/` (the EDIT, trailing slash) is now in
+>   `SHARED_ADMIN_ENDPOINTS`, so rebuilding this panel is a test failure. The
+>   bare list read stays allowed — a promo dialog needs the names.
+>
+> Rows 1–6 are open, and so is Scena's console conformance test (its two
+> remaining violations are the Stripe and Email panels, which is step 2).
+
 **And one structural finding that outranks all eight**, because it is why there
 will be a ninth: `apps/_template` **has no SPA**. It is a 1,230-line worker
 and nothing else. Every browser surface a new app needs — shell, session, host
@@ -689,24 +714,53 @@ Two halves, and the second is the big one:
   product vocabulary removed. This is the single change that most affects how
   fast the next app ships and how much it looks like the last one.
 
-### 4b. The money path — *do the reconciler before the code move*
+### 4b. The money path — ✅ **DONE (2026-08-08)**
 
 Independent of the `BILLING_SCHEMA` reconciliation in step 5, and higher
-priority than it, because these are the findings with money behind them:
+priority than it, because these are the findings with money behind them. All
+three landed; what each turned up on the way is worth recording:
 
-1. **Add `charge.refunded` + `charge.dispute.created` to Tessa and Scena.**
-   `resolveReversal` / `creditsAlreadyReversed` are already in `@4dl/billing`
-   and already handle the cumulative-amount trap. Both apps sell the same four
-   credit packs; today a refund in either leaves the credits granted.
-2. **Put Scena's reconciler on `syncStripeSubscription`**, or — if the column
-   shapes make that a step too far before (5) — at minimum add the
-   `LADDER_OWNED` exclusion and the stale-sub guard to `handleWebhook`. A late
-   `invoice.paid` reviving a `closing` workspace is a bug with a paper trail
-   already written in the shared code's comments.
-3. **Ship a plans panel in `@4dl/admin`**, over the generic
-   `featureKeys`/`quotaKeys` payload the server already returns — with a
-   `trialDays` field, which no app can edit today and Kova's section blurb
-   advertises. Kova's `PlansConfig` is the right shape to move; Scena's
+1. ~~**Add `charge.refunded` + `charge.dispute.created` to Tessa and Scena.**~~
+   **DONE**, and it went further than adding two cases: the maths itself was
+   Kova's, so `reverseChargedCredits` moved into `@4dl/billing` with the
+   metadata prefix injected, and Kova now calls the shared one. An extraction is
+   a move — the app kept only the sentence its owner reads, because notification
+   copy is a registry and never a package's.
+
+   `packages/billing/test/reversal.test.ts` is 9 tests, and the one that earns
+   its keep is *"is INCREMENTAL — a second partial refund takes only the
+   difference"*: Stripe re-sends `amount_refunded` **cumulative**, so the obvious
+   implementation reverses twice for a customer owed one reversal.
+
+2. ~~**Put Scena's reconciler on `syncStripeSubscription`**, or … add the
+   `LADDER_OWNED` exclusion and the stale-sub guard.~~ **DONE — the second
+   option**, because `BILLING_SCHEMA`'s column shapes still block the first.
+
+   The clamp went into `updateSubscription` as an OPTIONAL SQL condition rather
+   than a check above the call site, and that placement is the point: the
+   function is a read-modify-write, so a guard in the handler would race the
+   lifecycle sweep it exists to protect. Three tests assert a `suspended`,
+   `closing` and `canceled` workspace all survive an `invoice.paid`, one asserts
+   that paying still clears `past_due` (the rung where paying IS the way out),
+   and one pins `LADDER_OWNED` against the shared constant so Scena's guard and
+   the other apps' cannot drift.
+
+3. ~~**Ship a plans panel in `@4dl/admin`**~~ **DONE**, and the routes with it —
+   `planAdminRoutes` in `@4dl/billing`, because the panel needs one contract and
+   there were two shapes and one absence.
+
+   Kova's editor moved; Tessa gained one it never had; Scena's was replaced and
+   picked up the **grandfathering it did not have** — its old editor wrote the
+   new entitlements and stopped, so tightening a tier took the capability away
+   from every workspace already on it, and the help text described that as
+   intended. Scena's routes stay hand-written (its `plans` table is still
+   `price_cents`) but now speak the shared wire contract, so the day the columns
+   are reconciled that block is deleted rather than rewritten.
+
+   **`trialDays` is editable for the first time in any of them.** The panel is
+   driven by the server's `quotaKeys`/`featureKeys` and their labels, so it
+   carries no product vocabulary, and `featureMeta.group` lets Scena's nine
+   catalog categories survive the move. Kova's `PlansConfig` is the right shape to move; Scena's
    `PlansTab` and Tessa's absence both resolve into it.
 
 ### 5. Retire Scena's duplicated paths — *largest code win, lowest urgency*

@@ -192,6 +192,12 @@ What replaced the free tier is a **trial**: `starter` and `pro` open with 30 day
 free, collected as a card up front through Stripe Checkout
 (`subscription_data.trial_period_days`) so nothing is charged until it ends.
 
+The lengths below are the SEED. They are edited in the operator console —
+`@4dl/admin`'s plan panel, on `@4dl/billing`'s contract — which is new: Scena's
+own editor could change a price and a credit grant and not the trial, and it
+wrote a tightened tier straight through to every workspace already on it with
+no grandfathering. Lowering a limit now holds each of them at what they bought.
+
 | | free (parking) | starter | pro | business |
 |---|---|---|---|---|
 | price / month | — | $19 | $49 | $149 |
@@ -596,7 +602,7 @@ and grants, and `PAGE_META` carries each key's title and subtitle.
 | setup | Sign in (email code) | `apps/scena-app/src/pages/Login.tsx` |
 | setup, signed in | The three-step wizard | `apps/scena-app/src/pages/Onboarding.tsx` |
 | `<slug>`, unclaimed | No workspace at this address | `apps/scena-app/src/pages/Doors.tsx` (`ScenaNoWorkspace`) |
-| admin | The operator console | `apps/scena-app/src/pages/AdminDoor.tsx` → `pages/Admin.tsx` |
+| admin | The operator console | `apps/scena-app/src/pages/AdminDoor.tsx` → `pages/Admin.tsx` for Scena's own panels, `@4dl/admin`'s `sections/*` for the rest (plans, email, shared config, domains, Turnstile, rail, maintenance) |
 | device (`play.`) | The screen itself | `apps/scena-player/src/main.ts` |
 
 ⚠️ **A workspace is created in exactly one place, and it is not the sign-in

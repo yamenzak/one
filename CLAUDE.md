@@ -75,7 +75,10 @@ packages/
              # reads, subscription resolution, the two ceilings — the catalog's
              # CONTENTS are the app's), credit metering, the per-tenant credit
              # Durable Object (CreditLedgerDO — the class NAME is load-bearing),
-             # the Stripe client, and the dunning ladder. See its README.
+             # the Stripe client, the dunning ladder, the PLAN-CATALOG operator
+             # routes, and the refund/dispute CREDIT REVERSAL (proportional,
+             # clamped, and incremental against Stripe's cumulative
+             # `amount_refunded`). See its README.
   storage/   # @4dl/storage — R2 + the media ledger + the quota gate (resolver
              # injected, so it does not depend on billing), plus the three media
              # ROUTES: upload, the storage meter, the authed read. The closed
@@ -116,8 +119,10 @@ packages/
              # with an extra table. See its README.
   admin/     # @4dl/admin — the OPERATOR CONSOLE on every app's `admin.` door:
              # the router-free section-registry shell, plus panels for config a
-             # shared package owns (email delivery, maintenance). The SECTIONS
-             # are the app's.
+             # shared package owns (email delivery, maintenance, Stripe, domains,
+             # Turnstile, AI, shared config, the rail's dead letter, and the PLAN
+             # CATALOG — price, limits, features, grant and the free TRIAL, which
+             # no app could edit before it moved). The SECTIONS are the app's.
              # See its README.
   app-kit/   # @4dl/app-kit — the BROWSER runtime: the typed fetch layer and its
              # three-way offline outcome (queued | offline | HTTP error), host
@@ -772,13 +777,18 @@ handlers are woven through Kova's notification registry, entitlement gates and
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
 moves. **Measured 2026-08-08** from one `pnpm test`, per package:
-**632 kova/api (+31 skipped) + 237 kova/domain + 234 scena/api + 152 tessa/api +
-145 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 80 ai + 63 commerce +
-61 scena/widgets + 45 billing + 45 billing-rail + 44 core + 40 scena/timeline +
+**632 kova/api (+31 skipped) + 243 scena/api + 237 kova/domain + 152 tessa/api +
+145 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 80 ai + 68 billing +
+63 commerce + 61 scena/widgets + 45 billing-rail + 44 core + 40 scena/timeline +
 35 auth + 30 scena/app + 24 notify + 23 scena/manifest + 18 scena/protocol +
 18 storage + 18 app-kit + 17 kova/protocol + 17 template + 14 tessa/app +
-14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,331 passing,
+14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,363 passing,
 31 skipped**, 58 turbo tasks, all green.
+
+The +32 since the earlier figure on the same day is `@4dl/billing` 45 → 68 (the
+refund/dispute reversal and the plan-catalog routes, both moved out of an app)
+and `@4dl/scena` 234 → 243 (the three webhook guards). A split moves tests; these
+are new coverage over behaviour that was previously in one app or in none.
 
 Scena's 449 (234 api + 30 app + 185 across its five pure packages) were never in
 the older figure at all; nor were Tessa's. `@scena/timeline`'s 40 are the ones

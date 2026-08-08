@@ -338,3 +338,89 @@ export async function resolveReversal(
     customer: src.customer,
   };
 }
+
+/** The credit authority, as much of it as a reversal touches. */
+export interface RevocableAuthority {
+  revokePurchased(credits: number, reason?: string, ref?: string): Promise<unknown>;
+}
+
+export interface ReverseCreditsDeps {
+  db: D1Database;
+  /** For resolving the charge behind a Dispute — see `resolveReversal`. */
+  secretKey: string;
+  /**
+   * The prefix the checkout stamped, so this reads `<prefix>_tenant` and
+   * `<prefix>_credits`. Same value as `StripeBranding.metadataPrefix` and the
+   * rail's `metadataPrefix`, and it is LIVE DATA — see the note at each app's
+   * `STRIPE_BRANDING`.
+   */
+  metadataPrefix: string;
+  /** This tenant's credit authority, already bound. */
+  authority: (tenantId: string) => Promise<RevocableAuthority>;
+}
+
+export interface ReversalOutcome {
+  tenantId: string;
+  /** A chargeback rather than a refund — the app's copy differs. */
+  disputed: boolean;
+  /** Credits THIS event actually clawed back. 0 when the total was already settled. */
+  reversed: number;
+  chargeId: string | null;
+}
+
+/**
+ * MONEY WENT BACK; THE CREDITS HAVE TO GO WITH IT.
+ *
+ * `charge.refunded` and `charge.dispute.created` are the two events that mean a
+ * payment we already granted against has been reversed. Without this, a
+ * refunded credit pack leaves its credits spendable — the tenant keeps the
+ * goods and the money, and nothing anywhere reports a problem. It shipped that
+ * way in two of three apps, which is why it is here rather than in one of them.
+ *
+ * Three things make this harder than "subtract the pack":
+ *
+ *   PARTIAL REFUNDS ARE PROPORTIONAL. A $25 refund on a $100 pack takes a
+ *   quarter of the credits, clamped so a full refund takes exactly the pack and
+ *   never more.
+ *
+ *   EVERY EVENT CARRIES THE CUMULATIVE TOTAL. Stripe fires `charge.refunded`
+ *   again for each partial refund, with `amount_refunded` summed to date — so
+ *   subtracting the event's own share twice is the default behaviour of the
+ *   obvious implementation. `creditsAlreadyReversed` reads the ledger back by
+ *   charge id and takes only the difference.
+ *
+ *   A DISPUTE IS NOT A CHARGE. It carries no customer and empty metadata, so
+ *   `resolveReversal` fetches the underlying charge first. That lookup throws
+ *   rather than returning empty, so an unattributable chargeback is redelivered
+ *   instead of silently dropped.
+ *
+ * Returns what happened so the caller can tell the owner in its own words —
+ * notification copy is the app's registry, never a shared package's. `null`
+ * means no tenant could be resolved and nothing was touched.
+ */
+export async function reverseChargedCredits(
+  deps: ReverseCreditsDeps,
+  event: { type: string; data: { object: Record<string, unknown> } },
+): Promise<ReversalOutcome | null> {
+  const { db, secretKey, metadataPrefix } = deps;
+  const disputed = event.type === "charge.dispute.created";
+  const r = await resolveReversal(event.data.object, event.type, secretKey);
+  const tenantId = r.meta[`${metadataPrefix}_tenant`] ?? (await tenantByCustomer(db, r.customer));
+  if (!tenantId) return null;
+
+  const packCredits = Number(r.meta[`${metadataPrefix}_credits`] ?? 0);
+  let reversed = 0;
+  if (Number.isFinite(packCredits) && packCredits > 0 && r.amountCents > 0) {
+    const share = Math.min(1, Math.max(0, r.reversedCents / r.amountCents));
+    const owed = Math.min(packCredits, Math.round(packCredits * share));
+    const take = owed - (await creditsAlreadyReversed(db, tenantId, r.chargeId));
+    if (take > 0) {
+      const authority = await deps.authority(tenantId);
+      // `ref` = the CHARGE id, not the pack id, so the ledger doubles as the
+      // per-charge reversal total `creditsAlreadyReversed` reads back.
+      await authority.revokePurchased(take, disputed ? "pack.dispute" : "pack.refund", r.chargeId ?? undefined);
+      reversed = take;
+    }
+  }
+  return { tenantId, disputed, reversed, chargeId: r.chargeId };
+}

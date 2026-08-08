@@ -7,3 +7,4 @@ export * from "./schema.js";
 export * from "./store.js";
 export * from "./stripe.js";
 export * from "./webhook.js";
+export { planAdminRoutes, type PlanAdminConfig, type PlanKeyMeta } from "./plan-admin-routes.js";

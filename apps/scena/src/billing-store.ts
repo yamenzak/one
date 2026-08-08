@@ -8,6 +8,7 @@
 
 import { getConfig as coreGetConfig, type ConfigSource } from "@4dl/core";
 import { DEFAULT_SEED_MARKUP, lanesFor, seedAiModels, type AiModelRow } from "@4dl/ai";
+import { LADDER_OWNED } from "@4dl/billing";
 import { ensureSchema, DEMO_TENANT } from "./db.js";
 // `billing-seed.js` is imported for the plan/pack/config seeds AND for its
 // module-load side effect: it is where Scena hands `@4dl/ai` its lanes and its
@@ -289,7 +290,30 @@ export async function getSubscription(db: D1Database, tenantId = DEMO_TENANT): P
   return (await db.prepare("SELECT * FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<SubscriptionRow>())!;
 }
 
-export async function updateSubscription(db: D1Database, tenantId: string, patch: Partial<SubscriptionRow>): Promise<void> {
+/**
+ * `unlessLadderOwned` — the clamp that stops a payment webhook stalling the
+ * dunning ladder, or reviving a workspace its owner asked us to close.
+ *
+ * Scena's ladder escalates by SELECTING on the previous rung's status
+ * (`past_due` → `suspended` → deleted), and `closing` is an owner decision
+ * carrying its own `delete_at`. A late `invoice.paid` writing `active`
+ * unconditionally — which is what this did — breaks the chain permanently and
+ * fails SAFE, so nothing anywhere reports it: the workspace is simply never
+ * suspended, never purged, and its storage never reclaimed. `closing` is the
+ * sharper half, because `scheduleTenantClose` cancels the Stripe subscription
+ * and Stripe fires the cancellation straight back at us.
+ *
+ * The guard is in the SQL rather than a read-then-check above the call, because
+ * this function is a read-modify-write and the check would race with the sweep.
+ * `LADDER_OWNED` is `@4dl/billing`'s list, shared with the other apps' handlers
+ * so the two cannot drift.
+ */
+export async function updateSubscription(
+  db: D1Database,
+  tenantId: string,
+  patch: Partial<SubscriptionRow>,
+  opts?: { unlessLadderOwned?: boolean },
+): Promise<void> {
   await ensureBilling(db);
   const cur = await getSubscription(db, tenantId);
   const next = { ...cur, ...patch, updated_at: Date.now() };
@@ -297,7 +321,7 @@ export async function updateSubscription(db: D1Database, tenantId: string, patch
     .prepare(
       `UPDATE subscriptions SET plan_id = ?, status = ?, comp = ?, stripe_customer_id = ?, stripe_sub_id = ?,
         pending_plan_id = ?, current_period_end = ?, past_due_at = ?, suspend_at = ?, delete_at = ?, updated_at = ?
-       WHERE tenant_id = ?`,
+       WHERE tenant_id = ?${opts?.unlessLadderOwned ? ` AND status NOT IN (${LADDER_OWNED})` : ""}`,
     )
     .bind(
       next.plan_id,

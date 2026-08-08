@@ -32,6 +32,20 @@ export const SHARED_ADMIN_ENDPOINTS: { path: string; section: string }[] = [
   { path: "/api/admin/turnstile/", section: "PlatformTurnstileSection" },
   { path: "/api/admin/email", section: "PlatformEmailSection" },
   { path: "/api/admin/maintenance", section: "PlatformMaintenanceSection" },
+  /**
+   * The trailing slash is deliberate and is the whole precision of this entry.
+   *
+   * `PATCH /api/admin/plans/:id` is the EDIT, and rebuilding an editor over it
+   * is exactly what this file exists to stop — two apps did, in two shapes, and
+   * the one without grandfathering silently stripped capability from every
+   * tenant on a tier the operator tightened.
+   *
+   * `GET /api/admin/plans` — no slash — stays allowed, because reading the
+   * catalog is not editing it: the promo-code dialog needs the plan list for a
+   * dropdown, and refusing that would push an app into inventing a second
+   * endpoint for the same rows.
+   */
+  { path: "/api/admin/plans/", section: "PlatformPlansSection" },
 ];
 
 function walk(dir: string, out: string[] = []): string[] {

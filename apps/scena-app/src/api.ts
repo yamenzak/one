@@ -1210,6 +1210,12 @@ export interface Balance {
   available: number;
 }
 
+/**
+ * A plan as the TENANT-facing `/api/billing` payload carries it — the raw row,
+ * cents and all. Distinct from `AdminPlanRef` on purpose: the operator console's
+ * catalog read speaks `@4dl/admin`'s contract (dollars, resolved entitlements)
+ * and this one has not moved.
+ */
 export interface Plan {
   id: string;
   name: string;
@@ -1220,6 +1226,12 @@ export interface Plan {
   stripe_price_id: string | null;
   active: number;
   sort: number;
+}
+
+/** A plan, as much of one as the promo picker needs to name it. */
+export interface AdminPlanRef {
+  id: string;
+  name: string;
 }
 
 export interface Pack {
@@ -1450,12 +1462,17 @@ export async function stripeSync(): Promise<{ ok?: boolean; error?: string; plan
   return (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; plans?: unknown[]; packs?: unknown[] };
 }
 
-export async function adminListPlans(): Promise<Plan[]> {
-  return ((await (await apiFetch(`${API_BASE}/api/admin/plans`)).json()) as { plans: Plan[] }).plans;
-}
-
-export async function adminSavePlan(id: string, patch: Partial<Plan>): Promise<void> {
-  await apiFetch(`${API_BASE}/api/admin/plans/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
+/**
+ * The plan list, for the ONE surface that still needs it here: the promo-code
+ * dialog's "which plan does this apply to" picker.
+ *
+ * Editing a plan is `@4dl/admin`'s `PlatformPlansSection` and goes through the
+ * package, which is why there is no `adminSavePlan` any more. `id` and `name`
+ * are all this caller reads, and saying so keeps the SPA from re-declaring a
+ * payload shape the server owns.
+ */
+export async function adminListPlans(): Promise<AdminPlanRef[]> {
+  return ((await (await apiFetch(`${API_BASE}/api/admin/plans`)).json()) as { plans: AdminPlanRef[] }).plans;
 }
 
 /**

@@ -48,7 +48,10 @@ import {
   setTenantOverrides,
 } from "./billing-store.js";
 import { hasGeminiKey } from "./gemini.js";
-import { checkDowngrade, type Usage } from "./entitlements.js";
+import {
+  checkDowngrade, resolveEntitlements, snapshotDowngrade, raiseOverride,
+  QUOTA_KEYS, FEATURE_KEYS, PLAN_QUOTA_META, PLAN_FEATURE_META, type Usage,
+} from "./entitlements.js";
 import { countScreens } from "./db.js";
 import { listChannels } from "./content.js";
 import { listBoards } from "./board-store.js";
@@ -60,7 +63,7 @@ import { listLibrary, listGenres, createLibraryTrack, updateLibraryTrack, delete
 import { generate, type AiTask } from "./ai.js";
 import { addSlide } from "./content.js";
 import { grantForTenant, lifecycleSweep, deleteTenantData } from "./billing-service.js";
-import { stripeCfg, stripeEnabled, syncCatalog, subscriptionCheckout, packCheckout, stripePing, handleWebhook } from "./stripe.js";
+import { stripeCfg, stripeEnabled, syncCatalog, subscriptionCheckout, packCheckout, stripePing, handleWebhook, SCENA_METADATA_PREFIX } from "./stripe.js";
 import { dispatchEvent } from "@4dl/billing-rail";
 import { firstSeen, unmarkSeen } from "@4dl/billing";
 
@@ -543,18 +546,101 @@ export function registerBilling(app: App): void {
     }
   });
 
+  /**
+   * THE PLAN CATALOG, on `@4dl/admin`'s contract.
+   *
+   * These are hand-written rather than `@4dl/billing`'s `planAdminRoutes`
+   * because Scena's `plans` table is still its own — `price_cents` + `currency`
+   * where the shared schema has `price_usd_month` — and that reconciliation is
+   * a data migration, not a wiring change (see `src/schema.ts`). What they DO
+   * speak is the shared wire contract, so the console renders the same panel
+   * every other app does, and the day the columns are reconciled this whole
+   * block is deleted rather than rewritten.
+   *
+   * Two things this gained on the way, and both were missing:
+   *
+   *   GRANDFATHERING. The old editor wrote the new entitlements and stopped, so
+   *   tightening a tier took the capability away from every workspace already on
+   *   it — immediately, silently, and described in the help text as intended.
+   *   `snapshotDowngrade` + `raiseOverride` hold each of them at what they
+   *   bought; raising a limit still applies to everybody at read time.
+   *
+   *   THE STRIPE ID NULL-OUT. `syncCatalog` skips a plan that already carries a
+   *   price id, so a repriced plan kept charging the OLD amount forever, with a
+   *   200 back and nothing in any log.
+   */
   app.get("/api/admin/plans", async (c) => {
     const deny = await requireAdmin(c);
     if (deny) return deny;
-    return c.json({ plans: await listPlans(c.env.DB) });
+    const plans = await listPlans(c.env.DB);
+    const counts = await c.env.DB
+      .prepare("SELECT plan_id, COUNT(*) AS n FROM subscriptions WHERE status = 'active' GROUP BY plan_id")
+      .all<{ plan_id: string; n: number }>()
+      .catch(() => ({ results: [] as { plan_id: string; n: number }[] }));
+    const countMap = new Map((counts.results ?? []).map((r) => [r.plan_id, r.n]));
+    return c.json({
+      plans: plans.map((p) => ({
+        id: p.id,
+        name: p.name,
+        // The shared contract is dollars. Scena stores cents, which is the whole
+        // of the difference between this handler and the package's.
+        priceUsdMonth: p.price_cents / 100,
+        active: p.active,
+        ord: p.sort,
+        tenantCount: countMap.get(p.id) ?? 0,
+        entitlements: resolveEntitlements(p.entitlements_json),
+      })),
+      quotaKeys: QUOTA_KEYS,
+      featureKeys: FEATURE_KEYS,
+      quotaMeta: PLAN_QUOTA_META,
+      featureMeta: PLAN_FEATURE_META,
+    });
   });
 
-  app.put("/api/admin/plans/:id", async (c) => {
+  app.patch("/api/admin/plans/:id", async (c) => {
     const deny = await requireAdmin(c);
     if (deny) return deny;
-    const body = await c.req.json<{ name?: string; price_cents?: number; entitlements_json?: string; active?: number; sort?: number }>().catch(() => ({}));
-    await upsertPlan(c.env.DB, { id: c.req.param("id"), ...body });
-    return c.json({ ok: true });
+    const body = await c.req
+      .json<{ name?: string; priceUsdMonth?: number; active?: boolean; entitlements?: Record<string, unknown> }>()
+      .catch(() => ({}) as Record<string, never>);
+    const id = c.req.param("id");
+    const plan = await getPlan(c.env.DB, id);
+    if (!plan) return c.json({ error: "unknown plan" }, 404);
+
+    const patch: Parameters<typeof upsertPlan>[1] = { id };
+    let grandfathered = 0;
+    if (body.entitlements) {
+      const oldEnt = resolveEntitlements(plan.entitlements_json);
+      // An omitted `trialDays` means "leave it alone", not "no trial": the panel
+      // posts back the matrix it rendered, and a client that predates the field
+      // must not retire a plan's free trial as a side effect of an unrelated edit.
+      const incoming = { ...body.entitlements, trialDays: (body.entitlements as { trialDays?: number }).trialDays ?? oldEnt.trialDays };
+      const newEnt = resolveEntitlements(JSON.stringify(incoming));
+      patch.entitlements_json = JSON.stringify(newEnt);
+      const grants = snapshotDowngrade(oldEnt, newEnt);
+      if (Object.keys(grants).length) {
+        const subs = await c.env.DB
+          .prepare("SELECT tenant_id, overrides_json FROM subscriptions WHERE plan_id = ? AND status = 'active'")
+          .bind(id)
+          .all<{ tenant_id: string; overrides_json: string | null }>();
+        const stmts = (subs.results ?? []).map((s) =>
+          c.env.DB
+            .prepare("UPDATE subscriptions SET overrides_json = ?, updated_at = ? WHERE tenant_id = ?")
+            .bind(raiseOverride(s.overrides_json, grants), Date.now(), s.tenant_id),
+        );
+        if (stmts.length) await c.env.DB.batch(stmts);
+        grandfathered = stmts.length;
+      }
+    }
+    if (body.name !== undefined) patch.name = body.name;
+    if (body.active !== undefined) patch.active = body.active ? 1 : 0;
+    const repriced = body.priceUsdMonth !== undefined && Math.round(body.priceUsdMonth * 100) !== plan.price_cents;
+    if (body.priceUsdMonth !== undefined) patch.price_cents = Math.round(body.priceUsdMonth * 100);
+    await upsertPlan(c.env.DB, patch);
+    if (repriced) {
+      await c.env.DB.prepare("UPDATE plans SET stripe_product_id = NULL, stripe_price_id = NULL WHERE id = ?").bind(id).run();
+    }
+    return c.json({ ok: true, grandfathered, stripeResyncRequired: repriced });
   });
 
   app.get("/api/admin/models", async (c) => {
@@ -823,7 +909,7 @@ export function registerBilling(app: App): void {
       {
         apps: [{
           slug: SCENA_APP,
-          metadataPrefix: "scena",
+          metadataPrefix: SCENA_METADATA_PREFIX,
           claims: async (e) => tenantByCustomer(c.env.DB, (e.data.object as { customer?: unknown }).customer),
           handle: (e) => handleWebhook(c.env, e as never),
         }],

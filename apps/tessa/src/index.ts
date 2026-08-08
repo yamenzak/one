@@ -43,7 +43,7 @@ import { emailAdminRoutes } from "@4dl/email/admin-routes";
 import { sharedConfigRoutes } from "@4dl/core/admin-routes";
 import { railAdminRoutes } from "@4dl/billing-rail/admin-routes";
 import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
-import { DUNNING_DAYS } from "@4dl/billing";
+import { DUNNING_DAYS, planAdminRoutes } from "@4dl/billing";
 import { periodKey } from "@4dl/core";
 import { billingAdminRoutes, billingRoutes, stripeWebhookRoutes } from "./billing-routes.js";
 import { onboardingRoutes } from "./onboarding-routes.js";
@@ -52,7 +52,7 @@ import { aiCatalogAdminRoutes, applySharedSelection, disableRetiredModels } from
 import { settingsRoutes } from "./settings-routes.js";
 import { insightRoutes } from "./insight-routes.js";
 import { staffRoutes } from "./staff-routes.js";
-import { entitlements } from "./entitlements.js";
+import { entitlements, FEATURE_META, QUOTA_META, type AppEntitlements } from "./entitlements.js";
 import { listPlans, seedBilling } from "./billing-store.js";
 import { ensureSchema } from "./db.js";
 import { purgeTenant } from "./purge.js";
@@ -206,6 +206,26 @@ app.route("/api", insightRoutes);
 app.route("/api", aiRoutes);
 app.route("/api", stripeWebhookRoutes);
 app.route("/api", billingAdminRoutes);
+/**
+ * The PLAN CATALOG's operator routes — `@4dl/billing`'s.
+ *
+ * Tessa had no plan editor at all: changing a price, a limit or the trial was a
+ * code edit, a deploy and a catalog sync. It sells one plan, which is exactly
+ * why nobody noticed — one plan is still a price somebody eventually wants to
+ * move, and the two rules that matter (the Stripe-id null-out on a reprice, and
+ * grandfathering whoever is already on the tier) are the same for one plan as
+ * for four.
+ */
+app.route(
+  "/api",
+  planAdminRoutes<AppEntitlements>({
+    isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+    seed: (db) => seedBilling(db),
+    engine: entitlements,
+    quotaMeta: QUOTA_META,
+    featureMeta: FEATURE_META,
+  }) as unknown as Hono<AppEnv>,
+);
 app.route("/api", aiAdminRoutes);
 // The provider key, mock lane, credit markup and model catalog are
 // `@4dl/ai`'s state, so their console endpoints are `@4dl/ai`'s routes.
