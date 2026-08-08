@@ -16,6 +16,7 @@ import type { Env } from "./env.js";
 import { type AppEnv, type AppContext, sessionMiddleware, tenantOf, owns, isPlatformAdmin } from "./auth-context.js";
 import { routeGuard } from "./route-guard.js";
 import { domainRoutes, domainAdminRoutes, orgCreateGuard, orgUpdateGuard } from "./domain-routes.js";
+import { otpSendGuard } from "./otp-guard.js";
 import { maintenanceMiddleware } from "@4dl/tenancy";
 import { parseManifest, type Manifest } from "@scena/manifest";
 import { demoAssetSvg, DEFAULT_WIDGETS } from "./demo.js";
@@ -181,8 +182,34 @@ app.use("*", routeGuard);
 app.use("/api/auth/organization/create", orgCreateGuard as unknown as MiddlewareHandler<AppEnv>);
 app.use("/api/auth/organization/update", orgUpdateGuard as unknown as MiddlewareHandler<AppEnv>);
 
-// Better Auth handler: sign-up/in, magic-link, Google, organization + member
-// management all live under /api/auth/*.
+/**
+ * THE ONE GATE in front of the emailed sign-in code, ahead of the catch-all so
+ * this exact path lands here rather than on Better Auth's handler.
+ *
+ * On a product where a code is the only way a person gets in, everything that
+ * protects the front door — the bot check, the 30-second cooldown, the per-IP
+ * hourly ceiling, invite-only eligibility and the deliverability pre-flight —
+ * lives in `otpSendGuard` and nowhere else.
+ */
+app.post("/api/auth/email-otp/send-verification-otp", otpSendGuard as unknown as MiddlewareHandler<AppEnv>);
+
+/**
+ * The two sibling endpoints the emailOTP plugin registers unconditionally, both
+ * closed.
+ *
+ * Each calls the same `sendVerificationOTP` callback directly, so each is a way
+ * around the guard above entirely — no Turnstile, no cooldown, no per-IP ceiling,
+ * no eligibility — which would let somebody keep requesting codes after an
+ * operator turned the bot check on. A station's credential login is a different
+ * plugin and is unaffected; nothing else here has a password to reset, so
+ * password-reset OTP is attack surface with no legitimate caller. 404 rather
+ * than 403: do not confirm it exists.
+ */
+app.post("/api/auth/email-otp/request-password-reset", (c) => c.json({ error: "not_found" }, 404));
+app.post("/api/auth/forget-password/email-otp", (c) => c.json({ error: "not_found" }, 404));
+
+// Better Auth handler: the rest of its lane — OTP verify, passkeys, station
+// credentials, sessions, organization + member management.
 app.on(["POST", "GET"], "/api/auth/*", (c) => c.get("auth").handler(c.req.raw));
 
 app.get("/health", (c) => c.json({ ok: true, service: "scena-api" }));

@@ -27,6 +27,7 @@ import { createAuth } from "./auth.js";
 import { guard } from "./route-guard.js";
 import { domainAdminRoutes, domainRoutes } from "./domain-routes.js";
 import { orgCreateGuard, orgUpdateGuard } from "./org-guard.js";
+import { otpSendGuard } from "./otp-guard.js";
 import { caseRoutes } from "./case-routes.js";
 import { contextRoutes } from "./context-routes.js";
 import { notifyRoutes } from "@4dl/notify/routes";
@@ -80,7 +81,34 @@ app.get("/health", (c) => c.json({ ok: true }));
 app.use("/api/auth/organization/create", orgCreateGuard);
 app.use("/api/auth/organization/update", orgUpdateGuard);
 
-/** Better Auth owns its whole lane: OTP, passkeys, sessions, organizations. */
+/**
+ * THE ONE GATE in front of the emailed sign-in code, ahead of the catch-all so
+ * this exact path lands here rather than on Better Auth's handler.
+ *
+ * Registered FIRST for the same reason the two closures below it exist: on a
+ * passwordless product this endpoint is the entire front door, and everything
+ * that protects it — the bot check, the 30-second cooldown, the per-IP hourly
+ * ceiling, invite-only eligibility and the deliverability pre-flight — lives in
+ * `otpSendGuard` and nowhere else.
+ */
+app.post("/api/auth/email-otp/send-verification-otp", otpSendGuard);
+
+/**
+ * The two sibling endpoints the emailOTP plugin registers unconditionally, both
+ * closed.
+ *
+ * They call the same `sendVerificationOTP` callback directly, so each is a way
+ * around the guard above entirely — no Turnstile, no cooldown, no per-IP
+ * ceiling, no eligibility — which would let somebody keep requesting codes after
+ * an operator turned the bot check on. There is no password provider here at all
+ * (`emailAndPassword: { enabled: false }`), so password-reset OTP is pure attack
+ * surface with no legitimate caller. 404 rather than 403: do not confirm it
+ * exists.
+ */
+app.post("/api/auth/email-otp/request-password-reset", (c) => c.json({ error: "not_found" }, 404));
+app.post("/api/auth/forget-password/email-otp", (c) => c.json({ error: "not_found" }, 404));
+
+/** Better Auth owns the rest of its lane: OTP verify, passkeys, sessions, organizations. */
 app.on(["GET", "POST"], "/api/auth/*", (c) => {
   const auth = createAuth(c.env, new URL(c.req.url).origin, c.get("host").shape);
   return auth.handler(c.req.raw);
