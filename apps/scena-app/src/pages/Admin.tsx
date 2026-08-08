@@ -735,11 +735,34 @@ export function ModelsTab() {
     await adminSaveModel(m.id, patch);
     await reload();
   }
+  /**
+   * REPORT WHAT THE PAGES SAID, not what the seed re-wrote.
+   *
+   * This said `${added} added, ${updated} updated` — both counted from the
+   * hardcoded catalog, so a settled deployment saw "17 updated" on every press
+   * while no rate had moved and no page had been read. The number was real and
+   * the sentence it implied was not.
+   *
+   * Now: repricings first (the thing you pressed the button for), then the two
+   * kinds of switching-off, and a WARNING rather than a success when a pricing
+   * page could not be read — because that run left rates untouched on purpose
+   * and reporting it green would be the same lie in a smaller font.
+   */
   async function resync() {
     setSyncing(true);
     try {
       const r = await adminResyncModels();
-      toast.success(`Catalog synced · ${r.added} added, ${r.updated} updated`);
+      const off = r.rates.retired.length + r.rates.delisted.length;
+      const parts = [
+        `${r.rates.repriced} repriced`,
+        off ? `${off} switched off` : null,
+        r.added ? `${r.added} added` : null,
+      ].filter(Boolean);
+      if (r.rates.ok) toast.success(`Rates synced · ${parts.join(", ")}`);
+      else {
+        const why = r.rates.providers.filter((p) => !p.ok).map((p) => `${p.provider}: ${p.error ?? "unavailable"}`);
+        toast.error(`Partly synced (${parts.join(", ")}). ${why.join(" · ")}`);
+      }
       await reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Re-sync failed");

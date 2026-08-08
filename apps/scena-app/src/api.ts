@@ -1407,10 +1407,40 @@ export async function adminSaveModel(id: string, patch: Partial<AdminModel>): Pr
   await fetch(`${API_BASE}/api/admin/models/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
 }
 
-export async function adminResyncModels(): Promise<{ added: number; updated: number }> {
+/** What one provider's pricing page produced. `ok: false` means it was not read
+ *  at all and that lane's rates were deliberately left alone. */
+export interface RateSyncProvider {
+  provider: "workers-ai" | "google";
+  source: string;
+  ok: boolean;
+  parsed: number;
+  repriced: number;
+  retired: string[];
+  delisted: string[];
+  unchanged: number;
+  error: string | null;
+}
+
+export interface ResyncResult {
+  added: number;
+  updated: number;
+  /**
+   * What the live PRICING PAGES said, separately from what the built-in seed
+   * re-wrote.
+   *
+   * The two used to be one number, and it was misleading: `updated` counts rows
+   * the hardcoded catalog touched, which on a settled deployment is every row,
+   * every time, with the same values. An operator read "17 updated" as "rates
+   * refreshed from Cloudflare" and nothing had been fetched.
+   */
+  rates: { ok: boolean; repriced: number; retired: string[]; delisted: string[]; providers: RateSyncProvider[] };
+  gemini: { error?: string; added?: number; updated?: number };
+}
+
+export async function adminResyncModels(): Promise<ResyncResult> {
   const res = await fetch(`${API_BASE}/api/admin/models/resync`, { method: "POST" });
   if (!res.ok) throw new Error(`resync failed (${res.status})`);
-  return (await res.json()) as { added: number; updated: number };
+  return (await res.json()) as ResyncResult;
 }
 
 export interface PromoCode {

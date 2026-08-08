@@ -46,6 +46,7 @@ import { listLibrary, listGenres, createLibraryTrack, updateLibraryTrack, delete
 import { generate, type AiTask } from "./ai.js";
 import { addSlide } from "./content.js";
 import { grantForTenant, lifecycleSweep, deleteTenantData } from "./billing-service.js";
+import { syncScenaModelRates } from "./ai-catalog-sync.js";
 import { stripeCfg, stripeEnabled, syncCatalog, subscriptionCheckout, packCheckout, stripePing, handleWebhook } from "./stripe.js";
 import { dispatchEvent } from "@4dl/billing-rail";
 import { firstSeen, unmarkSeen } from "@4dl/billing";
@@ -514,17 +515,49 @@ export function registerBilling(app: App): void {
     return c.json({ ok: true });
   });
 
-  // Re-sync the model catalog: the built-in Workers AI + curated Gemini rows
-  // (adds new models, refreshes rates), then — if a platform Gemini key is set —
-  // fetch Google's live model list and fold in any additional Gemini/Lyria models.
+  /*
+    RE-SYNC THE CATALOG — and until now this button lied.
+
+    It called `resyncModels`, which upserts every row of the hardcoded
+    `DEFAULT_MODELS` list and returns how many rows it touched. So an operator
+    pressed "Sync", read "17 updated", and reasonably concluded the rates had
+    been refreshed from Cloudflare. Nothing was fetched; the same constants were
+    written back over themselves, and Scena went on metering real credits
+    against whatever they said on the day somebody typed them.
+
+    Three steps now, in this order and for these reasons:
+
+      SEED    `resyncModels` still runs FIRST, because it is what puts a row in
+              the table at all — a model Scena curates but has never inserted
+              cannot be repriced. It is the seed, not the sync.
+      REPRICE `syncScenaModelRates` reads the two live pricing pages through
+              `@4dl/ai`'s parsers and moves the rates, retiring what the
+              provider has shut down and disabling what the page no longer
+              lists. This is the part that was missing.
+      EXTEND  `syncGeminiFromGoogle` folds in models Google's API lists that the
+              curated set does not carry, when a key is configured.
+
+    The response reports the repricing separately from the seeding, because
+    "17 updated" meaning "17 rows rewritten with the same numbers" is what made
+    the old one misleading.
+  */
   app.post("/api/admin/models/resync", async (c) => {
     const deny = await requireAdmin(c);
     if (deny) return deny;
     const curated = await resyncModels(c.env.DB);
+    const rates = await syncScenaModelRates(c.env.DB);
     const gemini = await syncGeminiFromGoogle(c.env);
     return c.json({
       added: curated.added + gemini.added,
       updated: curated.updated + gemini.updated,
+      /** What the PAGES said, as opposed to what the seed re-wrote. */
+      rates: {
+        ok: rates.ok,
+        repriced: rates.providers.reduce((n, p) => n + p.repriced, 0),
+        retired: rates.providers.flatMap((p) => p.retired),
+        delisted: rates.providers.flatMap((p) => p.delisted),
+        providers: rates.providers,
+      },
       gemini: gemini.error ? { error: gemini.error } : { added: gemini.added, updated: gemini.updated },
     });
   });
