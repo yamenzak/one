@@ -1,22 +1,38 @@
 /**
- * PRACTICE SETTINGS.
+ * PRACTICE SETTINGS — an index, and a page per section.
  *
- * Reached from the account menu, which until now pointed at a route that
- * rendered the app bar and tab bar over an empty body — a dead link that
- * typechecked and shipped.
+ * The grammar is Kova's, because there is one settings grammar on this platform
+ * and Kova is where it was worked out (UI-LANGUAGE §7): a table of contents
+ * whose rows say WHAT IS INSIDE, a page per section whose rows say the CURRENT
+ * VALUE, and a section key that lives in the URL.
  *
- * ── Every control here confirms ─────────────────────────────────────────────
+ * ── What changed, and why each one is a defect rather than a preference ─────
  *
- * The instant ones (a switch, a theme picker) go through `useConfirmedState`,
- * which rolls back to the pre-apply snapshot when the write is refused; the ones
- * with a Save button go through `useAction`. Neither is optional:
- * `save-lifecycle.conformance.test.ts` in Kova makes the two shorter shapes a
- * test failure, and both fail SILENTLY — a `.catch(() => undefined)` leaves a
- * control showing a value the server rejected, which on a settings screen is the
- * worst possible outcome, because the person watched it take.
+ * THE SECTION WAS `useState`. It compiles, it looks right, and it means the
+ * whole surface has one address: the browser Back button leaves Settings from
+ * three levels deep instead of stepping out of the open section, nothing is
+ * linkable, and a reload always lands on the index. Kova and Scena both put it
+ * in `?s=`; this was the last one that did not.
+ *
+ * THE LOAD WAS A FULL-SCREEN SPINNER. §7: a skeleton in the shape of what is
+ * coming, not a spinner in the shape of nothing. The index is a known shape
+ * before the data arrives — it is a fixed list of rows — so the only thing that
+ * has to wait is each row's current value.
+ *
+ * "LANGUAGE" WAS A ROW THAT DID NOTHING. It sat in the index with an icon and a
+ * sub-line and no `onClick`, while the actual locale switch rendered as a bare
+ * unlabelled `Group` below the index. So the surface had a door that was a wall
+ * and a control with no door. It is a section now, like everything else.
+ *
+ * THERE WAS NO WAY OUT. `/api/tenant/close*` and `/api/me/delete*` have been
+ * mounted since the exit-routes commit and nothing rendered either — a route
+ * with no door, which passes every test. Both surfaces are `@4dl/app-kit`'s
+ * (`CloseTenantCard`, `AccountExitRows`), so this file names the centre and the
+ * package does the rest.
  */
 
 import { useCallback, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Badge,
   Button,
@@ -29,64 +45,127 @@ import {
   Screen,
   SettingsIndex,
   SettingsPage,
+  SkeletonLine,
   Spinner,
   Switch,
   useAction,
   useConfirmedState,
   useLoad,
+  Avatar,
   Building2,
   CreditCard,
   Globe,
   KeyRound,
   Palette,
+  Trash2,
   Wallet,
   Wand2,
   Users,
   type SettingsGroup,
 } from "@4dl/ui";
-import { PasskeysCard } from "@4dl/app-kit";
+import { AccountExitRows, CloseTenantCard, PasskeysCard } from "@4dl/app-kit";
 import { billing as billingApi, fmt, settings as settingsApi, type AiSettings, type PublicBranding } from "../data.js";
 import { useI18n, useT } from "../i18n.js";
+import { useSession } from "../session.js";
 import { StaffSection } from "./Staff.js";
 
-type View = null | "brand" | "ai" | "plan" | "staff" | "security";
+type View = "brand" | "ai" | "plan" | "staff" | "security" | "language" | "danger";
+
+/**
+ * Closing a section POPS the entry that opening it pushed.
+ *
+ * `setParams` alone would `push` again, so every open/close cycle leaves the
+ * history one deeper than it started and leaving Settings takes one Back press
+ * per section explored. `idx > 0` is the guard for a DEEP LINK: someone who
+ * landed straight on `?s=plan` has nothing of ours to pop back to, and
+ * `history.back()` would take them out of the app.
+ *
+ * Lifted verbatim from Kova's `useCloseSection`, where the bug it fixes was
+ * reported by a user almost word for word.
+ */
+function useCloseSection(): () => void {
+  const [, setParams] = useSearchParams();
+  return () => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (idx > 0) window.history.back();
+    else setParams((q: URLSearchParams) => { q.delete("s"); return q; }, { replace: true });
+  };
+}
 
 export function Settings({ onBack }: { onBack: () => void }) {
   const t = useT();
-  const [view, setView] = useState<View>(null);
+  const { ctx, signOut } = useSession();
+  const [params, setParams] = useSearchParams();
+  const view = params.get("s") as View | null;
+  const closeSection = useCloseSection();
+  const go = (v: View) => setParams((q: URLSearchParams) => { q.set("s", v); return q; });
+
   const load = useCallback(() => settingsApi.read(), []);
-  const { data, error, loading, reload } = useLoad(load, t("settings.title"), fmt);
+  const { data, error, reload } = useLoad(load, t("settings.title"), fmt);
 
-  if (loading) {
-    return (
-      <Screen center>
-        <div className="py-24">
-          <Spinner />
-        </div>
-      </Screen>
-    );
-  }
-  if (error || !data) {
-    return (
-      <Screen>
-        <LoadError what={t("settings.title")} error={error ?? "—"} onRetry={reload} />
-      </Screen>
-    );
-  }
+  const isOwner = ctx?.active?.role === "owner";
 
-  if (view === "brand") return <Screen><BrandSection initial={data.branding} onBack={() => setView(null)} /></Screen>;
-  if (view === "ai") return <Screen><AiSection initial={data.ai} allowed={data.canUseAi} onBack={() => setView(null)} /></Screen>;
-  if (view === "plan") return <Screen><PlanSection onBack={() => setView(null)} /></Screen>;
-  if (view === "staff") return <Screen><StaffSection onBack={() => setView(null)} /></Screen>;
+  /* ── the section pages ─────────────────────────────────────────────────── */
+
+  if (view === "staff") return <Screen><StaffSection onBack={closeSection} /></Screen>;
+  if (view === "plan") return <Screen><PlanSection onBack={closeSection} /></Screen>;
+  if (view === "language") return <Screen><LanguageSection onBack={closeSection} /></Screen>;
   if (view === "security") {
     return (
       <Screen>
-        <SettingsPage title={t("settings.security")} description={t("settings.security.intro")} onBack={() => setView(null)}>
+        <SettingsPage title={t("settings.security")} description={t("settings.security.intro")} onBack={closeSection}>
           <PasskeysCard />
         </SettingsPage>
       </Screen>
     );
   }
+  if (view === "danger") {
+    return (
+      <Screen>
+        <SettingsPage title={t("settings.danger")} description={t("settings.danger.intro")} onBack={closeSection}>
+          {/* The centre, not "the tenant". `graceDays` is what `purge.ts`
+              actually schedules — wrong here would be a promise about a
+              deadline, which is worse than saying nothing. */}
+          <CloseTenantCard noun={t("settings.danger.noun")} erases={t("settings.danger.erases")} graceDays={7} />
+        </SettingsPage>
+      </Screen>
+    );
+  }
+  // These two need the loaded settings, so they wait for it rather than
+  // rendering a form over `undefined`.
+  if (view === "brand" || view === "ai") {
+    if (error && !data) {
+      return <Screen><SettingsPage title={t("settings.title")} onBack={closeSection}><LoadError what={t("settings.title")} error={error} onRetry={reload} /></SettingsPage></Screen>;
+    }
+    if (!data) {
+      return (
+        <Screen>
+          <SettingsPage title={view === "brand" ? t("settings.brand") : t("settings.ai")} onBack={closeSection}>
+            <Card className="space-y-3 p-4">{[0, 1, 2, 3].map((i) => <SkeletonLine key={i} h="text" w={i === 3 ? "60%" : "100%"} />)}</Card>
+          </SettingsPage>
+        </Screen>
+      );
+    }
+    return (
+      <Screen>
+        {view === "brand"
+          ? <BrandSection initial={data.branding} onBack={closeSection} />
+          : <AiSection initial={data.ai} allowed={data.canUseAi} onBack={closeSection} />}
+      </Screen>
+    );
+  }
+
+  /* ── the index ─────────────────────────────────────────────────────────── */
+
+  /**
+   * The sub-line while the read is in flight.
+   *
+   * Not a value, and not an empty string. A row that reads "Not set" for the
+   * length of a round trip has told somebody their accent colour is missing
+   * when it is not — and stating the current value is the entire reason the
+   * sub-line exists, so getting it wrong here costs more than elsewhere.
+   */
+  const pending = <SkeletonLine w="7rem" h="xs" />;
 
   const groups: SettingsGroup[] = [
     {
@@ -97,58 +176,85 @@ export function Settings({ onBack }: { onBack: () => void }) {
           label: t("settings.brand"),
           icon: Palette,
           tone: "primary",
-          // Every row states its CURRENT value, so a glance answers "what is
-          // this set to" without opening — and therefore without risking a change.
-          sub: data.branding.primary ?? t("settings.brand.none"),
-          onClick: () => setView("brand"),
+          sub: data ? (data.branding.primary ?? t("settings.brand.none")) : pending,
+          onClick: () => go("brand"),
         },
         {
           key: "ai",
           label: t("settings.ai"),
           icon: Wand2,
           tone: "cycle",
-          sub: data.canUseAi ? t("settings.ai.on") : t("settings.ai.locked"),
-          trailing: data.canUseAi ? undefined : <Badge tone="neutral">{t("settings.plan.needed")}</Badge>,
-          onClick: () => setView("ai"),
+          sub: data ? (data.canUseAi ? t("settings.ai.on") : t("settings.ai.locked")) : pending,
+          trailing: data && !data.canUseAi ? <Badge tone="neutral">{t("settings.plan.needed")}</Badge> : undefined,
+          onClick: () => go("ai"),
         },
-        { key: "staff", label: t("staff.title"), icon: Users, tone: "case", sub: t("staff.intro"), onClick: () => setView("staff") },
-        { key: "plan", label: t("settings.plan"), icon: CreditCard, tone: "soiled", onClick: () => setView("plan") },
+        { key: "staff", label: t("staff.title"), icon: Users, tone: "case", sub: t("staff.intro"), onClick: () => go("staff") },
+        { key: "plan", label: t("settings.plan"), icon: CreditCard, tone: "soiled", sub: t("settings.plan.sub"), onClick: () => go("plan") },
       ],
     },
     {
       header: t("settings.account"),
       rows: [
-        /* Tessa had NO passkey surface at all — not here, not on the login
-           screen — while `@4dl/app-kit` shipped the whole ceremony. Its users
-           were on email codes only, on a platform whose own docs say
-           "email OTP + passkeys". The card is the package's now. */
-        { key: "security", label: t("settings.security"), icon: KeyRound, tone: "primary", sub: t("settings.security.sub"), onClick: () => setView("security") },
+        { key: "security", label: t("settings.security"), icon: KeyRound, tone: "primary", sub: t("settings.security.sub"), onClick: () => go("security") },
+        { key: "language", label: t("settings.language"), icon: Globe, tone: "neutral", sub: t("settings.language.sub"), onClick: () => go("language") },
       ],
     },
-    { header: t("settings.device"), rows: [{ key: "lang", label: t("settings.language"), icon: Globe, tone: "neutral", sub: t("settings.language.sub") }] },
+    // Owner-only, and its own named group. Kova learned this the hard way: an
+    // unnamed break above the destructive row reads as a rendering accident,
+    // and this is the one group where knowing what you are about to open
+    // matters most.
+    ...(isOwner
+      ? [{ header: t("settings.danger"), rows: [{ key: "danger", label: t("settings.danger.close"), icon: Trash2, sub: t("settings.danger.sub"), destructive: true, onClick: () => go("danger") }] }]
+      : []),
   ];
 
   return (
     <Screen>
       <SettingsPage title={t("settings.title")} onBack={onBack}>
+        {/* WHO, first — the fact a phone settings screen opens with. It is the
+            one thing here that does not navigate, so it does not pretend to. */}
+        <Card className="flex items-center gap-3.5">
+          <Avatar name={ctx?.user?.name ?? ctx?.user?.email ?? "?"} src={ctx?.user?.image ?? undefined} className="size-12" />
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-semibold">{ctx?.user?.name || ctx?.user?.email}</div>
+            {ctx?.user?.name && <div className="truncate text-body text-muted-foreground">{ctx.user.email}</div>}
+          </div>
+          {ctx?.active?.role && <Badge tone={isOwner ? "primary" : "neutral"}>{ctx.active.role}</Badge>}
+        </Card>
+
+        {/* A failed read costs the two rows that state a value, not the screen:
+            passkeys, staff, the plan and the exits are all still reachable. */}
+        {error && !data && <LoadError what={t("settings.title")} error={error} onRetry={reload} />}
+
         <SettingsIndex groups={groups} />
-        <LanguageRow />
+
+        <AccountExitRows
+          email={ctx?.user?.email ?? null}
+          ownsTenant={isOwner}
+          closeFirstHint={t("settings.danger")}
+          onSignOut={() => void signOut()}
+          onDeleted={() => void signOut()}
+        />
       </SettingsPage>
     </Screen>
   );
 }
 
-/** The locale switch is per-DEVICE, not per-practice — so it saves nothing. */
-function LanguageRow() {
+/** The locale switch is per-DEVICE, not per-practice — so it saves nothing, and
+ *  says so rather than leaving somebody wondering where the Save button is. */
+function LanguageSection({ onBack }: { onBack: () => void }) {
+  const t = useT();
   const { locale, locales, setLocale } = useI18n();
   return (
-    <Group>
-      {locales.map((l) => (
-        <Row key={l.code} onClick={() => setLocale(l.code)} trailing={l.code === locale ? <Badge tone="success">✓</Badge> : undefined}>
-          {l.label}
-        </Row>
-      ))}
-    </Group>
+    <SettingsPage title={t("settings.language")} description={t("settings.language.sub")} onBack={onBack}>
+      <Group>
+        {locales.map((l) => (
+          <Row key={l.code} onClick={() => setLocale(l.code)} trailing={l.code === locale ? <Badge tone="success">✓</Badge> : undefined}>
+            {l.label}
+          </Row>
+        ))}
+      </Group>
+    </SettingsPage>
   );
 }
 
@@ -281,7 +387,16 @@ function PlanSection({ onBack }: { onBack: () => void }) {
   const { data, error, loading, reload } = useLoad(load, t("settings.plan"), fmt);
   const { busy, err, run } = useAction(fmt);
 
-  if (loading) return <SettingsPage title={t("settings.plan")} onBack={onBack}><Spinner /></SettingsPage>;
+  if (loading) {
+    return (
+      <SettingsPage title={t("settings.plan")} onBack={onBack}>
+        {/* The shape that is coming — a summary card, then a list of plans —
+            rather than a spinner, which is the shape of nothing. */}
+        <Card className="space-y-2 p-4"><SkeletonLine w="9rem" h="title" /><SkeletonLine w="12rem" h="text" /></Card>
+        <Card className="space-y-3 p-4">{[0, 1, 2].map((i) => <SkeletonLine key={i} h="text" />)}</Card>
+      </SettingsPage>
+    );
+  }
   if (error || !data) {
     return (
       <SettingsPage title={t("settings.plan")} onBack={onBack}>
@@ -328,7 +443,7 @@ function PlanSection({ onBack }: { onBack: () => void }) {
                 sub={t("settings.plan.perMonth", { price: p.priceUsdMonth, credits: p.entitlements.aiCredits.monthlyGrant })}
                 trailing={
                   <Button size="sm" disabled={busy === p.id || !p.synced} onClick={() => go(p.id, () => billingApi.checkoutPlan(p.id))}>
-                    {p.id === data.subscription?.plan_id ? t("settings.plan.current") : t("settings.plan.choose")}
+                    {busy === p.id ? <Spinner /> : p.id === data.subscription?.plan_id ? t("settings.plan.current") : t("settings.plan.choose")}
                   </Button>
                 }
               >
@@ -346,7 +461,7 @@ function PlanSection({ onBack }: { onBack: () => void }) {
                 sub={`$${p.priceUsd}`}
                 trailing={
                   <Button size="sm" variant="secondary" disabled={busy === p.id} onClick={() => go(p.id, () => billingApi.checkoutPack(p.id))}>
-                    {t("action.buy")}
+                    {busy === p.id ? <Spinner /> : t("action.buy")}
                   </Button>
                 }
               >

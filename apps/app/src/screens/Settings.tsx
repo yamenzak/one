@@ -29,7 +29,7 @@ import { PreferencesEditorCard } from "./PreferencesEditor.js";
 import { INSIGHT_LABELS, mutedInsights, unmuteInsight } from "./client/InsightFeedback.js";
 import { useTheme } from "../theme.js";
 import { api, errorText, uploadMedia } from "../api.js";
-import { PasskeysCard, useUpload } from "@4dl/app-kit";
+import { AccountExitRows, CloseTenantCard, PasskeysCard, useUpload } from "@4dl/app-kit";
 import { usePasskey } from "../PasskeyPrompt.js";
 import { AiConfigSection } from "./AiSettings.js";
 import { SectionSplit } from "./SectionSplit.js";
@@ -601,87 +601,22 @@ function StudioIdentitySection() {
 /** Owner danger zone — close the studio: cancels billing now, holds data 7 days,
  *  then wipes everything (R2 + D1) for the studio and its members. OTP-confirmed. */
 function CloseStudioSection() {
-  const [status, setStatus] = useState<{ closing: boolean; deleteAt: string | null } | null>(null);
-  const [open, setOpen] = useState(false);
-  const [stage, setStage] = useState<"intro" | "code">("intro");
-  const [code, setCode] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const load = useCallback(async () => { setStatus(await api.get<{ closing: boolean; deleteAt: string | null }>("/api/tenant/close/status").catch(() => ({ closing: false, deleteAt: null }))); }, []);
-  useEffect(() => { void load(); }, [load]);
+  /*
+    The card is `@4dl/app-kit`'s now — this was ~85 lines of status fetch, a
+    two-stage OTP sheet, a scheduled state and a cancel, all of which is the
+    shared `/api/tenant/close*` contract rather than anything about a studio.
+    Tessa mounted the identical routes and shipped no way to reach them; Kova
+    having the only implementation is precisely why.
 
-  const sendCode = async () => {
-    setBusy(true); setErr(null);
-    try { await api.post("/api/tenant/close/request-otp"); setStage("code"); }
-    catch { setErr("Couldn't send the code. Try again."); }
-    finally { setBusy(false); }
-  };
-  const confirmClose = async () => {
-    setBusy(true); setErr(null);
-    try { await api.post("/api/tenant/close", { code: code.trim() }); setOpen(false); await load(); }
-    catch (e) { setErr((e as { status?: number })?.status === 403 ? "That code is wrong or has expired." : "Couldn't close the studio. Try again."); }
-    finally { setBusy(false); }
-  };
-  /**
-   * The way BACK from a scheduled deletion, so a silent failure here is the
-   * worst one on this screen: the owner taps "Keep my studio", the spinner
-   * stops, the card still says "scheduled for deletion", and nothing says
-   * whether the cancel landed. It had no catch at all.
-   */
-  const keepStudio = async () => {
-    setBusy(true); setErr(null);
-    try { await api.post("/api/tenant/close/cancel"); await load(); }
-    catch (e) { setErr(errorText(e, "Couldn't cancel the deletion — your studio is still scheduled. Try again.")); }
-    finally { setBusy(false); }
-  };
-
-  const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" }) : "");
-
+    What stays here is the only part that is Kova's: what a tenant is CALLED and
+    what is inside it.
+  */
   return (
-    <Stagger>
-      {status?.closing ? (
-        <Card className="space-y-2.5">
-          <div className="flex items-center gap-2 font-medium text-danger"><AlertTriangle className="size-4" /> Studio scheduled for deletion</div>
-          <p className="text-body text-muted-foreground">Billing is canceled. Your studio and all its data will be permanently erased on <span className="font-medium text-foreground">{fmt(status.deleteAt)}</span>. You can still undo this before then.</p>
-          <Button variant="secondary" className="w-full" disabled={busy} onClick={() => void keepStudio()}>{busy ? <><Spinner /> …</> : "Keep my studio"}</Button>
-          {/* `err` was only ever rendered inside the confirmation sheet, so a
-              failed cancel out here had nowhere to appear. */}
-          <ActionResult msg={null} err={err} />
-        </Card>
-      ) : (
-        <Card className="space-y-2.5">
-          <div className="flex items-center gap-2 font-medium text-danger"><AlertTriangle className="size-4" /> Close this studio</div>
-          <p className="text-body text-muted-foreground">Cancels your Kova subscription, then permanently deletes the studio and everything in it — every client, plan, log and file — after a 7-day grace period. This can't be undone once the grace period passes.</p>
-          <Button variant="outline" className="w-full border-danger/40 text-danger" onClick={() => { setStage("intro"); setCode(""); setErr(null); setOpen(true); }}><Trash2 /> Close my studio…</Button>
-        </Card>
-      )}
-
-      <Sheet
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Close your studio"
-        /* Two steps, one frame — so the footer follows the step. Each stage has
-           exactly one thing to press, and it is always in the same place. */
-        footer={stage === "intro" ? (
-          <Button size="lg" className="w-full" disabled={busy} onClick={() => void sendCode()}>{busy ? <><Spinner /> Sending…</> : "Email me a confirmation code"}</Button>
-        ) : (
-          <Button size="lg" className="w-full border-danger/40 text-danger" variant="outline" disabled={busy || code.length < 6} onClick={() => void confirmClose()}>{busy ? <><Spinner /> …</> : <><Trash2 /> Schedule studio deletion</>}</Button>
-        )}
-      >
-        {stage === "intro" ? (
-          <div className="space-y-4">
-            <p className="text-body text-muted-foreground">This cancels billing immediately and schedules your studio for permanent deletion in 7 days. We'll email you a confirmation code first.</p>
-            <ActionResult msg={null} err={err} />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-body text-muted-foreground">Enter the 6-digit code we emailed you to schedule the closure.</p>
-            <Field label="Confirmation code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} placeholder="000000" autoFocus />
-            <ActionResult msg={null} err={err} />
-          </div>
-        )}
-      </Sheet>
-    </Stagger>
+    <CloseTenantCard
+      noun="studio"
+      erases="every client, plan, log and file"
+      graceDays={7}
+    />
   );
 }
 
@@ -1364,92 +1299,28 @@ function EmailSection() {
   );
 }
 
-/*
-  Sign out and Delete are the two ways OUT, so they are one group of two rows.
-  Delete used to be a card with a heading, a paragraph and a button while Sign
-  out beside it was a row — two spellings of the same idea, stacked. The
-  paragraph moved to the confirmation sheet, which is where a consequence
-  belongs: at the moment you are asked to accept it, not two taps earlier.
-*/
-function AccountExits({ onDelete, deleteBlocked }: { onDelete: () => void; deleteBlocked: boolean }) {
-  const { signOut } = useSession();
-  return (
-    <SettingsIndex
-      groups={[{
-        header: "Account",
-        rows: [
-          { key: "signout", icon: LogOut, label: "Sign out", tone: "neutral", onClick: () => void signOut() },
-          {
-            key: "delete", icon: Trash2, label: "Delete my account", destructive: true,
-            sub: deleteBlocked ? "Close your studio first" : "Erases everything, permanently",
-            disabled: deleteBlocked,
-            onClick: onDelete,
-          },
-        ],
-      }]}
-    />
-  );
-}
-
-/** GDPR self-delete — an emailed code confirms erasing the account + all data.
- *  Owners are redirected to close their studio (which cancels billing first). */
+/**
+ * The two ways out, from `@4dl/app-kit`.
+ *
+ * This was `AccountExits` (the rows) plus `DeleteAccountSection` (the state and
+ * a two-stage OTP sheet) — about 90 lines, all of it the shared
+ * `/api/me/delete*` contract. The rows-not-a-card shape and the
+ * consequence-in-the-sheet placement travelled with it, because those were the
+ * two decisions worth keeping and neither is Kova's.
+ *
+ * `ownsTenant` is answered here rather than by the server's 409, so an owner is
+ * told before requesting a code rather than after typing one.
+ */
 function DeleteAccountSection() {
   const { ctx, signOut } = useSession();
-  const isOwner = ctx?.active?.role === "owner";
-  const [open, setOpen] = useState(false);
-  const [stage, setStage] = useState<"intro" | "code">("intro");
-  const [code, setCode] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const status = (e: unknown): number | undefined => (e as { status?: number })?.status;
-
-  const sendCode = async () => {
-    setBusy(true); setErr(null);
-    try { await api.post("/api/me/delete/request-otp"); setStage("code"); }
-    catch (e) { setErr(status(e) === 409 ? "You own a studio — close it first in Studio settings → Danger zone." : "Couldn't send the code. Try again."); }
-    finally { setBusy(false); }
-  };
-  const confirmDelete = async () => {
-    setBusy(true); setErr(null);
-    try { await api.post("/api/me/delete", { code: code.trim() }); await signOut(); }
-    catch (e) {
-      const s = status(e);
-      setErr(s === 403 ? "That code is wrong or has expired." : s === 409 ? "You own a studio — close it first." : "Couldn't delete your account. Try again.");
-      setBusy(false);
-    }
-  };
-
   return (
-    <Stagger>
-      <AccountExits deleteBlocked={isOwner} onDelete={() => { setStage("intro"); setCode(""); setErr(null); setOpen(true); }} />
-      
-      <Sheet
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Delete your account"
-        footer={stage === "intro" ? (
-          <Button size="lg" className="w-full" disabled={busy} onClick={() => void sendCode()}>{busy ? <><Spinner /> Sending…</> : "Email me a confirmation code"}</Button>
-        ) : (
-          <Button size="lg" className="w-full border-danger/40 text-danger" variant="outline" disabled={busy || code.length < 6} onClick={() => void confirmDelete()}>{busy ? <><Spinner /> Deleting…</> : <><Trash2 /> Permanently delete my account</>}</Button>
-        )}
-      >
-        {stage === "intro" ? (
-          <div className="space-y-4">
-            <p className="text-body text-muted-foreground">We'll email a confirmation code to <span className="font-medium text-foreground">{ctx?.user.email}</span>. Entering it permanently erases your account and all your data. There's no undo.</p>
-            <ActionResult msg={null} err={err} />
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <p className="text-body text-muted-foreground">Enter the 6-digit code we emailed you, then confirm. This erases everything.</p>
-            <Field label="Confirmation code" inputMode="numeric" value={code} onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))} placeholder="000000" autoFocus />
-            <ActionResult msg={null} err={err} />
-            {/* Stays in the body: it is an escape from the step, not the step's
-                action, and the footer holds exactly one thing to press. */}
-            <button className="w-full text-center text-caption text-muted-foreground hover:underline" onClick={() => void sendCode()} disabled={busy}>Resend code</button>
-          </div>
-        )}
-      </Sheet>
-    </Stagger>
+    <AccountExitRows
+      email={ctx?.user.email ?? null}
+      ownsTenant={ctx?.active?.role === "owner"}
+      closeFirstHint="Studio settings → Danger zone"
+      onSignOut={() => void signOut()}
+      onDeleted={() => void signOut()}
+    />
   );
 }
 
