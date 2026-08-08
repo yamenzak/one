@@ -128,15 +128,41 @@ export function NavRail({ tabs, active, onSelect, footer, brand, brandPlate, tin
   const color = activeColor(tabs, active, tinted);
   const soft = `color-mix(in oklch, ${color} 14%, transparent)`;
   return (
-    <motion.nav initial="hidden" animate="show" variants={chromeIn} className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center border-r border-border/40 bg-card/40 py-6 backdrop-blur-xl md:flex">
+    /*
+      A GRADIENT, NOT A FLAT WASH. `bg-card/40` over the page's atmosphere read
+      as "a slightly different dark" — the rail had no material of its own, so it
+      looked like a region of the page rather than a frame around it. A vertical
+      fade plus a hairline highlight down its inner edge is the cheapest honest
+      depth cue there is: it says "this is in front" without a shadow, which
+      would cast onto content that scrolls beneath it.
+    */
+    <motion.nav
+      initial="hidden"
+      animate="show"
+      variants={chromeIn}
+      aria-label="Sections"
+      className="fixed inset-y-0 left-0 z-30 hidden w-24 flex-col items-center border-r border-border/40 bg-gradient-to-b from-card/70 via-card/45 to-card/60 py-5 backdrop-blur-xl after:pointer-events-none after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-gradient-to-b after:from-transparent after:via-foreground/8 after:to-transparent md:flex"
+    >
       {/* No letter fallback. This shipped as a hardcoded "M" — a leftover from
           the old product name, which on any other app consuming this package
           would render a stranger's initial. An absent brand renders an empty
           mark, which is honest. */}
       {brand !== undefined && (
-        <div className={cn("mb-6 grid size-11 place-items-center overflow-hidden rounded-2xl text-title-3 font-bold", brandPlate ?? "bg-primary text-primary-foreground")}>{brand}</div>
+        <div className={cn("grid size-11 shrink-0 place-items-center overflow-hidden rounded-2xl text-title-3 font-bold", brandPlate ?? "bg-primary text-primary-foreground")}>{brand}</div>
       )}
-      <div className="flex w-full flex-1 flex-col items-center gap-1.5 px-3">
+      {/*
+        A HAIRLINE UNDER THE BRAND, and the items directly beneath it.
+
+        Centring them was tried first and is worse: it balances the void above
+        and below the list, but it strands the mark alone at the top of a
+        hundred-pixel gap, which reads as a header that lost its content. A rail
+        whose lower half is empty is the normal shape — every desk app has one —
+        and the rule is only that nothing should look ABANDONED. The rule the
+        separator carries: the mark is the app, the items are the app's places,
+        and a line is the cheapest way to say they are two different things.
+      */}
+      <div className="my-4 h-px w-10 shrink-0 bg-border/60" aria-hidden />
+      <div className="flex w-full flex-1 flex-col items-center gap-1 px-2.5">
         {tabs.map((t) => {
           const on = active === t.key;
           return (
@@ -144,21 +170,56 @@ export function NavRail({ tabs, active, onSelect, footer, brand, brandPlate, tin
               key={t.key}
               onClick={() => onSelect(t.key)}
               aria-current={on ? "page" : undefined}
-              className="group relative flex w-full flex-col items-center gap-1 rounded-2xl py-2.5 transition-colors"
+              className="group relative flex w-full flex-col items-center gap-1.5 rounded-2xl py-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/60"
             >
-              {on && <motion.span layoutId="rail-pill" initial={false} animate={{ backgroundColor: soft }} transition={{ ...navSpring, ...pillTween }} className="absolute inset-0 rounded-2xl" />}
-              {on && <motion.span layoutId="rail-bar" initial={false} animate={{ backgroundColor: color }} transition={{ ...navSpring, ...pillTween }} className="absolute -left-3 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full" />}
-              <t.icon
+              {/* The edge marker, flush to the rail's own border. `layoutId` so
+                  it TRAVELS between destinations rather than blinking off and
+                  on — the one motion in this component that carries meaning:
+                  where you were, and where you now are. */}
+              {on && <motion.span layoutId="rail-bar" initial={false} animate={{ backgroundColor: color }} transition={{ ...navSpring, ...pillTween }} className="absolute -left-2.5 top-1/2 h-8 w-[3px] -translate-y-1/2 rounded-r-full" />}
+              {/*
+                THE ICON SITS IN A CONTAINER, which is this language's own idiom
+                for "what this row is about" — `Row`'s leading squircle, the
+                section menu's tinted tiles. The active state was a 14% wash
+                across the WHOLE item, which at rail width is a faint rectangle
+                you have to look for. A tinted tile around the glyph reads at a
+                glance, and it is the same shape the rest of the system uses.
+              */}
+              <span
+                className={cn(
+                  "relative grid size-11 place-items-center rounded-2xl transition-colors",
+                  !on && "group-hover:bg-foreground/6",
+                )}
+              >
+                {on && <motion.span layoutId="rail-pill" initial={false} animate={{ backgroundColor: soft }} transition={{ ...navSpring, ...pillTween }} className="absolute inset-0 rounded-2xl" />}
+                <t.icon
+                  style={on ? { color } : undefined}
+                  className={cn("relative size-[1.3rem] transition-colors", !on && "text-muted-foreground group-hover:text-foreground")}
+                  strokeWidth={on ? 2.4 : 2}
+                />
+              </span>
+              {/*
+                `caption` (13), not `micro` (11).
+
+                §12's floor is 13px — "`caption` is the floor; there is nothing
+                below it" — and §5 defines `micro` as an OVERLINE or a badge, in
+                all caps. This label was `text-micro normal-case`: two sizes
+                below the floor, in a role that is not its own, with the role's
+                defining property explicitly cancelled. `BottomTabs` has used
+                `caption` all along, so the platform's two navigation surfaces
+                disagreed about how big their own labels are.
+              */}
+              <span
                 style={on ? { color } : undefined}
-                className={cn("relative size-[1.35rem] transition-colors", !on && "text-muted-foreground group-hover:text-foreground")}
-                strokeWidth={on ? 2.4 : 2}
-              />
-              <span style={on ? { color } : undefined} className={cn("relative text-micro normal-case transition-colors", !on && "text-muted-foreground group-hover:text-foreground")}>{t.label}</span>
+                className={cn("relative text-caption leading-none transition-colors", on ? "font-semibold" : "font-medium text-muted-foreground group-hover:text-foreground")}
+              >
+                {t.label}
+              </span>
             </button>
           );
         })}
       </div>
-      {footer && <div className="mt-auto">{footer}</div>}
+      {footer && <div className="shrink-0 pt-2">{footer}</div>}
     </motion.nav>
   );
 }
