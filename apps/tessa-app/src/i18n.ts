@@ -67,6 +67,7 @@ export const en = {
   "login.signIn": "Sign in",
   "login.checking": "Checking…",
   "login.otherEmail": "Use a different email",
+  "login.resendIn": "Resend in {seconds}s",
   "login.sendFailed": "Couldn't send a code.",
   "login.codeFailed": "That code didn't work. Check it, or send a new one.",
 
@@ -522,6 +523,7 @@ export const de: Translation<TessaDict> = {
   "login.code": "Code",
   "login.signIn": "Anmelden",
   "login.checking": "Wird geprüft…",
+  "login.resendIn": "Erneut senden in {seconds}s",
   "login.otherEmail": "Andere E-Mail-Adresse verwenden",
   "login.sendFailed": "Code konnte nicht gesendet werden.",
   "login.codeFailed": "Der Code hat nicht funktioniert. Prüfen Sie ihn oder fordern Sie einen neuen an.",

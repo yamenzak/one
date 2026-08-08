@@ -81,6 +81,23 @@ one each and Tessa has none at all. Trial length is not editable in any of them.
 > Rows 1–6 are open, and so is Scena's console conformance test (its two
 > remaining violations are the Stripe and Email panels, which is step 2).
 
+> ### ✅ Step 1 is DONE (2026-08-08), and it found a live outage
+>
+> Rows 1, 2 and 7 are closed. `otpSendGuard` is mounted in Tessa and Scena with
+> their own eligibility rules, the two bypass siblings are shut in both, the
+> Turnstile widget renders on both sign-in screens, and
+> `checkActorDailyBudget` gates every AI generation in both.
+> `scripts/otp-gate.test.mjs` derives its app list from `apps.json` and
+> mutation-tests three ways an app could be unguarded, so #4 cannot repeat it.
+>
+> **Scena's `HostInfo` is now the kit's type rather than a lookalike**, which
+> closes row 5's server→client half: `gate`, `maintenance` and `turnstile` all
+> arrive at the client instead of being dropped by a four-field re-declaration.
+> Rendering the standing and maintenance banners is still step 2.
+>
+> **And writing the test for row 7 uncovered something worse than row 7.** See
+> "The column a package read and did not ship", below.
+
 **And one structural finding that outranks all eight**, because it is why there
 will be a ninth: `apps/_template` **has no SPA**. It is a 1,230-line worker
 and nothing else. Every browser surface a new app needs — shell, session, host
@@ -151,6 +168,55 @@ there is no screen anywhere that could tell the operator otherwise.
 Note the asymmetry with the hazard the panel already warns about: a secret with
 no site key **locks everybody out**, loudly, and the panel says so. This is the
 inverse — it **protects nobody**, silently. Only one of the two is discoverable.
+
+---
+
+## Tier 0c — the column a package read and did not ship
+
+```
+grep -rn "ADD COLUMN ai_config_json" apps/*/src packages/*/src   # → apps/api only
+```
+
+Found by writing a test for the per-actor credit cap, not by looking for it, and
+it is the most expensive thing in this document.
+
+`@4dl/ai`'s `generate()` and `generateImage()` both OPEN with `loadTenantAi` —
+an unguarded `SELECT ai_config_json, ai_toggles_json FROM tenant_settings`. It is
+the first statement, before the model resolve, before the reserve.
+`perActorDailyCreditCap` reads the same blob.
+
+**`ai_config_json` was declared by exactly one app**, in Kova's own schema
+module. `ai_toggles_json` happens to live on `tenant_settings`' own CREATE, which
+is why only half of this was visible. So in Tessa — and in every future app that
+composes `AI_SCHEMA` — the entire AI suite threw `no such column: ai_config_json`
+on **every call**. Four features (`read-label`, `reorder-advisor`,
+`recall-report`, `read-document`), gated behind a paid `ai` entitlement, dead.
+
+What makes it the sharpest instance of this document's thesis is how completely
+invisible it was:
+
+- `@4dl/ai`'s own tests pass — they run against a database its own module built.
+- Tessa's tests pass. Its one AI test asserts that an **unauthenticated** call is
+  refused, and a refusal returns before the query ever runs.
+- The typecheck is clean, because a column name is a string.
+- A 500 on a feature nobody has tried yet is indistinguishable from a feature
+  nobody has tried yet.
+
+**Fixed by making the package ship what it reads**: the ALTER moved into
+`AI_SCHEMA` (version 4 → 5, and the alters are idempotent so Kova's duplicate is
+a no-op). Tessa's suite now asserts the exact select `generate()` makes, rather
+than the column list, because the select is what breaks.
+
+**The rule this leaves behind, and it is a contribution rule, not a bug fix:**
+
+> **A package that READS a column must DECLARE it.** Composing schema modules
+> makes it easy for a package to depend on a column some app happens to have —
+> and the first app always happens to have it, because that is where the code was
+> written.
+
+`packages/tenancy`'s `tenant_settings` is worth a second look on the same
+grounds: it carries `ai_toggles_json` and `marketplace_json` on its own CREATE,
+which are two product-shaped columns in the package that owns addressing.
 
 ---
 

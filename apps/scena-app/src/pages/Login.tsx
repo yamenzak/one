@@ -62,8 +62,26 @@ import {
   brandMark,
   hasWordmark,
 } from "@4dl/ui";
+import { Turnstile } from "@4dl/app-kit";
 import { ScenaMascot } from "../brand.js";
-import { authClient, signIn, emailOtp } from "../auth-client.js";
+import { authClient, signIn } from "../auth-client.js";
+import { API_BASE, apiFetch } from "../api.js";
+
+/**
+ * What `otpSendGuard` refuses with, in words a person can act on.
+ *
+ * The server answers a machine-readable `error` on purpose — the bodies are
+ * deliberately NEUTRAL, so "invite only" never says whether the address is
+ * known — and turning that into a sentence is the client's job.
+ */
+const SEND_ERRORS: Record<string, string> = {
+  invite_only: "This workspace is invite-only. Ask an owner to send you an invitation.",
+  wrong_door: "Sign in at your workspace's own address.",
+  human_check_failed: "The bot check didn't pass. Try again.",
+  cooldown: "Give it a moment before asking for another code.",
+  too_many_requests: "Too many codes requested from here. Try again later.",
+  email_not_configured: "This deployment can't send email yet, so no code went out.",
+};
 import { useTheme } from "../theme.js";
 import { LegalDialog, LegalLinks, type LegalDoc } from "../legal/content.js";
 import type { HostInfo } from "../host.js";
@@ -134,7 +152,7 @@ export function LoginScreen({
       {station ? (
         <StationSignIn onDone={onDone} onBack={() => setStation(false)} />
       ) : (
-        <EmailSignIn onDone={onDone} onStation={() => setStation(true)} canCreate={canCreate} />
+        <EmailSignIn onDone={onDone} onStation={() => setStation(true)} canCreate={canCreate} turnstile={host?.turnstile ?? null} />
       )}
 
       <TierContent className="space-y-1 pt-8 text-center">
@@ -226,13 +244,42 @@ function StationSignIn({ onDone, onBack }: { onDone: () => void; onBack: () => v
  * only what happens AFTER — the setup door hands you the wizard, a workspace
  * address hands you the workspace.
  */
-function EmailSignIn({ onDone, onStation, canCreate }: { onDone: () => void; onStation: () => void; canCreate: boolean }) {
+function EmailSignIn({
+  onDone,
+  onStation,
+  canCreate,
+  turnstile,
+}: {
+  onDone: () => void;
+  onStation: () => void;
+  canCreate: boolean;
+  turnstile: { siteKey: string | null; enabled: boolean } | null;
+}) {
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
+  const [tsToken, setTsToken] = useState<string | null>(null);
   const otpRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * THE BOT CHECK, WHICH USED TO BE CONFIGURABLE HERE AND ENFORCED NOWHERE.
+   *
+   * `turnstile.secret`, `turnstile.site_key` and `turnstile.hostnames` are on
+   * `SHARED_CONFIG_KEYS` — one widget across the whole apex — so an operator who
+   * switches the check on from ANY app's console has every reason to think the
+   * platform's sign-in is covered. It was covered in Kova and nowhere else: this
+   * screen never rendered a widget, so no token existed and the control read as
+   * ON while doing nothing.
+   *
+   * `enabled` means a server SECRET is set, so the server will demand a token.
+   * Both halves are required before the widget is offered — a site key with no
+   * secret gates nothing, and a secret with no key is the combination that locks
+   * everybody out, which is why the operator panel warns about it.
+   */
+  const needsTurnstile = Boolean(turnstile?.enabled && turnstile.siteKey);
 
   // Focus the code field the moment it appears — the alternative is a screen
   // that has just asked for six digits and put the caret nowhere.
@@ -240,12 +287,40 @@ function EmailSignIn({ onDone, onStation, canCreate }: { onDone: () => void; onS
     if (step === "otp") otpRef.current?.focus();
   }, [step]);
 
+  // The send guard's 30-second per-address cooldown, counted down rather than
+  // left as a dead button. The server reflects `retryAfterSec` precisely so this
+  // can say WHEN instead of "that didn't work".
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
   const sendCode = async () => {
     setBusy(true);
     setErr(null);
     try {
-      const res = await emailOtp.sendVerificationOtp({ email: email.trim(), type: "sign-in" });
-      if (res.error) throw new Error(res.error.message || "Could not send code");
+      /*
+        POSTED DIRECTLY RATHER THAN THROUGH THE BETTER AUTH CLIENT.
+
+        The client sends `{ email, type }` and nothing else, and `otpSendGuard`
+        needs `turnstileToken` in the body. This is our own endpoint answering
+        our own guard — the response carries no session, so the client bought
+        nothing here anyway — and `apiFetch` is the SPA's one door to the API,
+        which `scripts/scena-fetch-chokepoint.test.mjs` requires.
+      */
+      const res = await apiFetch(`${API_BASE}/api/auth/email-otp/send-verification-otp`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), type: "sign-in", turnstileToken: tsToken }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string; detail?: string; retryAfterSec?: number };
+        // A 429 carries how long to wait; showing it is the difference between a
+        // button that looks broken and one that says when.
+        if (res.status === 429 && typeof body.retryAfterSec === "number") setCooldown(body.retryAfterSec);
+        throw new Error(body.detail || SEND_ERRORS[body.error ?? ""] || "Could not send code");
+      }
       setStep("otp");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Could not send code");
@@ -268,7 +343,7 @@ function EmailSignIn({ onDone, onStation, canCreate }: { onDone: () => void; onS
     }
   };
 
-  const canSend = email.includes("@") && !busy;
+  const canSend = email.includes("@") && !busy && cooldown === 0 && (!needsTurnstile || Boolean(tsToken));
 
   return (
     <div className="space-y-3">
@@ -290,10 +365,11 @@ function EmailSignIn({ onDone, onStation, canCreate }: { onDone: () => void; onS
                 : "New or returning — we'll email you a 6-digit code."
             }
           />
+          {needsTurnstile && turnstile!.siteKey && <Turnstile siteKey={turnstile!.siteKey} onToken={setTsToken} />}
           {err && <Callout tone="danger" live="alert">{err}</Callout>}
           <Button size="lg" className="w-full" disabled={!canSend} onClick={() => void sendCode()}>
-            {busy ? "Sending…" : "Email me a code"}
-            {!busy && <ArrowRight aria-hidden />}
+            {busy ? "Sending…" : cooldown > 0 ? `Resend in ${cooldown}s` : "Email me a code"}
+            {!busy && cooldown === 0 && <ArrowRight aria-hidden />}
           </Button>
           <button
             className="flex min-h-12 w-full items-center justify-center gap-2 text-caption text-muted-foreground transition-colors hover:text-foreground"

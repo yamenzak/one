@@ -186,6 +186,14 @@ then delete the original — do not "port" it.
    list: a purge must swallow delete errors, so a forgotten table and a renamed
    column both read as a clean erasure. Kova kept three lists by hand and
    accumulated three real defects.
+4b. **A package that READS a column must DECLARE it** — including a column on
+   another module's table, as an `ADD COLUMN` alter. Composed schema makes it
+   easy to depend on a column some app happens to have, and the first app always
+   happens to have it, because that is where the code was written.
+   `@4dl/ai`'s `generate()` opened with a `SELECT ai_config_json …` that only
+   Kova declared, so in every other app the whole AI suite threw on every call —
+   a paid entitlement, dead, past a clean typecheck, the package's own green
+   suite and the app's.
 5. **Keep the ALLOW list empty.** If the boundary test wants an entry, the design
    is wrong — the vocabulary belongs in the app. The one legitimate exemption is a
    name a *spec or a vendor* chose (`clientExtensionResults` is WebAuthn's).

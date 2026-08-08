@@ -51,6 +51,19 @@ export interface GenerateRequest {
     designW?: number; designH?: number; currentWidgets?: unknown[];
   };
   tenantId?: string;
+  /**
+   * WHO asked for this, and the reason the per-actor cap is not decorative.
+   *
+   * `ai_generations.actor_user_id` was written as a literal NULL on every row,
+   * so `@4dl/ai`'s `checkActorDailyBudget` — which sums a rolling 24 hours of an
+   * actor's rows — could only ever read zero. Mounting the cap without this
+   * would have been a control that passes its own tests and bounds nothing.
+   *
+   * Optional because not every caller is a person: a board's announcement TTS
+   * is triggered by the schedule, and attributing it to whoever last touched the
+   * board would spend their allowance on the room's behalf.
+   */
+  actorUserId?: string | null;
 }
 
 export interface GenerateResult {
@@ -330,7 +343,7 @@ export async function generate(env: Env, req: GenerateRequest): Promise<Generate
       `ok` is 1 because a failure returns before reaching here: the hold is
       released and no row is written at all.
     */
-    env.DB.prepare("INSERT INTO ai_generations (id, tenant_id, actor_user_id, subject_id, feature, model, neurons, credits, ok, error, at) VALUES (?, ?, NULL, NULL, ?, ?, ?, ?, 1, NULL, ?)").bind(`gen_${rndHex(10)}`, tenantId, req.task, model.id, neurons, credits, Date.now()),
+    env.DB.prepare("INSERT INTO ai_generations (id, tenant_id, actor_user_id, subject_id, feature, model, neurons, credits, ok, error, at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, 1, NULL, ?)").bind(`gen_${rndHex(10)}`, tenantId, req.actorUserId ?? null, req.task, model.id, neurons, credits, Date.now()),
   ]);
 
   return finalize(env, req, model, out.output ?? "", out.assetHash ?? null, neurons, credits, false, out.mime, out.durationMs);

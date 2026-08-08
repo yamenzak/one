@@ -32,7 +32,7 @@ import { z } from "zod";
 import { type AppEnv, isPlatformAdmin, requirePermission, requireTenant } from "./auth-context.js";
 import { hasFeature } from "./billing-store.js";
 import { getConfig, parseJson, setConfig } from "@4dl/core";
-import { extractJson, generate, listModels, AI_FEATURES, TONE_GUIDE, TONE_KEYS } from "./ai.js";
+import { checkActorDailyBudget, extractJson, generate, listModels, AI_FEATURES, TONE_GUIDE, TONE_KEYS } from "./ai.js";
 import { recallDisposition, summariseRecall } from "@tessa/domain";
 
 /** The built-in system prompt for a feature. */
@@ -79,6 +79,41 @@ async function gate(c: Context<AppEnv>, feature: string): Promise<Response | { t
   if (cfg.features[feature] === false) {
     return c.json({ error: "This assistant is switched off for your practice.", feature }, 403);
   }
+  /*
+    ONE PERSON MUST NOT BE ABLE TO SPEND THE CENTRE'S WHOLE BALANCE.
+
+    `@4dl/ai` has shipped this since before Tessa existed and Tessa did not call
+    it, so the only ceiling here was the tenant's balance itself: a single member
+    — enthusiastic, or with a stuck retry loop, or whose session was taken —
+    could drain the monthly grant and every purchased credit in an afternoon,
+    and the first anyone would know is a centre that cannot read a label.
+
+    Two guards, both BEFORE the reserve. The credit cap is the owner's
+    (`tenant_settings.ai_config_json.perActorDailyCreditCap`) and is OFF until
+    somebody sets it, so this changes nothing for a centre that has not asked
+    for it. The 120-request daily ceiling is always on and is the backstop —
+    generous enough that ordinary use never meets it, low enough that a loop
+    stops in minutes rather than at the end of the balance.
+
+    Checked here rather than per route because `gate` is the one thing every AI
+    route already goes through: a new assistant added next to these inherits the
+    cap instead of having to remember it.
+  */
+  const budget = await checkActorDailyBudget(c.env, who.tenantId, who.userId);
+  if (!budget.ok) {
+    return c.json(
+      {
+        error: budget.reason === "rate_limited"
+          ? "You've hit today's AI limit — try again later."
+          : "You've reached your daily AI allowance. Ask an owner if you need more.",
+        reason: budget.reason,
+        used: budget.used,
+        limit: budget.limit,
+      },
+      429,
+    );
+  }
+
   const tone = (TONE_KEYS as readonly string[]).includes(cfg.tone) ? cfg.tone : "professional";
   return { tone };
 }

@@ -61,6 +61,7 @@ import { countTenantScheduleRules } from "./device-schedule-store.js";
 import { redeemPromo, createPromo, listPromos, getPromo, setPromoActive } from "./promos.js";
 import { listLibrary, listGenres, createLibraryTrack, updateLibraryTrack, deleteLibraryTrack } from "./library-store.js";
 import { generate, type AiTask } from "./ai.js";
+import { checkActorDailyBudget } from "@4dl/ai";
 import { addSlide } from "./content.js";
 import { grantForTenant, lifecycleSweep, deleteTenantData } from "./billing-service.js";
 import { stripeCfg, stripeEnabled, syncCatalog, subscriptionCheckout, packCheckout, stripePing, handleWebhook, SCENA_METADATA_PREFIX } from "./stripe.js";
@@ -149,6 +150,53 @@ export function configWriteRefusal(config: Record<string, string>, isDevelopment
     return "ai.mock=on is a development-only setting";
   }
   return null;
+}
+
+/**
+ * MAY THIS PERSON RUN A GENERATION RIGHT NOW?
+ *
+ * Two questions, and they are different: does the PLAN include AI generation,
+ * and has this ACTOR already spent their day's share of the workspace's balance.
+ *
+ * The second was missing entirely. `@4dl/ai` has shipped
+ * `checkActorDailyBudget` since before Scena joined the platform and nothing
+ * here called it, so the only ceiling was the workspace balance itself: one
+ * member — enthusiastic, or with a stuck retry, or whose session was taken —
+ * could drain the monthly grant and every purchased credit in an afternoon, and
+ * the first anyone would know is a wall of screens that cannot generate.
+ *
+ * The credit cap is the owner's (`tenant_settings.ai_config_json`
+ * `.perActorDailyCreditCap`) and is OFF until somebody sets it, so this changes
+ * nothing for a workspace that has not asked for it. The 120-request daily
+ * ceiling is always on and is the backstop — generous enough that ordinary use
+ * never meets it, low enough that a loop stops in minutes rather than at the end
+ * of the balance.
+ *
+ * Returns a Response to refuse with, or null to proceed. One helper rather than
+ * two copies, so a third AI route inherits both checks instead of half of them.
+ */
+async function aiGate(c: Ctx): Promise<Response | null> {
+  const tenantId = tenantOf(c);
+  const ent = await tenantEntitlements(c.env.DB, tenantId);
+  if (!ent.features.aiGeneration) return c.json({ error: "ai generation not in plan" }, 403);
+
+  const actorUserId = c.get("user")?.id;
+  // No actor means no attribution and nothing to meter against — the routes
+  // below are behind the session guard, so this is belt and braces.
+  if (!actorUserId) return null;
+  const budget = await checkActorDailyBudget(c.env, tenantId, actorUserId);
+  if (budget.ok) return null;
+  return c.json(
+    {
+      error: budget.reason === "rate_limited"
+        ? "You've hit today's AI limit — try again later."
+        : "You've reached your daily AI allowance. Ask an owner if you need more.",
+      reason: budget.reason,
+      used: budget.used,
+      limit: budget.limit,
+    },
+    429,
+  );
 }
 
 export function registerBilling(app: App): void {
@@ -397,8 +445,8 @@ export function registerBilling(app: App): void {
   });
 
   app.post("/api/ai/generate", async (c) => {
-    const ent = await tenantEntitlements(c.env.DB, tenantOf(c));
-    if (!ent.features.aiGeneration) return c.json({ error: "ai generation not in plan" }, 403);
+    const denied = await aiGate(c);
+    if (denied) return denied;
     const body = await c.req
       .json<{ task?: string; modelId?: string; prompt?: string; options?: Record<string, unknown>; channelId?: string; addSlide?: boolean; durationMs?: number }>()
       .catch(() => ({}) as Record<string, never>);
@@ -409,7 +457,7 @@ export function registerBilling(app: App): void {
     const modelId = body.modelId?.trim() || (await defaultModelForTask(c.env.DB, task, tenantOf(c)))?.id;
     if (!modelId) return c.json({ error: "no model available for task" }, 404);
 
-    const result = await generate(c.env, { task, modelId, prompt: body.prompt, options: body.options, tenantId: tenantOf(c) });
+    const result = await generate(c.env, { task, modelId, prompt: body.prompt, options: body.options, tenantId: tenantOf(c), actorUserId: c.get("user")?.id ?? null });
     if (!result.ok) {
       const code = result.error === "insufficient_credits" ? 402 : result.error === "unknown_model" ? 404 : 502;
       return c.json(result, code);
@@ -431,8 +479,8 @@ export function registerBilling(app: App): void {
   // set of widget nodes — design-from-scratch or improve/extend the existing
   // layout. Metered like a text generation (see ai.ts `layout` task).
   app.post("/api/ai/layout", async (c) => {
-    const ent = await tenantEntitlements(c.env.DB, tenantOf(c));
-    if (!ent.features.aiGeneration) return c.json({ error: "ai generation not in plan" }, 403);
+    const denied = await aiGate(c);
+    if (denied) return denied;
     const body = await c.req
       .json<{ modelId?: string; prompt?: string; widgets?: unknown[]; designW?: number; designH?: number }>()
       .catch(() => ({}) as Record<string, never>);
@@ -452,6 +500,7 @@ export function registerBilling(app: App): void {
         designH: body.designH,
       },
       tenantId: tenantOf(c),
+      actorUserId: c.get("user")?.id ?? null,
     });
     if (!result.ok) {
       const code = result.error === "insufficient_credits" ? 402 : result.error === "unknown_model" ? 404 : 502;

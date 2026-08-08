@@ -15,8 +15,8 @@
  * taken somewhere.
  */
 
-import { useState } from "react";
-import { api, ApiError, RefreshNote } from "@4dl/app-kit";
+import { useEffect, useState } from "react";
+import { api, ApiError, RefreshNote, Turnstile } from "@4dl/app-kit";
 import { Button, Callout, Field, KeyRound, Mail, Screen } from "@4dl/ui";
 import { useT } from "../i18n.js";
 import { useSession } from "../session.js";
@@ -32,14 +32,48 @@ export function Login() {
   const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
+  const [tsToken, setTsToken] = useState<string | null>(null);
+
+  /**
+   * THE BOT CHECK, WHICH USED TO BE CONFIGURABLE HERE AND ENFORCED NOWHERE.
+   *
+   * `turnstile.secret`, `turnstile.site_key` and `turnstile.hostnames` are on
+   * `SHARED_CONFIG_KEYS` — one widget across the whole apex — so an operator who
+   * turns the check on from ANY app's console has every reason to believe the
+   * platform's sign-in is covered. It was covered in Kova and nowhere else: this
+   * screen never rendered the widget, so no token existed, and the check was a
+   * security control that read as ON and did nothing.
+   *
+   * `enabled` means a server SECRET is configured, so the server will demand a
+   * token. Both halves are required before the widget is offered — a site key
+   * with no secret gates nothing, and a secret with no key is the combination
+   * that locks everybody out, which is why the operator panel warns about it.
+   */
+  const turnstile = host?.turnstile ?? null;
+  const needsTurnstile = Boolean(turnstile?.enabled && turnstile.siteKey);
+
+  // The 30-second per-address cooldown the send guard enforces, counted down
+  // rather than left as a dead button — the server reflects `retryAfterSec`
+  // precisely so this can say when, instead of "that didn't work".
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   const send = async () => {
     setBusy(true);
     setError(null);
     try {
-      await api.post("/api/auth/email-otp/send-verification-otp", { email: email.trim(), type: "sign-in" });
+      await api.post("/api/auth/email-otp/send-verification-otp", { email: email.trim(), type: "sign-in", turnstileToken: tsToken });
       setStep("otp");
     } catch (e) {
+      // A 429 carries how long to wait. Showing the countdown is the difference
+      // between a button that looks broken and one that says when.
+      if (e instanceof ApiError && e.status === 429 && typeof e.body?.retryAfterSec === "number") {
+        setCooldown(e.body.retryAfterSec);
+      }
       // The server's own sentence where it has one — a centre that does not take
       // new members says so, and replacing that with "something went wrong"
       // would leave someone retyping a correct address forever.
@@ -48,6 +82,10 @@ export function Login() {
       setBusy(false);
     }
   };
+
+  /** Everything the send needs: an address, no request in flight, the cooldown
+   *  elapsed, and a token when the platform is demanding one. */
+  const canSend = Boolean(email.trim()) && !busy && cooldown === 0 && (!needsTurnstile || Boolean(tsToken));
 
   const verify = async () => {
     setBusy(true);
@@ -79,7 +117,7 @@ export function Login() {
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
-              if (email.trim()) void send();
+              if (canSend) void send();
             }}
           >
             <Field
@@ -92,8 +130,9 @@ export function Login() {
               placeholder="you@clinic.de"
               autoFocus
             />
-            <Button type="submit" className="w-full" disabled={!email.trim() || busy}>
-              {busy ? t("login.sending") : t("login.continue")}
+            {needsTurnstile && turnstile!.siteKey && <Turnstile siteKey={turnstile!.siteKey} onToken={setTsToken} />}
+            <Button type="submit" className="w-full" disabled={!canSend}>
+              {busy ? t("login.sending") : cooldown > 0 ? t("login.resendIn", { seconds: String(cooldown) }) : t("login.continue")}
             </Button>
           </form>
         ) : (

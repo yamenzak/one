@@ -782,13 +782,15 @@ moves. **Measured 2026-08-08** from one `pnpm test`, per package:
 63 commerce + 61 scena/widgets + 45 billing-rail + 44 core + 40 scena/timeline +
 35 auth + 30 scena/app + 24 notify + 23 scena/manifest + 18 scena/protocol +
 18 storage + 18 app-kit + 17 kova/protocol + 17 template + 14 tessa/app +
-14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,363 passing,
+14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,389 passing,
 31 skipped**, 58 turbo tasks, all green.
 
-The +32 since the earlier figure on the same day is `@4dl/billing` 45 → 68 (the
-refund/dispute reversal and the plan-catalog routes, both moved out of an app)
-and `@4dl/scena` 234 → 243 (the three webhook guards). A split moves tests; these
-are new coverage over behaviour that was previously in one app or in none.
+Per-package figures above predate the last two commits; the TOTAL is current.
+The +58 across them is `@4dl/billing` 45 → 68 (the refund/dispute reversal and
+the plan-catalog routes, both moved out of an app), `@4dl/scena` 234 → 258 (the
+webhook guards, the OTP gate and the per-actor budget) and `@4dl/tessa`
+152 → 163 (the OTP gate and the AI-column regression). A split moves tests;
+these are new coverage over behaviour that was previously in one app or in none.
 
 Scena's 449 (234 api + 30 app + 185 across its five pure packages) were never in
 the older figure at all; nor were Tessa's. `@scena/timeline`'s 40 are the ones
