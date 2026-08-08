@@ -72,7 +72,24 @@ export async function createCentre(context: BrowserContext, page: Page, name = "
   await page.getByLabel("Centre name").waitFor();
   await page.getByLabel("Centre name").fill(name);
   await page.getByLabel("Address").fill(slug);
-  await page.getByRole("button", { name: "Create it" }).click();
+  await page.getByRole("button", { name: /^continue$/i }).click();
+
+  /*
+    STEP 2 — the plan, which this used to skip because it did not exist.
+
+    "Create it" made the centre and dropped the owner straight in, on the `free`
+    PARKING ROW that `statusOf` gates READ-ONLY. Every write in the product was
+    refused and this suite never noticed, because it only ever asserted that the
+    Shell rendered.
+
+    It lands on the DEGRADE path here: the E2E worker has no Stripe keys, so
+    `/me/onboarding/plan` answers `pending`. That is the same lane every
+    self-host takes, and it is the one worth proving — refusing there would mean
+    nobody could create a centre at all.
+  */
+  const go = page.getByRole("button", { name: /go to my centre/i });
+  await go.waitFor({ timeout: 30_000 });
+  await go.click();
   await page.waitForURL(new RegExp(`${slug}\\.`), { timeout: 30_000 }).catch(() => undefined);
   await carrySessionTo(context, SETUP_URL, `${slug}.${ROOT_DOMAIN}`);
   await page.goto(centreUrl(slug));

@@ -35,10 +35,24 @@ export interface PlanSeed {
   priceCents: number;
   interval: "month" | "year";
   sort: number;
+  /**
+   * Offered for sale. `false` keeps the row — its entitlements still resolve for
+   * anyone sitting on it — while taking it out of every picker.
+   *
+   * ⚠️ The seed used to hardcode `active = 1` for every plan, which is the whole
+   * reason `free` was a product rather than a state. See the row itself.
+   */
+  active?: boolean;
   entitlements: Entitlements;
 }
 
-const base = (over: Partial<Entitlements["quotas"]>, feat: Partial<Entitlements["features"]>, grant: number, resync: number): Entitlements => ({
+const base = (
+  over: Partial<Entitlements["quotas"]>,
+  feat: Partial<Entitlements["features"]>,
+  grant: number,
+  resync: number,
+  trialDays = 0,
+): Entitlements => ({
   quotas: {
     pairedDevices: 1,
     seats: 1,
@@ -85,18 +99,58 @@ const base = (over: Partial<Entitlements["quotas"]>, feat: Partial<Entitlements[
     ...feat,
   },
   aiCredits: { monthlyGrant: grant },
-  // No plan sells a trial today. The key exists because the engine reads it
-  // when opening a Stripe subscription; setting it is a one-line pricing change.
-  trialDays: 0,
+  /*
+    THE TRIAL IS WHAT REPLACED THE FREE TIER.
+
+    Scena sold a `free` plan — one screen, one channel, indefinitely. It is a
+    parking state now (see the row in `DEFAULT_PLANS`), and a workspace tries the
+    REAL product for thirty days instead of living on a crippled one forever.
+    Thirty is Kova's figure on its entry tiers, and it suits signage for the same
+    reason it suits coaching: the thing is judged on a wall over weeks, not in an
+    afternoon.
+
+    Read by the engine when it opens a Stripe subscription. A deployment with no
+    payment rail never reaches that, and `statusOf` deliberately fails open for
+    it — see host-context.ts.
+  */
+  trialDays,
 });
 
 export const DEFAULT_PLANS: PlanSeed[] = [
+  /**
+   * `free` IS A PARKING STATE, NOT A PLAN — and this is the one row to read
+   * carefully.
+   *
+   * `getSubscription` stamps every brand-new workspace `plan_id = 'free'`, and a
+   * deleted Stripe subscription falls back to the same pair. So it is the
+   * most-used row in the table, and while it was `active` it was also a genuinely
+   * usable free product: a screen on a wall, indefinitely, fully writable, for
+   * nothing.
+   *
+   * ── The fix is the GATE, and only the gate ──────────────────────────────
+   *
+   * `statusOf` (host-context.ts) reports `incomplete` for a workspace with no
+   * paid plan, and the route guard turns that into read-only with billing still
+   * writable. These entitlements are deliberately NOT zeroed as a second
+   * enforcement of the same rule.
+   *
+   * Zeroing them would brick the one configuration where the gate correctly
+   * stands down. A deployment with no Stripe keys — a self-host, anything before
+   * DEPLOY.md's Stripe step, the whole E2E suite — cannot take a payment, so
+   * gating "has not paid" there would strand every workspace over OUR
+   * misconfiguration; `statusOf` fails open for exactly that reason. Crippled
+   * quotas would then brick it anyway, one layer further down.
+   *
+   * So this row is what a NON-CHARGING deployment serves. On a charging one it is
+   * unreachable: the gate fires first, every time.
+   */
   {
     id: "free",
     name: "Free",
     priceCents: 0,
     interval: "month",
     sort: 0,
+    active: false,
     entitlements: base({}, {}, 0, 60),
   },
   {
@@ -109,6 +163,7 @@ export const DEFAULT_PLANS: PlanSeed[] = [
       { pairedDevices: 3, seats: 3, channelsPerProfile: 3, slidesPerPlaylist: 30, feeds: 2, feedRefreshMinSec: 1800, scheduleRules: 5, historyVersions: 10, libraryTracks: 10, storageMb: 2_000 },
       { ticker: true, dayparting: true, htmlSandbox: true, aiGeneration: true, musicLibrary: true },
       250,
+      30,
       30,
     ),
   },
@@ -153,6 +208,7 @@ export const DEFAULT_PLANS: PlanSeed[] = [
       },
       1000,
       15,
+      30,
     ),
   },
   {

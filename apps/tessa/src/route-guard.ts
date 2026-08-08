@@ -121,7 +121,16 @@ const allowedWithoutTenant = (path: string): boolean => path === "/api/host" || 
  * tenant, which is the signal the app needs and the whole of what it may learn
  * here. Every route that touches a centre's DATA stays behind the tenant gate.
  */
-const isPersonal = (path: string): boolean => path === "/api/context" || path === "/api/me";
+const isPersonal = (path: string): boolean =>
+  path === "/api/context" ||
+  path === "/api/me" ||
+  /*
+    A PREFIX, and it is what the onboarding wizard runs on. `/api/me/onboarding/*`
+    is read by a caller who is signed in and has no centre — precisely the state
+    gate 3 refuses — so an exact match left the plan picker 401ing on the one
+    door it exists for.
+  */
+  path.startsWith("/api/me/");
 
 /** Writes that survive a read-only tenant. Leaving is always allowed. */
 const allowedWhileReadOnly = (path: string): boolean =>

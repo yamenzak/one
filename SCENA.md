@@ -170,12 +170,32 @@ the quota and to erasure, forever, and nothing else would notice.
 
 ## 7. Plans and entitlements
 
-Four plans, seeded by `apps/scena/src/billing-seed.ts`. `free` is the parking
-state; the paid tiers are `starter`, `pro`, `business`.
+Four rows, seeded by `apps/scena/src/billing-seed.ts`, but only **three are for
+sale**: `starter`, `pro`, `business`.
 
-| | free | starter | pro | business |
+**There is no free tier, and `free` is not a plan.** It is the PARKING STATE
+every brand-new workspace is stamped with (and where a deleted Stripe
+subscription lands), carried as `active: 0` so no picker can offer it.
+`statusOf` reports `incomplete` for a workspace with no paid plan and
+`resolveHostGate` turns that into READ-ONLY — gate reason `setup`, deliberately
+not `suspended`: nothing was taken from them and there is no arrears to settle.
+
+⚠️ **Its entitlements below are deliberately NOT zeroed**, and that is not an
+oversight to tidy. They are what a deployment with **no payment rail** serves —
+a self-host, anything before `apps/scena/DEPLOY.md`'s Stripe step, the whole E2E
+suite — where `statusOf` correctly fails OPEN rather than stranding every
+workspace over our misconfiguration. Crippling them would brick exactly the
+configuration the gate stands down for. On a charging deployment the row is
+unreachable, because the gate fires first.
+
+What replaced the free tier is a **trial**: `starter` and `pro` open with 30 days
+free, collected as a card up front through Stripe Checkout
+(`subscription_data.trial_period_days`) so nothing is charged until it ends.
+
+| | free (parking) | starter | pro | business |
 |---|---|---|---|---|
 | price / month | — | $19 | $49 | $149 |
+| free trial | — | 30 days | 30 days | — |
 | paired devices | 1 | 3 | 15 | 60 |
 | seats | 1 | 3 | 10 | ∞ |
 | widget profiles | 1 | 1 | 3 | 10 |
@@ -572,9 +592,26 @@ and grants, and `PAGE_META` carries each key's title and subtitle.
 
 | Door | Screen | File |
 |---|---|---|
-| setup | Sign in / create a workspace | `apps/scena-app/src/pages/Login.tsx` |
+| root (`scena.4dl.app`) | The signpost — never the app | `apps/scena-app/src/pages/Doors.tsx` (`ScenaRootSignpost`) |
+| setup | Sign in (email code) | `apps/scena-app/src/pages/Login.tsx` |
+| setup, signed in | The three-step wizard | `apps/scena-app/src/pages/Onboarding.tsx` |
+| `<slug>`, unclaimed | No workspace at this address | `apps/scena-app/src/pages/Doors.tsx` (`ScenaNoWorkspace`) |
 | admin | The operator console | `apps/scena-app/src/pages/AdminDoor.tsx` → `pages/Admin.tsx` |
 | device (`play.`) | The screen itself | `apps/scena-player/src/main.ts` |
+
+⚠️ **A workspace is created in exactly one place, and it is not the sign-in
+screen.** `Login.tsx` used to carry a third lane that collected a workspace name,
+verified a code and created the organization — offered on **every** host, so
+somebody who followed a colleague's link to `acme.scena.4dl.app` was invited, on
+Acme's own branded sign-in, to start a second workspace instead of joining the
+one they were sent to. Worse, it skipped billing entirely: every workspace it
+made landed on the `free` PARKING ROW, which `statusOf` gates READ-ONLY, so the
+owner arrived in a product where every write was refused.
+
+The lane is `Onboarding.tsx` now — **name → plan → start**, on `@4dl/ui`'s
+`StepHeader`/`StepPanel`/`StepActions`, the same wizard Kova runs. `canCreate` on
+`LoginScreen` is all that is left of the distinction, and it changes only the
+copy: with a one-time code, signing in and signing up are the same act.
 
 ⚠️ **The console is on `admin.` and NOWHERE else.** It used to render at `/admin`
 inside the workspace shell on any host, while `/api/admin/*` has answered on the

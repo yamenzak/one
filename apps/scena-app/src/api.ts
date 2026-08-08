@@ -1917,3 +1917,60 @@ export async function refreshWeatherLocation(id: string): Promise<WeatherCurrent
   const res = await apiFetch(`${API_BASE}/api/weather/${id}/refresh`, { method: "POST" });
   return ((await res.json().catch(() => ({}))) as { current?: WeatherCurrent }).current ?? null;
 }
+
+/* ────────────────────────────── onboarding ──────────────────────────────────
+ *
+ * The two calls the first-run wizard makes, and both live under `/api/me/` for
+ * one reason: the route guard's `isPersonal` lane is the only authenticated lane
+ * that does not demand a tenancy, and the wizard runs on the SETUP door where
+ * there is no workspace yet. See `apps/scena/src/onboarding-routes.ts`.
+ */
+
+export interface OnboardingPlan {
+  id: string;
+  name: string;
+  priceCents: number;
+  interval: string;
+  trialDays: number;
+  /** The raw blob — `planHighlights` turns it into the "what you get" lines,
+   *  the same ones the Billing screen renders. */
+  entitlementsJson: string;
+}
+
+export interface OnboardingPlansFeed {
+  plans: OnboardingPlan[];
+  /** False on a deployment with no Stripe keys — drives the wizard's degrade
+   *  path, where the workspace is created and nothing is charged. */
+  stripeEnabled: boolean;
+  hasTenant: boolean;
+  current: { planId: string; pendingPlanId: string | null; status: string } | null;
+}
+
+export async function getOnboardingPlans(): Promise<OnboardingPlansFeed> {
+  const res = await apiFetch(`${API_BASE}/api/me/onboarding/plans`);
+  if (!res.ok) throw await apiError(res, "Couldn't load the plans");
+  return (await res.json()) as OnboardingPlansFeed;
+}
+
+export interface OnboardingPlanChoice {
+  planId: string;
+  planName: string;
+  trialDays: number;
+  stripeEnabled: boolean;
+  /** `checkout` ⇒ send the owner to `checkoutUrl`. `pending` ⇒ the workspace is
+   *  live on the free baseline with the choice recorded; nothing was charged. */
+  billing: "checkout" | "pending";
+  checkoutUrl?: string;
+  /** Why it degraded, when Stripe is configured but could not mint a session. */
+  detail?: string;
+}
+
+export async function chooseOnboardingPlan(planId: string): Promise<OnboardingPlanChoice> {
+  const res = await apiFetch(`${API_BASE}/api/me/onboarding/plan`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ planId }),
+  });
+  if (!res.ok) throw await apiError(res, "Couldn't save your plan choice");
+  return (await res.json()) as OnboardingPlanChoice;
+}

@@ -17,7 +17,26 @@ import type { SchemaModule } from "@4dl/core";
 
 export const AI_SCHEMA: SchemaModule = {
   id: "ai",
-  version: "3",
+  /**
+   * ⚠️ 3 → 4 IS NOT A DDL CHANGE. Nothing below moved; this bump exists so this
+   * module RE-RUNS after a host app has dropped an incompatible legacy table
+   * ahead of it.
+   *
+   * Scena declared `ai_models` / `ai_cache` / `ai_generations` itself, with
+   * different columns, before adopting this catalog — and a
+   * `CREATE TABLE IF NOT EXISTS` cannot rename a column, so the old shape wins
+   * and `CREATE INDEX … ON ai_generations(tenant_id, at)` fails with
+   * `no such column: at`, taking the whole `ensureSchema` down with it. The fix
+   * is `AI_LEGACY_RESET` in `apps/scena/src/db.ts`, which drops the three tables
+   * immediately before this module.
+   *
+   * That drop is only safe if this module then rebuilds them, and a module whose
+   * marker already reads its declared version does not run at all. Hence the
+   * bump. It is a no-op everywhere else: every statement here is
+   * `IF NOT EXISTS` or a tolerated `ADD COLUMN`, so Kova and Tessa re-apply a
+   * set that changes nothing.
+   */
+  version: "4",
   ddl: [
     "CREATE TABLE IF NOT EXISTS ai_models (id TEXT PRIMARY KEY, task TEXT, label TEXT, provider TEXT, input_rate REAL, output_rate REAL, unit_rate REAL, unit_kind TEXT, markup REAL, enabled INTEGER DEFAULT 1, is_default INTEGER DEFAULT 0);",
     "CREATE TABLE IF NOT EXISTS ai_generations (id TEXT PRIMARY KEY, tenant_id TEXT, actor_user_id TEXT, subject_id TEXT, feature TEXT, model TEXT, neurons REAL, credits INTEGER, ok INTEGER, error TEXT, at INTEGER);",

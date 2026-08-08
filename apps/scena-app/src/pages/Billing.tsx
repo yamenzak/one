@@ -18,10 +18,11 @@ import { useEffect, useState } from "react";
 import { Receipt, Check, Sparkles, ArrowRight, Lock, Loader2 } from "lucide-react";
 import { Button, Card, cn, Dialog, DialogContent, DialogFooter, EmptyState, Group, Input, LoadError, Meter, NoData, PageHeader, Row, SectionHeader, Skeleton, toast } from "@4dl/ui";
 import { LegalDialog, LegalLinks, type LegalDoc } from "../legal/content.js";
-import { FEATURE_CATALOG, QUOTA_CATALOG } from "@scena/manifest";
 import { getBilling, changePlan, buyPack, redeemPromo, type BillingState, type Plan, type Violation } from "../api.js";
+// Shared with the onboarding wizard — one derivation of "what you get", so a
+// picker cannot promise something this screen does not list.
+import { dollars, planHighlights as highlightsOf } from "../plan-highlights.js";
 
-const dollars = (cents: number) => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
 const num = (n: number) => n.toLocaleString();
 /**
  * Bytes as an amount a person reads — GB past a gigabyte, MB below it.
@@ -361,36 +362,9 @@ export function BillingPage() {
   );
 }
 
-/** Human "what you get" highlights for a plan, from its entitlements blob.
- *  Derived from the shared catalog: quotas with a `billing` formatter list their
- *  value; features with `billing` copy list when enabled (bool on, or a non-empty
- *  allow-list). Add a catalogued feature and it appears here automatically. */
+/** This screen's plans arrive as rows, so unwrap the blob and hand it over. */
 function planHighlights(p: Plan): string[] {
-  let ent: { quotas?: Record<string, number>; features?: Record<string, unknown> } = {};
-  try {
-    ent = JSON.parse(p.entitlements_json || "{}");
-  } catch {
-    /* empty */
-  }
-  const q = ent.quotas ?? {};
-  const f = ent.features ?? {};
-  const out: string[] = [];
-  // Capacity lines first (screens, profiles, sources, boards…).
-  for (const quota of QUOTA_CATALOG) {
-    if (!quota.billing) continue;
-    const line = quota.billing(q[quota.key] ?? 0);
-    if (line) out.push(line);
-  }
-  // Then feature lines, in catalog order.
-  for (const feat of FEATURE_CATALOG) {
-    if (!feat.billing) continue;
-    // Every feature is a boolean now — and `=== true` rather than truthiness,
-    // to match how the server resolves one. A plan blob carrying `1` or `"true"`
-    // does NOT enable the feature there, so advertising it here would promise
-    // something the gate refuses.
-    if (f[feat.key] === true) out.push(feat.billing);
-  }
-  return out;
+  return highlightsOf(p.entitlements_json);
 }
 
 /** Confirm-before-switch dialog — no plan ever changes on a single click. */

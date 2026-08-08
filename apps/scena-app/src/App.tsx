@@ -3,7 +3,7 @@ import { useNavigate, useLocation, Routes, Route, Navigate } from "react-router-
 import { Siren, LogOut, Sun, Moon, Scale, Layers, Music, Tv, Rss, Megaphone } from "lucide-react";
 import { ScenaMascot } from "./brand.js";
 import { adminUrl, ErrorBoundary } from "@4dl/app-kit";
-import { bootBrand, useHost } from "./host.js";
+import { bootBrand, useHost, type HostInfo } from "./host.js";
 import { ScenaNoWorkspace, ScenaRootSignpost, ScenaWrongDoor } from "./pages/Doors.js";
 import { AdminDoor } from "./pages/AdminDoor.js";
 import { CollectionPane } from "./components/collection-pane.js";
@@ -16,7 +16,8 @@ import { EmergencyModal } from "./components/EmergencyModal.js";
 import { canAccessKey, PAGE_META } from "./nav.js";
 import { signOut, authClient } from "./auth-client.js";
 import { ThemeProvider } from "./theme.js";
-import { LoginScreen, OrgOnboard } from "./pages/Login.js";
+import { LoginScreen } from "./pages/Login.js";
+import { WorkspaceOnboarding } from "./pages/Onboarding.js";
 import { LegalDialog, type LegalDoc } from "./legal/content.js";
 import { BoardControlApp } from "./pages/BoardControlApp.js";
 import { TeamPage } from "./pages/Team.js";
@@ -251,7 +252,8 @@ export function App() {
         return <ScenaWrongDoor />;
       case "admin":
         if (!meLoaded) return <Splash />;
-        if (!me?.authenticated) return <LoginScreen onDone={reloadMe} />;
+        // No `canCreate`: the operator console is not a signup surface.
+        if (!me?.authenticated) return <LoginScreen onDone={reloadMe} host={host} />;
         return <AdminDoor isAdmin={Boolean(me.isAdmin)} />;
       case "tenant":
       case "custom":
@@ -283,14 +285,22 @@ export function App() {
   if (!meLoaded) {
     return <Splash />;
   }
-  if (!me?.authenticated) return <LoginScreen onDone={reloadMe} />;
+  /*
+    ⚠️ `canCreate` COMES FROM THE DOOR, and this is the one place it is decided.
+
+    Creating a workspace is the SETUP door's whole purpose and belongs nowhere
+    else — offering it on `<slug>.scena.4dl.app` invited somebody who had
+    followed a colleague's link to start a second workspace on the first one's
+    branded sign-in. See `LoginScreen`.
+  */
+  if (!me?.authenticated) return <LoginScreen onDone={reloadMe} host={host} canCreate={host.role === "setup"} />;
   // Board users (a coordinator or a station) never see the operator app — they
   // land on their scoped control surface (§boards) and nothing else.
   if (me.board) return <BoardControlApp me={me} onSignedOut={() => { setMe(null); setBilling(null); reloadMe(); }} />;
   // Authenticated but no active org: a fresh session (returning owner or staff)
   // has a membership but no active org yet — auto-select it before offering
   // onboarding, so only genuinely org-less owners see the create-workspace step.
-  if (!me.tenantId) return <OrgGate onResolved={reloadMe} onSignOut={doSignOut} />;
+  if (!me.tenantId) return <OrgGate host={host} email={me.email ?? null} onResolved={reloadMe} onSignOut={doSignOut} />;
 
   // Guard direct navigation: a role/permission that can't see a page in the
   // sidebar shouldn't reach it by typing the URL. The server still enforces
@@ -458,9 +468,13 @@ export function App() {
  * Bridge between "signed in" and "has an active tenant". A fresh session (a
  * returning owner or any staff member) carries a membership but no active
  * organization yet, so pick the first one automatically. Only a user with zero
- * memberships (a brand-new owner) falls through to the create-workspace step.
+ * memberships (a brand-new owner) falls through to the wizard.
+ *
+ * ⚠️ The `Splash` while it decides is not cosmetic. It used to render the
+ * create-workspace card first and swap it out a moment later, so a returning
+ * owner with three workspaces was briefly invited to make a fourth.
  */
-function OrgGate({ onResolved, onSignOut }: { onResolved: () => void; onSignOut: () => void }) {
+function OrgGate({ host, email, onResolved, onSignOut }: { host: HostInfo; email: string | null; onResolved: () => void; onSignOut: () => void }) {
   const [needsOnboard, setNeedsOnboard] = useState(false);
 
   useEffect(() => {
@@ -485,8 +499,19 @@ function OrgGate({ onResolved, onSignOut }: { onResolved: () => void; onSignOut:
     };
   }, [onResolved]);
 
-  if (needsOnboard) return <OrgOnboard onDone={onResolved} onSignOut={onSignOut} />;
-  return <div className="grid min-h-screen place-items-center text-body text-muted-foreground">Loading…</div>;
+  if (needsOnboard) {
+    return (
+      <WorkspaceOnboarding
+        host={host}
+        email={email}
+        hasWorkspace={false}
+        workspaceName={null}
+        onDone={onResolved}
+        onSignOut={onSignOut}
+      />
+    );
+  }
+  return <Splash />;
 }
 
 /** Full-screen boot splash — a thinking Scena while identity/tenant resolves. */

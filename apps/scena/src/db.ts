@@ -21,6 +21,29 @@ export { DEMO_TENANT };
  */
 
 
+/**
+ * Clear the three PRE-MIGRATION AI tables out of the way, once.
+ *
+ * See the entry for it in `SCHEMA_MODULES` below for the whole argument — what
+ * is lost, why that is acceptable here, and why the version must never move.
+ *
+ * They are `backfills` rather than `ddl` on purpose: the runner applies a
+ * backfill on its own and swallows a failure with a named log line, which is
+ * exactly right for a statement that is a no-op on every database created after
+ * the migration. `ddl` is asserted to be `CREATE … IF NOT EXISTS` by
+ * `schema-module.test.ts`, and widening that assertion to admit `DROP TABLE`
+ * would open the door to a destructive statement in any module.
+ */
+const AI_LEGACY_RESET: SchemaModule = {
+  id: "scena_ai_legacy_reset",
+  version: "1",
+  backfills: [
+    { name: "drop pre-migration ai_models", sql: "DROP TABLE IF EXISTS ai_models" },
+    { name: "drop pre-migration ai_cache", sql: "DROP TABLE IF EXISTS ai_cache" },
+    { name: "drop pre-migration ai_generations", sql: "DROP TABLE IF EXISTS ai_generations" },
+  ],
+};
+
 export interface ScreenRow {
   id: string;
   tenant_id: string;
@@ -109,6 +132,40 @@ export const SCHEMA_MODULES: readonly SchemaModule[] = [
     output today. It is four columns and it comes with the module rather than
     needing to be remembered when the feature lands.
   */
+  /*
+    ⚠️ AND THIS IS WHAT MAKES THAT ORDERING ACTUALLY WORK ON AN EXISTING
+    DATABASE. Read this before touching `AI_LEGACY_RESET`.
+
+    The comment above says the shared statements "do nothing" against the old
+    shape. That was optimistic. `CREATE TABLE IF NOT EXISTS` does nothing, but
+    `AI_SCHEMA` also declares `CREATE INDEX IF NOT EXISTS idx_aigen_tenant ON
+    ai_generations(tenant_id, at)` — and Scena's `ai_generations` had
+    `created_at`, not `at`. The index therefore fails with
+    `no such column: at`, `applySchema` throws, and `ensureSchema` throws with
+    it. Every route that touches D1 500s, including `/api/billing`, the plan
+    picker and the whole dashboard. It is a total outage on any database created
+    before the catalog migration, and it is not hypothetical: the E2E suite's
+    own `.wrangler` state reproduced it exactly.
+
+    A `CREATE TABLE IF NOT EXISTS` cannot rename a column, so the three tables
+    have to go before the shared module builds them. DROPPING them is a
+    deliberate, destructive choice and it is the right one HERE, for reasons
+    specific to what they hold:
+
+      ai_models        a CATALOG, reseeded from `SCENA_MODEL_FLOOR` and the
+                       shared published rates on the next admin read. The only
+                       loss is per-row `enabled`/`is_default`/`markup` edits.
+      ai_cache         a CACHE. Losing it costs one regeneration.
+      ai_generations   an audit trail of AI spend. This is the real loss, and it
+                       is accepted: Scena has no live workspaces, and the
+                       alternative is a product that does not boot.
+
+    ⚠️ NEVER BUMP THIS VERSION. The marker row is what stops it running twice,
+    and a bump would drop a live catalog to fix nothing — the tables are already
+    the shared shape after the first run. If a future migration needs the same
+    treatment, add a NEW module with a new id.
+  */
+  AI_LEGACY_RESET,
   AI_SCHEMA,
   SCENA_SCHEMA,
 ];

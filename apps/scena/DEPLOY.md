@@ -185,6 +185,15 @@ https://scena.4dl.app/api/stripe/webhook
   is a legitimate configuration (a self-host, the test suite): the plan picker
   reports it and the app serves the free baseline rather than stranding every
   workspace over our misconfiguration.
+- ⚠️ **Sync the catalog before anyone signs up, or the trial is not a trial.**
+  Onboarding mints its own Checkout session with
+  `subscription_data.trial_period_days` from the plan's entitlements — but only
+  once the plan has a `stripe_price_id`. Without one, `/api/me/onboarding/plan`
+  degrades to `pending`: the workspace is created, nothing is charged, and the
+  owner is told billing is not ready. That is the correct refusal rather than a
+  crash, and it is still not what you want the first customer to see. Press
+  **Sync catalog** in the operator console's Stripe panel after configuring the
+  keys.
 
 ---
 
@@ -219,9 +228,12 @@ the worker.
 
 Then, by hand, the two things only a browser can tell you:
 
-1. **The doors.** `scena.4dl.app` is a signpost; `setup.` offers to create a
-   workspace; `admin.` is the console; a workspace subdomain is the app. If every
-   one of them 404s, the wildcard route (§2) is missing.
+1. **The doors.** `scena.4dl.app` is a signpost — it must NOT render the
+   dashboard, and it must make no refused API call; `setup.` signs you in and
+   then runs the three-step wizard (name → plan → start); `admin.` is the
+   console; a workspace subdomain is the app. If every one of them 404s, the
+   wildcard route (§2) is missing. `apps/scena-e2e/tests/02-doors.spec.ts` is the
+   automated half of this check.
 2. **A screen.** Open `tv.4dl.app` on any device and confirm it draws a pairing
    code rather than *"offline — no cached channel yet"*. That message means the
    bundle's `API_BASE` is not the device door (§3), and it is the single most

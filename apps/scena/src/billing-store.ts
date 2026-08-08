@@ -120,9 +120,12 @@ async function seed(db: D1Database): Promise<void> {
     stmts.push(
       db
         .prepare(
-          "INSERT OR IGNORE INTO plans (id, name, price_cents, currency, interval, entitlements_json, sort, active, created_at) VALUES (?, ?, ?, 'usd', ?, ?, ?, 1, ?)",
+          "INSERT OR IGNORE INTO plans (id, name, price_cents, currency, interval, entitlements_json, sort, active, created_at) VALUES (?, ?, ?, 'usd', ?, ?, ?, ?, ?)",
         )
-        .bind(p.id, p.name, p.priceCents, p.interval, JSON.stringify(p.entitlements), p.sort, now),
+        // `active` was hardcoded to 1 here, which is the whole reason `free` was
+        // a product rather than a parking state — the seed offered it for sale
+        // no matter what the catalog said.
+        .bind(p.id, p.name, p.priceCents, p.interval, JSON.stringify(p.entitlements), p.sort, p.active === false ? 0 : 1, now),
     );
   }
   for (const pk of DEFAULT_PACKS) {
@@ -224,9 +227,21 @@ export async function setConfig(db: D1Database, entries: Record<string, string>)
 
 /* -------------------------------- plans ---------------------------------- */
 
-export async function listPlans(db: D1Database): Promise<PlanRow[]> {
+/**
+ * The plan catalog.
+ *
+ * `onlySellable` is what every SIGN-UP and UPGRADE surface passes, and it is not
+ * cosmetic: `free` is a parking state, not a tier, and a retired plan still has
+ * to resolve for the workspaces sitting on it. Both would otherwise appear in
+ * the wizard as things a person could choose.
+ *
+ * The operator console passes nothing and sees everything, which is the point of
+ * having the flag rather than deleting the rows.
+ */
+export async function listPlans(db: D1Database, onlySellable = false): Promise<PlanRow[]> {
   await ensureBilling(db);
-  const res = await db.prepare("SELECT * FROM plans ORDER BY sort").all<PlanRow>();
+  const where = onlySellable ? " WHERE active = 1 AND price_cents > 0" : "";
+  const res = await db.prepare(`SELECT * FROM plans${where} ORDER BY sort`).all<PlanRow>();
   return res.results ?? [];
 }
 

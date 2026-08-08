@@ -29,6 +29,7 @@
  */
 
 import type { HasDb, HasPlatformConfig } from "@4dl/core";
+import { stripeCfg, stripeEnabled } from "./stripe.js";
 import type { Branding as StoredBranding } from "./branding-store.js";
 import {
   DEFAULT_DEVICE_LABEL,
@@ -108,20 +109,60 @@ export const APP_RESERVED_LABELS: ReadonlySet<string> = new Set([
  *
  * A primary-key point lookup on every request, never cached.
  *
- * ⚠️ Unlike Kova and Tessa, this does NOT synthesise an `incomplete` rung for a
- * workspace that never chose a plan. Scena's `free` plan is a real tier with
- * real (small) entitlements that the product is designed to be usable on — one
- * screen, one channel — not a parking state. Holding a free workspace read-only
- * would gate the tier we advertise. If Scena ever goes B2B-only the way Kova
- * did, this is the function that changes, and `standing.ts` already has the rung.
+ * ⚠️ THIS FUNCTION USED TO SAY THE OPPOSITE, and its own comment predicted this
+ * change: "If Scena ever goes B2B-only the way Kova did, this is the function
+ * that changes, and `standing.ts` already has the rung." Scena sold a `free`
+ * plan — one screen, one channel, indefinitely — so a workspace that never chose
+ * anything was a customer rather than an unfinished signup, and holding it
+ * read-only would have gated the tier being advertised.
+ *
+ * There is no free tier now. `free` is the PARKING STATE every brand-new
+ * workspace is stamped with (and the fallback a deleted Stripe subscription
+ * lands on), so `status` alone said "active" for somebody who had never paid:
+ * an owner who abandoned the wizard, was declined, or reloaded mid-checkout got
+ * a fully-writable product forever.
+ *
+ * A workspace with no PAID plan therefore reports `incomplete`, which
+ * `resolveHostGate` turns into read-only with billing still writable — gate
+ * reason `setup`, which is deliberately not `suspended`: nothing was taken from
+ * them and there is no arrears to settle.
+ *
+ * `comp` is exempt. An operator granting a workspace access is precisely the
+ * case where the absence of a payment is intentional.
  */
 async function statusOf(env: HasDb & HasPlatformConfig, tenantId: string): Promise<string | null> {
   const row = await env.DB
-    .prepare("SELECT status FROM subscriptions WHERE tenant_id = ?")
+    .prepare(
+      `SELECT s.status, s.comp, p.price_cents
+       FROM subscriptions s LEFT JOIN plans p ON p.id = s.plan_id
+       WHERE s.tenant_id = ?`,
+    )
     .bind(tenantId)
-    .first<{ status: string | null }>()
+    .first<{ status: string | null; comp: number | null; price_cents: number | null }>()
     .catch(() => null);
-  return row?.status ?? null;
+  if (row?.comp) return row.status ?? null;
+  // A paid plan on the row: nothing to decide, and this is the steady state, so
+  // it costs one query and stops here. (No row at all counts as unpaid too — the
+  // row is written lazily, and a missing plan id is an entitlement set nobody
+  // can name.)
+  if (Number(row?.price_cents) > 0) return row?.status ?? null;
+
+  /*
+    …but only if this deployment can actually TAKE a payment.
+
+    Gating on "has not paid" where there is no payment rail would strand every
+    workspace over OUR misconfiguration. A self-host, anything before
+    `apps/scena/DEPLOY.md`'s Stripe step, and the whole E2E suite are all in
+    exactly that state — `apps/scena-e2e` creates workspaces against a worker
+    with no keys. The house rule everywhere else here applies: fail CLOSED on
+    their non-payment, fail OPEN on ours.
+
+    Read LAST and only on this branch, so a healthy deployment — which returned
+    above with a paid plan — never pays for the extra config read.
+  */
+  const cfg = await stripeCfg(env).catch(() => null);
+  if (!cfg || !stripeEnabled(cfg)) return row?.status ?? null;
+  return "incomplete";
 }
 
 export const rootDomain = (env: RootDomainEnv): string => tRootDomain(env) || DEFAULT_ROOT;

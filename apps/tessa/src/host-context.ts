@@ -93,7 +93,31 @@ async function statusOf(env: HasDb & HasPlatformConfig, tenantId: string): Promi
   if (row?.comp) return row.status ?? null;
   if (Number(row?.price_usd_month) > 0) return row?.status ?? null;
   const cfg = await stripeConfig(env).catch(() => null);
-  if (!cfg || !stripeEnabled(cfg)) return row?.status ?? null;
+  if (!cfg || !stripeEnabled(cfg)) {
+    /*
+      ⚠️ AND THE PARKING STATUS DOES NOT COUNT HERE, which is what made the
+      fail-open above fail CLOSED for two years of comment.
+
+      `defaultSubscription` is `{ plan_id: "free", status: "incomplete" }`, so
+      the moment anything materialises the row — the onboarding wizard, tenant
+      creation, an operator opening billing — a centre on a deployment with NO
+      payment rail carries the literal string this branch then returns. The gate
+      reads `incomplete`, holds the centre read-only, and the whole "fail open on
+      OUR misconfiguration" paragraph above is decoration: a self-host, anything
+      before the Stripe step in DEPLOY.md, and the E2E suite are all stranded.
+
+      It stayed hidden only because nothing wrote the row on those deployments.
+      The onboarding wizard writes it, so the suite went red the moment it
+      landed — with `402 tenant_read_only, reason: setup` on an ordinary POST.
+
+      `incomplete` is not a fact the DUNNING ladder can produce; it is only ever
+      the default. Every status that IS a fact — `past_due`, `suspended`,
+      `canceled` — comes from a Stripe event, so it cannot exist on a deployment
+      with no Stripe, and passing them through unchanged loses nothing.
+    */
+    const status = row?.status ?? null;
+    return status === "incomplete" ? null : status;
+  }
   return "incomplete";
 }
 

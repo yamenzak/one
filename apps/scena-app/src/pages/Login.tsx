@@ -1,87 +1,156 @@
 /**
- * Auth screens shown before the operator Shell. Two populations, and the split
- * is now PEOPLE vs DEVICES rather than owners vs everyone else:
+ * SIGN IN — 100% passwordless, and now built out of the same pieces Kova's is.
+ *
+ * ── What this replaced, and why it mattered ──────────────────────────────────
+ *
+ * A hand-rolled card: a `min-h-screen` grid, two blurred gradient blobs, a
+ * `rounded-3xl border bg-card/80 shadow-xl backdrop-blur-sm` panel, and its own
+ * `<h1 className="text-body-lg">` inside it. None of that is in the design
+ * language, so Scena's front door looked like a different product from Kova's
+ * front door — which is the one screen where "these are the same platform" has
+ * to be true at a glance, because it is the only screen most people ever see
+ * twice.
+ *
+ * It is `Screen` + `TierAnchor` + `Field` + `Button` now, exactly as
+ * `apps/app/src/screens/Login.tsx` is. **The anchor is the WORKSPACE, not the
+ * form.** Somebody arriving has one question before any other — "am I in the
+ * right place?" — and the answer should be the biggest thing on the screen. The
+ * two steps are ONE screen: the anchor never moves between them, so entering a
+ * code feels like continuing rather than navigating.
+ *
+ * ── Two populations, and the split is DEVICES vs PEOPLE ──────────────────────
  *
  *   • **People** — owners, operators, front desk, viewers, platform admins —
- *     sign in with an **email code**, or a passkey. There is no password.
+ *     sign in with an **email code**. There is no password.
  *   • **Stations** — the shared tablet at a counter, the referee's phone, the
  *     door screen — sign in with the **handle + code** an owner provisioned on
  *     the Live Boards screen. They have no inbox and the device is shared, so a
  *     one-time code emailed to nobody is not a control, it is a locked door.
  *
- * So the DEFAULT view is email, and the station lane is secondary. It used to be
- * the other way round, because staff held handles too — they do not any more,
- * and the change matters beyond ordering: the old form asked the SERVER to turn
- * a handle into a login address, which made a public endpoint that would confirm
- * whether any given handle existed on the platform. A station's address is
- * `<handle>@bd.scena`, a constant this file can build on its own.
+ * The station lane builds its own address (`<handle>@bd.scena`) rather than
+ * asking the server to resolve one, because asking meant a public endpoint that
+ * would confirm whether any given handle existed on the platform.
+ *
+ * ── There is no "create a workspace" here any more ───────────────────────────
+ *
+ * ⚠️ This screen used to carry a THIRD lane that collected a workspace name,
+ * verified a code and created the organization — and it was offered on every
+ * host, so a person who followed a colleague's link to `acme.scena.4dl.app` was
+ * invited, on Acme's own branded sign-in, to start a SECOND workspace instead of
+ * joining the one they were sent to.
+ *
+ * It is gone, and not merely moved: it skipped the plan step entirely, so every
+ * workspace it made landed on the `free` parking row that `statusOf` now gates
+ * read-only. Creating a workspace is `Onboarding.tsx`'s three-step wizard, on
+ * the setup door, after this screen. `canCreate` is what this file keeps of the
+ * distinction, and it now changes only the COPY — signing in and signing up are
+ * the same act with a one-time code, so there is nothing else to switch.
  */
-import { useState } from "react";
-import { Loader2, Mail, ArrowLeft, MonitorSmartphone } from "lucide-react";
-import { Button, Input, Label } from "@4dl/ui";
+
+import { useEffect, useRef, useState } from "react";
+import {
+  ArrowRight,
+  Button,
+  Callout,
+  Field,
+  KeyRound,
+  Mail,
+  MonitorSmartphone,
+  Screen,
+  TierAnchor,
+  TierContent,
+  brandMark,
+  hasWordmark,
+} from "@4dl/ui";
 import { ScenaMascot } from "../brand.js";
 import { authClient, signIn, emailOtp } from "../auth-client.js";
+import { useTheme } from "../theme.js";
+import { LegalDialog, LegalLinks, type LegalDoc } from "../legal/content.js";
+import type { HostInfo } from "../host.js";
 
 /** The non-routable suffix every station account carries. Mirrors
  *  `STATION_DOMAIN` in the worker's `auth.ts`; they must not drift. */
 const STATION_DOMAIN = "@bd.scena";
-import { LegalDialog, LegalLinks, type LegalDoc } from "../legal/content.js";
 
-function Shell({ children }: { children: React.ReactNode }) {
+/**
+ * The sign-in surface.
+ *
+ * `canCreate` comes from the DOOR (`host.role === "setup"`) and is the only
+ * thing that differs between the setup door and a workspace's own address:
+ *
+ *   root        a signpost, not a login — the server refuses to send a code
+ *               here, and its one action points at setup.
+ *   setup       "Create your workspace." The same email field; the wizard
+ *               after it does the naming and the plan.
+ *   <slug>      "Sign in to <workspace>." No create lane at all.
+ *   admin       the operator console. Never a signup surface.
+ */
+export function LoginScreen({
+  onDone,
+  host,
+  canCreate = false,
+}: {
+  onDone: () => void;
+  host: HostInfo | null;
+  canCreate?: boolean;
+}) {
+  const [station, setStation] = useState(false);
   const [doc, setDoc] = useState<LegalDoc | null>(null);
+
+  const tenant = host?.tenant ?? null;
+  const { mode } = useTheme();
+  const brandName = tenant?.name ?? "Scena";
+  const logoUrl = brandMark(tenant?.branding, mode, "logo");
+  /*
+    A wordmark already contains the workspace's name, so writing it underneath
+    prints the name twice. When there is one the heading goes visually hidden
+    rather than away: it is this page's `h1` and the only thing that gives the
+    screen a name in the document outline. The image then carries an empty alt,
+    so the name is announced once, by the heading.
+  */
+  const wordmark = Boolean(logoUrl) && hasWordmark(tenant?.branding, mode);
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-muted/30">
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute left-1/2 top-[-12%] size-[38rem] -translate-x-1/2 rounded-full bg-primary/15 blur-[130px]" />
-        <div className="absolute -bottom-24 -right-16 size-[26rem] rounded-full bg-primary/10 blur-[120px]" />
-        <div className="absolute inset-0 bg-gradient-to-b from-background/0 via-background/0 to-background/40" />
-      </div>
-      <div className="grid min-h-screen place-items-center p-4 sm:p-6">
-        <div className="w-full max-w-md">
-          <div className="mb-7 flex flex-col items-center gap-2">
-            <ScenaMascot mood="idle" size={92} />
-            <div className="text-title-2 font-bold tracking-tight">Scena</div>
-          </div>
-          <div className="rounded-3xl border bg-card/80 p-8 shadow-xl shadow-primary/5 backdrop-blur-sm">{children}</div>
-          <p className="mt-6 text-center text-caption text-muted-foreground">Digital signage & live boards, beautifully simple.</p>
-          <p className="mt-2 text-center text-caption leading-relaxed text-muted-foreground">
-            By continuing, you agree to our <LegalLinks onOpen={setDoc} />.
-          </p>
-          <p className="mt-1 text-center text-caption text-muted-foreground/60">© 2026 Four Degree Labs · Scena</p>
-        </div>
-      </div>
-      <LegalDialog doc={doc} onClose={() => setDoc(null)} />
-    </div>
-  );
-}
+    <Screen center width="narrow">
+      {/* T1 — whose door this is. */}
+      <TierAnchor className="flex flex-col items-center gap-3 pb-8 text-center">
+        {logoUrl ? (
+          <img src={logoUrl} alt={wordmark ? "" : brandName} className="h-14 w-auto max-w-[70%] object-contain" />
+        ) : (
+          <ScenaMascot mood="idle" size={72} />
+        )}
+        <h1 className={wordmark ? "sr-only" : "text-title-1"}>{brandName}</h1>
+        <p className="text-body text-muted-foreground">
+          {station
+            ? "Sign in this station"
+            : canCreate
+              ? "Create your workspace"
+              : tenant
+                ? "Sign in to continue"
+                : "Digital signage & live boards"}
+        </p>
+      </TierAnchor>
 
-function ErrLine({ children }: { children: React.ReactNode }) {
-  return <div className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-body text-destructive">{children}</div>;
-}
-
-type View = "email" | "station" | "create";
-
-export function LoginScreen({ onDone }: { onDone: () => void }) {
-  const [view, setView] = useState<View>("email");
-  return (
-    <Shell>
-      {view === "create" ? (
-        <CreateWorkspace onDone={onDone} onBack={() => setView("email")} />
-      ) : view === "station" ? (
-        <StationSignIn onDone={onDone} onBack={() => setView("email")} />
+      {station ? (
+        <StationSignIn onDone={onDone} onBack={() => setStation(false)} />
       ) : (
-        <EmailSignIn onDone={onDone} onStation={() => setView("station")} onCreate={() => setView("create")} />
+        <EmailSignIn onDone={onDone} onStation={() => setStation(true)} canCreate={canCreate} />
       )}
-    </Shell>
+
+      <TierContent className="space-y-1 pt-8 text-center">
+        <p className="text-caption leading-relaxed text-muted-foreground">
+          By continuing, you agree to our <LegalLinks onOpen={setDoc} />.
+        </p>
+        <p className="text-caption text-muted-foreground/60">© 2026 Four Degree Labs · Scena</p>
+      </TierContent>
+
+      <LegalDialog doc={doc} onClose={() => setDoc(null)} />
+    </Screen>
   );
 }
 
 /**
  * The STATION lane: the handle and code from the Live Boards screen.
- *
- * The address is built here (`<handle>@bd.scena`) rather than asked for, because
- * asking meant a public endpoint that answered "does this handle exist" for any
- * string anybody sent it. The suffix is a constant; there is nothing to look up.
  *
  * The refusal is deliberately one sentence for both halves. "No such station"
  * and "wrong code" are two different answers to somebody guessing.
@@ -92,8 +161,7 @@ function StationSignIn({ onDone, onBack }: { onDone: () => void; onBack: () => v
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  const submit = async () => {
     setBusy(true);
     setErr(null);
     try {
@@ -101,238 +169,168 @@ function StationSignIn({ onDone, onBack }: { onDone: () => void; onBack: () => v
       const res = await signIn.email({ email, password: code });
       if (res.error) throw new Error("That handle and code don't match.");
       onDone();
-    } catch (e2) {
-      setErr(e2 instanceof Error ? e2.message : "Could not sign in");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not sign in");
     } finally {
       setBusy(false);
     }
-  }
+  };
+
+  const canSubmit = Boolean(handle.trim() && code) && !busy;
 
   return (
-    <form onSubmit={submit}>
-      <h1 className="text-body-lg font-semibold">Sign in this station</h1>
-      <p className="mb-4 mt-1 text-body text-muted-foreground">
-        Use the handle and code from the Live Boards screen. Ask an owner to regenerate one if you've lost it.
-      </p>
-      <div className="mb-3">
-        <Label htmlFor="handle">Handle</Label>
-        <Input id="handle" value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="k7m2xp" autoCapitalize="none" autoComplete="username" autoFocus required className="mt-1.5 font-mono" />
-      </div>
-      <div className="mb-1">
-        <Label htmlFor="code">Code</Label>
-        <Input id="code" type="password" value={code} onChange={(e) => setCode(e.target.value)} placeholder="••••••" autoComplete="current-password" required className="mt-1.5 font-mono" />
-      </div>
-      {err && <ErrLine>{err}</ErrLine>}
-      <Button type="submit" disabled={busy || !handle.trim() || !code} className="mt-4 w-full">
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Sign in"}
+    <div className="space-y-3">
+      <Field
+        label="Handle"
+        icon={MonitorSmartphone}
+        value={handle}
+        placeholder="k7m2xp"
+        autoCapitalize="none"
+        autoComplete="username"
+        autoFocus
+        className="[&_input]:font-mono"
+        onChange={(e) => setHandle(e.target.value)}
+        hint="From the Live Boards screen. Ask an owner to regenerate one if you've lost it."
+      />
+      <Field
+        label="Code"
+        icon={KeyRound}
+        type="password"
+        value={code}
+        placeholder="••••••"
+        autoComplete="current-password"
+        className="[&_input]:font-mono"
+        onChange={(e) => setCode(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && canSubmit && void submit()}
+      />
+      {err && <Callout tone="danger" live="alert">{err}</Callout>}
+      <Button size="lg" className="w-full" disabled={!canSubmit} onClick={() => void submit()}>
+        {busy ? "Signing in…" : "Sign in"}
+        {!busy && <ArrowRight aria-hidden />}
       </Button>
-      <button type="button" onClick={onBack} className="mt-4 flex w-full items-center justify-center gap-1.5 text-body text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-3.5" /> I'm a person, not a station
+      <button
+        className="min-h-12 w-full text-caption text-muted-foreground transition-colors hover:text-foreground"
+        onClick={onBack}
+      >
+        I&rsquo;m a person, not a station
       </button>
-    </form>
+    </div>
   );
 }
 
-/** The default: email → 6-digit code. Everyone who is a person signs in here. */
-function EmailSignIn({ onDone, onStation, onCreate }: { onDone: () => void; onStation: () => void; onCreate: () => void }) {
+/**
+ * The default: email → 6-digit code. Everyone who is a person signs in here.
+ *
+ * One "Continue", no login/signup mode: with a one-time code, signing in and
+ * signing up are the same act (prove you own the email). What differs by door is
+ * only what happens AFTER — the setup door hands you the wizard, a workspace
+ * address hands you the workspace.
+ */
+function EmailSignIn({ onDone, onStation, canCreate }: { onDone: () => void; onStation: () => void; canCreate: boolean }) {
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const otpRef = useRef<HTMLInputElement>(null);
 
-  async function sendCode(e?: React.FormEvent) {
-    e?.preventDefault();
-    if (!email.trim()) return setErr("Enter your email first");
+  // Focus the code field the moment it appears — the alternative is a screen
+  // that has just asked for six digits and put the caret nowhere.
+  useEffect(() => {
+    if (step === "otp") otpRef.current?.focus();
+  }, [step]);
+
+  const sendCode = async () => {
     setBusy(true);
     setErr(null);
     try {
       const res = await emailOtp.sendVerificationOtp({ email: email.trim(), type: "sign-in" });
       if (res.error) throw new Error(res.error.message || "Could not send code");
       setStep("otp");
-    } catch (e2) {
-      setErr(e2 instanceof Error ? e2.message : "Could not send code");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Could not send code");
     } finally {
       setBusy(false);
     }
-  }
+  };
 
-  async function verify(e: React.FormEvent) {
-    e.preventDefault();
+  const verify = async () => {
     setBusy(true);
     setErr(null);
     try {
-      const res = await signIn.emailOtp({ email: email.trim(), otp: otp.trim() });
+      const res = await authClient.signIn.emailOtp({ email: email.trim(), otp: otp.trim() });
       if (res.error) throw new Error(res.error.message || "Invalid or expired code");
       onDone();
-    } catch (e2) {
-      setErr(e2 instanceof Error ? e2.message : "Invalid code");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "That code didn't work. Check it and try again.");
     } finally {
       setBusy(false);
     }
-  }
+  };
 
-  if (step === "otp") {
-    return (
-      <form onSubmit={verify}>
-        <h1 className="text-body-lg font-semibold">Enter your code</h1>
-        <p className="mb-4 mt-1 text-body text-muted-foreground">We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span>.</p>
-        <Label htmlFor="otp">Verification code</Label>
-        <Input id="otp" value={otp} onChange={(ev) => setOtp(ev.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" inputMode="numeric" autoComplete="one-time-code" autoFocus className="mt-1.5 text-center text-body-lg tracking-[0.4em]" />
-        {err && <ErrLine>{err}</ErrLine>}
-        <Button type="submit" disabled={busy || otp.length < 6} className="mt-4 w-full">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & sign in"}</Button>
-        <div className="mt-3 flex items-center justify-between text-body text-muted-foreground">
-          <button type="button" className="hover:text-foreground" onClick={() => { setStep("email"); setOtp(""); setErr(null); }}>← Change email</button>
-          <button type="button" className="hover:text-foreground" onClick={() => sendCode()} disabled={busy}>Resend code</button>
-        </div>
-      </form>
-    );
-  }
+  const canSend = email.includes("@") && !busy;
 
   return (
-    <form onSubmit={sendCode}>
-      <h1 className="text-body-lg font-semibold">Sign in to Scena</h1>
-      <p className="mb-4 mt-1 text-body text-muted-foreground">We'll email you a one-time code — there's no password to remember.</p>
-      <Label htmlFor="email">Email</Label>
-      <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="email" autoFocus required className="mt-1.5" />
-      {err && <ErrLine>{err}</ErrLine>}
-      <Button type="submit" disabled={busy} className="mt-4 w-full">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (<><Mail className="mr-2 h-4 w-4" /> Email me a code</>)}</Button>
-      <button type="button" onClick={onStation} className="mt-4 flex w-full items-center justify-center gap-1.5 text-body text-muted-foreground hover:text-foreground">
-        <MonitorSmartphone className="size-3.5" /> Sign in a station instead
-      </button>
-      <div className="mt-5 border-t pt-4 text-center text-body text-muted-foreground">
-        New to Scena?{" "}
-        <button type="button" onClick={onCreate} className="font-medium text-primary hover:underline">Create a workspace</button>
-      </div>
-    </form>
+    <div className="space-y-3">
+      {step === "email" ? (
+        <>
+          <Field
+            label="Email"
+            icon={Mail}
+            type="email"
+            value={email}
+            placeholder="you@company.com"
+            autoComplete="email"
+            autoFocus
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && canSend && void sendCode()}
+            hint={
+              canCreate
+                ? "We'll email you a 6-digit code, then you'll name your workspace."
+                : "New or returning — we'll email you a 6-digit code."
+            }
+          />
+          {err && <Callout tone="danger" live="alert">{err}</Callout>}
+          <Button size="lg" className="w-full" disabled={!canSend} onClick={() => void sendCode()}>
+            {busy ? "Sending…" : "Email me a code"}
+            {!busy && <ArrowRight aria-hidden />}
+          </Button>
+          <button
+            className="flex min-h-12 w-full items-center justify-center gap-2 text-caption text-muted-foreground transition-colors hover:text-foreground"
+            onClick={onStation}
+          >
+            <MonitorSmartphone className="size-3.5" aria-hidden /> Sign in a station instead
+          </button>
+        </>
+      ) : (
+        <>
+          <Field
+            ref={otpRef}
+            label="Your code"
+            icon={KeyRound}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={6}
+            value={otp}
+            className="[&_input]:text-center [&_input]:text-title-3 [&_input]:tracking-[0.5em]"
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+            onKeyDown={(e) => e.key === "Enter" && otp.length === 6 && void verify()}
+            hint={`Sent to ${email}. It expires in 10 minutes.`}
+          />
+          {err && <Callout tone="danger" live="alert">{err}</Callout>}
+          <Button size="lg" className="w-full" disabled={otp.length !== 6 || busy} onClick={() => void verify()}>
+            {busy ? "Checking…" : "Continue"}
+          </Button>
+          <div className="flex items-center justify-between text-caption text-muted-foreground">
+            <button className="min-h-12 transition-colors hover:text-foreground" onClick={() => { setStep("email"); setOtp(""); setErr(null); }}>
+              Use a different email
+            </button>
+            <button className="min-h-12 transition-colors hover:text-foreground disabled:opacity-60" disabled={busy} onClick={() => void sendCode()}>
+              Resend code
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
-}
-
-/** Create a workspace (owner provisioning). Collects a workspace name + email,
- *  verifies a code (which creates and signs in the owner), then creates the
- *  organization. No password is chosen at any point — there is none to choose. */
-function CreateWorkspace({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
-  const [step, setStep] = useState<"form" | "otp">("form");
-  const [workspace, setWorkspace] = useState("");
-  const [email, setEmail] = useState("");
-  const [otp, setOtp] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  async function sendCode(e?: React.FormEvent) {
-    e?.preventDefault();
-    if (!workspace.trim()) return setErr("Name your workspace first");
-    if (!email.trim()) return setErr("Enter your email");
-    setBusy(true);
-    setErr(null);
-    try {
-      const res = await emailOtp.sendVerificationOtp({ email: email.trim(), type: "sign-in" });
-      if (res.error) throw new Error(res.error.message || "Could not send code");
-      setStep("otp");
-    } catch (e2) {
-      setErr(e2 instanceof Error ? e2.message : "Could not send code");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function verify(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setErr(null);
-    try {
-      const res = await signIn.emailOtp({ email: email.trim(), otp: otp.trim() });
-      if (res.error) throw new Error(res.error.message || "Invalid or expired code");
-      const ws = workspace.trim() || "My workspace";
-      const slug = `${slugify(ws) || "org"}-${Math.abs(hash(ws)).toString(36).slice(0, 4)}`;
-      const org = await authClient.organization.create({ name: ws, slug });
-      if (org.error) throw new Error(org.error.message);
-      if (org.data?.id) await authClient.organization.setActive({ organizationId: org.data.id });
-      onDone();
-    } catch (e2) {
-      setErr(e2 instanceof Error ? e2.message : "Could not create workspace");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (step === "otp") {
-    return (
-      <form onSubmit={verify}>
-        <h1 className="text-body-lg font-semibold">Enter your code</h1>
-        <p className="mb-4 mt-1 text-body text-muted-foreground">We sent a 6-digit code to <span className="font-medium text-foreground">{email}</span> to set up <span className="font-medium text-foreground">{workspace}</span>.</p>
-        <Label htmlFor="cw-otp">Verification code</Label>
-        <Input id="cw-otp" value={otp} onChange={(ev) => setOtp(ev.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" inputMode="numeric" autoComplete="one-time-code" autoFocus className="mt-1.5 text-center text-body-lg tracking-[0.4em]" />
-        {err && <ErrLine>{err}</ErrLine>}
-        <Button type="submit" disabled={busy || otp.length < 6} className="mt-4 w-full">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify & create workspace"}</Button>
-        <div className="mt-3 flex items-center justify-between text-body text-muted-foreground">
-          <button type="button" className="hover:text-foreground" onClick={() => { setStep("form"); setOtp(""); setErr(null); }}>← Back</button>
-          <button type="button" className="hover:text-foreground" onClick={() => sendCode()} disabled={busy}>Resend code</button>
-        </div>
-      </form>
-    );
-  }
-
-  return (
-    <form onSubmit={sendCode}>
-      <h1 className="text-body-lg font-semibold">Create your workspace</h1>
-      <p className="mb-4 mt-1 text-body text-muted-foreground">Screens, channels, boards, staff, and billing all live under it. You'll sign in with an email code — no password to manage.</p>
-      <div className="mb-3"><Label htmlFor="cw-ws">Workspace name</Label><Input id="cw-ws" value={workspace} onChange={(e) => setWorkspace(e.target.value)} placeholder="Acme Clinic" autoFocus required className="mt-1.5" /></div>
-      <div><Label htmlFor="cw-email">Your email</Label><Input id="cw-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" autoComplete="email" required className="mt-1.5" /></div>
-      {err && <ErrLine>{err}</ErrLine>}
-      <Button type="submit" disabled={busy} className="mt-4 w-full">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : (<><Mail className="mr-2 h-4 w-4" /> Email me a code</>)}</Button>
-      <button type="button" onClick={onBack} className="mt-4 flex w-full items-center justify-center gap-1.5 text-body text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-3.5" /> Back to sign in
-      </button>
-    </form>
-  );
-}
-
-/** First-run for an authenticated owner with no organization (they signed in via
- *  the email OTP path): name the workspace. Owners sign in with an email code, so
- *  there's no username/password to set here (§auth). */
-export function OrgOnboard({ onDone, onSignOut }: { onDone: () => void; onSignOut: () => void }) {
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  async function create(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setErr(null);
-    try {
-      const ws = name.trim() || "My workspace";
-      const slug = `${slugify(ws) || "org"}-${Math.abs(hash(ws)).toString(36).slice(0, 4)}`;
-      const created = await authClient.organization.create({ name: ws, slug });
-      if (created.error) throw new Error(created.error.message);
-      if (created.data?.id) await authClient.organization.setActive({ organizationId: created.data.id });
-      onDone();
-    } catch (e2) {
-      setErr(e2 instanceof Error ? e2.message : "Could not create workspace");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Shell>
-      <form onSubmit={create}>
-        <h1 className="text-body-lg font-semibold">Name your workspace</h1>
-        <p className="mb-4 mt-1 text-body text-muted-foreground">Screens, channels, boards, staff, and billing all live under it.</p>
-        <div className="mb-1"><Label htmlFor="org">Organization name</Label><Input id="org" value={name} onChange={(e) => setName(e.target.value)} placeholder="Acme Clinic" autoFocus className="mt-1.5" required /></div>
-        {err && <ErrLine>{err}</ErrLine>}
-        <Button type="submit" disabled={busy} className="mt-4 w-full">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create workspace"}</Button>
-        <button type="button" onClick={onSignOut} className="mt-4 block w-full text-center text-caption text-muted-foreground hover:text-foreground">Sign out</button>
-      </form>
-    </Shell>
-  );
-}
-
-function slugify(s: string): string {
-  return s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
-function hash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  return h + 1;
 }

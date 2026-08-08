@@ -486,6 +486,18 @@ editing it.
 - **Billing** (§6.2). ONE paid plan, `practice`, at $39/month with a 14-day
   trial and a 2,000-credit monthly grant, plus three credit packs. `free` is the
   PARKING STATE of a centre that has not chosen, not a tier anyone is sold.
+  ⚠️ **The setup door now finishes that thought.** It used to be one two-field
+  form that created the centre and dropped the owner in — which was right while
+  there was nothing to choose, and became wrong the moment `statusOf` started
+  gating an unpaid centre READ-ONLY. A centre created that way landed in a
+  product where every write was refused, on the first screen, with nothing on it
+  saying why. `apps/tessa-app/src/screens/Doors.tsx`'s `Start` is a **two-step
+  wizard** now — name the centre, then start the plan — on `@4dl/ui`'s
+  `StepHeader`/`StepPanel`/`StepActions`, the same chrome Kova and Scena use. Two
+  steps rather than their three is not a shortcut: with one plan, "choose a plan"
+  is a question with one answer. `apps/tessa/src/onboarding-routes.ts` is the
+  server half, on the `/api/me/onboarding/*` personal lane, because every
+  `/api/billing*` path needs a tenancy and this caller has none yet.
   Stripe rides the shared `@4dl/billing-rail` under `metadata.app = "tessa"`;
   the webhook is at `/api/webhooks/stripe`, which the route guard already exempts
   in the four places a provider callback has to survive. `dailySweep` drives the

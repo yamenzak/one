@@ -184,6 +184,28 @@ describe("the module list", () => {
     expect(SCHEMA_MODULES).toContain(SCENA_SCHEMA);
   });
 
+  /**
+   * ⚠️ THE ORDER HERE IS A MIGRATION, NOT A PREFERENCE.
+   *
+   * `AI_LEGACY_RESET` drops the three pre-migration AI tables and `AI_SCHEMA`
+   * rebuilds them in the shared shape. Reversed, or with the reset removed, an
+   * existing database keeps `ai_generations(created_at)`, `AI_SCHEMA`'s
+   * `CREATE INDEX … (tenant_id, at)` fails with `no such column: at`, and
+   * `ensureSchema` throws — which is not a degraded feature, it is every route
+   * that touches D1 answering 500. It reproduced exactly that way against the
+   * E2E suite's own `.wrangler` state.
+   *
+   * Reversed the OTHER way is worse and quieter: the reset would drop tables
+   * `AI_SCHEMA` had already built and, its marker being current, would never
+   * rebuild them.
+   */
+  it("drops the legacy AI tables immediately before the module that rebuilds them", () => {
+    const ids = SCHEMA_MODULES.map((m) => m.id);
+    const reset = ids.indexOf("scena_ai_legacy_reset");
+    expect(reset, "the legacy-AI reset is missing from the module list").toBeGreaterThanOrEqual(0);
+    expect(ids[reset + 1], "AI_SCHEMA must run directly after the reset").toBe("ai");
+  });
+
   it("claims no table twice", () => {
     const seen = new Map<string, string>();
     for (const m of SCHEMA_MODULES) {

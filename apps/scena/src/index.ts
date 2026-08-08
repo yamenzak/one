@@ -60,6 +60,7 @@ import { registerContentRoutes } from "./content-routes.js";
 import { getBranding } from "./branding-store.js";
 import { registerMemberRoutes } from "./member-routes.js";
 import { accountRoutes, tenantCloseRoutes } from "./exit-routes.js";
+import { onboardingRoutes } from "./onboarding-routes.js";
 import { grantAll, lifecycleSweep, isSuspended, tenantEntitlements, callerEmail } from "./billing-service.js";
 import { publishVersion, currentManifest, rollbackTo, currentVersion, listVersions, getVersionManifest, publishState, setVersionNote } from "./versions.js";
 import { createAd, listAds, getAd, setAdEnabled, deleteAd, enabledAdSchedules, listAdProfiles, createAdProfile, getAdProfile, updateAdProfile, deleteAdProfile, channelsUsingAdProfile } from "./ad-store.js";
@@ -208,6 +209,15 @@ app.route("/api", domainAdminRoutes);
 */
 app.route("/api", tenantCloseRoutes);
 app.route("/api", accountRoutes);
+
+/*
+  ARRIVING. The mirror of the two routes above, and mounted next to them for the
+  same reason: both are PERSONAL lanes, answering for a signed-in caller who has
+  no workspace — one for somebody who has not made theirs yet, one for somebody
+  leaving. Neither can live under `/api/billing`, which the guard refuses without
+  a tenancy. See `onboarding-routes.ts`.
+*/
+app.route("/api", onboardingRoutes);
 
 /*
   The inbox: `/api/notifications`, `/api/notifications/:id/read`,

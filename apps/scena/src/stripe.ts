@@ -151,12 +151,36 @@ async function ensureCustomer(env: Env, cfg: StripeCfg, tenantId: string): Promi
   return cust.id;
 }
 
-export async function subscriptionCheckout(env: Env, planId: string, urls: { success: string; cancel: string }, tenantId = DEMO_TENANT): Promise<{ url: string }> {
+/**
+ * A Checkout session for a plan.
+ *
+ * ⚠️ `trialDays` IS THE THING THAT REPLACED THE FREE TIER, so it has to reach
+ * Stripe. Scena's plans carry `entitlements.trialDays` and the onboarding wizard
+ * says "30 days free" on the button — but this function never sent
+ * `trial_period_days`, so the very first invoice was charged immediately and the
+ * promise on screen was false. It is a PARAMETER rather than a read of the plan
+ * blob because the same helper serves a mid-life plan CHANGE, where a second
+ * trial would be a free month for anyone who cancels and re-subscribes: the
+ * caller decides, and only onboarding passes it.
+ *
+ * Stripe requires a payment method for a trialling subscription by default, so
+ * the card is still collected up front — nothing is charged until the trial ends,
+ * which is exactly what the copy claims.
+ */
+export async function subscriptionCheckout(
+  env: Env,
+  planId: string,
+  urls: { success: string; cancel: string },
+  tenantId = DEMO_TENANT,
+  trialDays = 0,
+): Promise<{ url: string }> {
   const cfg = await stripeCfg(env);
   if (!stripeEnabled(cfg)) throw new Error("stripe not configured");
   const plan = await getPlan(env.DB, planId);
   if (!plan?.stripe_price_id) throw new Error("plan not synced to stripe");
   const customer = await ensureCustomer(env, cfg, tenantId);
+  const subscriptionData: Record<string, unknown> = { metadata: { scena_tenant: tenantId, scena_plan: planId } };
+  if (trialDays > 0) subscriptionData.trial_period_days = Math.floor(trialDays);
   const session = await stripeApi<{ url: string }>(cfg, "checkout/sessions", "POST", {
     mode: "subscription",
     customer,
@@ -164,7 +188,7 @@ export async function subscriptionCheckout(env: Env, planId: string, urls: { suc
     cancel_url: urls.cancel,
     line_items: { 0: { price: plan.stripe_price_id, quantity: 1 } },
     metadata: { scena_tenant: tenantId, scena_plan: planId },
-    subscription_data: { metadata: { scena_tenant: tenantId, scena_plan: planId } },
+    subscription_data: subscriptionData,
   });
   return { url: session.url };
 }

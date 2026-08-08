@@ -67,9 +67,22 @@ function featureOn(key, val) {
 function buildPricing(M) {
   const P = M.pricing;
   const num = (n) => n.toLocaleString("en-US");
-  return DEFAULT_PLANS.map((plan) => {
+  /*
+    ⚠️ ONLY WHAT IS FOR SALE. `DEFAULT_PLANS` still carries `free`, because it is
+    the PARKING ROW every new workspace is stamped with — but it is `active:
+    false` and no picker in the product offers it. This generator mapped the
+    whole array, so the marketing site advertised a "Free / forever" tier that
+    the signup wizard would not let anybody choose, and that `statusOf` gates
+    read-only if they somehow landed on it. The registry is the source of truth
+    for the price AND for whether there is a price.
+  */
+  return DEFAULT_PLANS.filter((plan) => plan.active !== false && plan.priceCents > 0).map((plan) => {
     const e = plan.entitlements;
     const bullets = [];
+    // The trial IS what replaced the free tier, so it leads. First bullet, not
+    // buried under the quotas.
+    const trialDays = e.trialDays ?? 0;
+    if (trialDays > 0) bullets.push((P.trial ?? "{n} days free").replace("{n}", num(trialDays)));
     // headline quota: screens (registry billing is plural-aware for the EN base;
     // a locale override with {n} wins where provided)
     const screens = quotaDef("pairedDevices")?.billing?.(e.quotas.pairedDevices);
@@ -92,9 +105,9 @@ function buildPricing(M) {
       id: plan.id,
       name: plan.name, // proper noun — same across locales
       price: `$${Math.round(plan.priceCents / 100)}`,
-      per: plan.priceCents === 0 ? (P.perForever ?? "/forever") : (P.perMonth ?? "/mo"),
+      per: P.perMonth ?? "/mo",
       tagline: P.taglines?.[plan.id] ?? "",
-      cta: plan.priceCents === 0 ? (P.ctaFree ?? "Get started") : (P.ctaPaid ?? "Start trial").replace("{plan}", plan.name),
+      cta: (trialDays > 0 ? (P.ctaTrial ?? "Start {plan} free") : (P.ctaPaid ?? "Start {plan}")).replace("{plan}", plan.name),
       popular: plan.id === "pro",
       bullets,
     };

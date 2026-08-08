@@ -58,15 +58,27 @@ export async function carrySessionTo(context: BrowserContext, fromUrl: string, t
 }
 
 /**
- * Create a workspace from the sign-in screen and land on its own hostname.
+ * Sign up on the setup door, walk the whole first-run wizard, and land on the
+ * new workspace's own hostname.
  *
  * Returns `{ name, slug }` — the slug is the origin every later navigation
  * needs, because the tenancy is pinned by the hostname and a spec that stayed on
  * `setup.` would be driving a door with no workspace behind it.
  *
- * The form is two steps (name + email, then the code), which is the real
- * ceremony a first-time owner goes through; there is no shortcut through the API
- * because this IS the path being proved.
+ * ── The ceremony this drives, and why none of it is shortcut ─────────────────
+ *
+ * Email → code → **name the workspace** → **choose a plan** → **start it**. It
+ * used to be one card that asked for a name and an email and created the
+ * organization on the spot; that card is gone, because a workspace created that
+ * way sat on the `free` PARKING ROW, which `statusOf` gates READ-ONLY. Every
+ * write in the product was refused, on the first screen, and nothing in the
+ * suite noticed — the fleet heading rendered fine.
+ *
+ * Step 3 lands on the **degrade path** here on purpose: the E2E worker has no
+ * Stripe keys, so `/me/onboarding/plan` answers `pending`. That is the same
+ * lane every self-host and every pre-Stripe deployment takes, so it is the right
+ * one for the gate to prove — and it is the one where refusing would have meant
+ * nobody could ever create a workspace at all.
  */
 export async function createWorkspace(
   context: BrowserContext,
@@ -75,18 +87,29 @@ export async function createWorkspace(
 ): Promise<{ name: string; slug: string }> {
   const name = uniqueWorkspace();
   await page.goto(SETUP_URL);
-  await page.getByRole("button", { name: /create a workspace/i }).click();
-  await page.getByLabel("Workspace name").fill(name);
-  await page.getByLabel("Your email").fill(email);
-  await page.getByRole("button", { name: /email me a code/i }).click();
-  await page.getByLabel("Verification code").waitFor();
-  await page.getByLabel("Verification code").fill(latestSignInOtp(email));
-  await page.getByRole("button", { name: /verify & create workspace/i }).click();
 
-  // The Shell is up once the fleet screen's own heading is on the page — the one
-  // signal that the org was created AND set active, rather than the app falling
-  // back to the create-workspace step it just came from.
-  await expect(page.getByRole("heading", { name: "Screens" })).toBeVisible({ timeout: 30_000 });
+  // 1 — identity. One field: with a one-time code, signing in and signing up
+  // are the same act.
+  await page.getByLabel("Email").fill(email);
+  await page.getByRole("button", { name: /email me a code/i }).click();
+  await page.getByLabel("Your code").waitFor();
+  await page.getByLabel("Your code").fill(latestSignInOtp(email));
+  await page.getByRole("button", { name: /^continue$/i }).click();
+
+  // 2 — the workspace's name, which is also its ADDRESS.
+  await page.getByLabel("Workspace name").waitFor({ timeout: 30_000 });
+  await page.getByLabel("Workspace name").fill(name);
+  await page.getByRole("button", { name: /^continue$/i }).click();
+
+  // 3 — the plan. Mandatory: there is no free tier to fall into.
+  await page.getByRole("radiogroup", { name: /choose your plan/i }).waitFor({ timeout: 30_000 });
+  await page.getByRole("radio").first().click();
+  await page.getByRole("button", { name: /^continue$/i }).click();
+
+  // 4 — the degrade path (no Stripe keys here), then into the workspace.
+  const go = page.getByRole("button", { name: /go to my workspace/i });
+  await go.waitFor({ timeout: 30_000 });
+  await go.click();
 
   const slug = workspaceSlug(name);
   await carrySessionTo(context, SETUP_URL, `${slug}.${ROOT_DOMAIN}`);

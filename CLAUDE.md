@@ -596,6 +596,41 @@ remote bindings without editing the config (this is what the E2E suite does).
   not paid" on a deployment that cannot take a payment — a self-host, anything
   before DEPLOY.md §10, the whole E2E suite — would strand every studio over our
   misconfiguration. Fail closed on their non-payment, open on ours.
+  - ⚠️ **AND THE PARKING ROW'S OWN STATUS MUST NOT DEFEAT THAT.** Tessa's
+    `defaultSubscription` is `{ plan_id: "free", status: "incomplete" }` and its
+    fail-open branch returned the stored status verbatim — so the moment anything
+    materialised the row, the gate read the parking DEFAULT as a verdict and held
+    the centre read-only on a deployment with no Stripe at all. The paragraph
+    above was written, at length, and did not work. It stayed invisible because
+    nothing wrote the row on those deployments; the onboarding wizard does, and
+    the E2E suite went red on an ordinary POST with
+    `402 tenant_read_only, reason: setup`. `incomplete` is never a fact the
+    dunning ladder produces, so the branch now maps it to `null`;
+    `apps/tessa/test/onboarding.test.ts` pins it and the assertion is
+    mutation-tested. Kova and Scena park on `active` and were never exposed.
+- **ONE WIZARD SHAPE, THREE APPS, and creating a tenant lives in exactly one
+  place per app.** Kova's `StudioOnboarding` is the grammar — `@4dl/ui`'s
+  `StepHeader`/`StepPanel`/`StepActions`, name → plan → start, the tenant created
+  *between* steps 2 and 3 so Back is lossless and a Stripe subscription has
+  something to attach to. Scena (`apps/scena-app/src/pages/Onboarding.tsx`, 3
+  steps) and Tessa (`Doors.tsx`'s `Start`, 2 — it sells one plan, so "choose a
+  plan" is a question with one answer) now follow it. The server half is
+  `onboarding-routes.ts` in each app, on the guard's `isPersonal` lane
+  (`/api/me/onboarding/*`), because every `/api/billing*` path demands a tenancy
+  and this caller has none yet.
+  - **Selecting a plan never GRANTS it** — `pending_plan_id` and nothing else.
+    Only the Stripe webhook may stamp `plan_id`/`status`.
+  - **The degrade lane is the feature, not the fallback.** With no Stripe keys
+    there is no session to be had, and a mandatory paid step that refused would
+    mean *nobody can ever create a tenant* on a self-host or before the deploy
+    guide's Stripe step. The tenant is created, the choice is recorded, nothing
+    is charged, and the screen says so.
+  - ⚠️ **Scena's sign-in screen no longer creates anything.** It carried a third
+    lane that collected a workspace name and made the organization, offered on
+    EVERY host — so somebody following a colleague's link to their workspace was
+    invited, on that workspace's own branded sign-in, to start a second one. It
+    also skipped billing, so everything it made landed on the read-only parking
+    row. `canCreate` is all that survives, and it now changes only the copy.
 - **Two access ladders, and they must not be confused.**
   - **Kova → tenant** (`@4dl/billing` dunning.ts + `@4dl/tenancy` standing.ts): past_due →
     **7d read-only** → **30d blocked** → **37d purged**, all anchored on
@@ -724,16 +759,16 @@ handlers are woven through Kova's notification registry, entitlement gates and
 `requireClientAccess`. Only the reconciliation logic moved.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. **Measured 2026-08-08** from `pnpm turbo run test --force`, per package:
-**632 kova/api (+31 skipped) + 237 kova/domain + 226 scena/api + 146 tessa/api +
+moves. **Measured 2026-08-08** from one `pnpm test`, per package:
+**632 kova/api (+31 skipped) + 237 kova/domain + 234 scena/api + 152 tessa/api +
 145 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 80 ai + 63 commerce +
 61 scena/widgets + 45 billing + 45 billing-rail + 44 core + 40 scena/timeline +
 35 auth + 30 scena/app + 24 notify + 23 scena/manifest + 18 scena/protocol +
 18 storage + 18 app-kit + 17 kova/protocol + 17 template + 14 tessa/app +
-14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,317 passing,
-31 skipped**, all green.
+14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,331 passing,
+31 skipped**, 58 turbo tasks, all green.
 
-Scena's 441 (226 api + 30 app + 185 across its five pure packages) were never in
+Scena's 449 (234 api + 30 app + 185 across its five pure packages) were never in
 the older figure at all; nor were Tessa's. `@scena/timeline`'s 40 are the ones
 that matter most per line — they prove
 `position(t) = (t − T0) mod cycleLength`, which is the whole product.
@@ -745,7 +780,7 @@ The pricing and normalizer suites live
 in `apps/api/test` and are already *inside* the API count — the older
 "protocol/pricing/normalizer" phrasing double-counted them. **E2E is separate**
 (`pnpm e2e`, not part of `pnpm test`): 3 Playwright specs for Kova, ~40 s all in,
-all green — plus Tessa's 2 and Scena's 1, each in its own package on its own port
+all green — plus **Tessa's 6 and Scena's 3**, each in its own package on its own port
 (**8787 Kova, 8788 Tessa, 8789 Scena + 8790 its player**). Sharing a port makes
 whichever suite runs second drive another product's worker, which fails as
 "element not found" rather than as a conflict; the same is true of wrangler's
@@ -957,10 +992,11 @@ its own — the owner's decision, cancellable for seven days, reversed by
 cancelling rather than by paying — and it shares the sweep's erasure branch with
 `suspended` so the two purge paths cannot drift.
 `SCHEMA_MODULES` in
-`apps/scena/src/db.ts` is the migration's progress bar — seven entries now
+`apps/scena/src/db.ts` is the migration's progress bar — eight entries now
 (`AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_RAIL_SCHEMA`, `STORAGE_SCHEMA`,
-`NOTIFY_SCHEMA`, `AI_SCHEMA`, `SCENA_SCHEMA`), and the diff that removes a table
-from Scena's module is the same diff that adds its package there. **Order in that
+`NOTIFY_SCHEMA`, `AI_LEGACY_RESET`, `AI_SCHEMA`, `SCENA_SCHEMA`), and the diff
+that removes a table from Scena's module is the same diff that adds its package
+there. **Order in that
 list IS dependency order**: `NOTIFY_SCHEMA` ALTERs `tenant_settings`, which
 `@4dl/tenancy` creates, and a wrong order does not fail — the runner swallows
 the ALTER and an owner's email veto silently never persists. `AI_SCHEMA` sits
@@ -968,7 +1004,22 @@ before `SCENA_SCHEMA` for the mirror-image reason: the app's module used to
 declare `ai_models`/`ai_cache`/`ai_generations` itself, and a `CREATE TABLE IF
 NOT EXISTS` is won by whichever module runs first.
 `apps/scena/test/schema-module.test.ts` fails if any of the three is declared
-locally again. Its resource ids
+locally again.
+
+⚠️ **`AI_LEGACY_RESET` is why the catalog migration works on a database that
+already exists**, and it is the one destructive module in this repo. A
+`CREATE TABLE IF NOT EXISTS` cannot rename a column, so on a pre-migration
+database the old `ai_generations(created_at)` survives and `AI_SCHEMA`'s
+`CREATE INDEX … (tenant_id, at)` fails with `no such column: at` — which does not
+degrade a feature, it throws out of `ensureSchema` and makes **every route that
+touches D1 answer 500**. It reproduced exactly that way against the E2E suite's
+own `.wrangler` state. The module drops the three tables immediately before the
+shared one rebuilds them; `AI_SCHEMA`'s version went 3 → 4 for no DDL reason at
+all, purely so it RE-RUNS after the drop (a module already at its declared
+version does not run, and the drop without the rebuild is strictly worse than the
+bug). **Never bump `AI_LEGACY_RESET`'s version** — that would drop a live catalog
+to fix nothing. A future migration needing the same treatment gets a new id.
+`schema-module.test.ts` pins the adjacency, in both directions. Its resource ids
 are deliberately placeholders (the old account's real ids were replaced), so
 `deploy.yml` skips it until the Provision workflow runs.
 
@@ -1043,8 +1094,8 @@ never exist, which is exactly how a fresh Stage 1 deployment ended up unable to
 save any setting (`app_config.updated_at`). Adopting it means reconciling the
 shapes first — a data change, not a wiring one.
 
-**The `ai_models` CATALOG is `@4dl/ai`'s now** (`AI_SCHEMA` is entry six of seven
-in `SCHEMA_MODULES`), and the reconciliation it needed is done:
+**The `ai_models` CATALOG is `@4dl/ai`'s now** (`AI_SCHEMA` is entry seven of eight
+in `SCHEMA_MODULES`, right after the legacy reset), and the reconciliation it needed is done:
 
 - **`ai_models.id` IS the provider path** (`@cf/deepgram/aura-1`,
   `gemini-2.5-flash`), with `provider` naming the lane. Scena keyed on a short

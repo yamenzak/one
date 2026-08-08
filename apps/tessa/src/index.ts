@@ -46,6 +46,7 @@ import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
 import { DUNNING_DAYS } from "@4dl/billing";
 import { periodKey } from "@4dl/core";
 import { billingAdminRoutes, billingRoutes, stripeWebhookRoutes } from "./billing-routes.js";
+import { onboardingRoutes } from "./onboarding-routes.js";
 import { aiAdminRoutes, aiRoutes } from "./ai-routes.js";
 import { aiCatalogAdminRoutes, applySharedSelection, disableRetiredModels } from "@4dl/ai";
 import { settingsRoutes } from "./settings-routes.js";
@@ -178,6 +179,12 @@ app.route("/api", notifyRoutes<AppEnv>({ currentUserId: (c) => c.get("user")?.id
  * *deliberately*, not by accident of mount order.
  */
 app.route("/api", billingRoutes);
+/*
+  ARRIVING — the personal lane a caller with no centre yet can reach. It cannot
+  live under `/api/billing`, which the guard refuses without a tenancy. See
+  `onboarding-routes.ts`.
+*/
+app.route("/api", onboardingRoutes);
 app.route("/api", settingsRoutes);
 app.route("/api", staffRoutes);
 /**
