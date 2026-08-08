@@ -45,13 +45,67 @@ const HEX = /^#[0-9a-fA-F]{6}$/;
 export const DEFAULT_BRANDING = { primary: null, logoUrl: null, headline: null, subtext: null } as const;
 export const DEFAULT_PREFS = { locale: "de", theme: "system" } as const;
 
+/**
+ * A CSS colour map, as `@4dl/ui`'s `BrandTokens` — `{ "--primary": "oklch(...)" }`.
+ *
+ * The values are NOT hex-validated the way `primary` is, because a token may
+ * legitimately be `oklch()`, `hsl()`, `color-mix()` or a keyword, and a regex
+ * that admitted all of those would admit anything. What protects the page is
+ * `applyBranding`'s own filter in `@4dl/ui` — it refuses a value the browser
+ * cannot parse rather than injecting broken CSS. So the wire schema bounds SIZE
+ * and shape (a flat string map, capped) and leaves meaning to the consumer.
+ */
+const tokenMap = z.record(z.string().max(120), z.string().max(200)).optional();
+
 const SettingsBody = z.object({
+  /*
+    THE WHOLE `Branding`, not four fields.
+
+    This accepted `primary`, `logoUrl`, `headline` and `subtext` — a colour and
+    three strings — while the column it writes is the same
+    `tenant_settings.branding_json` Kova stores a twenty-field brand in, and
+    `applyBranding` (shared) already knew how to apply every one of them. The
+    editor is `@4dl/ui`'s `BrandingEditor` now, so the schema has to admit what
+    that editor produces or the save 400s on a token map.
+
+    Widening a JSON column is not a migration: an existing row simply has fewer
+    keys, and every reader already treats a missing key as "not set".
+  */
   branding: z
     .object({
       primary: z.string().regex(HEX, "Use a six-digit hex colour, e.g. #25c891").nullable().optional(),
+      primaryForeground: z.string().max(200).nullable().optional(),
       logoUrl: z.string().url().max(500).nullable().optional(),
+      logoUrlLight: z.string().url().max(500).nullable().optional(),
+      iconUrl: z.string().url().max(500).nullable().optional(),
+      iconUrlLight: z.string().url().max(500).nullable().optional(),
       headline: z.string().max(80).nullable().optional(),
       subtext: z.string().max(200).nullable().optional(),
+      // The theme half — what `BrandingEditor` owns.
+      tokens: z.object({ light: tokenMap, dark: tokenMap }).nullable().optional(),
+      radius: z.number().min(0).max(3).nullable().optional(),
+      /*
+        ⚠️ THESE THREE ENUMS MIRROR `@4dl/ui` BY HAND, and the first draft of
+        this one was WRONG — `["none","soft","medium","strong"]` against the real
+        `ShadowPreset`, which is `subtle` and `dramatic`, not `medium` and
+        `strong`. A guessed enum typechecks perfectly and 400s the save the first
+        time somebody picks Dramatic.
+
+        The worker cannot import `@4dl/ui` (a Hono worker has no business
+        depending on a React design system), so the mirror is unavoidable; what
+        is avoidable is copying it from memory. `ShadowPreset`, `NeutralTint` and
+        `ThemeMode` in `packages/ui/src/lib/theme.ts` are the source.
+      */
+      shadow: z.enum(["none", "subtle", "soft", "dramatic"]).nullable().optional(),
+      borderWidth: z.number().min(0).max(4).nullable().optional(),
+      borderColor: z.string().max(200).nullable().optional(),
+      neutral: z.enum(["brand", "gray", "cool", "warm"]).nullable().optional(),
+      defaultMode: z.enum(["dark", "light"]).nullable().optional(),
+      // `preset` is nulled by the editor once tokens carry everything — see the
+      // note on `BrandTheme`. Accepting null is what lets it be CLEARED.
+      preset: z.string().max(40).nullable().optional(),
+      tintedNav: z.boolean().nullable().optional(),
+      ambient: z.boolean().nullable().optional(),
     })
     .optional(),
   prefs: z

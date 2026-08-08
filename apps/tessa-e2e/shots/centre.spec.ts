@@ -79,6 +79,22 @@ test("the centre", async ({ browser }, info) => {
   });
 
   /*
+    LOOK AND FEEL — `@4dl/ui`'s brand editor, which this app did not have.
+
+    It was four controls: a colour input, a logo URL and two sign-in strings.
+    The package had shipped presets, a derived palette, surface tint, radius,
+    elevation, hairline weight and a per-token grid all along, over the same
+    `Branding` type in the same column Kova keeps a twenty-field brand in — and
+    exactly one app could reach any of it. This is the picture that says a
+    practice now gets what a studio gets.
+  */
+  await test.step("look and feel", async () => {
+    // Not scoped to a `main` landmark: Tessa's `Screen` does not render one.
+    await visit(page, `${base}/settings?s=brand`, page.getByText("Shape & depth"));
+    await shoot(page, project, "brand", { settle: 600 });
+  });
+
+  /*
     THE CENTRE'S OWN COLOUR, applied — and this step exists because it was not.
 
     `main.tsx` mounted `<ThemeProvider branding={null}>`, so the accent a centre

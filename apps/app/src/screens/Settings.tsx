@@ -6,7 +6,7 @@
 import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { motion } from "motion/react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, monogramFor, renderMarkPng, markRuns, brandMark, MARK_WEIGHT, MARK_SOFT_ALPHA, MARK_TINT_ALPHA, RefreshCw, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, UploadProgress, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, cn, toneText, type Tone, type Branding, type BrandTokens, type WordmarkStyle, type MarkPlate, type MarkRun, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
+import { Button, Card, Badge, Chip, Switch, Textarea, Skeleton, Reveal, SkeletonLine, SkeletonCircle, SegmentedControl, SettingsList, SettingsIndex, SettingsPage, Settings as SettingsIcon, Page, Stagger, Field, Avatar, stagger, ConfirmDialog, BRAND_PRESETS, THEME_TOKEN_GROUPS, DEFAULT_TOKENS, SHADOW_PRESETS, BORDER_WIDTHS, Input, Slider, ColorSwatch, PreviewPicker, colorToHex, deriveTokens, extractPalette, monogramFor, renderMarkPng, markRuns, brandMark, MARK_WEIGHT, MARK_SOFT_ALPHA, MARK_TINT_ALPHA, RefreshCw, hexToOklchString, oklchStringToHex, parseThemeCss, dicebearUrl, KeyRound, Moon, Sun, LogOut, Palette, Target, Scale, CircleUser, Sliders, UserPlus, Lock, PencilLine, Waves, Store, Plug, ImageIcon, Upload, UploadProgress, Wand2, ChevronDown, Trash2, Check, ArrowLeft, Globe, Copy, Plus, Building2, Bell, BellOff, Mail, LogIn, ExternalLink, ArrowRight, Sheet, Spinner, AlertTriangle, ActionResult, SaveBar, useAction as useActionBase, ConfigRow, TabIntro, BrandingEditor as SharedBrandingEditor, cn, toneText, type Tone, type Branding, type BrandTokens, type WordmarkStyle, type MarkPlate, type MarkRun, type NeutralTint, type ShadowPreset, type LucideIcon, Clock, SkeletonList } from "@4dl/ui";
 import { personaLabel, personaTone } from "../registry/index.js";
 import { KOVA_TOKEN_GROUPS, DEFAULT_ACCENT_TOKENS, MACRO_SPEC } from "../registry/tones.js";
 
@@ -2015,35 +2015,39 @@ const seedFrom = (b: Branding | null): string =>
  * arrive; it deliberately does NOT key on the values themselves, which would
  * discard in-progress edits every time a save refreshed the context.
  */
-function BrandingEditor(props: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
-  return <BrandingEditorForm key={props.initial ? "loaded" : "empty"} {...props} />;
-}
-
-function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
+/**
+ * KOVA'S BRAND EDITOR — the shared theme editor, plus the marks only Kova has.
+ *
+ * Colour, shape & depth, section colour and the token grid are `@4dl/ui`'s
+ * `BrandingEditor` now. `lib/theme.ts` had always been shared — the 20-field
+ * `Branding`, the presets, `deriveTokens`, `parseThemeCss`, the shadow and
+ * border scales — and the SCREEN that drives them was not, so exactly one app
+ * could use any of it. Tessa shipped four text fields; Scena wrote a parallel
+ * editor over its own token engine.
+ *
+ * What stays here is what is genuinely Kova's, handed over as an `extras`
+ * sub-page:
+ *
+ *   THE MARKS     a logo, an app icon, their light-mode variants, the install
+ *                 icon, and the generator that DRAWS all five from the studio
+ *                 name. It stays because it needs a media store and the three
+ *                 apps do not share one — Scena keys objects by CONTENT HASH,
+ *                 because a television caches them for months.
+ *   THE AI COACH  a name and a face for the assistant. Product vocabulary; a
+ *                 sterilisation tracker has no coach.
+ *
+ * The extras block is a FUNCTION of the live theme, because the generator READS
+ * it (a wordmark is drawn in the brand colour, on the brand surface, in both
+ * modes) and "generate my palette from my logo" WRITES back to it. One form and
+ * one Save, in both directions.
+ */
+function BrandingEditor({ initial, onPreview, onSaved }: { initial: Branding | null; onPreview: (b: Branding | null) => void; onSaved: () => void }) {
   const [params, setParams] = useSearchParams();
   const closeSection = useCloseSection();
   const { ctx } = useSession();
   const studioName = ctx?.active?.tenantName?.trim() || "Your studio";
   const marks = useAction();
-  const [tokens, setTokens] = useState<BrandTokens>(() => (initial?.tokens && hasTokens(initial.tokens) ? initial.tokens : deriveTokens({ primary: seedFrom(initial), accents: MACRO_SPEC })));
-  const [seed, setSeed] = useState<string>(seedFrom(initial));
-  // Seeded from what was saved, not hardcoded. Two things broke when it was not:
-  // the chip always read "Brand" on a reload however the app actually looked, and
   // — worse — `generate(color)` passes this value through, so nudging the brand
-  // colour silently regenerated the palette with the stale default and threw the
-  // studio's tint away with no indication.
-  const [neutral, setNeutral] = useState<NeutralTint>(initial?.neutral ?? "brand");
-  const [radius, setRadius] = useState(initial?.radius ?? 0.95);
-  const [shadow, setShadow] = useState<ShadowPreset>(initial?.shadow ?? "soft");
-  // Hairline colour. Empty = the shipped per-mode default, which is the right
-  // answer for most studios (dark needs a light translucent edge, light a dark
-  // one); a single custom colour applies to BOTH modes, so it is opt-in.
-  const [borderColor, setBorderColor] = useState<string>(initial?.borderColor ?? "");
-  const [borderWidth, setBorderWidth] = useState<number>(initial?.borderWidth ?? 1);
-  // Both default ON, matching what the old per-device toggles defaulted to, so a
-  // studio that never touches them looks exactly as it did before the move.
-  const [tintedNav, setTintedNav] = useState<boolean>(initial?.tintedNav ?? true);
-  const [ambient, setAmbient] = useState<boolean>(initial?.ambient ?? true);
   const [logoUrl, setLogoUrl] = useState<string | null>(initial?.logoUrl ?? null);
   const [iconUrl, setIconUrl] = useState<string | null>(initial?.iconUrl ?? null);
   // The light-surface overrides. Null is the normal state and means "the mark
@@ -2083,9 +2087,6 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const [drawing, setDrawing] = useState<"icon" | "wordmark">("icon");
   const [aiAvatarUrl, setAiAvatarUrl] = useState<string | null>(initial?.aiAvatarUrl ?? null);
   const [aiName, setAiName] = useState<string>(initial?.aiName ?? "");
-  const [advanced, setAdvanced] = useState(false);
-  const [themeCss, setThemeCss] = useState("");
-  const act = useAction();
   // `msg` stays, for this editor's NOTES — "Palette generated from your logo",
   // "Theme applied — save to keep it". Those are not the outcome of a write, and
   // folding them into the action's result would let a stale note sit where a save
@@ -2093,10 +2094,8 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   const [msg, setMsg] = useState<string | null>(null);
 
   // Live-preview whenever the tokens or radius change (logo isn't a token).
-  useEffect(() => { onPreview({ tokens, radius, shadow, borderColor: borderColor || null, borderWidth, logoUrl, iconUrl }); }, [JSON.stringify(tokens), radius, shadow, borderColor, borderWidth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Generate a full palette from one color (the smart path).
-  const generate = (color: string, tint: NeutralTint = neutral) => { setSeed(color); setNeutral(tint); setTokens(deriveTokens({ primary: color, neutral: tint, accents: MACRO_SPEC })); };
 
   /**
    * Generate a mark from the studio's name and the accent it already picked.
@@ -2119,7 +2118,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
    * cannot rely on it. Drawing both costs two more uploads and removes the
    * whole class of "my logo disappears in light mode".
    */
-  const generateMarks = () =>
+  const generateMarks = (tokens: BrandTokens, seedHex: string) =>
     void marks.run("marks", async () => {
       const letters = monogram.trim() || monogramFor(studioName);
       const dark = markPaint(tokens, "dark", seedHex);
@@ -2194,15 +2193,25 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
   */
   const assetUp = useUpload();
   const [assetSlot, setAssetSlot] = useState<string | null>(null);
+  /*
+    THE UPLOAD'S OWN LINE, on the marks page rather than the editor's.
+
+    A failed image upload is a fact about this sub-page, and the editor's note
+    line sits beside the Save button two screens away — where it would read as
+    "your save failed". `note` from the extras context is for messages about the
+    THEME ("Palette generated from your logo"); this is for the five slots.
+  */
+  const [uploadNote, setUploadNote] = useState<string | null>(null);
+  const setNote = setUploadNote;
   const uploadAsset = async (file: File, setter: (url: string) => void, slot = "logo") => {
-    setMsg(null);
+    setNote(null);
     setAssetSlot(slot);
     // Tenant asset (no clientId) — route through the kit for 401 handling +
     // error surfacing instead of a bare fetch that silently no-ops.
     try {
       const key = await assetUp.upload(file, "brand", { filename: file.name });
       if (key) setter(`/api/media/${key}`);
-      else if (assetUp.error) setMsg("Couldn't upload that image — try again.");
+      else if (assetUp.error) setNote("Couldn't upload that image — try again.");
     } finally {
       setAssetSlot(null);
     }
@@ -2212,41 +2221,26 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
     <UploadProgress phase={assetSlot === slot ? assetUp.phase : "idle"} progress={assetUp.progress} onCancel={assetUp.cancel} />
   );
 
-  const extractFromLogo = () => {
+  /*
+    PALETTE FROM THE LOGO — the one place marks write BACK into the theme.
+
+    `setSeed` and `note` come from the shared editor's `extras` context: reading
+    a colour out of an uploaded image is a marks job, and applying it is a theme
+    job, so this is the seam between them rather than a leak across it.
+  */
+  const extractFromLogo = (setSeed: (hex: string) => void, note: (t: string | null) => void) => {
     if (!logoUrl) return;
-    setMsg("Reading your logo…");
+    note("Reading your logo…");
     const img = new Image();
-    img.onload = () => { const p = extractPalette(img); if (p) { generate(p.primary); setMsg("Palette generated from your logo."); } else setMsg("Couldn't find a strong color in that logo."); };
-    img.onerror = () => setMsg("Couldn't load the logo image.");
+    img.onload = () => { const p = extractPalette(img); if (p) { setSeed(p.primary); note("Palette generated from your logo."); } else note("Couldn't find a strong colour in that logo."); };
+    img.onerror = () => note("Couldn't load the logo image.");
     img.src = logoUrl;
   };
 
-  const applyThemeCss = () => {
-    const { tokens: t, radius: r } = parseThemeCss(themeCss);
-    if (!hasTokens(t)) { setMsg("No theme tokens found in that CSS."); return; }
-    setTokens((prev) => ({ light: { ...prev.light, ...t.light }, dark: { ...prev.dark, ...t.dark } }));
-    if (r != null) setRadius(r);
-    setThemeCss(""); setMsg("Theme applied — save to keep it.");
-  };
 
-  const setToken = (m: "light" | "dark", key: string, value: string) => setTokens((t) => {
-    const side = { ...(t[m] ?? {}) };
-    if (value.trim()) side[key] = value.trim(); else delete side[key];
-    return { ...t, [m]: side };
-  });
-
-  const save = () =>
-    act.run("save", async () => {
-      // Tokens carry everything now — null out legacy preset/primary fields.
-      await api.patch("/api/settings", { branding: { tokens, radius, shadow, borderColor: borderColor.trim() || null, borderWidth, neutral, tintedNav, ambient, logoUrl, iconUrl, logoUrlLight, iconUrlLight, installIconUrl, aiAvatarUrl, aiName: aiName.trim() || null, mark: { monogram: monogram.trim() || null, plate, icon: iconStyle, ...markStyle }, preset: null, primary: null, primaryForeground: null } });
-      onSaved();
-      setMsg(null);
-      return "Branding saved.";
-    }, "Couldn't save your branding — the studio still looks the way it did.");
-
-  const seedHex = oklchStringToHex(seed.startsWith("#") ? hexToOklchString(seed) : seed);
-
-  const marksBlock = (<>
+  const marksBlock = (tokens: BrandTokens, seedHex: string, setSeed: (hex: string) => void, note: (t: string | null) => void) => (<>
+        {/* The five slots' own outcome — see `uploadNote`. */}
+        <ActionResult msg={uploadNote} err={marks.err} />
         {/* No design file? Draw one. Most studios here are one person with a
             business name, and the fallback initial-in-a-square works in the nav
             and nowhere that matters — the browser tab, the installed icon, the
@@ -2325,7 +2319,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
             </div>
           )}
 
-          <Button size="sm" variant="secondary" disabled={marks.busy !== null} onClick={() => void generateMarks()}>
+          <Button size="sm" variant="secondary" disabled={marks.busy !== null} onClick={() => generateMarks(tokens, seedHex)}>
             {marks.busy ? <><Spinner className="size-4" /> Drawing…</> : <><Wand2 /> Draw both, light and dark</>}
           </Button>
           <ActionResult msg={marks.msg} err={marks.err} />
@@ -2343,7 +2337,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
               <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-body font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
                 <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setLogoUrl, "logo")} />
               </label>
-              <Button size="sm" variant="secondary" disabled={!logoUrl} onClick={extractFromLogo}><Wand2 /> Theme from logo</Button>
+              <Button size="sm" variant="secondary" disabled={!logoUrl} onClick={() => extractFromLogo(setSeed, note)}><Wand2 /> Theme from logo</Button>
               {logoUrl && <Button size="icon" variant="secondary" aria-label="Remove logo" onClick={() => setLogoUrl(null)}><Trash2 /></Button>}
             </div>
           </div>
@@ -2370,7 +2364,7 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
               <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-secondary px-3.5 text-body font-medium transition-colors hover:bg-surface-3 [&_svg]:size-4"><Upload /> Upload
                 <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadAsset(e.target.files[0], setIconUrl, "icon")} />
               </label>
-              {iconUrl && <Button size="sm" variant="secondary" disabled={!iconUrl} onClick={() => { const img = new Image(); img.onload = () => { const p = extractPalette(img); if (p) { generate(p.primary); setMsg("Palette generated from your icon."); } }; img.src = iconUrl; }}><Wand2 /> Theme from icon</Button>}
+              {iconUrl && <Button size="sm" variant="secondary" disabled={!iconUrl} onClick={() => { const img = new Image(); img.onload = () => { const p = extractPalette(img); if (p) { setSeed(p.primary); note("Palette generated from your icon."); } else note("Couldn't find a strong colour in that icon."); }; img.onerror = () => note("Couldn't load the icon image."); img.src = iconUrl; }}><Wand2 /> Theme from icon</Button>}
               {iconUrl && <Button size="icon" variant="secondary" aria-label="Remove icon" onClick={() => setIconUrl(null)}><Trash2 /></Button>}
             </div>
           </div>
@@ -2418,215 +2412,55 @@ function BrandingEditorForm({ initial, onPreview, onSaved }: { initial: Branding
 
   </>);
 
-  const colourBlock = (<>
-        {/* Brand color — presets + wheel, each generates the full palette */}
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between">
-            <span className="text-body font-medium">Brand color</span>
-            <label className="inline-flex cursor-pointer items-center gap-1.5 text-caption text-muted-foreground">
-              Custom
-              <ColorSwatch size="sm" value={seedHex} onChange={(hex) => generate(hex)} label="Custom brand colour" />
-            </label>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {BRAND_PRESETS.map((p) => {
-              const on = parseInt(oklchStringToHex(p.primary).slice(1), 16) === parseInt(seedHex.slice(1), 16);
-              return (
-                <button key={p.id} onClick={() => generate(p.primary)} className={`relative flex flex-col items-center gap-2 rounded-xl border p-3 transition-all active:scale-95 ${on ? "border-primary" : "border-border/60"}`}>
-                  <span className="size-7 rounded-full" style={{ background: p.primary }} />
-                  <span className="text-caption">{p.label}</span>
-                  {on && <Check className="absolute right-1.5 top-1.5 size-3.5 text-primary" strokeWidth={3} />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Neutral tint */}
-        <div className="space-y-1.5">
-          <span className="text-body text-muted-foreground">Surface tint</span>
-          <div className="flex gap-2">{NEUTRALS.map((n) => <Chip key={n.id} selected={neutral === n.id} onClick={() => generate(seed, n.id)}>{n.label}</Chip>)}</div>
-        </div>
-  </>);
-
-  const shapeBlock = (<>
-
-        {/* Radius — the slider belongs to the design system now, and a live
-            preview sits beside it so the number is not the only feedback. */}
-        <div className="flex items-end gap-3">
-          <Slider className="min-w-0 flex-1" label="Corner radius" display={`${radius.toFixed(2)}rem`}
-            min={0.4} max={1.4} step={0.05} value={radius} onChange={setRadius} />
-          <span aria-hidden className="size-10 shrink-0 rounded-xl border border-border bg-primary/15" />
-        </div>
-
-        {/* Elevation. One preset drives --shadow-sm/md/lg, so every raised
-            surface in the app moves together — enforced by the design-token
-            lint, which refuses a hard-coded box-shadow anywhere. */}
-        <div className="space-y-1.5">
-          <span className="text-body text-muted-foreground">Elevation</span>
-          <div className="flex flex-wrap gap-2">
-            {SHADOW_PRESETS.map((p) => <Chip key={p.id} selected={shadow === p.id} onClick={() => setShadow(p.id)}>{p.label}</Chip>)}
-          </div>
-          <p className="text-caption text-muted-foreground">{SHADOW_PRESETS.find((p) => p.id === shadow)?.hint}</p>
-        </div>
-
-        {/* Border WEIGHT. 0 genuinely removes every hairline in the app — the
-            width utilities resolve to --border-width (see tokens.css). */}
-        <PreviewPicker
-          label="Borders"
-          value={borderWidth}
-          onChange={setBorderWidth}
-          options={BORDER_WIDTHS.map((w) => ({
-            value: w.value,
-            label: w.label,
-            preview: (
-              <span
-                aria-hidden
-                className="block w-9 rounded-md bg-surface-2"
-                /* design-tokens-exempt: this IS the border-width picker — each swatch has to draw its own candidate weight, so it cannot resolve to the live token it is choosing. */
-                style={{ height: "1.25rem", border: `${w.value}px solid var(--border)` }}
-              />
-            ),
-          }))}
-          hint={borderWidth === 0
-            ? "Every divider and card edge is off — surfaces separate by colour and elevation alone."
-            : "The weight of every divider and card edge in the app."}
-        />
-
-        {/* Hairline colour — pointless while borders are off, so it hides. */}
-        {borderWidth > 0 && (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-body">
-            <span className="text-muted-foreground">Border colour</span>
-            {borderColor && <button onClick={() => setBorderColor("")} className="text-caption font-medium text-primary">Reset to default</button>}
-          </div>
-          <div className="flex items-center gap-2">
-            <ColorSwatch value={borderColor} onChange={setBorderColor} label="Border colour" />
-            <Input
-              value={borderColor}
-              onChange={(e) => setBorderColor(e.target.value)}
-              placeholder="Default (tuned per light / dark)"
-              className="min-w-0 flex-1 font-mono text-caption"
-            />
-          </div>
-          <p className="text-caption text-muted-foreground">
-            Leave blank unless you need a specific hairline — the default is tuned separately for light and dark, and one
-            colour has to serve both. Fine-tune per mode below.
-          </p>
-        </div>
-        )}
-
-  </>);
-
-  const sectionBlock = (<>
-        {/* Section colour. These two used to be per-device toggles in a personal
-            "Appearance" tab, which meant two clients of the same studio could see
-            differently-coloured chrome — and a studio that had deliberately dialled
-            its palette down to two greys got a rainbow tab bar back on whatever
-            phone happened to have it stored. They describe how the STUDIO looks,
-            so they belong to branding. */}
-        <div className="space-y-1.5">
-          <span className="text-body text-muted-foreground">Section colour</span>
-          <div className="overflow-hidden rounded-2xl border border-border/60 bg-card">
-            <ToggleRow icon={Palette} title="Colorful tab bar" desc="Tint the active tab by section — Train green, Eat amber, and so on." checked={tintedNav} onChange={setTintedNav} />
-            <div className="border-t border-border/50" />
-            <ToggleRow icon={Waves} title="Ambient page colour" desc="Wash each page's hero in its section's colour, fading into the background." checked={ambient} onChange={setAmbient} />
-          </div>
-          <p className="text-caption text-muted-foreground">
-            {tintedNav || ambient
-              ? "Applies to everyone in the studio — clients and staff alike."
-              : "Off: every section wears the brand colour instead of its own."}
-          </p>
-        </div>
-
-  </>);
-
-  const advancedBlock = (<>
-        {/* Advanced */}
-        <button onClick={() => setAdvanced((a) => !a)} className="flex w-full items-center justify-between text-body font-medium text-muted-foreground">
-          <span>Fine-tune tokens</span>
-          <ChevronDown className={`size-4 transition-transform ${advanced ? "rotate-180" : ""}`} />
-        </button>
-        {advanced && (
-          <div className="space-y-4">
-            <p className="text-caption text-muted-foreground">Every token, light and dark, side by side. A blank field falls back to the shipped default (shown as the placeholder). Type any CSS color — hex, <code className="rounded bg-surface-2 px-1">oklch()</code>, or <code className="rounded bg-surface-2 px-1">hsl()</code> — or use the swatch.</p>
-            <TokenGrid tokens={tokens} onSet={setToken} />
-            <div className="space-y-2">
-              <div className="text-body font-medium">Paste a theme</div>
-              <p className="text-caption text-muted-foreground">Drop in any CSS token set (<code className="rounded bg-surface-2 px-1">:root</code> for light, <code className="rounded bg-surface-2 px-1">.dark</code> for dark). Every token maps straight through — the whole app re-skins.</p>
-              <Textarea rows={4} value={themeCss} onChange={(e) => setThemeCss(e.target.value)} placeholder={":root { --primary: oklch(0.6 0.2 250); --background: oklch(1 0 0); ... }\n.dark { --primary: ...; --background: ...; ... }"} className="font-mono text-caption" />
-              <div className="flex gap-2">
-                <Button size="sm" variant="secondary" disabled={!themeCss.trim()} onClick={applyThemeCss}>Apply theme</Button>
-                <Button size="sm" variant="ghost" onClick={() => generate(seed)}>Regenerate</Button>
-              </div>
-            </div>
-          </div>
-        )}
-  </>);
-
-  /*
-    ── BRAND IS FIVE SETTINGS, NOT ONE CARD ────────────────────────────────
-
-    This was 5,599px inside a single `<Card>` — theme blurb, logo, app icon, AI
-    coach, nine brand swatches, surface tint, corner radius, elevation, borders,
-    border colour, two section toggles and a token grid, all under one Save.
-    Nothing in it could be found, and not one row said what it was set to.
-
-    Now an index whose every row carries its CURRENT VALUE, and a page each.
-    `?b=` so Back steps out of a sub-page rather than out of settings. The form
-    state stays shared and there is still exactly ONE Save, reachable from every
-    sub-page — splitting the save would let a half-applied theme exist, which is
-    a worse thing than a long page.
-  */
-  const presetName = BRAND_PRESETS.find((x) => x.primary === seed)?.label ?? "Custom";
-  const SUBS: { key: string; label: string; icon: LucideIcon; tone: Tone; value: string; block: ReactNode }[] = [
-    { key: "marks", label: "Logos & AI coach", icon: ImageIcon, tone: "cardio", block: marksBlock,
-      value: [logoUrl ? "Logo" : "No logo", iconUrl ? "icon" : "no icon", aiName.trim() || "coach unnamed"].join(" · ") },
-    { key: "colour", label: "Colour", icon: Palette, tone: "primary", block: colourBlock,
-      value: `${presetName} · ${NEUTRALS.find((n) => n.id === neutral)?.label ?? neutral} surfaces` },
-    { key: "shape", label: "Shape & depth", icon: Sliders, tone: "activity", block: shapeBlock,
-      value: `${radius.toFixed(2)}rem corners · ${SHADOW_PRESETS.find((x) => x.id === shadow)?.label ?? shadow} · ${BORDER_WIDTHS.find((x) => x.value === borderWidth)?.label ?? "hairline"}` },
-    { key: "sections", label: "Section colour", icon: Waves, tone: "nutrition", block: sectionBlock,
-      value: tintedNav && ambient ? "Tab bar and page wash" : tintedNav ? "Tab bar only" : ambient ? "Page wash only" : "Off — brand colour everywhere" },
-    { key: "advanced", label: "Fine-tune tokens", icon: Wand2, tone: "sleep", block: advancedBlock,
-      value: "Every token, light and dark" },
-  ];
-  const sub = params.get("b");
-  const openSub = SUBS.find((x) => x.key === sub) ?? null;
-  const goSub = (k: string | null) =>
-    k ? setParams((q: URLSearchParams) => { q.set("b", k); return q; }) : closeSection("b");
-
-  const saveBar = (
-    <div className="space-y-3">
-      {/* The editor's own notes sit above the bar; the bar carries the outcome
-          of the save itself. Two lines, because they answer two questions. */}
-      <ActionResult msg={msg} err={null} />
-      <SaveBar label="Save branding" saving={act.busy === "save"} msg={act.msg} err={act.err} onSave={() => void save()} />
-    </div>
-  );
-
-  if (openSub) {
-    return (
-      <section className="space-y-5">
-        <div className="flex items-center gap-3">
-          <Button size="icon" variant="secondary" onClick={() => goSub(null)} aria-label="Back to brand"><ArrowLeft /></Button>
-          <h2 className="min-w-0 flex-1 truncate text-title-3">{openSub.label}</h2>
-        </div>
-        <Card className="space-y-5">{openSub.block}</Card>
-        {saveBar}
-      </section>
-    );
-  }
-
   return (
-    <section className="space-y-5">
-      <SettingsIndex groups={[{ rows: SUBS.map((x) => ({
-        key: x.key, icon: x.icon, tone: x.tone, label: x.label, sub: x.value, onClick: () => goSub(x.key),
-      })) }]} />
-      {saveBar}
-    </section>
+    <SharedBrandingEditor
+      initial={initial}
+      /* Kova's eleven domain accents, so regenerating from a new brand colour
+         re-derives them too rather than leaving Train green against a new hue. */
+      accents={MACRO_SPEC}
+      tokenGroups={TOKEN_GROUPS}
+      defaultTokens={ALL_DEFAULT_TOKENS}
+      sectionCopy={{
+        navDesc: "Tint the active tab by section — Train green, Eat amber, and so on.",
+        ambientDesc: "Wash each page's hero in its section's colour, fading into the background.",
+        onHint: "Applies to everyone in the studio — clients and staff alike.",
+        offHint: "Off: every section wears the brand colour instead of its own.",
+      }}
+      extras={({ tokens, seedHex, setSeed, note }) => [
+        {
+          key: "marks",
+          label: "Logos & AI coach",
+          icon: ImageIcon,
+          tone: "cardio",
+          value: [logoUrl ? "Logo" : "No logo", iconUrl ? "icon" : "no icon", aiName.trim() || "coach unnamed"].join(" · "),
+          block: marksBlock(tokens, seedHex, setSeed, note),
+        },
+      ]}
+      onPreview={onPreview}
+      /*
+        The shared editor owns the theme fields and hands them back; Kova spreads
+        its own on top. That split is what keeps ONE Save across both — a marks
+        page with its own submit could leave a logo saved against an unsaved
+        palette, which is a studio that looks like neither of its two states.
+      */
+      onSave={async (theme) => {
+        await api.patch("/api/settings", {
+          branding: {
+            ...theme,
+            logoUrl, iconUrl, logoUrlLight, iconUrlLight, installIconUrl,
+            aiAvatarUrl, aiName: aiName.trim() || null,
+            mark: { monogram: monogram.trim() || null, plate, icon: iconStyle, ...markStyle },
+          },
+        });
+        onSaved();
+      }}
+      openSub={params.get("b")}
+      onOpenSub={(k) => (k ? setParams((q: URLSearchParams) => { q.set("b", k); return q; }) : closeSection("b"))}
+      format={errorText}
+    />
   );
 }
+
 
 /**
  * A TEXT LOGO IS NOT THE NAME IN ONE COLOUR.

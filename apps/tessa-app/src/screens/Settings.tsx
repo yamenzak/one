@@ -52,20 +52,24 @@ import {
   useConfirmedState,
   useLoad,
   Avatar,
+  BrandingEditor,
   Building2,
   CreditCard,
   Globe,
   KeyRound,
+  LogIn,
   Palette,
   Trash2,
   Wallet,
   Wand2,
   Users,
+  type Branding,
   type SettingsGroup,
 } from "@4dl/ui";
 import { AccountExitRows, CloseTenantCard, PasskeysCard } from "@4dl/app-kit";
 import { billing as billingApi, fmt, settings as settingsApi, type AiSettings, type PublicBranding } from "../data.js";
 import { useI18n, useT } from "../i18n.js";
+import { useTheme } from "../theme.js";
 import { useSession } from "../session.js";
 import { StaffSection } from "./Staff.js";
 
@@ -259,73 +263,87 @@ function LanguageSection({ onBack }: { onBack: () => void }) {
 }
 
 /**
- * PublicBranding: the accent, the logo, and the two lines on the sign-in screen.
+ * LOOK AND FEEL — `@4dl/ui`'s `BrandingEditor`, plus the two sign-in lines.
  *
- * A Save button rather than instant controls, because these are typed rather
- * than toggled — an instant write per keystroke would be a request per character.
+ * ── What this replaces ──────────────────────────────────────────────────────
+ *
+ * Four controls: a colour input, a logo URL, and two strings for the sign-in
+ * screen. Meanwhile `@4dl/ui` had shipped the whole brand system all along —
+ * presets, a palette derived from one colour, surface tint, corner radius,
+ * elevation, hairline weight and colour, and a per-token grid, over the same
+ * `Branding` type stored in the same `tenant_settings.branding_json` column that
+ * Kova keeps a twenty-field brand in. A centre could pick a green; it could not
+ * pick a shape, a depth, or a single token.
+ *
+ * The editor is the package's now, so a practice gets exactly what a studio
+ * gets. Widening the wire schema was the whole server change: a JSON column with
+ * fewer keys is not a migration, and every reader already treats a missing key
+ * as "not set".
+ *
+ * ── What stays here ─────────────────────────────────────────────────────────
+ *
+ * `headline` and `subtext` — the two lines above the sign-in form. They are
+ * copy, not theme, and they are Tessa's: no other app has a sign-in screen with
+ * a practice's own sentence on it. They ride along as an `extras` sub-page so
+ * they share the editor's one Save.
+ *
+ * The MARK is deliberately absent. Kova's generator draws a logo from a name and
+ * uploads five PNGs; Tessa takes a URL. Giving it the generator means giving it
+ * the media path, which is real work and not what "look and feel" was missing.
  */
 function BrandSection({ initial, onBack }: { initial: PublicBranding; onBack: () => void }) {
   const t = useT();
-  const [form, setForm] = useState<PublicBranding>(initial);
-  const { busy, msg, err, run } = useAction(fmt);
-  const dirty = JSON.stringify(form) !== JSON.stringify(initial);
-
-  const set = <K extends keyof PublicBranding>(k: K, v: PublicBranding[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const { preview } = useTheme();
+  const [sub, setSub] = useState<string | null>(null);
+  // The two sign-in lines and the logo URL — Tessa's half of the blob.
+  const [logoUrl, setLogoUrl] = useState<string | null>(initial.logoUrl ?? null);
+  const [headline, setHeadline] = useState<string | null>(initial.headline ?? null);
+  const [subtext, setSubtext] = useState<string | null>(initial.subtext ?? null);
 
   return (
     <SettingsPage title={t("settings.brand")} description={t("settings.brand.intro")} onBack={onBack}>
-      <Card className="space-y-4 p-4">
-        <div className="flex items-end gap-3">
-          {/* A native colour input, because a hand-rolled picker used on a phone
-              through a glove is worse than the platform's own. The hex field
-              beside it is what a practice pastes a brand colour into. */}
-          <input
-            type="color"
-            aria-label={t("settings.brand.accent")}
-            value={form.primary ?? "#25c891"}
-            onChange={(e) => set("primary", e.target.value)}
-            className="size-11 shrink-0 cursor-pointer rounded-lg border border-border bg-transparent"
-          />
-          <Field
-            className="flex-1"
-            label={t("settings.brand.accent")}
-            hint={t("settings.brand.accent.hint")}
-            value={form.primary ?? ""}
-            placeholder="#25c891"
-            onChange={(e) => set("primary", e.target.value || null)}
-          />
-        </div>
-        <Field
-          label={t("settings.brand.logo")}
-          value={form.logoUrl ?? ""}
-          placeholder="https://…"
-          onChange={(e) => set("logoUrl", e.target.value || null)}
-        />
-        <Field
-          label={t("settings.brand.headline")}
-          hint={t("settings.brand.headline.hint")}
-          value={form.headline ?? ""}
-          onChange={(e) => set("headline", e.target.value || null)}
-        />
-        <Field label={t("settings.brand.subtext")} value={form.subtext ?? ""} onChange={(e) => set("subtext", e.target.value || null)} />
-        <SaveBar
-          label={t("action.save")}
-          saving={busy === "brand"}
-          dirty={dirty}
-          msg={msg}
-          err={err}
-          onSave={() =>
-            void run(
-              "brand",
-              async () => {
-                await settingsApi.save({ branding: form });
-                return t("settings.saved");
-              },
-              t("settings.brand.failed"),
-            )
-          }
-        />
-      </Card>
+      <BrandingEditor
+        initial={initial as Branding}
+        sectionCopy={{
+          navDesc: t("settings.brand.nav"),
+          ambientDesc: t("settings.brand.ambient"),
+          onHint: t("settings.brand.sectionOn"),
+          offHint: t("settings.brand.sectionOff"),
+        }}
+        extras={() => [
+          {
+            key: "signin",
+            label: t("settings.brand.signin"),
+            icon: LogIn,
+            tone: "primary",
+            value: headline?.trim() || t("settings.brand.none"),
+            block: (
+              <>
+                <Field
+                  label={t("settings.brand.logo")}
+                  value={logoUrl ?? ""}
+                  placeholder="https://…"
+                  onChange={(e) => setLogoUrl(e.target.value || null)}
+                />
+                <Field
+                  label={t("settings.brand.headline")}
+                  hint={t("settings.brand.headline.hint")}
+                  value={headline ?? ""}
+                  onChange={(e) => setHeadline(e.target.value || null)}
+                />
+                <Field label={t("settings.brand.subtext")} value={subtext ?? ""} onChange={(e) => setSubtext(e.target.value || null)} />
+              </>
+            ),
+          },
+        ]}
+        /* Live, so dragging the radius moves the app underneath the slider —
+           `useTheme().preview` is `@4dl/app-kit`'s and applies without saving. */
+        onPreview={preview}
+        onSave={async (theme) => { await settingsApi.save({ branding: { ...theme, logoUrl, headline, subtext } }); }}
+        openSub={sub}
+        onOpenSub={setSub}
+        format={fmt}
+      />
     </SettingsPage>
   );
 }

@@ -27,3 +27,4 @@ export * from "./controls.js";
 export * from "./dates.js";
 export * from "./tiles.js";
 export * from "./dashboard.js";
+export { BrandingEditor, type BrandingEditorProps, type BrandingSubPage, type BrandTheme } from "./branding-editor.js";
