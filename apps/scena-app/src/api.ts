@@ -17,6 +17,19 @@ export async function apiError(res: Response, fallback: string): Promise<Error> 
   return new Error(`${fallback} (${res.status})`);
 }
 
+/**
+ * The `ErrorFormatter` every `@4dl/ui` lifecycle hook takes — `useLoad`,
+ * `useAction`, `useConfirmedState`.
+ *
+ * It lives here rather than in each screen because three pages had already
+ * written their own private copy and they had begun to disagree: `AdminDoor`'s
+ * ignores the fallback it is handed and always says "That didn't go through."
+ * `apiError` above has already unwrapped the server's `{ error }` into the
+ * message, so the only job left is choosing between it and the caller's
+ * sentence.
+ */
+export const errText = (e: unknown, fallback: string): string => (e instanceof Error && e.message ? e.message : fallback);
+
 export interface LiveStatus {
   state: string;
   online: boolean;

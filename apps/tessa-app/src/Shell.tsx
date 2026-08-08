@@ -95,7 +95,7 @@ export function Shell() {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="rounded-full" aria-label={t("shell.account")}>
-                  <Avatar name={ctx?.user?.name ?? ctx?.user?.email ?? "?"} src={ctx?.user?.image ?? undefined} className="size-8" />
+                  <Avatar name={ctx?.user?.name || ctx?.user?.email || "?"} src={ctx?.user?.image ?? undefined} className="size-8" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">

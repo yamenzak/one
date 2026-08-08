@@ -214,7 +214,7 @@ export function Settings({ onBack }: { onBack: () => void }) {
         {/* WHO, first — the fact a phone settings screen opens with. It is the
             one thing here that does not navigate, so it does not pretend to. */}
         <Card className="flex items-center gap-3.5">
-          <Avatar name={ctx?.user?.name ?? ctx?.user?.email ?? "?"} src={ctx?.user?.image ?? undefined} className="size-12" />
+          <Avatar name={ctx?.user?.name || ctx?.user?.email || "?"} src={ctx?.user?.image ?? undefined} className="size-12" />
           <div className="min-w-0 flex-1">
             <div className="truncate font-semibold">{ctx?.user?.name || ctx?.user?.email}</div>
             {ctx?.user?.name && <div className="truncate text-body text-muted-foreground">{ctx.user.email}</div>}

@@ -213,6 +213,25 @@ test("the operator's workspace", async () => {
     await shoot(page, project, "settings", { settle: 600 });
   });
 
+  /*
+    A SECTION PAGE, not just the index — because they are different designs and
+    only one of them was ever photographed.
+
+    Settings is index/detail: the index is a list of rows and every section is a
+    page of real controls behind it, so a suite that shoots only the index has
+    photographed the table of contents and none of the book. The brand kit is
+    the one worth having: it is the deepest surface in the app (a section, then
+    a sub-page), it holds the only `SaveBar` on this screen, and it is where an
+    unsaved preview lives.
+  */
+  await test.step("a settings section", async () => {
+    // The SUB-page's own heading, not the parent's: once a sub-page is open the
+    // brand frame stands down so there is only one header and one back button
+    // (Settings.tsx says why), so "Brand kit" is not on screen here.
+    await visit(page, `${base}/settings?s=brand&sub=identity`, page.getByRole("main").getByRole("heading", { name: "Name, fonts & shape" }));
+    await shoot(page, project, "settings-brand", { settle: 600 });
+  });
+
   // The operator console is a different DOOR, not a route inside the app — and
   // it had no picture at all, which is how a console redesign ships unreviewed.
   await test.step("the operator console", async () => {

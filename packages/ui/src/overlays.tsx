@@ -752,7 +752,31 @@ export function dicebearUrl(seed: string, style = "toon-head"): string {
 }
 
 export function Avatar({ name, src, seed, className }: { name: string; src?: string | null; seed?: string | null; className?: string }) {
-  const initials = name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  /*
+    A BLANK DISC IS NOT A FALLBACK.
+
+    `name.split(" ").map((w) => w[0])` returns `[undefined]` for an empty string
+    and `["", ""]` for a name with a double space, so the fallback rendered
+    NOTHING — a flat coloured circle that reads as a broken image rather than as
+    a person. It shipped that way on Tessa's settings and app bar, because the
+    caller wrote `user.name ?? user.email` and `??` does not fall through for
+    `""`, which is exactly what a server sends for a person who never set one.
+
+    Fixing it at the call site fixes one call site. The component is handed a
+    string and can see that the string yields no letters, so it is the component
+    that has to refuse to draw an empty circle: empty words are dropped, and
+    anything with no usable glyph at all falls back to `?` — which is at least a
+    legible statement that the name is unknown.
+  */
+  const initials =
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((w) => w[0])
+      .filter((ch): ch is string => Boolean(ch))
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "?";
   const imageSrc = src || (seed ? dicebearUrl(seed) : null);
   return (
     <AvatarPrimitive.Root className={cn("grid size-10 place-items-center overflow-hidden rounded-full bg-primary/15 text-caption font-semibold text-primary", className)}>
