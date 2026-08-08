@@ -27,10 +27,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { FONT_FAMILIES, DEFAULT_TOKENS } from "@scena/manifest";
-import { Sparkles, Palette, MonitorPlay, Mail, ImagePlus, Trash2, Loader2, Type } from "lucide-react";
+import { Sparkles, Palette, MonitorPlay, Mail, ImagePlus, Trash2, Loader2, Type, DoorOpen } from "lucide-react";
 import { BrandingEditor, Card, PageHeader, Select, SettingsIndex, SettingsPage as SectionFrame, SkeletonLine, Stagger, toast, useConfirmedState, type SettingsEntry, usePageChrome } from "@4dl/ui";
 import { Avatar, Badge, Button, Input, KeyRound, Label, Separator, Skeleton, Switch } from "@4dl/ui";
-import { PasskeysCard } from "@4dl/app-kit";
+import { AccountExitRows, CloseTenantCard, PasskeysCard } from "@4dl/app-kit";
+import { signOut } from "../auth-client.js";
 import { useCan } from "../permissions.js";
 import { useFeature } from "../entitlements.js";
 import { FeatureLockBadge } from "../components/feature-gate.js";
@@ -117,6 +118,14 @@ export function WorkspaceSettingsPage() {
   const [me, setMe] = useState<Me | null>(null);
   const [emailLoaded, setEmailLoaded] = useState(false);
   const email = me?.email ?? null;
+  /*
+    Owner, and only after `/api/me` has answered.
+
+    `me` is null while the read is in flight, so this is false then — which is
+    the right default for a row that offers to delete a workspace. It appearing a
+    beat late is invisible; it appearing and then vanishing would not be.
+  */
+  const isOwner = me?.role === "owner";
   const [models, setModels] = useState<AiModel[] | null>(null);
 
   /*
@@ -258,6 +267,23 @@ export function WorkspaceSettingsPage() {
       sub: "How you sign in on this device",
       onClick: () => open("security"),
     },
+    /*
+      CLOSING THE WORKSPACE — owner only, and it did not exist.
+
+      `route-guard.ts` has said since it was written that "paying must be A way
+      out, not the ONLY way out", and exempted billing and auth and nothing else,
+      because there was nothing else to exempt. A workspace Scena suspended over
+      an unpaid invoice had every write refused and no way to end the
+      relationship instead. See `apps/scena/src/exit-routes.ts`.
+    */
+    danger: {
+      key: "danger",
+      icon: DoorOpen,
+      tone: "danger",
+      label: "Close this workspace",
+      sub: "Ends billing and deletes everything, after seven days",
+      onClick: () => open("danger"),
+    },
   };
 
   if (!section) {
@@ -293,9 +319,29 @@ export function WorkspaceSettingsPage() {
         </Card>
         <SettingsIndex
           groups={[
-            { header: "Workspace", rows: [rows.brand!, rows.playback!, rows.ai!] },
+            {
+              header: "Workspace",
+              // The exit is the LAST row of the workspace group and only an
+              // owner sees it — an operator pressing it would only meet a 403
+              // from the route, which is a worse way to learn it is not theirs.
+              rows: isOwner ? [rows.brand!, rows.playback!, rows.ai!, rows.danger!] : [rows.brand!, rows.playback!, rows.ai!],
+            },
             { header: "You", rows: [rows.signin!, rows.security!] },
           ]}
+        />
+        {/*
+          SIGN OUT and DELETE MY ACCOUNT — `@4dl/app-kit`'s pair, so the step-up
+          ceremony, the owner-must-close-first branch and the copy are the same
+          three words in every 4DL app. Below the index rather than inside it:
+          neither navigates, and both are about the PERSON rather than the
+          workspace above them.
+        */}
+        <AccountExitRows
+          email={email}
+          ownsTenant={isOwner}
+          closeFirstHint="the workspace settings"
+          onSignOut={() => void signOut()}
+          onDeleted={() => void signOut()}
         />
       </div>
     );
@@ -444,6 +490,27 @@ export function WorkspaceSettingsPage() {
           onBack={back}
         >
           <PasskeysCard />
+        </SectionFrame>
+      )}
+
+      {/*
+        `CloseTenantCard` is `@4dl/app-kit`'s: it reads `/api/tenant/close/status`,
+        runs the two-stage step-up code, shows the countdown while a close is
+        pending and offers to cancel it. What Scena supplies is the NOUN and the
+        list of what goes — because "your screens go dark" is a sentence only
+        this product can write.
+      */}
+      {section === "danger" && (
+        <SectionFrame
+          title="Close this workspace"
+          description="Ends the subscription and erases everything, after a seven-day window in which you can change your mind."
+          onBack={back}
+        >
+          <CloseTenantCard
+            noun="workspace"
+            erases="every screen, channel, playlist, board, media file and analytics record"
+            graceDays={7}
+          />
         </SectionFrame>
       )}
     </Stagger>

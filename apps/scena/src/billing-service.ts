@@ -94,7 +94,21 @@ export async function lifecycleSweep(env: Env, now = Date.now()): Promise<Lifecy
           dedupeKey: `suspended:${sub.tenant_id}`,
         }).catch(() => undefined);
       }
-    } else if (sub.status === "suspended" && sub.delete_at && now >= sub.delete_at) {
+    } else if ((sub.status === "suspended" || sub.status === "closing") && sub.delete_at && now >= sub.delete_at) {
+      /*
+        ⚠️ TWO WAYS TO REACH THIS RUNG, and they are not the same journey.
+
+        `suspended` is where the dunning ladder puts a workspace whose invoice
+        went unpaid — Scena's decision, escapable by paying. `closing` is where
+        the OWNER put it, deliberately, from Settings — our decision to respect,
+        escapable by cancelling inside the window and not by paying. Both end
+        here, at the same erasure, and the `from` in the action record is what
+        keeps them distinguishable in the operator's log.
+
+        Sharing this branch is the point: a second purge path is a second place
+        for the cascade, the R2 release and the DO wipe to drift apart, and this
+        one has already had that bug.
+      */
       /*
         ⚠️ THE RECIPIENTS ARE READ BEFORE THE PURGE, and this is the one notice
         that CANNOT go to an inbox.
@@ -108,7 +122,8 @@ export async function lifecycleSweep(env: Env, now = Date.now()): Promise<Lifecy
       const owners = await ownerEmails(env.DB, sub.tenant_id);
       await deleteTenantData(env, sub.tenant_id);
       await updateSubscription(env.DB, sub.tenant_id, { status: "canceled", plan_id: "free", delete_at: null, suspend_at: null, past_due_at: null });
-      actions.push({ tenantId: sub.tenant_id, from: "suspended", to: "deleted" });
+      actions.push({ tenantId: sub.tenant_id, from: sub.status, to: "deleted" });
+      const closed = sub.status === "closing";
       for (const to of owners) {
         await sendEmail(env, {
           to,
@@ -120,11 +135,20 @@ export async function lifecycleSweep(env: Env, now = Date.now()): Promise<Lifecy
           // list had disagreed about this all along. The declaration is what
           // the erasure story is written against, so it wins — and the notice
           // now says what actually happened.
+          //
+          // The last message has to say which of the two things happened. "After
+          // the suspension window elapsed" sent to somebody who closed their own
+          // workspace on purpose reads as an accusation about an invoice they
+          // never owed.
           html: emailShell(
             "Workspace data removed",
-            "<p>After the suspension window elapsed, your screens, channels, content, media and account records were deleted. Nothing was retained.</p>",
+            closed
+              ? "<p>You asked us to close your workspace, and the seven-day window has now elapsed. Your screens, channels, content, media and account records were deleted. Nothing was retained.</p>"
+              : "<p>After the suspension window elapsed, your screens, channels, content, media and account records were deleted. Nothing was retained.</p>",
           ),
-          text: "After the suspension window elapsed, your Scena screens, channels, content, media and account records were deleted. Nothing was retained.",
+          text: closed
+            ? "You asked us to close your Scena workspace, and the seven-day window has now elapsed. Your screens, channels, content, media and account records were deleted. Nothing was retained."
+            : "After the suspension window elapsed, your Scena screens, channels, content, media and account records were deleted. Nothing was retained.",
         }).catch(() => undefined);
       }
     }

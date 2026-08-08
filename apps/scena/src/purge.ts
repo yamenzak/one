@@ -162,6 +162,88 @@ async function purgeKv(env: Env, tenantId: string): Promise<number> {
   return removed;
 }
 
+/* ================================ LEAVING ================================= */
+
+/**
+ * How long a closed workspace can change its mind.
+ *
+ * A close is irreversible the moment the sweep reaches it, and the one thing
+ * people get wrong about closing an account is which account they were signed
+ * into. The window is the difference between a mistake and a loss; the screens
+ * go dark immediately either way, which is the signal that it worked.
+ */
+const CLOSE_GRACE_DAYS = 7;
+
+/**
+ * Schedule a workspace's own closure.
+ *
+ * `closing` is a rung of its own rather than a reuse of `suspended`, and the
+ * distinction is not cosmetic: suspension is something Scena did to a workspace
+ * over an unpaid invoice, and it is escapable by paying. This is something the
+ * owner did, deliberately, and paying is not the way back — cancelling is. The
+ * sweep treats them differently for exactly that reason.
+ */
+export async function scheduleTenantClose(env: Env, tenantId: string): Promise<{ deleteAt: string }> {
+  const at = Date.now() + CLOSE_GRACE_DAYS * 86_400_000;
+  // Epoch milliseconds, because that is what this app's `subscriptions` columns
+  // hold — Tessa's are ISO strings and the shared route only ever echoes what it
+  // is handed, so the two apps disagree here on purpose rather than by accident.
+  await run(env.DB, "UPDATE subscriptions SET status = 'closing', suspend_at = ?, delete_at = ? WHERE tenant_id = ?", Date.now(), at, tenantId);
+  return { deleteAt: new Date(at).toISOString() };
+}
+
+/** Undo a pending close inside the window. The workspace stays; billing has to
+ *  be re-established separately, because the subscription was already ended. */
+export async function cancelTenantClose(env: Env, tenantId: string): Promise<void> {
+  await run(env.DB, "UPDATE subscriptions SET status = 'active', suspend_at = NULL, delete_at = NULL WHERE tenant_id = ? AND status = 'closing'", tenantId);
+}
+
+/** True when this user runs any workspace. An owner cannot self-delete out from
+ *  under one — they close it, which stops the billing and wipes the tenant. */
+export async function isOwnerAnywhere(db: D1Database, userId: string): Promise<boolean> {
+  const row = await db
+    .prepare('SELECT 1 AS x FROM "member" WHERE userId = ? AND role = ? LIMIT 1')
+    .bind(userId, "owner")
+    .first<{ x: number }>()
+    .catch(() => null);
+  return !!row;
+}
+
+/**
+ * Erase a USER — the person, not the workspace.
+ *
+ * Guarded by the caller: never reached while this user still owns a workspace,
+ * because deleting an owner would leave a workspace nobody can administer, still
+ * billing, with screens still playing.
+ *
+ * ⚠️ `board_users.user_id` IS NULLED, NOT DELETED, and that is the one judgement
+ * in here. A station is a LOGIN THAT BELONGS TO A BOARD, provisioned on the Live
+ * Boards screen and shared by whoever is at the counter — it is not the person
+ * asking to be forgotten, even though the row points at a `user` row this purge
+ * removes. Deleting the `board_users` row would take a working counter offline
+ * because somebody who once provisioned it left; leaving the pointer dangling
+ * would make the station un-re-provisionable. Nulling it detaches the identity
+ * and leaves the station to be re-issued a credential, which is what the screen
+ * already does.
+ */
+export async function purgeUser(env: Env, userId: string): Promise<void> {
+  await run(env.DB, "UPDATE board_users SET user_id = NULL WHERE user_id = ?", userId);
+  for (const sql of [
+    'DELETE FROM "member" WHERE userId = ?',
+    'DELETE FROM "user" WHERE id = ?',
+    'DELETE FROM "session" WHERE userId = ?',
+    'DELETE FROM "account" WHERE userId = ?',
+    'DELETE FROM "passkey" WHERE userId = ?',
+    "DELETE FROM user_prefs WHERE user_id = ?",
+    "DELETE FROM digest_sent WHERE user_id = ?",
+    "DELETE FROM notifications WHERE recipient_user_id = ?",
+    "DELETE FROM action_otps WHERE subject = ?",
+  ]) await run(env.DB, sql, userId);
+  // The inbox is a Durable Object, which no D1 delete reaches — and a DO cannot
+  // be enumerated, so if it is not wiped here it is never wiped at all.
+  await env.INBOX.get(env.INBOX.idFromName(userId)).wipe().catch(() => undefined);
+}
+
 /**
  * The workspace's rows in `app_config`, which the derived cascade cannot see.
  *

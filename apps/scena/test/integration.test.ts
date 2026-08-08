@@ -29,7 +29,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { ensureSchema } from "../src/db.js";
 import { ensureBilling } from "../src/billing-store.js";
 import { STATION_DOMAIN } from "../src/auth.js";
-import { purgeTenant } from "../src/purge.js";
+import { cancelTenantClose, purgeTenant, purgeUser, scheduleTenantClose } from "../src/purge.js";
 import { raiseAlert } from "../src/alerts.js";
 
 /*
@@ -1273,5 +1273,115 @@ describe("the operator console answers on its door and nowhere else", () => {
       const res = await SELF.fetch(`${door}${path}`);
       expect([401, 403, 404], `${path} answered an anonymous caller ${res.status}`).toContain(res.status);
     }
+  });
+});
+
+/*
+  LEAVING, AND THE RUNG THAT USED TO BE A TRAP.
+
+  `route-guard.ts` has said since it was written that paying must be A way out
+  and not the ONLY way out — and it exempted billing and auth and nothing else,
+  because `/api/tenant/close` did not exist. So a workspace Scena suspended over
+  an unpaid invoice had every write refused, a holding card on every screen, and
+  no mechanism at all for the other answer.
+
+  The suspended case is the point of this block. A test that only closed a
+  HEALTHY workspace would pass on the broken build too.
+*/
+describe("leaving is always allowed", () => {
+  /** Read a step-up code straight out of D1 — same idea as the sign-in OTP, and
+   *  the reason it works is that the code's HASH is stored, not the code. So the
+   *  test asks the route to mint one and then reads it from the mailer's own
+   *  development lane instead: `ENVIRONMENT=development` logs rather than sends,
+   *  which is why the flows below assert on the REFUSAL and the STATUS rather
+   *  than completing a close. Those are the two halves the guard controls. */
+  const closeStatus = (door: string, cookie: string) =>
+    SELF.fetch(`${door}/api/tenant/close/status`, { headers: { cookie } });
+
+  it("an owner can reach the close flow, and a suspended workspace still can", async () => {
+    const { cookie, slug, door } = await newWorkspace("leave");
+    await setPlan(slug, "pro");
+
+    expect((await closeStatus(door, cookie)).status, "healthy workspace").toBe(200);
+
+    // Suspend it the way the dunning sweep does, then try again. This is the
+    // state the whole exemption exists for.
+    const org = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>();
+    await db().prepare("UPDATE subscriptions SET status = 'suspended' WHERE tenant_id = ?").bind(org!.id).run();
+    await SELF.fetch(`${door}/api/host`); // drop the host cache so the gate re-resolves
+
+    // A write that is NOT an exit is refused — proving the workspace really is
+    // gated, so the next assertion is about the exemption and not about nothing.
+    const gated = await SELF.fetch(`${door}/api/branding`, {
+      method: "PUT",
+      headers: json(door, cookie),
+      body: JSON.stringify({ brandName: "nope" }),
+    });
+    // 402 Payment Required, which is the standing gate's own code — a 403 here
+    // would mean the ROLE was refused, which is a different (and wrong) answer.
+    expect(gated.status, "a suspended workspace's ordinary writes refuse").toBe(402);
+
+    // …and the way out still answers, including the code-minting step. Exempting
+    // only `/api/tenant/close` would let a suspended workspace ASK to close and
+    // then refuse the code that confirms it.
+    expect((await closeStatus(door, cookie)).status, "the status read survives suspension").toBe(200);
+    const otp = await SELF.fetch(`${door}/api/tenant/close/request-otp`, { method: "POST", headers: json(door, cookie) });
+    expect(otp.status, "the confirmation code survives suspension").toBe(200);
+  });
+
+  it("closing schedules a deletion the owner can still cancel", async () => {
+    const { cookie, slug, door } = await newWorkspace("leave-cancel");
+    await setPlan(slug, "pro");
+    const org = await db().prepare('SELECT id FROM "organization" WHERE slug = ?').bind(slug).first<{ id: string }>();
+
+    // `scheduleTenantClose` is what the confirmed route calls; driving it
+    // directly is what lets this assert the STATE without a mailbox.
+    const { deleteAt } = await scheduleTenantClose(env as unknown as Parameters<typeof scheduleTenantClose>[0], org!.id);
+    expect(Date.parse(deleteAt)).toBeGreaterThan(Date.now());
+
+    const status = (await (await closeStatus(door, cookie)).json()) as { closing: boolean; deleteAt: string | null };
+    expect(status.closing).toBe(true);
+    expect(status.deleteAt).toBeTruthy();
+
+    // The window is the whole point: a close is a mistake until it is not.
+    await cancelTenantClose(env as unknown as Parameters<typeof cancelTenantClose>[0], org!.id);
+    const after = (await (await closeStatus(door, cookie)).json()) as { closing: boolean };
+    expect(after.closing).toBe(false);
+  });
+
+  /*
+    ⚠️ A STATION IS NOT A PERSON.
+
+    `board_users.user_id` points at a `user` row this purge removes, and deleting
+    the row alongside it would take a working counter offline because whoever
+    provisioned it left the company. Nulling detaches the identity and leaves the
+    station to be re-issued a credential, which is what the Live Boards screen
+    already does.
+  */
+  it("erasing a person leaves their board's station standing", async () => {
+    const { cookie, slug, door } = await newWorkspace("leave-station");
+    await setPlan(slug, "pro");
+    // A board provisions its own logins on creation — there is no separate
+    // "add a station" call, which is what makes the roster a property of the
+    // board rather than of whoever set it up.
+    const created = await SELF.fetch(`${door}/api/boards`, {
+      method: "POST",
+      headers: json(door, cookie),
+      body: JSON.stringify({ kind: "queue", name: "Front desk", config: { counters: [{ id: "c1", name: "Counter 1" }] } }),
+    });
+    expect(created.status).toBe(200);
+    const boardId = ((await created.json()) as { id: string }).id;
+
+    const row = await db()
+      .prepare("SELECT id, user_id FROM board_users WHERE board_id = ? AND user_id IS NOT NULL LIMIT 1")
+      .bind(boardId)
+      .first<{ id: string; user_id: string | null }>();
+    expect(row?.user_id, "the fixture did not land").toBeTruthy();
+
+    await purgeUser(env as unknown as Parameters<typeof purgeUser>[0], row!.user_id!);
+
+    const after = await db().prepare("SELECT id, user_id FROM board_users WHERE id = ?").bind(row!.id).first<{ id: string; user_id: string | null }>();
+    expect(after, "the station row survives").toBeTruthy();
+    expect(after?.user_id, "…with the identity detached").toBeNull();
   });
 });

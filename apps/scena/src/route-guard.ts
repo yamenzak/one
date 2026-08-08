@@ -171,6 +171,18 @@ export function permissionFor(method: string, path: string): Grant | null {
   if (path === "/api/staff" || path.startsWith("/api/staff/")) return null;
   if (path === "/api/members" || path.startsWith("/api/members/")) return { member: ["update"] };
 
+  /*
+    LEAVING — `null` on purpose, and stated rather than left to fall through.
+
+    Both trees authorize themselves and neither can be expressed here. Closing
+    the workspace is OWNER-only, enforced inside `@4dl/tenancy`'s route against
+    `creatorRole` and behind a step-up code; deleting an account is SELF-only,
+    which is not a permission at all — it is an identity check the route makes
+    against the session. A permission in front of either would either close a
+    door that must stay open or duplicate a check that already exists.
+  */
+  if (path.startsWith("/api/tenant/close") || path.startsWith("/api/me/delete")) return null;
+
   // Alerts (rules are a settings concern; the list is a read).
   if (path === "/api/alerts" || path === "/api/alerts/rules") return isGet ? { analytics: ["read"] } : { settings: ["manage"] };
   if (path.startsWith("/api/alerts/rules")) return { settings: ["manage"] };
@@ -233,6 +245,20 @@ const allowedWhileReadOnly = (path: string): boolean =>
   path.startsWith("/api/billing") ||
   path.startsWith("/api/auth/") ||
   path.startsWith("/api/emergency") ||
+  /*
+    ⚠️ LEAVING IS ALWAYS ALLOWED, at every rung, and this line is the whole
+    difference between the principle above and a trap.
+
+    A PREFIX, not equality: `/api/tenant/close` schedules the close,
+    `/close/request-otp` mints the confirmation code and `/close/cancel` undoes
+    it inside the window. Exempting only the first would let a suspended
+    workspace ASK to close and then refuse the code that confirms it.
+
+    `/api/me/delete*` for the same reason on the personal side: a person's right
+    to erase themselves does not depend on their employer's invoice.
+  */
+  path.startsWith("/api/tenant/close") ||
+  path.startsWith("/api/me/delete") ||
   path === "/api/stripe/webhook";
 
 /**

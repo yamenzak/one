@@ -232,6 +232,19 @@ test("the operator's workspace", async () => {
     await shoot(page, project, "settings-brand", { settle: 600 });
   });
 
+  /*
+    THE WAY OUT, which did not exist until it did.
+
+    Worth its own frame rather than being folded into the settings shot: the row
+    that opens it is owner-only and the card behind it is the one irreversible
+    control in the product, so "what does a person actually see before they press
+    this" is a question the images should be able to answer.
+  */
+  await test.step("closing the workspace", async () => {
+    await visit(page, `${base}/settings?s=danger`, page.getByRole("main").getByRole("heading", { name: "Close this workspace" }));
+    await shoot(page, project, "settings-danger", { settle: 400 });
+  });
+
   // The operator console is a different DOOR, not a route inside the app — and
   // it had no picture at all, which is how a console redesign ships unreviewed.
   await test.step("the operator console", async () => {

@@ -294,6 +294,45 @@ and emailed the owner to say otherwise. A purge swallows every delete error by
 construction (an old database may legitimately lack a table), which is why the
 check is structural rather than behavioural.
 
+**Two things the derivation cannot see, and both are handled by hand.**
+`app_config` keys a per-workspace setting as `<setting>:<tenantId>` — the
+tenancy is in the KEY, so there is no column for `tenantCascade` to match on and
+every one of those rows outlived an erasure that reported success.
+`purgeConfigRows` sweeps the SHAPE (`LIKE '%:' || ?`, exact suffix) rather than a
+list, so the next setting keyed that way is covered without anyone remembering.
+And `purgeUser` is a different cascade entirely — a PERSON, not a workspace; see
+§12a.
+
+## 12a. Leaving is always allowed
+
+The route guard has said since it was written that paying must be A way out and
+not the ONLY way out. It exempted billing and auth and nothing else, because
+`/api/tenant/close` **did not exist** — so a workspace Scena suspended over an
+unpaid invoice had every write refused, a holding card on every screen, copy
+telling it to settle up, and no mechanism for the other answer. The exemption
+protected nothing.
+
+`apps/scena/src/exit-routes.ts` binds `@4dl/tenancy`'s `tenantCloseRoutes` and
+`@4dl/auth`'s `accountRoutes`. Four things about it are load-bearing:
+
+- **`closing` is a rung of its own, not a reuse of `suspended`.** Suspension is
+  something Scena did and paying reverses it; closing is something the OWNER did
+  and only CANCELLING reverses it, inside seven days. `@4dl/tenancy`'s standing
+  model already distinguishes them, so the gate and its copy come free.
+- **Both rungs end at the same erasure**, in one branch of `lifecycleSweep`. A
+  second purge path is a second place for the cascade, the R2 release and the DO
+  wipe to drift apart, and this app has already had that bug. Only the final
+  email differs — "after the suspension window elapsed" sent to somebody who
+  closed their own workspace reads as an accusation about an invoice.
+- **The read-only exemption is a PREFIX.** `/api/tenant/close` schedules,
+  `/close/request-otp` mints the confirmation code, `/close/cancel` undoes it.
+  Exempting only the first lets a suspended workspace ASK to close and then
+  refuses the code that confirms it — which the integration suite now fails on.
+- **A station is not a person.** `purgeUser` NULLS `board_users.user_id` instead
+  of deleting the row: a station is a login that belongs to a BOARD, shared by
+  whoever is at the counter, and deleting it would take a working desk offline
+  because whoever provisioned it left.
+
 ## 13. The theme is an ATTRIBUTE, not a class
 
 `@4dl/ui`'s tokens are **dark-first**: `:root` is the dark palette and the light
@@ -433,6 +472,7 @@ Every surface, mapped to the file that draws it. Routes are declared in
 | `/settings?s=brand&sub=assets` | Brand assets | `apps/scena-app/src/pages/Settings.tsx` (`BrandAssets`) |
 | `/settings?s=brand&sub=colour` / `shape` / `advanced` | Colour · Shape & depth · Fine-tune tokens | `packages/ui/src/branding-editor.tsx` |
 | `/settings?s=playback` / `ai` / `signin` / `security` | Playback · Default AI models · Sign-in · Passkeys | `apps/scena-app/src/pages/Settings.tsx` |
+| `/settings?s=danger` | Close this workspace (owner only) | `apps/scena-app/src/pages/Settings.tsx` → `@4dl/app-kit` `CloseTenantCard` |
 | `/team` | Team | `apps/scena-app/src/pages/Team.tsx` |
 | anything else | Not found | `apps/scena-app/src/App.tsx` (`NotFound`) |
 
@@ -440,7 +480,9 @@ Every surface, mapped to the file that draws it. Routes are declared in
 action; below `sm` the app-shell collapses every header action into one ⋮ menu,
 so there are two affordances for it and both are the product. The emergency
 takeover and the theme toggle live in the sidebar footer
-(`apps/scena-app/src/App.tsx`, `SidebarFooter`).
+(`apps/scena-app/src/App.tsx`, `SidebarFooter`). **Sign out** and **Delete my
+account** are `@4dl/app-kit`'s `AccountExitRows`, below the settings index —
+neither navigates, and both are about the person rather than the workspace.
 
 **The sidebar registry is `apps/scena-app/src/nav.tsx`** — five groups
 (Displays, Building blocks, Live boards, Insights, Account), with **Admin

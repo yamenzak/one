@@ -59,6 +59,7 @@ import { registerBilling } from "./billing-routes.js";
 import { registerContentRoutes } from "./content-routes.js";
 import { getBranding } from "./branding-store.js";
 import { registerMemberRoutes } from "./member-routes.js";
+import { accountRoutes, tenantCloseRoutes } from "./exit-routes.js";
 import { grantAll, lifecycleSweep, isSuspended, tenantEntitlements, callerEmail } from "./billing-service.js";
 import { publishVersion, currentManifest, rollbackTo, currentVersion, listVersions, getVersionManifest, publishState, setVersionNote } from "./versions.js";
 import { createAd, listAds, getAd, setAdEnabled, deleteAd, enabledAdSchedules, listAdProfiles, createAdProfile, getAdProfile, updateAdProfile, deleteAdProfile, channelsUsingAdProfile } from "./ad-store.js";
@@ -194,6 +195,20 @@ app.get("/health", (c) => c.json({ ok: true, service: "scena-api" }));
  */
 app.route("/api", domainRoutes);
 app.route("/api", domainAdminRoutes);
+
+/*
+  LEAVING. `route-guard.ts` says paying must be A way out and not the ONLY way
+  out, and until now it exempted billing and auth and nothing else — because
+  there was nothing else to exempt. A workspace Scena suspended over an unpaid
+  invoice had every write refused and no mechanism for the other answer.
+
+  `/api/tenant/close*` (owner, step-up code, seven-day window, cancellable) and
+  `/api/me/delete*` (a person's own erasure). Both are the shared packages'
+  routes; `exit-routes.ts` binds Scena's states and copy to them.
+*/
+app.route("/api", tenantCloseRoutes);
+app.route("/api", accountRoutes);
+
 /*
   The inbox: `/api/notifications`, `/api/notifications/:id/read`,
   `/api/notifications/read-all`, `/api/inbox/ws`.
