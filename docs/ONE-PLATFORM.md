@@ -478,12 +478,17 @@ which is exactly why it can be global; the moment somebody adds an owner's email
 "for convenience" the whole model breaks. Guard it: the directory's schema is
 allow-listed, and a column outside the list fails the build.
 
-**3. Bindings are region-tuples, never singletons.** ⚠️ **This is the rule that
-must exist from the first table.** One worker script (Workers run everywhere);
-D1 with location hints, R2 with jurisdiction `eu`, Durable Objects with
-`jurisdiction: "eu"` — all three are real Cloudflare features today. The manifest
-declares one *logical* binding (`db`, `media`, `inbox`); the framework resolves
-the regional instance per request from the tenant's region.
+**3. Stateful bindings are region-tuples, never singletons.** ⚠️ **This is the
+rule that must exist from the first table.** One worker script (Workers run
+everywhere); the manifest declares one *logical* binding (`db`, `media`,
+`inbox`) and the framework resolves the regional instance per request from the
+tenant's region.
+
+⚠️ **But not everything duplicates, and two exceptions matter** — §4.3 has the
+inventory. Durable Objects pick a jurisdiction at CALL time on a single
+namespace, so DO bindings do not multiply by region at all. KV is globally
+replicated by design and cannot be regionalised, so it may never hold anything
+personal.
 
 ```ts
 // what an operation sees — never a raw binding, never a region
@@ -666,6 +671,96 @@ The shape that works instead:
 - **If residency is to earn**, make it a plan attribute — an EU-resident tier
   with the DPA, the sub-processor list and the support terms that actually go
   with it — not a €25 button. That is what the buyer is trying to purchase.
+
+### 4.3 What actually duplicates — and what "100% EU" can honestly mean
+
+Two questions that decide the provisioning story, answered against the bindings
+these workers hold today: `AI`, `CACHE`/`PAIRING`, `PLATFORM_CONFIG`, `DB`,
+`MEDIA`, plus 11 Durable Object classes.
+
+#### It is not 2× everything. It is 2× the two stores that hold tenant data.
+
+| Binding | Per region? | Why |
+|---|---|---|
+| `DB` (D1) | **yes** | it *is* the tenant's data |
+| `MEDIA` (R2) | **yes** | and the EU one must be created **with** `jurisdiction: eu`, not merely hinted |
+| Durable Objects | **no** | a namespace is per-script; the jurisdiction is chosen at CALL time — `env.BILLING.jurisdiction("eu").idFromName(tenantId)`. Scena's seven classes stay seven, not fourteen |
+| `CACHE` / `PAIRING` (KV) | **no** | and not because it is cheap — see below |
+| `PLATFORM_CONFIG` (KV) | **no** | already one namespace shared by every worker |
+| `AI` | **no** | one binding; what becomes region-aware is the *model allow-list* |
+| identity D1 | **no** | one, EU, for everybody (§4.1 rule 4) |
+| tenant directory | **no** | one, global, routing data only |
+
+**Three apps × two regions is 8 databases and 6 buckets** — six regional app
+databases plus identity plus the directory — against 3 and 3 today. Kova's worker
+goes from 8 bindings to about 13. That is comfortable; worth noting in passing
+that bindings are static in `wrangler.jsonc`, so at five or six regions the
+topology to reach for is a worker deployment per region instead, with identity
+called over HTTP rather than bound.
+
+⚠️ **Nobody hand-manages 8 databases.** `apps.json` already drives provisioning
+and `bind-resource-ids.mjs` already writes a real id into a JSONC config
+structurally and verifiably. Adding a region dimension to the registry is a loop
+over a list, not a redesign — and a region should be provisioned only once a
+tenant is in it, so `apps.mjs ready` becomes a question about `(app, region)`
+rather than about an app.
+
+⚠️ **`applySchema` then runs per (app × region)** — six gates, not one. The
+composed runner is already idempotent per database, so this is cheap, but it has
+to be designed rather than discovered. So does the test story, where a second D1
+under Miniflare is now a proven pattern: `apps/scena/vitest.config.ts` binds one
+for the billing-reconcile suite.
+
+#### KV is the sharp edge
+
+**KV is globally replicated by design and has no jurisdiction option.** An EU
+tenant's data in KV is that tenant's data in every Cloudflare PoP on earth.
+
+That is survivable given what is in there today — `CACHE` holds host→tenant
+routing, `PAIRING` holds ephemeral device codes, `PLATFORM_CONFIG` holds operator
+credentials, none of it a tenant's personal data. But it has to become **a rule
+with a guard** rather than a happy accident: KV writes through one chokepoint
+with a typed, allow-listed key space, and anything not on the list fails the
+build. That is `storage-chokepoint.test.mjs`'s shape applied to the one store
+that cannot be regionalised.
+
+#### So: can a tenant get "100% EU"?
+
+**Data at rest in the EU: yes, and it is sellable.** Everything else needs
+qualifying, and the qualification is the difference between a DPA you can sign
+and one you cannot.
+
+| Layer | EU-only | Note |
+|---|---|---|
+| R2 | ✅ | `jurisdiction: eu` is a contractual guarantee, not a hint |
+| Durable Objects | ✅ | the same, chosen per call |
+| D1 | ⚠️ | a location hint at creation. **Read replication must be off or EU-constrained** — a replica on another continent is precisely the transfer you sold against |
+| KV | ❌ | globally replicated. Nothing personal, ever |
+| Worker compute / TLS | ⚠️ | a Worker runs where the request lands and TLS terminates at the nearest PoP. EU-only termination needs Cloudflare's **Data Localization Suite / Regional Services**, an Enterprise add-on with a real price |
+| Workers AI | ⚠️ | inference GPU location is not EU-guaranteed |
+| Gemini | ⚠️ | needs a Vertex EU endpoint, or AI is off for EU tenants |
+| Analytics Engine | ❌ | global |
+| Stripe | ❌ | a US processor under SCCs. Not ours to fix — and the tenant→customer rail deliberately never touches card data, which is the strongest thing you can say here |
+| Email | ⚠️ | Brevo is French; the Cloudflare sender needs checking |
+| Logs | ⚠️ | tail and Logpush transit global infrastructure |
+
+⚠️ **Do not sell "100% EU".** Sell **"EU data residency"** — data at rest in the
+EU, a DPA, an SCC-covered transfer list, a named sub-processor list. That is what
+a hospital DPO's questionnaire actually asks for, it is achievable, and it
+survives review. "100% EU" promised alongside inference on a GPU in Virginia is
+worse than the accurate claim, because it is the one they will check.
+
+**And the framework's job here is bigger than storage.** Residency is also *which
+sub-processors a tenant permits*, so a region carries an allow-list: an EU tenant
+may resolve a different (or empty) AI model set, a different mailer, no
+analytics. That is a manifest declaration and a gate, exactly like an
+entitlement — which is what makes the promise enforceable rather than
+aspirational.
+
+⚠️ **Verify the Cloudflare specifics before quoting them.** These products move
+quickly and the table above is a snapshot. The two most worth confirming: whether
+D1 offers a contractual jurisdiction as opposed to a location hint, and what
+Regional Services costs at your plan.
 
 ---
 
