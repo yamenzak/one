@@ -27,6 +27,7 @@ import { createAuth } from "./auth.js";
 import { guard } from "./route-guard.js";
 import { domainAdminRoutes, domainRoutes } from "./domain-routes.js";
 import { orgCreateGuard, orgUpdateGuard } from "./org-guard.js";
+import { otpSendGuard } from "./otp-guard.js";
 import { caseRoutes } from "./case-routes.js";
 import { contextRoutes } from "./context-routes.js";
 import { notifyRoutes } from "@4dl/notify/routes";
@@ -43,16 +44,16 @@ import { emailAdminRoutes } from "@4dl/email/admin-routes";
 import { sharedConfigRoutes } from "@4dl/core/admin-routes";
 import { railAdminRoutes } from "@4dl/billing-rail/admin-routes";
 import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
-import { DUNNING_DAYS } from "@4dl/billing";
+import { DUNNING_DAYS, planAdminRoutes } from "@4dl/billing";
 import { periodKey } from "@4dl/core";
-import { billingAdminRoutes, billingRoutes, stripeWebhookRoutes } from "./billing-routes.js";
+import { billingAdminRoutes, billingRoutes, stripeConsoleRoutes, stripeWebhookRoutes } from "./billing-routes.js";
 import { onboardingRoutes } from "./onboarding-routes.js";
 import { aiAdminRoutes, aiRoutes } from "./ai-routes.js";
 import { aiCatalogAdminRoutes, applySharedSelection, disableRetiredModels } from "@4dl/ai";
 import { settingsRoutes } from "./settings-routes.js";
 import { insightRoutes } from "./insight-routes.js";
 import { staffRoutes } from "./staff-routes.js";
-import { entitlements } from "./entitlements.js";
+import { entitlements, FEATURE_META, QUOTA_META, type AppEntitlements } from "./entitlements.js";
 import { listPlans, seedBilling } from "./billing-store.js";
 import { ensureSchema } from "./db.js";
 import { purgeTenant } from "./purge.js";
@@ -80,7 +81,34 @@ app.get("/health", (c) => c.json({ ok: true }));
 app.use("/api/auth/organization/create", orgCreateGuard);
 app.use("/api/auth/organization/update", orgUpdateGuard);
 
-/** Better Auth owns its whole lane: OTP, passkeys, sessions, organizations. */
+/**
+ * THE ONE GATE in front of the emailed sign-in code, ahead of the catch-all so
+ * this exact path lands here rather than on Better Auth's handler.
+ *
+ * Registered FIRST for the same reason the two closures below it exist: on a
+ * passwordless product this endpoint is the entire front door, and everything
+ * that protects it — the bot check, the 30-second cooldown, the per-IP hourly
+ * ceiling, invite-only eligibility and the deliverability pre-flight — lives in
+ * `otpSendGuard` and nowhere else.
+ */
+app.post("/api/auth/email-otp/send-verification-otp", otpSendGuard);
+
+/**
+ * The two sibling endpoints the emailOTP plugin registers unconditionally, both
+ * closed.
+ *
+ * They call the same `sendVerificationOTP` callback directly, so each is a way
+ * around the guard above entirely — no Turnstile, no cooldown, no per-IP
+ * ceiling, no eligibility — which would let somebody keep requesting codes after
+ * an operator turned the bot check on. There is no password provider here at all
+ * (`emailAndPassword: { enabled: false }`), so password-reset OTP is pure attack
+ * surface with no legitimate caller. 404 rather than 403: do not confirm it
+ * exists.
+ */
+app.post("/api/auth/email-otp/request-password-reset", (c) => c.json({ error: "not_found" }, 404));
+app.post("/api/auth/forget-password/email-otp", (c) => c.json({ error: "not_found" }, 404));
+
+/** Better Auth owns the rest of its lane: OTP verify, passkeys, sessions, organizations. */
 app.on(["GET", "POST"], "/api/auth/*", (c) => {
   const auth = createAuth(c.env, new URL(c.req.url).origin, c.get("host").shape);
   return auth.handler(c.req.raw);
@@ -205,7 +233,29 @@ app.route("/api", accountRoutes);
 app.route("/api", insightRoutes);
 app.route("/api", aiRoutes);
 app.route("/api", stripeWebhookRoutes);
+// `@4dl/billing`'s Stripe console routes, then Tessa's own operator lane.
+app.route("/api", stripeConsoleRoutes);
 app.route("/api", billingAdminRoutes);
+/**
+ * The PLAN CATALOG's operator routes — `@4dl/billing`'s.
+ *
+ * Tessa had no plan editor at all: changing a price, a limit or the trial was a
+ * code edit, a deploy and a catalog sync. It sells one plan, which is exactly
+ * why nobody noticed — one plan is still a price somebody eventually wants to
+ * move, and the two rules that matter (the Stripe-id null-out on a reprice, and
+ * grandfathering whoever is already on the tier) are the same for one plan as
+ * for four.
+ */
+app.route(
+  "/api",
+  planAdminRoutes<AppEntitlements>({
+    isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+    seed: (db) => seedBilling(db),
+    engine: entitlements,
+    quotaMeta: QUOTA_META,
+    featureMeta: FEATURE_META,
+  }) as unknown as Hono<AppEnv>,
+);
 app.route("/api", aiAdminRoutes);
 // The provider key, mock lane, credit markup and model catalog are
 // `@4dl/ai`'s state, so their console endpoints are `@4dl/ai`'s routes.

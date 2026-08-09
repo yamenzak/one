@@ -61,6 +61,36 @@ describe("the AI registry", () => {
   });
 });
 
+/**
+ * THE SUITE'S FIRST STATEMENT, AND THE ONE THAT USED TO THROW.
+ *
+ * `@4dl/ai`'s `generate()` and `generateImage()` both open with `loadTenantAi`,
+ * an unguarded `SELECT ai_config_json, ai_toggles_json FROM tenant_settings`.
+ * `ai_config_json` was declared by exactly ONE app, in its own schema module —
+ * so here, and in every future app, the whole AI suite threw
+ * `no such column: ai_config_json` on every call. A paid entitlement, dead, with
+ * nothing anywhere saying so: the package's tests passed, this file passed
+ * (it only ever asserted that an unauthenticated call is refused, and a refusal
+ * never reaches the query), and a 500 on a feature nobody has tried yet looks
+ * exactly like a feature nobody has tried yet.
+ *
+ * The column is `@4dl/ai`'s now — a package that reads a column has to ship it.
+ * This asserts the select the package actually makes, rather than the column
+ * list, because the select is what breaks.
+ */
+describe("the columns the AI package reads", () => {
+  it("answers `generate()`'s opening query without throwing", async () => {
+    await ensureSchema(env.DB as D1Database);
+    const row = await (env.DB as D1Database)
+      .prepare("SELECT ai_config_json, ai_toggles_json FROM tenant_settings WHERE tenant_id = ?")
+      .bind("nobody")
+      .first();
+    // No row is the correct answer for an unknown tenant; what matters is that
+    // the statement PREPARED and RAN.
+    expect(row).toBeNull();
+  });
+});
+
 describe("the AI gates", () => {
   const origin = "http://nobody.localhost:8787";
 

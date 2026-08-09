@@ -1210,23 +1210,40 @@ export interface Balance {
   available: number;
 }
 
+/**
+ * A plan as the TENANT-facing `/api/billing` payload carries it — the raw row,
+ * cents and all. Distinct from `AdminPlanRef` on purpose: the operator console's
+ * catalog read speaks `@4dl/admin`'s contract (dollars, resolved entitlements)
+ * and this one has not moved.
+ */
 export interface Plan {
   id: string;
   name: string;
-  price_cents: number;
-  currency: string;
-  interval: string;
-  entitlements_json: string;
+  /**
+   * ⚠️ DOLLARS, not cents, and `ord`, not `sort` — `@4dl/billing`'s column names
+   * since the schema reconciliation. `currency` and `interval` are gone with
+   * them: every Scena plan was always `usd`/`month`, which is why the shared
+   * shape (`price_usd_month`) loses nothing by not having them.
+   */
+  price_usd_month: number;
+  entitlements_json: string | null;
   stripe_price_id: string | null;
   active: number;
-  sort: number;
+  ord: number;
+}
+
+/** A plan, as much of one as the promo picker needs to name it. */
+export interface AdminPlanRef {
+  id: string;
+  name: string;
 }
 
 export interface Pack {
   id: string;
   name: string;
   credits: number;
-  price_cents: number;
+  /** Dollars, as `plans.price_usd_month` is. */
+  price_usd: number;
   stripe_price_id: string | null;
 }
 
@@ -1235,9 +1252,10 @@ export interface Subscription {
   plan_id: string;
   status: string;
   comp: number;
-  current_period_end: number | null;
-  suspend_at: number | null;
-  delete_at: number | null;
+  /** ISO-8601 text. These held epoch milliseconds before the reconciliation. */
+  current_period_end: string | null;
+  suspend_at: string | null;
+  delete_at: string | null;
 }
 
 export interface LedgerEntry {
@@ -1246,7 +1264,8 @@ export interface LedgerEntry {
   balance: number;
   reason: string;
   ref: string | null;
-  created_at: number;
+  /** Epoch milliseconds. `@4dl/billing` calls this column `at`. */
+  at: number;
 }
 
 export interface Entitlements {
@@ -1441,122 +1460,36 @@ export async function setAdminConfig(config: Record<string, string>): Promise<vo
   if (!res.ok) throw await apiError(res, "setAdminConfig");
 }
 
-export async function stripePing(): Promise<{ ok: boolean; account?: string; error?: string }> {
-  return (await (await apiFetch(`${API_BASE}/api/admin/stripe/ping`)).json()) as { ok: boolean; account?: string; error?: string };
-}
-
-export async function stripeSync(): Promise<{ ok?: boolean; error?: string; plans?: unknown[]; packs?: unknown[] }> {
-  const res = await apiFetch(`${API_BASE}/api/admin/stripe/sync`, { method: "POST" });
-  return (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; plans?: unknown[]; packs?: unknown[] };
-}
-
-export async function adminListPlans(): Promise<Plan[]> {
-  return ((await (await apiFetch(`${API_BASE}/api/admin/plans`)).json()) as { plans: Plan[] }).plans;
-}
-
-export async function adminSavePlan(id: string, patch: Partial<Plan>): Promise<void> {
-  await apiFetch(`${API_BASE}/api/admin/plans/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
-}
+/*
+  THE STRIPE PING AND CATALOG SYNC ARE `@4dl/admin`'s NOW — `PlatformStripeSection`
+  reaches those routes through the `AdminApi` the console injects, which
+  is why `admin-panels.conformance.test.ts` refuses a direct helper for one of
+  those paths anywhere in this SPA. A second caller is a second answer to "what
+  is configured", and the panel's two-lane model is the one that can tell an
+  operator the stored catalog belongs to the other lane.
+*/
 
 /**
- * One row of the AI model catalog.
+ * The plan list, for the ONE surface that still needs it here: the promo-code
+ * dialog's "which plan does this apply to" picker.
  *
- * ⚠️ `id` IS THE PROVIDER PATH (`@cf/deepgram/aura-1`, `gemini-2.5-flash`) since
- * Scena adopted `@4dl/ai`'s catalog. There used to be a short slug here with the
- * real path in a `cf_model` field beside it; `provider` names the lane now, which
- * is the column the server filters and groups on.
+ * Editing a plan is `@4dl/admin`'s `PlatformPlansSection` and goes through the
+ * package, which is why there is no `adminSavePlan` any more. `id` and `name`
+ * are all this caller reads, and saying so keeps the SPA from re-declaring a
+ * payload shape the server owns.
  */
-export interface AdminModel {
-  id: string;
-  label: string;
-  task: string;
-  provider: string;
-  input_rate: number | null;
-  output_rate: number | null;
-  unit_rate: number | null;
-  unit_kind: string | null;
-  markup: number | null;
-  enabled: number;
-  is_default: number;
-  /** `YYYY-MM-DD` the provider says it stops answering, or null. */
-  retires_at: string | null;
-  /** Curated display order. Null for a row the pricing-page sync discovered. */
-  sort: number | null;
+export async function adminListPlans(): Promise<AdminPlanRef[]> {
+  return ((await (await apiFetch(`${API_BASE}/api/admin/plans`)).json()) as { plans: AdminPlanRef[] }).plans;
 }
 
-export async function adminListModels(): Promise<AdminModel[]> {
-  return ((await (await apiFetch(`${API_BASE}/api/admin/models`)).json()) as { models: AdminModel[] }).models;
-}
-
-export async function adminSaveModel(id: string, patch: Partial<AdminModel>): Promise<void> {
-  await apiFetch(`${API_BASE}/api/admin/models/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) });
-}
-
-/**
- * What ONE provider's sync produced — `@4dl/ai`'s `ProviderSyncReport`.
- *
- * `ok: false` means that provider's page was not read at all and every one of
- * its rows was deliberately left exactly as it was. Reported per provider
- * because a Cloudflare outage must never touch a Gemini rate, and a half-failed
- * run has to be able to say which half.
- */
-export interface RateSyncProvider {
-  provider: "workers-ai" | "google";
-  source: string;
-  ok: boolean;
-  /** Models priced from the page. */
-  parsed: number;
-  added: number;
-  addedIds: string[];
-  updated: number;
-  /** Enabled ids that vanished from the page and were switched off. */
-  disabled: number;
-  disabledIds: string[];
-  /** Rows the page lists that cannot be priced exactly, and why. */
-  unpriceable: { id: string; reason: string }[];
-  /** Rows the page still prices but the provider has already SHUT DOWN. */
-  retired: { id: string; reason: string }[];
-  retiredDisabled: number;
-  /** The provider's own page, or a catalog another 4DL app already parsed. */
-  from: "pricing page" | "shared catalog";
-  error: string | null;
-}
-
-/**
- * `@4dl/ai`'s `SyncReport`, minus the parsed rows.
- *
- * ⚠️ THERE IS NO `added`/`updated` AT THE TOP LEVEL ANY MORE, and its absence is
- * the point. Those two counted rows a HARDCODED catalog re-wrote — on a settled
- * deployment, every row, every time, with identical values — so "17 updated" read
- * as "rates refreshed from Cloudflare" when nothing had been fetched. Every count
- * here belongs to a provider whose page was actually read.
- */
-export interface ResyncResult {
-  ok: boolean;
-  providers: RateSyncProvider[];
-  /** Rows in the catalog after the sync. */
-  total: number;
-  errors: string[];
-  /** Whether the parsed catalog reached the shared platform store, so the other
-   *  4DL apps seed from it. False on a deployment with no shared store bound. */
-  published: boolean;
-}
-
-export async function adminResyncModels(): Promise<ResyncResult> {
-  const res = await apiFetch(`${API_BASE}/api/admin/models/resync`, { method: "POST" });
-  /*
-    A 502 STILL CARRIES A REPORT, and it is the only place that says why.
-
-    The server answers 502 when neither pricing page produced a usable parse and
-    no shared catalog could stand in — and the body holds each provider's own
-    error. Throwing on `!res.ok` would replace "couldn't fetch the Cloudflare
-    pricing page (HTTP 503)" with "resync failed (502)", which tells an operator
-    nothing they can act on.
-  */
-  const body = (await res.json().catch(() => null)) as ResyncResult | null;
-  if (!body) throw new Error(`resync failed (${res.status})`);
-  return body;
-}
+/*
+  THE AI MODEL CATALOG'S TYPES AND HELPERS ARE `@4dl/ai`'s NOW, rendered by
+  `@4dl/admin`'s `PlatformAiSection` over `aiCatalogAdminRoutes`. `AdminModel`,
+  `adminListModels`, `adminSaveModel`, `RateSyncProvider`, `ResyncResult` and
+  `adminResyncModels` all went with it — a duplicate row shape in the browser is
+  how the `cf_model` column survived three stages after the server stopped
+  writing one.
+*/
 
 export interface PromoCode {
   code: string;
@@ -1835,11 +1768,13 @@ export async function publishChannelNote(channelId: string, note: string): Promi
 }
 
 /* ------------------------------- email (§23/§25) ------------------------- */
-
-export async function sendTestEmail(): Promise<{ to: string; ok: boolean; mocked?: boolean; skipped?: boolean; error?: string }> {
-  const res = await apiFetch(`${API_BASE}/api/admin/email/test`, { method: "POST" });
-  return (await res.json().catch(() => ({ ok: false }))) as { to: string; ok: boolean; mocked?: boolean; skipped?: boolean; error?: string };
-}
+/*
+  THE TEST SEND IS `@4dl/admin`'s — `PlatformEmailSection`, which this console
+  has mounted since it moved to the `admin.` door. `sendTestEmail` was the
+  second caller of the shared test-send route, from a form in the Stripe tab that
+  also wrote the sender rows the shared panel owns: two screens answering "what
+  is the sender" with no rule about which wins.
+*/
 
 /* -------------------------------- weather (§17) -------------------------- */
 

@@ -1174,7 +1174,7 @@ the tenancy".
 | Trigger | Who | File | What it is |
 | --- | --- | --- | --- |
 | session resolving | all | `main.tsx:35` `BootSplash` | Branded boot splash |
-| platform maintenance = `full` | all | `screens/Maintenance.tsx:42` | Deployment closed; outranks every door but `admin.` |
+| platform maintenance = `full` | all | `packages/app-kit/src/MaintenanceScreen.tsx:52` | Deployment closed; outranks every door but `admin.`. SHARED — all three apps render it |
 | host = root | anon | `screens/Doors.tsx:74` `RootSignpost` | Signpost to setup / admin / a studio |
 | host = tenant, no such tenant | anon | `screens/Doors.tsx:172` `NoStudio` | "No studio at this address" |
 | host = invalid | anon | `screens/Doors.tsx:207` `WrongDoor` | Unrecognised hostname |
@@ -1322,11 +1322,11 @@ None of these are routes. They live inside their parent's file.
 
 | File:line | What it is |
 | --- | --- |
-| `admin/AdminConsole.tsx:301` | Studio detail — plan, credits, standing |
-| `admin/AdminConsole.tsx:677` | Edit a plan's entitlements |
-| `admin/AdminConsole.tsx:733` | Gift credits |
-| `admin/AdminConsole.tsx:1261` | Default AI model per task |
-| `admin/AdminConsole.tsx:2675` | Platform-wide promo code |
+| `admin/AdminConsole.tsx:344` | Studio detail — plan, credits, standing |
+| `admin/AdminConsole.tsx:561` | One studio's entitlements, with each row's provenance |
+| `packages/admin/src/sections/plans.tsx:376` | Edit a plan — price, limits, features, grant, **trial** |
+| `packages/admin/src/sections/ai.tsx:154` | Default AI model per lane |
+| `admin/AdminConsole.tsx:1342` | Platform-wide promo code |
 
 ### F. Dead code
 
@@ -1379,24 +1379,31 @@ each section's gate — so a section can't drift from what the tenant bought.
 independently. Only `brand` has one save, because only there do the sub-pages
 share state.
 
-#### G3. Admin console — `ADMIN_SECTIONS`, `admin/AdminConsole.tsx:52-74`
+#### G3. Admin console — `ADMIN_SECTIONS`, `admin/AdminConsole.tsx:55-139`
 
 Reachable at the `admin.` door and nowhere else. Two sections are **not** in this
 file: their panels belong to the shared package that owns the configuration, and
 only the row registering them lives here.
 
+⚠️ **Re-measured 2026-08-08.** Every line number below was wrong — the table
+cited `:2675` in a file of 1,396 lines, having drifted through several passes.
+Most of the console is the shared package's now, and a row pointing into
+`packages/` cannot go stale from an edit here, which is the second reason to
+prefer one.
+
 | `?s=` | File:line | Nested |
 | --- | --- | --- |
-| `tenants` | `:159` | opens `:301`, `:733` |
-| `plans` | `:571` | `:651`, `:677` |
-| `ai` | `:886` | `?a=` — `provider` `pricing` `selftest` `:1467`; also `:1218`, `:1361` |
-| `stripe` | `:2187` | — |
-| `promos` | `:2546` | `:2641`, `:2675` |
-| `domains` | `:1663` | — |
-| `content` | `:1976` | — |
-| `email` | `packages/admin/src/sections/email.tsx:60` | — |
-| `maintenance` | `packages/admin/src/sections/maintenance.tsx:57` | — |
-| `security` | `:1826` | `:2032` nuclear reset |
+| `tenants` | `:202` | `TenantSheet :344`, `TenantEntitlementSheet :561` |
+| `plans` | `packages/admin/src/sections/plans.tsx:376` | the edit sheet is in that file |
+| `ai` | `packages/admin/src/sections/ai.tsx:154` | `?a=` — Kova's slots: `AiSelfTest :911`, `AiFeedbackPanel :808` |
+| `stripe` | `packages/admin/src/sections/stripe.tsx:92` | — |
+| `rail` | `packages/admin/src/sections/rail.tsx:83` | — |
+| `promos` | `:1213` | `PromoRow :1308`, `PlatformPromoSheet :1342` |
+| `domains` | `packages/admin/src/sections/domains.tsx:58` | — |
+| `platform` | `packages/admin/src/sections/shared-config.tsx:252` | — |
+| `email` | `packages/admin/src/sections/email.tsx:92` | — |
+| `maintenance` | `packages/admin/src/sections/maintenance.tsx:92` | — |
+| `security` | `packages/admin/src/sections/turnstile.tsx:42` | `NuclearResetCard :1097` rides in as `extra` |
 
 ---
 

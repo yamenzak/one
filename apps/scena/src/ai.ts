@@ -27,7 +27,7 @@ import { getBranding, brandBrief, brandImageHint } from "./branding-store.js";
 // figure the provider might report). Importing it back deletes the fork and
 // picks up the guards.
 import { neuronsForUsage, creditsForNeurons, type Usage, type ModelRate } from "@4dl/billing/model";
-import { DEFAULT_SEED_MARKUP, lanesFor, MUSIC_CLIP_SECONDS, shouldUseMockLane } from "@4dl/ai";
+import { DEFAULT_SEED_MARKUP, estimateUsage as sharedEstimate, lanesFor, MUSIC_CLIP_SECONDS, shouldUseMockLane } from "@4dl/ai";
 import { geminiGenerateText, geminiGenerateImage, geminiGenerateMusic, geminiGenerateSpeech } from "./gemini.js";
 import { createMedia } from "./media-store.js";
 import { storeAsset, StorageQuotaError } from "./storage.js";
@@ -51,6 +51,19 @@ export interface GenerateRequest {
     designW?: number; designH?: number; currentWidgets?: unknown[];
   };
   tenantId?: string;
+  /**
+   * WHO asked for this, and the reason the per-actor cap is not decorative.
+   *
+   * `ai_generations.actor_user_id` was written as a literal NULL on every row,
+   * so `@4dl/ai`'s `checkActorDailyBudget` — which sums a rolling 24 hours of an
+   * actor's rows — could only ever read zero. Mounting the cap without this
+   * would have been a control that passes its own tests and bounds nothing.
+   *
+   * Optional because not every caller is a person: a board's announcement TTS
+   * is triggered by the schedule, and attributing it to whoever last touched the
+   * board would spend their allowance on the room's behalf.
+   */
+  actorUserId?: string | null;
 }
 
 export interface GenerateResult {
@@ -98,15 +111,99 @@ const rateOf = (m: ModelRow): ModelRate => ({
   markup: markupOf(m),
 });
 
-/** Estimate the worst-case usage for the reserve, before we know real usage. */
-function estimateUsage(task: AiTask, prompt: string, opt: GenerateRequest["options"], perSongMusic = false): Usage {
-  const inTok = Math.ceil(prompt.length / 4) + 200; // + system prompt overhead
-  if (task === "text") return { inputTokens: inTok, outputTokens: opt?.maxTokens ?? 8000 };
-  // The layout designer sends a big system prompt (widget spec) + the current
-  // canvas as JSON, and answers with a compact JSON layout — text-metered.
-  if (task === "layout") {
-    const canvasTok = Math.ceil(JSON.stringify(opt?.currentWidgets ?? []).length / 4);
-    return { inputTokens: inTok + canvasTok + 1500, outputTokens: opt?.maxTokens ?? 4000 };
+/**
+ * THE SYSTEM PROMPT AND THE RESERVE IT IMPLIES — one call, so they cannot
+ * disagree.
+ *
+ * ⚠️ **This shape is the fix, and a test would not have been.** The defect was
+ * never that the estimate was wrong on its own terms; it was that the estimate
+ * and the run were computed in two places from two sets of constants. Unit tests
+ * on each half pass while the join is broken — which was demonstrated: a
+ * mutation replacing the system prompt with `""` in `generate` passed every
+ * assertion about `outputCap` and about `estimateUsage`, because both were
+ * called directly with a system prompt the test supplied itself.
+ *
+ * So the caller does not get to pass a system prompt to the estimator. It asks
+ * for a PLAN, uses `system` for the run and `usage` for the reserve, and the two
+ * are by construction about the same text.
+ */
+export function planRun(req: GenerateRequest, provider: string, brief: string, perSongMusic = false): { system: string; usage: Usage } {
+  const tokenLane = req.task === "text" || req.task === "layout";
+  const system = tokenLane ? systemPrompt(req, brief) : "";
+  return { system, usage: estimateUsage(req.task, system, req.prompt, req.options, provider, perSongMusic) };
+}
+
+/**
+ * THE OUTPUT CAP, IN ONE PLACE — because the reserve and the run were asking for
+ * different numbers.
+ *
+ * ⚠️ This is the sharpest of the reserve defects and it is pure lost margin. The
+ * run asked Gemini for `32768` output tokens on a slide (`8192` on a layout)
+ * while the estimate reserved `8000` (`4000`) — a FOUR-FOLD under-reserve on the
+ * most-used lane in the product. `settle` caps the charge at the reserve, so
+ * every generation that used more than a quarter of its allowance was billed for
+ * a quarter of it and the platform paid the rest.
+ *
+ * Nothing could have caught it: two constants in two functions two hundred lines
+ * apart, both plausible, neither wrong on its own terms. One function is the
+ * fix — a caller that changes the cap now changes what it reserves, necessarily.
+ *
+ * The caps differ by PROVIDER because the models do: a Gemini slide is one long
+ * document and rambles happily to 32k, while an uncapped Workers AI model
+ * stalls the request timeout long before that.
+ */
+export function outputCap(task: AiTask, provider: string, opt: GenerateRequest["options"]): number {
+  if (opt?.maxTokens) return opt.maxTokens;
+  const layout = task === "layout";
+  return provider === "google" ? (layout ? 8192 : 32768) : (layout ? 4096 : 8000);
+}
+
+/**
+ * Estimate the worst-case usage for the reserve, before we know real usage.
+ *
+ * ⚠️ **THE TOKEN LANES DELEGATE TO `@4dl/ai`, AND THE REASON IS MONEY.**
+ *
+ * `settle` caps the charge at the reserve, so every token the estimate fails to
+ * count is a token the PLATFORM pays for and the workspace does not. This
+ * function's own version under-counted in three compounding ways, all measured:
+ *
+ *   THE SYSTEM PROMPT WAS NOT COUNTED AT ALL. It padded a flat `+200` tokens
+ *   for text and `+1500` for layout. The real prompts are 3,207 chars
+ *   (`SLIDE_SYSTEM`) and 6,875 (`layoutSystem()`, which embeds 4,334 chars of
+ *   `describeWidgets(WIDGET_REGISTRY)`) — about 1,283 and 2,750 tokens. So every
+ *   slide generation under-reserved its system prompt by roughly 1,080 tokens,
+ *   on every call, forever.
+ *
+ *   FOUR CHARS PER TOKEN. That is the ENGLISH AVERAGE, and an average is the
+ *   wrong statistic for a bound. Arabic — which this product is sold into —
+ *   tokenizes at roughly 2 chars/token, so a wholly-Arabic prompt reserved about
+ *   half its real input. `@4dl/ai` uses 2.5, which covers Latin comfortably and
+ *   Arabic with room. Over-reserving costs nothing but a slightly larger
+ *   transient hold, released moments later.
+ *
+ *   NO THINKING BUDGET. Gemini 2.5+ thinks by default and bills
+ *   `thoughtsTokenCount` at the OUTPUT rate, on top of the answer, from a budget
+ *   the request does not cap. `maxTokens` bounds the answer and not the bill, so
+ *   reserving only the cap under-reserves every thinking model.
+ *
+ * The unit-metered lanes below (tts by character, image by tile, music by
+ * second) stay here: they are not token estimates at all, `@4dl/ai` has no
+ * equivalent, and the shapes do not correspond.
+ */
+export function estimateUsage(task: AiTask, system: string, prompt: string, opt: GenerateRequest["options"], provider: string, perSongMusic = false): Usage {
+  if (task === "text" || task === "layout") {
+    /*
+      The current canvas rides in the PROMPT for a layout run, so it is counted
+      by the shared estimator along with everything else rather than by a second
+      hand-rolled term.
+    */
+    const canvas = task === "layout" ? JSON.stringify(opt?.currentWidgets ?? []) : "";
+    return sharedEstimate({
+      system,
+      prompt: prompt + canvas,
+      maxOutputTokens: outputCap(task, provider, opt),
+      provider,
+    });
   }
   if (task === "tts") return { chars: Math.max(1, prompt.length) };
   // Lyria (Google) bills a flat price per song, so its reserve must cover a whole
@@ -249,8 +346,24 @@ export async function generate(env: Env, req: GenerateRequest): Promise<Generate
   // applies. The only difference is they run against Google, never the mock.
   const gemini = model.provider === "google";
 
+  /*
+    ⚠️ THE SYSTEM PROMPT IS BUILT **BEFORE** THE RESERVE, and the order is the
+    fix rather than a tidy-up.
+
+    It used to be built after — between the reserve and the run — so the
+    estimate could not see it and padded a flat constant instead. The prompts
+    are 3,207 chars for a slide and 6,875 for a layout; the pads were 200 and
+    1,500 tokens. `settle` caps the charge at the reserve, so the difference was
+    margin the platform ate on every single generation.
+
+    The brand brief is part of the system prompt and therefore part of the same
+    read, which is why `getBranding` moved up with it.
+  */
+  const brief = req.task === "text" || req.task === "layout" ? brandBrief(await getBranding(env.DB, tenantId)) : "";
+  const { system, usage: worstCase } = planRun(req, model.provider, brief, gemini);
+
   // Reserve a worst-case estimate so a concurrent burst can't overspend.
-  const estimate = creditsForNeurons(neuronsForUsage(estimateUsage(req.task, req.prompt, req.options, gemini), rate), markupOf(model));
+  const estimate = creditsForNeurons(neuronsForUsage(worstCase, rate), markupOf(model));
   const billing = env.BILLING.get(env.BILLING.idFromName(tenantId));
   await billing.bind(tenantId);
   const held = await billing.reserve(estimate);
@@ -266,8 +379,6 @@ export async function generate(env: Env, req: GenerateRequest): Promise<Generate
   // is true for them, so "auto" has nothing to fall back from.
   const external = gemini;
   const mock = await mayMock(env, external || Boolean(env.AI));
-  // Brand kit → an on-brand brief prepended to the slide/HTML/layout system prompt.
-  const brief = req.task === "text" || req.task === "layout" ? brandBrief(await getBranding(env.DB, tenantId)) : "";
   let out: RunResult;
   try {
     if (!external && mock) out = await runMock(env, req, model);
@@ -277,7 +388,7 @@ export async function generate(env: Env, req: GenerateRequest): Promise<Generate
         // stall) must fail cleanly with an error the client can show, not hang
         // until the connection drops (which the browser reports as "failed to
         // fetch"). Kept under the client's request timeout so we answer first.
-        const run = gemini ? runGemini(env, req, model, brief) : runReal(env, req, model, brief);
+        const run = gemini ? runGemini(env, req, model, system) : runReal(env, req, model, system, worstCase);
         out = await withTimeout(run, RUN_TIMEOUT_MS, `model ${model.id}`);
       } catch (err) {
         console.error(`ai.run failed (model=${model.id}): ${err instanceof Error ? err.message : String(err)}`);
@@ -330,7 +441,7 @@ export async function generate(env: Env, req: GenerateRequest): Promise<Generate
       `ok` is 1 because a failure returns before reaching here: the hold is
       released and no row is written at all.
     */
-    env.DB.prepare("INSERT INTO ai_generations (id, tenant_id, actor_user_id, subject_id, feature, model, neurons, credits, ok, error, at) VALUES (?, ?, NULL, NULL, ?, ?, ?, ?, 1, NULL, ?)").bind(`gen_${rndHex(10)}`, tenantId, req.task, model.id, neurons, credits, Date.now()),
+    env.DB.prepare("INSERT INTO ai_generations (id, tenant_id, actor_user_id, subject_id, feature, model, neurons, credits, ok, error, at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?, 1, NULL, ?)").bind(`gen_${rndHex(10)}`, tenantId, req.actorUserId ?? null, req.task, model.id, neurons, credits, Date.now()),
   ]);
 
   return finalize(env, req, model, out.output ?? "", out.assetHash ?? null, neurons, credits, false, out.mime, out.durationMs);
@@ -441,15 +552,14 @@ async function consumeAiStream(stream: ReadableStream): Promise<{ text: string; 
 /** Company-provided Google Gemini / Lyria. Runs on Scena's platform key and
  *  returns the real usage Google reports (tokens / images / chars / seconds) so
  *  billing meters it at Google's list price in neuron-equivalents, like any model. */
-async function runGemini(env: Env, req: GenerateRequest, model: ModelRow, brief = ""): Promise<RunResult> {
+async function runGemini(env: Env, req: GenerateRequest, model: ModelRow, system: string): Promise<RunResult> {
   const tenantId = req.tenantId ?? DEMO_TENANT;
   if (req.task === "text" || req.task === "layout") {
     const layout = req.task === "layout";
-    const sys = systemPrompt(req, brief);
-    const r = await geminiGenerateText(env, tenantId, model.id, sys, layout ? layoutUserPrompt(req) : req.prompt, {
+    const r = await geminiGenerateText(env, tenantId, model.id, system, layout ? layoutUserPrompt(req) : req.prompt, {
       // A full animated slide can be long; with thinking disabled the whole
       // budget goes to the HTML, so give it real room (was 8192 → truncation).
-      maxTokens: req.options?.maxTokens ?? (layout ? 8192 : 32768),
+      maxTokens: outputCap(req.task, model.provider, req.options),
       temperature: req.options?.temperature ?? (layout ? 0.6 : 0.8),
     });
     if (layout) {
@@ -486,24 +596,23 @@ async function runGemini(env: Env, req: GenerateRequest, model: ModelRow, brief 
   throw new Error(`gemini task not supported: ${req.task}`);
 }
 
-async function runReal(env: Env, req: GenerateRequest, model: ModelRow, brief = ""): Promise<RunResult> {
+async function runReal(env: Env, req: GenerateRequest, model: ModelRow, system: string, worstCase: Usage): Promise<RunResult> {
   const ai = env.AI! as unknown as LooseAi;
   if (req.task === "text" || req.task === "layout") {
     const layout = req.task === "layout";
-    const sys = systemPrompt(req, brief);
     const userContent = layout ? layoutUserPrompt(req) : req.prompt;
     // Gemma models on Workers AI don't accept a `system` role — fold it into the
     // user turn. Other models use a proper system message.
     const noSystemRole = /gemma/i.test(model.id);
     const messages = noSystemRole
-      ? [{ role: "user", content: `${sys}\n\n----\n\nRequest:\n${userContent}` }]
-      : [{ role: "system", content: sys }, { role: "user", content: userContent }];
+      ? [{ role: "user", content: `${system}\n\n----\n\nRequest:\n${userContent}` }]
+      : [{ role: "system", content: system }, { role: "user", content: userContent }];
     // A full animated slide is large — cap generously so the document isn't
     // truncated mid-markup. `max_tokens` is deprecated in Workers AI's
     // OpenAI-compatible schema in favour of `max_completion_tokens`; send both so
     // every model in the catalog actually honours the ceiling (an uncapped big
     // model rambles for minutes and trips the request timeout).
-    const budget = req.options?.maxTokens ?? (layout ? 4096 : 8000);
+    const budget = outputCap(req.task, model.provider, req.options);
     // Stream the response: Cloudflare recommends streaming for long generations —
     // it keeps the connection alive (tokens flow as SSE) instead of buffering a
     // large response, which is what stalled big models into a dropped request.
@@ -532,10 +641,25 @@ async function runReal(env: Env, req: GenerateRequest, model: ModelRow, brief = 
       reasoned = Boolean(res.choices?.[0]?.message?.reasoning);
       usage = res.usage;
     }
-    // Streaming responses don't always report usage — estimate from lengths so
-    // billing still meters (input ≈ prompt chars/4, output ≈ text chars/4).
+    /*
+      ⚠️ A MISSING USAGE REPORT FALLS BACK TO THE RESERVE, NOT TO A CHARACTER
+      COUNT — and the direction matters.
+
+      Streaming responses do not always report usage, and this used to guess
+      `chars / 4` in both directions. `settle` caps the charge at the reserve, so
+      a guess can only ever cost the platform: it cannot over-charge (the cap
+      catches it) and it under-charges systematically — badly on a reasoning
+      model, whose hidden thinking tokens have no relationship at all to the
+      visible answer's length, and on any non-Latin script, where 4 chars/token
+      is roughly double the real ratio.
+
+      The reserve is the worst case the workspace already had held, so charging
+      it can never exceed what they agreed to. Same estimator, same arguments,
+      same number — which is the property that makes this safe rather than
+      merely larger.
+    */
     if (!usage || (usage.prompt_tokens == null && usage.completion_tokens == null)) {
-      usage = { prompt_tokens: Math.ceil((sys.length + userContent.length) / 4), completion_tokens: Math.ceil(raw.length / 4) };
+      usage = { prompt_tokens: worstCase.inputTokens, completion_tokens: worstCase.outputTokens };
     }
 
     if (layout) {

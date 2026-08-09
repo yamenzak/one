@@ -42,20 +42,23 @@
 import { useCallback } from "react";
 import {
   AdminConsole,
+  PlatformAiSection,
   PlatformDomainsSection,
   PlatformEmailSection,
   PlatformMaintenanceSection,
   PlatformRailSection,
+  PlatformPlansSection,
   PlatformSharedConfigSection,
+  PlatformStripeSection,
   PlatformTurnstileSection,
   useConsoleSection,
   type AdminApi,
   type ConsoleSection,
 } from "@4dl/admin";
 import { Button, Card } from "@4dl/ui";
-import { AlertTriangle, CreditCard, Globe, Mail, Music, Package, ShieldCheck, Sparkles, Tag, Users, Wallet, Wrench } from "lucide-react";
+import { AlertTriangle, CreditCard, Globe, Mail, Music, Package, ShieldCheck, SlidersHorizontal, Sparkles, Tag, Users, Wallet, Wrench } from "lucide-react";
 import { API_BASE, apiError, apiFetch } from "../api.js";
-import { DangerTab, LibraryTab, ModelsTab, PlansTab, PromosTab, StripeTab, TenantsTab } from "./Admin.js";
+import { DangerTab, LibraryTab, PromosTab, ScenaSettingsTab, TenantsTab } from "./Admin.js";
 
 /**
  * The three verbs `@4dl/admin`'s panels need, over Scena's fetch conventions.
@@ -99,26 +102,68 @@ const deps = { api, errorText };
 function sections(): ConsoleSection[] {
   return [
     {
+      /*
+        `@4dl/admin`'s panel. The one it replaces was three panels wearing one
+        coat: Stripe credentials, an EMAIL form duplicating the "Email delivery"
+        section three rows below it, and the Gemini key. The shared one is two
+        LANES (test/live) with the mismatch alarm and the catalog-id stash,
+        where Scena's had one flat set of keys and no way to tell an operator
+        the stored catalog belonged to the other lane.
+      */
       key: "stripe",
-      label: "Stripe & config",
-      blurb: "The payment lane, provider keys, and this app’s own settings",
+      label: "Stripe",
+      blurb: "Keys, webhooks, and what is synced",
       icon: CreditCard,
       tone: "primary",
-      render: () => <StripeTab />,
+      render: () => <PlatformStripeSection {...deps} platformName="Scena" />,
     },
     {
+      /*
+        `@4dl/admin`'s panel now, not Scena's.
+
+        The one it replaces edited two numbers inline and opened a modal for the
+        rest, and it had no GRANDFATHERING: tightening a tier took the capability
+        away from every workspace already on it, immediately, and the help text
+        said so as though it were the design. It also could not edit the free
+        TRIAL, which is what actually replaced the free tier here.
+      */
       key: "plans",
       label: "Plans",
-      blurb: "The four tiers, their quotas, features and monthly credit grant",
+      blurb: "The four tiers — price, quotas, features, the credit grant and the trial",
       icon: Package,
-      render: () => <PlansTab />,
+      render: () => <PlatformPlansSection {...deps} tenantNoun="workspace" />,
     },
     {
+      /*
+        `@4dl/admin`'s panel, over `@4dl/ai`'s `aiCatalogAdminRoutes`.
+        `ai_models` has been the package's store since `AI_SCHEMA` became entry
+        seven of `SCHEMA_MODULES`; this is the surface catching up with it, and
+        it is what puts Scena on the "apply to every 4DL app" broadcast — the
+        entire reason the shared selection exists, and which it could neither
+        send nor receive while it had its own screen.
+
+        ⚠️ FOUR lanes, matching `configureAiLanes` in `billing-seed.ts` — no
+        `vision` and no `text-small`, because Scena's floor has no row in
+        either and a lane with nothing pickable is a picker that reads as
+        broken. `tts` covers Gemini's `speech` models too: `lanesFor` unifies
+        the two names server-side, which is the one thing a catalog carrying
+        both providers gets wrong on its own.
+      */
       key: "models",
       label: "AI models",
       blurb: "The catalog Scena meters against — rates, markup, and what is switched on",
       icon: Sparkles,
-      render: () => <ModelsTab />,
+      render: () => (
+        <PlatformAiSection
+          {...deps}
+          lanes={[
+            { task: "text", label: "Text", desc: "Slide copy, and the widget layouts the builder generates." },
+            { task: "image", label: "Image", desc: "Generated slide backgrounds, ad creative and track art." },
+            { task: "tts", label: "Speech", desc: "Voice-over clips for a slide or an announcement." },
+            { task: "music", label: "Music", desc: "Generated background beds for a playlist." },
+          ]}
+        />
+      ),
     },
     {
       key: "library",
@@ -177,6 +222,19 @@ function sections(): ConsoleSection[] {
       icon: Wallet,
       tone: "warning",
       render: () => <PlatformRailSection {...deps} />,
+    },
+    {
+      /*
+        What is left of the old "Stripe & config" form once the three shared
+        panels took their halves: Scena's own two-rung dunning windows (it does
+        not run `@4dl/billing`'s four-rung ladder — see the audit's step 5) and
+        the platform OpenWeather key, which no other product has.
+      */
+      key: "scena",
+      label: "Scena settings",
+      blurb: "Dunning windows and the platform weather key",
+      icon: SlidersHorizontal,
+      render: () => <ScenaSettingsTab />,
     },
     {
       key: "maintenance",

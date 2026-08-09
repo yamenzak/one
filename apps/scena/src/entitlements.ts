@@ -50,6 +50,7 @@
  */
 
 import { bindEntitlements, type EntitlementShape } from "@4dl/billing";
+import { FEATURE_CATALOG, QUOTA_CATALOG } from "@scena/manifest";
 
 export interface Quotas {
   pairedDevices: number;
@@ -223,6 +224,16 @@ export const FREE_ENTITLEMENTS: Entitlements = {
 
 const engine = bindEntitlements<Entitlements>(FREE_ENTITLEMENTS);
 
+/**
+ * The bound engine itself, for `bindBillingStore`.
+ *
+ * Every named helper below is one of its methods; the store wants the whole
+ * object rather than eight of them threaded through a config, and handing over
+ * the same instance is what keeps the store's resolution and every direct caller
+ * here reading one registry.
+ */
+export const entitlementEngine = engine;
+
 /** Merge a plan's stored blob onto the free baseline, coercing by type. */
 export const resolveEntitlements = (json: string | null | undefined): Entitlements => engine.resolve(json);
 
@@ -240,6 +251,26 @@ export const clampForStatus = engine.clamp;
 
 /** The whole resolution with its working shown, for the operator console. */
 export const explainEntitlements = engine.explain;
+
+/**
+ * GRANDFATHERING — what a plan edit owes the workspaces already on it.
+ *
+ * `snapshotDowngrade` diffs the old plan against the new and returns what each
+ * existing tenant had; `raiseOverride` writes that into their grant-only
+ * override, which can only ratchet UP. Neither was exposed, and the plan editor
+ * therefore did not call them: tightening a tier stripped the capability from
+ * every live workspace on it, immediately and silently. The editor's own help
+ * text described this as intended — "changes apply to every current and future
+ * tenant" — which is what it did, and not what a paying customer is owed.
+ *
+ * Raising a limit needs no write at all: it applies to everybody at read time.
+ */
+export const snapshotDowngrade = engine.snapshotDowngrade;
+export const raiseOverride = engine.raiseOverride;
+
+/** The key registries the operator console renders the plan editor from. */
+export const QUOTA_KEYS = engine.quotaKeys;
+export const FEATURE_KEYS = engine.featureKeys;
 
 /** A tenant's current resource usage, gathered for a downgrade check. */
 export interface Usage {
@@ -301,3 +332,23 @@ export function checkDowngrade(usage: Usage, target: Entitlements): DowngradeRes
 
   return { eligible: v.length === 0, violations: v };
 }
+
+/**
+ * THE KEY LABELS the operator console renders the plan editor from.
+ *
+ * Derived from `@scena/manifest`'s catalogs rather than restated, because
+ * `entitlements-catalog.test.ts` already pins those against the entitlement
+ * shape in both directions — a key added to one and not the other is a test
+ * failure. Restating the copy here would open a third place for them to drift.
+ *
+ * `group` carries the catalog's category through to the panel, which files keys
+ * under it. Quotas have no category in the catalog and want none: there are ten
+ * of them and they read as one list.
+ */
+export const PLAN_FEATURE_META: Record<string, { label: string; hint: string; group?: string }> = Object.fromEntries(
+  FEATURE_CATALOG.map((f) => [f.key, { label: f.label, hint: f.description, group: f.category }]),
+);
+
+export const PLAN_QUOTA_META: Record<string, { label: string; hint: string }> = Object.fromEntries(
+  QUOTA_CATALOG.map((q) => [q.key, { label: q.label, hint: q.description }]),
+);

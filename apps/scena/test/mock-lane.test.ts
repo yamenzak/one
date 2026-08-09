@@ -65,7 +65,42 @@ describe("the config write path", () => {
     for (const mode of ["auto", "off"]) {
       expect(configWriteRefusal({ "ai.mock": mode }, false), `ai.mock=${mode}`).toBeNull();
     }
-    expect(configWriteRefusal({ "ai.markup": "3", "stripe.secret_key": "sk_test_x" }, false)).toBeNull();
+    expect(configWriteRefusal({ "ai.markup": "3", "weather.credits_per_call": "3" }, false)).toBeNull();
     expect(configWriteRefusal({}, false)).toBeNull();
+  });
+
+  /**
+   * ⚠️ THIS ASSERTION USED TO SAY THE OPPOSITE, and it was right at the time.
+   *
+   * `{ "stripe.secret_key": "sk_test_x" }` was pinned as ALLOWED, because the
+   * generic config form was the only way to configure Stripe here. It stores
+   * whatever string it is handed — so a live secret key under a `test` mode, a
+   * publishable key in the secret slot and a signing secret in either were all
+   * saved without a word, and each is a payment path that is dead or dangerous
+   * with nothing on screen saying so.
+   *
+   * `@4dl/billing`'s `stripeAdminRoutes` is the door now: both lanes kept at
+   * once, every prefix checked against its slot AND its lane, and a mode whose
+   * resulting active keys belong to the other lane refused outright. Two ways in
+   * where one has no checks is not a fallback.
+   */
+  it("refuses a Stripe credential, which has a validated door of its own", () => {
+    for (const key of ["stripe.secret_key", "stripe.publishable_key", "stripe.webhook_secret"]) {
+      expect(configWriteRefusal({ [key]: "sk_test_x" }, false), key).toMatch(/Stripe panel/);
+      // Development is not an exemption: the keys are as real there.
+      expect(configWriteRefusal({ [key]: "sk_test_x" }, true), `${key} (dev)`).toMatch(/Stripe panel/);
+    }
+  });
+
+  it("refuses the MODE too, which is the sharpest of the four", () => {
+    // Flipping `stripe.mode` here skips the per-lane catalog swap, leaving every
+    // plan pointing at the outgoing lane's price id — so every checkout fails
+    // with "No such price", produced by a field that looks inert.
+    expect(configWriteRefusal({ "stripe.mode": "live" }, false)).toMatch(/Stripe panel/);
+  });
+
+  it("names the key it refused, so an operator knows which field to move", () => {
+    // A refusal that just says "invalid" sends somebody to bisect a form.
+    expect(configWriteRefusal({ "billing.grace_days": "7", "stripe.webhook_secret": "whsec_x" }, false)).toContain("stripe.webhook_secret");
   });
 });

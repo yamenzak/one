@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { appStorage, readBootBrand, writeBootBrand, type HostRole } from "@4dl/app-kit";
+import { appStorage, readBootBrand, writeBootBrand, type HostInfo as KitHostInfo, type HostRole } from "@4dl/app-kit";
 import { API_BASE } from "./api.js";
 import { applyBrandTheme, type WorkspaceBrand } from "./brand-theme.js";
 
@@ -30,12 +30,30 @@ import { applyBrandTheme, type WorkspaceBrand } from "./brand-theme.js";
  */
 export type { HostRole as DoorRole };
 
-export interface HostInfo {
-  role: HostRole;
-  rootDomain: string;
-  setupUrl: string;
-  tenant: { tenantId: string; name: string; slug: string; branding?: WorkspaceBrand | null } | null;
-}
+/**
+ * ⚠️ THE KIT'S SHAPE, NOT A LOOKALIKE — and the difference was three missing
+ * fields, all of them load-bearing.
+ *
+ * This was declared locally as `{ role, rootDomain, setupUrl, tenant }`, which
+ * is the same mistake `@4dl/tenancy`'s `/host` route warns about in its own
+ * comment, made on the receiving side of the wire. The server has always spread
+ * the WHOLE gate and sent `maintenance` and `turnstile` beside it; the client
+ * declared four fields and silently discarded the rest. The consequences were
+ * not type errors, they were absences:
+ *
+ *   `gate`         a workspace on the read-only rung, one blocked for
+ *                  non-payment, and one its owner scheduled for closure all
+ *                  looked identical — every write just failed into a toast.
+ *   `maintenance`  an operator closing the deployment got the same silence.
+ *   `turnstile`    the bot check could be switched on from any console (the keys
+ *                  are SHARED across every 4DL app) and this screen never
+ *                  rendered a widget, so no token existed and the control did
+ *                  nothing while reading as ON.
+ *
+ * Naming the package's type is what makes those impossible to drop again: a
+ * field added to `/api/host` arrives here without an edit.
+ */
+export type HostInfo = KitHostInfo<WorkspaceBrand>;
 
 /*
   THE BRAND ARRIVES WITH THE DOOR, AND IS REMEMBERED FOR THE NEXT BOOT.

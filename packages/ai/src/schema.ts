@@ -18,7 +18,11 @@ import type { SchemaModule } from "@4dl/core";
 export const AI_SCHEMA: SchemaModule = {
   id: "ai",
   /**
-   * ⚠️ 3 → 4 IS NOT A DDL CHANGE. Nothing below moved; this bump exists so this
+   * ⚠️ 4 → 5 IS a DDL change: `tenant_settings.ai_config_json` — see its note in
+   * `alters`. It is the column `generate()` reads first and no shared module
+   * declared, so two of three apps had an AI suite that threw on every call.
+   *
+   * ⚠️ 3 → 4 IS NOT A DDL CHANGE. Nothing below moved; that bump exists so this
    * module RE-RUNS after a host app has dropped an incompatible legacy table
    * ahead of it.
    *
@@ -36,7 +40,7 @@ export const AI_SCHEMA: SchemaModule = {
    * `IF NOT EXISTS` or a tolerated `ADD COLUMN`, so Kova and Tessa re-apply a
    * set that changes nothing.
    */
-  version: "4",
+  version: "5",
   ddl: [
     "CREATE TABLE IF NOT EXISTS ai_models (id TEXT PRIMARY KEY, task TEXT, label TEXT, provider TEXT, input_rate REAL, output_rate REAL, unit_rate REAL, unit_kind TEXT, markup REAL, enabled INTEGER DEFAULT 1, is_default INTEGER DEFAULT 0);",
     "CREATE TABLE IF NOT EXISTS ai_generations (id TEXT PRIMARY KEY, tenant_id TEXT, actor_user_id TEXT, subject_id TEXT, feature TEXT, model TEXT, neurons REAL, credits INTEGER, ok INTEGER, error TEXT, at INTEGER);",
@@ -85,6 +89,26 @@ export const AI_SCHEMA: SchemaModule = {
      */
     "ALTER TABLE ai_cache ADD COLUMN asset_hash TEXT;",
     "ALTER TABLE ai_cache ADD COLUMN neurons REAL;",
+    /**
+     * ⚠️ THE COLUMN THIS PACKAGE READS ON THE FIRST LINE OF `generate()`, AND
+     * DID NOT DECLARE.
+     *
+     * `loadTenantAi` selects `ai_config_json, ai_toggles_json` from
+     * `tenant_settings` before anything else happens, unguarded — it is the
+     * per-feature enable/model/prompt/tone config, and `perActorDailyCreditCap`
+     * reads the same blob. Only ONE app declared it, in its own schema module,
+     * and every other app therefore had an AI suite whose every call threw
+     * `no such column: ai_config_json`. The paid entitlement was simply dead,
+     * and nothing said so: the package's tests pass (they run against a database
+     * the package's own module built plus the app's), the app's tests pass (they
+     * never called a generation), and a 500 on a feature nobody has tried yet
+     * looks like a feature nobody has tried yet.
+     *
+     * A package that READS a column has to SHIP it. `ai_toggles_json` lives on
+     * `tenant_settings`' own CREATE, which is why the pair behaved differently
+     * and why only half of this was visible.
+     */
+    "ALTER TABLE tenant_settings ADD COLUMN ai_config_json TEXT;",
   ],
   backfills: [
     /**

@@ -48,8 +48,15 @@ apps/
   app/   # ONE role-adaptive PWA (client / trainer / owner / platform admin)
   www/   # marketing site (dependency-free static generator)
   e2e/   # Playwright — the golden paths, in a browser against the real worker
-  _template/ # a NEW 4DL app: every shared package wired, no product vocabulary.
-             # Typechecks + tests in this workspace so it cannot rot. Copy it.
+  _template/ # a NEW 4DL app, WORKER half: every shared package wired AND
+             # MOUNTED, no product vocabulary. Typechecks + tests in this
+             # workspace so it cannot rot.
+  _template-app/ # ...and its BROWSER half. Copy BOTH. The doors, the session,
+             # the theme, `pickScreen`, the Shell, the console binding, the
+             # accent registry and five conformance tests — every file carrying
+             # the bug it exists to prevent. This directory is why a fifth app
+             # does not re-derive the UI: every divergence in this repo happened
+             # while it did not exist.
 packages/
   core/      # @4dl/core — the floor every 4DL package stands on: ids, defensive
              # JSON columns, the STRUCTURAL BINDINGS CONTRACT (HasDb/HasMedia/…),
@@ -75,7 +82,13 @@ packages/
              # reads, subscription resolution, the two ceilings — the catalog's
              # CONTENTS are the app's), credit metering, the per-tenant credit
              # Durable Object (CreditLedgerDO — the class NAME is load-bearing),
-             # the Stripe client, and the dunning ladder. See its README.
+             # the Stripe client, the dunning ladder, BOTH OPERATOR route trees
+             # (the plan catalog, and the Stripe lane — status/credentials/sync,
+             # two lanes, the mode-flip catalog swap and the price rebuild; the
+             # catalog TABLES stay the app's, so `syncCatalog` is injected), and
+             # the refund/dispute CREDIT REVERSAL (proportional, clamped, and
+             # incremental against Stripe's cumulative `amount_refunded`).
+             # See its README.
   storage/   # @4dl/storage — R2 + the media ledger + the quota gate (resolver
              # injected, so it does not depend on billing), plus the three media
              # ROUTES: upload, the storage meter, the authed read. The closed
@@ -116,8 +129,10 @@ packages/
              # with an extra table. See its README.
   admin/     # @4dl/admin — the OPERATOR CONSOLE on every app's `admin.` door:
              # the router-free section-registry shell, plus panels for config a
-             # shared package owns (email delivery, maintenance). The SECTIONS
-             # are the app's.
+             # shared package owns (email delivery, maintenance, Stripe, domains,
+             # Turnstile, AI, shared config, the rail's dead letter, and the PLAN
+             # CATALOG — price, limits, features, grant and the free TRIAL, which
+             # no app could edit before it moved). The SECTIONS are the app's.
              # See its README.
   app-kit/   # @4dl/app-kit — the BROWSER runtime: the typed fetch layer and its
              # three-way offline outcome (queued | offline | HTTP error), host
@@ -238,6 +253,28 @@ that would not parse —
 a broken workflow does not *fail*, it does not *run*, and GitHub lists it by
 filename with nothing saying why. Both guard failures that are silent rather than
 loud, which is the only kind this repo has actually had.
+
+**And every OTHER `pnpm gate` guard derives its app list from the registry too,
+as of 2026-08-08.** Four of them did not, and each was hiding something:
+`entitlement-enforcement` and `flag-enforcement` checked `apps/api` only — so
+Tessa and Scena sold entitlements with nothing asserting a route enforced them,
+and running the widened guard found six such keys (the sharpest being Scena's
+`resyncIntervalSec`, where the number a paid tier buys never reaches the
+player's fetch loop). `storage-chokepoint` named two apps by hand, so **Tessa's
+R2 bucket and its `ai.ts` were unchecked**. `scena-fetch-chokepoint` is
+`api-door.test.mjs` now and covers every registered SPA, with `@scena/player`
+exempt in writing — a paired device has no session, so it has no 401 for a hook
+to catch.
+
+Two things that came out of widening them are worth knowing before writing the
+next guard. **The narrow check is the one that gets waived:** matching Kova's
+five gate shapes reported eight of Scena's entitlements as ungated and every one
+of them was gated, because a destructured `Features` object and a dynamic
+`features[needed]` lookup are invisible to call-shape matching. And **a widened
+guard finds bugs in itself first** — two of the first failures were the parser's,
+not the apps'. The unenforced keys are carried in `KNOWN_UNENFORCED` with a
+reason each, and that list can only SHRINK: an entry that becomes enforced fails
+the guard until it is deleted, so it cannot rot into a permanent exemption.
 
 ## Commands
 
@@ -403,6 +440,37 @@ remote bindings without editing the config (this is what the E2E suite does).
   `claims` is `tenantByCustomer`, which is load-bearing: `invoice.paid` often
   carries no Kova metadata at all. Credits stay in `TenantBillingDO` per app —
   routing crosses workers, a metered reserve→settle must not.
+- **The Stripe CONSOLE routes are the platform's, and the two lanes are the
+  reason.** `@4dl/billing`'s `stripeAdminRoutes` answers `/admin/stripe/status`,
+  `/admin/stripe/config` and `/admin/stripe/sync` in all three apps — the surface
+  above them (`@4dl/admin`'s `PlatformStripeSection`) had already moved, and
+  leaving the handlers behind produced three copies that drifted. Test and live
+  keys are stored SEPARATELY and both at once, so going live is a mode change
+  rather than a re-paste; a key whose prefix contradicts its lane is refused at
+  the door; and **the mode flip SWAPS the catalog's per-lane Stripe ids**, which
+  Tessa's copy did not do — pressing its own console's live switch left every
+  plan pointing at the test lane's price and every checkout failed with "No such
+  price". A mismatch is REPORTED, never corrected: relabelling what an operator
+  typed is how a live key ends up active by accident. `syncCatalog` / `seed` /
+  `clearCatalogIds` stay injected, because the catalog TABLE is still the app's
+  (Scena's `price_cents` against the shared store's `price_usd_month`).
+- **A RESERVE IS A CEILING ON REVENUE, not an estimate.** `settle` caps the
+  charge at what was held (`Math.min(held.credits, actual)`), so every token an
+  estimate fails to count is a token the platform pays for and the tenant does
+  not — silently, on every call. Scena's own copy under-counted four ways at
+  once, all measured: the run asked Gemini for **32,768** output tokens on a
+  slide while the reserve budgeted **8,000**; the system prompt was a flat
+  `+200` pad against 3,207 chars (`SLIDE_SYSTEM`) and 6,875
+  (`layoutSystem()`); the char→token ratio was 4 (the English average — Arabic
+  runs nearer 2); and nothing widened for a thinking model. `@4dl/ai`'s
+  `estimateUsage` is all four fixes and the token lanes delegate to it. **A
+  missing usage report falls back to the RESERVE, never to a character count** —
+  a guess can only ever under-charge, because the cap catches the other
+  direction.
+  - ⚠️ **The fix is a SHAPE, not a test.** `planRun` returns the system prompt
+    AND the reserve it implies from one call, so a caller cannot hand a different
+    text to each. Unit tests on the two halves separately passed a mutation that
+    restored the original defect — which is what the defect WAS.
 - **Credits**: `TenantBillingDO` (`billing-do.ts`) is the authoritative balance;
   AI goes through `@4dl/ai` `generate()` = reserve → run (Workers AI | Gemini |
   the dev-only mock) → settle; `apps/api/src/ai.ts` binds Kova's feature registry
@@ -491,7 +559,12 @@ remote bindings without editing the config (this is what the E2E suite does).
     tenant sells a client, `scripts/entitlement-enforcement.test.mjs` for what
     Kova sells a tenant — every live entitlement named by a gate, every quota
     counted against, and the reserved list pinned so it cannot grow to cover an
-    oversight.
+    oversight. **Both read `apps.json` now**, so the same question is asked of
+    every product: the entitlement guard finds each app's registry by the one
+    call all of them make (`bindEntitlements<T>(BASELINE)`), and the flag guard
+    DETECTS whether an app has a customer rail at all rather than assuming one —
+    Tessa and Scena have none, and it re-derives that on every run instead of
+    inheriting it as a silence.
   - **A capability a package SELLS must be checked by a route, and hiding a tab
     is not checking it.** The package builder auto-renders a toggle for every
     entry in `SELLABLE_CLIENT_FLAG_KEYS`, so adding a flag is one line and
@@ -750,6 +823,36 @@ new app. The staged extraction plan, the three pre-release audits and the
 billing/notifications/registry design plans are finished work and live in git
 history.
 
+**[docs/PLATFORM-AUDIT.md](docs/PLATFORM-AUDIT.md) is the THREE-APP assessment,
+and it is open work.** `docs/PLATFORM-GAPS.md` was the two-app one and every
+item on it is closed; this is the sequel, and the question changed. That audit
+found *a mechanism with no surface*. This one finds the surface shipped, shared
+and good — and **an app that does not mount it**, which fails nothing anywhere.
+Eight instances, the sharpest being that `otpSendGuard` — the one gate in front of
+the emailed sign-in code, carrying the bot check, the per-IP ceiling and the
+deliverability pre-flight — was mounted by Kova and by neither other app. Read it
+before assuming a shared capability reaches every product, and before adding an
+app.
+
+**[docs/ONE-PLATFORM.md](docs/ONE-PLATFORM.md) is the PLAN for what replaces all
+of this, and nothing in it is built.** A new framework directory that owns the
+runtime, the data model, the surface (HTTP + AI tools + webhooks) and the chrome,
+driven by a typed manifest per app, with the apps living inside it. Four
+decisions are settled there — a declarative shell with code screens, absorbing
+`@4dl/*` rather than wrapping it, Kova migrating first, and one 4DL identity with
+SSO — and each carries consequences that are cheap now and expensive later. Read
+it before starting anything structural, and read §7 before touching Kova's data:
+the migration pattern it prescribes is the one audit step 5.2 proved on Scena's
+billing tables, and it exists because the naive version is a total outage rather
+than a degraded feature.
+
+**That whole class is a guard now.** `scripts/capability-reachable.test.mjs` (in
+`pnpm gate`) fails on any app — the template included — that applies a package's
+`SchemaModule` and never mounts its route tree. The shape it catches is the one
+this document is a catalogue of: tables applied, a Durable Object bound, dispatch
+sites writing rows, and no route to reach any of it, with every suite green. It
+reads `apps.json`, so app #5 is asked the same question the day it is registered.
+
 Three things are still Kova's on purpose, and each README says why: `Shell.tsx`
 (role-adaptive nav is a product decision, extraction plan §3.2), the presentation
 halves of `StudioPausedBanner`/`NotificationBell`/`StudioSwitcher`/`FeatureLock`
@@ -758,22 +861,56 @@ registry leaves a `Card` with a parameter), and the Stripe **route trees**, whos
 handlers are woven through Kova's notification registry, entitlement gates and
 `requireClientAccess`. Only the reconciliation logic moved.
 
+⚠️ **The MAINTENANCE screen was on that list and should not have been.** It is
+`@4dl/app-kit`'s `MaintenanceScreen` as of 2026-08-08. Its own header comment is
+the argument — *"This is about US. Nobody reading it did anything, nobody can pay
+to end it"* — so the only variable is the name over the door, and it sat in one
+app while `platform.maintenance` closed all of them. The line above still holds
+for the standing banners, which name a product's own arrears and say different
+things per app; it did not hold for this one, and "presentation stays in the app"
+is a rule that has to be re-argued per case rather than applied.
+
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. **Measured 2026-08-08** from one `pnpm test`, per package:
-**632 kova/api (+31 skipped) + 237 kova/domain + 234 scena/api + 152 tessa/api +
-145 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 80 ai + 63 commerce +
-61 scena/widgets + 45 billing + 45 billing-rail + 44 core + 40 scena/timeline +
-35 auth + 30 scena/app + 24 notify + 23 scena/manifest + 18 scena/protocol +
-18 storage + 18 app-kit + 17 kova/protocol + 17 template + 14 tessa/app +
-14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,331 passing,
-31 skipped**, 58 turbo tasks, all green.
+moves. **Measured 2026-08-09** from one `pnpm turbo run test --concurrency=1`,
+per package:
+**632 kova/api (+31 skipped) + 282 scena/api + 237 kova/domain + 163 tessa/api +
+145 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 87 billing + 80 ai +
+63 commerce + 61 scena/widgets + 45 billing-rail + 44 core + 40 scena/timeline +
+35 auth + 35 scena/app + 24 notify + 23 scena/manifest + 23 tessa/app +
+20 template + 19 template/app + 18 scena/protocol + 18 storage + 18 app-kit +
+17 kova/protocol +
+14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,468 passing,
+31 skipped**, 60 turbo tasks, all green.
+
+⚠️ **`--concurrency=1`, and the reason is worth knowing before reading a red
+run.** A parallel root `pnpm test` still loses one Workers-pool suite to
+Miniflare storage contention now and then — `Isolated storage failed`, or
+`Network connection lost` out of an after-hook, never an assertion. `retry: 1`
+absorbs most of it; a serial run absorbs the rest. Re-run the failing suite on
+its own filter before believing a failure that has no assertion in it.
+
+The +81 since the earlier figure on the same day is all new coverage over
+behaviour that was previously in one app or in none: `@4dl/billing` 45 → 87 (the
+refund/dispute reversal, the plan-catalog routes and the Stripe console routes,
+all three moved out of an app), `@4dl/scena` 234 → 261 (the webhook guards, the
+OTP gate, the per-actor budget and the config-write refusal) and `@4dl/tessa`
+152 → 163 (the OTP gate and the AI-column regression). A split moves tests; it
+does not add any — so where a count went up, something is being checked that
+was not.
 
 Scena's 449 (234 api + 30 app + 185 across its five pure packages) were never in
 the older figure at all; nor were Tessa's. `@scena/timeline`'s 40 are the ones
 that matter most per line — they prove
 `position(t) = (t − T0) mod cycleLength`, which is the whole product.
-The template's 17 are 11 conformance (plain Node, no fixtures) + 6 integration
-(the real worker through Miniflare, on the real `*.localhost` host topology).
+The template's 20 are 11 conformance (declarations only — no database, no
+fixtures) + 9 integration (the real worker through Miniflare, on the real
+`*.localhost` host topology). Three of the nine are the ones to copy into a new
+app: they probe every shared surface for a 404, and assert the OTP guard is
+registered BEFORE Better Auth's catch-all — mounting it after is a bypass that
+typechecks, passes every other test, and looks identical in a route list.
+`@4dl/template-app`'s 19 are the SPA half: the UI-language lints, Tailwind's
+`@source` list, the shared admin panels, the accent tokens, and `pickScreen`'s
+door/gate decision — which is a pure function precisely so it can be one.
 Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
 `@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
 The pricing and normalizer suites live
@@ -992,9 +1129,10 @@ its own — the owner's decision, cancellable for seven days, reversed by
 cancelling rather than by paying — and it shares the sweep's erasure branch with
 `suspended` so the two purge paths cannot drift.
 `SCHEMA_MODULES` in
-`apps/scena/src/db.ts` is the migration's progress bar — eight entries now
-(`AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_RAIL_SCHEMA`, `STORAGE_SCHEMA`,
-`NOTIFY_SCHEMA`, `AI_LEGACY_RESET`, `AI_SCHEMA`, `SCENA_SCHEMA`), and the diff
+`apps/scena/src/db.ts` is the migration's progress bar — nine entries now
+(`AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_SCHEMA`, `BILLING_RAIL_SCHEMA`,
+`STORAGE_SCHEMA`, `NOTIFY_SCHEMA`, `AI_LEGACY_RESET`, `AI_SCHEMA`,
+`SCENA_SCHEMA`), and the diff
 that removes a table from Scena's module is the same diff that adds its package
 there. **Order in that
 list IS dependency order**: `NOTIFY_SCHEMA` ALTERs `tenant_settings`, which
@@ -1082,31 +1220,69 @@ was removed. `apps/scena-app/src/pages/AdminDoor.tsx` is the door;
 `pages/Admin.tsx` is now panels only. The sidebar's Admin item is a full page
 load to the other origin, because that is the console's only address.
 
-⚠️ **The inbox has a server but STILL no BELL — and this is now the oldest
-open gap in Scena, not a scheduled one.** `@4dl/notify` is wired end-to-end:
-schema, `InboxDO` (migration `v5`, class name permanent), the four routes, the
-registry in `notifications.ts`, dispatch from screen alerts, the dunning ladder
-and the emergency takeover. What is missing is the SURFACE — `NotificationBell`
-and `InboxScreen` are `@4dl/app-kit`'s and are mounted in Kova and Tessa but not
-here, so a Scena notification is reachable only at `GET /api/notifications` and
-nobody sees one.
+**The inbox is COMPLETE now, bell included** (2026-08-08). `@4dl/notify` was
+wired end-to-end for three stages — schema, `InboxDO` (migration `v5`, class
+name permanent), the four routes, the registry in `notifications.ts`, and
+sixteen dispatch sites — with no SURFACE, so a Scena notification was reachable
+at `GET /api/notifications` and nowhere a person would look. This note used to
+say the bell "lands with the Stage 7 UI rewrite"; Stage 7 shipped and it did
+not, and the sentence then became a reason not to look.
 
-This note used to say the bell "lands with the Stage 7 UI rewrite". Stage 7
-shipped and it did not, so the sentence became a reason not to look. It is a
-mount plus an `onOpen` handler (the kit is router-free on purpose and hands the
-notification back), and it is the whole job.
+`apps/scena-app/src/Notifications.tsx` is the binding (bell + `/inbox`), and
+mounting it found **five dead links**: four types pointed at `/screens`, which
+is not a route (the fleet list is `/`), and one at `/sources`, whose route is
+`/feeds`. An integration test was asserting `/screens` — it was pinning the bug,
+and it passed for as long as nothing rendered a notification.
 
-**ONE thing is still Scena's, and the plan names it so nobody "fixes" it
-casually: the billing STORE (`BILLING_SCHEMA`).** Its `plans`, `subscriptions`,
-`credit_packs` and `credit_ledger` share a NAME with Scena's and differ in
-COLUMNS — `price_cents` + `currency` + `interval` against `price_usd_month`, `at`
-against `created_at`, TEXT timestamps against INTEGER. A `CREATE TABLE IF NOT
-EXISTS` is won by whichever module runs first and the loser's columns silently
-never exist, which is exactly how a fresh Stage 1 deployment ended up unable to
-save any setting (`app_config.updated_at`). Adopting it means reconciling the
-shapes first — a data change, not a wiring one.
+⚠️ `notifications.conformance.test.ts` in the dashboard is what stops all of
+that recurring, and it checks three things a runtime never will: every
+dispatched type has an icon and tone (a missing one renders as an anonymous
+bell), no coding survives a renamed type, and **every `link` in the registry
+matches a real route**. All three are mutation-tested. It reads the worker's
+registry as SOURCE rather than importing it — `apps/scena/src` is outside the
+SPA's `rootDir`.
 
-**The `ai_models` CATALOG is `@4dl/ai`'s now** (`AI_SCHEMA` is entry seven of eight
+**The billing STORE is `@4dl/billing`'s now, and the column reconciliation it
+was waiting for is `apps/scena/src/billing-reconcile.ts`.** This paragraph used
+to say `BILLING_SCHEMA` was deliberately absent: its `plans`, `subscriptions`,
+`credit_packs` and `credit_ledger` shared a NAME with Scena's and differed in
+COLUMNS — `price_cents` + `currency` + `interval` against `price_usd_month`,
+`sort` against `ord`, `created_at` against `at`, epoch milliseconds against ISO
+text — and a `CREATE TABLE IF NOT EXISTS` is won by whichever module runs first
+while the loser's columns silently never exist.
+
+- ⚠️ **THE RECONCILER RUNS BEFORE `applySchema`, NOT AS A MODULE INSIDE IT.**
+  `BILLING_SCHEMA` indexes `credit_ledger(tenant_id, at)`, and on a
+  pre-migration database that column is `created_at` — so the index throws, the
+  DDL batch throws, `applySchema` throws, and every route that touches D1
+  answers 500. That is `AI_LEGACY_RESET`'s outage one table over.
+  `ensureSchema` in `db.ts` is where the order lives.
+- It is a FUNCTION rather than a `SchemaModule` because every statement names a
+  column that exists on exactly one of the two shapes: as a `backfill` each
+  would fail to PARSE on a fresh database, and the runner would print ten
+  alarming warnings about columns that are correctly absent on every deploy and
+  every test isolate. Reading `pragma_table_info` first makes each step a
+  decision instead of an attempt.
+- **The timestamps are the half that would have failed in silence.** SQLite
+  types are per-value, so a millisecond integer sits happily in a TEXT-declared
+  column — and then `sub.past_due_at + graceMs` is string CONCATENATION and
+  `past_due_at < ?` compares a number against ISO text. A workspace is either
+  never suspended or suspended the moment it goes past due, and nothing throws.
+  `apps/scena/test/billing-reconcile.test.ts` asserts the converted value is the
+  same BYTES `toISOString` writes, because the comparison is lexicographic.
+- What came with it: the version-stamped catalog seed (Scena's `INSERT OR
+  IGNORE` did nothing at all on any database that had booted once, so every
+  price and entitlement edit since reached fresh deployments and no live one),
+  `planAdminRoutes` and `@4dl/billing`'s `syncCatalog` — which pushes a RENAME
+  to Stripe and survives one stale id, neither of which Scena's copy did.
+  `upsertPlan`, `setPlanStripe`, `setPackStripe` and ~60 lines of sync went with
+  their callers.
+- `currency` and `interval` are gone rather than migrated: every Scena plan was
+  always `usd`/`month`, so they were generality nothing used. The legacy COLUMNS
+  are left in place on a migrated database — nothing reads them, and dropping a
+  column on a live table to reclaim four bytes a row is a risk taken for tidiness.
+
+**The `ai_models` CATALOG is `@4dl/ai`'s now** (`AI_SCHEMA` is entry eight of nine
 in `SCHEMA_MODULES`, right after the legacy reset), and the reconciliation it needed is done:
 
 - **`ai_models.id` IS the provider path** (`@cf/deepgram/aura-1`,
@@ -1131,6 +1307,14 @@ in `SCHEMA_MODULES`, right after the legacy reset), and the reconciliation it ne
   from Google's — so `WHERE task = 'tts'` silently cannot see any Gemini voice.
   Every selection path goes through it (`ai.ts`'s model match,
   `defaultModelForTask`, `PUT /api/ai/defaults`).
+- **The RESERVE ARITHMETIC is the package's too, as of 2026-08-08** — see the
+  "a reserve is a ceiling on revenue" note above for the four under-counts it
+  fixed. What is NOT the package's, and cannot be: `generateImage` writes a
+  tenant-prefixed media key and **Scena's R2 key is the content hash**, so the
+  image lane keeps its own writer; and there is no `generateMusic` at all
+  (Lyria bills per song, a third metering shape). The wholesale replacement of
+  `ai.ts` is therefore blocked, and pretending otherwise would produce a rewrite
+  wearing an extraction's clothes.
 - Two latent defects went with it: `lyria-3-clip` was an id Google has never
   answered to (every music generation on that row 404'd), and
   `syncGeminiFromGoogle` priced each newly-discovered model by LANE — flash-tier
@@ -1165,7 +1349,7 @@ mounted, every screen rendered whatever empty state its failed poll produced, an
 every save failed into a toast. An expired session was indistinguishable from a
 deleted workspace. `apiFetch` is `fetch`-shaped, so adopting it was a rename
 rather than 167 hand-edited calls, and `App.tsx` installs the handler.
-`scripts/scena-fetch-chokepoint.test.mjs` (in `pnpm gate`) fails on a bare
+`scripts/api-door.test.mjs` (in `pnpm gate`) fails on a bare
 `fetch` anywhere in the SPA outside two stated exceptions — the definition
 itself, and `host.ts`'s public `/api/host` probe, which runs before there is a
 session and where a 401 is not an expiry. The 401 exemptions are `/api/auth/*`

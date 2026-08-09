@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0b0c0e" />
+    <title>Template</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Template" />
+    <script>
+      /*
+        ANTI-FLASH — apply the stored theme before first paint.
+
+        ⚠️ The key here and the one in `theme.tsx`'s `configureTheme` are the
+        same string, and nothing checks that. Rename one and the app opens in
+        light for a beat on every dark-mode phone, on every visit, forever —
+        which reads as a slow app rather than as a bug.
+      */
+      try {
+        var t = localStorage.getItem("template-theme");
+        if (t === "light") document.documentElement.dataset.theme = "light";
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

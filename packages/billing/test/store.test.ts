@@ -23,7 +23,7 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 import { bindEntitlements, type EntitlementShape } from "../src/entitlements.js";
-import { bindBillingStore, type PackRow, type PlanSeed } from "../src/store.js";
+import { bindBillingStore, type PackSeed, type PlanSeed } from "../src/store.js";
 
 interface Ent extends EntitlementShape {
   quotas: { seats: number; widgets: number };
@@ -48,7 +48,7 @@ const PAID = JSON.stringify({
 
 const PLANS: PlanSeed[] = [{ id: "paid", name: "Paid", price_usd_month: 39, entitlements_json: PAID, ord: 1, active: 1 }];
 const RETIRED: PlanSeed[] = [{ id: "old", name: "Old", price_usd_month: 79, entitlements_json: PAID, ord: 90, active: 0 }];
-const PACKS: PackRow[] = [{ id: "p1", name: "1k", credits: 1_000, price_usd: 1, ord: 0, active: 1 }];
+const PACKS: PackSeed[] = [{ id: "p1", name: "1k", credits: 1_000, price_usd: 1, ord: 0, active: 1 }];
 
 /** One recorded statement: its SQL and the values bound to it. */
 interface Stmt {

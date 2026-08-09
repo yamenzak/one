@@ -48,11 +48,11 @@ export const tenantCloseRoutes = sharedCloseRoutes<AppEnv>({
     const row = await c.env.DB
       .prepare("SELECT status, delete_at FROM subscriptions WHERE tenant_id = ?")
       .bind(tenantId)
-      .first<{ status: string; delete_at: number | null }>();
+      .first<{ status: string; delete_at: string | null }>();
     const closing = row?.status === "closing";
     // ISO out, epoch in the column — this app stores milliseconds where Tessa
     // stores strings, and the shared route only reports what it is handed.
-    return { closing, deleteAt: closing && row?.delete_at ? new Date(row.delete_at).toISOString() : null };
+    return { closing, deleteAt: closing ? (row?.delete_at ?? null) : null };
   },
   schedule: (c, tenantId) => scheduleTenantClose(c.env, tenantId),
   cancel: (c, tenantId) => cancelTenantClose(c.env, tenantId),

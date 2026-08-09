@@ -133,19 +133,19 @@ export const APP_RESERVED_LABELS: ReadonlySet<string> = new Set([
 async function statusOf(env: HasDb & HasPlatformConfig, tenantId: string): Promise<string | null> {
   const row = await env.DB
     .prepare(
-      `SELECT s.status, s.comp, p.price_cents
+      `SELECT s.status, s.comp, p.price_usd_month
        FROM subscriptions s LEFT JOIN plans p ON p.id = s.plan_id
        WHERE s.tenant_id = ?`,
     )
     .bind(tenantId)
-    .first<{ status: string | null; comp: number | null; price_cents: number | null }>()
+    .first<{ status: string | null; comp: number | null; price_usd_month: number | null }>()
     .catch(() => null);
   if (row?.comp) return row.status ?? null;
   // A paid plan on the row: nothing to decide, and this is the steady state, so
   // it costs one query and stops here. (No row at all counts as unpaid too — the
   // row is written lazily, and a missing plan id is an entitlement set nobody
   // can name.)
-  if (Number(row?.price_cents) > 0) return row?.status ?? null;
+  if (Number(row?.price_usd_month) > 0) return row?.status ?? null;
 
   /*
     …but only if this deployment can actually TAKE a payment.

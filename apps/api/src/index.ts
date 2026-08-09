@@ -15,10 +15,11 @@ import { routeGuard } from "./route-guard.js";
 import { ensureSchema, parseJson } from "./db.js";
 import { seedBilling, listPlans, getSubscription } from "./billing-store.js";
 import {
-  resolveEntitlements, type NotifType,
+  resolveEntitlements, type NotifType, type Entitlements,
+  FEATURE_KEYS, FEATURE_META, QUOTA_KEYS, QUOTA_META, raiseOverride, snapshotDowngrade,
   DEFAULT_LAPSE_POLICY, checkLapsePolicy, isDestructive, isFullyExpired, type LapsePolicy,
 } from "@kova/domain";
-import { DUNNING_DAYS } from "@4dl/billing";
+import { DUNNING_DAYS, planAdminRoutes } from "@4dl/billing";
 import { periodKey } from "./ids.js";
 import { contextRoutes } from "./context-routes.js";
 import { notifyRoutes } from "@4dl/notify/routes";
@@ -136,6 +137,25 @@ app.route("/api", billingRoutes);
 // Mounted later, the Stripe handler would answer first and the gate would be dead.
 app.route("/api", downgradeRoutes);
 app.route("/api", adminRoutes);
+/**
+ * The PLAN CATALOG's operator routes — `@4dl/billing`'s, with Kova's engine and
+ * its key labels handed over.
+ *
+ * The Stripe-id null-out on a reprice and the `snapshotDowngrade` grandfathering
+ * are the two rules here that cost real money when they are missing, and both
+ * were written once, in this app, while a second app had no plan editor at all
+ * and a third had one without the grandfathering.
+ */
+app.route(
+  "/api",
+  planAdminRoutes<Entitlements>({
+    isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+    seed: (db) => seedBilling(db),
+    engine: { resolve: resolveEntitlements, quotaKeys: QUOTA_KEYS, featureKeys: FEATURE_KEYS, snapshotDowngrade, raiseOverride },
+    quotaMeta: QUOTA_META,
+    featureMeta: FEATURE_META,
+  }) as unknown as Hono<AppEnv>,
+);
 app.route("/api", emailConfigRoutes);
 /**
  * The SHARED platform config store, on the operator door.

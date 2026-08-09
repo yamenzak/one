@@ -27,7 +27,7 @@
  * version below, which is what makes an existing deployment adopt it.
  */
 
-import { bindBillingStore, getConfig, setConfig, type PackRow, type PlanSeed } from "@4dl/billing";
+import { bindBillingStore, getConfig, setConfig, type PackSeed, type PlanSeed } from "@4dl/billing";
 import { entitlements, type AppEntitlements, FREE } from "./entitlements.js";
 
 export type { PackRow, PlanRow, SubscriptionRow } from "@4dl/billing";
@@ -95,7 +95,7 @@ export const RETIRED_PLANS: PlanSeed[] = [
  * same and two apps on one Stripe account quoting different credit values would
  * be indefensible the first time somebody ran both.
  */
-export const DEFAULT_PACKS: PackRow[] = [
+export const DEFAULT_PACKS: PackSeed[] = [
   { id: "pack_1k", name: "1,000 credits", credits: 1_000, price_usd: 1, ord: 0, active: 1 },
   { id: "pack_5k", name: "5,500 credits", credits: 5_500, price_usd: 5, ord: 1, active: 1 },
   { id: "pack_25k", name: "30,000 credits", credits: 30_000, price_usd: 25, ord: 2, active: 1 },

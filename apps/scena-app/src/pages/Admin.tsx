@@ -1,11 +1,18 @@
 /**
  * THE OPERATOR CONSOLE'S SCENA-SPECIFIC PANELS.
  *
- * ⚠️ This file no longer renders a page. It exports the seven panels that are
- * genuinely Scena's — the plan catalog, the AI model rates, the public track
- * library, promo codes, the workspace list, the Stripe/config form and the
- * factory reset — and `AdminDoor.tsx` mounts them as sections alongside the
- * platform's own.
+ * ⚠️ This file no longer renders a page, and it is now down to the five panels
+ * that are genuinely Scena's: the public track library, promo codes, the
+ * workspace list, its own operator settings and the factory reset.
+ * `AdminDoor.tsx` mounts them as sections alongside the platform's own.
+ *
+ * ⚠️ Three of the original seven are GONE, not moved-and-kept — the plan
+ * catalog, the AI model rates and the Stripe credential form are `@4dl/admin`'s
+ * panels now, and each departure is marked in place with what the shared one
+ * does that this could not. A panel kept "just in case" is a second screen
+ * writing the same `app_config` rows with no rule about which wins, which is
+ * exactly what the email form here was doing against the console's own
+ * `PlatformEmailSection`.
  *
  * What it used to be: a `TabsList` at `/admin` INSIDE the studio Shell. Two
  * things were wrong with that and only one was cosmetic. `/api/admin/*` has
@@ -27,9 +34,6 @@ import {
   Users,
   RefreshCw,
   AlertTriangle,
-  CreditCard,
-  Package,
-  Sparkles,
   Tag,
   Search,
   Upload,
@@ -39,17 +43,11 @@ import {
   Pencil,
 } from "lucide-react";
 import { FEATURE_CATALOG, QUOTA_CATALOG, FEATURE_CATEGORIES } from "@scena/manifest";
-import { Badge, Button, Card, cn, confirm, Dialog, DialogContent, DialogDescription, DialogFooter, EmptyState, Group, Input, Label, Row, SectionHeader, Select, Separator, Skeleton, StatCard, StatusDot, Switch, toast, type Tone } from "@4dl/ui";
+import { Badge, Button, Card, cn, confirm, Dialog, DialogContent, DialogDescription, DialogFooter, EmptyState, Group, Input, Label, Row, SectionHeader, Select, Skeleton, StatCard, StatusDot, toast, type Tone } from "@4dl/ui";
 import {
   getAdminConfig,
   setAdminConfig,
-  stripePing,
-  stripeSync,
   adminListPlans,
-  adminSavePlan,
-  adminListModels,
-  adminSaveModel,
-  adminResyncModels,
   adminListPromos,
   adminCreatePromo,
   adminTogglePromo,
@@ -59,7 +57,6 @@ import {
   adminGetTenantEntitlements,
   adminSetTenantOverrides,
   adminSweep,
-  sendTestEmail,
   uploadAsset,
   adminListLibrary,
   adminAddLibraryTrack,
@@ -67,8 +64,7 @@ import {
   adminDeleteLibraryTrack,
   nukeRequest,
   nukeConfirm,
-  type Plan,
-  type AdminModel,
+  type AdminPlanRef,
   type PromoCode,
   type AdminTenant,
   type LibraryTrack,
@@ -216,15 +212,60 @@ export function DangerTab() {
 }
 
 /* -------------------------------- Stripe --------------------------------- */
-export function StripeTab() {
+/**
+ * SCENA'S OWN OPERATOR SETTINGS — what is left after the shared panels took the
+ * rest.
+ *
+ * ── What this replaces ──────────────────────────────────────────────────────
+ *
+ * `StripeTab` was three panels wearing one coat, and two of the three belonged
+ * to packages that already ship a better version:
+ *
+ *   Stripe credentials   → `PlatformStripeSection`. Two LANES (test/live) with
+ *                          the mismatch alarm and the catalog-id stash, where
+ *                          this had one flat set of keys and no way to tell you
+ *                          the stored catalog belonged to the other lane.
+ *   Email                → `PlatformEmailSection`, which this console ALREADY
+ *                          mounted as its own section. Two screens writing the
+ *                          same `app_config` rows is not a duplicate control, it
+ *                          is two answers to "what is the sender" with no rule
+ *                          about which wins.
+ *   Gemini key, AI mock,
+ *   AI markup            → `PlatformAiSection`, which reads the MERGED config so
+ *                          it can say a key came from the shared platform store
+ *                          rather than reporting "no key" and inviting an
+ *                          operator to paste one in — which would write a
+ *                          permanent per-app override of the shared value.
+ *
+ * What genuinely is Scena's is below: its own dunning windows (Scena runs its
+ * own two-rung ladder, not `@4dl/billing`'s four) and the platform OpenWeather
+ * key, which no other product has.
+ */
+/**
+ * ⚠️ THE KEYS THIS FORM OWNS, and the list is the point.
+ *
+ * The panel this replaces loaded the WHOLE config map and posted the whole thing
+ * back on save — which is how one screen came to own every key any other screen
+ * displayed, and why moving Stripe and email out of it was not just a deletion.
+ * Posting a key you merely happen to be holding is how a stale value overwrites
+ * a fresh one written from another panel thirty seconds earlier.
+ *
+ * The server refuses `stripe.*` outright now (`configWriteRefusal`), so sending
+ * the whole map would not silently misbehave — it would 400 and this form would
+ * be unsavable. Which is the better failure, and still a failure.
+ */
+const SCENA_CONFIG_KEYS = ["billing.grace_days", "billing.delete_days", "weather.api_key", "weather.onecall_version", "weather.credits_per_call"];
+
+export function ScenaSettingsTab() {
   const [cfg, setCfg] = useState<Record<string, string> | null>(null);
-  const [ping, setPing] = useState<{ ok: boolean; account?: string; error?: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     getAdminConfig()
       .then(setCfg)
-      .catch(() => {});
+      // A failed load must not render as an empty FORM: every field would show a
+      // blank, and pressing Save would write those blanks over real settings.
+      .catch(() => setCfg(null));
   }, []);
   if (!cfg) return <Loading />;
 
@@ -233,26 +274,18 @@ export function StripeTab() {
   async function save() {
     setBusy(true);
     try {
-      await setAdminConfig(cfg!);
-      setPing(await stripePing());
+      const mine = Object.fromEntries(SCENA_CONFIG_KEYS.map((k) => [k, cfg![k] ?? ""]));
+      await setAdminConfig(mine);
       toast.success("Settings saved.");
     } catch (e) {
-      // The server refuses some values outright — `ai.mock = "on"` outside
-      // development is the first. Without this catch the rejection went to the
-      // app-wide "something went wrong" toast, which tells an operator nothing
-      // about WHICH field was refused or why, and the form kept showing the
-      // value that was never stored.
+      // The server refuses some values outright. Without this catch the
+      // rejection went to the app-wide "something went wrong" toast, which tells
+      // an operator nothing about WHICH field was refused, and the form kept
+      // showing a value that was never stored.
       toast.error(e instanceof Error ? e.message : "Could not save settings.");
     } finally {
       setBusy(false);
     }
-  }
-  async function sync() {
-    setBusy(true);
-    const r = await stripeSync();
-    if (r.error) toast.error(`Sync failed: ${r.error}`);
-    else toast.success(`Synced ${r.plans?.length ?? 0} plans + ${r.packs?.length ?? 0} packs to Stripe.`);
-    setBusy(false);
   }
 
   const field = (key: string, label: string, placeholder = "", helper?: string) => (
@@ -262,113 +295,40 @@ export function StripeTab() {
         value={cfg[key] ?? ""}
         onChange={(e) => set(key, e.target.value)}
         placeholder={placeholder}
-        className={cn((key.includes("key") || key.includes("secret")) && "font-mono")}
+        className={cn(key.includes("key") && "font-mono")}
       />
       {helper ? <span className="text-caption text-muted-foreground">{helper}</span> : null}
     </div>
   );
 
   return (
-    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.1fr_1fr]">
+    <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
       <Card>
         <div className="mb-4">
-          <h3 className="text-title-3">Stripe credentials</h3>
-          <p className="text-body text-muted-foreground">Keys are stored server-side and never shipped to the browser or screens.</p>
+          <h3 className="text-title-3">Dunning windows</h3>
+          <p className="text-body text-muted-foreground">
+            How long a workspace stays live after a payment fails, and how long its data is kept after that.
+          </p>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <Label>Mode</Label>
-          <Select
-            value={cfg["stripe.mode"] ?? "disabled"}
-            onChange={(v) => set("stripe.mode", v)}
-            className="w-full"
-            options={[
-              { value: "disabled", label: "Disabled" },
-              { value: "test", label: "Test" },
-              { value: "live", label: "Live" },
-            ]}
-          />
+        {field("billing.grace_days", "Grace days (past-due → suspend)")}
+        {field("billing.delete_days", "Delete days (suspend → auto-delete)")}
+        <div className="pt-1">
+          <Button disabled={busy} onClick={save}>Save</Button>
         </div>
-        {field("stripe.secret_key", "Secret key", "sk_test_…")}
-        {field("stripe.publishable_key", "Publishable key", "pk_test_…")}
-        {field("stripe.webhook_secret", "Webhook signing secret", "whsec_…", "Endpoint: /api/stripe/webhook")}
-        <div className="flex items-center gap-2 pt-1">
-          <Button disabled={busy} onClick={save}>
-            Save
-          </Button>
-          <Button variant="outline" disabled={busy} onClick={sync}>
-            Sync catalog → Stripe
-          </Button>
-        </div>
-        {ping ? (
-          <Badge tone={ping.ok ? "success" : "danger"} className="w-fit">
-            <StatusDot tone={ping.ok ? "success" : "danger"} />
-            {ping.ok ? `Connected: ${ping.account}` : `Not connected: ${ping.error}`}
-          </Badge>
-        ) : null}
       </Card>
 
       <Card>
         <div className="mb-4">
-          <h3 className="text-title-3">Billing policy</h3>
-          <p className="text-body text-muted-foreground">Dunning windows, AI margin, transactional email, and platform provider keys.</p>
-        </div>
-        {field("billing.grace_days", "Grace days (past-due → suspend)")}
-        {field("billing.delete_days", "Delete days (suspend → auto-delete)")}
-        {field("ai.default_markup", "Default AI markup ×")}
-        <div className="flex flex-col gap-1.5">
-          <Label>AI mock mode</Label>
-          <Select
-            value={cfg["ai.mock"] ?? "auto"}
-            onChange={(v) => set("ai.mock", v)}
-            className="w-full"
-            options={[
-              { value: "auto", label: "Auto (mock if no Workers AI)" },
-              { value: "on", label: "On (always mock)" },
-              { value: "off", label: "Off (require Workers AI)" },
-            ]}
-          />
-        </div>
-
-        <Separator />
-        <SectionLabel>Email (transactional)</SectionLabel>
-        <div className="flex flex-col gap-1.5">
-          <Label>Provider</Label>
-          <Select
-            value={cfg["email.provider"] ?? "disabled"}
-            onChange={(v) => set("email.provider", v)}
-            className="w-full"
-            options={[
-              { value: "disabled", label: "Disabled" },
-              { value: "cloudflare", label: "Cloudflare Email Sending" },
-              { value: "mock", label: "Mock (development only)" },
-            ]}
-          />
-          <p className="text-caption text-muted-foreground">
-            Mock logs the message instead of sending it, including sign-in codes — outside development it refuses rather than reporting a delivery that never
-            happened.
+          <h3 className="text-title-3">Weather</h3>
+          <p className="text-body text-muted-foreground">
+            The company key behind every weather source. Empty means locations show mock conditions, for free.
           </p>
         </div>
-        {field("email.from", "From address", "Scena <noreply@yourdomain>")}
-        {field(
-          "email.admin",
-          "Send test emails to",
-          "you@company.com",
-          "Where the Send test button below delivers. Billing and screen notices go to each workspace's own owners, not here.",
-        )}
-
-        <Separator />
-        <SectionLabel>Platform provider keys</SectionLabel>
-        {field(
-          "google.gemini_key",
-          "Platform Gemini API key",
-          "AIza…",
-          "One key for all Google AI — Gemini/Lyria generation, queue voice announcements (Gemini TTS), and the model-registry Sync. Each generation is metered at the model's rate (Google's list price × markup) in credits — no BYO key.",
-        )}
         {field(
           "weather.api_key",
           "Platform OpenWeather key",
           "OpenWeather One Call key…",
-          "Company key that powers every weather source (Sources → Weather). Empty ⇒ locations show mock conditions for free. Each real fetch charges the tenant the per-call price below.",
+          "Each real fetch charges the workspace the per-call price below — per location, once an hour, inside its opening-hours window.",
         )}
         <div className="flex flex-col gap-1.5">
           <Label>OpenWeather One Call version</Label>
@@ -382,33 +342,12 @@ export function StripeTab() {
             ]}
           />
           <p className="text-caption text-muted-foreground">
-            Match your key's subscription — a key is subscribed to one version, not both. New OpenWeather keys are 4.0.
+            Match your key&rsquo;s subscription — a key is subscribed to one version, not both. New keys are 4.0.
           </p>
         </div>
-        {field(
-          "weather.credits_per_call",
-          "Weather credits per call",
-          "3",
-          "Credits charged per real weather fetch — per location, once an hour within its opening-hours window.",
-        )}
-
-        <div className="flex items-center gap-2 pt-1">
-          <Button disabled={busy} onClick={save}>
-            Save policy
-          </Button>
-          <Button
-            variant="outline"
-            disabled={busy}
-            onClick={async () => {
-              await save();
-              const r = await sendTestEmail();
-              if (r.skipped) toast.error("Email disabled — enable a provider first.");
-              else if (r.ok) toast.success(`Test email ${r.mocked ? "logged (mock)" : "sent"} to ${r.to}`);
-              else toast.error(`Test failed: ${r.error}`);
-            }}
-          >
-            Send test email
-          </Button>
+        {field("weather.credits_per_call", "Weather credits per call", "3")}
+        <div className="pt-1">
+          <Button disabled={busy} onClick={save}>Save</Button>
         </div>
       </Card>
     </div>
@@ -416,522 +355,44 @@ export function StripeTab() {
 }
 
 /* --------------------------------- Plans --------------------------------- */
-export function PlansTab() {
-  const [plans, setPlans] = useState<Plan[] | null>(null);
-  const [editing, setEditing] = useState<Plan | null>(null);
-  const reload = () =>
-    adminListPlans()
-      .then(setPlans)
-      .catch(() => {});
-  useEffect(() => {
-    reload();
-  }, []);
-  if (!plans) return <Loading />;
-
-  async function savePrice(p: Plan, cents: number) {
-    await adminSavePlan(p.id, { price_cents: cents });
-    toast.success(`Updated ${p.name} price.`);
-    await reload();
-  }
-  async function saveGrant(p: Plan, grant: number) {
-    try {
-      const ent = JSON.parse(p.entitlements_json) as { aiCredits?: { monthlyGrant?: number } };
-      ent.aiCredits = { ...(ent.aiCredits ?? {}), monthlyGrant: grant };
-      await adminSavePlan(p.id, { entitlements_json: JSON.stringify(ent) });
-      toast.success(`Updated ${p.name} grant.`);
-      await reload();
-    } catch {
-      /* ignore */
-    }
-  }
-
-  return (
-    <Card>
-      <div className="mb-4">
-        <h3 className="text-title-3">Plans &amp; entitlements</h3>
-        <p className="text-body text-muted-foreground">
-          Edit price/grant inline and click away to save. <b>Configure</b> opens the full entitlements editor — changes apply to{" "}
-          <b>every current and future tenant</b> on the plan (per-tenant overrides in the Tenants tab still win).
-        </p>
-      </div>
-      <div className="overflow-x-auto">
-        <Group>
-          {plans.map((p, i) => (
-            <PlanRow key={p.id} plan={p} onPrice={savePrice} onGrant={saveGrant} onConfigure={() => setEditing(p)} last={i === plans.length - 1} />
-          ))}
-        </Group>
-      </div>
-      {editing && (
-        <PlanEntitlementsModal
-          plan={editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => {
-            setEditing(null);
-            reload();
-          }}
-        />
-      )}
-    </Card>
-  );
-}
-
-/**
- * One plan — a `Row`, and the two editable numbers live in `trailing`.
- *
- * The grid this replaces put Price and Grant in their own columns because a
- * table needs one shape per row. But nobody compares four plans' prices by
- * scanning a column here; they open the console to CHANGE one. So the numbers
- * sit together where the hand is, each with its own label, and the plan's
- * identity and standing read as a sentence on the left.
- */
-function PlanRow({
-  plan,
-  onPrice,
-  onGrant,
-  onConfigure,
-  last,
-}: {
-  plan: Plan;
-  onPrice: (p: Plan, c: number) => void;
-  onGrant: (p: Plan, g: number) => void;
-  onConfigure: () => void;
-  last: boolean;
-}) {
-  const grant = (() => {
-    try {
-      return (JSON.parse(plan.entitlements_json) as { aiCredits?: { monthlyGrant?: number } }).aiCredits?.monthlyGrant ?? 0;
-    } catch {
-      return 0;
-    }
-  })();
-  const [price, setPrice] = useState(String(plan.price_cents));
-  const [g, setG] = useState(String(grant));
-  return (
-    <Row
-      divider={!last}
-      sub={
-        <span className="flex items-center gap-2">
-          <span className="font-mono">{plan.id}</span>
-          <StatusDot tone={plan.active ? "success" : "neutral"} />
-          {plan.active ? "Active" : "Off"}
-          {plan.stripe_price_id ? " · Stripe synced" : " · not in Stripe"}
-        </span>
-      }
-      trailing={
-        <span className="flex shrink-0 items-center gap-3">
-          <label className="flex flex-col items-end gap-1">
-            <span className="text-micro uppercase text-muted-foreground">¢ / mo</span>
-            <Input
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              onBlur={() => onPrice(plan, Number(price) || 0)}
-              aria-label={`${plan.name} price in cents per month`}
-              className="h-9 w-24 font-mono tabular-nums"
-            />
-          </label>
-          <label className="flex flex-col items-end gap-1">
-            <span className="text-micro uppercase text-muted-foreground">cr / mo</span>
-            <Input
-              value={g}
-              onChange={(e) => setG(e.target.value)}
-              onBlur={() => onGrant(plan, Number(g) || 0)}
-              aria-label={`${plan.name} monthly credit grant`}
-              className="h-9 w-24 font-mono tabular-nums"
-            />
-          </label>
-          <Button size="sm" variant="outline" onClick={onConfigure}>
-            Configure
-          </Button>
-        </span>
-      }
-    >
-      {plan.name}
-    </Row>
-  );
-}
-
-/* ---------------------- Per-plan entitlements editor ---------------------- */
-// Editing a plan's entitlements_json applies live to every tenant on the plan
-// (tenantEntitlements resolves the plan row per request). Per-tenant overrides
-// still take precedence. -1 = unlimited on any quota.
-//
-// The quota + feature rows are derived from the shared catalog (@scena/manifest)
-// so every entitlement the plan shape supports appears here automatically — add
-// a feature to the catalog and it shows up in this editor, the tenant overrides,
-// the billing cards, and the dashboard gates at once (no drifting hand lists).
-const PLAN_QUOTAS = QUOTA_CATALOG;
 /*
-  EVERY FEATURE IS A BOOLEAN NOW. Four used to be variant allow-lists (`ticker`,
-  `clock`, `weather`, `alerting`); Stage 4 flattened them into booleans, and the
-  two "Variant & channel allow-lists" editors that rendered them are gone with
-  the `kind` field they filtered on.
+  THE PLAN CATALOG EDITOR IS `@4dl/admin`'s NOW — `PlatformPlansSection`,
+  mounted from `AdminDoor.tsx`.
+
+  What was here: an inline price/grant editor plus a modal for the rest, over a
+  `PUT` where the other apps used a `PATCH`, and with no GRANDFATHERING at all —
+  so tightening a tier took the capability away from every workspace already on
+  it, and the help text described that as the design. It also could not edit the
+  free TRIAL, which is the thing that replaced the free tier here.
+
+  The rows are still derived from `@scena/manifest`'s catalogs, which is what
+  made the move cheap: the server hands the panel `quotaKeys`/`featureKeys` and
+  their labels (see `entitlements.ts`'s `PLAN_*_META`), so a feature added to the
+  catalog still appears in the editor on its own.
 */
-const PLAN_BOOL_FEATURES = FEATURE_CATALOG;
-/** Features grouped by catalog category, in category order, for a tidy editor. */
-const FEATURE_GROUPS = FEATURE_CATEGORIES.map((cat) => ({ cat, items: PLAN_BOOL_FEATURES.filter((f) => f.category === cat) })).filter(
-  (g) => g.items.length > 0,
-);
-
-type PlanEnt = {
-  quotas: Record<string, number>;
-  features: Record<string, unknown>;
-  aiCredits: { monthlyGrant?: number };
-  [k: string]: unknown;
-};
-
-function PlanEntitlementsModal({ plan, onClose, onSaved }: { plan: Plan; onClose: () => void; onSaved: () => void }) {
-  const [ent, setEnt] = useState<PlanEnt | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    let parsed: PlanEnt;
-    try {
-      parsed = JSON.parse(plan.entitlements_json) as PlanEnt;
-    } catch {
-      parsed = { quotas: {}, features: {}, aiCredits: {} };
-    }
-    parsed.quotas ??= {};
-    parsed.features ??= {};
-    parsed.aiCredits ??= {};
-    setEnt(parsed);
-  }, [plan]);
-
-  const setQuota = (k: string, v: string) =>
-    setEnt((e) => e && { ...e, quotas: { ...e.quotas, [k]: v.trim() === "" || v.trim() === "-" ? 0 : Math.trunc(Number(v)) || 0 } });
-  const setBool = (k: string, v: boolean) => setEnt((e) => e && { ...e, features: { ...e.features, [k]: v } });
-  const toggleList = (k: string, opt: string) =>
-    setEnt((e) => {
-      if (!e) return e;
-      const cur = Array.isArray(e.features[k]) ? (e.features[k] as string[]) : [];
-      const next = cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt];
-      return { ...e, features: { ...e.features, [k]: next } };
-    });
-
-  async function save() {
-    if (!ent) return;
-    setSaving(true);
-    try {
-      await adminSavePlan(plan.id, { entitlements_json: JSON.stringify(ent) });
-      toast.success(`Updated ${plan.name} entitlements — applied to all ${plan.name} tenants.`);
-      onSaved();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save entitlements");
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog
-      open
-      onOpenChange={(o) => {
-        if (!o) onClose();
-      }}
-    >
-      <DialogContent title={<>{plan.name} — entitlements</>} className="flex max-h-[88dvh] flex-col overflow-hidden sm:max-w-3xl">
-        <DialogDescription>
-          Applies to <b>every current and future tenant</b> on <span className="font-mono">{plan.id}</span> (per-tenant overrides still win). <b>-1</b> =
-          unlimited on any quota.
-        </DialogDescription>
-        {!ent ? (
-          <Loading />
-        ) : (
-          <>
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
-              <div className="space-y-2">
-                <SectionLabel>Quotas</SectionLabel>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {PLAN_QUOTAS.map((x) => (
-                    <label key={x.key} className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-body text-muted-foreground">
-                      <span className="flex-1">{x.label}</span>
-                      <Input
-                        value={String(ent.quotas[x.key] ?? 0)}
-                        onChange={(e) => setQuota(x.key, e.target.value)}
-                        className="h-8 w-20 text-right font-mono tabular-nums"
-                      />
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <SectionLabel>Features</SectionLabel>
-                {FEATURE_GROUPS.map((g) => (
-                  <div key={g.cat} className="space-y-1.5">
-                    <div className="text-micro text-muted-foreground/70 uppercase">{g.cat}</div>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {g.items.map((x) => (
-                        <label key={x.key} title={x.description} className="flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-body">
-                          <span className="flex-1 text-muted-foreground">
-                            {x.label}
-                            {x.safety && (
-                              <span className="ml-1.5 rounded bg-muted px-1 py-0.5 text-micro text-muted-foreground/70 uppercase">
-                                always on
-                              </span>
-                            )}
-                          </span>
-                          <Switch checked={Boolean(ent.features[x.key])} onCheckedChange={(v) => setBool(x.key, v)} />
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <label className="flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-body text-muted-foreground">
-                <span className="flex-1">Monthly AI credit grant</span>
-                <Input
-                  value={String(ent.aiCredits.monthlyGrant ?? 0)}
-                  onChange={(e) => setEnt((s) => s && { ...s, aiCredits: { ...s.aiCredits, monthlyGrant: Math.trunc(Number(e.target.value)) || 0 } })}
-                  className="h-8 w-24 text-right font-mono tabular-nums"
-                />
-              </label>
-            </div>
-            <DialogFooter className="border-t pt-3">
-              <Button variant="ghost" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button disabled={saving} onClick={save}>
-                {saving ? "Saving…" : "Save entitlements"}
-              </Button>
-            </DialogFooter>
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 /* -------------------------------- Models --------------------------------- */
-/**
- * Neutral tier + tone from the model's PROVIDER COLUMN.
- *
- * Vendor-agnostic on purpose, so the catalog reads as capability tiers rather
- * than provider jargon. It used to pattern-match the model id (`/^@cf\//`,
- * `/gemini|lyria/i`) because there was nothing else to read; the column is the
- * fact now, and it cannot be wrong about a model whose name does not match the
- * family it belongs to.
- */
-function modelProvider(provider: string): { label: string; tone: Tone } {
-  if (provider === "workers-ai") return { label: "Standard", tone: "neutral" };
-  if (provider === "google") return { label: "Advanced", tone: "primary" };
-  return { label: "External", tone: "neutral" };
-}
+/*
+  THE AI MODEL CATALOG IS `@4dl/admin`'s NOW — `PlatformAiSection`, over
+  `@4dl/ai`'s `aiCatalogAdminRoutes`, mounted from `AdminDoor.tsx`.
 
-/**
- * ⚠️ THE SPEECH FILTER MATCHES TWO LANE NAMES, and it has to.
- *
- * A catalog carrying both providers stores text-to-speech under `tts`
- * (Cloudflare's pricing page prices per character) AND `speech` (Google's ids
- * contain "tts"). `@4dl/ai`'s `LANE_ALIASES` unifies them on the server; this is
- * the one place the browser needs to know, and matching one name would hide
- * every Gemini voice behind a filter labelled "Speech".
- */
-const TASK_FILTERS: { id: string; label: string; lanes: string[] }[] = [
-  { id: "all", label: "All", lanes: [] },
-  { id: "text", label: "Text", lanes: ["text", "text-small"] },
-  { id: "image", label: "Image", lanes: ["image"] },
-  { id: "tts", label: "Speech", lanes: ["tts", "speech"] },
-  { id: "music", label: "Music", lanes: ["music"] },
-];
+  What this file had was a rate table and three toggles over Scena's own
+  bespoke admin handlers, which are deleted with it. What the shared panel
+  adds is everything around them:
 
-export function ModelsTab() {
-  const [models, setModels] = useState<AdminModel[] | null>(null);
-  const [syncing, setSyncing] = useState(false);
-  const [q, setQ] = useState("");
-  const [task, setTask] = useState("all");
-  const reload = () =>
-    adminListModels()
-      .then(setModels)
-      .catch(() => {});
-  useEffect(() => {
-    reload();
-  }, []);
+    • the provider key and the mock lane read from the MERGED config, so a key
+      set once in the shared platform store reads as SET here rather than
+      inviting an operator to paste a second copy — which would write a
+      permanent per-app override of the shared value;
+    • the per-lane default-model picker, which says when its list is filtered
+      rather than silently offering nothing;
+    • **"Apply to every 4DL app"** — the broadcast that is the entire reason the
+      shared selection exists, and which Scena could neither send nor receive.
 
-  async function save(m: AdminModel, patch: Partial<AdminModel>) {
-    await adminSaveModel(m.id, patch);
-    await reload();
-  }
-  /**
-   * REPORT WHAT THE PAGES SAID, not what a seed re-wrote.
-   *
-   * This once said `${added} added, ${updated} updated` — both counted from a
-   * hardcoded catalog, so a settled deployment saw "17 updated" on every press
-   * while no rate had moved and no page had been read. The number was real and
-   * the sentence it implied was not.
-   *
-   * Every figure below now comes from a provider whose page was actually read:
-   * refreshed rates first (the thing you pressed the button for), then new rows,
-   * then the two kinds of switching-off — retired (the provider has shut the
-   * model down) counted separately from delisted (it left the page), because the
-   * first means a model may have been failing calls already.
-   *
-   * A provider that could not be read is a WARNING, not a success: that run left
-   * its rates untouched on purpose, and reporting it green is the same lie in a
-   * smaller font.
-   */
-  async function resync() {
-    setSyncing(true);
-    try {
-      const r = await adminResyncModels();
-      const read = r.providers.filter((p) => p.ok);
-      const sum = (f: (p: (typeof r.providers)[number]) => number) => read.reduce((n, p) => n + f(p), 0);
-      const off = sum((p) => p.disabled) + sum((p) => p.retiredDisabled);
-      const parts = [
-        `${sum((p) => p.updated)} rates refreshed`,
-        sum((p) => p.added) ? `${sum((p) => p.added)} added` : null,
-        off ? `${off} switched off` : null,
-        // Where the rows came from, when it was NOT the live pages — a fallback
-        // to another app's published catalog is a materially different claim.
-        read.some((p) => p.from === "shared catalog") ? "from the shared catalog" : null,
-        r.published ? "published to the platform" : null,
-      ].filter(Boolean);
-      if (r.ok && read.length === r.providers.length) toast.success(`Catalog synced · ${parts.join(", ")}`);
-      else {
-        const why = r.providers.filter((p) => !p.ok).map((p) => `${p.provider}: ${p.error ?? "unavailable"}`);
-        const did = parts.length ? `(${parts.join(", ")}) ` : "";
-        toast.error(`${r.ok ? "Partly synced" : "Not synced"} ${did}${why.join(" · ")}`);
-      }
-      await reload();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Re-sync failed");
-    } finally {
-      setSyncing(false);
-    }
-  }
-
-  const filtered = useMemo(() => {
-    if (!models) return null;
-    const needle = q.trim().toLowerCase();
-    const lanes = TASK_FILTERS.find((t) => t.id === task)?.lanes ?? [];
-    return models.filter(
-      (m) =>
-        (task === "all" || lanes.includes(m.task)) &&
-        // The id IS the provider path now, so searching it is how an operator
-        // finds "the flux one" or every `@cf/deepgram/*` voice.
-        (!needle || m.label.toLowerCase().includes(needle) || m.id.toLowerCase().includes(needle)),
-    );
-  }, [models, q, task]);
-
-  if (!models) return <Loading />;
-  const enabled = models.filter((m) => m.enabled === 1).length;
-
-  return (
-    <Card>
-      <div className="mb-4 gap-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="text-title-3">AI model catalog &amp; pricing</h3>
-            <p className="text-body text-muted-foreground">
-              Unit rates set the cost basis; Markup × sets the margin (3× ≈ 67%). Advanced models run on the platform key, metered at the provider's list price.
-              Sync refreshes the live model catalog when the platform key is set.
-            </p>
-          </div>
-          <Button variant="outline" disabled={syncing} onClick={resync}>
-            <RefreshCw className={cn("size-4", syncing && "animate-spin")} /> {syncing ? "Syncing…" : "Re-sync catalog"}
-          </Button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <SearchBox value={q} onChange={setQ} placeholder="Search models…" className="w-full sm:w-64" />
-          <div className="flex flex-wrap gap-1.5">
-            {TASK_FILTERS.map((t) => (
-              <Button key={t.id} size="sm" variant={task === t.id ? "default" : "outline"} onClick={() => setTask(t.id)}>
-                {t.label}
-              </Button>
-            ))}
-          </div>
-          <span className="ml-auto text-body text-muted-foreground tabular-nums">
-            {filtered?.length ?? 0} shown · {enabled}/{models.length} enabled
-          </span>
-        </div>
-      </div>
-      <div className="overflow-x-auto">
-        {filtered && filtered.length > 0 ? (
-          <Group>
-            {filtered.map((m, i) => (
-              <ModelRow key={m.id} model={m} onSave={save} last={i === filtered.length - 1} />
-            ))}
-          </Group>
-        ) : (
-          <p className="py-10 text-center text-body text-muted-foreground">No models match your search.</p>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-/** Format a model's cost basis: token-metered → in/out per Mtok; else the unit
- *  rate. Keyed on whether the row HAS token rates rather than on the lane name,
- *  so a `text-small` row the pricing-page sync discovered is not silently
- *  rendered as "— unit". */
-function costBasis(m: AdminModel): React.ReactNode {
-  if (m.input_rate != null || m.output_rate != null) {
-    const i = m.input_rate != null ? num(Math.round(m.input_rate)) : "—";
-    const o = m.output_rate != null ? num(Math.round(m.output_rate)) : "—";
-    return (
-      <span className="font-mono tabular-nums text-muted-foreground">
-        {i} in · {o} out<span className="ml-1 text-micro uppercase">/Mtok</span>
-      </span>
-    );
-  }
-  const r = m.unit_rate != null ? num(Math.round(m.unit_rate)) : "—";
-  const unit = (m.unit_kind ?? "").replace(/_/g, " ") || "unit";
-  return (
-    <span className="font-mono tabular-nums text-muted-foreground">
-      {r}
-      <span className="ml-1 text-micro uppercase">{unit}</span>
-    </span>
-  );
-}
-
-/**
- * One model in the catalog.
- *
- * The cost basis is the ONE number an operator scans down this list — "what am
- * I paying for a thousand tokens of that" — so it is the `value`, which `Row`
- * right-aligns and sets in tabular figures. That is the column-comparison a
- * table was providing, kept; the other five columns were identity and controls,
- * which read better as a line and a cluster.
- */
-function ModelRow({ model, onSave, last }: { model: AdminModel; onSave: (m: AdminModel, patch: Partial<AdminModel>) => void; last: boolean }) {
-  const [markup, setMarkup] = useState(String(model.markup ?? ""));
-  const prov = modelProvider(model.provider);
-  return (
-    <Row
-      divider={!last}
-      className={cn(model.enabled !== 1 && "opacity-60")}
-      sub={
-        <span className="flex items-center gap-1.5">
-          <Badge tone={prov.tone}>{prov.label}</Badge>
-          <span className="capitalize">{model.task}</span>
-          {model.is_default === 1 && <Badge tone="primary">Lane default</Badge>}
-          {/* An announced shutdown, while it is still in the future. Worth a badge
-              rather than a note: this row keeps working right up to the date and
-              then stops, and the sweep switches it off on the morning it lands. */}
-          {model.retires_at && <Badge tone="warning">Retires {model.retires_at}</Badge>}
-          <span className="truncate font-mono">· {model.id}</span>
-        </span>
-      }
-      trailing={
-        <span className="flex shrink-0 items-center gap-3">
-          <span className="text-right">{costBasis(model)}</span>
-          <label className="flex flex-col items-end gap-1">
-            <span className="text-micro uppercase text-muted-foreground">markup ×</span>
-            <Input
-              value={markup}
-              onChange={(e) => setMarkup(e.target.value)}
-              onBlur={() => onSave(model, { markup: Number(markup) || model.markup })}
-              aria-label={`${model.label} markup multiplier`}
-              className="h-9 w-20 font-mono tabular-nums"
-            />
-          </label>
-          <Switch checked={model.enabled === 1} onCheckedChange={(c) => onSave(model, { enabled: c ? 1 : 0 })} aria-label={`${model.label} enabled`} />
-        </span>
-      }
-    >
-      {model.label}
-    </Row>
-  );
-}
+  The rate rows themselves are unchanged: `ai_models` has been `@4dl/ai`'s since
+  `AI_SCHEMA` became entry seven of `SCHEMA_MODULES`, so this is the surface
+  catching up with the store.
+*/
 
 /* ---------------------------- Public library ----------------------------- */
 export function LibraryTab() {
@@ -1243,7 +704,7 @@ function audioFileDuration(file: File): Promise<number> {
 /* -------------------------------- Promos --------------------------------- */
 export function PromosTab() {
   const [promos, setPromos] = useState<PromoCode[] | null>(null);
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const [plans, setPlans] = useState<AdminPlanRef[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const reload = () =>
     adminListPromos()
@@ -1336,7 +797,7 @@ export function PromosTab() {
 }
 
 /** Create a promo code (credit top-up or comped plan). */
-function PromoDialog({ open, plans, onClose, onSaved }: { open: boolean; plans: Plan[]; onClose: () => void; onSaved: () => void }) {
+function PromoDialog({ open, plans, onClose, onSaved }: { open: boolean; plans: AdminPlanRef[]; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({ code: "", kind: "credits", credits: "1000", planId: "pro", planMonths: "12", maxRedemptions: "", note: "" });
   const [busy, setBusy] = useState(false);
   useEffect(() => {

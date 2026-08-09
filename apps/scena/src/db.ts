@@ -1,8 +1,10 @@
 import { schemaGate, type SchemaModule } from "@4dl/core";
 import { AI_SCHEMA } from "@4dl/ai";
 import { AUTH_SCHEMA } from "@4dl/auth";
+import { BILLING_SCHEMA } from "@4dl/billing";
 import { TENANCY_SCHEMA } from "@4dl/tenancy";
 import { BILLING_RAIL_SCHEMA } from "@4dl/billing-rail/schema";
+import { reconcileLegacyBilling } from "./billing-reconcile.js";
 import { NOTIFY_SCHEMA } from "@4dl/notify";
 import { STORAGE_SCHEMA } from "@4dl/storage";
 import { SCENA_SCHEMA, DEMO_TENANT } from "./schema.js";
@@ -85,19 +87,24 @@ export const SCHEMA_MODULES: readonly SchemaModule[] = [
   AUTH_SCHEMA,
   TENANCY_SCHEMA,
   /*
-    ⚠️ `BILLING_SCHEMA` IS DELIBERATELY ABSENT, and it is not an oversight.
+    `plans`, `subscriptions`, `credit_packs`, `credit_ledger`, `stripe_events`.
 
-    Its `plans`, `subscriptions`, `credit_packs` and `credit_ledger` have
-    different COLUMNS from Scena's — `price_usd_month REAL` against
-    `price_cents INTEGER` + `currency` + `interval`, `at` against `created_at`,
-    TEXT timestamps against INTEGER. A `CREATE TABLE IF NOT EXISTS` is won by
-    whichever module runs first, and the loser's columns silently never exist:
-    the exact shape of the `app_config.updated_at` regression that made a fresh
-    Stage 1 deployment unable to save any setting.
+    This entry read "⚠️ DELIBERATELY ABSENT" for four stages, and the reason was
+    real: Scena's four tables shared their NAMES with the shared ones and differed
+    in COLUMNS, a `CREATE TABLE IF NOT EXISTS` is won by whichever module runs
+    first, and the loser's columns silently never exist. Adopting it needed a data
+    change, not a wiring one.
 
-    The rail is additive (`rail_parked_events` only), so it comes in now. The
-    STORE moves when its 1,000 lines of queries do.
+    ⚠️ THAT DATA CHANGE IS `reconcileLegacyBilling`, AND IT RUNS BEFORE
+    `applySchema` — see `ensureSchema` below and the header of
+    `billing-reconcile.ts`. The ordering is not a preference: this module
+    declares `CREATE INDEX … ON credit_ledger(tenant_id, at)`, and on a
+    pre-migration database `credit_ledger` has `created_at` and no `at`, so the
+    index throws out of the batch and every route that touches D1 answers 500.
+    That is the `AI_LEGACY_RESET` failure again, in a different table.
   */
+  BILLING_SCHEMA,
+  // Additive (`rail_parked_events` only), and reads nothing above it.
   BILLING_RAIL_SCHEMA,
   /*
     `media_assets` — the ledger behind every stored object.
@@ -171,7 +178,33 @@ export const SCHEMA_MODULES: readonly SchemaModule[] = [
 ];
 
 const gate = schemaGate(SCHEMA_MODULES);
-export const ensureSchema = (db: D1Database): Promise<void> => gate({ DB: db });
+
+/**
+ * ⚠️ THE LEGACY BILLING RECONCILIATION RUNS FIRST, AND THAT ORDER IS LOAD-BEARING.
+ *
+ * `BILLING_SCHEMA` builds an index over `credit_ledger(tenant_id, at)`, and a
+ * database created before that module joined this list has `created_at` and no
+ * `at`. The index throws, the whole DDL batch throws, `applySchema` throws, and
+ * every route that touches D1 answers 500 — the same total outage
+ * `AI_LEGACY_RESET` exists to prevent, one table over. Moving the columns into
+ * place before the shared module is allowed to index them is the fix.
+ *
+ * Memoized here rather than inside the reconciler so the two share one promise:
+ * a failure in either clears it and the next request retries, instead of the
+ * isolate inheriting a half-migrated schema for as long as it lives.
+ */
+let ready: Promise<void> | null = null;
+export const ensureSchema = (db: D1Database): Promise<void> => {
+  if (!ready) {
+    ready = reconcileLegacyBilling(db)
+      .then(() => gate({ DB: db }))
+      .catch((err) => {
+        ready = null;
+        throw err;
+      });
+  }
+  return ready;
+};
 
 /** Register (or re-register) a screen at claim time. */
 export async function registerScreen(

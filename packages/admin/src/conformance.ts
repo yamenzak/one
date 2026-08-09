@@ -32,6 +32,39 @@ export const SHARED_ADMIN_ENDPOINTS: { path: string; section: string }[] = [
   { path: "/api/admin/turnstile/", section: "PlatformTurnstileSection" },
   { path: "/api/admin/email", section: "PlatformEmailSection" },
   { path: "/api/admin/maintenance", section: "PlatformMaintenanceSection" },
+  /**
+   * The trailing slash is deliberate and is the whole precision of this entry.
+   *
+   * `PATCH /api/admin/plans/:id` is the EDIT, and rebuilding an editor over it
+   * is exactly what this file exists to stop — two apps did, in two shapes, and
+   * the one without grandfathering silently stripped capability from every
+   * tenant on a tier the operator tightened.
+   *
+   * `GET /api/admin/plans` — no slash — stays allowed, because reading the
+   * catalog is not editing it: the promo-code dialog needs the plan list for a
+   * dropdown, and refusing that would push an app into inventing a second
+   * endpoint for the same rows.
+   */
+  { path: "/api/admin/plans/", section: "PlatformPlansSection" },
+  /**
+   * ⚠️ The two AI entries name the ROUTES, not the prefix, and that is not
+   * fussiness.
+   *
+   * `@4dl/ai`'s `aiCatalogAdminRoutes` owns exactly `/admin/ai/config` and
+   * `/admin/ai/models*`. An app may legitimately mount its OWN routes under the
+   * same prefix — Kova has `/api/admin/ai/selftest` (it runs Kova's prompts
+   * through Kova's parsers) and `/api/admin/ai/feedback` (it reads Kova's
+   * `insight_feedback`), and both ride into the shared panel through `extraSub`
+   * / `extraBelowCatalog`. A blanket `/api/admin/ai/` entry would flag those two
+   * as violations, and a checker that cries wolf gets waived.
+   *
+   * Scena had a whole second catalog screen over its own copies of these until
+   * it adopted the panel — a rate table with no shared-config read, no lane
+   * default picker, and no way to send or receive the "apply to every 4DL app"
+   * broadcast, which is the entire reason the shared selection exists.
+   */
+  { path: "/api/admin/ai/models", section: "PlatformAiSection" },
+  { path: "/api/admin/ai/config", section: "PlatformAiSection" },
 ];
 
 function walk(dir: string, out: string[] = []): string[] {

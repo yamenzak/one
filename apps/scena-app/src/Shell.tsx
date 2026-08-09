@@ -37,6 +37,8 @@
  *  4. The account menu on the avatar, with the name beside it at `sm` and up.
  *  5. The standing and maintenance banners ABOVE the bar — the state of the
  *     whole surface, not one more indicator competing for space inside it.
+ *     (These arrived late: this line claimed them for three stages while
+ *     `HostInfo` had no `gate` for them to read. See `WorkspacePausedBanner`.)
  *
  * ── What stays Scena's ──────────────────────────────────────────────────────
  *
@@ -55,7 +57,9 @@ import {
   Siren, LogOut, Sun, Moon, Scale, Users, CreditCard, Settings as SettingsIcon, ShieldCheck,
   Image as ImageIcon, MonitorSpeaker, Tv, Layers, LayoutDashboard, BarChart3,
 } from "lucide-react";
-import { adminUrl } from "@4dl/app-kit";
+import { adminUrl, MaintenanceBanner } from "@4dl/app-kit";
+import { NotificationBell } from "./Notifications.js";
+import type { HostInfo } from "./host.js";
 import { ScenaIcon } from "./brand.js";
 import { useTheme } from "./theme.js";
 import { LegalDialog, type LegalDoc } from "./legal/content.js";
@@ -113,12 +117,49 @@ export function destinationFor(pathname: string): string {
   return OWNER[seg] ?? "screens";
 }
 
+/**
+ * THE WORKSPACE IS READ-ONLY, SAID OUT LOUD.
+ *
+ * A workspace on the first dunning rung, or one whose owner has scheduled a
+ * close, refuses every write at the edge (`route-guard.ts`'s host gate). Without
+ * this the dashboard looks completely normal and each save fails on its own with
+ * a 402 — so the model somebody forms is "the software is broken", which is
+ * wrong and is the version they repeat.
+ *
+ * Not dismissible: this is not a notification, it is the current state of the
+ * whole surface, and it stops being true only when the state changes.
+ *
+ * ⚠️ `blocked` never reaches here — `App.tsx` withholds the dashboard entirely
+ * at that rung. This is the rung where reads still work, which is the whole
+ * point of it existing separately.
+ */
+function WorkspacePausedBanner({ gate }: { gate: HostInfo["gate"] }) {
+  if (!gate?.readOnly) return null;
+  const closing = gate.reason === "closing";
+  /*
+    `setup` is not an arrears. Nothing was taken from a workspace that never
+    finished choosing a plan, so telling them to "settle an invoice" would be
+    both wrong and alarming — they simply have not started yet.
+  */
+  const setup = gate.reason === "setup";
+  return (
+    <div className="border-b border-warning/25 bg-warning/10 px-4 py-2.5 text-center text-caption text-warning-foreground">
+      {closing
+        ? "This workspace is scheduled to close. Editing is paused — cancel the closure in Settings to pick it back up."
+        : setup
+          ? "Finish setting up billing to start editing. Your screens and content are already here."
+          : "Editing is paused while the subscription is unsettled. Your screens keep playing, and nothing has been deleted."}
+    </div>
+  );
+}
+
 export function Shell({
   me,
   billing,
   emergencyActive,
   onEmergency,
   onSignOut,
+  host,
   children,
 }: {
   me: Me | null;
@@ -126,6 +167,8 @@ export function Shell({
   emergencyActive: boolean;
   onEmergency: () => void;
   onSignOut: () => void;
+  /** The door's own answer — the standing gate and the deployment switch. */
+  host: HostInfo | null;
   children: ReactNode;
 }) {
   const nav = useNavigate();
@@ -196,6 +239,22 @@ export function Shell({
       />
 
       <div className="relative z-10 transition-colors duration-500" style={pageVars}>
+        {/*
+          THE TWO BANNERS THIS FILE'S HEADER HAS PROMISED SINCE IT WAS WRITTEN.
+
+          §5 above lists "the standing and maintenance banners ABOVE the bar" as
+          one of the things that came across from Kova. Neither existed: there
+          was no gate in the client's `HostInfo` to read, so a workspace on the
+          read-only rung, one whose owner had scheduled a close, and a
+          deployment-wide maintenance window all looked identical — every write
+          simply failed into a toast.
+
+          Maintenance FIRST because it is the wider truth: it is about the
+          platform, not about this workspace's bill. `full` never reaches here —
+          `App.tsx` swaps the whole screen before the Shell mounts.
+        */}
+        <MaintenanceBanner state={host?.maintenance} />
+        <WorkspacePausedBanner gate={host?.gate} />
         <AppBar
           bare
           scrolled={scrolled}
@@ -223,6 +282,13 @@ export function Shell({
                 widths by itself.
               */}
               <ShellActions actions={chrome.actions} />
+              {/*
+                THE BELL, which this app dispatched to for three stages without
+                ever showing anybody. Left of the avatar, as in every other 4DL
+                app — a notification is about the workspace, the avatar menu is
+                about you.
+              */}
+              <NotificationBell />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button

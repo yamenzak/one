@@ -79,19 +79,31 @@ export const NOTIF_CATEGORIES: Meta[] = [
  * people who run the screens. The audience it BUYS from (a customer looking at a
  * menu board) has no account at all.
  */
+/**
+ * ⚠️ THE SCREEN LIST IS `/`, NOT `/screens`.
+ *
+ * Four types linked to `/screens`, which is not a route: the dashboard puts the
+ * fleet on the index and reserves `/screens/:id` for one screen's detail
+ * (`Shell.tsx`'s `go` maps the `screens` tab to `/` for exactly this reason).
+ * Nothing caught it because nothing rendered a notification until the bell
+ * landed — tapping "a screen went offline" would have dropped somebody on the
+ * SPA's catch-all. `notifications.conformance.test.ts` in the dashboard now
+ * checks every link in this file against the real route table.
+ */
 export const NOTIF_TYPES: Record<string, TypeMeta> = {
   // ── screens ──────────────────────────────────────────────────────────────
   /** A paired screen stopped answering. Titles name the screen at the call site. */
-  screen_offline: { category: "screens", to: "staff", link: "/screens" },
-  screen_recovered: { category: "screens", to: "staff", link: "/screens" },
+  screen_offline: { category: "screens", to: "staff", link: "/" },
+  screen_recovered: { category: "screens", to: "staff", link: "/" },
   /** An emergency takeover was broadcast — dispatched with `force`. */
-  emergency_active: { category: "screens", to: "staff", title: "Emergency message is live", link: "/screens" },
-  emergency_cleared: { category: "screens", to: "staff", title: "Emergency message cleared", link: "/screens" },
+  emergency_active: { category: "screens", to: "staff", title: "Emergency message is live", link: "/" },
+  emergency_cleared: { category: "screens", to: "staff", title: "Emergency message cleared", link: "/" },
 
   // ── content ──────────────────────────────────────────────────────────────
   channel_published: { category: "content", to: "staff", link: "/channels" },
   channel_rolled_back: { category: "content", to: "staff", link: "/channels" },
-  feed_stalled: { category: "content", to: "staff", link: "/sources" },
+  // The Sources screen is routed at `/feeds`; "Sources" is only its label.
+  feed_stalled: { category: "content", to: "staff", link: "/feeds" },
 
   // ── staff ────────────────────────────────────────────────────────────────
   staff_joined: { category: "staff", to: "owner", link: "/team" },
@@ -106,6 +118,13 @@ export const NOTIF_TYPES: Record<string, TypeMeta> = {
   billing_deleted: { category: "billing", to: "owner", title: "Workspace data deleted", link: "/billing" },
   credits_purchased: { category: "billing", to: "owner", link: "/billing" },
   credits_low: { category: "billing", to: "owner", link: "/billing" },
+  /**
+   * Money went back, so the credits did too — and the owner has to be told
+   * either way. A plan-level refund carries no credit count, so there is
+   * nothing to reverse and still something to reconcile.
+   */
+  payment_refunded: { category: "billing", to: "owner", title: "A payment was refunded", link: "/billing" },
+  payment_disputed: { category: "billing", to: "owner", title: "A payment was disputed", link: "/billing" },
 };
 
 /**

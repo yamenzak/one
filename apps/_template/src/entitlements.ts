@@ -16,7 +16,7 @@
  *             conformance test cannot see it.
  */
 
-import { bindEntitlements, type EntitlementShape } from "@4dl/billing";
+import { bindEntitlements, type EntitlementShape, type PlanKeyMeta } from "@4dl/billing";
 
 export interface AppEntitlements extends EntitlementShape {
   quotas: {
@@ -54,46 +54,51 @@ export const FREE: AppEntitlements = {
 export const entitlements = bindEntitlements<AppEntitlements>(FREE);
 
 /**
- * The D1 lookups. Thin on purpose — the engine is shared, the QUERY is the
- * app's, because which table holds a tenant's plan is a schema decision.
+ * COPY FOR THE PLAN EDITOR — `@4dl/admin`'s `PlatformPlansSection` renders these.
  *
- * `clamp` is the one place delinquency bites: every feature gate and every quota
- * check resolves through here, so a suspended tenant falls back to FREE
- * everywhere at once rather than in each gate separately.
- */
-export async function tenantEntitlements(db: D1Database, tenantId: string): Promise<AppEntitlements> {
-  const sub = await db
-    .prepare("SELECT plan_id, status, overrides_json FROM subscriptions WHERE tenant_id = ?")
-    .bind(tenantId)
-    .first<{ plan_id: string | null; status: string | null; overrides_json: string | null }>()
-    .catch(() => null);
-  const plan = sub?.plan_id
-    ? await db.prepare("SELECT entitlements_json FROM plans WHERE id = ?").bind(sub.plan_id).first<{ entitlements_json: string | null }>().catch(() => null)
-    : null;
-  const resolved = entitlements.merge(entitlements.resolve(plan?.entitlements_json), sub?.overrides_json);
-  return entitlements.clamp(resolved, sub?.status ?? "active");
-}
-
-/** True when the tenant's plan (or a grant) includes `feature`. */
-export async function hasFeature(db: D1Database, tenantId: string, feature: keyof AppEntitlements["features"]): Promise<boolean> {
-  return (await tenantEntitlements(db, tenantId)).features[feature];
-}
-
-/**
- * Is ONE MORE of `quota` allowed? `-1` is unlimited.
+ * The key LIST is derived from the engine above, so a quota added to
+ * `AppEntitlements` appears in the operator console on its own. What cannot be
+ * derived is what the key MEANS, which is why the labels are here rather than in
+ * the panel: a shared panel that hard-coded them would be a shared panel with
+ * one product's vocabulary in it.
  *
- * Note what this deliberately does NOT do: it never looks at rows that already
- * exist. Call it only on a CREATE. A tenant left over a lowered ceiling keeps
- * every existing row fully readable and writable; they simply cannot add
- * another. Nothing should ever archive, hide or brick an over-quota row.
+ * A key with no entry still renders, spelled as its key — so forgetting one is
+ * ugly rather than broken, and `reserved: true` marks a key that is declared and
+ * deliberately not yet enforced (`scripts/entitlement-enforcement.test.mjs`
+ * checks that claim, per app, and pins the list so it cannot quietly grow).
  */
-export async function withinQuota(
-  db: D1Database,
-  tenantId: string,
-  quota: keyof AppEntitlements["quotas"],
-  currentCount: number,
-): Promise<{ ok: boolean; max: number }> {
-  const max = (await tenantEntitlements(db, tenantId)).quotas[quota];
-  if (max < 0) return { ok: true, max };
-  return { ok: currentCount < max, max };
-}
+export const PLAN_QUOTA_META: Record<string, PlanKeyMeta> = {
+  staffSeats: { label: "Team seats", hint: "Owner + staff. A customer does not consume one.", unit: "people" },
+  subjects: { label: "Records", hint: "The individuals a tenant may have on its books.", unit: "subjects" },
+  storageMb: { label: "Storage", hint: "Megabytes in the media bucket. −1 is unlimited.", unit: "MB" },
+};
+
+export const PLAN_FEATURE_META: Record<string, PlanKeyMeta> = {
+  customDomain: { label: "Custom domain", hint: "Bring your own domain, with a certificate we manage." },
+  ai: { label: "AI suite", hint: "Metered generation. Credits are the other half of what a plan buys." },
+};
+
+/*
+  THE D1 LOOKUPS ARE `billing-store.ts`'s — `bindBillingStore`, not three
+  hand-written queries.
+
+  What was here: `tenantEntitlements`, `hasFeature` and `withinQuota`, each a
+  short function over `subscriptions` and `plans`. They read correctly and they
+  were the wrong thing to ship in a template, because the package's versions
+  carry three rules a re-implementation does not arrive with:
+
+    A FAILED READ IS NOT AN ANSWER. These caught D1 errors into `null`, which
+    resolves to the free baseline — so a transient failure silently downgrades a
+    PAYING tenant and shows them the finish-setting-up gate. The package lets the
+    error propagate: a 500 is visible and retried.
+
+    A RETIRED PLAN STILL RESOLVES. `listPlans` is active-only, but `getPlan` is
+    not, because a tenant grandfathered onto a withdrawn tier must still be able
+    to read what they hold.
+
+    THE PARKING ROW'S STATUS IS A DECISION. See `billing-store.ts` — Tessa's
+    default of `incomplete` held brand-new workspaces read-only on a deployment
+    with no Stripe at all.
+
+  Import them from `./billing-store.js`.
+*/

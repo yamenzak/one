@@ -16,6 +16,7 @@ import type { Env } from "./env.js";
 import { type AppEnv, type AppContext, sessionMiddleware, tenantOf, owns, isPlatformAdmin } from "./auth-context.js";
 import { routeGuard } from "./route-guard.js";
 import { domainRoutes, domainAdminRoutes, orgCreateGuard, orgUpdateGuard } from "./domain-routes.js";
+import { otpSendGuard } from "./otp-guard.js";
 import { maintenanceMiddleware } from "@4dl/tenancy";
 import { parseManifest, type Manifest } from "@scena/manifest";
 import { demoAssetSvg, DEFAULT_WIDGETS } from "./demo.js";
@@ -73,6 +74,11 @@ import { emailAdminRoutes } from "@4dl/email/admin-routes";
 import { sharedConfigRoutes } from "@4dl/core/admin-routes";
 import { railAdminRoutes } from "@4dl/billing-rail/admin-routes";
 import { maintenanceAdminRoutes } from "@4dl/tenancy";
+import { aiCatalogAdminRoutes } from "@4dl/ai";
+import { planAdminRoutes, stripeAdminRoutes, syncCatalog } from "@4dl/billing";
+import { stripeBranding, stripeCfg } from "./stripe.js";
+import { ensureBilling } from "./billing-store.js";
+import { entitlementEngine, PLAN_QUOTA_META, PLAN_FEATURE_META, type Entitlements } from "./entitlements.js";
 import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
 // Importing the delivery binding also installs the notification REGISTRY
 // (`notifications.ts` calls `configureNotify` at module scope), so this import
@@ -181,8 +187,34 @@ app.use("*", routeGuard);
 app.use("/api/auth/organization/create", orgCreateGuard as unknown as MiddlewareHandler<AppEnv>);
 app.use("/api/auth/organization/update", orgUpdateGuard as unknown as MiddlewareHandler<AppEnv>);
 
-// Better Auth handler: sign-up/in, magic-link, Google, organization + member
-// management all live under /api/auth/*.
+/**
+ * THE ONE GATE in front of the emailed sign-in code, ahead of the catch-all so
+ * this exact path lands here rather than on Better Auth's handler.
+ *
+ * On a product where a code is the only way a person gets in, everything that
+ * protects the front door — the bot check, the 30-second cooldown, the per-IP
+ * hourly ceiling, invite-only eligibility and the deliverability pre-flight —
+ * lives in `otpSendGuard` and nowhere else.
+ */
+app.post("/api/auth/email-otp/send-verification-otp", otpSendGuard as unknown as MiddlewareHandler<AppEnv>);
+
+/**
+ * The two sibling endpoints the emailOTP plugin registers unconditionally, both
+ * closed.
+ *
+ * Each calls the same `sendVerificationOTP` callback directly, so each is a way
+ * around the guard above entirely — no Turnstile, no cooldown, no per-IP ceiling,
+ * no eligibility — which would let somebody keep requesting codes after an
+ * operator turned the bot check on. A station's credential login is a different
+ * plugin and is unaffected; nothing else here has a password to reset, so
+ * password-reset OTP is attack surface with no legitimate caller. 404 rather
+ * than 403: do not confirm it exists.
+ */
+app.post("/api/auth/email-otp/request-password-reset", (c) => c.json({ error: "not_found" }, 404));
+app.post("/api/auth/forget-password/email-otp", (c) => c.json({ error: "not_found" }, 404));
+
+// Better Auth handler: the rest of its lane — OTP verify, passkeys, station
+// credentials, sessions, organization + member management.
 app.on(["POST", "GET"], "/api/auth/*", (c) => c.get("auth").handler(c.req.raw));
 
 app.get("/health", (c) => c.json({ ok: true, service: "scena-api" }));
@@ -280,6 +312,95 @@ app.route("/api", railAdminRoutes({
   // `isPlatformAdmin` checks against ADMIN_EMAILS, so it names whoever the
   // allowlist let in.
   operatorRef: (c) => (c as unknown as AppContext).get("user")?.email ?? "operator",
+}) as unknown as Hono<AppEnv>);
+
+/**
+ * THE STRIPE LANE'S OPERATOR ROUTES — `@4dl/billing`'s, and Scena had none.
+ *
+ * `@4dl/admin`'s `PlatformStripeSection` speaks `/admin/stripe/status`,
+ * `/admin/stripe/config` and `/admin/stripe/sync`. Scena answered only the
+ * third, in a shape nothing rendered, so its console configured Stripe through
+ * the GENERIC `/api/admin/config` form — which stores whatever string it is
+ * handed. A live secret key filed under a `test` mode, a publishable key in the
+ * secret slot, a signing secret in either: all saved, none reported, and each
+ * one a payment path that is dead or dangerous in a way no screen said.
+ *
+ * `syncCatalog` is `@4dl/billing`'s own function now, passed straight through
+ * rather than adapted. It was injected because Scena's `plans` and
+ * `credit_packs` carried `price_cents` + `currency` + `interval` where the
+ * shared store has `price_usd_month`; `billing-reconcile.ts` reconciled them,
+ * and the ~60-line copy in `stripe.ts` went with the difference.
+ */
+app.route("/api", stripeAdminRoutes({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  // The catalog seed is idempotent and version-stamped, so a sync that runs
+  // against a database seeded on an older catalog reconciles it first.
+  seed: (db) => ensureBilling(db),
+  syncCatalog: (db, secretKey) => syncCatalog(db, secretKey, stripeBranding),
+  /*
+    The rebuild repair, which Scena had no path to at all. An ordinary sync
+    skips any row already holding a `stripe_price_id`, so a row whose Stripe
+    price drifted — edited in the dashboard, deleted by hand, half-written by an
+    interrupted sync — reported "0 synced" while every checkout failed with "No
+    such price". Nulling the ids lets the sync recreate them at the current
+    price; anyone already subscribed keeps their old price until they
+    re-subscribe, which is why the panel puts this behind a confirmation.
+  */
+  clearCatalogIds: async (db) => {
+    const plans = await db
+      .prepare("UPDATE plans SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)")
+      .run();
+    const packs = await db
+      .prepare("UPDATE credit_packs SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)")
+      .run();
+    return { cleared: plans.meta?.changes ?? 0, clearedPacks: packs.meta?.changes ?? 0 };
+  },
+}) as unknown as Hono<AppEnv>);
+
+/**
+ * THE AI CATALOG'S OPERATOR ROUTES — `@4dl/ai`'s, replacing Scena's own.
+ *
+ * `/api/admin/models*` was three hand-written handlers over `ai_models`. The
+ * catalog itself became `@4dl/ai`'s at the AI_SCHEMA migration, so what was left
+ * here was a second, thinner API over the same table — and thinner in ways that
+ * cost: the shared reader seeds from the PLATFORM's published catalog (a fresh
+ * app arrives priced rather than on the twelve-row floor), applies whatever
+ * another 4DL app broadcast with "apply to every app", disables models whose
+ * announced shutdown date has passed, and returns each row's price in CREDITS
+ * beside its neuron rate card. Scena's returned rows.
+ *
+ * The PATCH carries the `allApps` broadcast, which is the whole reason the
+ * shared selection exists and which Scena had no way to send or receive from
+ * this screen.
+ */
+app.route("/api", aiCatalogAdminRoutes({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  appName: "Scena",
+}) as unknown as Hono<AppEnv>);
+
+/**
+ * THE PLAN CATALOG'S OPERATOR ROUTES — `@4dl/billing`'s, replacing Scena's own.
+ *
+ * `billing-routes.ts` carried two handlers over `plans` that spoke `@4dl/admin`'s
+ * wire contract (dollars, `ord`) against a table storing cents and `sort`. They
+ * were a translation layer, they said so in a comment, and they said the block
+ * would be deleted rather than rewritten the day the columns were reconciled.
+ * `billing-reconcile.ts` reconciled them.
+ *
+ * The two rules that cost real money live in the shared tree and are the reason
+ * not to keep a second copy of it: GRANDFATHERING (`snapshotDowngrade` +
+ * `raiseOverride` hold every workspace already on a tier at what it bought, so
+ * tightening a plan does not silently take a capability away from paying
+ * customers) and THE STRIPE ID NULL-OUT (a repriced plan whose ids survive keeps
+ * charging the old amount forever, because `syncCatalog` skips anything that
+ * already has a price id).
+ */
+app.route("/api", planAdminRoutes<Entitlements>({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  seed: (db) => ensureBilling(db),
+  engine: entitlementEngine,
+  quotaMeta: PLAN_QUOTA_META,
+  featureMeta: PLAN_FEATURE_META,
 }) as unknown as Hono<AppEnv>);
 
 /**

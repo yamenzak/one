@@ -29,6 +29,20 @@ import type { Entitlements } from "./entitlements.js";
  */
 export const PLATFORM_FROM_DEFAULT = "Scena <noreply@4dl.app>";
 
+/**
+ * ⚠️ BUMP THIS WHENEVER `DEFAULT_PLANS` OR `DEFAULT_PACKS` CHANGES IN A WAY AN
+ * EXISTING DEPLOYMENT MUST ADOPT — a price, a name, an entitlement, the order, or
+ * whether a rung is offered at all.
+ *
+ * The seed this replaces was `INSERT OR IGNORE` and nothing else, so it did
+ * exactly nothing on any database that had booted once. Every catalog edit since
+ * has reached a fresh deployment and no live one, silently. `seedBilling` reads
+ * this stamp, reconciles the whole catalog to the declared values when it moves,
+ * and skips otherwise — so a runtime edit an operator makes in the console still
+ * survives every redeploy in between.
+ */
+export const SCENA_CATALOG_VERSION = "2026-08-09";
+
 export interface PlanSeed {
   id: string;
   name: string;

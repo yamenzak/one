@@ -1198,7 +1198,19 @@ describe("the inbox", () => {
     expect(notifications[0]!.type).toBe("screen_offline");
     // Named, not an opaque id — the whole point of the join.
     expect(notifications[0]!.title).toContain("Lobby panel");
-    expect(notifications[0]!.link).toBe("/screens");
+    /*
+      ⚠️ This asserted `/screens`, which is not a route — the fleet list is `/`,
+      and `/screens/:id` is one screen's detail. The test was pinning the bug: it
+      passed for as long as nothing rendered a notification, and the moment the
+      bell landed, tapping "a screen went offline" would have dropped somebody on
+      the SPA's catch-all.
+
+      The dashboard's `notifications.conformance.test.ts` now checks every link
+      in the registry against the real route table, which is the assertion that
+      generalises. This one keeps a narrower claim it can actually own: the
+      notification arrives WITH a destination.
+    */
+    expect(notifications[0]!.link).toBe("/");
   });
 
   it("marks one read, and then all", async () => {
@@ -1254,7 +1266,32 @@ describe("the operator console answers on its door and nowhere else", () => {
     "/api/admin/rail/parked",
     "/api/admin/domains/config",
     "/api/admin/turnstile/config",
+    // The plan catalog. Scena's handler is still hand-written (its `plans` table
+    // is `price_cents`, not the shared `price_usd_month`) but it answers
+    // `@4dl/admin`'s contract, so the panel is the shared one and this list is
+    // where "the panel renders and 404s on its first read" gets caught.
+    "/api/admin/plans",
+    /*
+      THE STRIPE LANE. `PlatformStripeSection` opens on `status` and cannot
+      render at all without it — and Scena answered only `sync`, in a shape
+      nothing read, so the panel could not be mounted here until the route tree
+      became `@4dl/billing`'s. `config` is the write; both are listed because a
+      console that reads and cannot save is its own kind of broken.
+    */
+    "/api/admin/stripe/status",
+    // The AI catalog. `@4dl/ai`'s routes, replacing Scena's own `/admin/models`
+    // — and `config` is the one that carries the shared-store read, which is
+    // what stops the panel reporting "no key" over a key set platform-wide.
+    "/api/admin/ai/models",
+    "/api/admin/ai/config",
   ];
+
+  /**
+   * The WRITE halves, which a GET cannot probe — Hono answers 404 for a path
+   * that exists on another method, so listing them above would fail for the
+   * wrong reason and read as "not mounted".
+   */
+  const ADMIN_WRITE_SURFACES = ["/api/admin/stripe/config"];
 
   it("registers every endpoint the console's shared panels call", async () => {
     const { cookie, door } = await newWorkspace("console");
@@ -1263,6 +1300,10 @@ describe("the operator console answers on its door and nowhere else", () => {
       // 404 here means the route was never mounted — a panel that renders and
       // then fails on its first read. Anything else (200, 403, 503) means the
       // surface exists and the guard is doing its job.
+      expect(res.status, `${path} is not mounted`).not.toBe(404);
+    }
+    for (const path of ADMIN_WRITE_SURFACES) {
+      const res = await SELF.fetch(`${door}${path}`, { method: "POST", headers: { cookie, "content-type": "application/json" }, body: "{}" });
       expect(res.status, `${path} is not mounted`).not.toBe(404);
     }
   });

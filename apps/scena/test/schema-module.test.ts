@@ -12,6 +12,7 @@
 import { describe, expect, it } from "vitest";
 import { schemaStatements } from "@4dl/core";
 import { AI_SCHEMA } from "@4dl/ai";
+import { BILLING_SCHEMA } from "@4dl/billing";
 import { SCENA_SCHEMA } from "../src/schema.js";
 import { SCHEMA_MODULES } from "../src/db.js";
 
@@ -70,11 +71,19 @@ describe("the Scena schema module", () => {
     // here with different columns from the shared ones, which is precisely why
     // they could not both exist — a `CREATE TABLE IF NOT EXISTS` is won by
     // whichever module runs first and the loser's columns silently never exist.
+    //
+    // And FIVE more with `BILLING_SCHEMA`: `plans`, `subscriptions`,
+    // `credit_packs`, `credit_ledger` and `stripe_events`. Four of them had the
+    // same column divergence (`price_cents` vs `price_usd_month`, `sort` vs
+    // `ord`, `created_at` vs `at`, epoch ms vs ISO text), which is what kept the
+    // shared module out of the list for four stages; `billing-reconcile.ts`
+    // moves an existing database across. The `overrides_json` ALTER went with
+    // them — `BILLING_SCHEMA` declares that column itself.
     const ddl = schemaStatements(SCENA_SCHEMA);
-    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(32);
+    expect(ddl.filter((s) => s.startsWith("CREATE TABLE"))).toHaveLength(27);
     expect(ddl.filter((s) => s.startsWith("CREATE INDEX"))).toHaveLength(10);
     expect(ddl.filter((s) => s.startsWith("CREATE UNIQUE INDEX"))).toHaveLength(0);
-    expect(SCENA_SCHEMA.alters ?? []).toHaveLength(52);
+    expect(SCENA_SCHEMA.alters ?? []).toHaveLength(51);
     expect(SCENA_SCHEMA.backfills ?? []).toHaveLength(7);
   });
 });
@@ -146,6 +155,25 @@ describe("erasure is derivable from the declaration", () => {
       .map((s) => /CREATE TABLE IF NOT EXISTS "?(\w+)"?/.exec(s)?.[1] ?? "");
     expect(aiTables).toContain("ai_models");
     expect([...created].filter((t) => aiTables.includes(t))).toEqual([]);
+  });
+
+  /*
+    AND NONE OF `@4dl/billing`'s, for exactly the same reason and with a sharper
+    consequence.
+
+    Four of the five differed in COLUMNS, not just in ownership. Re-declaring
+    `plans` here would win the `CREATE TABLE IF NOT EXISTS` on a fresh database,
+    the shared store's `SELECT … price_usd_month` would fail on a column that
+    never existed, and the whole billing surface would 500 — while every test
+    that seeds its own rows through this module kept passing.
+  */
+  it("declares none of `@4dl/billing`'s tables", () => {
+    const billingTables = schemaStatements(BILLING_SCHEMA)
+      .filter((s) => s.startsWith("CREATE TABLE"))
+      .map((s) => /CREATE TABLE IF NOT EXISTS "?(\w+)"?/.exec(s)?.[1] ?? "");
+    expect(billingTables).toContain("plans");
+    expect(billingTables).toContain("subscriptions");
+    expect([...created].filter((t) => billingTables.includes(t))).toEqual([]);
   });
 
   it("does not try to cascade the tenant row itself", () => {

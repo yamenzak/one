@@ -11,23 +11,41 @@
  * Crypto for webhook signature verification — no SDK, Workers-native.
  */
 
-import type { ConfigSource } from "@4dl/core";
+import { nowIso, type ConfigSource } from "@4dl/core";
+import { hasPaymentMethod, resolveStripeConfig, reverseChargedCredits, type StripeBranding } from "@4dl/billing";
 import type { Env } from "./env.js";
 import { DEMO_TENANT } from "./db.js";
 import {
   getConfig,
-  listPlans,
-  listPacks,
   getPlan,
   getPack,
-  setPlanStripe,
-  setPackStripe,
   getSubscription,
   updateSubscription,
   type PlanRow,
 } from "./billing-store.js";
 import { grantForTenant } from "./billing-service.js";
 import { notifyRole } from "./notify.js";
+
+/**
+ * ⚠️ THIS IS LIVE DATA, not a naming choice.
+ *
+ * `metadata[scena_tenant]` is stamped on every Stripe customer, subscription,
+ * price and checkout session Scena has ever created, and the webhook reads it
+ * back to decide whose workspace an event is about. Changing it orphans
+ * everything already sold — and on a shared Stripe account it also un-attributes
+ * the events, so they park instead of applying. The literals below (`scena_pack`,
+ * `scena_plan`, `scena_credits`) share the prefix and are the same promise.
+ */
+export const SCENA_METADATA_PREFIX = "scena";
+
+/**
+ * The branding `@4dl/billing`'s shared Stripe helpers take.
+ *
+ * `productPrefix` is cosmetic — it is what a buyer reads on their receipt, and
+ * "Scena Pro" is what Scena's own sync has always written. `metadataPrefix` is
+ * not cosmetic at all; see the paragraph above it.
+ */
+export const stripeBranding: StripeBranding = { metadataPrefix: SCENA_METADATA_PREFIX, productPrefix: "Scena" };
 
 export interface StripeCfg {
   mode: string; // disabled | test | live
@@ -37,24 +55,28 @@ export interface StripeCfg {
 }
 
 /**
- * ONE STRIPE ACCOUNT, MANY APPS.
+ * ONE STRIPE ACCOUNT, MANY APPS — and TWO LANES within it.
  *
  * `src` is a `ConfigSource` so this reads the shared store: the account keys and
  * the mode are the platform's, and only `stripe.webhook_secret` is per-endpoint
  * (hence per-app) — which is exactly how `SHARED_CONFIG_KEYS` is drawn.
  *
- * Stage 4 moves this onto `@4dl/billing-rail`, which adds event→app attribution
- * so a webhook for Kova cannot be answered by Scena. Until then the shared keys
- * are the useful half.
+ * ⚠️ **It resolves the LANE, and that is not cosmetic.** This used to read
+ * `stripe.secret_key` — one flat, unscoped key — while the operator console now
+ * writes `stripe.test.*` and `stripe.live.*` through `@4dl/billing`'s
+ * `stripeAdminRoutes`. Left as it was, every key an operator pasted would have
+ * been stored correctly, reported as set by the console, and read by NOTHING:
+ * `stripeEnabled` would answer false, checkout would degrade to "billing
+ * pending", and the screen would say Stripe was not configured while the panel
+ * beside it said it was.
+ *
+ * `resolveStripeConfig` reads the active lane first and falls back to the legacy
+ * unscoped key per credential, so a deployment configured before the lanes
+ * existed keeps working untouched.
  */
 export async function stripeCfg(src: ConfigSource): Promise<StripeCfg> {
-  const cfg = await getConfig(src);
-  return {
-    mode: cfg["stripe.mode"] ?? "disabled",
-    secretKey: cfg["stripe.secret_key"] ?? "",
-    publishableKey: cfg["stripe.publishable_key"] ?? "",
-    webhookSecret: cfg["stripe.webhook_secret"] ?? "",
-  };
+  const { mode, secretKey, publishableKey, webhookSecret } = resolveStripeConfig(await getConfig(src));
+  return { mode, secretKey, publishableKey, webhookSecret };
 }
 
 export function stripeEnabled(cfg: StripeCfg): boolean {
@@ -86,58 +108,34 @@ async function stripeApi<T = unknown>(cfg: StripeCfg, path: string, method: "GET
   return json;
 }
 
-/* ----------------------------- catalog sync ------------------------------ */
+/*
+  THE CATALOG SYNC IS `@4dl/billing`'s NOW — `syncCatalog(db, secretKey,
+  branding)`, mounted through `stripeAdminRoutes` in index.ts.
 
-export interface SyncSummary {
-  plans: { id: string; productId: string; priceId: string }[];
-  packs: { id: string; productId: string; priceId: string }[];
-}
+  What was here was ~60 lines that created a product and a price per paid plan
+  and per pack, and it read `price_cents` + `currency` + `interval` — which is
+  the ONE reason it could not be the shared function. `billing-reconcile.ts`
+  moved the columns.
 
-/**
- * Push the D1 catalog into Stripe: create a product + recurring price per paid
- * plan and a product + one-time price per credit pack, storing their ids back
- * in D1. Idempotent — skips anything that already has a `stripe_price_id`.
- */
-export async function syncCatalog(env: Env): Promise<SyncSummary> {
-  const cfg = await stripeCfg(env);
-  if (!stripeEnabled(cfg)) throw new Error("stripe not configured");
-  const out: SyncSummary = { plans: [], packs: [] };
+  Three things the shared one does that this did not, and each is a real defect
+  rather than a nicety:
 
-  for (const p of await listPlans(env.DB)) {
-    if (p.price_cents <= 0 || p.active !== 1) continue;
-    if (p.stripe_price_id) {
-      out.plans.push({ id: p.id, productId: p.stripe_product_id ?? "", priceId: p.stripe_price_id });
-      continue;
-    }
-    const product = await stripeApi<{ id: string }>(cfg, "products", "POST", { name: `Scena ${p.name}`, metadata: { scena_plan: p.id } });
-    const price = await stripeApi<{ id: string }>(cfg, "prices", "POST", {
-      product: product.id,
-      currency: p.currency || "usd",
-      unit_amount: p.price_cents,
-      recurring: { interval: p.interval || "month" },
-      metadata: { scena_plan: p.id },
-    });
-    await setPlanStripe(env.DB, p.id, product.id, price.id);
-    out.plans.push({ id: p.id, productId: product.id, priceId: price.id });
-  }
+    A RENAMED PLAN REACHED NOBODY. This loop `continue`d past any row that
+    already had a price id, so a plan renamed in the console kept its old name
+    on every checkout page, invoice and card statement, permanently, with no way
+    to correct it from anywhere in the product. The shared loop pushes the name
+    to Stripe unconditionally — a Price is immutable, but a Product is not.
 
-  for (const pk of await listPacks(env.DB)) {
-    if (pk.stripe_price_id) {
-      out.packs.push({ id: pk.id, productId: pk.stripe_product_id ?? "", priceId: pk.stripe_price_id });
-      continue;
-    }
-    const product = await stripeApi<{ id: string }>(cfg, "products", "POST", { name: `Scena ${pk.name}`, metadata: { scena_pack: pk.id } });
-    const price = await stripeApi<{ id: string }>(cfg, "prices", "POST", {
-      product: product.id,
-      currency: pk.currency || "usd",
-      unit_amount: pk.price_cents,
-      metadata: { scena_pack: pk.id },
-    });
-    await setPackStripe(env.DB, pk.id, product.id, price.id);
-    out.packs.push({ id: pk.id, productId: product.id, priceId: price.id });
-  }
-  return out;
-}
+    ONE STALE ROW ABORTED THE WHOLE SYNC. Ids are lane-specific, so a row still
+    carrying test ids while live is active answers "No such product". Here that
+    threw out of the loop: no plan created, no pack created, and an
+    information-free 500. There it is counted as `renameFailed` and the loop
+    carries on creating what is missing.
+
+    THE SUMMARY WAS ROWS, NOT COUNTS. `stripeAdminRoutes` wanted
+    `{plans, packs}` as numbers and got arrays, so the adapter in index.ts
+    existed purely to call `.length` twice. It is gone with this.
+*/
 
 /* ------------------------------- checkout -------------------------------- */
 
@@ -268,6 +266,21 @@ async function tenantOfEvent(env: Env, obj: Record<string, unknown>): Promise<st
   throw new Error(`stripe event carries no resolvable tenant (customer=${customer ?? "none"})`);
 }
 
+/**
+ * Is this event about the subscription we currently hold for the workspace?
+ *
+ * A mid-cycle upgrade creates a SECOND Stripe subscription, and the old one
+ * keeps emitting `updated` and `deleted` events with its own metadata for a
+ * while afterwards. Acting on those moves the live plan's status or drops a
+ * paying workspace to `free`. No stored id means nothing to contradict — a
+ * fresh subscription is let through so it can be adopted.
+ */
+async function isCurrentSub(env: Env, tenantId: string, obj: Record<string, unknown>): Promise<boolean> {
+  const subId = typeof obj["id"] === "string" ? obj["id"] : null;
+  const cur = await getSubscription(env.DB, tenantId);
+  return !cur?.stripe_sub_id || !subId || cur.stripe_sub_id === subId;
+}
+
 export async function handleWebhook(env: Env, event: StripeEvent): Promise<void> {
   const obj = event.data.object;
   const tenantId = await tenantOfEvent(env, obj);
@@ -310,24 +323,89 @@ export async function handleWebhook(env: Env, event: StripeEvent): Promise<void>
     case "invoice.paid": {
       // Recurring renewal: extend the period, clear dunning, apply any queued
       // downgrade, and drop the monthly credit grant.
-      const periodEnd = Number((obj["lines"] as { data?: { period?: { end?: number } }[] } | undefined)?.data?.[0]?.period?.end ?? 0) * 1000 || null;
+      // Stripe reports period boundaries in epoch SECONDS; the column is ISO
+      // text, like every other timestamp on this row.
+      const periodEndMs = Number((obj["lines"] as { data?: { period?: { end?: number } }[] } | undefined)?.data?.[0]?.period?.end ?? 0) * 1000 || null;
+      const periodEnd = periodEndMs ? new Date(periodEndMs).toISOString() : null;
       const sub = await getSubscription(env.DB, tenantId);
       const nextPlan = sub.pending_plan_id ?? sub.plan_id;
-      await updateSubscription(env.DB, tenantId, {
-        plan_id: nextPlan,
-        pending_plan_id: null,
-        status: "active",
-        current_period_end: periodEnd,
-        past_due_at: null,
-        suspend_at: null,
-        delete_at: null,
-      });
+      /*
+        ⚠️ `unlessLadderOwned` — this wrote `active` unconditionally.
+
+        A late or duplicate `invoice.paid` therefore pulled a workspace back out
+        of `suspended` (stalling the ladder, which selects on the previous rung)
+        and out of `closing` (undoing a deletion the owner asked for, since
+        `scheduleTenantClose` cancels the Stripe subscription and Stripe answers
+        with events of its own). Both fail SAFE, so neither reports anything.
+
+        Paying IS the way out of `past_due`, and that is unaffected: `past_due`
+        is not on the list. Coming back from `suspended` is an operator action,
+        not a webhook's.
+      */
+      await updateSubscription(
+        env.DB,
+        tenantId,
+        {
+          plan_id: nextPlan,
+          pending_plan_id: null,
+          status: "active",
+          current_period_end: periodEnd,
+          past_due_at: null,
+          suspend_at: null,
+          delete_at: null,
+        },
+        { unlessLadderOwned: true },
+      );
       await grantForTenant(env, tenantId);
+      break;
+    }
+    /**
+     * MONEY WENT BACK, SO THE CREDITS HAVE TO.
+     *
+     * Scena sells four credit packs and had no handler for either event, so a
+     * refunded pack left its credits spendable — the workspace kept the goods
+     * and the money, and nothing reported a problem.
+     *
+     * The maths is `@4dl/billing`'s: proportional to the refunded share, clamped
+     * to the pack, and incremental against the CUMULATIVE `amount_refunded`
+     * Stripe re-sends on every partial refund. A dispute carries no customer and
+     * empty metadata, so the underlying charge is fetched first — and that
+     * lookup THROWS rather than returning empty, which is what makes an
+     * unattributable chargeback redelivered rather than quietly dropped.
+     */
+    case "charge.refunded":
+    case "charge.dispute.created": {
+      const cfg = await stripeCfg(env);
+      const outcome = await reverseChargedCredits(
+        {
+          db: env.DB,
+          secretKey: cfg.secretKey,
+          metadataPrefix: SCENA_METADATA_PREFIX,
+          authority: async (id) => {
+            const billing = env.BILLING.get(env.BILLING.idFromName(id));
+            await billing.bind(id);
+            return billing;
+          },
+        },
+        event,
+      );
+      if (!outcome) break;
+      // Sent whatever the maths did: a plan-level refund carries no credit count,
+      // so there is nothing to reverse and still something an owner must know.
+      await notifyRole(env, outcome.tenantId, "owner", {
+        type: outcome.disputed ? "payment_disputed" : "payment_refunded",
+        message: outcome.disputed
+          ? "A payment on this workspace was disputed. Any credits it granted may be reversed — check the balance."
+          : "A payment on this workspace was refunded. Credits from a refunded pack have been reversed from the balance.",
+        dedupeKey: `${event.type}:${String(obj["id"] ?? "")}`,
+      }).catch(() => undefined);
       break;
     }
     case "invoice.payment_failed": {
       // Enter dunning: mark past_due; the lifecycle cron schedules suspend/delete.
-      await updateSubscription(env.DB, tenantId, { status: "past_due", past_due_at: Date.now() });
+      // Guarded for the same reason `invoice.paid` is — a failed invoice on a
+      // workspace already suspended must not reset it to the first rung.
+      await updateSubscription(env.DB, tenantId, { status: "past_due", past_due_at: nowIso() }, { unlessLadderOwned: true });
       await notifyRole(env, tenantId, "owner", {
         type: "billing_past_due",
         message: "We couldn't process your latest payment. Update your card to keep your screens live — after a grace period the workspace is suspended.",
@@ -338,13 +416,32 @@ export async function handleWebhook(env: Env, event: StripeEvent): Promise<void>
       break;
     }
     case "customer.subscription.deleted": {
-      await updateSubscription(env.DB, tenantId, { status: "canceled", plan_id: "free", stripe_sub_id: null });
+      // Only if the DELETED subscription is the one we hold. A stale sub being
+      // cleaned up after an upgrade must not drop a workspace whose new
+      // subscription is live and paying.
+      if (!(await isCurrentSub(env, tenantId, obj))) break;
+      await updateSubscription(env.DB, tenantId, { status: "canceled", plan_id: "free", stripe_sub_id: null }, { unlessLadderOwned: true });
       break;
     }
     case "customer.subscription.updated": {
+      if (!(await isCurrentSub(env, tenantId, obj))) break;
       const status = String(obj["status"] ?? "");
+      /*
+        ⚠️ `trialing` ALONE IS NOT A PAID-FOR PLAN.
+
+        Stripe reports `trialing` for a trial with no card attached — a
+        subscription created from the dashboard, or one whose card confirmation
+        has not landed yet. Stamping it granted the plan's full entitlements for
+        the length of the trial to somebody who had paid nothing and could not
+        be charged at the end of it. The same shape, in Kova, handed out a paid
+        tier plus its whole monthly credit grant before the guard existed.
+
+        Scena's own Checkout collects a card, so the ordinary path is unchanged:
+        `hasPaymentMethod` is true and this reads exactly as it did.
+      */
+      if (status === "trialing" && !hasPaymentMethod(obj)) break;
       const map: Record<string, string> = { active: "active", past_due: "past_due", canceled: "canceled", unpaid: "past_due", trialing: "trialing" };
-      if (map[status]) await updateSubscription(env.DB, tenantId, { status: map[status] });
+      if (map[status]) await updateSubscription(env.DB, tenantId, { status: map[status] }, { unlessLadderOwned: true });
       break;
     }
   }
@@ -354,16 +451,18 @@ function metaOf(obj: Record<string, unknown>): Record<string, unknown> {
   return (obj["metadata"] as Record<string, unknown>) ?? {};
 }
 
-/** Exposed for the admin "test connection" button. */
-export async function stripePing(env: Env): Promise<{ ok: boolean; account?: string; error?: string }> {
-  const cfg = await stripeCfg(env);
-  if (!stripeEnabled(cfg)) return { ok: false, error: "not configured" };
-  try {
-    const acct = await stripeApi<{ id: string }>(cfg, "account", "GET");
-    return { ok: true, account: acct.id };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "failed" };
-  }
-}
+/*
+  `stripePing` — a live `GET /v1/account` behind `/api/admin/stripe/ping` — was
+  DELETED with the console panel that called it, rather than kept.
+
+  It was a good idea with no caller, which is the exact defect
+  `docs/PLATFORM-AUDIT.md` is a catalogue of, and keeping it with a comment
+  explaining its value would have made this file one more instance. The idea is
+  worth having: `status` reports what is STORED and never touches the network, so
+  a key that is present, in the right lane and REVOKED looks identical to a
+  working one in every field it returns. But the place for it is
+  `@4dl/billing`'s `stripeAdminRoutes` with a button in `@4dl/admin`'s panel,
+  where all three apps get it — not here, where none of them did.
+*/
 
 export type { PlanRow };

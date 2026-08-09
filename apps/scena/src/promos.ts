@@ -116,7 +116,7 @@ export async function redeemPromo(db: D1Database, code: string, tenantId = DEMO_
     const plan = await getPlan(db, p.plan_id ?? "");
     if (!plan) throw new Error("bad_plan" satisfies PromoError);
     const months = p.plan_months ?? 12;
-    const periodEnd = Date.now() + months * 30 * 24 * 3600 * 1000;
+    const periodEnd = new Date(Date.now() + months * 30 * 24 * 3600 * 1000).toISOString();
     // Comped: active plan, exempt from dunning, no Stripe subscription.
     await updateSubscription(db, tenantId, {
       plan_id: plan.id,

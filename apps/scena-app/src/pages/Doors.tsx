@@ -23,8 +23,8 @@
  * outage.
  */
 
-import { NoTenant, RootSignpost, WrongDoor, type DoorDestination } from "@4dl/app-kit";
-import { MapPin, Monitor, Row, Store } from "@4dl/ui";
+import { NoTenant, RefreshNote, RootSignpost, WrongDoor, type DoorDestination } from "@4dl/app-kit";
+import { AlertTriangle, ArrowRight, Button, Card, IconBadge, MapPin, Monitor, Page, Row, Stagger, Store, TierAnchor } from "@4dl/ui";
 import { useEffect, useState } from "react";
 import { apiFetch, API_BASE } from "../api.js";
 import { useTheme } from "../theme.js";
@@ -118,4 +118,66 @@ export function ScenaNoWorkspace({ host }: { host: HostInfo }) {
 /** A reserved or over-nested host under the root. Serves nothing, says nothing. */
 export function ScenaWrongDoor() {
   return <WrongDoor copy={{ eyebrow: "Nothing here", title: "This address doesn’t serve anything." }} />;
+}
+
+/**
+ * The workspace is closed for non-payment — the whole dashboard, replaced.
+ *
+ * Rung two of the platform ladder (`@4dl/billing`'s `DUNNING_DAYS`): past due →
+ * read-only at 7 days → blocked at 30 → erased at 37. Read-only still serves the
+ * dashboard and refuses writes; this withholds it.
+ *
+ * ── Why the SCREENS keep playing, and why that has to be said here ──────────
+ *
+ * This is the one thing a signage product owes its customer that the other apps
+ * do not have to think about: a blocked workspace is a dashboard nobody can use,
+ * not sixty dark panels in a hotel lobby. The player holds its cached manifest
+ * and keeps running on the clock, so what stops is EDITING, not playout.
+ * Somebody reading this screen is standing in a building full of screens they
+ * can see, and telling them nothing about those screens invites the worst guess.
+ *
+ * ── Two doors stay open ─────────────────────────────────────────────────────
+ *
+ * `@4dl/tenancy`'s gate exempts `/api/tenant/close` and `/api/me/*` from every
+ * rung so leaving is always possible, and a screen with no exit would make that
+ * exemption protect nothing. Paying must be A way out, not the ONLY one.
+ */
+export function WorkspaceBlocked({ host }: { host: HostInfo }) {
+  const name = host.tenant?.name ?? "This workspace";
+  return (
+    <Page className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 p-6">
+      {/* No T1 anchor: the subject is a state, not a value — the icon and the
+          sentence are the anchor. */}
+      <TierAnchor className="flex flex-col items-center gap-3 text-center">
+        <IconBadge icon={AlertTriangle} tone="danger" size="lg" />
+        <div className="space-y-1.5">
+          <h1 className="text-title-1">{name} is paused</h1>
+          <p className="text-body text-muted-foreground">
+            The subscription is unpaid, so the dashboard is on hold. Nothing has been deleted.
+          </p>
+        </div>
+      </TierAnchor>
+
+      <Stagger className="space-y-3">
+        <Card className="space-y-3">
+          <Row icon={Monitor} sub="They keep playing the last published channel from their own cache">
+            Your screens are still running
+          </Row>
+          <p className="text-caption leading-relaxed text-muted-foreground">
+            Channels, media and boards are all still here. Settling the invoice restores editing immediately, and
+            closing the workspace and exporting stay available either way.
+          </p>
+          {/* A full page load, not a router navigation: the Shell is not mounted,
+              so there is no route table to navigate inside. */}
+          <Button size="lg" className="w-full" onClick={() => { window.location.href = "/billing"; }}>
+            Go to billing
+            <ArrowRight aria-hidden />
+          </Button>
+        </Card>
+        {/* The gate was read once, at boot. When the invoice clears, asking again
+            is the only way back in. */}
+        <RefreshNote label="Already settled?" action="Check again" />
+      </Stagger>
+    </Page>
+  );
 }

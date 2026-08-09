@@ -11,6 +11,10 @@ import { Shell } from "./Shell.js";
 import { RoleProvider } from "./permissions.js";
 import { EntitlementsProvider } from "./entitlements.js";
 import { clearEmergency, getActiveEmergency, getMe, getBilling, getBranding, setUnauthorizedHandler, type ActiveEmergency, type Me, type BillingState } from "./api.js";
+import { setUnauthorizedHandler as setKitUnauthorizedHandler } from "@4dl/app-kit";
+import { InboxPage } from "./Notifications.js";
+import { MaintenanceScreen } from "@4dl/app-kit";
+import { WorkspaceBlocked } from "./pages/Doors.js";
 import { clearBrandTheme, type WorkspaceBrand } from "./brand-theme.js";
 import { EmergencyModal } from "./components/EmergencyModal.js";
 import { canAccessKey, PAGE_META } from "./nav.js";
@@ -122,7 +126,20 @@ export function App() {
   */
   useEffect(() => {
     setUnauthorizedHandler(() => { void reloadMe(); });
-    return () => setUnauthorizedHandler(null);
+    /*
+      BOTH FETCH LAYERS, because this app now has two.
+
+      Everything the SPA writes goes through `apiFetch`; the inbox's socket and
+      list go through `@4dl/app-kit`'s own `api`, inside the package. They keep
+      separate handlers, so arming only one leaves a whole surface where an
+      expired session reads as an empty inbox rather than as signed out — which
+      is the exact failure `apiFetch` was introduced to end.
+    */
+    setKitUnauthorizedHandler(() => { void reloadMe(); });
+    return () => {
+      setUnauthorizedHandler(null);
+      setKitUnauthorizedHandler(null);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once; reloadMe is stable enough (it only closes over setState)
   }, []);
   useEffect(() => {
@@ -238,6 +255,27 @@ export function App() {
     later fails to compile here instead of silently falling through to the Shell,
     which is precisely how this happened.
   */
+  /*
+    THE DEPLOYMENT IS CLOSED — checked BEFORE the door cascade.
+
+    `platform.maintenance = "full"` withholds the app for every workspace at
+    once, and `/api/host` is one of the few endpoints that still answers so the
+    client can render the closed sign rather than a login it could never
+    complete: the sign-in lane is refused at `full`, so the code never arrives
+    and nothing on screen says why.
+
+    The `admin.` door is exempt, exactly as it is server-side — the console is
+    how an operator ENDS the window, and locking them out of it would make the
+    switch a one-way door.
+
+    Nothing rendered this before. The operator panel for the switch has shipped
+    in all three consoles since `@4dl/admin` existed, so turning it on refused
+    every write across the deployment with no explanation anywhere.
+  */
+  if (host.maintenance?.level === "full" && host.role !== "admin") {
+    return <MaintenanceScreen state={host.maintenance} brandName={host.tenant?.name ?? null} />;
+  }
+
   const doorScreen = ((): ReactNode | null => {
     switch (host.role) {
       case "root":
@@ -259,7 +297,18 @@ export function App() {
       case "custom":
         // A well-formed workspace address that no workspace owns. NOT a login: a
         // sign-in form here invites somebody into a place that does not exist.
-        return host.tenant ? null : <ScenaNoWorkspace host={host} />;
+        if (!host.tenant) return <ScenaNoWorkspace host={host} />;
+        /*
+          RUNG TWO OF THE LADDER — the workspace is blocked for non-payment, so
+          the app is WITHHELD rather than made read-only.
+
+          Read before the session on purpose: the gate is a fact about the
+          address, and a blocked workspace should say so to whoever arrives
+          rather than only after they have signed in. `readOnly` deliberately
+          does NOT come here — reads are never withheld over a bill, at any rung.
+        */
+        if (host.gate?.blocked) return <WorkspaceBlocked host={host} />;
+        return null;
       case "setup":
         // The create-a-workspace lane. Falls through to the auth gate below.
         return null;
@@ -319,6 +368,7 @@ export function App() {
         emergencyActive={Boolean(emergency)}
         onEmergency={() => (emergency ? clearOverride() : setEmgOpen(true))}
         onSignOut={doSignOut}
+        host={host}
       >
         <ErrorBoundary resetKey={pathname} homePath="/" art={<ScenaMascot mood="sad" size={104} className="mx-auto mb-2" />}>
           {/*
@@ -425,6 +475,10 @@ export function App() {
               </Route>
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/alerts" element={<AlertsPageComp />} />
+              {/* The inbox, behind the bell's "See all". Not in the nav: a
+                  notification is something you are told, not a destination you
+                  visit — the bell is the entry point and this is its overflow. */}
+              <Route path="/inbox" element={<InboxPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/settings" element={<WorkspaceSettingsPage />} />
               <Route path="/team" element={<TeamPage />} />

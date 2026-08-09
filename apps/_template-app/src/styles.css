@@ -1,0 +1,35 @@
+@import "tailwindcss";
+@import "@4dl/ui/tokens.css";
+/* This app's own accents. `@4dl/ui` owns surfaces, the brand primary and the
+   five status tones; it may not own a product's information vocabulary. Read
+   `tokens.accents.css`'s header before changing a value — both modes are
+   validated against a palette checker, not chosen by eye. */
+@import "./tokens.accents.css";
+
+/* ⚠️ TAILWIND v4: SCAN EVERY WORKSPACE PACKAGE THAT RENDERS.
+   Tailwind only sees source it is pointed at, and a package resolved through
+   node_modules is not covered by the automatic detection. Miss one and its
+   components still mount, still typecheck and still pass every test — they just
+   render with a subset of their classes, whichever ones some other file happened
+   to use too. In Kova that is exactly how an update card lost its bottom offset
+   and rendered flush against the browser chrome with its buttons clipped.
+
+   Adding a workspace package with JSX in it? Add it here in the same commit;
+   `tailwind-sources.conformance.test.ts` makes forgetting a test failure. */
+@source "../../../packages/ui/src";
+@source "../../../packages/app-kit/src";
+@source "../../../packages/admin/src";
+
+@import "@fontsource/figtree/400.css";
+@import "@fontsource/figtree/500.css";
+@import "@fontsource/figtree/600.css";
+@import "@fontsource/figtree/700.css";
+
+/* Hide the native scrollbar on horizontal scrollers (chip rows, strips). */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

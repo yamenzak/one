@@ -12,7 +12,8 @@ a frozen ALLOW list that can only shrink. Thirteen of the fourteen are empty —
 `@4dl/core`'s is the only one with entries.
 
 **Starting a new app?** → [`apps/_template/README.md`](apps/_template/README.md).
-It typechecks and its tests pass in this workspace, so it cannot rot.
+The worker is `apps/_template`, its browser half is `apps/_template-app`, and
+both typecheck and pass their tests in this workspace, so neither can rot.
 
 ---
 
@@ -20,7 +21,15 @@ It typechecks and its tests pass in this workspace, so it cannot rot.
 > is the two-app assessment: what is still an app's that should be here, measured
 > rather than guessed, with the commands to re-check every claim. Read it before
 > proposing a new package — most of what looks missing is already listed there,
-> and some of what looks extractable is argued against.
+> and some of what looks extractable is argued against. Everything on it is now
+> closed.
+>
+> **Where the next ADOPTION is.** [docs/PLATFORM-AUDIT.md](docs/PLATFORM-AUDIT.md)
+> is the three-app assessment, and it asks a different question. The two-app
+> audit found *mechanisms with no surface*; with three apps the surfaces exist
+> and are good, and the finding is that **an app simply does not mount one** —
+> which fails nothing, anywhere. Read it before adding an app, and before
+> assuming a shared capability is reaching every product.
 
 
 ## The packages
@@ -30,7 +39,7 @@ It typechecks and its tests pass in this workspace, so it cannot rot.
 | [`@4dl/core`](packages/core/README.md) | ids, defensive JSON, the **bindings contract**, the **composed schema runner**, `app_config` + the **shared platform-config store**, the boundary checker | its `SchemaModule`s |
 | [`@4dl/tenancy`](packages/tenancy/README.md) | the five doors, host→tenant + KV cache, custom domains (CF for SaaS + DCV), the standing/gate model, the deployment-wide maintenance switch, the tenant-CLOSE routes | root domain, reserved labels, `statusOf`, the close transition |
 | [`@4dl/auth`](packages/auth/README.md) | passwordless identity (OTP + passkeys), the request identity, the **five-gate route guard**, the grant algebra, staff seats + the staff ROUTES, step-up codes + the self-DELETE route | the RBAC registry, the route table, brand, seat quota, the role copy, the invite email, the purge |
-| [`@4dl/billing`](packages/billing/README.md) | the entitlement engine, the catalog STORE (seeding, plan/pack reads, quota + feature gates), credit metering, `CreditLedgerDO`, the Stripe client, the dunning ladder | quota + feature keys, and the catalog's CONTENTS |
+| [`@4dl/billing`](packages/billing/README.md) | the entitlement engine, the catalog STORE (seeding, plan/pack reads, quota + feature gates), credit metering, `CreditLedgerDO`, the Stripe client, the dunning ladder, and the two OPERATOR route trees (plan catalog, Stripe lane) | quota + feature keys, the catalog's CONTENTS, and which tables hold it (`syncCatalog`) |
 | [`@4dl/commerce`](packages/commerce/README.md) | what a tenant sells its own customers: budgets (queue, never sum), the customer-lapse ladder, discount codes | the scope list, the lapse copy |
 | [`@4dl/ai`](packages/ai/README.md) | the metered path: reserve → run → settle, the model catalog, pricing parsers, the dev-only mock lane | the feature registry (prompts), where images go |
 | [`@4dl/storage`](packages/storage/README.md) | R2 + the media ledger + the quota gate + the three media ROUTES (upload, meter, authed read) | the quota resolver, the closed `purpose` set, the scope check |
@@ -178,6 +187,14 @@ then delete the original — do not "port" it.
    list: a purge must swallow delete errors, so a forgotten table and a renamed
    column both read as a clean erasure. Kova kept three lists by hand and
    accumulated three real defects.
+4b. **A package that READS a column must DECLARE it** — including a column on
+   another module's table, as an `ADD COLUMN` alter. Composed schema makes it
+   easy to depend on a column some app happens to have, and the first app always
+   happens to have it, because that is where the code was written.
+   `@4dl/ai`'s `generate()` opened with a `SELECT ai_config_json …` that only
+   Kova declared, so in every other app the whole AI suite threw on every call —
+   a paid entitlement, dead, past a clean typecheck, the package's own green
+   suite and the app's.
 5. **Keep the ALLOW list empty.** If the boundary test wants an entry, the design
    is wrong — the vocabulary belongs in the app. The one legitimate exemption is a
    name a *spec or a vendor* chose (`clientExtensionResults` is WebAuthn's).
@@ -202,6 +219,26 @@ At the binding site you will need `c as never` — the seam is structural but Ho
 through every handler would force each call site to name the app's full env, which
 is the coupling the seam exists to avoid.
 
+### An OPERATOR route tree is not a product route tree
+
+The rule that kept the console's handlers in three apps for too long was "route
+trees are the app's", and it is right about the wrong half. A checkout route
+reads a product registry: what a plan grants, which notification to dispatch, who
+may buy. A **plan editor** and a **Stripe credential form** read neither — they
+speak `@4dl/admin`'s wire contract, which is identical in every app, because
+`@4dl/admin` ships the panel that calls them.
+
+The test: **would two apps' versions of this handler differ for a reason a user
+could name?** If not, one of them is going to be worse, and the drift is silent.
+That is exactly what happened — three copies of `/admin/stripe/*`, one with a
+mode-flip catalog swap and two without (so one app's live switch was a payments
+outage), one with a price rebuild and two without, one app with no credential
+screen at all.
+
+What the app still supplies is which TABLES hold its catalog: `syncCatalog`,
+`seed`, `clearCatalogIds`. That seam is what lets an app adopt the routes long
+before it adopts the store.
+
 ### What must NOT move, and why
 
 - **`@kova/protocol`** — wire schemas are per-app by definition.
@@ -217,8 +254,20 @@ is the coupling the seam exists to avoid.
 
 ### Adding an app
 
-Copy `apps/_template` — it typechecks and its tests run in this workspace, so it
-cannot rot. Its README is the file-by-file guide;
+Copy `apps/_template` **and `apps/_template-app`** — the worker and its browser
+half. Both typecheck and their tests run in this workspace, so neither can rot.
+The worker **mounts a route tree for every schema module it applies**,
+which it did not for a long time: a new app inherited nine capabilities that had
+tables, a bound Durable Object, and no way for a person to reach them.
+`scripts/capability-reachable.test.mjs` (in `pnpm gate`) now fails on any app —
+the template included — that installs a package's schema and never mounts its
+routes. The SPA carries the other half: the five doors' screens, the session,
+the theme, `pickScreen`, the Shell's maintenance strip and standing chip, the
+operator console binding, the accent registry and five conformance tests. Every
+UI divergence catalogued in `docs/PLATFORM-AUDIT.md` happened while that
+directory did not exist.
+
+Its README is the file-by-file guide;
 [`docs/SHIPPING-AN-APP.md`](docs/SHIPPING-AN-APP.md) is the walkthrough from
 nothing to deployed.
 

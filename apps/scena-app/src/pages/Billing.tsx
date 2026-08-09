@@ -21,7 +21,7 @@ import { LegalDialog, LegalLinks, type LegalDoc } from "../legal/content.js";
 import { getBilling, changePlan, buyPack, redeemPromo, type BillingState, type Plan, type Violation } from "../api.js";
 // Shared with the onboarding wizard — one derivation of "what you get", so a
 // picker cannot promise something this screen does not list.
-import { dollars, planHighlights as highlightsOf } from "../plan-highlights.js";
+import { usd, planHighlights as highlightsOf } from "../plan-highlights.js";
 
 const num = (n: number) => n.toLocaleString();
 /**
@@ -44,8 +44,16 @@ const mb = (bytes: number) => {
   return `${value} ${unit}`;
 };
 
-function fmtDate(ts: number): string {
-  const ms = ts < 1e12 ? ts * 1000 : ts;
+/**
+ * A date, from either representation the API sends.
+ *
+ * The subscription's timestamps are ISO-8601 text (`@4dl/billing`'s columns);
+ * the credit ledger's `at` is still epoch milliseconds, because a ledger row is
+ * an event stamp rather than a lifecycle boundary and nothing compares it in
+ * SQL. The seconds branch is Stripe's — its period ends arrive in seconds.
+ */
+function fmtDate(ts: number | string): string {
+  const ms = typeof ts === "string" ? Date.parse(ts) : ts < 1e12 ? ts * 1000 : ts;
   return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
@@ -161,7 +169,7 @@ export function BillingPage() {
           <div className="flex items-baseline gap-2.5">
             <span className="text-title-2 font-semibold tracking-tight">{plan?.name ?? sub.plan_id}</span>
             <span className="numeral text-body text-muted-foreground">
-              {plan ? (plan.price_cents === 0 ? "Free" : `${dollars(plan.price_cents)}/${plan.interval}`) : ""}
+              {plan ? (plan.price_usd_month === 0 ? "Free" : `${usd(plan.price_usd_month)}/month`) : ""}
             </span>
           </div>
           <div className="grid grid-cols-3 gap-4 border-t pt-4 text-body">
@@ -241,8 +249,8 @@ export function BillingPage() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {plans.map((p) => {
             const current = p.id === sub.plan_id;
-            const rank = plan?.price_cents ?? 0;
-            const dir = p.price_cents > rank ? "up" : p.price_cents < rank ? "down" : "same";
+            const rank = plan?.price_usd_month ?? 0;
+            const dir = p.price_usd_month > rank ? "up" : p.price_usd_month < rank ? "down" : "same";
             const feats = planHighlights(p);
             return (
               <div
@@ -254,8 +262,8 @@ export function BillingPage() {
                 )}
                 <div className="text-body font-semibold">{p.name}</div>
                 <div className="mt-1.5 flex items-baseline gap-1">
-                  <span className="text-title-2">{p.price_cents === 0 ? "Free" : dollars(p.price_cents)}</span>
-                  {p.price_cents > 0 && <span className="text-caption text-muted-foreground">/{p.interval}</span>}
+                  <span className="text-title-2">{p.price_usd_month === 0 ? "Free" : usd(p.price_usd_month)}</span>
+                  {p.price_usd_month > 0 && <span className="text-caption text-muted-foreground">/month</span>}
                 </div>
                 <div className="mt-1 flex items-center gap-1 text-caption font-medium text-primary">
                   <Sparkles className="size-3" /> {planGrantN(p) > 0 ? `${planGrant(p)} AI credits / mo` : "No AI credits"}
@@ -298,7 +306,7 @@ export function BillingPage() {
               <div className="numeral text-title-3 font-semibold">{num(pk.credits)}</div>
               <div className="mb-3 text-caption text-muted-foreground">credits</div>
               <Button variant="outline" size="sm" className="w-full" disabled={busy === pk.id} onClick={() => purchase(pk.id)}>
-                {dollars(pk.price_cents)}
+                {usd(pk.price_usd)}
               </Button>
             </div>
           ))}
@@ -328,7 +336,7 @@ export function BillingPage() {
                 key={l.id}
                 icon={Receipt}
                 iconTone={l.delta >= 0 ? "success" : "neutral"}
-                sub={`${fmtDate(l.created_at)}${l.ref ? ` · ${l.ref}` : ""}`}
+                sub={`${fmtDate(l.at)}${l.ref ? ` · ${l.ref}` : ""}`}
                 value={
                   <span className={l.delta >= 0 ? "text-success" : undefined}>
                     {l.delta >= 0 ? "+" : ""}
@@ -348,7 +356,7 @@ export function BillingPage() {
       {pending && (
         <PlanChangeDialog
           target={pending}
-          currentPrice={plan?.price_cents ?? 0}
+          currentPrice={plan?.price_usd_month ?? 0}
           stripeEnabled={state.stripeEnabled}
           busy={busy === pending.id}
           onConfirm={() => confirmPlan(pending)}
@@ -383,8 +391,8 @@ function PlanChangeDialog({
   onConfirm: () => void;
   onClose: () => void;
 }) {
-  const paid = target.price_cents > 0;
-  const dir = target.price_cents > currentPrice ? "up" : target.price_cents < currentPrice ? "down" : "same";
+  const paid = target.price_usd_month > 0;
+  const dir = target.price_usd_month > currentPrice ? "up" : target.price_usd_month < currentPrice ? "down" : "same";
   const needsPayment = paid && dir === "up";
   const blockedNoStripe = needsPayment && !stripeEnabled;
   const feats = planHighlights(target);
@@ -397,8 +405,8 @@ function PlanChangeDialog({
     >
       <DialogContent title={`${dir === "up" ? "Upgrade to" : "Switch to"} ${target.name}`} className="sm:max-w-md">
         <div className="flex items-baseline gap-1.5">
-          <span className="text-title-2">{paid ? dollars(target.price_cents) : "Free"}</span>
-          {paid && <span className="text-body text-muted-foreground">/{target.interval}</span>}
+          <span className="text-title-2">{paid ? usd(target.price_usd_month) : "Free"}</span>
+          {paid && <span className="text-body text-muted-foreground">/month</span>}
         </div>
         <ul className="space-y-1.5">
           {feats.map((f) => (
@@ -545,7 +553,7 @@ function reasonLabel(r: string): string {
 
 function planGrantN(p: Plan): number {
   try {
-    return (JSON.parse(p.entitlements_json) as { aiCredits?: { monthlyGrant?: number } }).aiCredits?.monthlyGrant ?? 0;
+    return (JSON.parse(p.entitlements_json ?? "{}") as { aiCredits?: { monthlyGrant?: number } }).aiCredits?.monthlyGrant ?? 0;
   } catch {
     return 0;
   }

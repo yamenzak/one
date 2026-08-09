@@ -10,3 +10,12 @@ export { PlatformDomainsSection, type DomainsSectionProps } from "./sections/dom
 export { PlatformTurnstileSection, type TurnstileSectionProps } from "./sections/turnstile.js";
 export { PlatformSharedConfigSection } from "./sections/shared-config.js";
 export { PlatformRailSection } from "./sections/rail.js";
+export {
+  PlatformPlansSection,
+  PlanEntitlementFields,
+  type PlansSectionProps,
+  type PlanCatalog,
+  type CatalogPlan,
+  type PlanEntitlements,
+  type KeyMeta,
+} from "./sections/plans.js";

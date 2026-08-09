@@ -24,13 +24,13 @@ import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle, Badge, Building2, Button, Callout, Card, ChevronRight, Chip, CircleCheck,
   ConfirmDialog, CreditCard, EmptyState, Eyebrow, Field, Gift, GlanceStrip, Globe, IconBadge, Info, Input, KeyRound, ThumbsUp,
-  LayoutGrid, Mail, Percent, Plus, Reveal, RefreshCw, RotateCcw, Search, SlidersHorizontal, SectionHeader, SegmentedControl, Select, Sheet, ShieldCheck, Wand2,
+  Mail, Percent, Plus, Reveal, RefreshCw, RotateCcw, Search, SlidersHorizontal, SectionHeader, SegmentedControl, Select, Sheet, ShieldCheck, Wand2,
   Skeleton, SkeletonLine, Play, Plug, Spinner, Stagger, Switch, Tag, Trash2, Wallet, Wrench, cn, toneText, type Tone,
   ActionResult, ConfigRow, FieldGroup, LoadError, useLoad, useAction as useActionBase,
 } from "@4dl/ui";
 import {
   AdminConsole as Console, PlatformAiSection, PlatformDomainsSection, providerLabel, type AiCatalogModel, PlatformEmailSection, PlatformMaintenanceSection,
-  PlatformStripeSection, PlatformTurnstileSection, PlatformSharedConfigSection, PlatformRailSection, type ConsoleSection,
+  PlatformStripeSection, PlatformTurnstileSection, PlatformSharedConfigSection, PlatformRailSection, PlatformPlansSection, type ConsoleSection,
 } from "@4dl/admin";
 import { SectionSplit } from "../SectionSplit.js";
 import { api, errorText } from "../../api.js";
@@ -54,7 +54,9 @@ import { fmtPrice } from "../../money.js";
  */
 const ADMIN_SECTIONS: ConsoleSection[] = [
   { group: "Studios & money", key: "tenants", label: "Studios", blurb: "Every studio, its plan, credits and standing", icon: Building2, tone: "primary", render: () => <Tenants /> },
-  { group: "Studios & money", key: "plans", label: "Plans", blurb: "Price, limits and trials owners buy", icon: CreditCard, tone: "cardio", render: () => <PlansConfig /> },
+  // The catalog editor is `@4dl/admin`'s now, and the blurb is finally honest:
+  // this screen could not edit a trial until the panel moved, despite saying so.
+  { group: "Studios & money", key: "plans", label: "Plans", blurb: "Price, limits and trials owners buy", icon: CreditCard, tone: "cardio", render: () => <PlatformPlansSection api={api} errorText={errorText} tenantNoun="studio" /> },
   /* `@4dl/admin`'s, over `@4dl/ai`'s endpoints. Kova's two genuinely-own pieces
      ride in as slots: the live self-test (which runs THIS product's prompts
      through THIS product's parsers) and the 👍/👎 read side (which reads Kova's
@@ -530,260 +532,12 @@ interface EntMeta {
   quotaMeta: Record<string, { label: string; hint: string; unit?: string }>;
 }
 
-function EntitlementFields({ ent, meta, onChange }: { ent: Ent; meta: EntMeta; onChange: (e: Ent) => void }) {
-  const setQuota = (k: string, v: number) => onChange({ ...ent, quotas: { ...ent.quotas, [k]: v } });
-  const setFeature = (k: string, v: boolean) => onChange({ ...ent, features: { ...ent.features, [k]: v } });
-  return (
-    <div className="space-y-5">
-      <FieldGroup title="Limits" hint="A number caps it; ∞ makes it unlimited. Keys come from the platform, so a limit added server-side appears here on its own.">
-        <div className="space-y-3">
-          {meta.quotaKeys.map((k) => {
-            // An unknown key is a new server-side limit, not a bug — label it by
-            // its key and say so, rather than rendering a blank row.
-            const m = meta.quotaMeta[k] ?? { label: k, hint: "New platform limit — no description yet." };
-            const v = ent.quotas[k] ?? 0;
-            const unlimited = v < 0;
-            return (
-              <div key={k} className="flex items-start gap-2">
-                <div className="min-w-0 flex-1 pt-1">
-                  <div className="text-body font-medium">{m.label}{m.unit ? <span className="font-normal text-muted-foreground"> ({m.unit})</span> : null}</div>
-                  <div className="text-caption leading-snug text-muted-foreground">{m.hint}</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setQuota(k, unlimited ? 0 : -1)}
-                  aria-pressed={unlimited}
-                  aria-label={`${m.label}: unlimited`}
-                  className={cn(
-                    "grid size-12 shrink-0 place-items-center rounded-xl text-body-lg font-semibold transition-colors",
-                    unlimited ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground hover:bg-surface-3",
-                  )}
-                >
-                  ∞
-                </button>
-                <Input
-                  type="number"
-                  min={0}
-                  disabled={unlimited}
-                  aria-label={m.label}
-                  value={unlimited ? "" : v}
-                  onChange={(e) => setQuota(k, Math.max(0, Number(e.target.value) || 0))}
-                  placeholder={unlimited ? "∞" : ""}
-                  className="numeral h-12 w-[4.75rem] shrink-0 px-2.5 text-right text-body"
-                />
-              </div>
-            );
-          })}
-        </div>
-      </FieldGroup>
-
-      <FieldGroup title="Features" hint="Each switch is a platform capability gate. A studio's client sees a feature only where this and the client's own package both allow it.">
-        <div className="space-y-3">
-          {meta.featureKeys.map((k) => {
-            const m = meta.featureMeta[k] ?? { label: k, hint: "New platform feature — no description yet." };
-            return (
-              <div key={k} className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-body font-medium">{m.label}</span>
-                    {m.reserved && <Badge tone="warning">not built yet</Badge>}
-                  </div>
-                  <div className="text-caption leading-snug text-muted-foreground">{m.hint}</div>
-                </div>
-                <div className="grid size-12 shrink-0 place-items-center">
-                  <Switch checked={!!ent.features[k]} onCheckedChange={(val) => setFeature(k, val)} aria-label={m.label} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </FieldGroup>
-
-      <FieldGroup title="AI credits" hint="Granted at the start of each billing period. The grant is a reset, not a top-up — last period's unused grant lapses.">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-body font-medium">Monthly grant</div>
-            <div className="text-caption leading-snug text-muted-foreground">Purchased credits are separate and never lapse.</div>
-          </div>
-          <Input
-            type="number"
-            min={0}
-            aria-label="Monthly AI credit grant"
-            value={ent.aiCredits.monthlyGrant}
-            onChange={(e) => onChange({ ...ent, aiCredits: { monthlyGrant: Math.max(0, Number(e.target.value) || 0) } })}
-            className="numeral h-12 w-24 shrink-0 px-2.5 text-right text-body"
-          />
-        </div>
-      </FieldGroup>
-    </div>
-  );
-}
-
-// ── Plans ────────────────────────────────────────────────────────────────────
-
-interface PlanFull { id: string; name: string; priceUsdMonth: number; active: number; tenantCount: number; entitlements: Ent }
-
-function PlansConfig() {
-  const load = useCallback(() => api.get<{ plans: PlanFull[] } & EntMeta>("/api/admin/plans"), []);
-  const { data, error, loading, reload } = useAdminLoad(load, "the plan catalog");
-  const [edit, setEdit] = useState<PlanFull | null>(null);
-  const [saved, setSaved] = useState<string | null>(null);
-
-  const all = data?.plans ?? [];
-  const onSale = all.filter((p) => !!p.active);
-  const retired = all.filter((p) => !p.active);
-
-  if (error && !data) {
-    return <Stagger><LoadError what="the plans" error={error} onRetry={reload} /></Stagger>;
-  }
-
-  return (
-    <>
-      <Stagger className="space-y-3">
-
-        {saved && <Callout tone="success" icon={CircleCheck} live="status">{saved}</Callout>}
-
-        <Reveal
-          loading={loading}
-          className="space-y-4"
-          skeleton={
-            <>
-              {Array.from({ length: 4 }).map((_, i) => (
-                <Card key={i} className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Skeleton className="size-9 shrink-0 rounded-2xl" />
-                    <div className="flex-1 space-y-1.5"><SkeletonLine w="8rem" h="text" /><SkeletonLine w="5rem" h="xs" /></div>
-                    <Skeleton className="h-12 w-20 shrink-0 rounded-xl" />
-                  </div>
-                  <div className="flex gap-1.5">{[0, 1, 2].map((j) => <Skeleton key={j} className="h-6 w-20 rounded-full" />)}</div>
-                </Card>
-              ))}
-            </>
-          }
-        >
-          {data && (all.length === 0 ? (
-            <EmptyState icon={LayoutGrid} title="No plans in the catalog" description="The platform seeds its plans on first use. Reload once a studio has signed up." />
-          ) : (
-            <>
-              <section className="space-y-2">
-                <Eyebrow>On sale{onSale.length ? ` · ${onSale.length}` : ""}</Eyebrow>
-                {onSale.length === 0 ? (
-                  <Callout tone="warning" icon={AlertTriangle}>
-                    No plan is on sale, so no studio can subscribe and none can be comped onto a plan.
-                  </Callout>
-                ) : (
-                  onSale.map((p) => <PlanCard key={p.id} plan={p} featureKeys={data.featureKeys} onEdit={() => setEdit(p)} />)
-                )}
-              </section>
-
-              {retired.length > 0 && (
-                <section className="space-y-2">
-                  <Eyebrow>No longer sold · {retired.length}</Eyebrow>
-                  <p className="px-1 text-caption leading-relaxed text-muted-foreground">
-                    Grandfathered: studios already on these keep them and keep working, but nobody new can pick one and
-                    they can&apos;t be comped onto. Editing one still applies to the studios that are on it.
-                  </p>
-                  {retired.map((p) => <PlanCard key={p.id} plan={p} featureKeys={data.featureKeys} onEdit={() => setEdit(p)} />)}
-                </section>
-              )}
-            </>
-          ))}
-        </Reveal>
-      </Stagger>
-
-      {edit && data && (
-        <PlanEditSheet
-          plan={edit}
-          meta={data}
-          onClose={() => setEdit(null)}
-          onSaved={(message) => { setEdit(null); setSaved(message); reload(); }}
-        />
-      )}
-    </>
-  );
-}
-
-function PlanCard({ plan, featureKeys, onEdit }: { plan: PlanFull; featureKeys: string[]; onEdit: () => void }) {
-  const enabled = featureKeys.filter((k) => plan.entitlements.features[k]).length;
-  return (
-    <Card className="space-y-3">
-      <div className="flex items-start gap-3">
-        <IconBadge icon={LayoutGrid} tone={plan.active ? "primary" : "neutral"} size="sm" />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <h3 className="min-w-0 truncate font-semibold">{plan.name}</h3>
-            {!plan.active && <Badge tone="neutral">not sold</Badge>}
-          </div>
-          <div className="numeral text-caption text-muted-foreground">{planUsd(plan.priceUsdMonth)} / month</div>
-        </div>
-        <Button size="sm" variant="secondary" className="min-h-12 shrink-0 rounded-xl" onClick={onEdit} aria-label={`Edit the ${plan.name} plan`}>
-          <LayoutGrid /> Edit
-        </Button>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        <Badge tone={plan.tenantCount ? "primary" : "neutral"}>{plural(plan.tenantCount, "studio")}</Badge>
-        <Badge tone="neutral" className="numeral">{plan.entitlements.aiCredits.monthlyGrant} credits/mo</Badge>
-        <Badge tone="neutral">{enabled} of {featureKeys.length} features</Badge>
-      </div>
-    </Card>
-  );
-}
-
-function PlanEditSheet({ plan, meta, onClose, onSaved }: { plan: PlanFull; meta: EntMeta; onClose: () => void; onSaved: (message: string) => void }) {
-  const [name, setName] = useState(plan.name);
-  const [price, setPrice] = useState(String(plan.priceUsdMonth));
-  const [ent, setEnt] = useState<Ent>(plan.entitlements);
-  const act = useAction();
-
-  const save = () =>
-    act.run("save", async () => {
-      const r = await api.patch<{ grandfathered: number }>(`/api/admin/plans/${plan.id}`, {
-        name,
-        priceUsdMonth: Number(price) || 0,
-        entitlements: ent,
-      });
-      // The result is hoisted to the tab: this sheet closes on save, so a message
-      // rendered in here would have been unmountedbefore anyone could read it.
-      onSaved(
-        r.grandfathered
-          ? `Saved ${name}. ${plural(r.grandfathered, "existing studio")} kept their old limits.`
-          : `Saved ${name} — applied to every studio on the plan.`,
-      );
-    }, "Couldn't save the plan — nothing was changed.");
-
-  return (
-    <Sheet open onClose={onClose} title={`Edit ${plan.name}`} footer={<Button size="lg" className="w-full" disabled={act.busy !== null} onClick={() => void save()}>
-          {act.busy === "save" ? <><Spinner className="size-5" /> Saving…</> : "Save plan"}
-        </Button>}>
-      <div className="space-y-5">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <Badge tone={plan.active ? "success" : "neutral"}>{plan.active ? "on sale" : "not sold"}</Badge>
-          <Badge tone="neutral">{plural(plan.tenantCount, "studio")} on this plan</Badge>
-        </div>
-        {!plan.active && (
-          <Callout tone="neutral" icon={Info}>
-            This plan isn&apos;t sold any more. Edits still reach the studios grandfathered onto it.
-          </Callout>
-        )}
-        {plan.tenantCount > 0 && (
-          <Callout tone="warning" icon={AlertTriangle}>
-            {plural(plan.tenantCount, "studio")} on this plan. Raising a limit or enabling a feature applies to all of
-            them at once; lowering one snapshots their current level so nobody loses what they paid for.
-          </Callout>
-        )}
-
-        <div className="flex gap-2">
-          <Field label="Name" value={name} onChange={(e) => setName(e.target.value)} className="flex-1" />
-          <Field label="$ / mo" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ""))} className="w-24" />
-        </div>
-
-        <EntitlementFields ent={ent} meta={meta} onChange={setEnt} />
-
-        <ActionResult msg={act.msg} err={act.err} />
-      </div>
-    </Sheet>
-  );
-}
+/*
+  The plan matrix editor is `@4dl/admin`'s `PlanEntitlementFields` now, and it
+  moved with the panel that used it. The per-tenant sheet below does NOT reuse
+  it: that one renders each row with its PROVENANCE (plan / grandfathered / set
+  by you) and can clear a key, which is a different control over the same shape.
+*/
 
 /**
  * ONE STUDIO'S ENTITLEMENTS, editable in both directions.

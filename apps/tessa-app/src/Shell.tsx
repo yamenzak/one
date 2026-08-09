@@ -26,6 +26,7 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AppBar, Archive, Avatar, Badge, BottomTabs, Button, NavRail, ClipboardList, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Home, RotateCcw, ScanLine, TrendingUp, type TabDef } from "@4dl/ui";
+import { MaintenanceBanner } from "@4dl/app-kit";
 import { useSession } from "./session.js";
 import { NotificationBell } from "./Notifications.js";
 import { useI18n, useT } from "./i18n.js";
@@ -39,7 +40,7 @@ import { Cases } from "./screens/Cases.js";
 
 
 export function Shell() {
-  const { ctx, signOut } = useSession();
+  const { ctx, host, signOut } = useSession();
   const t = useT();
   const { locale, locales, setLocale } = useI18n();
   const nav = useNavigate();
@@ -75,6 +76,17 @@ export function Shell() {
       a hypothetical width for this product.
     */
     <div className="min-h-dvh pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0 md:pl-24">
+      {/*
+        THE DEPLOYMENT-WIDE STRIP, above the bar because it is the wider truth:
+        a `readonly` maintenance window is about the whole platform, not about
+        this centre's standing. `full` never reaches here — `pickScreen` swaps
+        the entire screen before the Shell mounts.
+
+        The operator panel for this switch has shipped in all three consoles
+        since `@4dl/admin` existed; nothing rendered it here, so turning it on
+        refused every write with no explanation anywhere in the product.
+      */}
+      <MaintenanceBanner state={host?.maintenance} />
       <AppBar
         leading={<span className="truncate text-body-lg font-semibold">{name}</span>}
         trailing={

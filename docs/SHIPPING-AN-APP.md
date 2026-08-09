@@ -32,28 +32,47 @@ domains, and an operator console.
 
 ---
 
-## 1. Copy the template
+## 1. Copy the template — BOTH halves
 
 ```sh
-cp -r apps/_template apps/inventory
+cp -r apps/_template      apps/inventory      # the worker
+cp -r apps/_template-app  apps/inventory-app  # the browser half
 ```
+
+⚠️ **Take the second one.** It is the newer half and the more valuable: the five
+doors' screens, the session, the theme, `pickScreen`, the Shell's maintenance
+strip and standing chip, the operator console binding, the accent registry, and
+five conformance tests. Before it existed, a new app's browser half was copied by
+hand from whichever product the author happened to open — and **every UI
+divergence catalogued in `docs/PLATFORM-AUDIT.md` arrived that way.**
 
 Then rename, in this order:
 
-1. `package.json` — `name`
+1. `package.json` — `name`, in both
 2. `wrangler.jsonc` — `name`, `ROOT_DOMAIN`, `BETTER_AUTH_URL`, `ADMIN_EMAILS`,
-   and the three placeholder resource ids
+   the three placeholder resource ids, and `assets.directory`
 3. `src/host-context.ts` — `DEFAULT_ROOT` and your brand's reserved labels
 4. `src/mailer.ts` — brand and sender
+5. `src/notifications.ts` — the notification types (the routes read this registry)
+6. In the SPA: the theme storage key, which appears in **three** places
+   (`index.html`'s anti-flash script, `theme.tsx`'s `configureTheme`,
+   `session.ts`'s keep-list) and is checked by nothing. Rename one and the app
+   opens in light for a beat on every dark phone, forever, which reads as a slow
+   app rather than a bug.
+7. `turbo.json` — the `<app>#test` → `<app>-app#build` edge. An
+   `assets.directory` is a filesystem path, not a package dependency, so turbo
+   cannot infer it, and a missing SPA build makes the Miniflare suite abort
+   reporting **"no tests"** — which reads as a pass.
 
 ```sh
-pnpm install && pnpm --filter @<scope>/inventory test
+pnpm install && pnpm --filter @<scope>/inventory test && pnpm --filter @<scope>/inventory-app test
 ```
 
-Sixteen tests should pass immediately: eleven conformance (plain Node) and five
-integration (the real worker through Miniflare). If they do, every package is
-wired correctly. **Do not start writing routes until they pass** — a wiring
-failure found now is ten minutes; found later it is a day.
+**39 tests should pass immediately** — 20 on the worker (11 conformance, plain
+Node; 9 integration through Miniflare on the real `*.localhost` host topology)
+and 19 on the SPA. If they do, every package is wired correctly. **Do not start
+writing routes until they pass** — a wiring failure found now is ten minutes;
+found later it is a day.
 
 ## 2. Name your tenants
 
@@ -119,18 +138,48 @@ owner id, and wrote without re-checking.
 `WHERE id = ? AND tenant_id = ?` is **not sufficient** for anything a customer
 owns.
 
-## 6. Add your routes
+## 6. Add your routes — and keep the ones you inherited
 
 Mount after `sessionMiddleware` and `guard`, in that order. Routes mounted before
 them are ungoverned; the one legitimate exception is a provider webhook that
 carries its own signature and no session.
 
+⚠️ **The template already mounts a route tree for every schema module it
+applies** — the inbox, the roster, media, leaving, the plan catalog, the AI
+catalog, and `otpSendGuard` in front of the sign-in code. Do not delete one
+because the product "does not need it yet". A capability with tables and no route
+is the single most common defect in this repo's history: nothing fails, every
+suite stays green, and the feature is simply absent until somebody goes looking
+years later.
+
+`scripts/capability-reachable.test.mjs` (in `pnpm gate`) enforces this for every
+app in `apps.json`, so deleting a mount fails the build with the reason. If your
+app genuinely diverges — Scena keeps its own asset door because its R2 key is a
+content hash the shared routes cannot issue — the entry goes in
+`KNOWN_UNMOUNTED` with the argument, where it has to be re-read rather than
+silently absent.
+
+⚠️ **And the OTP guard goes BEFORE Better Auth's `/api/auth/*` catch-all.** Hono
+matches in registration order, so mounting it after is a bypass that typechecks,
+passes every test, and looks identical in a route list.
+`scripts/otp-gate.test.mjs` asserts the order.
+
 ## 7. Wire the operator console
 
-`@4dl/admin` gives you the shell; you supply `ConsoleSection[]`. Take
-`PlatformEmailSection` from day one — `@4dl/email` fails closed until
-`email.provider` and `email.from` are set, and an app that cannot configure its
-mailer cannot send the sign-in code that is the only way in.
+`@4dl/admin` gives you the shell; you supply `ConsoleSection[]`. The template's
+SPA already mounts **nine** of them — plans, Stripe, the rail's dead letter, AI,
+email, shared config, custom domains, the bot check and maintenance — so this
+step is adding YOUR sections beside them rather than starting from nothing.
+
+⚠️ **Do not rebuild one of the nine.** `admin-panels.conformance.test.ts` fails
+an app that reaches a shared admin endpoint directly, naming the section it
+should have used. If a shared panel is missing something you need, add it THERE,
+where every app gets it — the tempting alternative, one more local copy just for
+this app, is exactly how two consoles diverged.
+
+`PlatformEmailSection` matters more than the rest on day one: `@4dl/email` fails
+closed until `email.provider` and `email.from` are set, and an app that cannot
+configure its mailer cannot send the sign-in code that is the only way in.
 
 ## 8. Register the app, then deploy
 

@@ -17,6 +17,7 @@ The operator console every 4DL app puts on its `admin.` door.
 | `sections/ai.tsx` | Provider key, mock lane, credit markup, catalog sync, and the per-lane default-model picker. |
 | `sections/shared-config.tsx` | **The shared platform store** — the keys every 4DL app reads, set once instead of once per product. |
 | `sections/rail.tsx` | **Unattributed payments** — Stripe events the rail could not match to any app. Money in, nothing granted. |
+| `sections/plans.tsx` | **The plan catalog** — price, limits, features, the credit grant and the free TRIAL. |
 
 ## The sections are the app's; the frame is not
 
@@ -98,7 +99,7 @@ nobody knows is set.
 
 ## What a panel may live here
 
-Only configuration a **shared package already owns**. Seven qualify today:
+Only configuration a **shared package already owns**. Eight qualify today:
 
 - **Email delivery** — `email.provider`, `email.from`, `email.platform_from` and
   `email.credits_per_email` are `@4dl/email`'s keys, read by nothing else, and
@@ -126,6 +127,24 @@ Only configuration a **shared package already owns**. Seven qualify today:
 - **Turnstile** — `@4dl/auth`'s. A secret stored with no site key locks *every*
   4DL app out of its own sign-in, so the warning belongs with the package that
   owns the check, not with whoever remembers to write it.
+- **The plan catalog** — over `@4dl/billing`'s `planAdminRoutes`. The three
+  rules it carries are the argument for it being here rather than in each app,
+  because each is invisible until it costs something: a price change must NULL
+  the plan's Stripe id pair (or `syncCatalog` skips the row and every subscriber
+  keeps paying the old amount), lowering a limit must GRANDFATHER whoever is
+  already on the tier, and an omitted `trialDays` means "leave it alone" rather
+  than "no trial". Written three times, this went: all three in one app, none in
+  a second that had no plan editor at all, and the middle one missing in a third
+  — whose help text described stripping live tenants as the design.
+
+  What the app supplies is the CONTENTS (`DEFAULT_PLANS`) and the key LABELS.
+  The key LIST comes off the bound entitlement engine, so a limit added
+  server-side appears in the editor with no client release.
+
+  ⚠️ The conformance entry is `/api/admin/plans/` **with the trailing slash** —
+  the EDIT. The bare list read stays allowed, because a promo dialog needs the
+  plan names for a dropdown and refusing that would push an app into inventing a
+  second endpoint over the same rows.
 - **AI** — over `@4dl/ai`'s `aiCatalogAdminRoutes`. An app's own pieces ride in
   as slots: `extraSub` for a live self-test (which needs the product's prompts)
   and `extraBelowCatalog` for whatever it does with user feedback. `extraSub`'s
@@ -141,9 +160,9 @@ shared package should know how to do.
 
 ## The rule is enforced, not documented
 
-`@4dl/admin/conformance` exports `sharedPanelViolations(srcDir)`, and both apps
-assert it is empty. An app that calls `/api/admin/stripe/…` itself fails its own
-test suite, naming the section it should have used.
+`@4dl/admin/conformance` exports `sharedPanelViolations(srcDir)`, and **all three**
+apps assert it is empty. An app that calls `/api/admin/stripe/…` itself fails its
+own test suite, naming the section it should have used.
 
 This exists because the honour system failed exactly once and that was enough.
 Kova built good surfaces over three shared endpoints; Tessa, facing the same
@@ -151,6 +170,21 @@ three, shipped `<pre>{JSON.stringify(data, null, 2)}</pre>` plus three text boxe
 over one and nothing at all over the other two. Neither app could see the problem
 from the inside — it only became visible with a second app to compare against,
 which is precisely what a conformance test is for.
+
+⚠️ **The two AI entries name the ROUTES, not the prefix**
+(`/api/admin/ai/models`, `/api/admin/ai/config`), and that precision is
+load-bearing. An app may legitimately mount its own routes under the same prefix
+— Kova's `/api/admin/ai/selftest` runs Kova's prompts through Kova's parsers, and
+its `/feedback` reads Kova's own table; both ride into this panel through
+`extraSub` / `extraBelowCatalog`. A blanket prefix entry would flag those two as
+violations, and a checker that cries wolf gets waived.
+
+**The console's endpoints were only half the duplication.** Scena's own AI and
+Stripe panels were the visible half; underneath, three apps each carried their
+own `/admin/stripe/status|config|sync` handlers, and mounting `PlatformStripeSection`
+in Scena was blocked because two of the three did not exist there at all. Those
+route trees are `@4dl/billing`'s `stripeAdminRoutes` now — see that package's
+README, and PLATFORM.md's "An operator route tree is not a product route tree".
 
 **If a shared section is missing something you need, add it to the section.** The
 tempting alternative — one more local copy, just for this app — is how the two

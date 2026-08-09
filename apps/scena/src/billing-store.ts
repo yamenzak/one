@@ -6,56 +6,35 @@
  * db.ts / content.ts (ensureSchema first, `XxxRow` interfaces, DEMO_TENANT).
  */
 
-import { getConfig as coreGetConfig, type ConfigSource } from "@4dl/core";
+import { getConfig as coreGetConfig, nowIso, type ConfigSource } from "@4dl/core";
 import { DEFAULT_SEED_MARKUP, lanesFor, seedAiModels, type AiModelRow } from "@4dl/ai";
+import { bindBillingStore, LADDER_OWNED, type PackRow, type PackSeed, type PlanRow, type PlanSeed, type SubscriptionRow } from "@4dl/billing";
 import { ensureSchema, DEMO_TENANT } from "./db.js";
 // `billing-seed.js` is imported for the plan/pack/config seeds AND for its
 // module-load side effect: it is where Scena hands `@4dl/ai` its lanes and its
 // curated floor, and `seedAiModels` below reads both.
-import { DEFAULT_PLANS, DEFAULT_PACKS, CONFIG_DEFAULTS } from "./billing-seed.js";
-import { resolveEntitlements, mergeOverrides, clampForStatus, type Entitlements } from "./entitlements.js";
+import { DEFAULT_PLANS, DEFAULT_PACKS, CONFIG_DEFAULTS, SCENA_CATALOG_VERSION } from "./billing-seed.js";
+import { entitlementEngine, resolveEntitlements, mergeOverrides, clampForStatus, type Entitlements } from "./entitlements.js";
 
-export interface PlanRow {
-  id: string;
-  name: string;
-  price_cents: number;
-  currency: string;
-  interval: string;
-  entitlements_json: string;
-  stripe_product_id: string | null;
-  stripe_price_id: string | null;
-  sort: number;
-  active: number;
-}
-
-export interface SubscriptionRow {
-  tenant_id: string;
-  plan_id: string;
-  status: string; // active | trialing | past_due | suspended | canceled
-  comp: number; // 1 = comped (promo/gift/demo) — exempt from dunning
-  stripe_customer_id: string | null;
-  stripe_sub_id: string | null;
-  pending_plan_id: string | null;
-  current_period_end: number | null;
-  past_due_at: number | null;
-  suspend_at: number | null;
-  delete_at: number | null;
-  updated_at: number;
-  /** Admin-set per-tenant entitlement gifts, layered on top of the plan (§25). */
-  overrides_json: string | null;
-}
-
-export interface PackRow {
-  id: string;
-  name: string;
-  credits: number;
-  price_cents: number;
-  currency: string;
-  stripe_product_id: string | null;
-  stripe_price_id: string | null;
-  sort: number;
-  active: number;
-}
+/**
+ * ⚠️ THE THREE ROW TYPES ARE `@4dl/billing`'s NOW, and re-exported rather than
+ * redeclared so a column added to the package's row cannot go missing from this
+ * app's view of it.
+ *
+ * What changed, and it is worth knowing because the old names are all over the
+ * git history: `price_cents INTEGER` + `currency` + `interval` became
+ * `price_usd_month REAL` (every Scena plan was `usd`/`month`, so the two extra
+ * columns were generality nothing used); `sort` became `ord`; and the five
+ * subscription timestamps hold ISO-8601 TEXT where they held epoch
+ * milliseconds. `billing-reconcile.ts` moves an existing database across.
+ *
+ * `subscriptions` also GAINS `adjustments_json` — the operator's absolute
+ * per-tenant setting, which Scena has never had. `overrides_json` alone meant
+ * "give this workspace two more screens" was a one-way door: the grant blob is
+ * raise-only by design, so the only way back down was discarding it whole,
+ * grandfathering included.
+ */
+export type { PackRow, PlanRow, SubscriptionRow };
 
 /**
  * A row of `@4dl/ai`'s `ai_models`.
@@ -90,6 +69,49 @@ export interface PromoRow {
   created_at: number;
 }
 
+/**
+ * THE SHARED CATALOG STORE, bound to Scena's registry and Scena's catalog.
+ *
+ * `@4dl/billing` owns the tables, the entitlement engine, the credit DO and the
+ * Stripe client, and now owns the reads and writes over `plans`,
+ * `subscriptions` and `credit_packs` here too. What stays in this file is what
+ * is genuinely Scena's: the CONTENTS of the catalog (four rungs, because a
+ * single screen in a café and a forty-screen retail estate are different
+ * businesses), the promo codes, the AI model rows, and the two subscription
+ * writers that carry Scena-specific rules — `getSubscription`'s demo default and
+ * `updateSubscription`'s ladder guard.
+ *
+ * `materialiseOnRead: true` matches what this app has always done: a read for a
+ * workspace with no row writes one. `defaultSubscription` is `free`/`active`
+ * rather than `free`/`incomplete` — the PARKING row, not a verdict. Tessa parked
+ * on `incomplete` and its gate read the parking default as a fact, holding every
+ * workspace read-only on a deployment with no Stripe at all.
+ */
+const store = bindBillingStore<Entitlements>({
+  entitlements: entitlementEngine,
+  catalog: {
+    plans: DEFAULT_PLANS.map(
+      (p): PlanSeed => ({
+        id: p.id,
+        name: p.name,
+        // Every Scena plan is billed monthly in USD, which is what made the
+        // `currency` + `interval` columns droppable rather than a loss.
+        price_usd_month: p.priceCents / 100,
+        entitlements_json: JSON.stringify(p.entitlements),
+        ord: p.sort,
+        // `active` was hardcoded to 1 in the loop this replaces, which is the
+        // whole reason `free` was a product rather than a parking state — the
+        // seed offered it for sale no matter what the catalog said.
+        active: p.active === false ? 0 : 1,
+      }),
+    ),
+    packs: DEFAULT_PACKS.map((pk): PackSeed => ({ id: pk.id, name: pk.name, credits: pk.credits, price_usd: pk.priceCents / 100, ord: pk.sort, active: 1 })),
+    version: SCENA_CATALOG_VERSION,
+  },
+  defaultSubscription: { plan_id: "free", status: "active" },
+  materialiseOnRead: true,
+});
+
 let seeded: Promise<void> | null = null;
 
 /** Seed the default catalog + config + a starting subscription once per isolate. */
@@ -114,27 +136,28 @@ export async function forceReseedBilling(db: D1Database): Promise<void> {
 
 async function seed(db: D1Database): Promise<void> {
   const now = Date.now();
-  const stmts: D1PreparedStatement[] = [];
 
-  for (const p of DEFAULT_PLANS) {
-    stmts.push(
-      db
-        .prepare(
-          "INSERT OR IGNORE INTO plans (id, name, price_cents, currency, interval, entitlements_json, sort, active, created_at) VALUES (?, ?, ?, 'usd', ?, ?, ?, ?, ?)",
-        )
-        // `active` was hardcoded to 1 here, which is the whole reason `free` was
-        // a product rather than a parking state — the seed offered it for sale
-        // no matter what the catalog said.
-        .bind(p.id, p.name, p.priceCents, p.interval, JSON.stringify(p.entitlements), p.sort, p.active === false ? 0 : 1, now),
-    );
-  }
-  for (const pk of DEFAULT_PACKS) {
-    stmts.push(
-      db
-        .prepare("INSERT OR IGNORE INTO credit_packs (id, name, credits, price_cents, currency, sort, active) VALUES (?, ?, ?, ?, 'usd', ?, 1)")
-        .bind(pk.id, pk.name, pk.credits, pk.priceCents, pk.sort),
-    );
-  }
+  /*
+    ⚠️ THE CATALOG SEED IS `@4dl/billing`'s, AND THE DIFFERENCE IS NOT COSMETIC.
+
+    What was here was one `INSERT OR IGNORE` per plan, per pack, forever. That
+    is fine on an empty database and does NOTHING on a populated one — so a
+    repriced plan, a renamed tier, a widened entitlement or a newly-added rung
+    never reached a deployment that had already booted once. The catalog in this
+    repo and the catalog customers were being charged against could disagree
+    indefinitely, and nothing anywhere reported it.
+
+    `seedBilling` is version-stamped: it reconciles name, price, entitlements,
+    order and `active` to the declared values on every bump of
+    `SCENA_CATALOG_VERSION`, and skips entirely otherwise, so an operator's
+    runtime edits still survive a redeploy. It also carries the money rule this
+    app had no equivalent of — a price change NULLS the Stripe id pair, because
+    `syncCatalog` skips any plan that already has one and a repriced plan would
+    otherwise keep charging the old amount forever.
+  */
+  await store.seedBilling(db);
+
+  const stmts: D1PreparedStatement[] = [];
   for (const [key, value] of Object.entries(CONFIG_DEFAULTS)) {
     stmts.push(db.prepare("INSERT OR IGNORE INTO app_config (key, value, updated_at) VALUES (?, ?, ?)").bind(key, value, now));
   }
@@ -146,7 +169,7 @@ async function seed(db: D1Database): Promise<void> {
       .prepare(
         "INSERT OR IGNORE INTO subscriptions (tenant_id, plan_id, status, comp, current_period_end, updated_at) VALUES (?, 'pro', 'active', 1, NULL, ?)",
       )
-      .bind(DEMO_TENANT, now),
+      .bind(DEMO_TENANT, nowIso()),
   );
   await db.batch(stmts);
   /*
@@ -240,43 +263,26 @@ export async function setConfig(db: D1Database, entries: Record<string, string>)
  */
 export async function listPlans(db: D1Database, onlySellable = false): Promise<PlanRow[]> {
   await ensureBilling(db);
-  const where = onlySellable ? " WHERE active = 1 AND price_cents > 0" : "";
-  const res = await db.prepare(`SELECT * FROM plans${where} ORDER BY sort`).all<PlanRow>();
+  const where = onlySellable ? " WHERE active = 1 AND price_usd_month > 0" : "";
+  const res = await db.prepare(`SELECT * FROM plans${where} ORDER BY ord`).all<PlanRow>();
   return res.results ?? [];
 }
 
 export async function getPlan(db: D1Database, id: string): Promise<PlanRow | null> {
   await ensureBilling(db);
-  return db.prepare("SELECT * FROM plans WHERE id = ?").bind(id).first<PlanRow>();
+  return store.getPlan(db, id);
 }
 
-export async function upsertPlan(db: D1Database, p: Partial<PlanRow> & { id: string }): Promise<void> {
-  await ensureBilling(db);
-  const existing = await getPlan(db, p.id);
-  if (existing) {
-    await db
-      .prepare("UPDATE plans SET name = ?, price_cents = ?, interval = ?, entitlements_json = ?, sort = ?, active = ? WHERE id = ?")
-      .bind(
-        p.name ?? existing.name,
-        p.price_cents ?? existing.price_cents,
-        p.interval ?? existing.interval,
-        p.entitlements_json ?? existing.entitlements_json,
-        p.sort ?? existing.sort,
-        p.active ?? existing.active,
-        p.id,
-      )
-      .run();
-  } else {
-    await db
-      .prepare("INSERT INTO plans (id, name, price_cents, currency, interval, entitlements_json, sort, active, created_at) VALUES (?, ?, ?, 'usd', ?, ?, ?, 1, ?)")
-      .bind(p.id, p.name ?? p.id, p.price_cents ?? 0, p.interval ?? "month", p.entitlements_json ?? "{}", p.sort ?? 99, Date.now())
-      .run();
-  }
-}
+/*
+  `upsertPlan` AND `setPlanStripe` ARE GONE, and so is `setPackStripe` below.
 
-export async function setPlanStripe(db: D1Database, id: string, productId: string, priceId: string): Promise<void> {
-  await db.prepare("UPDATE plans SET stripe_product_id = ?, stripe_price_id = ? WHERE id = ?").bind(productId, priceId, id).run();
-}
+  Both writers moved out with their only callers. The plan EDITOR is
+  `@4dl/billing`'s `planAdminRoutes` — which carries the grandfathering and the
+  reprice id null-out this app's version never had — and the Stripe id writes
+  belong to `@4dl/billing`'s `syncCatalog`, which replaced Scena's copy the day
+  `price_cents` became `price_usd_month`. Nothing here should write `plans`
+  again; if a new surface needs to, it wants one of those two.
+*/
 
 /* ---------------------------- subscriptions ------------------------------ */
 
@@ -285,19 +291,42 @@ export async function getSubscription(db: D1Database, tenantId = DEMO_TENANT): P
   const row = await db.prepare("SELECT * FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<SubscriptionRow>();
   if (row) return row;
   // Defensive: materialize a Free subscription if seeding raced.
-  await db.prepare("INSERT OR IGNORE INTO subscriptions (tenant_id, plan_id, status, comp, updated_at) VALUES (?, 'free', 'active', 0, ?)").bind(tenantId, Date.now()).run();
+  await db.prepare("INSERT OR IGNORE INTO subscriptions (tenant_id, plan_id, status, comp, updated_at) VALUES (?, 'free', 'active', 0, ?)").bind(tenantId, nowIso()).run();
   return (await db.prepare("SELECT * FROM subscriptions WHERE tenant_id = ?").bind(tenantId).first<SubscriptionRow>())!;
 }
 
-export async function updateSubscription(db: D1Database, tenantId: string, patch: Partial<SubscriptionRow>): Promise<void> {
+/**
+ * `unlessLadderOwned` — the clamp that stops a payment webhook stalling the
+ * dunning ladder, or reviving a workspace its owner asked us to close.
+ *
+ * Scena's ladder escalates by SELECTING on the previous rung's status
+ * (`past_due` → `suspended` → deleted), and `closing` is an owner decision
+ * carrying its own `delete_at`. A late `invoice.paid` writing `active`
+ * unconditionally — which is what this did — breaks the chain permanently and
+ * fails SAFE, so nothing anywhere reports it: the workspace is simply never
+ * suspended, never purged, and its storage never reclaimed. `closing` is the
+ * sharper half, because `scheduleTenantClose` cancels the Stripe subscription
+ * and Stripe fires the cancellation straight back at us.
+ *
+ * The guard is in the SQL rather than a read-then-check above the call, because
+ * this function is a read-modify-write and the check would race with the sweep.
+ * `LADDER_OWNED` is `@4dl/billing`'s list, shared with the other apps' handlers
+ * so the two cannot drift.
+ */
+export async function updateSubscription(
+  db: D1Database,
+  tenantId: string,
+  patch: Partial<SubscriptionRow>,
+  opts?: { unlessLadderOwned?: boolean },
+): Promise<void> {
   await ensureBilling(db);
   const cur = await getSubscription(db, tenantId);
-  const next = { ...cur, ...patch, updated_at: Date.now() };
+  const next = { ...cur, ...patch, updated_at: nowIso() };
   await db
     .prepare(
       `UPDATE subscriptions SET plan_id = ?, status = ?, comp = ?, stripe_customer_id = ?, stripe_sub_id = ?,
         pending_plan_id = ?, current_period_end = ?, past_due_at = ?, suspend_at = ?, delete_at = ?, updated_at = ?
-       WHERE tenant_id = ?`,
+       WHERE tenant_id = ?${opts?.unlessLadderOwned ? ` AND status NOT IN (${LADDER_OWNED})` : ""}`,
     )
     .bind(
       next.plan_id,
@@ -369,7 +398,7 @@ export async function withinQuota(
 /** Admin: set a tenant's entitlement override blob (a partial Entitlements). */
 export async function setTenantOverrides(db: D1Database, tenantId: string, json: string | null): Promise<void> {
   await getSubscription(db, tenantId); // ensure the row exists
-  await db.prepare("UPDATE subscriptions SET overrides_json = ?, updated_at = ? WHERE tenant_id = ?").bind(json, Date.now(), tenantId).run();
+  await db.prepare("UPDATE subscriptions SET overrides_json = ?, updated_at = ? WHERE tenant_id = ?").bind(json, nowIso(), tenantId).run();
 }
 
 export async function listSubscriptions(db: D1Database): Promise<SubscriptionRow[]> {
@@ -382,17 +411,12 @@ export async function listSubscriptions(db: D1Database): Promise<SubscriptionRow
 
 export async function listPacks(db: D1Database): Promise<PackRow[]> {
   await ensureBilling(db);
-  const res = await db.prepare("SELECT * FROM credit_packs WHERE active = 1 ORDER BY sort").all<PackRow>();
-  return res.results ?? [];
+  return store.listPacks(db);
 }
 
 export async function getPack(db: D1Database, id: string): Promise<PackRow | null> {
   await ensureBilling(db);
   return db.prepare("SELECT * FROM credit_packs WHERE id = ?").bind(id).first<PackRow>();
-}
-
-export async function setPackStripe(db: D1Database, id: string, productId: string, priceId: string): Promise<void> {
-  await db.prepare("UPDATE credit_packs SET stripe_product_id = ?, stripe_price_id = ? WHERE id = ?").bind(productId, priceId, id).run();
 }
 
 /* ---------------------------- AI model rates ----------------------------- */
@@ -492,21 +516,35 @@ export interface LedgerRow {
   balance: number;
   reason: string;
   ref: string | null;
-  created_at: number;
+  /**
+   * ⚠️ `at`, not `created_at` — `@4dl/billing`'s column, and epoch MILLISECONDS
+   * unlike the subscription's five ISO timestamps.
+   *
+   * The difference is deliberate on the package's side: a ledger row is an event
+   * stamp nothing compares in SQL, while `past_due_at` anchors a ladder whose
+   * every rung is a `<` against a value JavaScript produced.
+   */
+  at: number;
 }
 
-/** Mirror a DO ledger entry to D1 for invoices/history (append-only). */
-export async function appendLedger(db: D1Database, entry: Omit<LedgerRow, "id" | "created_at"> & { id?: string; created_at?: number }): Promise<void> {
+/**
+ * Mirror a DO ledger entry to D1 for invoices/history (append-only).
+ *
+ * `INSERT OR IGNORE`, not `INSERT`: the shared store's `appendLedger` mints its
+ * own id, and this one lets the CALLER supply one so a retried settle re-writes
+ * the same row instead of adding a second. That is why this stays Scena's.
+ */
+export async function appendLedger(db: D1Database, entry: Omit<LedgerRow, "id" | "at"> & { id?: string; at?: number }): Promise<void> {
   await ensureBilling(db);
   await db
-    .prepare("INSERT OR IGNORE INTO credit_ledger (id, tenant_id, delta, balance, reason, ref, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-    .bind(entry.id ?? `led_${randomHex(10)}`, entry.tenant_id, entry.delta, entry.balance, entry.reason, entry.ref ?? null, entry.created_at ?? Date.now())
+    .prepare("INSERT OR IGNORE INTO credit_ledger (id, tenant_id, delta, balance, reason, ref, at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(entry.id ?? `led_${randomHex(10)}`, entry.tenant_id, entry.delta, entry.balance, entry.reason, entry.ref ?? null, entry.at ?? Date.now())
     .run();
 }
 
 export async function listLedger(db: D1Database, tenantId = DEMO_TENANT, limit = 100): Promise<LedgerRow[]> {
   await ensureBilling(db);
-  const res = await db.prepare("SELECT * FROM credit_ledger WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?").bind(tenantId, limit).all<LedgerRow>();
+  const res = await db.prepare("SELECT * FROM credit_ledger WHERE tenant_id = ? ORDER BY at DESC LIMIT ?").bind(tenantId, limit).all<LedgerRow>();
   return res.results ?? [];
 }
 

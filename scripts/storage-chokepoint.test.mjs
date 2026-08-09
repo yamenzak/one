@@ -25,7 +25,7 @@
  * Plain Node, no dependencies, like the rest of `scripts/`.
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 /**
@@ -44,6 +44,7 @@ function stripComments(src) {
 }
 
 const ROOT = new URL("..", import.meta.url).pathname;
+const REGISTRY = JSON.parse(readFileSync(join(ROOT, "apps.json"), "utf8"));
 let bad = 0;
 const fail = (m) => (console.error(`BAD  ${m}`), bad++);
 const ok = (m) => console.log(`ok   ${m}`);
@@ -66,19 +67,28 @@ function sources(dir) {
 /* ─────────────── 1. the R2 chokepoint ──────────────────────────────────── */
 
 /**
- * Apps with an R2 bucket, and the ONE module in each that may touch it.
+ * Apps with an R2 bucket, DERIVED — and the modules in each that may touch it.
  *
- * A per-app allow-list rather than a global one, because the adapter's filename
- * is the app's choice and a typo'd path would make this check pass vacuously —
- * so every entry is asserted to exist.
+ * ⚠️ This was a two-entry literal naming `apps/scena` and `apps/api`, so
+ * **Tessa's bucket was never checked**: it provisions `tessa-media`, it has a
+ * `storage.ts`, and a bare `MEDIA.put` anywhere in it would have passed this
+ * guard in silence. That is the finding this whole sweep is about — a check
+ * that repeats an app list instead of deriving one is a per-app step somebody
+ * has to remember, and nobody did.
+ *
+ * `apps.json`'s `provision.r2` is the fact: an app with a bucket must have an
+ * adapter, and an app with no bucket has nothing to funnel. The adapter FILES
+ * are still asserted to exist — a typo'd path would make the check pass
+ * vacuously, which is the failure mode a chokepoint guard must never have.
  */
-const R2_OWNERS = [
-  { app: "apps/scena", adapters: ["src/storage.ts", "src/purge.ts"] },
-  // Kova predates the package and routes its writes through `@4dl/storage`
-  // directly from its own adapter; `purge.ts` deletes by prefix, which is the
-  // package's own escape hatch for objects the ledger never recorded.
-  { app: "apps/api", adapters: ["src/storage.ts", "src/purge.ts"] },
-];
+const R2_ADAPTERS = ["src/storage.ts", "src/purge.ts"];
+const R2_OWNERS = REGISTRY.apps
+  .filter((a) => a.provision?.r2)
+  .map((a) => ({ app: a.dir, adapters: R2_ADAPTERS }));
+
+if (R2_OWNERS.length < 2) {
+  fail(`apps.json lists ${R2_OWNERS.length} app(s) with an R2 bucket — the registry reader is broken, not the registry.`);
+}
 
 // `MEDIA.put(` / `MEDIA.delete(` on anything — `c.env.MEDIA`, `env.MEDIA`, `this.env.MEDIA`.
 const BARE_R2 = /\bMEDIA\s*\.\s*(put|delete)\s*\(/;
@@ -132,9 +142,27 @@ for (const { app, adapters } of R2_OWNERS) {
  * — and it puts fabricated output, billed at the real model's rate, back into
  * production. It is what Scena shipped, in three places.
  */
-const AI_DECIDERS = ["apps/scena/src/ai.ts", "packages/ai/src/generate.ts"];
-/** Files that must NOT decide for themselves — they delegate. */
-const AI_DELEGATES = ["apps/api/src/ai.ts"];
+const SELF_DECIDERS = new Set(["apps/scena"]);
+const AI_DECIDERS = [
+  ...REGISTRY.apps.filter((a) => SELF_DECIDERS.has(a.dir)).map((a) => `${a.dir}/src/ai.ts`),
+  "packages/ai/src/generate.ts",
+];
+/**
+ * Files that must NOT decide for themselves — they delegate.
+ *
+ * Derived as "every product app with an `ai.ts` that is not a self-decider", so
+ * a fourth app is in one list or the other the moment it exists. Tessa was in
+ * NEITHER: it has an `ai.ts`, it delegates correctly, and nothing checked that
+ * it kept doing so.
+ */
+const AI_DELEGATES = REGISTRY.apps
+  .filter((a) => a.provision?.d1 && !SELF_DECIDERS.has(a.dir))
+  .map((a) => `${a.dir}/src/ai.ts`)
+  .filter((rel) => existsSync(join(ROOT, rel)));
+
+if (!AI_DELEGATES.length) {
+  fail("no app was found delegating the mock decision — the derivation is broken, not the apps.");
+}
 
 for (const rel of AI_DECIDERS) {
   let src;

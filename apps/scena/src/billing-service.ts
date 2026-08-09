@@ -74,10 +74,10 @@ export async function lifecycleSweep(env: Env, now = Date.now()): Promise<Lifecy
     if (sub.comp === 1) continue; // gifted/demo accounts are exempt
 
     if (sub.status === "past_due" && sub.past_due_at) {
-      const suspendAt = sub.suspend_at ?? sub.past_due_at + graceMs;
-      if (sub.suspend_at == null) await updateSubscription(env.DB, sub.tenant_id, { suspend_at: suspendAt });
+      const suspendAt = at(sub.suspend_at) ?? at(sub.past_due_at)! + graceMs;
+      if (sub.suspend_at == null) await updateSubscription(env.DB, sub.tenant_id, { suspend_at: iso(suspendAt) });
       if (now >= suspendAt) {
-        await updateSubscription(env.DB, sub.tenant_id, { status: "suspended", delete_at: now + deleteMs });
+        await updateSubscription(env.DB, sub.tenant_id, { status: "suspended", delete_at: iso(now + deleteMs) });
         actions.push({ tenantId: sub.tenant_id, from: "past_due", to: "suspended" });
         /*
           THE WORKSPACE'S OWNER, not the deployment's operator.
@@ -94,7 +94,7 @@ export async function lifecycleSweep(env: Env, now = Date.now()): Promise<Lifecy
           dedupeKey: `suspended:${sub.tenant_id}`,
         }).catch(() => undefined);
       }
-    } else if ((sub.status === "suspended" || sub.status === "closing") && sub.delete_at && now >= sub.delete_at) {
+    } else if ((sub.status === "suspended" || sub.status === "closing") && sub.delete_at && now >= at(sub.delete_at)!) {
       /*
         ⚠️ TWO WAYS TO REACH THIS RUNG, and they are not the same journey.
 
@@ -175,6 +175,23 @@ function days(v: string | undefined): number {
   const n = Number(v);
   return (Number.isFinite(n) ? n : 7) * 24 * 3600 * 1000;
 }
+
+/**
+ * THE LADDER'S TIMESTAMPS ARE ISO-8601 TEXT, and these two are the only place
+ * the arithmetic meets them.
+ *
+ * They were epoch milliseconds until `BILLING_SCHEMA` was adopted, and this is
+ * exactly the code the change would have broken in silence: SQLite types are
+ * per-value, so a millisecond integer sits happily in a TEXT-declared column,
+ * `sub.past_due_at + graceMs` becomes string CONCATENATION, and `now >=
+ * "1754…604800000"` compares a number against a string. Nothing throws. A
+ * workspace is either never suspended or suspended the moment it goes past due,
+ * and the only symptom is a support ticket a month later.
+ *
+ * `billing-reconcile.ts` converts the stored values; these convert at the edge.
+ */
+const at = (s: string | null | undefined): number | null => (s ? Date.parse(s) : null);
+const iso = (ms: number): string => new Date(ms).toISOString();
 
 /** Is the tenant's playout gated (suspended for non-payment)? */
 export async function isSuspended(db: D1Database, tenantId = DEMO_TENANT): Promise<boolean> {
