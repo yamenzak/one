@@ -17,11 +17,13 @@ import type { GuideSpec } from "./guide.js";
 import { guideProblems } from "./guide.js";
 import type { HelpRegistry } from "./help.js";
 import type { JobSpec } from "./job.js";
+import type { MilestoneRegistry } from "./milestone.js";
+import { MILESTONE_EARNED, milestoneProblems } from "./milestone.js";
 import { danglingHelp, helpProblems } from "./help.js";
 import type { NotificationRegistry } from "./notify.js";
 import type { Release, Retired } from "./release.js";
 import { releaseProblems } from "./release.js";
-import { danglingLinks } from "./notify.js";
+import { PLATFORM_EVENTS, danglingLinks } from "./notify.js";
 import type { EntitlementDef, PlanSpec } from "./entitlement.js";
 import { parkingAboveFloor } from "./entitlement.js";
 import type { Currency, Locale, RegionId, TimeZone, UnitSystem } from "./primitives.js";
@@ -240,6 +242,15 @@ export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = Probl
    * deleted. A tour step can only record "seen".
    */
   readonly guide: GuideSpec;
+  /**
+   * ⚠️ RECOGNITION, NOT SCORE, AND THE RULES ARE OVER `emits`. A milestone is a
+   * rule over something the manifest already declares an operation raises — so
+   * there is no second set of instrumentation to remember, and a rule waiting on
+   * an event nothing raises is refused rather than being a badge somebody works
+   * towards forever. Empty is a product that recognises nothing, which is most
+   * of them.
+   */
+  readonly milestones: MilestoneRegistry;
   /** The changelog, as product copy. A commit message here is refused. */
   readonly releases: readonly Release[];
   /**
@@ -306,6 +317,43 @@ export interface Uncovered {
  */
 const DERIVED_VERBS = ["list", "read", "create", "update", "delete", "submit", "cancel", "amend"] as const;
 
+/**
+ * Every event this manifest says something raises.
+ *
+ * ⚠️ JOBS RAISE EVENTS TOO, AND THEIRS ARE THE ONES NOBODY SEES FAIL. An
+ * operation with an undeclared emit is found the first time somebody uses the
+ * feature; a sweep's is found the night it finally has something to say.
+ */
+export function raisedEvents(spec: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
+  readonly operations: readonly OperationSpec<any, any, any, string>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
+  readonly jobs?: readonly JobSpec<any>[];
+}): readonly string[] {
+  const out = new Set<string>();
+  for (const source of [...spec.operations, ...(spec.jobs ?? [])]) {
+    for (const event of source.emits ?? []) out.add(event);
+  }
+  return [...out];
+}
+
+/**
+ * Everything a milestone rule may legitimately be written over.
+ *
+ * ⚠️ THE PLATFORM'S OWN EVENTS COUNT HERE AND NOT IN `undeclaredEmits`. A
+ * workspace created, a plan chosen and a package granted are raised by
+ * operations no app wrote — so a rule over one of them is over something real,
+ * while an app is not the thing that failed to declare it.
+ */
+export function recognisableEvents(spec: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
+  readonly operations: readonly OperationSpec<any, any, any, string>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
+  readonly jobs?: readonly JobSpec<any>[];
+}): readonly string[] {
+  return [...new Set([...PLATFORM_EVENTS, ...raisedEvents(spec)])];
+}
+
 export function undeclaredEmits(spec: {
   readonly notifications: NotificationRegistry;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
@@ -314,16 +362,7 @@ export function undeclaredEmits(spec: {
   readonly jobs?: readonly JobSpec<any>[];
 }): readonly string[] {
   const declared = new Set(Object.keys(spec.notifications));
-  const out = new Set<string>();
-  /*
-    ⚠️ JOBS RAISE EVENTS TOO, AND THEIRS ARE THE ONES NOBODY SEES FAIL. An
-    operation with an undeclared emit is found the first time somebody uses the
-    feature; a sweep's is found the night it finally has something to say.
-  */
-  for (const source of [...spec.operations, ...(spec.jobs ?? [])]) {
-    for (const event of source.emits ?? []) if (!declared.has(event)) out.add(event);
-  }
-  return [...out];
+  return raisedEvents(spec).filter((event) => !declared.has(event));
 }
 
 export function coverage(spec: {
@@ -430,6 +469,7 @@ export function assertComposable(spec: {
   readonly help: HelpRegistry;
   readonly releases: readonly Release[];
   readonly guide?: GuideSpec;
+  readonly milestones?: MilestoneRegistry;
   readonly problems: Readonly<Record<string, unknown>>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly jobs?: readonly JobSpec<any>[];
@@ -462,6 +502,21 @@ export function assertComposable(spec: {
     throw new Error(
       `${spec.id}: operation(s) raise ${unheard.join(", ")}, which no notification declares — ` +
         `nobody can subscribe to it and it has no copy, icon or destination.`,
+    );
+  }
+
+  /*
+    ⚠️ THE PLATFORM'S EVENTS NEED COPY TOO, AND THE APP IS WHERE COPY LIVES.
+    `dispatch` answers an unknown type by returning nothing — so an app that did
+    not happen to declare these three got no announcement of a workspace being
+    created, a plan being chosen or days being added, from a registry lookup,
+    with every test green.
+  */
+  const silent = PLATFORM_EVENTS.filter((event) => !(event in spec.notifications));
+  if (silent.length) {
+    throw new Error(
+      `${spec.id}: the platform raises ${silent.join(", ")}, which this app declares no notification for — ` +
+        `so nothing announces it and there is no copy for it anywhere.`,
     );
   }
 
@@ -516,6 +571,16 @@ export function assertComposable(spec: {
   );
   if (guide.length) {
     throw new Error(`${spec.id}: guide — ${guide.map((g) => `"${g.id}" ${g.why}`).join("; ")}.`);
+  }
+
+  /*
+    ⚠️ A MILESTONE OVER AN EVENT NOTHING RAISES IS ONE NOBODY CAN EARN, and it
+    is indistinguishable from one that is merely hard — so somebody works towards
+    it forever and the product never says a word.
+  */
+  const milestones = milestoneProblems(spec.milestones ?? {}, recognisableEvents(spec), spec.notifications[MILESTONE_EARNED]);
+  if (milestones.length) {
+    throw new Error(`${spec.id}: milestones — ${milestones.map((m) => `"${m.id}" ${m.why}`).join("; ")}.`);
   }
 
   const notes = releaseProblems(spec.releases);

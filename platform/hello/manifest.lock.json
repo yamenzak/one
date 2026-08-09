@@ -12,6 +12,7 @@
     "file:write",
     "guide:read",
     "inbox:read",
+    "milestone:read",
     "note:read",
     "note:write",
     "receipt:read",
@@ -47,6 +48,7 @@
     "receipt.update"
   ],
   "notifications": [
+    "milestone.earned",
     "package.granted",
     "plan.chosen",
     "workspace.created"

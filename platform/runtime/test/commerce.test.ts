@@ -12,11 +12,13 @@
 import { describe, expect, it } from "vitest";
 import { createRuntime } from "../src/runtime.js";
 import { collectionOperations } from "../src/collection-ops.js";
-import { customerOperations, providerOperations } from "../src/commerce-ops.js";
+import { commerceOperations, customerOperations, providerOperations } from "../src/commerce-ops.js";
+import { platformOperations } from "../src/platform-ops.js";
+import { identityOperations } from "../src/identity-ops.js";
 import { guideOperations } from "../src/guide-ops.js";
 import { attribute, verifySignature } from "../src/provider.js";
 import { PARKED, standingFor } from "../src/commerce.js";
-import { ALWAYS_ALLOWED, PUBLIC, cache, collection, defineBindings, field, laneOf, objects, s, sql, operation, type AppSpec, type Instant, type RegionId } from "@one/kernel";
+import { ALWAYS_ALLOWED, PUBLIC, cache, collection, defineBindings, field, laneOf, objects, s, sql, operation, type AppSpec, type Instant, type RegionId, PLATFORM_EVENTS } from "@one/kernel";
 
 const bindings = defineBindings({ db: sql(), media: objects({ jurisdictional: true }), cache: cache() });
 
@@ -56,17 +58,31 @@ const app = (over: Partial<AppSpec<typeof bindings>>): AppSpec<typeof bindings> 
   },
   format: { currency: "EUR", timeZone: "Europe/Berlin" as never, locale: "en" as never, units: "metric", weekStart: 1 },
   access: {
-    permissions: ["seat:take"], roles: {}, entitlements: {}, plans: [],
+    /*
+      ⚠️ EVERY PERMISSION THE PLATFORM'S OWN OPERATIONS NAME, because the runtime
+      refuses a manifest whose derived surface no role can reach — an operation
+      naming a permission nothing declares 403s for everybody, forever, and reads
+      as a feature nobody uses.
+    */
+    permissions: ["seat:take", "thing:read", "thing:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "commerce:read", "commerce:manage", "file:read", "file:write", "guide:read", "milestone:read"],
+    roles: {}, entitlements: {}, plans: [],
     customerRail: false, customerFlags: {}, seats: { counts: [] },
   },
   governance: { legal: [], impersonation: { maxMinutes: 30, announce: true }, auditRetentionDays: 365 },
   collections: [],
-  notifications: {},
+  /* ⚠️ The three the PLATFORM raises. An app that declares none of them boots
+     with a workspace creation, a plan choice and a grant that announce nothing. */
+  notifications: {
+    "workspace.created": { category: "service", tone: "success", icon: "sparkle", title: "{slug} is ready", link: { to: "inbox" }, roles: ["owner"] },
+    "plan.chosen": { category: "billing", tone: "info", icon: "card", title: "You chose {planId}", link: { to: "inbox" }, roles: ["owner"] },
+    "package.granted": { category: "billing", tone: "success", icon: "gift", title: "{days} days added", link: { to: "inbox" }, roles: ["owner"] },
+  },
   help: {},
   filePurposes: {},
   releases: [],
   jobs: [],
   guide: { steps: [], hints: [] },
+  milestones: {},
   retired: {},
   operations: [],
   problems: {},
@@ -385,5 +401,64 @@ describe("the runtime refuses a manifest that would sell something it cannot wit
       access: { ...app({}).access, entitlements: { seats: { parked: 3, enforcement: "quota" } } },
       operations: [counted] as never,
     }), { ...opts, countQuota: async () => 0 })).not.toThrow();
+  });
+});
+
+/* --------------------------------------------------------- reachability --- */
+
+/**
+ * ⚠️ A SURFACE NO ROLE CAN REACH IS THE FAILURE THIS PLATFORM WAS STARTED OVER,
+ * wearing its quietest costume.
+ *
+ * The gate compares an operation's permission against what the caller holds, and
+ * what a caller can hold comes from `access.roles`, whose values come from
+ * `access.permissions`. So an operation naming something absent from that list
+ * 403s for everybody, forever — including the workspace owner — and reads
+ * exactly like a feature nobody uses.
+ *
+ * It bites hardest on operations an app never wrote: a collection implies
+ * `<id>:read` and `<id>:write`, the checklist implies `guide:read`, the shelf
+ * implies `milestone:read`. Nothing in the manifest names them out loud.
+ */
+describe("the runtime refuses a surface no role can reach", () => {
+  it("refuses a collection whose implied permissions the app does not declare", () => {
+    expect(() => createRuntime(app({
+      access: { ...app({}).access, permissions: app({}).access.permissions.filter((p) => p !== "thing:read") },
+      collections: [stored],
+    }), opts)).toThrow(/thing\.list/);
+  });
+
+  it("refuses a platform operation whose permission the app does not declare", () => {
+    expect(() => createRuntime(app({
+      access: { ...app({}).access, permissions: app({}).access.permissions.filter((p) => p !== "inbox:read") },
+    }), opts)).toThrow(/inbox:read/);
+  });
+
+  it("accepts one that declares every permission its surface implies", () => {
+    expect(() => createRuntime(app({ collections: [stored] }), opts)).not.toThrow();
+  });
+});
+
+/* ------------------------------------------------------- platform events --- */
+
+/**
+ * ⚠️ THE KERNEL'S COPY OF WHAT THE PLATFORM RAISES, PINNED TO WHAT IT ACTUALLY
+ * RAISES. `@one/kernel` cannot import the runtime, so `PLATFORM_EVENTS` is a
+ * transcription — and a transcription nobody checks is a list that is right
+ * until somebody adds an event. The consequence of drift is silent in both
+ * directions: an event no app declares copy for announces nothing, and a name
+ * left behind refuses every manifest for a notification nothing will ever send.
+ */
+describe("what the platform raises is what the kernel says it raises", () => {
+  it("matches the emits of the platform's own operations exactly", () => {
+    const built = createRuntime(app({ collections: [stored] }), opts);
+    expect(built).toBeDefined();
+    const raised = new Set<string>();
+    /* ⚠️ With the customer rail ON, or `package.granted` is not mounted to be found. */
+    const railed = app({ access: { ...app({}).access, customerRail: true } });
+    for (const op of [...platformOperations(railed), ...commerceOperations(railed), ...customerOperations(railed), ...identityOperations(railed)]) {
+      for (const e of op.emits ?? []) raised.add(e);
+    }
+    expect([...raised].sort()).toEqual([...PLATFORM_EVENTS].sort());
   });
 });

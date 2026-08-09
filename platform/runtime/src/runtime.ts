@@ -19,7 +19,7 @@ import type {
 } from "@one/kernel";
 import {
   ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, PLATFORM_PROBLEMS, STORAGE_ENTITLEMENT,
-  fromQuery, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
+  fromQuery, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
 import { COMMERCE, commerceOperations, customerOperations, providerOperations, type CommerceCarrier } from "./commerce-ops.js";
@@ -27,6 +27,8 @@ import { INBOX, inboxOperations, type InboxCarrier } from "./inbox-ops.js";
 import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
 import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files-ops.js";
 import { GUIDE, guideOperations, type GuideCarrier } from "./guide-ops.js";
+import { MILESTONES, milestoneOperations, type MilestoneCarrier } from "./milestone-ops.js";
+import { MILESTONE_EARNED, dayIn, earnerOf, recognise } from "./milestone.js";
 import { fetchMedia, usedBytes } from "./files.js";
 import { readMaintenance, refuses } from "./maintenance.js";
 import { runDue, type RunReport } from "./jobs.js";
@@ -223,7 +225,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...guideOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...guideOperations(app), ...milestoneOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -288,6 +290,27 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
   if (Object.keys(app.filePurposes ?? {}).length) {
     counters.set(STORAGE_ENTITLEMENT, (db, tenantId) => usedBytes(db, tenantId));
   }
+  /*
+    ⚠️ A PERMISSION NO ROLE CAN HOLD IS A REFUSAL FOR EVERYBODY, FOREVER — and it
+    reads as a feature nobody uses. The gate compares the operation's permission
+    against what the caller holds, and what a caller can hold comes from
+    `access.roles`, whose values come from `access.permissions`; so an operation
+    naming something absent from that list is unreachable by construction.
+
+    It is checked HERE rather than at composition because the platform derives
+    operations an app never wrote — the checklist, the inbox, the shelf — and
+    each of those names a permission the app has to declare for its own people.
+    An app that declares milestones and forgets `milestone:read` gets a surface
+    that 403s for its owner, which is indistinguishable from a bug in the gate.
+  */
+  const declaredPermissions = new Set(app.access.permissions);
+  const unreachable = [...byPath.values()].filter((op) => op.permission !== PUBLIC && !declaredPermissions.has(op.permission));
+  if (unreachable.length) {
+    throw new Error(
+      `${app.id}: operation(s) ${unreachable.map((op) => `"${op.id}" (${op.permission})`).join(", ")} name a permission this app does not declare, so no role can hold it.`,
+    );
+  }
+
   for (const op of byPath.values()) {
     if (op.quota && !counters.has(op.quota) && !opts.countQuota) {
       throw new Error(`${app.id}: "${op.id}" counts against "${op.quota}", which nothing can count — declare it on a collection or supply countQuota.`);
@@ -573,6 +596,21 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       const input = parsed.value;
 
       /*
+        ⚠️ ONE ROLE, RESOLVED ONCE, FOR EVERY SURFACE THAT IS PER-PERSON. The
+        checklist, the shelf and a milestone's announcement all filter by it, and
+        three separate resolutions is how a person comes to be an owner to one
+        and a reader to the next.
+      */
+      const personRole = opts.roleOf?.(permissions) ?? "owner";
+      /*
+        ⚠️ THE DEVICE SAYS WHERE IT IS STANDING; THE MANIFEST IS THE FALLBACK.
+        A day boundary is the one thing a streak is made of, and UTC is nobody's
+        day — see `dayIn`. An absent or unknown header degrades to the app's
+        declared zone rather than to a refusal.
+      */
+      const zone = request.headers.get("x-one-time-zone") || app.format.timeZone;
+
+      /*
         ⚠️ ONE DISPATCH PATH FOR BOTH TRANSPORTS. A tool call runs the same
         handler, behind the same gate, with the same context — the only
         difference is the actor's kind and what the audit records. A second
@@ -608,11 +646,44 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             }).catch(() => undefined);
           }
         }
+
+        /*
+          ⚠️ RECOGNITION READS THE SAME `emits`, AND ONLY FOR A PERSON. There is
+          no second thing to instrument and nothing for a handler to remember —
+          a milestone is a rule over an event the manifest already declares. A
+          system actor earns nothing: a sweep that closed somebody's month is not
+          an achievement, and crediting the last person to touch the row would
+          hand it to somebody who was asleep.
+
+          ⚠️ AND IT NEVER FAILS THE OPERATION. The write already happened; a
+          badge is the least important thing in this function.
+        */
+        const earner = earnerOf(actor, session);
+        if (target.emits?.length && at.tenant && earner && Object.keys(app.milestones ?? {}).length) {
+          const day = dayIn(new Date().toISOString() as Instant, zone);
+          for (const event of target.emits) {
+            const earned = await recognise({
+              db: regionalDb, registry: app.milestones ?? {}, tenantId: at.tenant.tenantId,
+              userId: earner, role: personRole, event, today: day,
+              at: new Date().toISOString() as Instant,
+            }).catch(() => [] as readonly string[]);
+            for (const id of earned) {
+              await dispatch({
+                db: regionalDb, registry: app.notifications, tenantId: at.tenant.tenantId,
+                type: MILESTONE_EARNED,
+                audience: [{ userId: earner, role: personRole }],
+                values: { milestone: id, title: (app.milestones ?? {})[id]!.title },
+                at: new Date().toISOString() as Instant,
+                send: opts.send,
+              }).catch(() => undefined);
+            }
+          }
+        }
         return result;
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GuideCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GuideCarrier & MilestoneCarrier = {
         [INBOX]: { db: regionalDb, tenantId: at.tenant?.tenantId ?? "", userId: session?.accountId ?? null },
         [FILES]: {
           db: regionalDb,
@@ -640,7 +711,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           db: regionalDb,
           tenantId: at.tenant?.tenantId ?? "",
           userId: session?.accountId ?? "",
-          role: opts.roleOf?.(permissions) ?? "owner",
+          role: personRole,
           facts: async () => ({
             plan_chosen: Boolean(sub.planId ?? sub.pendingPlanId),
             passkey_registered: session ? (await identity.credentials(session.accountId).catch(() => [])).length > 0 : false,
@@ -649,6 +720,12 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             ).catch(() => null))?.n ?? 0) > 0,
             colleague_invited: (await opts.audienceFor?.(at.tenant?.tenantId ?? "", regionalDb).catch(() => []))!.length > 1,
           }),
+        },
+        [MILESTONES]: {
+          db: regionalDb,
+          tenantId: at.tenant?.tenantId ?? "",
+          userId: session?.accountId ?? "",
+          role: personRole,
         },
         [DATA]: {
           db: regionalDb,

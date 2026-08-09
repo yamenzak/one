@@ -30,7 +30,17 @@ const call = async (path: string, body?: unknown, cookie = member) => {
   return { status: res.status, body: (await res.json()) as Record<string, never> };
 };
 
-const inbox = async () => (await call("/api/inbox.list")).body as unknown as { rows: { type: string; title: string; icon: string; open: Record<string, string> }[]; unread: number };
+type Row = { id: string; type: string; title: string; icon: string; open: Record<string, string> };
+const inbox = async () => (await call("/api/inbox.list")).body as unknown as { rows: Row[]; unread: number };
+
+/*
+  ⚠️ FOUND BY TYPE, NEVER BY POSITION OR BY COUNT. Recognition rides this same
+  inbox — a milestone earned is announced through the one dispatch path, by
+  design — so a suite about `emits` that asserted the whole list would break
+  every time a manifest recognised something, which is a fact about the manifest
+  rather than about the mechanism under test.
+*/
+const rowOf = async (type: string): Promise<Row | undefined> => (await inbox()).rows.find((r) => r.type === type);
 
 beforeAll(async () => {
   const staff = await signIn("bell@example.test", SETUP);
@@ -46,8 +56,9 @@ describe("an operation's `emits` is the only dispatcher", () => {
     expect((await call("/api/billing.choose", { planId: "keeper" })).status).toBe(200);
 
     const after = await inbox();
-    expect(after.rows.map((r) => r.type)).toEqual(["plan.chosen"]);
-    expect(after.unread).toBe(1);
+    expect(after.rows.map((r) => r.type)).toContain("plan.chosen");
+    /* Nothing has been read, so every row written is a row still unread. */
+    expect(after.unread).toBe(after.rows.length);
   });
 
   /*
@@ -56,7 +67,7 @@ describe("an operation's `emits` is the only dispatcher", () => {
     corrected when the copy is wrong, and keeps saying the old thing forever.
   */
   it("renders the copy from the manifest, with the operation's own values in it", async () => {
-    const row = (await inbox()).rows[0]!;
+    const row = (await rowOf("plan.chosen"))!;
     expect(row.title).toBe("You chose keeper");
     expect(row.icon).toBe("card");
   });
@@ -67,7 +78,7 @@ describe("an operation's `emits` is the only dispatcher", () => {
     for three stages because nothing rendered a notification.
   */
   it("carries a destination the shell can resolve rather than a path", async () => {
-    expect((await inbox()).rows[0]!.open).toEqual({});
+    expect((await rowOf("plan.chosen"))!.open).toEqual({});
   });
 
   it("does not write anything for an operation that declares no event", async () => {
@@ -85,10 +96,14 @@ describe("reading and clearing", () => {
     await call("/api/commerce.grant", { subjectId: "someone", packageId: "p1" });
 
     const before = await inbox();
-    expect(before.unread).toBe(2);
+    const granted = before.rows.find((r) => r.type === "package.granted");
+    expect(granted).toBeDefined();
+    expect(before.unread).toBe(before.rows.length);
 
-    await call("/api/inbox.read", { id: before.rows[0]!.type === "package.granted" ? (before.rows[0] as unknown as { id: string }).id : (before.rows[1] as unknown as { id: string }).id });
-    expect((await inbox()).unread).toBe(1);
+    await call("/api/inbox.read", { id: granted!.id });
+    /* ⚠️ ONE, and the others untouched — asserted as a difference rather than
+       as a total, so it says the same thing whatever else the app announces. */
+    expect((await inbox()).unread).toBe(before.unread - 1);
   });
 
   it("marks everything read when asked for nothing in particular", async () => {

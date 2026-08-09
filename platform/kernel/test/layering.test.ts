@@ -27,6 +27,7 @@ const LAYER: Record<string, number> = {
   "identity.ts": 1,
   "config.ts": 1,
   "meter.ts": 1,
+  "milestone.ts": 1,
   "directory.ts": 2,
   "session.ts": 2,
   "membership.ts": 2,

@@ -976,6 +976,78 @@
       "impl": "hello/test/guide.test.ts",
       "proves": "has no operation that could mark a step complete",
       "fails": "an operation that could mark a checklist step done, which is a way to tell somebody something untrue about their own workspace"
+    },
+    {
+      "id": "milestone-earnable",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/milestone.test.ts",
+      "proves": "refuses a rule over an event nothing raises",
+      "fails": "a milestone waiting on an event nothing in the app raises \u2014 unearnable, and indistinguishable from one that is merely hard, so somebody works towards it forever"
+    },
+    {
+      "id": "milestone-announced",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/milestone.test.ts",
+      "proves": "refuses a milestone whose earners the announcement is not addressed to",
+      "fails": "a milestone earned in silence \u2014 notifications are delivered by role, so one a customer can earn with an announcement addressed to owners is a row in a table and nothing else"
+    },
+    {
+      "id": "milestone-once",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "hello/test/milestone.test.ts",
+      "proves": "does not announce it a second time when the rule is satisfied again",
+      "fails": "an award made on satisfaction rather than on the first write \u2014 a rule stays satisfied forever, so it congratulates somebody on every call for the rest of the account's life"
+    },
+    {
+      "id": "milestone-counts-nothing-else",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "hello/test/milestone.test.ts",
+      "proves": "writes no tally at all for an event no rule is about",
+      "fails": "a tally row per person per event \u2014 a permanent record of everything anybody ever did, written on the hot path of every write in the product"
+    },
+    {
+      "id": "milestone-earner-is-a-person",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "runtime/test/milestone.test.ts",
+      "proves": "names nobody for a system actor",
+      "fails": "recognition credited to a sweep or a webhook \u2014 a badge handed to whichever account happened to be on the request, for work nobody did"
+    },
+    {
+      "id": "streak-is-their-day",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "runtime/test/milestone.test.ts",
+      "proves": "resolves one instant to two days in two zones",
+      "fails": "a streak bucketed in UTC \u2014 midnight UTC is four in the afternoon in California, so it breaks halfway through somebody's day and they lose it having done nothing wrong"
+    },
+    {
+      "id": "permission-reachable",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "runtime/test/commerce.test.ts",
+      "proves": "refuses a collection whose implied permissions the app does not declare",
+      "fails": "an operation naming a permission no role can hold \u2014 it refuses everybody, forever, including the workspace owner, and reads exactly like a feature nobody uses"
+    },
+    {
+      "id": "platform-events-have-copy",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses a manifest that declares no copy for one of them",
+      "fails": "an app with no notification for an event the platform raises \u2014 dispatch answers an unknown type by returning nothing, so a workspace creation, a plan choice and a grant announce nothing at all"
     }
   ]
 }

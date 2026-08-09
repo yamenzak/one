@@ -244,7 +244,16 @@ const base = {
       seats: { counts: [] },
     },
   collections: [] as CollectionSpec[],
-  notifications: {} as Record<string, NotificationDef>,
+  /*
+    ⚠️ THE THREE THE PLATFORM RAISES, in the shared base, because every manifest
+    must declare them — an app that does not has a workspace creation, a plan
+    choice and a grant that announce nothing at all.
+  */
+  notifications: {
+    "workspace.created": { category: "service", tone: "success", icon: "sparkle", title: "ready", link: { to: "inbox" }, roles: ["owner"] },
+    "plan.chosen": { category: "billing", tone: "info", icon: "card", title: "chosen", link: { to: "inbox" }, roles: ["owner"] },
+    "package.granted": { category: "billing", tone: "success", icon: "gift", title: "granted", link: { to: "inbox" }, roles: ["owner"] },
+  } as Record<string, NotificationDef>,
   help: {} as HelpRegistry,
   filePurposes: {},
   releases: [] as Release[],
@@ -353,6 +362,66 @@ describe("a sold capability is withheld by something", () => {
  * destination — which renders, if anything renders it at all, as an anonymous
  * bell that says nothing and goes nowhere.
  */
+describe("a milestone is refused by the whole manifest or by nothing", () => {
+  const announced = {
+    ...base.notifications,
+    "milestone.earned": { category: "activity", tone: "success", icon: "sparkle", title: "{title}", link: { to: "inbox" }, roles: ["owner"] },
+  } as Record<string, NotificationDef>;
+
+  /*
+    ⚠️ THE CHECK HAS TO BE FATAL, not reported. A milestone nobody can earn is
+    somebody working towards a badge forever, and a warning in a boot log is a
+    thing nobody reads — the manifest is evaluated when the worker starts, so a
+    refusal here is a deployment that does not begin.
+  */
+  it("refuses one waiting on an event nothing raises", () => {
+    expect(() => assertComposable({
+      ...base,
+      notifications: announced,
+      milestones: { ghost: { title: "Ghost", icon: "x", rule: { kind: "first", event: "never.happens" }, roles: ["owner"] } },
+    })).toThrow(/never\.happens/);
+  });
+
+  /*
+    ⚠️ A RULE MAY BE OVER ONE OF THE PLATFORM'S OWN EVENTS. `package.granted` is
+    raised by an operation no manifest wrote, so a check reading only the app's
+    `emits` would refuse "count the packages you granted" as a rule over
+    something nothing raises — which is the opposite of true, and would push
+    every app towards re-emitting an event it does not own.
+  */
+  it("accepts one over an event the platform raises rather than the app", () => {
+    expect(() => assertComposable({
+      ...base,
+      notifications: announced,
+      milestones: { ten: { title: "Ten", icon: "gift", rule: { kind: "count", event: "package.granted", reaches: 10 }, roles: ["owner"] } },
+    })).not.toThrow();
+  });
+
+  it("refuses an app with milestones and nothing to announce them", () => {
+    expect(() => assertComposable({
+      ...base,
+      milestones: { ten: { title: "Ten", icon: "gift", rule: { kind: "count", event: "package.granted", reaches: 10 }, roles: ["owner"] } },
+    })).toThrow(/milestone\.earned/);
+  });
+});
+
+describe("the platform's own events need copy, and the app is where copy lives", () => {
+  /*
+    ⚠️ `dispatch` ANSWERS AN UNKNOWN TYPE BY RETURNING NOTHING. So an app that
+    did not happen to write these three strings announced neither a workspace
+    being created, nor a plan being chosen, nor days being added — from a
+    registry lookup that returns undefined and moves on, with every test green.
+  */
+  it("refuses a manifest that declares no copy for one of them", () => {
+    const { "plan.chosen": _dropped, ...rest } = base.notifications;
+    expect(() => assertComposable({ ...base, notifications: rest })).toThrow(/plan\.chosen/);
+  });
+
+  it("accepts one that declares all of them", () => {
+    expect(() => assertComposable({ ...base })).not.toThrow();
+  });
+});
+
 describe("what an app can tell somebody", () => {
   const told: NotificationDef = {
     category: "activity", tone: "info", icon: "bell",
@@ -369,7 +438,7 @@ describe("what an app can tell somebody", () => {
   it("accepts it once the registry declares it", () => {
     expect(() => assertComposable({
       ...base,
-      notifications: { "thing.happened": told },
+      notifications: { ...base.notifications, "thing.happened": told },
       operations: [{ ...stub, emits: ["thing.happened"] }] as never,
     })).not.toThrow();
   });
@@ -383,14 +452,14 @@ describe("what an app can tell somebody", () => {
   it("refuses a link to a collection this app does not have", () => {
     expect(() => assertComposable({
       ...base,
-      notifications: { "thing.happened": { ...told, link: { to: "row", collection: "ghost" } } },
+      notifications: { ...base.notifications, "thing.happened": { ...told, link: { to: "row", collection: "ghost" } } },
     })).toThrow(/thing\.happened/);
   });
 
   it("accepts a link to one it does", () => {
     expect(() => assertComposable({
       ...base,
-      notifications: { "thing.happened": { ...told, link: { to: "row", collection: "x" } } },
+      notifications: { ...base.notifications, "thing.happened": { ...told, link: { to: "row", collection: "x" } } },
       collections: [stubCollection] as never,
     })).not.toThrow();
   });

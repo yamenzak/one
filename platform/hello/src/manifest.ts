@@ -157,13 +157,13 @@ export const hello = defineApp({
     weekStart: 1,
   },
   access: {
-    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read"],
+    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read"],
     /*
       Anybody signed in may open a workspace — this is a self-serve product, and
       `workspace:create` is checked on a door that has no tenant to be a member
       of, so a role is the only place it could come from.
     */
-    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read"], reader: ["note:read", "guide:read"] },
+    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read"], reader: ["note:read", "guide:read", "milestone:read"] },
     /*
       ⚠️ EVERY ENTRY NAMES HOW IT IS WITHHELD, and `defineApp` refuses one whose
       mechanism does not exist. `notes` is gated on the collection rather than on
@@ -242,6 +242,18 @@ export const hello = defineApp({
       link: { to: "inbox" },
       roles: ["owner"],
     },
+    /*
+      ⚠️ THE ONE TYPE EVERY MILESTONE IS ANNOUNCED WITH, and the platform names
+      it. An app with milestones and no announcement does not compose: earning
+      something and being told about it are the same moment, and a milestone
+      nobody is told about is a row in a table.
+    */
+    "milestone.earned": {
+      category: "activity", tone: "success", icon: "sparkle",
+      title: "{title}",
+      link: { to: "inbox" },
+      roles: ["owner", "reader"],
+    },
   },
   /*
     ⚠️ EMPTY, AND THAT IS THE POINT. Every surface this app has is derived from
@@ -292,6 +304,28 @@ export const hello = defineApp({
     hints: [
       { id: "search-notes", surface: "note", body: "Search looks inside every note, not just the titles.", roles: ["owner", "reader"] },
     ],
+  },
+
+  /*
+    ⚠️ RULES OVER EVENTS THE MANIFEST ALREADY DECLARES, and `hello` declares no
+    operation that raises one — so both of these are over what the PLATFORM
+    raises. That is the honest smallest version, and it is the interesting case:
+    a rule over `package.granted` is only expressible because the platform's own
+    events are named in the contract layer rather than inferred from a manifest.
+  */
+  milestones: {
+    "picked-a-plan": {
+      title: "You chose a plan",
+      icon: "sparkle",
+      rule: { kind: "first", event: "plan.chosen" },
+      roles: ["owner"],
+    },
+    "three-grants": {
+      title: "Three lots of days handed out",
+      icon: "gift",
+      rule: { kind: "count", event: "package.granted", reaches: 3 },
+      roles: ["owner"],
+    },
   },
 
   releases: [

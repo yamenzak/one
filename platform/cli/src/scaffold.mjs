@@ -326,6 +326,18 @@ export const ${id.replace(/-/g, "")} = defineApp({
     hints: [],
   },
 
+  /*
+    ⚠️ RECOGNITION, NOT SCORE, AND EVERY RULE IS OVER AN EVENT SOMETHING ALREADY
+    RAISES — an operation's \`emits\` or one of the platform's own. There is no
+    total and no ranking here by design: a points total invites a leaderboard,
+    and a leaderboard invites comparison between customers.
+
+    Empty is a product that recognises nothing, which is most of them. Declaring
+    one means declaring \`milestone.earned\` above and \`milestone:read\` in the
+    permissions, or it does not boot.
+  */
+  milestones: {},
+
   releases: [{ version: "0.1.0", at: "2026-01-01", notes: ["First release."] }],
 
   /* Nothing has been withdrawn — and when it is, it is named here with a reason. */
@@ -358,7 +370,7 @@ import { deriveSchema, type Actor, type Resolved, type Session } from "@one/kern
 import {
   ACTIVITY_SCHEMA, applySchema, COMMERCE_SCHEMA, createRuntime, DIRECTORY_SCHEMA,
   DOMAIN_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA,
-  GUIDE_SCHEMA, JOB_SCHEMA, MEDIA_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
+  GUIDE_SCHEMA, JOB_SCHEMA, MEDIA_SCHEMA, MILESTONE_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
 } from "@one/runtime";
 import { ${id.replace(/-/g, "")}, records } from "./manifest.js";
 
@@ -369,7 +381,7 @@ if (derived.problems.length) throw new Error(\`${id}: \${derived.problems.map((p
    trusting the array, because a wrong order produces an ALTER against a table
    that does not exist yet, swallowed, leaving a column that never appeared. */
 const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, PLATFORM_STATE_SCHEMA, JOB_SCHEMA];
-export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, INBOX_SCHEMA, MEDIA_SCHEMA, GUIDE_SCHEMA, derived.module];
+export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, INBOX_SCHEMA, MEDIA_SCHEMA, GUIDE_SCHEMA, MILESTONE_SCHEMA, derived.module];
 
 /**
  * ⚠️ IDENTITY IS THE PLATFORM'S; AUTHORIZATION IS THE APP'S. What it returns is

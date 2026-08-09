@@ -176,6 +176,24 @@ export const kova = defineApp({
     because nothing rendered a notification. There is no string to get wrong.
   */
   notifications: {
+    /*
+      ⚠️ THE THREE THE PLATFORM RAISES ARE DECLARED HERE TOO, and an app that
+      omits one does not compose. They are raised by operations no manifest
+      wrote — so without copy in the app they announce nothing at all, from a
+      registry lookup that returns undefined and moves on.
+    */
+    "workspace.created": {
+      category: "service", tone: "success", icon: "sparkle",
+      title: "{slug} is ready",
+      link: { to: "inbox" },
+      roles: ["owner"],
+    },
+    "plan.chosen": {
+      category: "billing", tone: "info", icon: "card",
+      title: "You chose {planId}",
+      link: { to: "inbox" },
+      roles: ["owner"],
+    },
     "plan.published": {
       category: "activity", tone: "success", icon: "check",
       title: "{name} published a plan for you",
@@ -193,6 +211,18 @@ export const kova = defineApp({
       title: "{email} was invited",
       link: { to: "inbox" },
       roles: ["owner"],
+    },
+    /*
+      ⚠️ ONE TYPE FOR EVERY MILESTONE, and the platform names it. Earning
+      something and being told about it are the same moment, so an app with
+      milestones and no announcement does not compose — and the roles here have
+      to cover everybody who can earn one, or it is earned in silence.
+    */
+    "milestone.earned": {
+      category: "activity", tone: "success", icon: "sparkle",
+      title: "{title}",
+      link: { to: "inbox" },
+      roles: ["owner", "trainer"],
     },
   },
   operations: [readProgress, publishPlan, applyPackageGrant, inviteStaff],
@@ -293,6 +323,35 @@ export const kova = defineApp({
     hints: [
       { id: "swipe-weeks", surface: "package", body: "Swipe to compare weeks side by side.", roles: ["trainer"] },
     ],
+  },
+
+  /*
+    ⚠️ RECOGNITION, NOT SCORE. Every rule is over an event an operation above
+    already declares it raises, so there is nothing to instrument and a rule
+    waiting on an event nothing raises does not compose. There is no total and no
+    ranking — comparison between people being coached through their own bodies is
+    a product decision nobody asked for.
+  */
+  milestones: {
+    "first-plan": {
+      title: "Your first plan",
+      body: "You wrote a plan and somebody is following it.",
+      icon: "sparkle",
+      rule: { kind: "first", event: "plan.published" },
+      roles: ["trainer", "owner"],
+    },
+    "ten-renewals": {
+      title: "Ten renewals",
+      icon: "gift",
+      rule: { kind: "count", event: "package.granted", reaches: 10 },
+      roles: ["owner"],
+    },
+    "a-full-week": {
+      title: "A full week of writing",
+      icon: "flame",
+      rule: { kind: "streak", event: "plan.published", days: 7 },
+      roles: ["trainer"],
+    },
   },
 
   /* Nothing has been withdrawn yet — and when it is, it is named here with a reason. */

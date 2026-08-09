@@ -1465,3 +1465,82 @@ Two habits fix it, and both are better tests anyway. Vary the key per attempt �
 a fresh slug, a fresh event id — so a retry is a real second run. And assert by
 CONTENT rather than by COUNT: a row count is an assertion about how many times
 the test has run, which is the one thing it is never about.
+
+## 121. Recognition is not score, and the difference is one field
+
+A points total invites a leaderboard, a leaderboard invites comparison between
+customers, and comparison between people being coached through their own bodies
+is a product decision nobody asked for. There is no total here and no ranking:
+a milestone is a person against themselves, `recognitionsFor` takes one role and
+one person's tallies, and there is no argument anywhere that could name a second
+person. Refusing the field is cheaper than refusing the feature later.
+
+The same reasoning caps the rule shapes at three. An escape hatch — a predicate
+the app supplies — would be a rule nobody can explain to the person who earned
+it, and the first one written would read a table the engine knows nothing about.
+
+## 122. A milestone consumes `emits`, which is why it is the platform's
+
+The event stream already exists, is already declared, and is already checked
+against the notification registry. So a rule over it needs no instrumentation
+anybody has to remember to fire — `hello` awards two milestones and contains no
+call to the engine at all. The RULES stay the app's, because "seven sessions in
+a row" means nothing to a signage product.
+
+The corollary is that composition can check them: a rule over an event nothing
+raises is unearnable and looks exactly like one that is merely hard, so somebody
+works towards it forever and the product never says a word.
+
+## 123. The platform's own events were real and undeclarable
+
+`workspace.created`, `plan.chosen` and `package.granted` are raised by operations
+no app wrote. Nothing named them anywhere a manifest could see, and `dispatch`
+answers an unknown type by returning nothing — so an app that did not happen to
+write the same three strings announced none of them, from a registry lookup, with
+every test green. It also meant "count the packages you granted" would have been
+refused as a rule over an event nothing raises, which is the opposite of true.
+
+`PLATFORM_EVENTS` is that list in the contract layer, required of every manifest
+and pinned to the runtime by a test — because a transcription nobody checks is a
+list that is right until somebody adds an event.
+
+## 124. A permission no role can hold refuses everybody, forever
+
+The gate compares an operation's permission against what the caller holds, and
+what a caller can hold comes from `access.roles`, whose values come from
+`access.permissions`. An operation naming something absent from that list 403s
+for the workspace owner and reads exactly like a feature nobody uses.
+
+It bites hardest on operations an app never wrote: a collection implies
+`<id>:read` and `<id>:write`, the checklist implies `guide:read`, the shelf
+implies `milestone:read`. None of them is named out loud in a manifest. The
+check is in `createRuntime` rather than in `assertComposable` for that reason —
+composition sees only what the app declared, and the chokepoint sees the whole
+derived surface.
+
+## 125. An award decided by satisfaction congratulates somebody forever
+
+A rule stays satisfied: the hundredth plan satisfies "your first plan" exactly as
+the first did. `INSERT OR IGNORE` cannot report which of those wrote anything, so
+the write cannot decide either. Reading the row back and comparing its timestamp
+to your own is what makes the announcement once-only — and it settles the
+two-requests-at-once case that a read-then-skip cannot, where both read nothing
+and both speak.
+
+One decider, exercised on every award, rather than a fast path plus an unproved
+backstop. A mutation confirmed the backstop version was unreachable.
+
+## 126. A streak bucketed in UTC breaks halfway through somebody's day
+
+Midnight UTC is four in the afternoon in California. The day comes from the
+device, falls back to the manifest's zone, and never to UTC — an unknown zone
+degrades rather than throwing, because the value arrives in a header a browser
+fills in. And a second occurrence on the same day does not extend anything: a
+streak counts days, not enthusiasm, or one keen afternoon earns a week.
+
+## 127. A default parameter is applied when the argument is `undefined`
+
+A test helper defaulting the announcement supplied one to the single case whose
+whole point was that there was none — so the assertion passed by never asking
+the question. Mutation caught it. Any helper whose absent-value case is the
+interesting one must take the argument explicitly.

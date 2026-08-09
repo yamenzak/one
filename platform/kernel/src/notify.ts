@@ -80,6 +80,26 @@ export interface NotificationDef {
 
 export type NotificationRegistry = Readonly<Record<string, NotificationDef>>;
 
+/**
+ * ⚠️ WHAT THE PLATFORM ITSELF RAISES, NAMED IN THE CONTRACT LAYER.
+ *
+ * A workspace created, a plan chosen, a package granted — none of them is an
+ * app's operation, and every one of them is something somebody should be told
+ * about. Before this list existed the events were real and undeclarable: an app
+ * that did not happen to write the same three strings got no announcement at
+ * all, and `dispatch` answered a missing registry entry by returning nothing.
+ * Silence, from a registry lookup, with every test green.
+ *
+ * It is also what a milestone rule may be written over. An app's own `emits` are
+ * visible to composition; these are not, so without them "count the packages you
+ * granted" would be refused as a rule over an event nothing raises.
+ *
+ * ⚠️ AND IT IS PINNED AGAINST THE RUNTIME BY A TEST. This is a copy of what the
+ * platform's operations actually declare, in a package that cannot import them —
+ * so the copy is asserted equal rather than trusted.
+ */
+export const PLATFORM_EVENTS = ["workspace.created", "plan.chosen", "package.granted"] as const;
+
 /* ---------------------------------------------------------- the channels --- */
 
 export type Channel = "inbox" | "email" | "push";

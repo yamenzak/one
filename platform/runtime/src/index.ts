@@ -25,6 +25,8 @@ export * from "./maintenance.js";
 export * from "./jobs.js";
 export * from "./guide.js";
 export * from "./guide-ops.js";
+export * from "./milestone.js";
+export * from "./milestone-ops.js";
 export * from "./exif.js";
 export * from "./files.js";
 export * from "./files-ops.js";

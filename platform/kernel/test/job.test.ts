@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { assertComposable, CADENCE_MS, isDue, job, type Instant, type JobSpec, type NotificationDef } from "../src/index.js";
+import { assertComposable, CADENCE_MS, isDue, job, type Instant, type JobSpec, type NotificationDef, type NotificationRegistry } from "../src/index.js";
 
 const AT = (iso: string) => iso as Instant;
 const sweeping = (over: Partial<JobSpec> = {}) =>
@@ -59,7 +59,14 @@ const base = {
     permissions: [], roles: {}, plans: [], entitlements: {},
     customerRail: false, customerFlags: {}, seats: { counts: [] },
   },
-  collections: [], notifications: {}, help: {}, filePurposes: {},
+  collections: [],
+  /* ⚠️ The three the platform raises: an app that declares none announces none. */
+  notifications: {
+    "workspace.created": { category: "service", tone: "success", icon: "sparkle", title: "ready", link: { to: "inbox" }, roles: ["owner"] },
+    "plan.chosen": { category: "billing", tone: "info", icon: "card", title: "chosen", link: { to: "inbox" }, roles: ["owner"] },
+    "package.granted": { category: "billing", tone: "success", icon: "gift", title: "granted", link: { to: "inbox" }, roles: ["owner"] },
+  } as NotificationRegistry,
+  help: {}, filePurposes: {},
   releases: [], problems: {}, operations: [], jobs: [] as JobSpec[],
   guide: { steps: [], hints: [] },
 };
@@ -89,6 +96,6 @@ describe("what a manifest may not say about a job", () => {
       category: "service", tone: "info", icon: "clock",
       title: "Swept", link: { to: "inbox" }, roles: ["owner"],
     };
-    expect(() => assertComposable({ ...base, notifications: { swept: told }, jobs: [sweeping({ emits: ["swept"] })] })).not.toThrow();
+    expect(() => assertComposable({ ...base, notifications: { ...base.notifications, swept: told }, jobs: [sweeping({ emits: ["swept"] })] })).not.toThrow();
   });
 });
