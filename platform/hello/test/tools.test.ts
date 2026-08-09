@@ -36,15 +36,15 @@ beforeAll(async () => {
 
 describe("an agent drives the product through the same operations a person does", () => {
   it("completes a round trip", async () => {
-    const before = await callTool("notes_list", {});
+    const before = await callTool("note_list", {});
     expect(before.res.status).toBe(200);
 
-    const made = await callTool("notes_create", { title: "written by an agent" });
+    const made = await callTool("note_create", { title: "written by an agent" });
     expect(made.res.status).toBe(200);
-    expect((made.body.result as { id: string }).id).toMatch(/^n_/);
+    expect((made.body.result as { id: string }).id).toMatch(/^not_/);
 
-    const after = await callTool("notes_list", {});
-    const notes = (after.body.result as { notes: unknown[] }).notes;
+    const after = await callTool("note_list", {});
+    const notes = (after.body.result as { rows: unknown[] }).rows;
     expect(notes.length).toBeGreaterThan(0);
   });
 
@@ -78,7 +78,7 @@ describe("an agent drives the product through the same operations a person does"
     list was computed for a caller at a moment; the call arrives later.
   */
   it("refuses a tool this caller was never offered", async () => {
-    const stranger = await callTool("notes_create", { title: "nope" }, "");
+    const stranger = await callTool("note_create", { title: "nope" }, "");
     expect(stranger.res.status).toBe(403);
   });
 
@@ -107,7 +107,7 @@ describe("an agent drives the product through the same operations a person does"
   it("marks which tools mutate, so a caller can require confirmation", async () => {
     const { body } = await get("/api/tools.list");
     const tools = body.tools as { name: string; mutates: boolean }[];
-    expect(tools.find((t) => t.name === "notes_create")?.mutates).toBe(true);
-    expect(tools.find((t) => t.name === "notes_list")?.mutates).toBe(false);
+    expect(tools.find((t) => t.name === "note_create")?.mutates).toBe(true);
+    expect(tools.find((t) => t.name === "note_list")?.mutates).toBe(false);
   });
 });

@@ -8,11 +8,6 @@ kind: index
 > Every entry is a `DEFER` marker somewhere in the repository. Nothing here
 > was remembered — it was found, which is the point (docs/DOCS-STANDARD.md §2).
 
-## Stage 3 — Data — collections, ledger, files, jobs, relocation
-
-- `one-012` — a durable actor binding, which arrives with the  
-  <sub>hello/src/manifest.ts:27</sub>
-
 ## Stage 4 — Renderer — shell, nav, collection views, whitelabel, PWA
 
 - `one-007` — the choreographer: role-derived timelines, the motion budget, shared-element continuity across surfaces.  

@@ -23,6 +23,7 @@ import {
 } from "@one/kernel";
 import { bindingsFor, globalSql, type RawEnv } from "./env.js";
 import { sqlDirectory } from "./directory.js";
+import { collectionOperations } from "./collection-ops.js";
 import { DIRECTORY, TOOLS, platformOperations, toolOperations, type DirectoryCarrier, type ToolCarrier } from "./platform-ops.js";
 import { identityOperations, PLATFORM, type PlatformCarrier, type PlatformDeps } from "./identity-ops.js";
 import { identityStore, readCookie, SESSION_COOKIE, sessionStore } from "./identity.js";
@@ -110,6 +111,17 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
   */
   const byPath = new Map<string, AnyOperation>();
   for (const op of [...platformOperations(app), ...identityOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+
+  /*
+    ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
+    an app makes "declare a collection and forget to mount it" expressible — a
+    table applied, rows written by some other path, and no route to reach any of
+    it, with every suite green. That is the exact failure this platform was
+    started over, and here it cannot be written.
+  */
+  for (const spec of app.collections) {
+    for (const op of collectionOperations(spec)) byPath.set(routeFor(op).path, op);
+  }
   for (const op of app.operations as readonly AnyOperation[]) {
     const path = routeFor(op).path;
     /*

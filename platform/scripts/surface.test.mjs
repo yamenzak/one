@@ -179,6 +179,81 @@ for (const file of files) {
 }
 ok(`parsed: ${unparsed} operation(s) asserting their input`);
 
+/* ------------------------------------------------------------- 5. DATA --- */
+
+/**
+ * ⚠️ ERASURE IS DERIVED, AND IT HAS TO STAY THAT WAY. A hand-written delete list
+ * drifts from the schema in silence: a table added without a matching line is
+ * one a purge steps over forever while reporting success, because a purge
+ * swallows delete errors by construction. Relocation reads the SAME declaration,
+ * so this one check covers both — a table that cannot be forgotten cannot be
+ * moved either.
+ */
+const relocate = readFileSync(join(ROOT, "runtime/src/relocate.ts"), "utf8");
+if (!/tenantCascade\(modules\)/.test(relocate)) {
+  fail(`runtime/src/relocate.ts: relocation no longer reads the erasure cascade.\n` +
+       `       A separate table list would drift, and the symptom is a workspace that\n` +
+       `       arrives in its new region with one table missing.`);
+} else ok(`erasure derived: relocation and erasure read one declaration`);
+
+/*
+  ⚠️ THE FLIP IS SEPARATE FROM THE COPY, and deleting is separate from both.
+  Deleting as part of a move makes the whole operation irreversible at its least
+  tested moment; the source staying bootable is what turns a bad relocation into
+  an inconvenience.
+*/
+if (/dropSourceCopy[\s\S]{0,600}?await to\.run|copyTenant[\s\S]{0,2000}?DELETE FROM/.test(relocate)) {
+  fail(`runtime/src/relocate.ts: the copy deletes from the source.\n` +
+       `       A move that cannot be abandoned halfway is one nobody can back out of.`);
+}
+if (!/export async function verifyTenant/.test(relocate)) {
+  fail(`runtime/src/relocate.ts: there is no verification step.\n` +
+       `       The directory write is the point of no return for every request after it.`);
+}
+
+/**
+ * ⚠️ A DURABLE ACTOR MUST BE ABLE TO MOVE BEFORE IT MAY HOLD ANYTHING. Storage
+ * cannot be relocated across jurisdictions and a jurisdiction-scoped namespace
+ * mints different ids for the same name, so every class written before the rule
+ * exists is one that has to be rewritten to obey it.
+ */
+if (!/interface Relocatable[\s\S]{0,300}?seal\(\)[\s\S]{0,200}?exportState\(\)[\s\S]{0,200}?importState\(/.test(relocate)) {
+  fail(`runtime/src/relocate.ts: the \`Relocatable\` contract is incomplete.\n` +
+       `       \`seal\` matters most: an actor holding a balance that is moved wrongly\n` +
+       `       either mints value or destroys it, silently, on the money path.`);
+}
+const actorClasses = files.flatMap((f) => {
+  const src = stripComments(readFileSync(f, "utf8"));
+  return [...src.matchAll(/export class (\w+)[^{]*\{/g)].map((m) => ({ file: f, name: m[1], src }));
+}).filter((c) => /DurableObject|Relocatable/.test(c.src));
+for (const c of actorClasses) {
+  for (const method of ["seal", "exportState", "importState"]) {
+    if (new RegExp(`\\b${method}\\s*\\(`).test(c.src)) continue;
+    fail(`${rel(c.file)}: class ${c.name} holds durable state and cannot ${method}.`);
+  }
+}
+ok(`relocatable: ${actorClasses.length} durable class(es) checked`);
+
+/*
+  ⚠️ A BOUNDED SWEEP THAT DOES NOT SAY WHAT IT DROPPED reads as "covered
+  everything". A list with a ceiling and no report is the same silence.
+*/
+const collectionOps = readFileSync(join(ROOT, "runtime/src/collection-ops.ts"), "utf8");
+if (!/Math\.min\(input\.limit/.test(collectionOps)) {
+  fail(`runtime/src/collection-ops.ts: the list has no ceiling.\n` +
+       `       An unbounded list is one row count away from a response nothing can render,\n` +
+       `       and the row count is the tenant's rather than anybody's decision.`);
+} else ok(`no silent cap: the derived list is bounded`);
+
+/*
+  ⚠️ AND THE TENANT PREDICATE IS DERIVED, in one place. A hand-written list that
+  forgets it returns every tenant's rows and looks completely ordinary — same
+  shape, same code path, more results.
+*/
+if (!/function scopeClause/.test(collectionOps) || !/tenant_id = \?/.test(collectionOps)) {
+  fail(`runtime/src/collection-ops.ts: the tenant predicate is no longer derived in one place.`);
+}
+
 /* -------------------------------------------------------------------------- */
 
 if (bad) {

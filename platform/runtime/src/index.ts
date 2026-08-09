@@ -12,5 +12,8 @@ export * from "./directory.js";
 export * from "./webauthn.js";
 export * from "./identity.js";
 export * from "./identity-ops.js";
+export * from "./collection-ops.js";
+export * from "./ledger.js";
+export * from "./relocate.js";
 export * from "./platform-ops.js";
 export * from "./runtime.js";

@@ -870,6 +870,10 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `operation-registry` | a route, tool or webhook that did not come from `operation()` | **live** |
 | `tool-subset-route` | an AI tool reachable where the equivalent route is not | **live** |
 | `problem-envelope` | a failure body that is not a `Problem`, a code with no copy, or a `catch` that re-throws or serialises a provider's error | **live** |
+| `erasure-derived` | a table carrying a scope column and declaring none | **live** |
+| `schema-adjacency` | a module ordered where its dependency has not run | **live** |
+| `relocatable-do` | a Durable Object class that cannot seal, export and import its state | **live** |
+| `no-silent-cap` | a bounded sweep that does not log what it dropped | **live** |
 | `schema-idempotent` | a schema module that is not re-runnable, a duplicate table across modules, or a module ordered before something it declares it needs | **live** |
 | `boot-per-region` | a deployment that composes one region's schema and serves another — the tenant resolves, reaches the right database, and finds nothing in it | **live** |
 | `standing-not-permission` | an always-allowed lane that skips the permission check with the standing gate | **live** |
@@ -881,10 +885,9 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `fails-declared` | an operation naming a failure code no catalogue declares, which becomes a generic 503 wearing the shape of a specific answer | **live** |
 | `agent-equals-caller` | a tool offered where the equivalent route would refuse, or an operation withheld from every model that is reachable by name | **live** |
 | `input-parsed` | an operation whose input is asserted rather than parsed — a type assertion compiles, reads like validation, and lets a number reach a text column | **live** |
-| `erasure-derived` | a table carrying a scope column and declaring none | stage 3 |
-| `schema-adjacency` | a module ordered where its dependency has not run | stage 3 |
-| `relocatable-do` | a Durable Object class that cannot seal, export and import its state | stage 3 |
-| `no-silent-cap` | a bounded sweep that does not log what it dropped | stage 3 |
+| `tenant-predicate-derived` | a list that filters by tenant in its own code — one that forgets returns every tenant's rows and looks completely ordinary | **live** |
+| `copy-before-flip` | a relocation that deletes from the source, or one with no verification before the directory write | **live** |
+| `collection-reachable` | a collection declared and left without a surface — a table applied, rows written by some other path, and no route to reach any of it | **live** |
 | `entitlement-enforced` | a sold entitlement no gate names | stage 5 |
 | `flag-enforced` | a sold capability the UI hides and no route withholds | stage 5 |
 | `manifest-diff` | a deploy removing a plan, permission or entitlement somebody holds | stage 6 |
@@ -979,8 +982,8 @@ second-system effect, which is the largest risk here by a distance.
 |---|---|---|
 | 0 | **Contracts** — manifest schema, layer boundaries, naming, the operation and collection types. Types only. | ✅ built in `platform/kernel` — the four types compile, six real surfaces from two shipping products are expressed in them, and eight mistakes are rejected by the compiler. [FINDINGS.md](../kernel/test/FINDINGS.md) is what did not fit. Open: review |
 | 1 | **Kernel** — bindings from manifest, config, schema composition, shared identity + root-scoped passkeys, tenancy + doors, **region resolution and the global tenant directory**, standing. | A generated `hello` app boots, signs in with one passkey usable from a second app's origin, creates a tenant, answers `/health` — and no handler has seen a raw binding. ✅ `platform/hello` boots through `platform/runtime` on the real host topology, composes its schema per region, creates a workspace, signs a person in with an emailed code, registers a passkey at the ROOT relying party and signs in with it from a second origin. Open: review |
-| 2 | **Surface** — operations → routes + tools + webhooks + audit + OpenAPI. | An AI agent completes a CRUD round trip through tools, and is refused exactly what the user would be |
-| 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search, **and tenant relocation (§4.2) with the `Relocatable` DO contract**. | `hello` has a real collection with an activity log and a metered ledger — and a tenant can be copied to a second region and back, verified, with the source still bootable |
+| 2 | **Surface** — operations → routes + tools + webhooks + audit + OpenAPI. | ✅ An agent lists tools, completes a CRUD round trip and is refused exactly what the user would be — asserted over the whole catalogue rather than sampled. Input is parsed at the boundary rather than asserted |
+| 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search, **and tenant relocation (§4.2) with the `Relocatable` DO contract**. | ✅ `hello` declares two collections and writes no routing at all: list, read, create, update, archive, the document lifecycle and the activity log are derived. A metered ledger sums rather than stores, and a tenant copies to a second region, verifies by counting, and leaves the source bootable. Open: files, jobs |
 | 4 | **Renderer** — shell, nav, collection views, settings, admin, whitelabel, PWA. The language is [UI.md](UI.md). | `pnpm shots` photographs `hello` at 4 viewports × 2 themes and it looks like the product — and the state matrix, the contrast sweep over every legal brand and the boundary guard all pass |
 | 5 | **Commerce** — plans, entitlements, flags, Stripe on one webhook, B2C packages, metering, parking state. | `hello` sells a plan and a package end to end in Stripe test mode |
 | 6 | **Ops** — notifications incl. web push, help centre, versioning + changelog, data & subscription centre, maintenance, provisioning, CI. | A new app is `one new` + a manifest + a deploy, with nothing hand-wired |

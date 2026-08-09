@@ -26,7 +26,18 @@ interface FieldCommon {
   readonly sensitive?: boolean;
 }
 
-export interface TextField extends FieldCommon { readonly kind: "text"; readonly max?: number; readonly multiline?: boolean }
+export interface TextField extends FieldCommon {
+  readonly kind: "text";
+  /**
+   * ⚠️ `required` AND `min: 1` ARE DIFFERENT QUESTIONS. Required asks whether the
+   * key is present; a minimum asks whether the value is worth storing. An empty
+   * string satisfies the first and is useless for the second — a record whose
+   * title is `""` is one nobody can find again.
+   */
+  readonly min?: number;
+  readonly max?: number;
+  readonly multiline?: boolean;
+}
 export interface NumberField extends FieldCommon { readonly kind: "number"; readonly min?: number; readonly max?: number; readonly integer?: boolean }
 export interface BoolField extends FieldCommon { readonly kind: "bool" }
 export interface EnumField<V extends string = string> extends FieldCommon { readonly kind: "enum"; readonly values: readonly V[] }

@@ -9,10 +9,10 @@
 
 import { deriveSchema, gateFor, type Actor, type Caller, type Resolved, type Session } from "@one/kernel";
 import {
-  applySchema, createRuntime, DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA,
-  OTP_SCHEMA, SESSION_SCHEMA, type RawEnv,
+  ACTIVITY_SCHEMA, applySchema, createRuntime, DIRECTORY_SCHEMA,
+  DOMAIN_SCHEMA, IDENTITY_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA, SESSION_SCHEMA, type RawEnv,
 } from "@one/runtime";
-import { hello, notes } from "./manifest.js";
+import { hello, notes, receipts } from "./manifest.js";
 
 /* ---------------------------------------------------------------- schema --- */
 
@@ -21,7 +21,7 @@ import { hello, notes } from "./manifest.js";
  * erasure cascade and the relocation plan cannot disagree with one another —
  * they are one declaration read four ways.
  */
-const derived = deriveSchema("hello", [notes]);
+const derived = deriveSchema("hello", [notes, receipts]);
 if (derived.problems.length) throw new Error(`hello: ${derived.problems.map((p) => p.detail).join("; ")}`);
 
 /*
@@ -31,7 +31,8 @@ if (derived.problems.length) throw new Error(`hello: ${derived.problems.map((p) 
   exist yet, swallowed, leaving a column that silently never appeared.
 */
 const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA];
-const REGIONAL_MODULES = [SESSION_SCHEMA, derived.module];
+export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, derived.module];
+
 
 /* -------------------------------------------------------------- identity --- */
 
@@ -95,6 +96,8 @@ const runtime = createRuntime(hello, {
     region: (bind) => applySchema(bind.db, REGIONAL_MODULES).then(() => undefined),
   },
 });
+
+export { TenantLedgerActor } from "./ledger-actor.js";
 
 export default {
   fetch: (request: Request, env: RawEnv): Promise<Response> => runtime.fetch(request, env),

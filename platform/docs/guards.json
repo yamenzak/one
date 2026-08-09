@@ -192,28 +192,36 @@
       "group": "platform",
       "fails": "a table carrying a scope column and declaring none",
       "stage": "3",
-      "status": "owed"
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "relocation and erasure read one declaration"
     },
     {
       "id": "schema-adjacency",
       "group": "platform",
       "fails": "a module ordered where its dependency has not run",
       "stage": "3",
-      "status": "owed"
+      "status": "live",
+      "impl": "runtime/test/schema.test.ts",
+      "proves": "ordered before something it declares it needs"
     },
     {
       "id": "relocatable-do",
       "group": "platform",
       "fails": "a Durable Object class that cannot seal, export and import its state",
       "stage": "3",
-      "status": "owed"
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "holds durable state and cannot"
     },
     {
       "id": "no-silent-cap",
       "group": "platform",
       "fails": "a bounded sweep that does not log what it dropped",
       "stage": "3",
-      "status": "owed"
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "the derived list is bounded"
     },
     {
       "id": "entitlement-enforced",
@@ -460,6 +468,33 @@
       "status": "live",
       "impl": "scripts/surface.test.mjs",
       "proves": "asserted rather than parsed"
+    },
+    {
+      "id": "tenant-predicate-derived",
+      "group": "platform",
+      "fails": "a list that filters by tenant in its own code \u2014 one that forgets returns every tenant's rows and looks completely ordinary",
+      "stage": "3",
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "no longer derived in one place"
+    },
+    {
+      "id": "copy-before-flip",
+      "group": "platform",
+      "fails": "a relocation that deletes from the source, or one with no verification before the directory write",
+      "stage": "3",
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "there is no verification step"
+    },
+    {
+      "id": "collection-reachable",
+      "group": "platform",
+      "fails": "a collection declared and left without a surface \u2014 a table applied, rows written by some other path, and no route to reach any of it",
+      "stage": "3",
+      "status": "live",
+      "impl": "hello/test/data.test.ts",
+      "proves": "without a line of routing"
     }
   ]
 }

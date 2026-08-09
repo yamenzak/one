@@ -154,9 +154,9 @@ describe("a request resolves to a tenant and its region", () => {
   });
 
   it("serves a workspace at its own address", async () => {
-    const [status, body] = await json(await call("https://north.hello.4dl.app/api/notes.list", { as: "member" }));
+    const [status, body] = await json(await call("https://north.hello.4dl.app/api/note.list", { as: "member" }));
     expect(status).toBe(200);
-    expect(body).toEqual({ notes: [] });
+    expect(body).toEqual({ rows: [] });
   });
 
   /*
@@ -167,20 +167,20 @@ describe("a request resolves to a tenant and its region", () => {
     resolver.
   */
   it("writes to the region the tenant lives in, and nowhere else", async () => {
-    const write = await call("https://north.hello.4dl.app/api/notes.create", {
+    const write = await call("https://north.hello.4dl.app/api/note.create", {
       method: "POST", as: "member", body: JSON.stringify({ title: "in the EU" }),
     });
     expect(write.status).toBe(200);
 
-    const [, mine] = await json(await call("https://north.hello.4dl.app/api/notes.list", { as: "member" }));
-    expect((mine as { notes: unknown[] }).notes).toHaveLength(1);
+    const [, mine] = await json(await call("https://north.hello.4dl.app/api/note.list", { as: "member" }));
+    expect((mine as { rows: unknown[] }).rows).toHaveLength(1);
 
-    const [, theirs] = await json(await call("https://acme.hello.4dl.app/api/notes.list", { as: "member" }));
-    expect((theirs as { notes: unknown[] }).notes).toHaveLength(0);
+    const [, theirs] = await json(await call("https://acme.hello.4dl.app/api/note.list", { as: "member" }));
+    expect((theirs as { rows: unknown[] }).rows).toHaveLength(0);
   });
 
   it("404s a workspace that does not exist", async () => {
-    expect((await call("https://nobody.hello.4dl.app/api/notes.list", { as: "member" })).status).toBe(404);
+    expect((await call("https://nobody.hello.4dl.app/api/note.list", { as: "member" })).status).toBe(404);
   });
 
   /*
@@ -189,7 +189,7 @@ describe("a request resolves to a tenant and its region", () => {
     value — and the row is wrong with nothing throwing anywhere.
   */
   it("refuses a body the shape does not describe, naming each field", async () => {
-    const [status, body] = await json(await call("https://north.hello.4dl.app/api/notes.create", {
+    const [status, body] = await json(await call("https://north.hello.4dl.app/api/note.create", {
       method: "POST", as: "member", body: JSON.stringify({ title: 42 }),
     }));
     expect(status).toBe(400);
@@ -198,20 +198,25 @@ describe("a request resolves to a tenant and its region", () => {
 
   it("drops a field nobody declared rather than forwarding it", async () => {
     // A writer that spread its input would otherwise take `tenant_id` with it.
-    const [status] = await json(await call("https://north.hello.4dl.app/api/notes.create", {
+    const [status] = await json(await call("https://north.hello.4dl.app/api/note.create", {
       method: "POST", as: "member", body: JSON.stringify({ title: "fine", tenant_id: "t_someone_else" }),
     }));
     expect(status).toBe(200);
-    const [, listed] = await json(await call("https://north.hello.4dl.app/api/notes.list", { as: "member" }));
-    expect((listed as { notes: { title: string }[] }).notes.some((n) => n.title === "fine")).toBe(true);
+    const [, listed] = await json(await call("https://north.hello.4dl.app/api/note.list", { as: "member" }));
+    expect((listed as { rows: { title: string }[] }).rows.some((n) => n.title === "fine")).toBe(true);
   });
 
-  it("reports a declared failure as a Problem, with a reference", async () => {
-    const [status, body] = await json(await call("https://north.hello.4dl.app/api/notes.create", {
+  /*
+    ⚠️ AN EMPTY TITLE IS REFUSED BY THE DECLARATION, not by a rule in a handler.
+    `required` asks whether the key is present; `min: 1` asks whether the value
+    is worth storing, and a record titled `""` is one nobody can find again.
+  */
+  it("refuses a value the field declaration will not accept, with a reference", async () => {
+    const [status, body] = await json(await call("https://north.hello.4dl.app/api/note.create", {
       method: "POST", as: "member", body: JSON.stringify({ title: "" }),
     }));
     expect(status).toBe(400);
-    expect(body).toMatchObject({ code: "notes.title_required", title: "A note needs a title" });
+    expect(body).toMatchObject({ code: "platform.invalid", fields: { title: "must be at least 1 character(s)" } });
     expect((body as { ref: string }).ref).toMatch(/^ONE-/);
   });
 });

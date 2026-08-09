@@ -608,3 +608,55 @@ Adding `validate.ts` turned the suite red — not because it violated the
 direction, but because it was absent from the map. That is the check working:
 the alternative is a new module that quietly belongs to no layer and may import
 anything, which is how a layered design stops being one.
+
+## 46. Deriving the operations is where the manifest actually pays
+
+`hello` declares two collections and writes no routing at all. List, read,
+create, update, archive, the document lifecycle and the activity log are all
+derived — and with them the tenant predicate, the archived-row clause, the
+version check and the audit entry, each applied in exactly one place.
+
+The value is not the lines saved. It is that a hand-written list which forgets
+the tenant predicate returns every tenant's rows through the same code path, in
+the same shape, with more results — and there is no version of that a reviewer
+reliably catches on the four hundredth route.
+
+## 47. Deriving them in the APP makes "declare and forget to mount" expressible
+
+The first version had the app compose `collectionOperations` and pass the result
+to `createRuntime`. That is the failure this platform was started over, one layer
+up: a collection declared, its table applied, and no route to reach any of it,
+with every suite green.
+
+The runtime derives them from `app.collections` now, so the mistake cannot be
+written. It also fixed a typing problem for free — mixing `AnyOperation` into a
+typed `operations` array widened the binding generic and lost `ctx.bind.db`.
+
+## 48. A product rule in a handler was a field declaration in disguise
+
+Replacing the hand-written writer removed a check on an empty title, and the
+first instinct was to put it back in the derived one. It belonged in the field:
+`required` asks whether the key is present, `min: 1` asks whether the value is
+worth storing, and a record titled `""` is one nobody can find again.
+
+The general form: **before adding a rule to a handler, ask whether the
+declaration could carry it.** One that can is enforced on every transport, shown
+in the API document, and inherited by every app.
+
+## 49. Mutation testing found two coverage gaps a green suite hid
+
+Two mutations survived, and both were absences rather than weak assertions.
+
+**Nothing asserted tenant isolation within a region.** The cross-tenant test used
+two workspaces in DIFFERENT regions, so separate databases separated them for
+free and removing the predicate entirely changed nothing. Two tenants in one
+database is the case that needed writing.
+
+**Nothing proved `copyTenant` verifies.** The verification test called
+`verifyTenant` directly, so replacing the call inside the copy with a hardcoded
+success passed. A relocation reporting a success it never checked sends a
+workspace to a region missing part of itself.
+
+⚠️ Both suites were green, both properties were "obviously" covered, and neither
+was. A mutation that survives is the only reliable way to find a test that
+asserts the wrong subject.
