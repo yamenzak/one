@@ -15,7 +15,7 @@ import { defineApp } from "../src/app.js";
 import { collection, field } from "../src/collection.js";
 import { declareProblems } from "../src/problem.js";
 import type { Currency, Locale, RegionId, TimeZone } from "../src/primitives.js";
-import { applyPackageGrant, bindings, inviteStaff, problems as appProblems, publishPlan, readProgress } from "./proof.kova.js";
+import { applyPackageGrant, bindings, dunning, inviteStaff, problems as appProblems, publishPlan, readProgress } from "./proof.kova.js";
 
 /* --------------------------------------------------------------- a table --- */
 
@@ -234,6 +234,13 @@ export const kova = defineApp({
   releases: [
     { version: "0.1.0", at: "2026-01-15", notes: ["You can now sell packages that renew.", "Progress reports load faster on a phone."] },
   ],
+
+  /*
+    ⚠️ THE LADDER IS A SWEEP, and it is DECLARED so that "did it run" has an
+    answer. A cron entry in a deployment config has no test, no audit and no
+    record — and the characteristic failure of scheduled work is silence.
+  */
+  jobs: [dunning],
 
   /* Nothing has been withdrawn yet — and when it is, it is named here with a reason. */
   retired: {},

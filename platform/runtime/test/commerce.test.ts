@@ -64,6 +64,7 @@ const app = (over: Partial<AppSpec<typeof bindings>>): AppSpec<typeof bindings> 
   help: {},
   filePurposes: {},
   releases: [],
+  jobs: [],
   retired: {},
   operations: [],
   problems: {},

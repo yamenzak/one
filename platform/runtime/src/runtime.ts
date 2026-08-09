@@ -28,6 +28,7 @@ import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
 import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files-ops.js";
 import { fetchMedia, usedBytes } from "./files.js";
 import { readMaintenance, refuses } from "./maintenance.js";
+import { runDue, type RunReport } from "./jobs.js";
 import { dispatch, interpolatable, type Delivery } from "./inbox.js";
 import { customerFlagsFor, PARKED, readSubscription, standingFor } from "./commerce.js";
 import { sqlDirectory } from "./directory.js";
@@ -183,6 +184,14 @@ export interface RuntimeOptions<B extends BindingSpec> {
 
 export interface Runtime {
   fetch(request: Request, env: RawEnv): Promise<Response>;
+  /**
+   * ⚠️ THE SCHEDULED ENTRY POINT, and it is part of the runtime rather than
+   * something an app wires. A worker whose `scheduled` handler is written by
+   * hand is one where the run record, the isolation between jobs and the bound
+   * on a sweep are all optional — and every one of them is invisible when it is
+   * missing.
+   */
+  scheduled(env: RawEnv): Promise<readonly RunReport[]>;
 }
 
 /* --------------------------------------------------------------- dispatch --- */
@@ -276,6 +285,14 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     }
   }
 
+  /**
+   * ⚠️ A CEILING ON HOW MANY WORKSPACES ONE SWEEP VISITS, because "every tenant"
+   * is a number that only grows and a scheduled run has a time limit. The
+   * per-job `batch` bounds the work inside one workspace; this bounds how many
+   * workspaces are opened at all.
+   */
+  const SWEEP_TENANTS = 500;
+
   const booted = new Map<string, Promise<void>>();
   const once = (key: string, run: () => Promise<void>) => {
     const existing = booted.get(key);
@@ -286,6 +303,36 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
   };
 
   return {
+    /*
+      ⚠️ A REGION IS SWEPT AT A TIME AND THE TENANTS IN IT ARE BOUNDED. The
+      directory is global, so the runner reads which workspaces exist before it
+      knows which database to open — and it takes a page rather than all of
+      them, because "every tenant" is a number that only grows.
+    */
+    async scheduled(env) {
+      const directoryDb = globalSql(env, opts.directoryBinding);
+      /*
+        ⚠️ NO DIRECTORY MEANS NOTHING TO SWEEP, and that is not a failure. A
+        deployment mid-provisioning has no store yet; throwing here would turn
+        every scheduled tick into an alert about a state that resolves itself.
+      */
+      if (!directoryDb) return [];
+      if (opts.onBoot) await once("global", () => opts.onBoot!.global(directoryDb));
+      return runDue(app.jobs ?? [], {
+        global: directoryDb,
+        regions: app.tenancy.regions,
+        now: () => new Date().toISOString() as Instant,
+        bindingsFor: (region) => regional(env)(region as ResolvedRegion),
+        tenants: async (region) => {
+          const rows = await directoryDb.all<{ tenant_id: string }>(
+            `SELECT tenant_id FROM tenant_directory WHERE region = ? ORDER BY tenant_id LIMIT ?`,
+            region, SWEEP_TENANTS,
+          ).catch(() => []);
+          return rows.map((r) => ({ tenantId: r.tenant_id as TenantId, region }));
+        },
+      });
+    },
+
     async fetch(request, env) {
       const ref = newRef();
       const url = new URL(request.url);
@@ -577,6 +624,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         },
         [DATA]: {
           db: regionalDb,
+          global: directoryDb,
           tenantId: at.tenant?.tenantId ?? "",
           modules: opts.regionalModules ?? [],
           isOperator: at.door === "admin",

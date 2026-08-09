@@ -1352,3 +1352,59 @@ the return value.
 
 What anybody looks at later is the stored row. A test that asserts the return
 value proves the function agrees with itself, which it always does.
+
+## 111. Scheduled work does not break, it stops
+
+An operation that fails is reported by whoever was waiting. A sweep has nobody
+waiting — so when it stops, the first anybody knows is a workspace that was
+never suspended, a budget that never expired, or a digest nobody received for
+five weeks.
+
+Every rule in the job system follows from that: a run table so "did it run" has
+an answer, a failure recorded rather than raised, a bound that reports when it
+was hit, and an operator surface over all of it. A cron entry in a deployment
+config has none of them.
+
+## 112. An unbounded sweep works everywhere until it stops forever
+
+It runs fine on every deployment until one tenant is large enough to cross the
+runtime's time limit. Then it fails, is retried, fails at exactly the same size,
+and the work never happens again — and the failure arrives long after the commit
+that made it inevitable.
+
+A bound with `more` is a sweep that catches up. A bound with nothing to report it
+was hit is worse than none: the backlog builds at exactly the rate the ceiling
+truncates it, and work-done-per-run looks healthy the whole time.
+
+## 113. Isolating a tenant is right; treating every tenant failing as success is not
+
+One malformed row must not stop a sweep for everybody else — that is how a
+single bad record freezes a whole deployment's billing ladder. So a per-tenant
+failure is caught and counted.
+
+But a run where NOTHING succeeded and something was skipped is a broken job
+wearing a partial success's clothes. Recorded as a success, its clock advances
+and it never retries: the run table fills with healthy-looking rows while the
+work has stopped completely. `skipped > 0 && done === 0` is the line, and a real
+database is what found it — the fake was too forgiving to notice.
+
+## 114. A fake that reimplements the query makes the query untestable
+
+`lastSuccess` reads past failed runs to the last one that worked, and that
+predicate is in SQL. The unit test's fake answered it in JavaScript, so mutating
+the SQL changed nothing and the test passed either way.
+
+The rule this generalises to: a fake may stand in for a STORE, but not for
+logic that lives in the query. Anything expressed in SQL is asserted against a
+real database, and the unit test says so in a comment pointing at where.
+
+## 115. An interval is honest where a wall-clock time is not
+
+A cron expression encodes a moment, and for a platform serving several regions
+that is a question with no single answer: "02:00" is three different moments for
+three tenants and none at all for a fourth on the day a clock changes.
+
+Every sweep this platform has needed is "roughly this often", so that is what the
+declaration can say. Never-run is always due, because a first deployment, a new
+region and a job added later all have no last-run — and reading that as "not yet"
+means a weekly job starts a week late, during which somebody assumes it works.

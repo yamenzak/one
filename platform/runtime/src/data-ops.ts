@@ -16,12 +16,15 @@
 import type { AnyOperation, AppSpec, BindingSpec, Instant, SchemaModule, SqlHandle } from "@one/kernel";
 import { operation, s } from "@one/kernel";
 import { erasurePlan, eraseTenant, exportTenant } from "./data.js";
+import { jobHistory } from "./jobs.js";
 
 /** ⚠️ A symbol, so an app cannot reach the plan by writing a property name. */
 export const DATA = Symbol.for("one.runtime.data");
 
 export interface DataDeps {
   readonly db: SqlHandle;
+  /** The global store, where a job's run record lives. */
+  readonly global: SqlHandle;
   readonly tenantId: string;
   readonly modules: readonly SchemaModule[];
   /** Whether this caller may act for the whole deployment rather than one workspace. */
@@ -128,5 +131,27 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
     },
   });
 
-  return [takeIt, close, cancel, erase] as unknown as readonly AnyOperation[];
+  /**
+   * ⚠️ A RUN TABLE NOBODY CAN READ IS THE SAME SILENCE WITH AN EXTRA TABLE.
+   *
+   * Same argument as the payment dead letter and the same conclusion: the
+   * surface is not optional, and it is behind an operator permission. The
+   * question it answers — "is the sweep still running" — is one nobody thinks to
+   * ask until something that should have happened has not for a month.
+   */
+  const runs = operation({
+    id: "billing.jobs",
+    kind: "read",
+    summary: "What the scheduler has actually been doing.",
+    input: s.object({ limit: s.optional(s.number({ integer: true, min: 1, max: 100 })) }),
+    output: s.object({ runs: s.json() }),
+    permission: "billing:operate",
+    idempotency: { mode: "none" },
+    async handler(ctx, input: { limit?: number }) {
+      const d = deps(ctx);
+      return { runs: await jobHistory(d.global, Math.min(input.limit ?? 25, 100)) };
+    },
+  });
+
+  return [takeIt, close, cancel, erase, runs] as unknown as readonly AnyOperation[];
 }

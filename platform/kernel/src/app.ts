@@ -14,6 +14,7 @@ import type { BindingSpec } from "./bindings.js";
 import type { CollectionSpec } from "./collection.js";
 import type { FlagDef } from "./customer.js";
 import type { HelpRegistry } from "./help.js";
+import type { JobSpec } from "./job.js";
 import { danglingHelp, helpProblems } from "./help.js";
 import type { NotificationRegistry } from "./notify.js";
 import type { Release, Retired } from "./release.js";
@@ -27,11 +28,6 @@ import { PLATFORM_PROBLEMS } from "./problem.js";
 import type { OperationSpec } from "./operation.js";
 
 /**
- * ⚠️ `accept` IS THE CONTENT TYPE, NOT THE EXTENSION. An extension is whatever
- * somebody typed; the content type is what the browser said and what the reader
- * will trust.
- */
-/**
  * ⚠️ THE ONE ENTITLEMENT KEY THE PLATFORM ITSELF ENFORCES, and it is named here
  * so an app cannot choose a different word for it.
  *
@@ -42,6 +38,11 @@ import type { OperationSpec } from "./operation.js";
  */
 export const STORAGE_ENTITLEMENT = "storedBytes";
 
+/**
+ * ⚠️ `accept` IS THE CONTENT TYPE, NOT THE EXTENSION. An extension is whatever
+ * somebody typed; the content type is what the browser said and what the reader
+ * will trust.
+ */
 export interface FilePurpose {
   readonly accept: readonly string[];
   readonly maxBytes: number;
@@ -223,6 +224,13 @@ export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = Probl
    * rather than present and refusing.
    */
   readonly filePurposes: Readonly<Record<string, FilePurpose>>;
+  /**
+   * ⚠️ SCHEDULED WORK IS DECLARED, NOT CRON'D. A cron entry in a deployment
+   * config is a capability with no surface, no test, no audit and no record that
+   * it ran — and the characteristic failure is silence rather than an error.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
+  readonly jobs: readonly JobSpec<any>[];
   /** The changelog, as product copy. A commit message here is refused. */
   readonly releases: readonly Release[];
   /**
@@ -285,10 +293,19 @@ export function undeclaredEmits(spec: {
   readonly notifications: NotificationRegistry;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly operations: readonly OperationSpec<any, any, any, string>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
+  readonly jobs?: readonly JobSpec<any>[];
 }): readonly string[] {
   const declared = new Set(Object.keys(spec.notifications));
   const out = new Set<string>();
-  for (const op of spec.operations) for (const event of op.emits ?? []) if (!declared.has(event)) out.add(event);
+  /*
+    ⚠️ JOBS RAISE EVENTS TOO, AND THEIRS ARE THE ONES NOBODY SEES FAIL. An
+    operation with an undeclared emit is found the first time somebody uses the
+    feature; a sweep's is found the night it finally has something to say.
+  */
+  for (const source of [...spec.operations, ...(spec.jobs ?? [])]) {
+    for (const event of source.emits ?? []) if (!declared.has(event)) out.add(event);
+  }
   return [...out];
 }
 
@@ -397,6 +414,8 @@ export function assertComposable(spec: {
   readonly releases: readonly Release[];
   readonly problems: Readonly<Record<string, unknown>>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
+  readonly jobs?: readonly JobSpec<any>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly operations: readonly OperationSpec<any, any, any, string>[];
 }): void {
   const uncovered = coverage(spec);
@@ -454,6 +473,16 @@ export function assertComposable(spec: {
   const missing = danglingHelp(spec.help, referenced);
   if (missing.length) {
     throw new Error(`${spec.id}: help article(s) ${missing.join(", ")} are linked to and not declared.`);
+  }
+
+  /*
+    ⚠️ AN UNBOUNDED SWEEP IS ONE THAT STOPS. It works on every deployment until
+    the largest tenant crosses the runtime's time limit — and then it fails, is
+    retried, fails at the same size, and the work never happens again.
+  */
+  const unbounded = (spec.jobs ?? []).filter((j) => !Number.isInteger(j.batch) || j.batch < 1).map((j) => j.id);
+  if (unbounded.length) {
+    throw new Error(`${spec.id}: job(s) ${unbounded.join(", ")} declare no bound on one run.`);
   }
 
   const notes = releaseProblems(spec.releases);

@@ -248,6 +248,7 @@ const base = {
   help: {} as HelpRegistry,
   filePurposes: {},
   releases: [] as Release[],
+  jobs: [],
   problems: {},
   operations: [] as never[],
 };

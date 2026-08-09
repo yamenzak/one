@@ -34,6 +34,7 @@ const LAYER: Record<string, number> = {
   "collection.ts": 2,
   "entitlement.ts": 2,
   "customer.ts": 2,
+  "job.ts": 2,
   "notify.ts": 3,
   "help.ts": 3,
   "release.ts": 3,

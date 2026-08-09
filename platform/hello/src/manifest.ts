@@ -13,7 +13,7 @@
 import {
   UNLIMITED,
   cache, collection, defineApp, defineBindings, field,
-  objects, operation, s, sql,
+  job, objects, operation, s, sql,
   type Currency, type Locale, type RegionId, type TimeZone,
 } from "@one/kernel";
 
@@ -100,6 +100,31 @@ export const digest = operation<Bindings, Record<string, never>, { count: number
   async handler(ctx) {
     const row = await ctx.bind.db.first<{ n: number }>(`SELECT COUNT(*) AS n FROM notes WHERE tenant_id = ?`, ctx.tenantId);
     return { count: row?.n ?? 0 };
+  },
+});
+
+/* ------------------------------------------------------------------ job --- */
+
+/**
+ * ⚠️ BOUNDED, AND IT SAYS SO WHEN IT HIT THE BOUND. A sweep that reached its
+ * ceiling and reported success builds a backlog at exactly the rate it truncates
+ * it — and the graph of work-done-per-run looks healthy the entire time.
+ */
+export const tidy = job<Bindings>({
+  id: "notes.tidy",
+  summary: "Forget notes that were archived long enough ago.",
+  every: "daily",
+  scope: "tenant",
+  batch: 100,
+  async handler(ctx) {
+    const cutoff = new Date(Date.parse(ctx.now()) - 30 * 86_400_000).toISOString();
+    const stale = await ctx.bind.db.all<{ id: string }>(
+      `SELECT id FROM notes WHERE tenant_id = ? AND deleted_at IS NOT NULL AND deleted_at < ? LIMIT ?`,
+      ctx.tenantId, cutoff, ctx.batch + 1,
+    );
+    const doing = stale.slice(0, ctx.batch);
+    for (const row of doing) await ctx.bind.db.run(`DELETE FROM notes WHERE id = ?`, row.id);
+    return { done: doing.length, more: stale.length > ctx.batch };
   },
 });
 
@@ -249,6 +274,8 @@ export const hello = defineApp({
   filePurposes: {
     attachment: { label: "Attachment", accept: ["image/jpeg", "image/png", "text/plain"], maxBytes: 4_000_000 },
   },
+
+  jobs: [tidy],
 
   releases: [
     { version: "0.1.0", at: "2026-02-01", notes: ["Notes and receipts.", "You can now choose a plan."] },

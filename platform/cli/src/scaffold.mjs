@@ -304,6 +304,12 @@ export const ${id.replace(/-/g, "")} = defineApp({
     },
   },
 
+  /* ⚠️ Scheduled work is DECLARED, not cron'd — a cron entry in a deployment
+     config has no test, no audit and no record that it ran, and the
+     characteristic failure of scheduled work is silence rather than an error.
+     Empty is a decision; the field is not optional. */
+  jobs: [],
+
   releases: [{ version: "0.1.0", at: "2026-01-01", notes: ["First release."] }],
 
   /* Nothing has been withdrawn — and when it is, it is named here with a reason. */
@@ -336,7 +342,7 @@ import { deriveSchema, type Actor, type Resolved, type Session } from "@one/kern
 import {
   ACTIVITY_SCHEMA, applySchema, COMMERCE_SCHEMA, createRuntime, DIRECTORY_SCHEMA,
   DOMAIN_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA,
-  MEDIA_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
+  JOB_SCHEMA, MEDIA_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
 } from "@one/runtime";
 import { ${id.replace(/-/g, "")}, records } from "./manifest.js";
 
@@ -346,7 +352,7 @@ if (derived.problems.length) throw new Error(\`${id}: \${derived.problems.map((p
 /* ⚠️ ORDER IS DEPENDENCY ORDER, DECLARED — the runner validates it rather than
    trusting the array, because a wrong order produces an ALTER against a table
    that does not exist yet, swallowed, leaving a column that never appeared. */
-const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, PLATFORM_STATE_SCHEMA];
+const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, PLATFORM_STATE_SCHEMA, JOB_SCHEMA];
 export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, INBOX_SCHEMA, MEDIA_SCHEMA, derived.module];
 
 /**
@@ -400,6 +406,10 @@ const runtime = createRuntime(${id.replace(/-/g, "")}, {
 
 export default {
   fetch: (request: Request, env: RawEnv): Promise<Response> => runtime.fetch(request, env),
+  /* ⚠️ The scheduled handler is the RUNTIME's. A worker that writes its own is
+     one where the run record, the isolation between jobs and the bound on a
+     sweep are each optional — and all three are invisible when missing. */
+  scheduled: (_controller: unknown, env: RawEnv): Promise<unknown> => runtime.scheduled(env),
 };
 `;
 

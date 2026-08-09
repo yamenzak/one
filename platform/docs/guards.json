@@ -904,6 +904,42 @@
       "impl": "hello/test/files.test.ts",
       "proves": "never lets a shared cache keep it",
       "fails": "a file served through a JSON envelope, or one a shared cache may keep \u2014 a shared cache holding one workspace's photograph is the one place a caching header is a disclosure"
+    },
+    {
+      "id": "job-bounded",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/job.test.ts",
+      "proves": "refuses one with no bound on a single run",
+      "fails": "a sweep with no ceiling on one run \u2014 it works until the largest tenant crosses the runtime's time limit, then fails, is retried, fails at the same size, and the work never happens again"
+    },
+    {
+      "id": "job-emits-declared",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/job.test.ts",
+      "proves": "refuses one raising an event no notification declares",
+      "fails": "a job raising an event no notification declares \u2014 found on the night it finally has something to say, rather than the first time somebody uses a feature"
+    },
+    {
+      "id": "job-clock-on-success",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "hello/test/jobs.solo.test.ts",
+      "proves": "a failure must not advance the clock, or a broken job never retries",
+      "fails": "a scheduler clock advanced by a failed run, or by one where every tenant was skipped \u2014 the run table fills with healthy-looking rows and the work stops"
+    },
+    {
+      "id": "job-isolation",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "runtime/test/jobs.test.ts",
+      "proves": "carries on past a workspace that throws, and counts it as skipped",
+      "fails": "one workspace's malformed row stopping a sweep for every other workspace, or one job's failure stopping the others"
     }
   ]
 }

@@ -10,7 +10,7 @@
 import { deriveSchema, type Actor, type Resolved, type Session } from "@one/kernel";
 import {
   ACTIVITY_SCHEMA, applySchema, COMMERCE_SCHEMA, createRuntime, DIRECTORY_SCHEMA, INBOX_SCHEMA, MEDIA_SCHEMA,
-  DOMAIN_SCHEMA, IDENTITY_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
+  DOMAIN_SCHEMA, IDENTITY_SCHEMA, LEDGER_SCHEMA, JOB_SCHEMA, OTP_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
 } from "@one/runtime";
 import { hello, notes, receipts } from "./manifest.js";
 
@@ -30,7 +30,7 @@ if (derived.problems.length) throw new Error(`hello: ${derived.problems.map((p) 
   array — a wrong order used to produce an ALTER against a table that did not
   exist yet, swallowed, leaving a column that silently never appeared.
 */
-const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, PLATFORM_STATE_SCHEMA];
+const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, PLATFORM_STATE_SCHEMA, JOB_SCHEMA];
 export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, INBOX_SCHEMA, MEDIA_SCHEMA, derived.module];
 
 
@@ -141,4 +141,11 @@ export { TenantLedgerActor } from "./ledger-actor.js";
 
 export default {
   fetch: (request: Request, env: RawEnv): Promise<Response> => runtime.fetch(request, env),
+  /*
+    ⚠️ THE SCHEDULED HANDLER IS THE RUNTIME'S, not this app's. A worker that
+    writes its own is one where the run record, the isolation between jobs and
+    the bound on a sweep are each optional — and every one of them is invisible
+    when it is missing.
+  */
+  scheduled: (_controller: unknown, env: RawEnv): Promise<unknown> => runtime.scheduled(env),
 };

@@ -22,6 +22,7 @@
 import { defineBindings, sql, objects, cache, actor, inference } from "../src/bindings.js";
 import { declareProblems } from "../src/problem.js";
 import { operation } from "../src/operation.js";
+import { job } from "../src/job.js";
 import { s } from "../src/validate.js";
 
 /* ------------------------------------------------------------- bindings --- */
@@ -202,6 +203,27 @@ export const inviteStaff = operation({
   audit: (i) => ({ subject: i.email, verb: "invite" }),
   emits: ["staff.invited"],
   fails: ["platform.conflict"],
+  async handler() {
+    throw new Error("stage 0: types only");
+  },
+});
+
+/* ------------------------------------------------------------------- 5 --- */
+
+/**
+ * The sweep — work with nobody waiting for it.
+ *
+ * ⚠️ IT IS BOUNDED, AND IT SAYS WHEN IT HIT THE BOUND. A sweep that reached its
+ * ceiling and reported success builds a backlog at exactly the rate it truncates
+ * it, and the graph of work-done-per-run looks healthy the entire time.
+ */
+export const dunning = job<KovaBindings>({
+  id: "billing.dunning",
+  summary: "Advance every past-due workspace one rung, and tell whoever can act.",
+  every: "daily",
+  scope: "tenant",
+  batch: 200,
+  emits: ["package.granted"],
   async handler() {
     throw new Error("stage 0: types only");
   },

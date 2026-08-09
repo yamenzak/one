@@ -165,8 +165,20 @@ describe("the way out", () => {
   const ops = dataOperations({} as never);
 
   it("mounts export, close, cancel and erase, all on the exit lane", () => {
-    expect(ops.map((op) => op.id).sort()).toEqual(["exit.cancel", "exit.close", "exit.erase", "exit.export"]);
-    for (const op of ops) expect(op.id.split(".")[0], op.id).toBe("exit");
+    const leaving = ops.filter((op) => op.id.startsWith("exit."));
+    expect(leaving.map((op) => op.id).sort()).toEqual(["exit.cancel", "exit.close", "exit.erase", "exit.export"]);
+    expect(leaving.length).toBe(4);
+  });
+
+  /*
+    ⚠️ THE SCHEDULER'S RECORD SITS WITH THE DEAD LETTER, on the `billing` lane
+    and behind an operator permission. Both answer the same shape of question —
+    "is the machinery still running" — and both are read during exactly the
+    incident where hitting a standing gate would be least helpful.
+  */
+  it("puts the scheduler's record beside the other operator reads", () => {
+    const runs = ops.find((op) => op.id === "billing.jobs");
+    expect(runs?.permission).toBe("billing:operate");
   });
 
   /*

@@ -927,6 +927,10 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `metadata-stripped` | a stored file recorded as stripped when its format was never parsed — a written claim that somebody's location was removed when it was not, and stripping later never fixes what is already stored | **live** |
 | `storage-counts-stored` | a storage ceiling checked as 'are we full', which admits one more file of any size — the difference between a limit and a suggestion | **live** |
 | `file-read-is-bytes` | a file served through a JSON envelope, or one a shared cache may keep — a shared cache holding one workspace's photograph is the one place a caching header is a disclosure | **live** |
+| `job-bounded` | a sweep with no ceiling on one run — it works until the largest tenant crosses the runtime's time limit, then fails, is retried, fails at the same size, and the work never happens again | **live** |
+| `job-emits-declared` | a job raising an event no notification declares — found on the night it finally has something to say, rather than the first time somebody uses a feature | **live** |
+| `job-clock-on-success` | a scheduler clock advanced by a failed run, or by one where every tenant was skipped — the run table fills with healthy-looking rows and the work stops | **live** |
+| `job-isolation` | one workspace's malformed row stopping a sweep for every other workspace, or one job's failure stopping the others | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 
