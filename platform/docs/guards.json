@@ -253,9 +253,11 @@
     {
       "id": "app-test-budget",
       "group": "platform",
-      "fails": "an app's own suite crossing its duration cap \u2014 the fixture problem gets solved rather than tolerated",
+      "fails": "an app's own suite crossing its duration cap \u2014 measured, not asked, because a budget nobody times is a comment",
       "stage": "6",
-      "status": "owed"
+      "status": "live",
+      "impl": "scripts/budget.test.mjs",
+      "proves": "over the ${CAP_SECONDS}s cap"
     },
     {
       "id": "help-limits",
@@ -278,8 +280,8 @@
     {
       "id": "shot-id-resolves",
       "group": "platform",
-      "fails": "a screenshot id the suite does not produce",
-      "stage": "6",
+      "fails": "a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one",
+      "stage": "7",
       "status": "owed"
     },
     {
@@ -803,6 +805,42 @@
       "impl": "scripts/surface.test.mjs",
       "proves": "manifest.lock.json\"))",
       "fails": "an app with no manifest lock, so removing something somebody holds is a diff nobody reads and a failure the customer finds"
+    },
+    {
+      "id": "leaving-always-allowed",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "hello/test/exit.test.ts",
+      "proves": "still works when the workspace has been blocked over an unpaid charge",
+      "fails": "an exit route that is itself gated by standing \u2014 a workspace that cannot be closed while suspended is a trap"
+    },
+    {
+      "id": "export-erasure-one-plan",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "hello/test/exit.test.ts",
+      "proves": "covers every table a module declares as a tenant's, with nothing hand-listed",
+      "fails": "an export or an erasure that reads a hand-written table list \u2014 one named seven tables against a declaration of twenty-five and reported success"
+    },
+    {
+      "id": "maintenance-above-public",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "hello/test/exit.solo.test.ts",
+      "proves": "withholds even the public sign-in lane on a full stop",
+      "fails": "a maintenance check placed after the session read, which leaves open exactly the doors a full stop exists to close"
+    },
+    {
+      "id": "maintenance-fails-open",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "runtime/test/data.test.ts",
+      "proves": "reads a value nobody can parse as open rather than as closed",
+      "fails": "an unreadable maintenance row read as closed, which takes a whole deployment down over a malformed string an operator would need a working request to fix"
     }
   ]
 }

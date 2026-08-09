@@ -1154,3 +1154,84 @@ The split is on "does this need a worker", not on "is this a unit test" — one
 project for behaviour against the real runtime, one for the checks about the
 repository. Splitting on the other axis would put half the behavioural tests in
 front of a mock, which is how a suite comes to test the mock.
+
+## 93. Export and erasure differ by one verb, so they must read one plan
+
+A table that can be forgotten and not exported is a workspace losing something
+it was never offered a copy of. One that can be exported and not forgotten is a
+promise broken. Two walks over the same declaration agree on the day they are
+written and disagree the first time either is touched — silently, in both
+directions.
+
+There is no list here at all: every schema module already declares which of its
+tables carry a tenant, and both paths read `tenantCascade`. A hand-written
+version in a shipping product named seven tables against a declaration of
+twenty-five, so a deleted workspace kept its media library, its history and its
+generated content while the sweep reported success and emailed the owner to say
+otherwise.
+
+## 94. A truncated export that says nothing is a false claim about somebody's records
+
+The ceiling is necessary — unbounded, one large workspace exhausts the worker and
+the export fails entirely, which is worse than a partial one because a failed
+export gets retried at exactly the same size. What is not optional is saying what
+was left out. Silence there reads as "this is everything you had", made in
+writing, at the moment somebody is leaving.
+
+Same shape as the dead letter and the derived list: a bounded thing that does not
+report its bound is indistinguishable from an unbounded one that happened to fit.
+
+## 95. A half-erased workspace looks exactly like one where erasure did not run
+
+Every delete is allowed to fail, because a database that predates a module
+legitimately lacks its tables — and a purge that threw on the first absent one
+would stop partway with no signal at all. So the failures are collected and
+REPORTED: "that table never existed here" and "erasure has silently stopped
+covering it" have to be different answers to whoever reads the result.
+
+## 96. Maintenance is about us, and every decision follows from that
+
+The standing ladder closes one workspace over one workspace's bill, and the
+person seeing it can pay or leave. Maintenance closes every door because an
+operator said so — nobody reading it did anything, nobody can pay to end it. So
+the copy differs, the exemptions differ, and the check sits ABOVE the public lane
+rather than after the session read: "sign-in is disabled" is a claim about a lane
+that has no session yet.
+
+Two exemptions, both machine lanes with no person behind them. A deployment
+nobody can probe is one nobody can tell has recovered, and a payment provider
+retries into a closed door until it gives up — on money.
+
+## 97. A switch that fails closed on a malformed value cannot be turned off
+
+The stored maintenance state is JSON, so it can be unparseable — from a partial
+write, an older shape, or a hand edit during the incident it was set for.
+Reading that as "closed" takes a whole deployment down, and the operator's way
+to fix it is a request, which would be refused.
+
+Fail open here and fail closed on the ladder. The difference is whose mistake it
+is: theirs is non-payment, ours is a corrupt row.
+
+## 98. A deployment-wide switch cannot be tested beside anything else
+
+The maintenance suite turned every door off for whatever shared the database, and
+three unrelated tests went red reporting a 503 from endpoints with nothing to do
+with the one that closed the door. Serialising files did not fix it; the suite
+now runs in its own invocation.
+
+The split is on "does this affect the whole deployment", which is a property
+anybody can check, rather than on subject — and exactly one thing qualifies. That
+is the second axis this app has been split on (the first was "does this need a
+worker"), and both are about what the test DOES rather than what it is about.
+
+## 99. A slow suite is not run less often — it is not run
+
+Skipped locally with a filter, waited out once in review and trusted after that,
+and eventually the reason somebody proposes a fast lane that becomes the only one
+anybody watches. So the budget is a guard rather than a preference, one number
+for every app, and it MEASURES rather than asks: a budget nobody times is a
+comment.
+
+Every way of coming in under it is a good change — fewer fixtures, a shared
+world, a unit test where an integration test was doing its work. The bad way,
+deleting coverage, is visible in the same diff.

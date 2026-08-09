@@ -877,6 +877,7 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `entitlement-enforced` | a sold entitlement no gate, quota or shaped response names — a capability on a price list that every workspace has anyway | **live** |
 | `flag-enforced` | a sold customer capability the interface hides and no route withholds, so anybody who calls it directly receives it | **live** |
 | `manifest-diff` | a manifest that stopped offering a plan, permission, entitlement, collection or operation somebody holds, without naming it as retired | **live** |
+| `app-test-budget` | an app's own suite crossing its duration cap — measured, not asked, because a budget nobody times is a comment | **live** |
 | `help-limits` | a help article over its length limit, naming a surface the manifest does not declare, or written in developer vocabulary | **live** |
 | `release-note-shape` | a release note reading like a commit message — a file path, a type name, a pull-request number, an internal id | **live** |
 | `schema-idempotent` | a schema module that is not re-runnable, a duplicate table across modules, or a module ordered before something it declares it needs | **live** |
@@ -911,8 +912,11 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `notification-audience` | a dispatch that names its own recipients rather than reading the registry — 'everybody' and 'nobody' have both shipped | **live** |
 | `help-link-resolves` | a help cross-link naming an article that does not exist — rendered beside an error, so it is the second failure in a row | **live** |
 | `lock-exists` | an app with no manifest lock, so removing something somebody holds is a diff nobody reads and a failure the customer finds | **live** |
-| `app-test-budget` | an app's own suite crossing its duration cap — the fixture problem gets solved rather than tolerated | stage 6 |
-| `shot-id-resolves` | a screenshot id the suite does not produce | stage 6 |
+| `leaving-always-allowed` | an exit route that is itself gated by standing — a workspace that cannot be closed while suspended is a trap | **live** |
+| `export-erasure-one-plan` | an export or an erasure that reads a hand-written table list — one named seven tables against a declaration of twenty-five and reported success | **live** |
+| `maintenance-above-public` | a maintenance check placed after the session read, which leaves open exactly the doors a full stop exists to close | **live** |
+| `maintenance-fails-open` | an unreadable maintenance row read as closed, which takes a whole deployment down over a malformed string an operator would need a working request to fix | **live** |
+| `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first.** Two of the first failures
@@ -1004,7 +1008,7 @@ second-system effect, which is the largest risk here by a distance.
 | 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search, **and tenant relocation (§4.2) with the `Relocatable` DO contract**. | ✅ `hello` declares two collections and writes no routing at all: list, read, create, update, archive, the document lifecycle and the activity log are derived. A metered ledger sums rather than stores, and a tenant copies to a second region, verifies by counting, and leaves the source bootable. Open: files, jobs |
 | 4 | **Renderer** — shell, nav, collection views, settings, admin, whitelabel, PWA. The language is [UI.md](UI.md). | ✅ The contrast sweep walks every legal brand, the state matrix proves no two states render alike, the boundary guard holds, and `hello` has a screen that writes no chrome at all. A live surface moves between four presentations without remounting. Open: the settings and admin surfaces, the PWA, and `pnpm shots` |
 | 5 | **Commerce** — plans, entitlements, flags, the provider on one webhook, B2C packages, metering, parking state. | ✅ Both rails resolve through one explained walk each, and a manifest that would sell something nothing withholds does not boot. `hello` declares a catalogue, a ceiling and one sold capability; the ladder, the parking state, the quota, the package offer, the grant ledger, the intersection and the whole provider lane are derived. A signed event is applied or PARKED where an operator can read and replay it — there is no third answer — and one that belongs to a workspace on another continent settles there. Open: opening a checkout, which needs an account rather than a design |
-| 6 | **Ops** — notifications incl. web push, help centre, versioning + changelog, data & subscription centre, maintenance, provisioning, CI. | A new app is `one new` + a manifest + a deploy, with nothing hand-wired |
+| 6 | **Ops** — notifications incl. web push, help centre, versioning + changelog, data & subscription centre, maintenance, provisioning, CI. | A new app is `one new` + a manifest + a deploy, with nothing hand-wired. Landed: `emits` drives the inbox, the webhook catalogue and the audit entry from one declaration; help and the changelog are manifest content the composition checks; a manifest lock makes a removal a decision rather than a diff; export and erasure read ONE derived plan; leaving works from the bottom rung; maintenance closes every door above the public lane. **Open: provisioning and `one new`** |
 | 7 | **Kova** — §7. The long one. | Production tenants are served by `platform/kova` and `apps/api` is unrouted |
 | 8 | **Tessa, then Scena** | Both migrated; Scena's player proves the canvas boundary |
 | 9 | **Delete** `packages/@4dl/*` and `apps/*` | The repo has one platform |

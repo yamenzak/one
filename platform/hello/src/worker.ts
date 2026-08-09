@@ -10,7 +10,7 @@
 import { deriveSchema, type Actor, type Resolved, type Session } from "@one/kernel";
 import {
   ACTIVITY_SCHEMA, applySchema, COMMERCE_SCHEMA, createRuntime, DIRECTORY_SCHEMA, INBOX_SCHEMA,
-  DOMAIN_SCHEMA, IDENTITY_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
+  DOMAIN_SCHEMA, IDENTITY_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
 } from "@one/runtime";
 import { hello, notes, receipts } from "./manifest.js";
 
@@ -30,7 +30,7 @@ if (derived.problems.length) throw new Error(`hello: ${derived.problems.map((p) 
   array — a wrong order used to produce an ALTER against a table that did not
   exist yet, swallowed, leaving a column that silently never appeared.
 */
-const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA];
+const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, PLATFORM_STATE_SCHEMA];
 export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, INBOX_SCHEMA, derived.module];
 
 
@@ -89,6 +89,13 @@ const runtime = createRuntime(hello, {
   directoryBinding: "DIRECTORY",
   identityBinding: "DIRECTORY",
   sessionsBinding: "db",
+  /*
+    ⚠️ EXPORT AND ERASURE ARE DERIVED FROM THESE. An app that adds a module gets
+    both paths covered on the same commit — a hand-written erasure list in a
+    shipping product named seven tables against a declaration of twenty-five, and
+    the sweep reported success while a deleted workspace kept eighteen.
+  */
+  regionalModules: REGIONAL_MODULES,
   deliverCode: async (email, code) => { delivered.set(email, code); },
   /*
     ⚠️ NO SECRET, SO THE WEBHOOK REFUSES AND `chargeable` STAYS FALSE. That is

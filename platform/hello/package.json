@@ -5,7 +5,7 @@
   "type": "module",
   "description": "The smallest real app on ONE: a manifest, one collection, three operations. It exists to boot \u2014 every stage's exit criterion is asserted against it.",
   "scripts": {
-    "test": "vitest run && vitest run --config vitest.node.config.ts",
+    "test": "vitest run && vitest run --config vitest.solo.config.ts && vitest run --config vitest.node.config.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "clean": "rm -rf .turbo *.tsbuildinfo"

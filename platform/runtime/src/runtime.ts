@@ -15,7 +15,7 @@
 
 import type {
   Actor, AnyOperation, AppSpec, AuditEntry, BindingSpec, Caller, Ctx, Instant, Problem,
-  ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, Session, SqlHandle, StandingState, TenantId,
+  ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
 } from "@one/kernel";
 import {
   ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, PLATFORM_PROBLEMS,
@@ -24,6 +24,8 @@ import {
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
 import { COMMERCE, commerceOperations, customerOperations, providerOperations, type CommerceCarrier } from "./commerce-ops.js";
 import { INBOX, inboxOperations, type InboxCarrier } from "./inbox-ops.js";
+import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
+import { readMaintenance, refuses } from "./maintenance.js";
 import { dispatch, interpolatable, type Delivery } from "./inbox.js";
 import { customerFlagsFor, PARKED, readSubscription, standingFor } from "./commerce.js";
 import { sqlDirectory } from "./directory.js";
@@ -142,6 +144,15 @@ export interface RuntimeOptions<B extends BindingSpec> {
   /** How an interruption travels. The DECISION is the platform's; the sending is not. */
   send?(delivery: Delivery): Promise<void>;
   /**
+   * The regional modules this app composes.
+   *
+   * ⚠️ EXPORT AND ERASURE ARE DERIVED FROM THESE, so an app that adds a module
+   * gets both paths covered on the same commit. A hand-written erasure list in a
+   * shipping product named seven tables against a declaration of twenty-five,
+   * and the sweep reported success while a deleted workspace kept eighteen.
+   */
+  readonly regionalModules?: readonly SchemaModule[];
+  /**
    * The NAME of the deployment variable holding the provider's signing secret.
    *
    * ⚠️ ABSENT MEANS THE WEBHOOK REFUSES, and that is the safe direction. The
@@ -190,7 +201,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -314,6 +325,25 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
 
       const op = byPath.get(url.pathname);
       if (!op || routeFor(op).method !== request.method) return problemResponse(NOT_FOUND, ref);
+
+      /*
+        ⚠️ MAINTENANCE IS THE STANDING GATE ONE LEVEL UP, AND IT IS ABOVE THE
+        PUBLIC LANE. "Sign-in is disabled" is a claim about a lane that has no
+        session yet, so a check placed after the session read would leave exactly
+        the doors open that a full stop exists to close.
+
+        ⚠️ AND IT DOES NOT STAND DOWN IN DEVELOPMENT. Sparing every request there
+        spares the whole test suite too, so the switch would appear to work while
+        withholding nothing.
+      */
+      const closed = await readMaintenance(directoryDb);
+      if (refuses(closed, laneOf(op), routeFor(op).method !== "GET", at.door === "admin")) {
+        return problemResponse({
+          code: "platform.maintenance", status: 503,
+          title: closed.message || "We're doing some work — back shortly",
+          retryable: true,
+        }, ref);
+      }
 
       /*
         ⚠️ THE SESSION IS VALIDATED AGAINST THE ORIGIN IT ARRIVED ON, always. A
@@ -503,8 +533,14 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier = {
         [INBOX]: { db: regionalDb, tenantId: at.tenant?.tenantId ?? "", userId: session?.accountId ?? null },
+        [DATA]: {
+          db: regionalDb,
+          tenantId: at.tenant?.tenantId ?? "",
+          modules: opts.regionalModules ?? [],
+          isOperator: at.door === "admin",
+        },
         [PLATFORM]: platform,
         [COMMERCE]: {
           db: regionalDb,

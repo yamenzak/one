@@ -15,8 +15,16 @@ import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
  */
 export default defineWorkersConfig({
   test: {
+    /*
+      ⚠️ THE MAINTENANCE SUITE IS NOT HERE — see `vitest.solo.config.ts`. Files
+      share one database on purpose, and maintenance is a DEPLOYMENT-WIDE switch,
+      so a file that closes the door closes it for whatever is running beside it.
+      Three unrelated suites went red the first time it lived here, every one of
+      them reporting a 503 from an endpoint with nothing to do with the test that
+      turned it on.
+    */
     /* ⚠️ The lock check needs a filesystem, so it lives in the node project. */
-    exclude: ["**/*.node.test.ts", "**/node_modules/**"],
+    exclude: ["**/*.node.test.ts", "**/*.solo.test.ts", "**/node_modules/**"],
     /*
       ⚠️ The screen suite is plain React rendered to a string — no worker, no
       Miniflare. It runs in the same project because one command is worth more

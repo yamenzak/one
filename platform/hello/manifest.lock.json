@@ -13,6 +13,7 @@
     "note:write",
     "receipt:read",
     "receipt:write",
+    "workspace:close",
     "workspace:create"
   ],
   "plans": [
