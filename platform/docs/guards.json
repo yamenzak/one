@@ -1,0 +1,352 @@
+{
+  "$comment": [
+    "THE GUARD REGISTRY — every enforcement promise this platform makes.",
+    "",
+    "`scripts/guards.test.mjs` reads this file. Three rules make it more than a",
+    "list:",
+    "",
+    "  1. A `live` guard must name an implementation AND a literal string that",
+    "     implementation contains. Rename or delete the check and the registry",
+    "     fails — so a guard cannot quietly stop existing.",
+    "  2. A `live` guard must actually RUN: an .mjs guard is named by the root",
+    "     `gate` or `one:gate` script, a .ts guard sits where the test runner",
+    "     finds it. A check nobody invokes is the same as no check.",
+    "  3. An `owed` guard names a stage, and ⚠️ a SHIPPED stage may owe",
+    "     nothing. This is the DEFER mechanism applied to enforcement: flipping a",
+    "     stage to shipped is what forces every guard it promised to be built,",
+    "     re-targeted with a reason, or dropped on purpose.",
+    "",
+    "And the tables in PLAN.md §6 and UI.md §10 are GENERATED from this file, so",
+    "prose cannot promise a guard that has no entry here — which is the failure",
+    "this registry exists for. Documentation claiming enforcement nobody built is",
+    "worse than no documentation, because it is expensive to disprove.",
+    "",
+    "group: docs | kernel | platform | interface",
+    "status: live | owed"
+  ],
+  "guards": [
+    {
+      "id": "docs-kind",
+      "group": "docs",
+      "fails": "a governed document with no `kind` in its front matter, or a contract with no `verified:` date",
+      "stage": "0",
+      "status": "live",
+      "impl": "scripts/docs.test.mjs",
+      "proves": "has no \\`kind\\` in front matter"
+    },
+    {
+      "id": "docs-defer",
+      "group": "docs",
+      "fails": "a deferral with no id, a duplicate id, no description, an unknown stage — or a stage that is SHIPPED",
+      "stage": "0",
+      "status": "live",
+      "impl": "scripts/docs.test.mjs",
+      "proves": "which is SHIPPED"
+    },
+    {
+      "id": "docs-generated",
+      "group": "docs",
+      "fails": "a generated block whose command now produces different output — a hand-edited inventory",
+      "stage": "0",
+      "status": "live",
+      "impl": "scripts/docs.test.mjs",
+      "proves": "generated block is stale"
+    },
+    {
+      "id": "docs-orphan",
+      "group": "docs",
+      "fails": "a document no other document links to",
+      "stage": "0",
+      "status": "live",
+      "impl": "scripts/docs.test.mjs",
+      "proves": "is not linked from any other document"
+    },
+    {
+      "id": "guard-registry",
+      "group": "docs",
+      "fails": "a guard claimed in prose with no registry entry, a live guard whose check has been renamed or deleted, a live guard nothing invokes, or a shipped stage still owing one",
+      "stage": "0",
+      "status": "live",
+      "impl": "scripts/guards.test.mjs",
+      "proves": "names stage"
+    },
+    {
+      "id": "kernel-layering",
+      "group": "kernel",
+      "fails": "a module importing one at its own layer or above",
+      "stage": "0",
+      "status": "live",
+      "impl": "kernel/test/layering.test.ts",
+      "proves": "layers go DOWN only"
+    },
+    {
+      "id": "kernel-day-zero",
+      "group": "kernel",
+      "fails": "a day-zero declaration from MANIFEST.md §9 with no type expressing it, or one expressed as optional",
+      "stage": "0",
+      "status": "live",
+      "impl": "scripts/kernel.test.mjs",
+      "proves": "day-zero"
+    },
+    {
+      "id": "kernel-vocabulary",
+      "group": "kernel",
+      "fails": "a product noun in kernel code — an identifier, a type or a string literal",
+      "stage": "0",
+      "status": "live",
+      "impl": "scripts/kernel.test.mjs",
+      "proves": "vocabulary"
+    },
+    {
+      "id": "kernel-no-escape",
+      "group": "kernel",
+      "fails": "an escape hatch on a manifest type — a passthrough, a raw blob, an unchecked extension point",
+      "stage": "0",
+      "status": "live",
+      "impl": "scripts/kernel.test.mjs",
+      "proves": "escape hatch"
+    },
+    {
+      "id": "kernel-unproved-export",
+      "group": "kernel",
+      "fails": "an exported symbol no proof or test exercises",
+      "stage": "0",
+      "status": "live",
+      "impl": "scripts/kernel.test.mjs",
+      "proves": "unproved"
+    },
+    {
+      "id": "kernel-unstated-any",
+      "group": "kernel",
+      "fails": "an `any` with no stated reason beside it",
+      "stage": "0",
+      "status": "live",
+      "impl": "scripts/kernel.test.mjs",
+      "proves": "unstated any"
+    },
+    {
+      "id": "capability-reachable",
+      "group": "platform",
+      "fails": "a module applied with no surface mounted to reach it",
+      "stage": "1",
+      "status": "owed"
+    },
+    {
+      "id": "binding-chokepoint",
+      "group": "platform",
+      "fails": "any runtime binding touched outside its owner — a query that will hit the wrong continent the day a second region exists",
+      "stage": "1",
+      "status": "owed"
+    },
+    {
+      "id": "kv-key-space",
+      "group": "platform",
+      "fails": "a KV write outside the allow-listed key space — the one store that cannot be regionalised may never hold anything personal",
+      "stage": "1",
+      "status": "owed"
+    },
+    {
+      "id": "directory-columns",
+      "group": "platform",
+      "fails": "a column on the global tenant directory outside the routing-data allow-list",
+      "stage": "1",
+      "status": "owed"
+    },
+    {
+      "id": "operation-registry",
+      "group": "platform",
+      "fails": "a route, tool or webhook that did not come from `operation()`",
+      "stage": "2",
+      "status": "owed"
+    },
+    {
+      "id": "tool-subset-route",
+      "group": "platform",
+      "fails": "an AI tool reachable where the equivalent route is not",
+      "stage": "2",
+      "status": "owed"
+    },
+    {
+      "id": "problem-envelope",
+      "group": "platform",
+      "fails": "a failure body that is not a `Problem`, a code with no copy, or a `catch` that re-throws or serialises a provider's error",
+      "stage": "2",
+      "status": "owed"
+    },
+    {
+      "id": "erasure-derived",
+      "group": "platform",
+      "fails": "a table carrying a scope column and declaring none",
+      "stage": "3",
+      "status": "owed"
+    },
+    {
+      "id": "schema-adjacency",
+      "group": "platform",
+      "fails": "a module ordered where its dependency has not run",
+      "stage": "3",
+      "status": "owed"
+    },
+    {
+      "id": "relocatable-do",
+      "group": "platform",
+      "fails": "a Durable Object class that cannot seal, export and import its state",
+      "stage": "3",
+      "status": "owed"
+    },
+    {
+      "id": "no-silent-cap",
+      "group": "platform",
+      "fails": "a bounded sweep that does not log what it dropped",
+      "stage": "3",
+      "status": "owed"
+    },
+    {
+      "id": "entitlement-enforced",
+      "group": "platform",
+      "fails": "a sold entitlement no gate names",
+      "stage": "5",
+      "status": "owed"
+    },
+    {
+      "id": "flag-enforced",
+      "group": "platform",
+      "fails": "a sold capability the UI hides and no route withholds",
+      "stage": "5",
+      "status": "owed"
+    },
+    {
+      "id": "manifest-diff",
+      "group": "platform",
+      "fails": "a deploy removing a plan, permission or entitlement somebody holds",
+      "stage": "6",
+      "status": "owed"
+    },
+    {
+      "id": "app-test-budget",
+      "group": "platform",
+      "fails": "an app's own suite crossing its duration cap — the fixture problem gets solved rather than tolerated",
+      "stage": "6",
+      "status": "owed"
+    },
+    {
+      "id": "help-limits",
+      "group": "platform",
+      "fails": "a help article over its length limit, naming a surface the manifest does not declare, or using developer vocabulary",
+      "stage": "6",
+      "status": "owed"
+    },
+    {
+      "id": "release-note-shape",
+      "group": "platform",
+      "fails": "a release note reading like a commit message — a file path, a type name, a PR number, an internal id",
+      "stage": "6",
+      "status": "owed"
+    },
+    {
+      "id": "shot-id-resolves",
+      "group": "platform",
+      "fails": "a screenshot id the suite does not produce",
+      "stage": "6",
+      "status": "owed"
+    },
+    {
+      "id": "contrast-sweep",
+      "group": "interface",
+      "fails": "any brand-slot combination in range producing ink below its floor, at either theme, on any ground",
+      "stage": "4",
+      "status": "owed"
+    },
+    {
+      "id": "no-literal-colour",
+      "group": "interface",
+      "fails": "a colour value anywhere outside the token layer",
+      "stage": "4",
+      "status": "owed"
+    },
+    {
+      "id": "no-literal-motion",
+      "group": "interface",
+      "fails": "a duration, easing curve, `@keyframes` or transition property outside the choreographer",
+      "stage": "4",
+      "status": "owed"
+    },
+    {
+      "id": "state-completeness",
+      "group": "interface",
+      "fails": "a registered component with a state it does not declare and photograph",
+      "stage": "4",
+      "status": "owed"
+    },
+    {
+      "id": "unknown-not-empty",
+      "group": "interface",
+      "fails": "a data container whose pending and empty states resolve to the same render",
+      "stage": "4",
+      "status": "owed"
+    },
+    {
+      "id": "disabled-has-reason",
+      "group": "interface",
+      "fails": "a `disabled` prop with no accompanying explanation",
+      "stage": "4",
+      "status": "owed"
+    },
+    {
+      "id": "gated-is-locked",
+      "group": "interface",
+      "fails": "an entitlement or permission rendered as `disabled` rather than `locked`",
+      "stage": "4",
+      "status": "owed"
+    },
+    {
+      "id": "renderer-boundary",
+      "group": "interface",
+      "fails": "an app defining a shell, dialog, toast, empty state or form primitive; a raw `<button>` or `<input>`",
+      "stage": "4",
+      "status": "owed"
+    },
+    {
+      "id": "hover-not-required",
+      "group": "interface",
+      "fails": "an interaction reachable only by hover",
+      "stage": "4",
+      "status": "owed"
+    },
+    {
+      "id": "pane-container-queries",
+      "group": "interface",
+      "fails": "a pane-capable surface sized by viewport breakpoints rather than by its container",
+      "stage": "4",
+      "status": "owed"
+    },
+    {
+      "id": "one-navigation-surface",
+      "group": "interface",
+      "fails": "a second destination surface at any width",
+      "stage": "4",
+      "status": "owed"
+    },
+    {
+      "id": "target-size",
+      "group": "interface",
+      "fails": "an interactive element whose hit area resolves below the floor",
+      "stage": "4",
+      "status": "owed"
+    },
+    {
+      "id": "one-live-surface",
+      "group": "interface",
+      "fails": "a second surface declared live, or a live surface remounted between presentations",
+      "stage": "4",
+      "status": "owed"
+    },
+    {
+      "id": "reduced-motion",
+      "group": "interface",
+      "fails": "a layout that depends on an animation having run",
+      "stage": "4",
+      "status": "owed"
+    }
+  ]
+}

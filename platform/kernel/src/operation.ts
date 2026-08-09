@@ -61,6 +61,8 @@ export interface Outcome {
 export type Idempotency =
   | { readonly mode: "none" }
   | { readonly mode: "natural"; readonly key: string }
+  // vocabulary-exempt: the HTTP caller, not somebody's customer. The key comes
+  // from whoever is retrying, because only they know two attempts are one intent.
   | { readonly mode: "client-supplied" };
 
 /* -------------------------------------------------------------- metering --- */

@@ -265,7 +265,6 @@ changes is a visible diff in review. This is the same suite that produces help
 screenshots and the marketing images (STANDARDS.md §6) — one set of images,
 which is what keeps them honest.
 
-<!-- DEFER(one-006) stage:4 — the state-matrix conformance suite: every registered component × every declared state × both themes, photographed by id. -->
 
 ---
 
@@ -542,20 +541,30 @@ dialog, one hand-rolled empty state, one `<button>`. §10 is what stops it.
 Each fails `one lint`, and each covers something that produces no error at
 runtime and no failing test anywhere.
 
-| guard | fails on |
-|---|---|
-| **contrast sweep** | any brand-slot combination in range producing ink below its floor, at either theme, on any ground |
-| **no literal colour** | a colour value anywhere outside the token layer |
-| **no literal motion** | a duration, curve, `@keyframes` or transition property outside the choreographer |
-| **state completeness** | a registered component with a state it does not declare and photograph |
-| **unknown ≠ empty** | a data container whose pending and empty states resolve to the same render |
-| **disabled has a reason** | a `disabled` prop with no accompanying explanation |
-| **gated is locked** | an entitlement or permission rendered as `disabled` rather than `locked` |
-| **renderer boundary** | an app defining a shell, dialog, toast, empty state or form primitive; a raw `<button>` or `<input>` |
-| **hover is not required** | an interaction reachable only by hover |
-| **container queries in panes** | a pane-capable surface sized by viewport breakpoints |
-| **one navigation surface** | a second destination surface at any width |
-| **target size** | an interactive element whose hit area resolves below the floor |
+⚠️ **The table is GENERATED from [`guards.json`](guards.json)**, so this section
+cannot promise enforcement that has no registry entry — and the registry cannot
+carry one owed by a stage that has already shipped. That is deliberate: a
+document claiming a guard nobody built reads as safety, costs nothing to write,
+and is expensive to disprove, so it survives review indefinitely.
+
+<!-- generated: node scripts/guards.mjs table interface -->
+| guard | fails on | |
+|---|---|---|
+| `contrast-sweep` | any brand-slot combination in range producing ink below its floor, at either theme, on any ground | stage 4 |
+| `no-literal-colour` | a colour value anywhere outside the token layer | stage 4 |
+| `no-literal-motion` | a duration, easing curve, `@keyframes` or transition property outside the choreographer | stage 4 |
+| `state-completeness` | a registered component with a state it does not declare and photograph | stage 4 |
+| `unknown-not-empty` | a data container whose pending and empty states resolve to the same render | stage 4 |
+| `disabled-has-reason` | a `disabled` prop with no accompanying explanation | stage 4 |
+| `gated-is-locked` | an entitlement or permission rendered as `disabled` rather than `locked` | stage 4 |
+| `renderer-boundary` | an app defining a shell, dialog, toast, empty state or form primitive; a raw `<button>` or `<input>` | stage 4 |
+| `hover-not-required` | an interaction reachable only by hover | stage 4 |
+| `pane-container-queries` | a pane-capable surface sized by viewport breakpoints rather than by its container | stage 4 |
+| `one-navigation-surface` | a second destination surface at any width | stage 4 |
+| `target-size` | an interactive element whose hit area resolves below the floor | stage 4 |
+| `one-live-surface` | a second surface declared live, or a live surface remounted between presentations | stage 4 |
+| `reduced-motion` | a layout that depends on an animation having run | stage 4 |
+<!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder
 than the repository's existing guards because several are questions about
@@ -563,7 +572,6 @@ than the repository's existing guards because several are questions about
 matrix both want the component suite running, which is why they belong to the
 same stage as the renderer rather than to a script that could be written earlier.
 
-<!-- DEFER(one-009) stage:4 — the contrast sweep over the brand-slot ranges, proving §1.1's safety claim exhaustively rather than by sampling. -->
 <!-- DEFER(one-010) stage:4 — semantic collision detection and the contained form: hue-distance against the resolved ground selects the presentation, with no author decision. -->
 
 ---

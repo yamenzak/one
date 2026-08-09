@@ -139,6 +139,44 @@ finished when the code works; it is finished when it owes nothing.**
 
 ---
 
+## 3a. ⚠️ A claim of enforcement is a registry entry, never a sentence
+
+**The same rule as §3, aimed at the other thing prose gets away with.** A
+deferral is work somebody said they would do; a *guard* is work somebody says is
+already done. The second is worse when it is untrue, because a deferral at least
+admits to being outstanding.
+
+"Enforced by a lint", "fails the build", "the guard catches this" — each costs
+one sentence, reads as safety, and is expensive to disprove. So it survives
+review indefinitely, and the platform comes to believe it is stricter than it is.
+
+Every enforcement promise is an entry in [`guards.json`](guards.json):
+
+```json
+{ "id": "unknown-not-empty", "group": "interface",
+  "fails": "a data container whose pending and empty states resolve to the same render",
+  "stage": "4", "status": "owed" }
+```
+
+The guard over the registry (`scripts/guards.test.mjs`) fails on:
+
+- a **`live`** entry whose `proves` string no longer appears in its `impl` — ⚠️
+  **a guard dies by rename, not by deletion.** Nobody removes a check on
+  purpose; a refactor renames the assertion and the registry goes on describing
+  enforcement that left.
+- a **`live`** entry no script invokes. A check nobody calls is a green line
+  produced by nothing.
+- an **`owed`** entry naming a stage that is `shipped` — §3's mechanism, applied
+  to enforcement. **A stage is not finished when its code works; it is finished
+  when it owes nothing**, and the guards it promised are exactly what gets
+  dropped while a stage is being closed.
+
+**And the tables in the documents are GENERATED from it** (§5), so a document
+cannot name a guard with no entry. That is what makes this a mechanism rather
+than another convention: the prose does not write itself.
+
+---
+
 ## 4. A number in prose carries the command that produced it
 
 Not `2,468 passing` but ``2,468 passing (`pnpm one:test`, 2026-08-09)``. The
@@ -311,6 +349,8 @@ everything else here.
    stale.
 2. **`platform/docs/DEFERRED.md`** — generated. Everything outstanding, grouped
    by the stage that owes it. Nothing here was remembered; it was found.
+   `node platform/scripts/guards.mjs list` is the same question about
+   *enforcement*: what is guarded today, and which stage owes the rest.
 3. **`PLAN.md` §2** — the four decisions and the consequence of each. Read
    before questioning one: they were argued, and §2.3 in particular records a
    risk that was accepted knowingly rather than missed.
@@ -318,7 +358,7 @@ everything else here.
    most easily broken while feeling diligent.
 5. **`platform/kernel/test/FINDINGS.md`** — what did not fit, per stage. The
    record of what was learned the expensive way.
-6. **`pnpm one:test && pnpm gate`** — under a second and a few seconds. Green
+6. **`pnpm one:test && pnpm one:gate`** — under a second and a few seconds. Green
    means the ground is solid; red means read the failure before reading anything
    else.
 

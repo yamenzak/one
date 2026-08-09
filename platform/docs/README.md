@@ -13,7 +13,7 @@ kind: index
 |---|---|
 | active | **0** — Contracts — the four core types<br>**1** — Kernel — bindings, identity, tenancy, regions, standing<br>**2** — Surface — operations to routes, tools, webhooks, OpenAPI<br>**3** — Data — collections, ledger, files, jobs, relocation |
 | shipped | none yet |
-| open deferrals | 10 — see [DEFERRED.md](DEFERRED.md) |
+| open deferrals | 8 — see [DEFERRED.md](DEFERRED.md) |
 
 ⚠️ Resuming after a break, or after a compressed conversation?
 [STANDARDS.md §9](STANDARDS.md) is the checklist, in order. Start there rather

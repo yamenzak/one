@@ -11,7 +11,7 @@ kind: index
 ## Stage 1 — Kernel — bindings, identity, tenancy, regions, standing
 
 - `one-001` — a builder that accumulates the operation union, so  
-  <sub>kernel/src/app.ts:118</sub>
+  <sub>kernel/src/app.ts:127</sub>
 - `one-004` — turn `regionalBindings` into a real resolver over  
   <sub>kernel/src/resolve.ts:134</sub>
 - `one-005` — the WebAuthn ceremony itself: attestation parsing,  
@@ -20,20 +20,16 @@ kind: index
 ## Stage 2 — Surface — operations to routes, tools, webhooks, OpenAPI
 
 - `one-002` — bind to the real validator, and make `output` carry  
-  <sub>kernel/src/operation.ts:110</sub>
+  <sub>kernel/src/operation.ts:112</sub>
 
 ## Stage 4 — Renderer — shell, nav, collection views, whitelabel, PWA
 
-- `one-006` — the state-matrix conformance suite: every registered component × every declared state × both themes, photographed by id.  
-  <sub>docs/UI.md:268</sub>
 - `one-007` — the choreographer: role-derived timelines, the motion budget, shared-element continuity across surfaces.  
-  <sub>docs/UI.md:324</sub>
+  <sub>docs/UI.md:323</sub>
 - `one-008` — live surfaces: the persistent-subtree host, the four presentations, and the single-live-surface rule.  
-  <sub>docs/UI.md:521</sub>
-- `one-009` — the contrast sweep over the brand-slot ranges, proving §1.1's safety claim exhaustively rather than by sampling.  
-  <sub>docs/UI.md:566</sub>
+  <sub>docs/UI.md:520</sub>
 - `one-010` — semantic collision detection and the contained form: hue-distance against the resolved ground selects the presentation, with no author decision.  
-  <sub>docs/UI.md:567</sub>
+  <sub>docs/UI.md:575</sub>
 
 ## Stage 6 — Ops — notifications, help, versioning, data centre, CI
 

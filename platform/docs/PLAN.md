@@ -837,21 +837,48 @@ re-implement a dialog.
 ## 6. The guards
 
 Types cover most of the manifest. These are the things they cannot, each of
-which has already happened here at least once:
+which has already happened here at least once.
 
-| Guard | Fails on |
-|---|---|
-| capability reachable | a module applied with no surface mounted (nine instances found) |
-| binding chokepoint | any L0 binding touched outside its owner |
-| operation registry | a route, tool or webhook that did not come from `operation()` |
-| tool ⊆ route | an AI tool reachable where the equivalent route is not |
-| entitlement enforced | a sold entitlement no gate names |
-| flag enforced | a sold capability the UI hides and no route withholds |
-| renderer boundary | an app defining chrome (§3.6) |
-| erasure derived | a table with a scope column and no declaration |
-| schema adjacency | a module ordered where its dependency has not run |
-| manifest diff | a deploy removing a plan or permission somebody holds |
-| no silent cap | a bounded sweep that does not log what it dropped |
+⚠️ **The table is GENERATED from [`guards.json`](guards.json)**, which is what
+stops this section from being a wish list. A guard named here has a registry
+entry; a `live` one is bound to a literal assertion in a real file and to the
+script that runs it, so it cannot be renamed away silently; and an outstanding
+one names the stage that owes it — which a **shipped** stage may not do.
+[UI.md](UI.md) §10 carries the interface half the same way.
+
+<!-- generated: node scripts/guards.mjs table docs kernel platform -->
+| guard | fails on | |
+|---|---|---|
+| `docs-kind` | a governed document with no `kind` in its front matter, or a contract with no `verified:` date | **live** |
+| `docs-defer` | a deferral with no id, a duplicate id, no description, an unknown stage — or a stage that is SHIPPED | **live** |
+| `docs-generated` | a generated block whose command now produces different output — a hand-edited inventory | **live** |
+| `docs-orphan` | a document no other document links to | **live** |
+| `guard-registry` | a guard claimed in prose with no registry entry, a live guard whose check has been renamed or deleted, a live guard nothing invokes, or a shipped stage still owing one | **live** |
+| `kernel-layering` | a module importing one at its own layer or above | **live** |
+| `kernel-day-zero` | a day-zero declaration from MANIFEST.md §9 with no type expressing it, or one expressed as optional | **live** |
+| `kernel-vocabulary` | a product noun in kernel code — an identifier, a type or a string literal | **live** |
+| `kernel-no-escape` | an escape hatch on a manifest type — a passthrough, a raw blob, an unchecked extension point | **live** |
+| `kernel-unproved-export` | an exported symbol no proof or test exercises | **live** |
+| `kernel-unstated-any` | an `any` with no stated reason beside it | **live** |
+| `capability-reachable` | a module applied with no surface mounted to reach it | stage 1 |
+| `binding-chokepoint` | any runtime binding touched outside its owner — a query that will hit the wrong continent the day a second region exists | stage 1 |
+| `kv-key-space` | a KV write outside the allow-listed key space — the one store that cannot be regionalised may never hold anything personal | stage 1 |
+| `directory-columns` | a column on the global tenant directory outside the routing-data allow-list | stage 1 |
+| `operation-registry` | a route, tool or webhook that did not come from `operation()` | stage 2 |
+| `tool-subset-route` | an AI tool reachable where the equivalent route is not | stage 2 |
+| `problem-envelope` | a failure body that is not a `Problem`, a code with no copy, or a `catch` that re-throws or serialises a provider's error | stage 2 |
+| `erasure-derived` | a table carrying a scope column and declaring none | stage 3 |
+| `schema-adjacency` | a module ordered where its dependency has not run | stage 3 |
+| `relocatable-do` | a Durable Object class that cannot seal, export and import its state | stage 3 |
+| `no-silent-cap` | a bounded sweep that does not log what it dropped | stage 3 |
+| `entitlement-enforced` | a sold entitlement no gate names | stage 5 |
+| `flag-enforced` | a sold capability the UI hides and no route withholds | stage 5 |
+| `manifest-diff` | a deploy removing a plan, permission or entitlement somebody holds | stage 6 |
+| `app-test-budget` | an app's own suite crossing its duration cap — the fixture problem gets solved rather than tolerated | stage 6 |
+| `help-limits` | a help article over its length limit, naming a surface the manifest does not declare, or using developer vocabulary | stage 6 |
+| `release-note-shape` | a release note reading like a commit message — a file path, a type name, a PR number, an internal id | stage 6 |
+| `shot-id-resolves` | a screenshot id the suite does not produce | stage 6 |
+<!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first.** Two of the first failures
 when `pnpm gate`'s guards were widened to all apps were the parser's, not the

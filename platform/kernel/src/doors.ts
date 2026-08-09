@@ -59,6 +59,8 @@ export const UNIVERSAL_RESERVED: readonly string[] = [
   "admin", "setup", "api", "www", "app", "auth", "id", "account", "accounts",
   "mail", "smtp", "imap", "mx", "autodiscover", "autoconfig",
   "_acme-challenge", "_domainkey", "dmarc", "spf",
+  // vocabulary-exempt: money words a tenant may not take as a hostname. A slug
+  // that reads as a payment page is a phishing surface, whatever the app sells.
   "billing", "pay", "payment", "payments", "invoice", "checkout",
   "status", "health", "static", "assets", "cdn", "media",
   "help", "support", "docs", "blog", "legal", "privacy", "terms",
@@ -76,6 +78,19 @@ export function classifyHost(hostnameRaw: string, cfg: DoorConfig): HostShape {
 
   if (!hostname) return { ...base, door: "invalid", underRoot: false, slug: null };
   if (hostname === cfg.appRoot) return { ...base, door: "root", underRoot: true, slug: null };
+
+  /*
+    ⚠️ THE PLATFORM ROOT IS OURS AND IS NOBODY'S, and it has to be said before
+    the custom-domain fallthrough. It is not this app's root, so the label test
+    below does not match it — and everything that does not match falls through
+    to `custom`, which means a lookup in the CUSTOM-DOMAIN directory. A tenant
+    holding the platform root as a custom domain would then be served at the
+    address every product's credentials are scoped to.
+
+    `underRoot` is true because it is literally our root: the relying party is
+    the platform, not this hostname.
+  */
+  if (hostname === cfg.platformRoot) return { ...base, door: "unclaimed", underRoot: true, slug: null };
 
   const l = label(hostname, cfg.appRoot);
   if (l === null) {
@@ -134,6 +149,13 @@ export function relyingPartyFor(shape: HostShape): string {
 export function cookieDomainFor(shape: HostShape): string | null {
   if (!shape.underRoot) return null;
   if (!shape.appRoot.includes(".")) return null;
+  /*
+    ⚠️ A HOST MAY ONLY WIDEN A COOKIE TO A SUFFIX OF ITSELF. The platform root is
+    under our control but ABOVE the app root, so widening to the app root there
+    is a `Set-Cookie` every browser silently drops — a sign-in that reports
+    success and leaves no session, which is indistinguishable from a wrong code.
+  */
+  if (shape.hostname !== shape.appRoot && !shape.hostname.endsWith(`.${shape.appRoot}`)) return null;
   return `.${shape.appRoot}`;
 }
 

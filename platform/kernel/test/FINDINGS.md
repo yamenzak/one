@@ -412,3 +412,45 @@ cannot be forgotten by one without being forgotten by the other.
 whose content hashed the same; moving it breaks all of them, and the breakage
 surfaces weeks later on a device replaying a cached manifest offline. The bucket
 deduplicates; the accounting does not.
+
+## 29. `defineApp` had never been tried, and it was the only type that mattered
+
+Every other proof exercised one type against one hard surface. Nothing assembled
+a whole app — so the entry point every app touches first was the one piece with
+no evidence behind it. Writing `proof.app.ts` cost an afternoon and immediately
+surfaced a day-zero field (`seats`) that was optional, which is the same as
+absent: an app that omits it is indistinguishable from an app with no ceiling,
+right up until somebody is billed for the difference.
+
+The general form: **a composition root is the last thing anybody proves and the
+first thing everybody uses.** Prove it early.
+
+## 30. The platform root fell through to the custom-domain lookup
+
+`classifyHost` matched this app's root, then its labels, then treated everything
+remaining as a tenant's own domain. The platform root — `4dl.app`, one level
+ABOVE the app root — matched neither, so it landed in the custom-domain branch
+and would have been resolved by a lookup in the directory of domains tenants own.
+
+That is the address every product's credentials are scoped to. A fallthrough
+whose default is "somebody else's domain" needs the cases above it to be
+exhaustive, and "ours but not this app's" was the case nobody enumerated.
+
+Found by a test asserting that every tenantless door resolves no tenant — a
+property, not a case. The case would not have been guessed.
+
+## 31. A guard registry is a guard, and the thing it catches is prose
+
+Documents claim enforcement. "Enforced by a lint", "fails the build", "the guard
+says so" — each costs nothing to write, reads as safety, and is expensive to
+disprove, so an unbuilt one survives review indefinitely.
+
+`docs/guards.json` makes every claim an entry, and three rules make the entry
+worth something: a live guard names a literal string its implementation
+contains, so a rename cannot silently retire it; a live guard must be reachable
+from a script that actually runs; and an outstanding one names a stage, which
+may not be `shipped`. The tables in the documents are GENERATED from it, so
+prose cannot name a guard that does not exist.
+
+⚠️ The registry immediately caught six of its own entries pointing at checks
+nothing invoked, because `pnpm gate` did not yet call them.

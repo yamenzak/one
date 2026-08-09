@@ -67,7 +67,16 @@ export interface AccessSpec {
   readonly entitlements: Readonly<Record<string, number | boolean>>;
   /** Whether this app sells to its tenants' own customers. Two flag systems, never merged. */
   readonly customerRail: boolean;
-  readonly seats?: { readonly counts: readonly string[] };
+  /**
+   * ⚠️ REQUIRED, and the empty list is the honest way to say "nothing counts".
+   *
+   * A seat model decides what a plan's ceiling is measured against, so it is a
+   * day-zero declaration: arriving late means auditing every membership row for
+   * what should have been counted since the first tenant signed up. Optional, it
+   * is a field an app omits — which is indistinguishable from an app that has no
+   * ceiling, right up until somebody is billed for the difference.
+   */
+  readonly seats: { readonly counts: readonly string[] };
 }
 
 /* --------------------------------------------------------------- consent --- */

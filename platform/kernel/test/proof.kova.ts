@@ -24,7 +24,7 @@ import { operation } from "../src/operation.js";
 
 /* ------------------------------------------------------------- bindings --- */
 
-const bindings = defineBindings({
+export const bindings = defineBindings({
   db: sql(),
   media: objects({ jurisdictional: true }),
   cache: cache(),
@@ -32,7 +32,7 @@ const bindings = defineBindings({
   ai: inference({ subprocessors: ["cloudflare-workers-ai", "google-gemini"] }),
 });
 
-const problems = declareProblems({
+export const problems = declareProblems({
   "coaching.client_not_assigned": {
     status: 403,
     title: "You're not this client's coach",
