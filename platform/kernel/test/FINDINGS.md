@@ -709,3 +709,45 @@ never on the identical ones it exists for.
 It looked like a considered piece of modular arithmetic. Nothing about reading it
 suggested the direction was backwards; the test that asserted "green on a green
 ground collides" is what said so.
+
+## 54. Two states that render identically are two states one of which is a lie
+
+The state matrix's obvious assertion is that every declared state renders without
+throwing. That passes for a component whose `busy` looks exactly like its `idle`
+— and so does the photograph, because the two images match.
+
+The assertion worth having is DISTINGUISHABILITY: every declared state produces
+different output from every other. A declaration says a state was considered; the
+render is what says it was designed.
+
+## 55. A locked control is not disabled, including to assistive technology
+
+Marking a plan-gated control `aria-disabled` announces the opposite of what it
+does. It is actionable — pressing it is how somebody reaches the plan that would
+unlock it — so it stays focusable, stays announced, and carries the way out.
+
+`disabled` is for a control that is genuinely inapplicable, and it still says
+why. Neither may render a refusal with no reason: that is not a degraded button,
+it is a dead end, and shipping one silently is how a product accumulates controls
+nobody can get past and nobody can describe.
+
+## 56. An app's screen is where the boundary is provable rather than stated
+
+The renderer-boundary guard passed with zero apps having any `.tsx` at all — a
+green line produced by nothing, which is what the guard registry exists to make
+visible. Giving `hello` one screen made it real, and the screen is the argument:
+no shell, no navigation, no dialog, no empty state, no loading state, no button.
+
+Four distinct states — not yet, nothing, failed, ready — come out of one prop,
+and the app wrote none of them.
+
+## 57. The invoked check did not know about `.tsx`, so a whole suite could be inert
+
+Registering the component tests as guards failed on the invocation rule, which
+matched `.test.ts` only. Widening it exposed the sharper question: vitest's
+default include does not pick up `.tsx` either, so a suite of component tests can
+sit in the tree, be registered, and never run.
+
+The check now reads the package's own vitest config and refuses a `.tsx` guard in
+a project that does not include one. Same shape as every other guard here — the
+failure it prevents produces a green line rather than a red one.

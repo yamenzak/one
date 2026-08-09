@@ -550,23 +550,27 @@ and is expensive to disprove, so it survives review indefinitely.
 | guard | fails on | |
 |---|---|---|
 | `contrast-sweep` | any brand-slot combination in range producing ink below its floor, at either theme, on any ground | **live** |
+| `no-literal-colour` | a colour value anywhere outside the token layer | **live** |
+| `no-literal-motion` | a duration, easing curve, `@keyframes` or transition property outside the choreographer | **live** |
+| `state-completeness` | a registered component with a state it does not declare and photograph — the photograph half arrives with the component suite | **live** |
 | `unknown-not-empty` | a data container whose pending and empty states resolve to the same render | **live** |
 | `disabled-has-reason` | a `disabled` prop with no accompanying explanation | **live** |
 | `gated-is-locked` | an entitlement or permission rendered as `disabled` rather than `locked` | **live** |
+| `renderer-boundary` | an app defining a shell, dialog, toast, empty state or form primitive; a raw `<button>` or `<input>` | **live** |
+| `hover-not-required` | an interaction reachable only by hover | **live** |
+| `one-navigation-surface` | a second destination surface at any width | **live** |
+| `target-size` | an interactive element whose hit area resolves below the floor | **live** |
 | `reduced-motion` | a layout that depends on an animation having run | **live** |
 | `brand-closed` | a brand slot outside its declared range being clamped instead of refused, or a token emitted outside the closed set | **live** |
 | `accent-relit` | a screen recomputing the accent instead of re-lighting it — a brand that is a different colour on every surface | **live** |
 | `ladder-never-collapses` | a surface step that saturates against the end of its range, leaving nested surfaces indistinguishable | **live** |
 | `one-clock` | a component holding its own duration, or a scene whose stagger grows without a budget | **live** |
 | `state-declared` | a component registered with no resting state, or a container declaring `empty` without `unknown` | **live** |
-| `no-literal-colour` | a colour value anywhere outside the token layer | stage 4 |
-| `no-literal-motion` | a duration, easing curve, `@keyframes` or transition property outside the choreographer | stage 4 |
-| `state-completeness` | a registered component with a state it does not declare and photograph — the photograph half arrives with the component suite | stage 4 |
-| `renderer-boundary` | an app defining a shell, dialog, toast, empty state or form primitive; a raw `<button>` or `<input>` | stage 4 |
-| `hover-not-required` | an interaction reachable only by hover | stage 4 |
-| `pane-container-queries` | a pane-capable surface sized by viewport breakpoints rather than by its container | stage 4 |
-| `one-navigation-surface` | a second destination surface at any width | stage 4 |
-| `target-size` | an interactive element whose hit area resolves below the floor | stage 4 |
+| `overlay-ladder` | a third overlay layer, a non-dialog covering another overlay, two drawers, or a destructive confirm that does not name its object | **live** |
+| `shape-from-kind` | a screen choosing its own layout instead of taking it from the destination's kind — which is how a collection replaces its list on open | **live** |
+| `no-colour-on-the-wire` | a rendered component emitting a colour that is not a token reference | **live** |
+| `refusal-has-reason` | a control rendering a refusal with no explanation — a dead end nobody can get past and nobody can describe | **live** |
+| `pane-container-queries` | a pane-capable surface sized by viewport breakpoints rather than by its container — checkable once surfaces carry stylesheets | stage 4 |
 | `one-live-surface` | a second surface declared live, or a live surface remounted between presentations | stage 4 |
 <!-- /generated -->
 

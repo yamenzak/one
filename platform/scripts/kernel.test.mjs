@@ -42,7 +42,7 @@ const walk = (dir, out = []) => {
   for (const e of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, e.name);
     if (e.isDirectory()) walk(p, out);
-    else if (e.name.endsWith(".ts")) out.push(p);
+    else if (/\.tsx?$/.test(e.name)) out.push(p);
   }
   return out;
 };

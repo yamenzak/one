@@ -15,7 +15,7 @@ kind: index
 - `one-008` — live surfaces: the persistent-subtree host, the four presentations, and the single-live-surface rule.  
   <sub>docs/UI.md:519</sub>
 - `one-010` — the CONTAINED FORM itself. The detection is built and swept; what is owed is the component that renders a colliding semantic as an edge and an icon on a neutral surface.  
-  <sub>docs/UI.md:579</sub>
+  <sub>docs/UI.md:583</sub>
 
 ## Stage 6 — Ops — notifications, help, versioning, data centre, CI
 

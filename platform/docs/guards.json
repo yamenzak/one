@@ -286,21 +286,27 @@
       "group": "interface",
       "fails": "a colour value anywhere outside the token layer",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "scripts/interface.test.mjs",
+      "proves": "outside the token layer"
     },
     {
       "id": "no-literal-motion",
       "group": "interface",
       "fails": "a duration, easing curve, `@keyframes` or transition property outside the choreographer",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "scripts/interface.test.mjs",
+      "proves": "outside ${CHOREOGRAPHER}"
     },
     {
       "id": "state-completeness",
       "group": "interface",
       "fails": "a registered component with a state it does not declare and photograph \u2014 the photograph half arrives with the component suite",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "ui/test/components.test.tsx",
+      "proves": "renders each of a button's states differently"
     },
     {
       "id": "unknown-not-empty",
@@ -334,19 +340,23 @@
       "group": "interface",
       "fails": "an app defining a shell, dialog, toast, empty state or form primitive; a raw `<button>` or `<input>`",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "scripts/interface.test.mjs",
+      "proves": "an app defining"
     },
     {
       "id": "hover-not-required",
       "group": "interface",
       "fails": "an interaction reachable only by hover",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "scripts/interface.test.mjs",
+      "proves": "reachable only by hover"
     },
     {
       "id": "pane-container-queries",
       "group": "interface",
-      "fails": "a pane-capable surface sized by viewport breakpoints rather than by its container",
+      "fails": "a pane-capable surface sized by viewport breakpoints rather than by its container \u2014 checkable once surfaces carry stylesheets",
       "stage": "4",
       "status": "owed"
     },
@@ -355,14 +365,18 @@
       "group": "interface",
       "fails": "a second destination surface at any width",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "ui/test/components.test.tsx",
+      "proves": "refuses more than five destinations"
     },
     {
       "id": "target-size",
       "group": "interface",
       "fails": "an interactive element whose hit area resolves below the floor",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "ui/test/components.test.tsx",
+      "proves": "makes the whole row the target"
     },
     {
       "id": "one-live-surface",
@@ -550,6 +564,42 @@
       "status": "live",
       "impl": "ui/test/state.test.ts",
       "proves": "or it is not registered"
+    },
+    {
+      "id": "overlay-ladder",
+      "group": "interface",
+      "fails": "a third overlay layer, a non-dialog covering another overlay, two drawers, or a destructive confirm that does not name its object",
+      "stage": "4",
+      "status": "live",
+      "impl": "ui/test/components.test.tsx",
+      "proves": "caps depth at two"
+    },
+    {
+      "id": "shape-from-kind",
+      "group": "interface",
+      "fails": "a screen choosing its own layout instead of taking it from the destination's kind \u2014 which is how a collection replaces its list on open",
+      "stage": "4",
+      "status": "live",
+      "impl": "ui/test/components.test.tsx",
+      "proves": "never from the screen"
+    },
+    {
+      "id": "no-colour-on-the-wire",
+      "group": "interface",
+      "fails": "a rendered component emitting a colour that is not a token reference",
+      "stage": "4",
+      "status": "live",
+      "impl": "ui/test/components.test.tsx",
+      "proves": "emits no literal colour in any rendered output"
+    },
+    {
+      "id": "refusal-has-reason",
+      "group": "interface",
+      "fails": "a control rendering a refusal with no explanation \u2014 a dead end nobody can get past and nobody can describe",
+      "stage": "4",
+      "status": "live",
+      "impl": "ui/test/components.test.tsx",
+      "proves": "refuses to render a refusal with no reason"
     }
   ]
 }

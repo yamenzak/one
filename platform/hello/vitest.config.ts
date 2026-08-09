@@ -15,6 +15,12 @@ import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
  */
 export default defineWorkersConfig({
   test: {
+    /*
+      ⚠️ The screen suite is plain React rendered to a string — no worker, no
+      Miniflare. It runs in the same project because one command is worth more
+      than the second of startup it costs, and because a screen that cannot be
+      rendered beside the routes it calls is a screen nobody checks.
+    */
     // A serial root run absorbs Miniflare storage contention; one retry absorbs
     // the rest. A genuine assertion failure still fails twice.
     retry: 1,

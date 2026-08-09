@@ -98,9 +98,20 @@ for (const g of guards.filter((x) => x.status === "live" && x.impl)) {
     if (!invocations.includes(`platform/${g.impl}`)) {
       fail(`${at}: ${g.impl} is not named by the root \`gate\` or \`one:gate\` script, so it never runs.`);
     }
-  } else if (/^[^/]+\/test\/.+\.test\.ts$/.test(g.impl)) {
-    // A vitest file under `<package>/test/`. `pnpm one:test` runs it.
-  } else if (/^[^/]+\/test\/.+\.ts$/.test(g.impl)) {
+  } else if (/^[^/]+\/test\/.+\.test\.tsx?$/.test(g.impl)) {
+    /*
+      A vitest file under `<package>/test/`. ⚠️ `.tsx` is not picked up by the
+      default include, so a suite of component tests can sit in the tree, be
+      registered as a guard, and never run — which is the exact green line
+      produced by nothing that this check exists for.
+    */
+    const pkg = g.impl.split("/")[0];
+    const cfgPath = join(ROOT, pkg, "vitest.config.ts");
+    const cfg = existsSync(cfgPath) ? readFileSync(cfgPath, "utf8") : "";
+    if (g.impl.endsWith(".tsx") && cfg && !/tsx/.test(cfg)) {
+      fail(`${at}: ${pkg}/vitest.config.ts does not include \`.tsx\`, so ${g.impl} never runs.`);
+    }
+  } else if (/^[^/]+\/test\/.+\.tsx?$/.test(g.impl)) {
     /*
       ⚠️ A COMPILE-TIME ASSERTION IS INVOKED BY THE TYPE CHECKER, not by a test
       runner — a file of `@ts-expect-error` directives has no assertions to run
