@@ -176,6 +176,18 @@ export interface CollectionSpec {
   readonly naming?: NamingSeries;
   readonly docStatus?: DocStatus;
   /** The append-only record of who changed what. Off only for pure caches. */
+  /**
+   * ⚠️ WHAT THE WORKSPACE MUST HAVE BOUGHT TO REACH THIS AT ALL, and what
+   * counting one more counts against.
+   *
+   * Declared on the collection rather than on each derived operation, because a
+   * collection derives six or seven of them and repeating the gate on each is
+   * how five get it and the sixth does not. `entitlement` refuses the whole
+   * collection; `quota` is checked on create alone — reading what already exists
+   * is never the thing a ceiling should refuse.
+   */
+  readonly entitlement?: string;
+  readonly quota?: string;
   readonly activity?: boolean;
   readonly search?: readonly string[];
   readonly offline?: OfflinePolicy;

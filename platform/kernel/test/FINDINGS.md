@@ -803,3 +803,123 @@ That is the mechanism working as designed rather than a coincidence. A deferral
 attached to a stage cannot outlive it, so the last increment of a stage is
 always the one that collects everything the stage promised and could not do
 until its final piece existed.
+
+## 62. A capability that is sold and enforced nowhere is worse than one that is free
+
+It appears on a price list, a workspace pays the difference for it, and every
+workspace that did not pay has it anyway. Nothing fails, no test goes red, and
+the only signal is a support conversation about why the cheap plan does the
+expensive thing.
+
+Two products shipped exactly that, and one shipped it through a builder that
+rendered a switch for every declared capability — so adding one was a single
+line and forgetting to enforce it was invisible.
+
+The fix is not a grep over source, which is what the legacy repo used and what
+gets waived the first time a destructured lookup defeats it. An entitlement
+declares HOW it is withheld — a gate, a ceiling, a shaped response — and the
+mechanism it names is a field on an operation, so composition can ask whether an
+operation really names it. The manifest that would sell something nothing
+withholds does not boot.
+
+## 63. The honest exemption carries a reason, and that is what makes it survive
+
+`reserved: true` and `uiOnly: true` are the same decision as `{ unenforced:
+"no plan in the catalogue enables it" }`, and only one of them is still legible
+after its author has left. A boolean exemption is indistinguishable from an
+oversight; a sentence is a decision somebody made, and the next reader can tell
+whether it still holds.
+
+## 64. A coverage check that reads `operations` alone passes every app it matters to
+
+The first version walked the operation list. `hello`'s is empty — every surface
+it has is derived from two collections — so the check reported full coverage over
+nothing and passed.
+
+That is not an edge case, it is the shape the platform exists to encourage. A
+whole-manifest question has to read the whole manifest, and the parts an app
+writes least are the parts most likely to be the only ones there.
+
+## 65. A set of entitlement names cannot answer the question half of them are
+
+Half of what a plan sells is a number. A gate holding only the keys can answer
+"is this included" and never "is there room for one more" — so the count gets
+asked somewhere else, against some other copy of the plan, and the two answers
+drift. Carrying the resolved VALUES makes the second lookup unnecessary and the
+drift unrepresentable.
+
+The mutation that caught this was replacing `grants(value)` with `key in
+entitlements`: a caller holding `reports: false` was admitted, and every test
+passed, because no caller in any test carried a falsey entitlement.
+
+## 66. A returned obligation nobody discharges reads exactly like an enforced limit
+
+`check` is pure so a tool catalogue can be filtered without touching a store, so
+a ceiling is REPORTED — `quotaRequired` — for the runner to count. The code
+reads as though the limit is enforced from the moment the field exists, and the
+runner not acting on it is invisible at both ends.
+
+Two things close it. The runner counts, and a mutation proves it does. And a
+ceiling nobody CAN count is refused at composition: an operation naming a key
+that no collection counts and no app supplies a counter for is a limit on a
+price list that refuses nothing, so the deployment does not start.
+
+## 67. The parking state is not a verdict, and materialising it is how that is forgotten
+
+A workspace with no subscription row and one whose row says "never started
+paying" are the same situation, and the honest answer for both is `active` —
+because the alternative is a deployment with no payment provider holding every
+workspace read-only over a bill nobody could have paid.
+
+A product wrote that paragraph, at length, and shipped the bug anyway: the
+fallback branch returned the stored status verbatim, so the moment anything
+materialised the row, the parking DEFAULT was read as a decision. Here the
+parked subscription is a VALUE and never a row, and whether non-payment gates
+anything is one boolean the deployment answers rather than a fact a handler
+infers.
+
+## 68. Two override stores that share one write path make a support gesture a one-way door
+
+Grandfathering holds an existing workspace at what it was sold when a plan is
+edited down, so it may only ratchet up. An operator adjustment is deliberate,
+absolute and reversible per key. Sharing one blob and one raise-only merge meant
+"give this workspace ten seats" could only be undone by a reset that discarded
+the grandfathering with it.
+
+They are separate stores with opposite rules, and the standing clamp runs after
+both — last, permanently, because an adjustment applied after it is a way around
+the payment ladder wearing a support gesture's clothes.
+
+## 69. A maximum and a sum agree whenever the other term is zero
+
+"The headline day count is a maximum across scopes" was asserted with one live
+scope and one spent one — 0 and 60 — where `Math.max` and `reduce((a,b)=>a+b)`
+return the same 60. The mutation survived until a second live scope existed in
+the fixture.
+
+Any assertion about combining values needs at least two that are both
+interesting. A zero is not a value, it is an identity, and an identity makes
+every operator look like every other one.
+
+## 70. An equivalent mutant is a dead expression, not a missing test
+
+`current.packageId ?? pkg.id` survived every test — and it had to, because the
+`ON CONFLICT` clause it feeds does not update that column, so the fallback is
+reached only when there is no current row and `current.packageId` is therefore
+always null.
+
+The mutation was not a gap in the suite. It was the suite correctly reporting
+that the expression has one branch. The mechanism that keeps the opening package
+is the absence of `package_id` from the update clause, and now the code says so
+instead of implying a choice that is never made.
+
+## 71. A once-only package granted first cannot tell the two implementations apart
+
+The defect being guarded against is asking the live access row whether a package
+was bought before — which answers correctly for the package that OPENED the row
+and "never" forever for everything after it.
+
+A test that grants the once-only package first makes the row's own package id
+equal to it, so the wrong implementation and the right one agree. The fixture has
+to sell a repeatable package first. The property under test was never about one
+purchase; it was about the second one.

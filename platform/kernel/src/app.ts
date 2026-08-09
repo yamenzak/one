@@ -12,6 +12,9 @@
 
 import type { BindingSpec } from "./bindings.js";
 import type { CollectionSpec } from "./collection.js";
+import type { FlagDef } from "./customer.js";
+import type { EntitlementDef, PlanSpec } from "./entitlement.js";
+import { parkingAboveFloor } from "./entitlement.js";
 import type { Currency, Locale, RegionId, TimeZone, UnitSystem } from "./primitives.js";
 import type { ProblemCatalog, ProblemDef } from "./problem.js";
 import { PLATFORM_PROBLEMS } from "./problem.js";
@@ -75,9 +78,17 @@ export interface FormatSpec {
 export interface AccessSpec {
   readonly permissions: readonly string[];
   readonly roles: Readonly<Record<string, readonly string[]>>;
-  readonly entitlements: Readonly<Record<string, number | boolean>>;
-  /** Whether this app sells to its tenants' own customers. Two flag systems, never merged. */
+  /** What the platform sells this app's tenants, and how each one is withheld. */
+  readonly entitlements: Readonly<Record<string, EntitlementDef>>;
+  /** The catalogue. Empty is a legitimate deployment — one with nothing for sale. */
+  readonly plans: readonly PlanSpec[];
+  /**
+   * ⚠️ Whether this app sells to its tenants' own customers. Two flag systems,
+   * never merged — and an app that says no may not then declare flags, because
+   * the rail is what decides whether anything resolves them.
+   */
   readonly customerRail: boolean;
+  readonly customerFlags: Readonly<Record<string, FlagDef>>;
   /**
    * ⚠️ REQUIRED, and the empty list is the honest way to say "nothing counts".
    *
@@ -172,6 +183,79 @@ export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = Probl
   readonly sounds?: SoundSpec;
 }
 
+/* ------------------------------------------------------------- coverage --- */
+
+/**
+ * ⚠️ EVERY SOLD CAPABILITY IS WITHHELD BY SOMETHING, AND THIS IS WHERE IT IS
+ * PROVED.
+ *
+ * Both rails fail the same way and it is the quietest failure in a commercial
+ * product: a capability appears on a price list, the interface hides it from
+ * whoever did not buy it, and no route withholds anything. Every test passes,
+ * because the tests drive the interface. The only signal is that the cheap plan
+ * does the expensive thing for anyone who asks for it directly — which is the
+ * first thing an API consumer, an assistant, or a curious customer does.
+ *
+ * Two products shipped that exact shape, and one of them shipped it through a
+ * builder that rendered a switch for every declared capability, so adding one
+ * was a single line and forgetting to enforce it was invisible.
+ *
+ * The check is a lookup rather than a search: an enforcement names a mechanism,
+ * and the mechanism is an operation field, so composition can ask whether an
+ * operation really names it. `{ unenforced }` and `{ derived }` opt out WITH A
+ * REASON, which is the only kind of exemption that survives review — a boolean
+ * exemption is indistinguishable from an oversight the moment its author leaves.
+ */
+export interface Uncovered {
+  readonly rail: "entitlement" | "customer_flag";
+  readonly key: string;
+  readonly declared: string;
+}
+
+export function coverage(spec: {
+  readonly access: AccessSpec;
+  /**
+   * ⚠️ COLLECTIONS COUNT, and forgetting them would make this check vacuous for
+   * exactly the apps it matters most to. An app whose whole surface is derived
+   * declares no operations at all — so a coverage check reading `operations`
+   * alone would report full coverage over an empty list and pass every app that
+   * writes no routing, which is the shape the platform is built to encourage.
+   */
+  readonly collections: readonly CollectionSpec[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
+  readonly operations: readonly OperationSpec<any, any, any, string>[];
+}): readonly Uncovered[] {
+  const gated = new Set<string>();
+  const quotaed = new Set<string>();
+  const flagged = new Set<string>();
+  const shaped = new Set<string>();
+  for (const c of spec.collections) {
+    if (c.entitlement) gated.add(c.entitlement);
+    if (c.quota) quotaed.add(c.quota);
+  }
+  for (const op of spec.operations) {
+    if (op.entitlement) gated.add(op.entitlement);
+    if (op.quota) quotaed.add(op.quota);
+    if (op.customerFlag) flagged.add(op.customerFlag);
+    for (const key of Object.values(op.shape ?? {})) shaped.add(key);
+  }
+
+  const out: Uncovered[] = [];
+  for (const [key, def] of Object.entries(spec.access.entitlements)) {
+    if (typeof def.enforcement !== "string") continue;
+    const found = def.enforcement === "gate" ? gated.has(key)
+      : def.enforcement === "quota" ? quotaed.has(key)
+      : shaped.has(key);
+    if (!found) out.push({ rail: "entitlement", key, declared: def.enforcement });
+  }
+  for (const [key, def] of Object.entries(spec.access.customerFlags)) {
+    if (typeof def.enforcement !== "string") continue;
+    const found = def.enforcement === "gate" ? flagged.has(key) : shaped.has(key);
+    if (!found) out.push({ rail: "customer_flag", key, declared: def.enforcement });
+  }
+  return out;
+}
+
 /**
  * Compose an app.
  *
@@ -179,6 +263,17 @@ export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = Probl
  * error names the code. That check can only live here: an operation is written
  * before the catalogue it will be composed with, so its own declaration site
  * cannot see one.
+ *
+ * It refuses three more things for the same reason — all of them are questions
+ * only the whole manifest can answer, and all of them are silent at runtime:
+ * a sold capability nothing withholds, a workspace that is better off never
+ * paying, and customer capabilities declared by an app with no customer rail to
+ * resolve them.
+ *
+ * ⚠️ IT THROWS RATHER THAN REPORTING. A manifest is evaluated when the worker
+ * boots, so a refusal here is a deployment that does not start — which is the
+ * correct outcome for a product about to sell something it does not enforce, and
+ * it is loud in a way a warning in a log is not.
  */
 export function defineApp<
   const B extends BindingSpec,
@@ -191,5 +286,44 @@ export function defineApp<
       : { readonly problems: { readonly [K in UndeclaredFailure<O, P>]: ProblemDef } }
   ),
 ): AppSpec<B, P> {
+  assertComposable(spec);
   return spec;
+}
+
+/**
+ * The three whole-manifest refusals, in one function with two callers.
+ *
+ * ⚠️ CALLED AGAIN BY THE RUNTIME, deliberately. `defineApp` is where the error
+ * is most useful — it names the manifest — but a spec is structurally typed, so
+ * an app can assemble one without ever calling it. The runtime is the chokepoint
+ * every app genuinely passes through, and a check that can be sidestepped by not
+ * using the constructor is a check with an opt-out nobody documented.
+ */
+export function assertComposable(spec: {
+  readonly id: string;
+  readonly access: AccessSpec;
+  readonly collections: readonly CollectionSpec[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
+  readonly operations: readonly OperationSpec<any, any, any, string>[];
+}): void {
+  const uncovered = coverage(spec);
+  if (uncovered.length) {
+    throw new Error(
+      `${spec.id}: ${uncovered.length} sold capability(s) that nothing withholds — ` +
+        uncovered.map((u) => `${u.key} (declared "${u.declared}" on the ${u.rail} rail)`).join(", ") +
+        `. Name it on an operation, or declare it unenforced with a reason.`,
+    );
+  }
+
+  const generous = parkingAboveFloor(spec.access.entitlements, spec.access.plans);
+  if (generous.length) {
+    throw new Error(
+      `${spec.id}: the parking state is more generous than the cheapest plan for ${generous.join(", ")} — ` +
+        `not paying would buy more than paying does.`,
+    );
+  }
+
+  if (!spec.access.customerRail && Object.keys(spec.access.customerFlags).length) {
+    throw new Error(`${spec.id}: declares customer capabilities with customerRail false, so nothing resolves them.`);
+  }
 }

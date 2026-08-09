@@ -144,6 +144,16 @@ export interface OperationSpec<B extends BindingSpec, I, O, F extends string = s
   readonly entitlement?: string;
   /** What the tenant's own CUSTOMER bought from them, where an app has that rail. */
   readonly customerFlag?: string;
+  /**
+   * The ceiling this write counts against — a seat, a stored item, a send.
+   *
+   * ⚠️ A SEPARATE FIELD FROM `entitlement`, because the two refuse for different
+   * reasons and a caller must be told which. "Your plan does not include this"
+   * and "your plan includes twenty of these and you have twenty" are different
+   * problems with different ways out, and collapsing them into one gate produces
+   * copy that is wrong for whichever case it was not written for.
+   */
+  readonly quota?: string;
 
   /**
    * ROW-LEVEL scope — the invariant no framework can supply and no gate replaces.

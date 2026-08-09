@@ -874,6 +874,8 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `schema-adjacency` | a module ordered where its dependency has not run | **live** |
 | `relocatable-do` | a Durable Object class that cannot seal, export and import its state | **live** |
 | `no-silent-cap` | a bounded sweep that does not log what it dropped | **live** |
+| `entitlement-enforced` | a sold entitlement no gate, quota or shaped response names — a capability on a price list that every workspace has anyway | **live** |
+| `flag-enforced` | a sold customer capability the interface hides and no route withholds, so anybody who calls it directly receives it | **live** |
 | `schema-idempotent` | a schema module that is not re-runnable, a duplicate table across modules, or a module ordered before something it declares it needs | **live** |
 | `boot-per-region` | a deployment that composes one region's schema and serves another — the tenant resolves, reaches the right database, and finds nothing in it | **live** |
 | `standing-not-permission` | an always-allowed lane that skips the permission check with the standing gate | **live** |
@@ -888,8 +890,11 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `tenant-predicate-derived` | a list that filters by tenant in its own code — one that forgets returns every tenant's rows and looks completely ordinary | **live** |
 | `copy-before-flip` | a relocation that deletes from the source, or one with no verification before the directory write | **live** |
 | `collection-reachable` | a collection declared and left without a surface — a table applied, rows written by some other path, and no route to reach any of it | **live** |
-| `entitlement-enforced` | a sold entitlement no gate names | stage 5 |
-| `flag-enforced` | a sold capability the UI hides and no route withholds | stage 5 |
+| `parking-below-floor` | a parking state more generous than the cheapest paid plan — not paying buys more than paying does | **live** |
+| `quota-countable` | an operation counting against a ceiling nothing can count, which reports an obligation on every request and refuses nothing | **live** |
+| `one-entitlement-walk` | a second implementation of what a workspace or a customer may do, which is how a screen comes to promise what a route refuses | **live** |
+| `clamp-is-last` | an operator adjustment applied after the standing clamp, which turns a support gesture into a way around the payment ladder | **live** |
+| `reserve-is-a-ceiling` | a settlement that recounts an unreported call, or a reserve computed from a different text than the one that was sent | **live** |
 | `manifest-diff` | a deploy removing a plan, permission or entitlement somebody holds | stage 6 |
 | `app-test-budget` | an app's own suite crossing its duration cap — the fixture problem gets solved rather than tolerated | stage 6 |
 | `help-limits` | a help article over its length limit, naming a surface the manifest does not declare, or using developer vocabulary | stage 6 |
@@ -985,7 +990,7 @@ second-system effect, which is the largest risk here by a distance.
 | 2 | **Surface** — operations → routes + tools + webhooks + audit + OpenAPI. | ✅ An agent lists tools, completes a CRUD round trip and is refused exactly what the user would be — asserted over the whole catalogue rather than sampled. Input is parsed at the boundary rather than asserted |
 | 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search, **and tenant relocation (§4.2) with the `Relocatable` DO contract**. | ✅ `hello` declares two collections and writes no routing at all: list, read, create, update, archive, the document lifecycle and the activity log are derived. A metered ledger sums rather than stores, and a tenant copies to a second region, verifies by counting, and leaves the source bootable. Open: files, jobs |
 | 4 | **Renderer** — shell, nav, collection views, settings, admin, whitelabel, PWA. The language is [UI.md](UI.md). | ✅ The contrast sweep walks every legal brand, the state matrix proves no two states render alike, the boundary guard holds, and `hello` has a screen that writes no chrome at all. A live surface moves between four presentations without remounting. Open: the settings and admin surfaces, the PWA, and `pnpm shots` |
-| 5 | **Commerce** — plans, entitlements, flags, Stripe on one webhook, B2C packages, metering, parking state. | `hello` sells a plan and a package end to end in Stripe test mode |
+| 5 | **Commerce** — plans, entitlements, flags, Stripe on one webhook, B2C packages, metering, parking state. | `hello` sells a plan and a package end to end in Stripe test mode. Both rails now resolve through one explained walk each, and a manifest that would sell something nothing withholds does not boot: `hello` declares a catalogue, a ceiling and one sold capability, and the ladder, parking state, quota, package offer, grant ledger and intersection are all derived. **Open: the payment provider** — the webhook, cross-app attribution and the dead letter |
 | 6 | **Ops** — notifications incl. web push, help centre, versioning + changelog, data & subscription centre, maintenance, provisioning, CI. | A new app is `one new` + a manifest + a deploy, with nothing hand-wired |
 | 7 | **Kova** — §7. The long one. | Production tenants are served by `platform/kova` and `apps/api` is unrouted |
 | 8 | **Tessa, then Scena** | Both migrated; Scena's player proves the canvas boundary |

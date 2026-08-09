@@ -15,7 +15,7 @@ import { defineApp } from "../src/app.js";
 import { collection, field } from "../src/collection.js";
 import { declareProblems } from "../src/problem.js";
 import type { Currency, Locale, RegionId, TimeZone } from "../src/primitives.js";
-import { applyPackageGrant, bindings, problems as appProblems, publishPlan, readProgress } from "./proof.kova.js";
+import { applyPackageGrant, bindings, inviteStaff, problems as appProblems, publishPlan, readProgress } from "./proof.kova.js";
 
 /* --------------------------------------------------------------- a table --- */
 
@@ -81,16 +81,74 @@ export const kova = defineApp({
   },
 
   access: {
-    permissions: ["client:read", "plan:publish", "commerce:grant"],
+    permissions: ["client:read", "plan:publish", "commerce:grant", "staff:invite"],
     roles: {
-      owner: ["client:read", "plan:publish", "commerce:grant"],
+      owner: ["client:read", "plan:publish", "commerce:grant", "staff:invite"],
       trainer: ["client:read", "plan:publish"],
       customer: ["client:read"],
     },
-    entitlements: { trainingPlans: true, customerPackages: true, seats: 3 },
+
+    /*
+      ⚠️ EVERY ENTRY NAMES HOW IT IS WITHHELD, and composition checks that the
+      mechanism really exists. `parked` is what a workspace that never chose a
+      plan gets — and what a deployment with no payment rail at all serves, which
+      is why it is not simply zero.
+    */
+    entitlements: {
+      trainingPlans: { parked: false, enforcement: "gate" },
+      customerPackages: { parked: false, enforcement: "gate" },
+      seats: { parked: 1, enforcement: "quota" },
+      // Sold nowhere, enforced nowhere — and the reason is the exemption. A
+      // boolean here would be indistinguishable from an oversight in a year.
+      chat: { parked: false, enforcement: { unenforced: "no plan in the catalogue enables it; inert until one does" } },
+    },
+
+    /*
+      ⚠️ NOT PAYING MUST NOT BUY MORE THAN THE CHEAPEST PLAN. The parking row
+      above carries one seat against the entry plan's three, which is the right
+      way round — a shipping product once had it the other way and its entry
+      plan was a downgrade.
+    */
+    plans: [
+      {
+        id: "starter",
+        name: "Starter",
+        price: { minor: 499, currency: "USD" as Currency },
+        period: "month",
+        trialDays: 14,
+        entitlements: { trainingPlans: true, customerPackages: false, seats: 3, chat: false },
+      },
+      {
+        id: "pro",
+        name: "Pro",
+        price: { minor: 2900, currency: "USD" as Currency },
+        period: "month",
+        trialDays: 14,
+        entitlements: { trainingPlans: true, customerPackages: true, seats: 12, chat: false },
+      },
+    ],
+
     // This app sells to its tenants' own customers, so there are two flag
     // systems and a capability is their intersection.
     customerRail: true,
+
+    /*
+      ⚠️ `requires` NAMES THE ENTITLEMENT THE WORKSPACE ITSELF MUST HOLD. The
+      intersection is what stops a workspace selling what it did not buy, and
+      the two rails have separate vocabularies — a shared key name is a
+      coincidence, not a mechanism.
+    */
+    customerFlags: {
+      trainingPlans: { parked: false, enforcement: "gate", scope: "training", requires: "trainingPlans" },
+      bodyReport: { parked: false, enforcement: "shape", scope: "body" },
+      strengthReport: { parked: false, enforcement: "shape", scope: "training" },
+      nutritionReport: { parked: false, enforcement: "shape", scope: "nutrition" },
+      // The one honest exemption: computed entirely from the customer's own
+      // entries, so there is nothing a route could withhold without breaking
+      // the thing that produced it.
+      macroBreakdown: { parked: true, enforcement: { derived: "computed from the customer's own logged entries" } },
+    },
+
     seats: { counts: ["owner", "trainer"] },
   },
 
@@ -105,7 +163,7 @@ export const kova = defineApp({
   },
 
   collections: [packages],
-  operations: [readProgress, publishPlan, applyPackageGrant],
+  operations: [readProgress, publishPlan, applyPackageGrant, inviteStaff],
   problems: { ...appProblems, ...declareProblems({ "billing.quota_exceeded": { status: 402, title: "You've used everything in your plan", retryable: false } }) },
 
   // Registered per SURFACE rather than per action: a surface somebody is not

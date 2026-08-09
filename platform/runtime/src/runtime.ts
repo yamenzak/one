@@ -15,13 +15,15 @@
 
 import type {
   Actor, AnyOperation, AppSpec, AuditEntry, BindingSpec, Caller, Ctx, Instant, Problem,
-  ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, Session, SqlHandle, TenantId,
+  ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, Session, SqlHandle, StandingState, TenantId,
 } from "@one/kernel";
 import {
-  ALWAYS_ALLOWED, auditFor, check, cookieDomainFor, laneOf, PLATFORM_PROBLEMS,
-  relyingPartyFor, resolveRequest, routeFor, validateSession,
+  ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, PLATFORM_PROBLEMS,
+  relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
 import { bindingsFor, globalSql, type RawEnv } from "./env.js";
+import { COMMERCE, commerceOperations, customerOperations, type CommerceCarrier } from "./commerce-ops.js";
+import { customerFlagsFor, PARKED, readSubscription, standingFor } from "./commerce.js";
 import { sqlDirectory } from "./directory.js";
 import { collectionOperations } from "./collection-ops.js";
 import { DIRECTORY, TOOLS, platformOperations, toolOperations, type DirectoryCarrier, type ToolCarrier } from "./platform-ops.js";
@@ -48,6 +50,13 @@ const problemResponse = (p: Omit<Problem, "ref">, ref: string): Response =>
 /** Never a provider's words, and never a binding's name. */
 const UNAVAILABLE = { code: "platform.unavailable", status: 503, title: "Something went wrong on our side", retryable: true } as const;
 const NOT_FOUND = { code: "platform.not_found", status: 404, title: "Not found", retryable: false } as const;
+/*
+  ⚠️ ITS OWN CODE, NOT A 403. "Your plan does not include this" and "your plan
+  includes twenty of these and you have twenty" are different problems with
+  different ways out, and one code produces copy that is wrong for whichever
+  case it was not written for. `402` because the answer is a payment decision.
+*/
+const QUOTA_REACHED = { code: "platform.quota_reached", status: 402, title: "You've reached what your plan includes", retryable: false } as const;
 
 /* --------------------------------------------------------------- options --- */
 
@@ -78,8 +87,46 @@ export interface RuntimeOptions<B extends BindingSpec> {
    * tenant of one app, and it stays the app's. Handing the resolved account in
    * rather than letting an app read the cookie is what keeps the session format
    * — and its validation — in one place.
+   *
+   * ⚠️ IT RETURNS PERMISSIONS, NEVER ENTITLEMENTS OR A GATE. What a workspace
+   * bought and where it stands on the payment ladder are the PLATFORM's answers,
+   * resolved from the subscription row below — because an app that assembled its
+   * own `Caller` could hand the gate a set it made up, and the one that did
+   * handed it every declared key unconditionally. There is no honest reason for
+   * an app to be able to widen its own entitlements at the door.
    */
-  resolveCaller(session: Session | null, at: Resolved): Promise<{ actor: Actor; caller: Caller }>;
+  resolveCaller(session: Session | null, at: Resolved): Promise<{
+    readonly actor: Actor;
+    readonly permissions: ReadonlySet<string>;
+    /**
+     * WHO THIS CALLER IS ON THE CUSTOMER RAIL, where an app has one.
+     *
+     * ⚠️ A NAME, NOT A RESOLVED SET. Only the app knows which of its records is
+     * the customer a caller is acting as — in one product it is the signed-in
+     * person, in another a record they were assigned to. What that customer may
+     * do is then resolved by the platform through the same walk the capabilities
+     * screen reads, so the two cannot disagree.
+     */
+    readonly subjectId?: string;
+  }>;
+  /**
+   * Whether this deployment can actually take money.
+   *
+   * ⚠️ FAIL CLOSED ON THEIR NON-PAYMENT, OPEN ON OURS. A workspace that has not
+   * chosen a plan is held to setup only where a plan could have been bought; on
+   * a self-host, or before a payment provider is configured, gating it would
+   * strand every workspace over our own misconfiguration. Defaults to false, so
+   * a deployment that says nothing sells nothing.
+   */
+  readonly chargeable?: boolean;
+  /**
+   * How to count what a key's ceiling applies to, where a collection cannot.
+   *
+   * ⚠️ SEATS ARE THE CASE THIS EXISTS FOR. A collection's quota is counted from
+   * its own table by the platform; a seat is a membership row in whatever the
+   * app calls its roster, and no framework can know which of those rows count.
+   */
+  countQuota?(key: string, db: SqlHandle, tenantId: string): Promise<number>;
   /** Applied once per database, before the first request it serves. */
   readonly onBoot?: {
     /** The global store: the directory, and anything else routing needs. */
@@ -103,6 +150,15 @@ export interface Runtime {
 
 export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: RuntimeOptions<B>): Runtime {
   /*
+    ⚠️ THE COMMERCE REFUSALS, RE-ASSERTED AT THE CHOKEPOINT. `defineApp` already
+    runs them and names the manifest, which is where the error is most useful —
+    but an `AppSpec` is structurally typed, so an app can assemble one without
+    ever calling the constructor. A check that is skipped by not using a helper
+    is a check with an undocumented opt-out, and this is the one door every app
+    must come through.
+  */
+  assertComposable(app);
+  /*
     ⚠️ THE ROUTE TABLE IS BUILT FROM THE OPERATION REGISTRY, ONCE. There is no
     other way to reach a handler — no `router.get`, no mount, no registration
     step to forget. A capability that exists and cannot be reached is the exact
@@ -110,7 +166,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -149,6 +205,29 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     directoryRegion: app.identity.directoryRegion,
   };
   const regional = (env: RawEnv) => bindingsFor(app.bindings, env, { defaultRegion: app.tenancy.defaultRegion });
+
+  /*
+    ⚠️ A CEILING NOBODY CAN COUNT IS NOT A CEILING, and this is where that stops
+    being expressible. A collection that declares a `quota` is counted by the
+    platform from its own table; anything else needs the app to say how, because
+    only the app knows what a seat is. An operation naming a key neither can
+    count would report the obligation on every request and have it silently
+    discharged as "fine" — a limit on a price list that refuses nothing.
+  */
+  const counters = new Map<string, (db: SqlHandle, tenantId: string) => Promise<number>>();
+  for (const spec of app.collections) {
+    if (!spec.quota) continue;
+    const table = tableNameFor(spec);
+    counters.set(spec.quota, async (db, tenantId) => {
+      const row = await db.first<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table} WHERE tenant_id = ?`, tenantId);
+      return row?.n ?? 0;
+    });
+  }
+  for (const op of byPath.values()) {
+    if (op.quota && !counters.has(op.quota) && !opts.countQuota) {
+      throw new Error(`${app.id}: "${op.id}" counts against "${op.quota}", which nothing can count — declare it on a collection or supply countQuota.`);
+    }
+  }
 
   const booted = new Map<string, Promise<void>>();
   const once = (key: string, run: () => Promise<void>) => {
@@ -254,7 +333,39 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         deliverCode: opts.deliverCode,
       };
 
-      const { actor, caller } = await opts.resolveCaller(session, at);
+      const { actor, permissions, subjectId } = await opts.resolveCaller(session, at);
+
+      /*
+        ⚠️ ONE READ, ONE WALK, AND THE GATE IS DOWNSTREAM OF BOTH. The
+        subscription row is the single source for what a workspace bought and
+        where it stands — resolved here so that the router, the tool filter and
+        every handler are looking at the same answer. The directory carries a
+        standing column too; that one is the ROUTING copy, written by a sweep and
+        read before a region is known, and it is deliberately not what gates a
+        request.
+      */
+      const regionalDb = bind[opts.sessionsBinding] as SqlHandle;
+      const sub = at.tenant ? await readSubscription(regionalDb, at.tenant.tenantId) : PARKED;
+      const standingState = at.tenant
+        ? standingFor(sub, new Date().toISOString() as Instant, opts.chargeable ?? false)
+        : ({ standing: "active", reason: "ok" } as StandingState);
+      const gate = gateFor(standingState);
+      const entitlements = resolveEntitlements({
+        declared: app.access.entitlements,
+        plan: app.access.plans.find((p) => p.id === sub.planId) ?? null,
+        overrides: sub.overrides,
+        gate,
+      });
+      /*
+        ⚠️ THE SECOND RAIL RESOLVES THROUGH THE SAME WALK THE CAPABILITIES SCREEN
+        READS, and it is INTERSECTED with the first — a workspace cannot sell
+        what it did not itself buy, and losing a plan does not quietly rewrite
+        what its customers were sold, it withholds it while the plan is gone.
+      */
+      const customerFlags = app.access.customerRail && subjectId && at.tenant
+        ? await customerFlagsFor(regionalDb, at.tenant.tenantId, subjectId, app.access.customerFlags, entitlements, new Date().toISOString() as Instant)
+        : undefined;
+      const caller: Caller = { permissions, customerFlags, entitlements, gate };
 
       /*
         ⚠️ THE GATE RUNS ONCE, FOR EVERY TRANSPORT, FROM HERE. A per-route check
@@ -279,6 +390,24 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         : caller;
       const verdict = check(op, forGate);
       if (!verdict.allowed) return problemResponse(refusalProblem(verdict.refusal), ref);
+
+      /*
+        ⚠️ THE OBLIGATION `check` RETURNED, DISCHARGED HERE. It is reported rather
+        than performed there because counting needs a query and the gate is pure
+        so a whole tool catalogue can be filtered without touching a store — but a
+        returned obligation nobody acts on is worse than one that was never
+        mentioned, because the code reads as though the limit is enforced.
+      */
+      if (verdict.quotaRequired && at.tenant) {
+        const key = verdict.quotaRequired.key;
+        const count = counters.get(key);
+        const used = count
+          ? await count(regionalDb, at.tenant.tenantId)
+          : await opts.countQuota!(key, regionalDb, at.tenant.tenantId);
+        if (!withinQuota(verdict.quotaRequired.allowance, used)) {
+          return problemResponse({ ...QUOTA_REACHED, meta: { limit: String(verdict.quotaRequired.allowance), used: String(used) } }, ref);
+        }
+      }
 
       const raw = request.method === "GET"
         ? Object.fromEntries(url.searchParams)
@@ -316,8 +445,9 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier = {
         [PLATFORM]: platform,
+        [COMMERCE]: { db: regionalDb, tenantId: at.tenant?.tenantId ?? "", chargeable: opts.chargeable ?? false, entitlements: caller.entitlements },
         [TOOLS]: {
           operations: [...byPath.values()],
           caller,

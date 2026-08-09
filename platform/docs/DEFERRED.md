@@ -13,4 +13,4 @@ kind: index
 - `one-003` — resolve against the declared help registry, so a  
   <sub>kernel/src/problem.ts:20</sub>
 - `one-013` — the same treatment for `emits`, against the declared  
-  <sub>kernel/src/app.ts:163</sub>
+  <sub>kernel/src/app.ts:174</sub>

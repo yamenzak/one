@@ -226,16 +226,20 @@
     {
       "id": "entitlement-enforced",
       "group": "platform",
-      "fails": "a sold entitlement no gate names",
+      "fails": "a sold entitlement no gate, quota or shaped response names \u2014 a capability on a price list that every workspace has anyway",
       "stage": "5",
-      "status": "owed"
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses an entitlement declared as a gate that no operation names"
     },
     {
       "id": "flag-enforced",
       "group": "platform",
-      "fails": "a sold capability the UI hides and no route withholds",
+      "fails": "a sold customer capability the interface hides and no route withholds, so anybody who calls it directly receives it",
       "stage": "5",
-      "status": "owed"
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses a customer capability the interface hides and no route withholds"
     },
     {
       "id": "manifest-diff",
@@ -631,6 +635,51 @@
       "status": "live",
       "impl": "ui/test/state.test.ts",
       "proves": "moves one element when two surfaces show the same subject"
+    },
+    {
+      "id": "parking-below-floor",
+      "group": "platform",
+      "stage": "5",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses a parking state more generous than the cheapest plan",
+      "fails": "a parking state more generous than the cheapest paid plan \u2014 not paying buys more than paying does"
+    },
+    {
+      "id": "quota-countable",
+      "group": "platform",
+      "stage": "5",
+      "status": "live",
+      "impl": "runtime/test/commerce.test.ts",
+      "proves": "refuses an operation counting against a key nothing can count",
+      "fails": "an operation counting against a ceiling nothing can count, which reports an obligation on every request and refuses nothing"
+    },
+    {
+      "id": "one-entitlement-walk",
+      "group": "platform",
+      "stage": "5",
+      "status": "live",
+      "impl": "kernel/test/commerce.test.ts",
+      "proves": "projects to the plain answer without a second merge",
+      "fails": "a second implementation of what a workspace or a customer may do, which is how a screen comes to promise what a route refuses"
+    },
+    {
+      "id": "clamp-is-last",
+      "group": "platform",
+      "stage": "5",
+      "status": "live",
+      "impl": "kernel/test/commerce.test.ts",
+      "proves": "floors everything when the product itself is withheld, whatever was adjusted",
+      "fails": "an operator adjustment applied after the standing clamp, which turns a support gesture into a way around the payment ladder"
+    },
+    {
+      "id": "reserve-is-a-ceiling",
+      "group": "platform",
+      "stage": "5",
+      "status": "live",
+      "impl": "kernel/test/commerce.test.ts",
+      "proves": "settles an unreported call at the reserve, never at a recount",
+      "fails": "a settlement that recounts an unreported call, or a reserve computed from a different text than the one that was sent"
     }
   ]
 }

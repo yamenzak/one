@@ -123,4 +123,17 @@ export const PLATFORM_PROBLEMS = declareProblems({
   },
   "platform.rate_limited": { status: 429, title: "Too many attempts — wait a moment", retryable: true },
   "platform.read_only": { status: 402, title: "This workspace is read-only right now", retryable: false },
+  /*
+    ⚠️ ITS OWN CODE RATHER THAN A SHARE OF `forbidden`. "Your plan does not
+    include this" and "your plan includes twenty and you have twenty" are
+    different problems with different ways out — one is an upgrade, the other is
+    deleting something — and a single code produces copy that is wrong for
+    whichever case it was not written for.
+  */
+  "platform.quota_reached": {
+    status: 402,
+    title: "You've reached what your plan includes",
+    detail: (m) => `Your plan includes ${m.limit}, and ${m.used} are in use.`,
+    retryable: false,
+  },
 });

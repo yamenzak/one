@@ -16,6 +16,8 @@
  */
 
 import type { BindingSpec } from "./bindings.js";
+import type { Allowance } from "./entitlement.js";
+import { grants, withinQuota } from "./entitlement.js";
 import type { OperationSpec } from "./operation.js";
 import type { StandingGate } from "./standing.js";
 import { permits } from "./standing.js";
@@ -55,14 +57,21 @@ export function routeFor(op: AnyOperation): Route {
 /** Everything the gates need, resolved once per request. */
 export interface Caller {
   readonly permissions: ReadonlySet<string>;
-  /** What the TENANT bought from us. */
-  readonly entitlements: ReadonlySet<string>;
+  /**
+   * What the TENANT bought from us — the resolved VALUES, not the names.
+   *
+   * ⚠️ A SET WOULD LOSE THE CEILING. Half of what a plan sells is a number, and
+   * a gate holding only the keys can answer "is this included" but never "is
+   * there room for one more" — so the count gets asked somewhere else, against
+   * some other copy of the plan, and the two answers drift.
+   */
+  readonly entitlements: Readonly<Record<string, Allowance>>;
   /** What the tenant's own CUSTOMER bought from them. Absent where an app has no such rail. */
   readonly customerFlags?: ReadonlySet<string>;
   readonly gate: StandingGate;
 }
 
-export type Refusal = "standing" | "permission" | "entitlement" | "customer_flag";
+export type Refusal = "standing" | "permission" | "entitlement" | "customer_flag" | "quota";
 
 export type Verdict =
   | {
@@ -71,6 +80,17 @@ export type Verdict =
       readonly included: Readonly<Record<string, boolean>>;
       /** Row-level scope still to be checked, with I/O, by the runner. */
       readonly scopeRequired: boolean;
+      /**
+       * ⚠️ A CEILING STILL TO BE COUNTED AGAINST, reported rather than silently
+       * skipped — the same treatment as row scope, and for the same reason.
+       *
+       * Counting needs a query, and this function is pure so that `toolsFor` can
+       * filter a whole catalogue without touching a store. Returning the
+       * obligation makes it something the runner must discharge; omitting it
+       * would make a forgotten quota look exactly like a collection that has
+       * none.
+       */
+      readonly quotaRequired: { readonly key: string; readonly allowance: Allowance } | null;
     }
   | { readonly allowed: false; readonly refusal: Refusal };
 
@@ -106,11 +126,24 @@ export const PUBLIC = "public";
 export function check(op: AnyOperation, caller: Caller): Verdict {
   if (!permits(caller.gate, laneOf(op), op.kind === "write")) return { allowed: false, refusal: "standing" };
   if (op.permission !== PUBLIC && !caller.permissions.has(op.permission)) return { allowed: false, refusal: "permission" };
-  if (op.entitlement && !caller.entitlements.has(op.entitlement)) return { allowed: false, refusal: "entitlement" };
+  if (op.entitlement && !grants(caller.entitlements[op.entitlement] ?? false)) return { allowed: false, refusal: "entitlement" };
   if (op.customerFlag && !(caller.customerFlags?.has(op.customerFlag) ?? false)) {
     return { allowed: false, refusal: "customer_flag" };
   }
-  return { allowed: true, included: shapeFor(op, caller), scopeRequired: Boolean(op.scope) };
+  /*
+    ⚠️ A CEILING OF ZERO IS REFUSED HERE RATHER THAN COUNTED. Nothing fits under
+    it, so the count is a query whose answer cannot change the verdict — and a
+    tool catalogue filtered without one would still offer the operation, which
+    is a promise the first call breaks.
+  */
+  const allowance = op.quota === undefined ? undefined : caller.entitlements[op.quota] ?? false;
+  if (allowance !== undefined && !withinQuota(allowance, 0)) return { allowed: false, refusal: "quota" };
+  return {
+    allowed: true,
+    included: shapeFor(op, caller),
+    scopeRequired: Boolean(op.scope),
+    quotaRequired: op.quota !== undefined && allowance !== undefined ? { key: op.quota, allowance } : null,
+  };
 }
 
 /** The standing lane an operation belongs to — its id's first segment. */
@@ -132,7 +165,7 @@ export const laneOf = (op: AnyOperation): string => op.id.split(".")[0] ?? "";
 export function shapeFor(op: AnyOperation, caller: Caller): Readonly<Record<string, boolean>> {
   const out: Record<string, boolean> = {};
   for (const [key, flag] of Object.entries(op.shape ?? {})) {
-    out[key] = caller.customerFlags?.has(flag) ?? caller.entitlements.has(flag);
+    out[key] = caller.customerFlags?.has(flag) ?? grants(caller.entitlements[flag] ?? false);
   }
   return out;
 }

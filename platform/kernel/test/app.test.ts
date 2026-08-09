@@ -11,7 +11,16 @@ import { describe, expect, it } from "vitest";
 import { kova } from "./proof.app.js";
 import { PLATFORM_PROBLEMS, type Problem, type ProblemCode, type ProviderAdapter } from "../src/problem.js";
 import { TENANT_DOORS, TENANTLESS_DOORS, DIRECTORY_REGION, classifyHost, cookieDomainFor, type Door, type DoorConfig } from "../src/doors.js";
+import { assertComposable, coverage } from "../src/app.js";
+import type { EntitlementDef, PlanSpec } from "../src/entitlement.js";
+import type { FlagDef } from "../src/customer.js";
+import type { CollectionSpec } from "../src/collection.js";
 import { isArchived } from "../src/document.js";
+
+/** The smallest thing the coverage walk will read — it inspects four fields. */
+const stub = { id: "x.do", kind: "write", permission: "x" };
+const stubCollection = { id: "x", label: { one: "X", many: "Xs" }, scope: { of: "tenant" } };
+
 import type { RowBase } from "../src/collection.js";
 import type { Result } from "../src/operation.js";
 import type { Instant, Id, Money, Quantity } from "../src/primitives.js";
@@ -207,5 +216,118 @@ describe("the row a collection implies", () => {
     // ⚠️ Absent is not archived. A row that never carried the column is live,
     // and reading it as deleted would hide every row in a purging collection.
     expect(isArchived({})).toBe(false);
+  });
+});
+
+/* -------------------------------------------------------------- commerce --- */
+
+/**
+ * THE TWO RAILS' COVERAGE, WHICH IS THE QUIETEST FAILURE A COMMERCIAL PRODUCT
+ * HAS.
+ *
+ * A capability appears on a price list, the interface hides it from whoever did
+ * not buy it, and no route withholds anything. Every test passes, because the
+ * tests drive the interface. The only signal is that the cheap plan does the
+ * expensive thing for anybody who asks for it directly — which is the first
+ * thing an API consumer, an assistant or a curious customer does.
+ */
+describe("a sold capability is withheld by something", () => {
+  const base = {
+    id: "test",
+    access: {
+      permissions: [], roles: {}, plans: [] as PlanSpec[],
+      entitlements: {} as Record<string, EntitlementDef>,
+      customerRail: false, customerFlags: {} as Record<string, FlagDef>,
+      seats: { counts: [] },
+    },
+    collections: [] as CollectionSpec[],
+    operations: [] as never[],
+  };
+
+  it("refuses an entitlement declared as a gate that no operation names", () => {
+    expect(() => assertComposable({
+      ...base,
+      access: { ...base.access, entitlements: { reports: { parked: false, enforcement: "gate" } } },
+    })).toThrow(/reports/);
+  });
+
+  it("accepts it once an operation names it", () => {
+    expect(() => assertComposable({
+      ...base,
+      access: { ...base.access, entitlements: { reports: { parked: false, enforcement: "gate" } } },
+      operations: [{ ...stub, entitlement: "reports" }] as never,
+    })).not.toThrow();
+  });
+
+  /*
+    ⚠️ A COLLECTION COUNTS. An app whose whole surface is derived declares no
+    operations at all, so a check reading `operations` alone would report full
+    coverage over an empty list — and pass every app that writes no routing,
+    which is the shape this platform exists to encourage.
+  */
+  it("accepts a quota a collection counts against", () => {
+    expect(() => assertComposable({
+      ...base,
+      access: { ...base.access, entitlements: { stored: { parked: 5, enforcement: "quota" } } },
+      collections: [{ ...stubCollection, quota: "stored" }] as never,
+    })).not.toThrow();
+  });
+
+  it("refuses a quota nothing counts against, even where a gate names the key", () => {
+    expect(() => assertComposable({
+      ...base,
+      access: { ...base.access, entitlements: { stored: { parked: 5, enforcement: "quota" } } },
+      operations: [{ ...stub, entitlement: "stored" }] as never,
+    })).toThrow(/stored/);
+  });
+
+  /*
+    ⚠️ THE EXEMPTION CARRIES A REASON, not a boolean. A decision with no stated
+    reason is indistinguishable from an oversight once its author has left.
+  */
+  it("accepts one declared unenforced, with a reason", () => {
+    expect(() => assertComposable({
+      ...base,
+      access: { ...base.access, entitlements: { chat: { parked: false, enforcement: { unenforced: "nothing sells it yet" } } } },
+    })).not.toThrow();
+  });
+
+  it("refuses a customer capability the interface hides and no route withholds", () => {
+    expect(() => assertComposable({
+      ...base,
+      access: { ...base.access, customerRail: true, customerFlags: { bodyReport: { parked: false, enforcement: "shape" } } },
+    })).toThrow(/bodyReport/);
+    expect(() => assertComposable({
+      ...base,
+      access: { ...base.access, customerRail: true, customerFlags: { bodyReport: { parked: false, enforcement: "shape" } } },
+      operations: [{ ...stub, shape: { body: "bodyReport" } }] as never,
+    })).not.toThrow();
+  });
+
+  it("refuses customer capabilities on an app with no rail to resolve them", () => {
+    expect(() => assertComposable({
+      ...base,
+      access: { ...base.access, customerFlags: { bodyReport: { parked: false, enforcement: { derived: "their own data" } } } },
+    })).toThrow(/customerRail/);
+  });
+
+  /*
+    ⚠️ NOT PAYING MUST NOT BUY MORE THAN PAYING. A shipping product's parking
+    state carried three seats against its entry plan's one, so the entry plan
+    was a downgrade.
+  */
+  it("refuses a parking state more generous than the cheapest plan", () => {
+    expect(() => assertComposable({
+      ...base,
+      access: {
+        ...base.access,
+        entitlements: { seats: { parked: 5, enforcement: { unenforced: "not the point of this case" } } },
+        plans: [{ id: "entry", name: "Entry", price: { minor: 499, currency: "USD" }, period: "month", trialDays: 0, entitlements: { seats: 1 } }],
+      },
+    })).toThrow(/not paying would buy more/);
+  });
+
+  it("holds the real manifest to all of it", () => {
+    expect(coverage(kova)).toEqual([]);
   });
 });

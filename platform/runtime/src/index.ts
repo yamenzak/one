@@ -14,6 +14,8 @@ export * from "./identity.js";
 export * from "./identity-ops.js";
 export * from "./collection-ops.js";
 export * from "./ledger.js";
+export * from "./commerce.js";
+export * from "./commerce-ops.js";
 export * from "./relocate.js";
 export * from "./platform-ops.js";
 export * from "./runtime.js";

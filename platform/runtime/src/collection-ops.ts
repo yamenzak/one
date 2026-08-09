@@ -353,7 +353,29 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
   }
 
   const ops = [list, readOne, create, update, remove, ...lifecycle, ...(spec.activity ? [activity] : [])];
-  return ops as unknown as readonly AnyOperation[];
+
+  /**
+   * ⚠️ THE COLLECTION'S GATES APPLIED IN ONE PLACE, over every operation it
+   * derives.
+   *
+   * Attaching them at each declaration site above would mean seven chances to
+   * omit one, and the omission is invisible: six operations refuse correctly and
+   * the seventh is the one nobody thought to try. Here there is one rule and no
+   * site to forget.
+   *
+   * `quota` lands on the two operations that ADD a row and on nothing else.
+   * Counting a read against a ceiling would withhold what a workspace already
+   * stored the moment it downgraded, which is holding their own records hostage
+   * rather than withholding a product — and an amendment is a new document, so
+   * it counts exactly as a create does.
+   */
+  const ADDS = new Set([`${spec.id}.create`, `${spec.id}.amend`]);
+  const gated = ops.map((op) => ({
+    ...op,
+    ...(spec.entitlement ? { entitlement: spec.entitlement } : {}),
+    ...(spec.quota && ADDS.has(op.id) ? { quota: spec.quota } : {}),
+  }));
+  return gated as unknown as readonly AnyOperation[];
 }
 
 /** A body becomes columns and binds, money splitting into its two. */

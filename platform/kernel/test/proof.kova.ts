@@ -12,6 +12,8 @@
  *      payload, of which a given customer bought some
  *   2. a write behind ROW-LEVEL scope, the invariant no gate replaces
  *   3. a money path that must survive being delivered twice
+ *   4. a write against a CEILING, which refuses for a different reason than a
+ *      gate does and must say so differently
  *
  * `platform/kernel/test/FINDINGS.md` records what did not fit on the first
  * attempt, which is the actual output of stage 0.
@@ -163,6 +165,37 @@ export const applyPackageGrant = operation({
   emits: ["package.granted"],
   tool: false,
   fails: ["platform.conflict", "platform.not_found"],
+  async handler() {
+    throw new Error("stage 0: types only");
+  },
+});
+
+/* ------------------------------------------------------------------- 4 --- */
+
+/**
+ * The ceiling — a seat counted, not a capability gated.
+ *
+ * ⚠️ `quota` RATHER THAN `entitlement`, and the distinction is the whole reason
+ * the field exists. "Your plan does not include staff" and "your plan includes
+ * three and you have three" are different problems with different ways out, and
+ * a single gate produces copy that is wrong for whichever case it was not
+ * written for. Declaring which one this is means the refusal can name the
+ * ceiling and the number.
+ */
+export const inviteStaff = operation({
+  id: "team.staff.invite",
+  kind: "write",
+  summary: "Invite a member of staff to the workspace.",
+  input: s.object({ email: s.text({ max: 320 }), role: s.text({ max: 40 }) }),
+  output: s.object({ invitedAt: s.instant() }),
+
+  permission: "staff:invite",
+  quota: "seats",
+
+  idempotency: { mode: "natural", key: "email" },
+  audit: (i) => ({ subject: i.email, verb: "invite" }),
+  emits: ["staff.invited"],
+  fails: ["platform.conflict"],
   async handler() {
     throw new Error("stage 0: types only");
   },

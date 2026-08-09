@@ -13,13 +13,13 @@ import {
   type AnyOperation, type Caller,
 } from "../src/surface.js";
 import { gateFor } from "../src/standing.js";
-import { applyPackageGrant, publishPlan, readProgress } from "./proof.kova.js";
+import { applyPackageGrant, inviteStaff, publishPlan, readProgress } from "./proof.kova.js";
 
-const OPS: readonly AnyOperation[] = [readProgress, publishPlan, applyPackageGrant] as unknown as AnyOperation[];
+const OPS: readonly AnyOperation[] = [readProgress, publishPlan, applyPackageGrant, inviteStaff] as unknown as AnyOperation[];
 
 const caller = (over: Partial<Caller> = {}): Caller => ({
   permissions: new Set<string>(),
-  entitlements: new Set<string>(),
+  entitlements: {},
   customerFlags: new Set<string>(),
   gate: gateFor({ standing: "active", reason: "ok" }),
   ...over,
@@ -27,7 +27,7 @@ const caller = (over: Partial<Caller> = {}): Caller => ({
 
 const full = caller({
   permissions: new Set(["client:read", "plan:publish", "commerce:grant"]),
-  entitlements: new Set(["trainingPlans", "customerPackages"]),
+  entitlements: { trainingPlans: true, customerPackages: true, seats: 3 },
   customerFlags: new Set(["trainingPlans", "bodyReport"]),
 });
 
@@ -70,10 +70,46 @@ describe("the gates, in order", () => {
     }
   });
 
+  /*
+    ⚠️ AN ENTITLEMENT IS A VALUE, NOT A KEY. Half of what a plan sells is a
+    number, and a gate holding only the names can answer "is this included" but
+    never "is there room" — so a caller carrying `reports: false` must be refused
+    exactly as one carrying nothing is. A set-shaped caller cannot express the
+    difference, which is why this asserts the falsey value specifically.
+  */
+  it("refuses an entitlement the caller holds at a value worth nothing", () => {
+    for (const value of [false, 0] as const) {
+      const v = check(publishPlan as never, caller({ ...full, entitlements: { ...full.entitlements, trainingPlans: value } }));
+      expect(v.allowed, `value ${String(value)}`).toBe(false);
+      if (!v.allowed) expect(v.refusal).toBe("entitlement");
+    }
+  });
+
+  /*
+    ⚠️ A CEILING OF ZERO IS REFUSED BY THE PURE GATE, not deferred to a count.
+    Nothing fits under it, so the query cannot change the verdict — and a tool
+    catalogue filtered without one would still offer the operation, which is a
+    promise its first call breaks.
+  */
+  it("refuses a full ceiling without needing a count, and keeps it out of the tools", () => {
+    const noRoom = caller({ ...full, permissions: new Set([...full.permissions, "staff:invite"]), entitlements: { ...full.entitlements, seats: 0 } });
+    const v = check(inviteStaff as never, noRoom);
+    expect(v.allowed).toBe(false);
+    if (!v.allowed) expect(v.refusal).toBe("quota");
+    expect(toolsFor([inviteStaff as never], noRoom).map((t) => t.name)).toEqual([]);
+  });
+
+  it("reports the ceiling as an obligation when there IS room, rather than passing it", () => {
+    const room = caller({ ...full, permissions: new Set([...full.permissions, "staff:invite"]), entitlements: { ...full.entitlements, seats: 3 } });
+    const v = check(inviteStaff as never, room);
+    expect(v.allowed).toBe(true);
+    if (v.allowed) expect(v.quotaRequired).toEqual({ key: "seats", allowance: 3 });
+  });
+
   it("distinguishes the three commerce questions", () => {
     // What the STAFF may do, what the STUDIO bought, what the CLIENT bought.
     const noPerm = caller({ ...full, permissions: new Set(["client:read"]) });
-    const noEnt = caller({ ...full, entitlements: new Set() });
+    const noEnt = caller({ ...full, entitlements: {} });
     const noFlag = caller({ ...full, customerFlags: new Set() });
     for (const [c, expected] of [[noPerm, "permission"], [noEnt, "entitlement"], [noFlag, "customer_flag"]] as const) {
       const v = check(publishPlan as never, c);
@@ -136,7 +172,7 @@ describe("the tool surface is the route surface, masked", () => {
       ["nothing", caller()],
       ["read only", caller({ permissions: new Set(["client:read"]) })],
       ["full", full],
-      ["no entitlement", caller({ ...full, entitlements: new Set() })],
+      ["no entitlement", caller({ ...full, entitlements: {} })],
       ["no customer flag", caller({ ...full, customerFlags: new Set() })],
       ["workspace read-only", caller({ ...full, gate: gateFor({ standing: "read_only", reason: "arrears" }) })],
       ["workspace blocked", caller({ ...full, gate: gateFor({ standing: "blocked", reason: "arrears" }) })],
@@ -172,7 +208,7 @@ describe("the tool surface is the route surface, masked", () => {
 
 describe("webhooks and audit fall out of the same declaration", () => {
   it("derives the subscribable events from what operations emit", () => {
-    expect(webhookEventsFor(OPS).map((e) => e.event).sort()).toEqual(["package.granted", "plan.published"]);
+    expect(webhookEventsFor(OPS).map((e) => e.event).sort()).toEqual(["package.granted", "plan.published", "staff.invited"]);
   });
 
   it("does not emit an event twice when two operations raise it", () => {

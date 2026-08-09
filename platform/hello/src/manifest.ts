@@ -11,8 +11,9 @@
  */
 
 import {
+  UNLIMITED,
   cache, collection, defineApp, defineBindings, field,
-  objects, sql,
+  objects, operation, s, sql,
   type Currency, type Locale, type RegionId, type TimeZone,
 } from "@one/kernel";
 
@@ -32,6 +33,7 @@ export const notes = collection({
   id: "note",
   label: { one: "Note", many: "Notes" },
   scope: { of: "tenant" },
+  entitlement: "notes",
   version: true,
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "archive" },
@@ -58,6 +60,10 @@ export const receipts = collection({
   id: "receipt",
   label: { one: "Receipt", many: "Receipts" },
   scope: { of: "tenant" },
+  // ⚠️ A CEILING ON CREATE, NOT ON READ. Refusing to show what a workspace
+  // already stored because it has since downgraded holds their own records
+  // hostage; refusing the next one does not.
+  quota: "receiptsStored",
   version: true,
   retention: { days: 2555, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
@@ -68,6 +74,32 @@ export const receipts = collection({
     total: field.money({ required: true }),
     issuedOn: field.plainDate({ required: true }),
     memo: field.text({ multiline: true }),
+  },
+});
+
+/* ------------------------------------------------------------ operation --- */
+
+/**
+ * ⚠️ THE ONE THING A COLLECTION COULD NOT IMPLY: a capability sold to somebody
+ * who is not the workspace.
+ *
+ * Everything else `hello` has is derived. This exists because the customer rail
+ * needs a capability that is genuinely WITHHELD by a route — hiding a tab is not
+ * withholding anything, and a product that only hides it ships a report every
+ * customer can fetch by asking for it directly.
+ */
+export const digest = operation<Bindings, Record<string, never>, { count: number }>({
+  id: "notes.digest",
+  kind: "read",
+  summary: "A rolled-up view of this workspace's notes.",
+  input: s.object({}),
+  output: s.object({ count: s.number({ integer: true }) }),
+  permission: "note:read",
+  customerFlag: "digest",
+  idempotency: { mode: "none" },
+  async handler(ctx) {
+    const row = await ctx.bind.db.first<{ n: number }>(`SELECT COUNT(*) AS n FROM notes WHERE tenant_id = ?`, ctx.tenantId);
+    return { count: row?.n ?? 0 };
   },
 });
 
@@ -100,15 +132,52 @@ export const hello = defineApp({
     weekStart: 1,
   },
   access: {
-    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create"],
+    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage"],
     /*
       Anybody signed in may open a workspace — this is a self-serve product, and
       `workspace:create` is checked on a door that has no tenant to be a member
       of, so a role is the only place it could come from.
     */
-    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create"], reader: ["note:read"] },
-    entitlements: { notes: true },
-    customerRail: false,
+    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage"], reader: ["note:read"] },
+    /*
+      ⚠️ EVERY ENTRY NAMES HOW IT IS WITHHELD, and `defineApp` refuses one whose
+      mechanism does not exist. `notes` is gated on the collection rather than on
+      each derived operation — a collection derives seven of them, and repeating
+      a gate seven times is how six get it.
+    */
+    entitlements: {
+      notes: { parked: true, enforcement: "gate" },
+      receiptsStored: { parked: 5, enforcement: "quota" },
+    },
+    plans: [
+      {
+        id: "free",
+        name: "Free",
+        price: { minor: 0, currency: "EUR" as Currency },
+        period: "month",
+        trialDays: 0,
+        entitlements: { notes: true, receiptsStored: 5 },
+      },
+      {
+        id: "keeper",
+        name: "Keeper",
+        price: { minor: 500, currency: "EUR" as Currency },
+        period: "month",
+        trialDays: 14,
+        entitlements: { notes: true, receiptsStored: UNLIMITED },
+      },
+    ],
+    /*
+      ⚠️ THE SECOND RAIL, AND IT IS NOT THE FIRST ONE AGAIN. `notes` is what the
+      PLATFORM sells this workspace; `digest` is what the workspace sells the
+      people it serves. They resolve separately and a real capability is the
+      intersection — which is what stops a workspace selling something it did
+      not itself buy.
+    */
+    customerRail: true,
+    customerFlags: {
+      digest: { parked: false, enforcement: "gate", scope: "reading", requires: "notes" },
+    },
     seats: { counts: ["owner"] },
   },
   governance: {
@@ -124,7 +193,7 @@ export const hello = defineApp({
     lifecycle and the activity log. What belongs here is what a collection could
     not imply, and `hello` has none of that.
   */
-  operations: [],
+  operations: [digest],
   /*
     ⚠️ EMPTY, HONESTLY. Every failure this app can produce is one the platform
     raises on its behalf — a refused shape, a stale version, a missing row. An

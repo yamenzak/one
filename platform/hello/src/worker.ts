@@ -7,9 +7,9 @@
  * a caller is, and what the app's own tables hold.
  */
 
-import { deriveSchema, gateFor, type Actor, type Caller, type Resolved, type Session } from "@one/kernel";
+import { deriveSchema, type Actor, type Resolved, type Session } from "@one/kernel";
 import {
-  ACTIVITY_SCHEMA, applySchema, createRuntime, DIRECTORY_SCHEMA,
+  ACTIVITY_SCHEMA, applySchema, COMMERCE_SCHEMA, createRuntime, DIRECTORY_SCHEMA,
   DOMAIN_SCHEMA, IDENTITY_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA, SESSION_SCHEMA, type RawEnv,
 } from "@one/runtime";
 import { hello, notes, receipts } from "./manifest.js";
@@ -31,7 +31,7 @@ if (derived.problems.length) throw new Error(`hello: ${derived.problems.map((p) 
   exist yet, swallowed, leaving a column that silently never appeared.
 */
 const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA];
-export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, derived.module];
+export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, derived.module];
 
 
 /* -------------------------------------------------------------- identity --- */
@@ -45,25 +45,32 @@ export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA,
  *
  * A real app reads a membership row here. `hello` grants the owner role to
  * whoever is signed in, because it has no roster.
+ *
+ * ⚠️ NOTE WHAT IT NO LONGER RETURNS: entitlements, and a gate. What a workspace
+ * bought and where it stands are resolved by the platform from the subscription
+ * row, so an app cannot answer them generously by accident — which is what the
+ * previous version of this function did, handing back every declared key
+ * unconditionally.
  */
-async function resolveCaller(session: Session | null, at: Resolved): Promise<{ actor: Actor; caller: Caller }> {
-  const permissions = new Set<string>(session ? hello.access.roles.owner : []);
+async function resolveCaller(session: Session | null, at: Resolved): Promise<{
+  actor: Actor;
+  permissions: ReadonlySet<string>;
+  subjectId: string | undefined;
+}> {
   return {
+    /*
+      ⚠️ WHO THE CALLER IS ON THE CUSTOMER RAIL IS THE APP'S ANSWER. In `hello`
+      the signed-in person IS the customer, because it has no roster; a product
+      with one names the record they are acting as. The platform resolves what
+      that customer may do — the app only says who they are.
+    */
+    subjectId: session?.accountId ?? undefined,
     actor: {
       userId: session?.accountId ?? null,
       tenantId: at.tenant?.tenantId ?? null,
       kind: session ? "user" : "system",
     },
-    caller: {
-      permissions,
-      entitlements: new Set(Object.keys(hello.access.entitlements)),
-      /*
-        ⚠️ THE GATE COMES FROM THE TENANT'S STANDING, NEVER FROM THE CALLER. A
-        session cannot carry its own permission to write to a suspended
-        workspace, because the gate is not read from anything the caller sends.
-      */
-      gate: gateFor(at.tenant?.standing ?? { standing: "active", reason: "ok" }),
-    },
+    permissions: new Set<string>(session ? hello.access.roles.owner : []),
   };
 }
 
