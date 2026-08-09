@@ -14,6 +14,8 @@ kind: index
   <sub>kernel/src/app.ts:118</sub>
 - `one-004` — turn `regionalBindings` into a real resolver over  
   <sub>kernel/src/resolve.ts:134</sub>
+- `one-005` — the WebAuthn ceremony itself: attestation parsing,  
+  <sub>kernel/src/identity.ts:129</sub>
 
 ## Stage 2 — Surface — operations to routes, tools, webhooks, OpenAPI
 

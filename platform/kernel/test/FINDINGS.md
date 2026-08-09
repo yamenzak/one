@@ -183,6 +183,46 @@ A custom domain is excluded from both. WebAuthn requires the first — there is 
 suffix relationship to our root — and whitelabel requires the second, because a
 tenant's client bounced to a domain they do not recognise reads as phishing.
 
+## 12. The relying party had to live on the CREDENTIAL, not in config
+
+The obvious shape is one `relyingParty` constant per app. It makes raising the
+scope to the platform root a flag day: every existing passkey is bound to the old
+value, so the switch either invalidates them or requires a dual-read hack.
+
+Storing it per credential makes the same change additive. An existing credential
+keeps resolving exactly where it always did, new ones are created at the root and
+work everywhere, and the only thing a person ever sees is a one-time offer to add
+one. Nobody is locked out and nobody re-registers under duress.
+
+⚠️ `offerableAt` must test a DOMAIN BOUNDARY, not a string suffix.
+`evil4dl.app` ends with `4dl.app` and is a different registrable domain;
+offering a credential there is a takeover. Asserted, and mutation-tested by
+replacing the check with a naive `endsWith`.
+
+## 13. `validateSession` must never be allowed to take an `Account`
+
+The snapshot is what makes one global identity store affordable: everything the
+hot path needs is in the session row, so validation never crosses a region.
+
+That property survives only as long as the function cannot reach the account —
+the moment its signature admits one, somebody will use it for something
+reasonable and the cross-region read is back on every request in the platform.
+It takes an optional `profileVersion` instead, which answers the staleness
+question without opening the door.
+
+⚠️ Staleness is advisory, not fatal. A behind-the-times snapshot is a VALID
+session; signing somebody out because they changed their avatar would be absurd.
+
+## 14. A role is a back door around a permission unless it is bounded too
+
+`canGrant` alone is not enough. Anybody able to assign roles escalates in one
+step — assign yourself the role carrying the permission you were just refused.
+`canAssignRole` closes it by requiring the granter to hold every permission the
+role carries.
+
+Invisible without the check: no error, no log, and nobody notices until somebody
+has been an owner for a month. Mutation-tested.
+
 ## What stage 1 still owes
 
 `DEFER` markers carry these; they are not prose here. Identity and Better Auth,
