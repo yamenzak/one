@@ -148,39 +148,82 @@ with three things that are not optional:
 
 §7 has the mechanics.
 
-### 2.4 One 4DL account, with SSO
+### 2.4 One 4DL account — one credential, separate sessions, no IdP
 
 One person, one identity, memberships in many tenants across many products.
 
-⚠️ **Two findings from the current code change how this must be built.**
+⚠️ **"SSO" is three separable things, and you want two of them.** Conflating
+them is what makes this look like a large project; separated, most of it is a
+configuration change.
 
-**Passkeys are per-app today, and the fix is graceful.** `rpIdFor` returns
-`shape.root`, which is `kova.4dl.app` / `tessa.4dl.app` / `scena.4dl.app` — so
-a passkey registered on Kova is, by WebAuthn's rules, unusable on Tessa. But a
-credential whose RP ID is `4dl.app` **is** usable from every subdomain of it. So
-the migration is additive, not destructive: existing credentials keep working on
-their own product, new registrations bind to the root, and a person is prompted
-once to add a root passkey. Nobody is locked out, and nothing has to be
-re-registered under duress. This requires per-credential RP ID at verification
-time — a detail, but one that must be designed in rather than discovered.
+| | Build it | What it buys |
+|---|---|---|
+| **Single account** — one `user` record, shared | **yes** | the data & subscription centre, one avatar, one export, one erasure, cross-sell |
+| **Single credential** — passkey RP = `4dl.app` | **yes** | first sign-in to a second product is one biometric tap, on that product's own branded screen |
+| **Single session** — one cookie across products | **no** | nothing needed, in exchange for an XSS in signage reaching a health record |
 
-**Do NOT get SSO by widening the session cookie.** `cookieDomainFor` widens to
-`.<root>` today and its own comment states the trade-off being accepted: a
-widened cookie reaches every studio subdomain, so an XSS on any one of them acts
-as that user in all of their studios. That is a considered risk across *one*
-product's tenants. Widening to `.4dl.app` extends it across *every product* —
-an XSS in a signage dashboard becomes an XSS in a personal-training record and a
-sterile-supply log. The blast radius stops being proportionate.
+#### Why there is no `id.4dl.app`, and no redirect to hide
 
-**The design instead:** a dedicated identity origin (`id.4dl.app`) owns
-credentials and issues short-lived, audience-scoped tokens that each product
-exchanges for its own host-scoped session. One passkey, one sign-in, N sessions
-that cannot be replayed at each other. It is more work than a cookie attribute
-and it is the difference between SSO and a shared-blast-radius accident.
+Google runs `accounts.google.com` because its properties sit on **different
+registrable domains** — `google.com`, `youtube.com`, `android.com`. Neither
+cookies nor WebAuthn can span those, so a central origin and a redirect dance is
+the only option available; "headless" is Google concealing machinery it cannot
+avoid.
 
-**GDPR gets better, not worse.** One identity means one erasure request, one
-export, one place a person manages what they have. That is the Google-style data
-centre you described, and it is only buildable on unified identity.
+Every 4DL app is a subdomain of **one** registrable domain. `rpIdFor`'s own
+comment states the consequence: *"the RP ID may be any registrable-domain suffix
+of the origin — and it is the whole reason cross-tenant identity works here at
+all."* Raising the RP from `<app>.4dl.app` to `4dl.app` extends that sentence
+from cross-tenant to cross-product, and the ceremony still runs **on the app's
+own origin**. No redirect, no brand mismatch, nothing to conceal. This design is
+more headless than the one it is imitating, because there is no step to hide.
+
+⚠️ **The trade being made knowingly.** `rpIdFor` documents, as a load-bearing
+property, that today's scoping *"does not leak sideways: `kova.4dl.app` is not a
+suffix of `otherapp.4dl.app`, so an unrelated app sharing the `4dl.app` zone
+cannot assert this RP ID and cannot be offered these credentials."* Raising the
+RP reverses that deliberately. It is defensible because all four relying parties
+are ours and one worker serves each — but it must be a decision recorded here,
+not a side effect of an edit, and it means **anything third-party must never be
+hosted under `4dl.app`.**
+
+#### The migration is additive
+
+A credential bound to `<app>.4dl.app` keeps working on that app. New
+registrations bind to `4dl.app` and work everywhere. Nobody is locked out, and
+nobody is forced to re-register under duress. This requires per-credential RP ID
+at verification time — a detail, but one to design in rather than discover.
+
+#### Where identity lives, and why it stays cheap
+
+A **shared identity D1, bound with the same id into every worker** — precisely
+the pattern `PLATFORM_CONFIG` KV already proves in this repo. It holds `user`,
+`passkey`, `account`, `verification` and the global tenant directory. It does
+**not** hold sessions or memberships: those are about one product's tenants and
+stay in that product's own regional database.
+
+⚠️ **The property that makes a single global store viable: identity is read at
+SIGN-IN; sessions are read on EVERY request.** Each app's session row carries a
+denormalised snapshot of the user (id, email, name, avatar), so per-request
+validation never leaves the region. The shared store is authoritative and
+low-traffic; a profile change propagates on next sign-in or via a version stamp.
+Get this backwards and you have put a cross-region round trip on the hot path of
+every request in the platform.
+
+#### Custom domains are excluded, and that is correct
+
+`coaching.byshujaa.com` has no suffix relationship with our root, so it gets a
+host-scoped RP and its own session. That is a WebAuthn invariant rather than a
+choice — and it is also exactly what whitelabel demands: a studio's client is
+never bounced to a domain they do not recognise, which would read as phishing.
+Kova's B2C clients live on studio subdomains and custom domains and never see
+"4DL" at all.
+
+#### GDPR gets better
+
+One identity means one erasure request, one export, one place a person manages
+what they have. That is the Google-style data centre from your list, and it is
+only buildable on a single account record.
 
 ---
 
@@ -386,7 +429,7 @@ Your list, answered. Where a row says **new**, no app has it today.
 
 | Subsystem | Design | Source today |
 |---|---|---|
-| **Identity + SSO** | `id.4dl.app` owns credentials; audience-scoped tokens; per-product host sessions. Passkeys migrate additively (§2.4). One avatar, one profile. | `@4dl/auth`, per-app RP |
+| **Identity** | Shared identity D1 bound into every worker; passkey RP raised to `4dl.app`; sessions stay per-app and per-region. No IdP, no redirect (§2.4). | `@4dl/auth`, per-app RP |
 | **Tenancy + doors** | Five doors kept — they are correct. Region added as a tenant property resolved at the host gate. | `@4dl/tenancy` |
 | **Regions (EU/global)** | §4.1 — the hardest item on the list | **new** |
 | **Standing + dunning** | One ladder, one set of rungs, per-app copy in the manifest. Reads never gated at any rung; leaving always allowed. | `@4dl/billing` + `@4dl/tenancy` |
@@ -410,33 +453,89 @@ Your list, answered. Where a row says **new**, no app has it today.
 | **Maintenance** | Deployment-wide read-only / full, plus per-tenant standing. Already right. | `@4dl/tenancy` |
 | **Datetime + units** | Store UTC and metric, convert at display from the person's preference, browser-derived default. | `@kova/domain` units |
 
-### 4.1 Regions — design it now, build it later
+### 4.1 Regions — the one thing that must be right from the first table
 
-⚠️ **This is the one item on the list that cannot be retrofitted cheaply**,
-because it constrains every binding, every schema and the tenant lookup.
+⚠️ **This is the only item on the list that cannot be retrofitted cheaply.**
+Everything else is a feature you can add late. Residency constrains every
+binding, every schema, the tenant lookup and the identity store — retrofitting
+it means touching all ~122 tables and every data access in the platform, at a
+point where there is production traffic on it.
 
-- **A tenant lives in exactly one region.** Region is resolved at the host gate,
-  before anything regional is touched.
-- **The tenant directory is global** and holds only routing data: slug → tenant
-  id → region → standing. Nothing personal, so it can live anywhere.
-- **Bindings are region-tuples**, not singletons. One worker script (Workers run
-  everywhere); D1 with location hints, R2 with `eu` jurisdiction, DOs with
-  `jurisdiction: "eu"`. The manifest declares one logical binding; the framework
-  resolves the regional instance per request.
-- **Identity: put the identity store in the EU for everyone.** It is the
-  strictest regime, so it is always sufficient; it removes an entire class of
-  "which region is this person in" routing bug; and the cost is one
-  cross-region hop per sign-in, not per request. The alternative — identity
-  region derived from first tenant — needs a global email-hash directory and
-  gets genuinely hard the moment somebody joins tenants in both.
-- **Not solved here:** AI provider residency. Workers AI and Gemini have their
-  own answers and they are contractual, not architectural. Flag it to whoever
-  signs the DPA; do not pretend the framework fixes it.
+The recommendation is not "build two regions". It is: **build the indirection
+now, run one region, and make the second a configuration change.** The
+indirection is perhaps 200 lines. Adding it later is a rewrite.
 
-**Recommendation: design the binding resolution and the tenant directory in
-Stage 1, ship single-region, and turn on the second region when a customer pays
-for it.** The expensive part is the shape, and the shape costs almost nothing
-if it is there from the first table.
+#### The four rules
+
+**1. A tenant lives in exactly one region, and the region is resolved before
+anything regional is touched.** This is the host gate's job and it already has
+the shape — `@4dl/tenancy` resolves host → tenant with a KV cache on every
+request. Region becomes a property of that resolution.
+
+**2. The tenant directory is GLOBAL and holds routing data only** — slug →
+tenant id → region → standing → custom domains. Nothing in it is personal data,
+which is exactly why it can be global; the moment somebody adds an owner's email
+"for convenience" the whole model breaks. Guard it: the directory's schema is
+allow-listed, and a column outside the list fails the build.
+
+**3. Bindings are region-tuples, never singletons.** ⚠️ **This is the rule that
+must exist from the first table.** One worker script (Workers run everywhere);
+D1 with location hints, R2 with jurisdiction `eu`, Durable Objects with
+`jurisdiction: "eu"` — all three are real Cloudflare features today. The manifest
+declares one *logical* binding (`db`, `media`, `inbox`); the framework resolves
+the regional instance per request from the tenant's region.
+
+```ts
+// what an operation sees — never a raw binding, never a region
+async handler(ctx, input) {
+  await ctx.db.insert(clients, { … })   // ctx.db is already the tenant's region
+}
+```
+
+The guard in §6 ("binding chokepoint") is what keeps it true: an app that
+reaches `env.DB` has just written a query that will hit the wrong continent the
+day a second region exists, and nothing else would notice.
+
+**4. Put the identity store in the EU, for everybody.** Three reasons, and the
+third is the one that decides it:
+
+- EU residency is the strictest regime, so it is always *sufficient*. A US or
+  Gulf subject has no legal objection to their record being held in the EU; the
+  reverse is not true.
+- It costs one cross-region hop **per sign-in**, not per request — see §2.4's
+  read/write split, which exists precisely to make this affordable.
+- ⚠️ **A person can belong to an EU tenant and a non-EU tenant at the same
+  time**, and with unified identity that is not hypothetical — it is the normal
+  case for anyone with two customers. One identity store makes that a
+  non-question. Per-region identity makes it an unanswerable one: the record has
+  to be in both places, or the sign-in has to know which region before it knows
+  who you are.
+
+**The escape hatch, if a customer ever contractually demands non-EU identity
+residency:** identity region becomes a property, resolved through a global
+directory of `hash(email) → region`. Build the *lookup indirection* now — one
+function with one implementation — and the second implementation is a day's
+work rather than a redesign.
+
+#### What is NOT solved here
+
+- **AI provider residency.** Workers AI and Gemini have their own answers, and
+  they are contractual rather than architectural. Whoever signs the DPA needs to
+  know which models may see tenant data in which region; the framework can
+  *enforce* a per-region model allow-list, but it cannot create one.
+- **Stripe.** One account, one jurisdiction for the money. Payment data
+  residency is Stripe's problem and the answer is "not ours" — which is exactly
+  why the tenant-to-customer rail was designed to never touch card data.
+- **Email deliverability.** `noreply@4dl.app` is one zone. A regional sender is
+  a DNS decision, not a code one.
+
+#### The cost of getting this wrong, stated plainly
+
+Retrofitted after Kova migrates, this is: every table gains a region dimension
+or is copied; every query is audited for which database it meant; the tenant
+lookup changes shape while serving traffic; and the identity store has to be
+split or moved while people are signed in. Done in Stage 1, it is a resolver, a
+directory table and a lint rule.
 
 ---
 
@@ -562,7 +661,7 @@ second-system effect, which is the largest risk here by a distance.
 | # | Stage | Ends when |
 |---|---|---|
 | 0 | **Contracts** — manifest schema, layer boundaries, naming, the operation and collection types. Throwaway code only. | The four types compile and three people agree on them |
-| 1 | **Kernel** — bindings from manifest, config, schema composition, identity + SSO, tenancy + doors + region resolution, standing. | A generated `hello` app boots, signs in at `id.`, creates a tenant, answers `/health` |
+| 1 | **Kernel** — bindings from manifest, config, schema composition, shared identity + root-scoped passkeys, tenancy + doors, **region resolution and the global tenant directory**, standing. | A generated `hello` app boots, signs in with one passkey usable from a second app's origin, creates a tenant, answers `/health` — and no handler has seen a raw binding |
 | 2 | **Surface** — operations → routes + tools + webhooks + audit + OpenAPI. | An AI agent completes a CRUD round trip through tools, and is refused exactly what the user would be |
 | 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search. | `hello` has a real collection with an activity log and a metered ledger |
 | 4 | **Renderer** — shell, nav, collection views, settings, admin, whitelabel, PWA. | `pnpm shots` photographs `hello` at 4 viewports × 2 themes and it looks like the product |
@@ -589,9 +688,10 @@ new apps are cheap and the old ones keep working.
 3. **The renderer boundary erodes.** One "just this once" at a time until you
    have a component library with extra steps. Mitigation: §3.6's guard, in CI,
    from stage 4 — not added later.
-4. **SSO's blast radius**, if it is built with a widened cookie instead of an
-   identity origin. §2.4.
-5. **Regions retrofitted.** Cheap in stage 1, a schema-wide rewrite in stage 7.
+4. **Identity's blast radius**, if "single account" is ever implemented as a
+   single *session*. The account is shared; the cookie must not be. §2.4.
+5. **Regions retrofitted.** A resolver and a directory table in stage 1; every
+   table, every query and a live identity store in stage 7. §4.1.
 6. **Test time gets worse.** You named this. It is real: `@kova/api` is 632 tests
    each provisioning a world through real OTP sign-ins, ~2.5 minutes whenever
    Kova's API changes. The fix is a seeded-fixture harness with a shared
@@ -613,8 +713,11 @@ Concretely, in order, and none of it is expensive:
    `defineBindings` — as types only, with no implementation, and try to express
    Kova's hardest three routes and Scena's hardest three collections in them. A
    type that cannot express a real case fails cheaply on a Tuesday.
-3. **Decide regions** — design-now/build-later is my recommendation, and it is
-   the only item where deferring the *design* costs real money.
+3. **Write the region indirection before the first table.** Not the second
+   region — the *resolver*: `ctx.db` / `ctx.media` / `ctx.inbox` derived from the
+   tenant's region, a global directory holding routing data only, and the lint
+   rule that fails any handler touching a raw binding. This is the one item where
+   deferring the design costs real money, and it is roughly 200 lines.
 4. **Prototype the operation → tool derivation** against three real Kova routes,
    including one that is entitlement-gated and one that is row-scoped. If tool
    masking is not clean there, the whole §3.4 story needs rethinking before
