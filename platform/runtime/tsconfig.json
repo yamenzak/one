@@ -3,6 +3,8 @@
   "compilerOptions": {
     "rootDir": ".",
     "types": ["vitest/globals"],
+    // WebCrypto and the fetch types the runtime verifies signatures with.
+    "lib": ["ES2023", "DOM"],
     "noEmit": true,
     "declaration": false,
     "declarationMap": false

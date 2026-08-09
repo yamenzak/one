@@ -11,6 +11,8 @@ import { describe, expect, it } from "vitest";
 import type { SchemaModule } from "@one/kernel";
 import { applySchema, SchemaInvalid } from "../src/schema.js";
 import { handleOf, recorder } from "./fake.js";
+import { bindingsFor } from "../src/env.js";
+import { sql, type RegionalBindings } from "@one/kernel";
 
 const mod = (over: Partial<SchemaModule> = {}): SchemaModule => ({
   id: "notes",
@@ -115,5 +117,21 @@ describe("an invalid composition never reaches the database", () => {
   it("refuses DDL that is not re-runnable", async () => {
     const r = recorder();
     await expect(applySchema(handleOf(r), [mod({ ddl: [`CREATE TABLE notes (id TEXT);`] })])).rejects.toThrow(SchemaInvalid);
+  });
+});
+
+/* ------------------------------------------------------------ the contract --- */
+
+describe("the resolver satisfies the contract the kernel declares", () => {
+  /*
+    ⚠️ THE KERNEL DECLARES THE SHAPE AND THE RUNTIME IMPLEMENTS IT, so the two
+    can drift into a resolver that takes a plain region — which is the one
+    constraint that makes "a handler cannot reach the wrong continent" a compile
+    error. Asserting the assignment here is what keeps the halves in step.
+  */
+  it("is assignable to RegionalBindings", () => {
+    const spec = { db: sql() };
+    const resolver: RegionalBindings<typeof spec> = { for: bindingsFor(spec, { DB: {} }, { defaultRegion: "auto" }) };
+    expect(typeof resolver.for).toBe("function");
   });
 });

@@ -12,7 +12,7 @@ import {
   type DoorConfig,
 } from "../src/doors.js";
 import { DIRECTORY_FIELDS, type Directory, type DirectoryEntry } from "../src/directory.js";
-import { resolveRequest, regionalBindings, type ResolveConfig } from "../src/resolve.js";
+import { resolveRequest, type RegionalBindings, type ResolveConfig } from "../src/resolve.js";
 import { gateFor, permits, type StandingState } from "../src/standing.js";
 import { defineBindings, sql, cache } from "../src/bindings.js";
 import type { RegionId, TenantId } from "../src/primitives.js";
@@ -222,11 +222,20 @@ describe("the two rules that never bend", () => {
 describe("bindings come from a resolution", () => {
   const spec = defineBindings({ db: sql(), cache: cache() });
 
-  it("hands a handle per declared store", async () => {
+  /*
+    ⚠️ THE PROOF IS THAT A RESOLUTION IS THE ONLY INPUT A RESOLVER ACCEPTS. The
+    implementation is the runtime's — resolving a binding means touching a raw
+    environment, which is permitted in one file — so what is asserted here is the
+    contract every implementation must satisfy, with a fake standing in for one.
+  */
+  const resolver: RegionalBindings<typeof spec> = {
+    for: () => ({ db: {}, cache: {} }) as never,
+  };
+
+  it("takes a region that came from a lookup, and hands back one handle per store", async () => {
     const r = await resolveRequest("gym.kova.4dl.app", cfg, dir(entry()));
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    const bound = regionalBindings(spec).for(r.at.region);
-    expect(Object.keys(bound).sort()).toEqual(["cache", "db"]);
+    expect(Object.keys(resolver.for(r.at.region)).sort()).toEqual(["cache", "db"]);
   });
 });

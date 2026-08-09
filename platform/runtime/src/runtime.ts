@@ -15,12 +15,17 @@
 
 import type {
   Actor, AnyOperation, AppSpec, BindingSpec, Caller, Ctx, Instant, Problem,
-  ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SqlHandle, TenantId,
+  ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, Session, SqlHandle, TenantId,
 } from "@one/kernel";
-import { ALWAYS_ALLOWED, check, laneOf, PLATFORM_PROBLEMS, resolveRequest, routeFor } from "@one/kernel";
+import {
+  ALWAYS_ALLOWED, check, cookieDomainFor, laneOf, PLATFORM_PROBLEMS, relyingPartyFor,
+  resolveRequest, routeFor, validateSession,
+} from "@one/kernel";
 import { bindingsFor, globalSql, type RawEnv } from "./env.js";
 import { sqlDirectory } from "./directory.js";
 import { DIRECTORY, platformOperations, type DirectoryCarrier } from "./platform-ops.js";
+import { identityOperations, PLATFORM, type PlatformCarrier, type PlatformDeps } from "./identity-ops.js";
+import { identityStore, readCookie, SESSION_COOKIE, sessionStore } from "./identity.js";
 
 /* -------------------------------------------------------------------- ref --- */
 
@@ -52,8 +57,28 @@ export interface RuntimeOptions<B extends BindingSpec> {
    * region is the question the directory answers.
    */
   readonly directoryBinding: string;
-  /** Who is calling, resolved once per request from the session. */
-  resolveCaller(request: Request, at: Resolved): Promise<{ actor: Actor; caller: Caller }>;
+  /**
+   * ⚠️ THE IDENTITY STORE IS GLOBAL AND MAY BE THE SAME PHYSICAL STORE AS THE
+   * DIRECTORY. Naming it separately is what makes splitting them later a config
+   * change rather than a migration — and they will split, because one is read at
+   * sign-in and the other on every request.
+   */
+  readonly identityBinding: string;
+  /** Where a session's regional row lives. Read per request; never global. */
+  readonly sessionsBinding: keyof B & string;
+  readonly sessionDays?: number;
+  /** The platform owns the code; an app owns how it travels. */
+  deliverCode(email: string, code: string): Promise<void>;
+  /**
+   * What this caller may do, given who they are.
+   *
+   * ⚠️ IDENTITY IS NOT AUTHORIZATION. The platform answers "who is this" from a
+   * session; "what may they do here" is a question about a membership in one
+   * tenant of one app, and it stays the app's. Handing the resolved account in
+   * rather than letting an app read the cookie is what keeps the session format
+   * — and its validation — in one place.
+   */
+  resolveCaller(session: Session | null, at: Resolved): Promise<{ actor: Actor; caller: Caller }>;
   /** Applied once per database, before the first request it serves. */
   readonly onBoot?: {
     /** The global store: the directory, and anything else routing needs. */
@@ -84,7 +109,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of platformOperations(app)) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app)]) byPath.set(routeFor(op).path, op);
   for (const op of app.operations as readonly AnyOperation[]) {
     const path = routeFor(op).path;
     /*
@@ -139,7 +164,8 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       }
 
       const directoryDb = globalSql(env, opts.directoryBinding);
-      if (!directoryDb) return problemResponse(UNAVAILABLE, ref);
+      const identityDb = globalSql(env, opts.identityBinding);
+      if (!directoryDb || !identityDb) return problemResponse(UNAVAILABLE, ref);
 
       /*
         ⚠️ BOOT RUNS BEFORE THE DIRECTORY IS READ, because the directory read IS
@@ -174,7 +200,49 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       const op = byPath.get(url.pathname);
       if (!op || routeFor(op).method !== request.method) return problemResponse(NOT_FOUND, ref);
 
-      const { actor, caller } = await opts.resolveCaller(request, at);
+      /*
+        ⚠️ THE SESSION IS VALIDATED AGAINST THE ORIGIN IT ARRIVED ON, always. A
+        cookie can be sent somewhere it was not meant for — a widened domain
+        attribute, a proxy, a future edit — and this check is what makes that
+        inert rather than a cross-product compromise. Braces as well as belt, on
+        the one thing where the belt alone would be a bad trade.
+      */
+      const identity = identityStore(identityDb);
+      const sessions = sessionStore(bind[opts.sessionsBinding] as SqlHandle);
+      const cookieId = readCookie(request.headers.get("cookie"), SESSION_COOKIE);
+      let session: Session | null = null;
+      if (cookieId) {
+        const found = await sessions.read(cookieId);
+        const now = new Date().toISOString() as Instant;
+        if (found) {
+          const verdict = validateSession(found, { origin: url.origin, appId: app.id }, now);
+          if (verdict.ok) session = verdict.session;
+          // An expired row is deleted rather than left to accumulate; a row for
+          // another origin is left alone, because it is somebody else's session.
+          else if (verdict.why === "expired") await sessions.revoke(found.id);
+        }
+      }
+
+      const cookies: string[] = [];
+      const platform: PlatformDeps = {
+        directory: identityDb, identity, sessions,
+        origin: url.origin,
+        /*
+          ⚠️ THE RELYING PARTY IS DERIVED FROM THE HOST, NEVER FROM THE REQUEST
+          BODY. `relyingPartyFor` returns the platform root under our own roots
+          and the hostname itself for a tenant's own domain — which is a WebAuthn
+          invariant rather than a policy, and also exactly what whitelabel wants.
+        */
+        relyingParty: relyingPartyFor(at.host),
+        cookieDomain: cookieDomainFor(at.host),
+        secureCookies: url.protocol === "https:",
+        sessionDays: opts.sessionDays ?? 30,
+        session,
+        setCookie: (value) => cookies.push(value),
+        deliverCode: opts.deliverCode,
+      };
+
+      const { actor, caller } = await opts.resolveCaller(session, at);
 
       /*
         ⚠️ THE GATE RUNS ONCE, FOR EVERY TRANSPORT, FROM HERE. A per-route check
@@ -204,7 +272,8 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         ? Object.fromEntries(url.searchParams)
         : await request.json().catch(() => ({}));
 
-      const ctx: Ctx<B> & DirectoryCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier = {
+        [PLATFORM]: platform,
         /*
           ⚠️ The directory rides on a SYMBOL that `Ctx` does not declare, so a
           platform operation can reach it and an app's cannot — including by
@@ -220,7 +289,10 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
 
       try {
-        return Response.json(await op.handler(ctx as never, input as never));
+        const out = await op.handler(ctx as never, input as never);
+        const res = Response.json(out);
+        for (const c of cookies) res.headers.append("set-cookie", c);
+        return res;
       } catch (e) {
         if (e instanceof DeclaredFailure) {
           const def = problems[e.code];

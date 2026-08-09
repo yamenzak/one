@@ -159,12 +159,25 @@ const PRODUCT_NOUNS = [
 ];
 const NOUN_RE = new RegExp(`\\b(${PRODUCT_NOUNS.join("|")})[a-z]*\\b`, "gi");
 
+/**
+ * ⚠️ A FILE-SCOPED EXEMPTION NAMES ONE NOUN, and it exists because the
+ * alternative is worse. A wire protocol's own field names — `clientDataJSON` —
+ * appear a dozen times in the file that implements it, and a dozen line
+ * exemptions teach everybody that exemptions are routine. One statement, naming
+ * the single word it covers, with a reason: `vocabulary-exempt-file(client):
+ * WebAuthn's own field names`. Any OTHER noun in that file still fails.
+ */
+const fileExemptions = (src) =>
+  new Set([...src.matchAll(/vocabulary-exempt-file\(([a-z]+)\):\s*\S/g)].map((m) => m[1]));
+
 let vocabHits = 0;
 for (const file of srcFiles) {
   const src = read(file);
   const code = stripComments(src);
+  const perFile = fileExemptions(src);
   for (const m of code.matchAll(NOUN_RE)) {
     const line = code.slice(0, m.index).split("\n").length;
+    if (perFile.has(m[1].toLowerCase())) continue;
     if (exempted(src, line, "vocabulary-exempt")) continue;
     vocabHits++;
     fail(`${rel(file)}:${line}: product vocabulary "${m[0]}" in code.\n` +
@@ -235,7 +248,9 @@ ok(`unstated any: ${anyHits} found`);
  * something proved refers to it. What survives is genuinely unreachable — no
  * proof touches it directly, and nothing that a proof touches leads to it.
  */
-const DECL_RE = /^(export\s+)?(?:declare\s+)?(?:abstract\s+)?(type|interface|const|function|class|enum)\s+([A-Za-z_$][\w$]*)/gm;
+/** ⚠️ `async` sits between `export` and `function`, and omitting it makes every
+ *  async export invisible — neither reported nor able to prove what it uses. */
+const DECL_RE = /^(export\s+)?(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(type|interface|const|function|class|enum)\s+([A-Za-z_$][\w$]*)/gm;
 
 /**
  * A declaration runs from its own line to the next top-level one.

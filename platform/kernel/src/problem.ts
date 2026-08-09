@@ -104,6 +104,16 @@ export const PLATFORM_PROBLEMS = declareProblems({
   },
   "platform.forbidden": { status: 403, title: "You don't have access to this", retryable: false },
   "platform.not_found": { status: 404, title: "Not found", retryable: false },
+  /*
+    ⚠️ RETRYABLE, and it carries how long to wait. A 429 with no `retryAfter` is
+    one every client turns into a tight loop, which is the opposite of what a
+    rate limit is for.
+  */
+  "platform.too_many": {
+    status: 429, title: "Too many attempts — try again shortly",
+    detail: (m) => `Try again in ${m.retryAfter} second(s).`,
+    retryable: true,
+  },
   "platform.invalid": { status: 400, title: "That doesn't look right", retryable: false },
   "platform.conflict": {
     status: 409,

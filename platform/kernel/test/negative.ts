@@ -14,7 +14,7 @@
 
 import type { Instant, Money, PlainDate, Id, RegionId } from "../src/primitives.js";
 import { defineBindings, sql } from "../src/bindings.js";
-import { regionalBindings } from "../src/resolve.js";
+import type { RegionalBindings } from "../src/resolve.js";
 import type { DirectoryEntry } from "../src/directory.js";
 import type { CacheStore } from "../src/bindings.js";
 import { collection, field } from "../src/collection.js";
@@ -138,13 +138,14 @@ export const unexplainedHide = operation({
 // In the legacy tree this rule is a lint over source text. Here it is the type
 // system, which is a level better on the ranking and costs a `unique symbol`.
 const someSpec = defineBindings({ db: sql() });
+declare const resolver: RegionalBindings<typeof someSpec>;
 // @ts-expect-error — "eu" is a RegionId, not a ResolvedRegion
-regionalBindings(someSpec).for("eu");
+resolver.for("eu");
 
 // Nor can one be minted by asserting the string type.
 declare const plainRegion: RegionId;
 // @ts-expect-error — RegionId is not assignable to ResolvedRegion
-regionalBindings(someSpec).for(plainRegion);
+resolver.for(plainRegion);
 
 // ⚠️ And the directory may not grow a personal field. It is replicated to every
 // region precisely because nothing in it is governed by residency.

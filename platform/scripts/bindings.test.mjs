@@ -142,6 +142,41 @@ else {
   }
 }
 
+/* ------------------------------------------------------ 4. REACHABILITY --- */
+
+/**
+ * ⚠️ THE FAILURE THIS WHOLE PLATFORM WAS STARTED OVER: a capability that ships,
+ * and an app that does not mount it. Here it should be unrepresentable — every
+ * route comes from the operation registry — so what is left to check is the
+ * schema side: a module an app composes but whose surface nothing serves, and a
+ * module a surface needs that nothing composes.
+ */
+const appDirs = packages.filter((p) => existsSync(join(ROOT, p, "src", "worker.ts")));
+let unreachable = 0;
+for (const appDir of appDirs) {
+  const worker = readFileSync(join(ROOT, appDir, "src", "worker.ts"), "utf8");
+  const composed = new Set([...stripComments(worker).matchAll(/\b([A-Z][A-Z_]*_SCHEMA)\b/g)].map((m) => m[1]));
+
+  /*
+    Every schema the runtime's own operations read from. A module absent here is
+    a table the platform will query and nobody created — which is not a missing
+    feature, it is a 500 on the first request that touches it.
+  */
+  const REQUIRED = {
+    IDENTITY_SCHEMA: "the accounts and credentials every sign-in reads",
+    OTP_SCHEMA: "the sign-in codes the emailed lane writes",
+    SESSION_SCHEMA: "the sessions every authenticated request validates",
+    DIRECTORY_SCHEMA: "the tenant directory every request resolves through",
+  };
+  for (const [mod, why] of Object.entries(REQUIRED)) {
+    if (composed.has(mod)) continue;
+    unreachable++;
+    fail(`${appDir}: mounts the platform runtime and never composes ${mod} — ${why}.\n` +
+         `       A capability declared and unreachable is the failure this platform exists to end.`);
+  }
+}
+ok(`reachable: ${appDirs.length} app(s), ${unreachable} module(s) declared and unreachable`);
+
 /* -------------------------------------------------------------------------- */
 
 if (bad) {

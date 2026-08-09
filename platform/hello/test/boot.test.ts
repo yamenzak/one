@@ -9,17 +9,38 @@
 import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "../src/worker.js";
+import { signIn } from "./session.js";
 import { BindingMissing, bindingsFor, physicalName } from "@one/runtime";
 import type { RegionId, ResolvedRegion } from "@one/kernel";
 import { cache, sql } from "@one/kernel";
 
-const call = (url: string, init?: RequestInit & { as?: string[] }) =>
+/**
+ * ⚠️ `as` IS A SESSION, NOT A HEADER. Authorization is derived from who is
+ * signed in, so a test that asserted a gate while bypassing the session would be
+ * asserting the gate against a caller the product cannot produce.
+ */
+/**
+ * ⚠️ ONE SESSION PER ORIGIN, and that is the design rather than a fixture
+ * problem. An account is shared across products; a session is not, so a helper
+ * that quietly reused one cookie everywhere would be testing a platform we
+ * deliberately did not build.
+ */
+const members = new Map<string, string>();
+const memberAt = async (origin: string): Promise<string> => {
+  const held = members.get(origin);
+  if (held) return held;
+  const cookie = await signIn(`boot@example.test`, origin);
+  members.set(origin, cookie);
+  return cookie;
+};
+
+const call = async (url: string, init?: RequestInit & { as?: "member" }) =>
   worker.fetch(
     new Request(url, {
       ...init,
       headers: {
         "content-type": "application/json",
-        "x-one-permissions": (init?.as ?? []).join(","),
+        ...(init?.as === "member" ? { cookie: await memberAt(new URL(url).origin) } : {}),
         ...(init?.headers ?? {}),
       },
     }),
@@ -29,6 +50,10 @@ const call = (url: string, init?: RequestInit & { as?: string[] }) =>
 const json = async (r: Response) => [r.status, await r.json()] as const;
 
 /* ------------------------------------------------------------------ boot --- */
+
+beforeAll(async () => {
+  await call("https://hello.4dl.app/health");
+});
 
 describe("the app boots", () => {
   /*
@@ -54,14 +79,9 @@ describe("the app boots", () => {
 describe("a workspace is created, and only the platform may create it", () => {
   const setup = "https://setup.hello.4dl.app/api/identity.workspace.create";
 
-  beforeAll(async () => {
-    // The first request composes both schemas. Nothing else primes anything.
-    await call("https://hello.4dl.app/health");
-  });
-
   it("creates one on the setup door", async () => {
     const [status, body] = await json(await call(setup, {
-      method: "POST", as: ["workspace:create"], body: JSON.stringify({ slug: "acme" }),
+      method: "POST", as: "member", body: JSON.stringify({ slug: "acme" }),
     }));
     expect(status).toBe(200);
     expect(body).toMatchObject({ slug: "acme", region: "auto" });
@@ -70,7 +90,7 @@ describe("a workspace is created, and only the platform may create it", () => {
 
   it("refuses a second workspace at the same address", async () => {
     const [status, body] = await json(await call(setup, {
-      method: "POST", as: ["workspace:create"], body: JSON.stringify({ slug: "acme" }),
+      method: "POST", as: "member", body: JSON.stringify({ slug: "acme" }),
     }));
     expect(status).toBe(409);
     expect(body).toMatchObject({ code: "platform.conflict" });
@@ -84,7 +104,7 @@ describe("a workspace is created, and only the platform may create it", () => {
   it("refuses a reserved address", async () => {
     for (const slug of ["admin", "setup", "_acme-challenge", "hello"]) {
       const [status] = await json(await call(setup, {
-        method: "POST", as: ["workspace:create"], body: JSON.stringify({ slug }),
+        method: "POST", as: "member", body: JSON.stringify({ slug }),
       }));
       expect(status, slug).toBe(400);
     }
@@ -97,12 +117,17 @@ describe("a workspace is created, and only the platform may create it", () => {
   */
   it("refuses a region the deployment does not have", async () => {
     const [status] = await json(await call(setup, {
-      method: "POST", as: ["workspace:create"], body: JSON.stringify({ slug: "elsewhere", region: "mars" }),
+      method: "POST", as: "member", body: JSON.stringify({ slug: "elsewhere", region: "mars" }),
     }));
     expect(status).toBe(400);
   });
 
-  it("refuses a caller without the permission", async () => {
+  /*
+    ⚠️ AN ALWAYS-ALLOWED LANE OPENS THE STANDING GATE AND NOTHING ELSE. Standing
+    is a fact about a workspace; permission is a fact about a caller, and no rung
+    of the billing ladder has anything to say about the second.
+  */
+  it("refuses a caller with no session at all", async () => {
     const [status] = await json(await call(setup, { method: "POST", body: JSON.stringify({ slug: "nope" }) }));
     expect(status).toBe(403);
   });
@@ -115,7 +140,7 @@ describe("a workspace is created, and only the platform may create it", () => {
   it("serves workspace creation from the platform, not from the manifest", async () => {
     const { hello } = await import("../src/manifest.js");
     expect(hello.operations.map((o) => o.id)).not.toContain("identity.workspace.create");
-    expect((await call(setup, { method: "POST", as: ["workspace:create"], body: JSON.stringify({ slug: "second" }) })).status).toBe(200);
+    expect((await call(setup, { method: "POST", as: "member", body: JSON.stringify({ slug: "second" }) })).status).toBe(200);
   });
 });
 
@@ -124,12 +149,12 @@ describe("a workspace is created, and only the platform may create it", () => {
 describe("a request resolves to a tenant and its region", () => {
   beforeAll(async () => {
     await call("https://setup.hello.4dl.app/api/identity.workspace.create", {
-      method: "POST", as: ["workspace:create"], body: JSON.stringify({ slug: "north", region: "eu" }),
+      method: "POST", as: "member", body: JSON.stringify({ slug: "north", region: "eu" }),
     });
   });
 
   it("serves a workspace at its own address", async () => {
-    const [status, body] = await json(await call("https://north.hello.4dl.app/api/notes.list", { as: ["note:read"] }));
+    const [status, body] = await json(await call("https://north.hello.4dl.app/api/notes.list", { as: "member" }));
     expect(status).toBe(200);
     expect(body).toEqual({ notes: [] });
   });
@@ -143,24 +168,24 @@ describe("a request resolves to a tenant and its region", () => {
   */
   it("writes to the region the tenant lives in, and nowhere else", async () => {
     const write = await call("https://north.hello.4dl.app/api/notes.create", {
-      method: "POST", as: ["note:write"], body: JSON.stringify({ title: "in the EU" }),
+      method: "POST", as: "member", body: JSON.stringify({ title: "in the EU" }),
     });
     expect(write.status).toBe(200);
 
-    const [, mine] = await json(await call("https://north.hello.4dl.app/api/notes.list", { as: ["note:read"] }));
+    const [, mine] = await json(await call("https://north.hello.4dl.app/api/notes.list", { as: "member" }));
     expect((mine as { notes: unknown[] }).notes).toHaveLength(1);
 
-    const [, theirs] = await json(await call("https://acme.hello.4dl.app/api/notes.list", { as: ["note:read"] }));
+    const [, theirs] = await json(await call("https://acme.hello.4dl.app/api/notes.list", { as: "member" }));
     expect((theirs as { notes: unknown[] }).notes).toHaveLength(0);
   });
 
   it("404s a workspace that does not exist", async () => {
-    expect((await call("https://nobody.hello.4dl.app/api/notes.list", { as: ["note:read"] })).status).toBe(404);
+    expect((await call("https://nobody.hello.4dl.app/api/notes.list", { as: "member" })).status).toBe(404);
   });
 
   it("reports a declared failure as a Problem, with a reference", async () => {
     const [status, body] = await json(await call("https://north.hello.4dl.app/api/notes.create", {
-      method: "POST", as: ["note:write"], body: JSON.stringify({ title: "" }),
+      method: "POST", as: "member", body: JSON.stringify({ title: "" }),
     }));
     expect(status).toBe(400);
     expect(body).toMatchObject({ code: "notes.title_required", title: "A note needs a title" });

@@ -863,13 +863,17 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `kernel-no-escape` | an escape hatch on a manifest type — a passthrough, a raw blob, an unchecked extension point | **live** |
 | `kernel-unproved-export` | an exported symbol no proof or test exercises | **live** |
 | `kernel-unstated-any` | an `any` with no stated reason beside it | **live** |
+| `capability-reachable` | a module applied with no surface mounted to reach it | **live** |
 | `binding-chokepoint` | any runtime binding touched outside its owner — a query that will hit the wrong continent the day a second region exists | **live** |
 | `kv-key-space` | a KV write outside the allow-listed key space — the one store that cannot be regionalised may never hold anything personal | **live** |
 | `directory-columns` | a column on the global tenant directory outside the routing-data allow-list | **live** |
 | `schema-idempotent` | a schema module that is not re-runnable, a duplicate table across modules, or a module ordered before something it declares it needs | **live** |
 | `boot-per-region` | a deployment that composes one region's schema and serves another — the tenant resolves, reaches the right database, and finds nothing in it | **live** |
 | `standing-not-permission` | an always-allowed lane that skips the permission check with the standing gate | **live** |
-| `capability-reachable` | a module applied with no surface mounted to reach it | stage 1 |
+| `session-per-origin` | a session accepted at an origin it was not issued for — an account is shared across products and a bearer token is not | **live** |
+| `passkey-needs-session` | a credential registered with no session behind it, which turns the strongest factor into the cheapest account takeover | **live** |
+| `ceremony-refusals` | an assertion accepted for the wrong origin, the wrong relying party, a replayed challenge, a stalled counter or the wrong ceremony type | **live** |
+| `no-membership-oracle` | a sign-in endpoint that answers differently for an address with an account — type an address, learn whether that person uses the product | **live** |
 | `operation-registry` | a route, tool or webhook that did not come from `operation()` | stage 2 |
 | `tool-subset-route` | an AI tool reachable where the equivalent route is not | stage 2 |
 | `problem-envelope` | a failure body that is not a `Problem`, a code with no copy, or a `catch` that re-throws or serialises a provider's error | stage 2 |
@@ -970,7 +974,7 @@ second-system effect, which is the largest risk here by a distance.
 | # | Stage | Ends when |
 |---|---|---|
 | 0 | **Contracts** — manifest schema, layer boundaries, naming, the operation and collection types. Types only. | ✅ built in `platform/kernel` — the four types compile, six real surfaces from two shipping products are expressed in them, and eight mistakes are rejected by the compiler. [FINDINGS.md](../kernel/test/FINDINGS.md) is what did not fit. Open: review |
-| 1 | **Kernel** — bindings from manifest, config, schema composition, shared identity + root-scoped passkeys, tenancy + doors, **region resolution and the global tenant directory**, standing. | A generated `hello` app boots, signs in with one passkey usable from a second app's origin, creates a tenant, answers `/health` — and no handler has seen a raw binding. **Done except identity:** `platform/hello` boots through `platform/runtime` on the real host topology, composes its schema per region, creates a workspace and serves it. The passkey ceremony is the remainder |
+| 1 | **Kernel** — bindings from manifest, config, schema composition, shared identity + root-scoped passkeys, tenancy + doors, **region resolution and the global tenant directory**, standing. | A generated `hello` app boots, signs in with one passkey usable from a second app's origin, creates a tenant, answers `/health` — and no handler has seen a raw binding. ✅ `platform/hello` boots through `platform/runtime` on the real host topology, composes its schema per region, creates a workspace, signs a person in with an emailed code, registers a passkey at the ROOT relying party and signs in with it from a second origin. Open: review |
 | 2 | **Surface** — operations → routes + tools + webhooks + audit + OpenAPI. | An AI agent completes a CRUD round trip through tools, and is refused exactly what the user would be |
 | 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search, **and tenant relocation (§4.2) with the `Relocatable` DO contract**. | `hello` has a real collection with an activity log and a metered ledger — and a tenant can be copied to a second region and back, verified, with the source still bootable |
 | 4 | **Renderer** — shell, nav, collection views, settings, admin, whitelabel, PWA. The language is [UI.md](UI.md). | `pnpm shots` photographs `hello` at 4 viewports × 2 themes and it looks like the product — and the state matrix, the contrast sweep over every legal brand and the boundary guard all pass |

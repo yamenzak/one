@@ -514,3 +514,57 @@ re-exporting everything would make everything reachable and the check vacuous.
 Neither refinement weakens it: only exports are reported, and an entry's root is
 its imports and default export rather than its declarations, so an unused export
 in an entry file is still found.
+
+## 37. `permission: "public"` was not satisfiable, and the fix is a declaration
+
+Signing in must work with no session, so the identity operations declared
+`permission: "public"` — a string no caller could ever hold, so every one of them
+answered 403 and the whole lane was unreachable.
+
+The fix is not an optional `permission` field where omitting it means public.
+That makes the most dangerous state in the system the one you get by forgetting
+to type something. `PUBLIC` is a declared constant the gate knows: an operation
+with no permission does not compile, and a public one says the word.
+
+## 38. A cookie a browser drops is a sign-in that reports success
+
+`cookieDomainFor` widened to the app root from any host under our own roots,
+including the PLATFORM root — which sits above the app root. A host may only set
+a `Domain` that is a suffix of itself, so that `Set-Cookie` is discarded without
+a word: the request answers 200, no session exists, and the person trying to sign
+in cannot tell it apart from a wrong code.
+
+The general shape: **a header the browser silently ignores is worse than one it
+rejects**, because there is no failure anywhere to attach a message to.
+
+## 39. Registration must require a session, and that ordering is the design
+
+The passkey lane looks like the strong one and the emailed code looks like the
+weak one, which makes it tempting to build passkeys first. Done that way, anybody
+who can type an address attaches a credential to it — and the strongest factor in
+the product becomes the cheapest way to take an account over.
+
+So the code lane is what proves an address, it is the only lane that may run with
+no session behind it, and it is therefore the only one that needs a rate limit.
+Passkey registration requires a session, always.
+
+## 40. Delete-then-judge, not read-then-check-then-delete
+
+A challenge read, validated and then deleted leaves a window where two requests
+both see the same unused row — which is exactly the replay a challenge exists to
+prevent, arrived at by being careful in the wrong order. `DELETE … RETURNING`
+makes the delete the CLAIM and its result the verdict.
+
+Mutation-tested by turning it back into a `SELECT`: the replay test fails.
+
+## 41. Two more guard bugs, and both hid whole categories
+
+`export async function` was invisible to the reachability graph — neither
+reported nor able to prove what it referenced — so an entire file's exports read
+as dead while the async functions that used them were never checked at all.
+
+And the vocabulary check's case-insensitive flag made `[a-z]*` match uppercase,
+so `clientDataJSON` matched the noun `client`. The narrow fix was a file-scoped
+exemption naming ONE noun with a reason: a wire protocol's field names appear a
+dozen times in the file implementing it, and a dozen line exemptions teach
+everybody that exemptions are routine.

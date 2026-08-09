@@ -132,7 +132,12 @@ export const hello = defineApp({
   },
   access: {
     permissions: ["note:read", "note:write", "workspace:create"],
-    roles: { owner: ["note:read", "note:write"], reader: ["note:read"] },
+    /*
+      Anybody signed in may open a workspace — this is a self-serve product, and
+      `workspace:create` is checked on a door that has no tenant to be a member
+      of, so a role is the only place it could come from.
+    */
+    roles: { owner: ["note:read", "note:write", "workspace:create"], reader: ["note:read"] },
     entitlements: { notes: true },
     customerRail: false,
     seats: { counts: ["owner"] },

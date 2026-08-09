@@ -125,9 +125,3 @@ export function shouldOfferRootCredential(all: readonly Credential[], rpId: stri
   return all.length > 0 && usable.every((c) => c.relyingParty !== platformRoot);
 }
 
-/*
-  DEFER(one-005) stage:1 — the WebAuthn ceremony itself: attestation parsing,
-  challenge storage and counter verification. `offerableAt` decides WHICH
-  credentials a door may prompt for, which is the part with a migration attached;
-  the ceremony is a library binding. See test/FINDINGS.md §12.
-*/

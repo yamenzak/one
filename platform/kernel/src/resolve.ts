@@ -100,38 +100,19 @@ export async function resolveRequest(hostname: string, cfg: ResolveConfig, direc
 /* --------------------------------------------------------------- bindings --- */
 
 /**
- * Turns a declaration into handles, for one region.
+ * The shape a binding resolver must have.
  *
- * ⚠️ IT TAKES A `ResolvedRegion`, WHICH ONLY `resolveRegion` CAN PRODUCE.
+ * ⚠️ IT TAKES A `ResolvedRegion`, WHICH ONLY `resolveRegion` CAN MINT, and that
+ * single constraint is what makes "no handler ever sees a raw binding" a compile
+ * error rather than a code-review habit. A handler cannot guess a region,
+ * default to one, or read one from a header: it can only be handed the one its
+ * request resolved to.
  *
- * That single constraint is what makes "no handler ever sees a raw binding" a
- * compile error rather than a code-review habit. A handler cannot guess a
- * region, default to one, or read one from a header: it can only be handed the
- * one its request resolved to. In the legacy tree this rule is a lint over
- * source text; here it is the type system.
+ * The IMPLEMENTATION lives in the runtime, because resolving a binding means
+ * touching a raw environment and that is permitted in exactly one file. The type
+ * stays here so the constraint is part of the contract rather than a property of
+ * whoever happened to write the resolver.
  */
 export interface RegionalBindings<B extends BindingSpec> {
   for(region: ResolvedRegion): ResolvedBindings<B>;
 }
-
-/**
- * Stage 1 wiring is a stub, and deliberately so: the SHAPE is what stage 0's
- * findings said to prove first. What matters here is the signature — a region
- * that came from a lookup goes in, opaque handles come out, and nothing in
- * between is reachable from an app.
- */
-export function regionalBindings<B extends BindingSpec>(spec: B): RegionalBindings<B> {
-  return {
-    for(_region: ResolvedRegion): ResolvedBindings<B> {
-      const out: Record<string, unknown> = {};
-      for (const key of Object.keys(spec)) out[key] = {};
-      return out as ResolvedBindings<B>;
-    },
-  };
-}
-
-/*
-  DEFER(one-004) stage:1 — turn `regionalBindings` into a real resolver over
-  Cloudflare's per-region D1, R2 and durable-object namespaces. The SHAPE is
-  proved and mutation-tested; the wiring is not written. See test/FINDINGS.md §8.
-*/

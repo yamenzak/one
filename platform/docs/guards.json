@@ -129,7 +129,9 @@
       "group": "platform",
       "fails": "a module applied with no surface mounted to reach it",
       "stage": "1",
-      "status": "owed"
+      "status": "live",
+      "impl": "scripts/bindings.test.mjs",
+      "proves": "declared and unreachable"
     },
     {
       "id": "binding-chokepoint",
@@ -379,7 +381,43 @@
       "stage": "1",
       "status": "live",
       "impl": "hello/test/boot.test.ts",
-      "proves": "refuses a caller without the permission"
+      "proves": "refuses a caller with no session at all"
+    },
+    {
+      "id": "session-per-origin",
+      "group": "platform",
+      "fails": "a session accepted at an origin it was not issued for \u2014 an account is shared across products and a bearer token is not",
+      "stage": "1",
+      "status": "live",
+      "impl": "hello/test/identity.test.ts",
+      "proves": "refused at an origin it was not issued for"
+    },
+    {
+      "id": "passkey-needs-session",
+      "group": "platform",
+      "fails": "a credential registered with no session behind it, which turns the strongest factor into the cheapest account takeover",
+      "stage": "1",
+      "status": "live",
+      "impl": "hello/test/identity.test.ts",
+      "proves": "refuses to register a passkey with no session"
+    },
+    {
+      "id": "ceremony-refusals",
+      "group": "platform",
+      "fails": "an assertion accepted for the wrong origin, the wrong relying party, a replayed challenge, a stalled counter or the wrong ceremony type",
+      "stage": "1",
+      "status": "live",
+      "impl": "hello/test/identity.test.ts",
+      "proves": "refuses an assertion signed for another origin"
+    },
+    {
+      "id": "no-membership-oracle",
+      "group": "platform",
+      "fails": "a sign-in endpoint that answers differently for an address with an account \u2014 type an address, learn whether that person uses the product",
+      "stage": "1",
+      "status": "live",
+      "impl": "hello/test/identity.test.ts",
+      "proves": "answers a stranger exactly as it answers a member"
     }
   ]
 }
