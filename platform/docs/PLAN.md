@@ -14,6 +14,12 @@ kind: plan
 > the first table and what is safe to add later. It is the specification stage 0
 > implements.
 >
+> **[UI.md](UI.md) is the interface language** — Northlight: what a tenant may
+> theme and why the list is closed, how furniture is lit by its ground rather
+> than painted, semantics on branded surfaces, the state matrix, one
+> choreographer, the overlay ladder and live surfaces. It is what §3.6's
+> renderer column actually contains.
+>
 > **[STANDARDS.md](STANDARDS.md) is how we write while building it** — the
 > invariant-not-the-incident rule, deferral markers, help, release notes and the
 > per-app test budget. Read it before the first commit; it governs `platform/**`
@@ -440,6 +446,7 @@ a framework starts enforcing limitations you have to hack around.
 ### 3.6 The renderer boundary, and the guard that holds it
 
 **The renderer owns the chrome. The app owns the canvas.**
+[UI.md](UI.md) is what the left column is made of.
 
 | Renderer (manifest-driven) | App (React) |
 |---|---|
@@ -933,7 +940,7 @@ second-system effect, which is the largest risk here by a distance.
 | 1 | **Kernel** — bindings from manifest, config, schema composition, shared identity + root-scoped passkeys, tenancy + doors, **region resolution and the global tenant directory**, standing. | A generated `hello` app boots, signs in with one passkey usable from a second app's origin, creates a tenant, answers `/health` — and no handler has seen a raw binding |
 | 2 | **Surface** — operations → routes + tools + webhooks + audit + OpenAPI. | An AI agent completes a CRUD round trip through tools, and is refused exactly what the user would be |
 | 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search, **and tenant relocation (§4.2) with the `Relocatable` DO contract**. | `hello` has a real collection with an activity log and a metered ledger — and a tenant can be copied to a second region and back, verified, with the source still bootable |
-| 4 | **Renderer** — shell, nav, collection views, settings, admin, whitelabel, PWA. | `pnpm shots` photographs `hello` at 4 viewports × 2 themes and it looks like the product |
+| 4 | **Renderer** — shell, nav, collection views, settings, admin, whitelabel, PWA. The language is [UI.md](UI.md). | `pnpm shots` photographs `hello` at 4 viewports × 2 themes and it looks like the product — and the state matrix, the contrast sweep over every legal brand and the boundary guard all pass |
 | 5 | **Commerce** — plans, entitlements, flags, Stripe on one webhook, B2C packages, metering, parking state. | `hello` sells a plan and a package end to end in Stripe test mode |
 | 6 | **Ops** — notifications incl. web push, help centre, versioning + changelog, data & subscription centre, maintenance, provisioning, CI. | A new app is `one new` + a manifest + a deploy, with nothing hand-wired |
 | 7 | **Kova** — §7. The long one. | Production tenants are served by `platform/kova` and `apps/api` is unrouted |

@@ -1,0 +1,600 @@
+---
+kind: contract
+verified: 2026-08-09
+---
+
+# Northlight — the interface language
+
+> The design system every ONE app renders through. [PLAN.md](PLAN.md) §3.6 draws
+> the line between what the renderer owns and what an app owns; this is what the
+> renderer owns, and why it is shaped this way.
+>
+> ⚠️ **§1 is the section everything else falls out of.** It answers what is
+> themeable, and the answer is the mechanism rather than a list: *the ground is
+> painted, the furniture is lit by it, and ink is measured.* §2's semantics, §4's
+> motion and §7's ambience are consequences of it, not separate policies.
+
+---
+
+## 0. The name
+
+**Northlight.** North light is the studio painter's window: constant, indirect,
+colour-true, unchanged from morning to evening. It is the light you judge a
+colour in — which is exactly what this system is. A tenant supplies the pigment;
+the system supplies a light in which any pigment reads correctly.
+
+Shortened to **north** in conversation. The three alternates and why they lose:
+
+| | argument against |
+|---|---|
+| `mocha` | a colour name on a system whose central claim is that it holds no colour of its own — and `mocha` is a JavaScript test runner, so in a repository it reads as one |
+| `timeless` | naming yourself your own aspiration. It can only ever be falsified |
+| `oneui` | Samsung's, and one character from `@one/ui`, which is the package |
+
+⚠️ **The package stays `@one/ui` whatever the language is called.** The name is
+for the language, the documentation and the design conversation — not for an
+import path — so changing it later costs a find-and-replace in prose. Do not let
+it become load-bearing.
+
+---
+
+## 1. What is themeable
+
+Three layers. Only the first is painted.
+
+| | | themeable |
+|---|---|---|
+| **Ground** | canvas, surfaces, the ambience wash, the rails, the shell | **yes — this is where brand lives** |
+| **Furniture** | cards, rows, buttons, inputs, sheets, chips | **shape only.** Colour is *derived from the ground it stands on* |
+| **Ink** | text, icons, semantic signals, focus rings | **never.** Always computed against whatever it lands on |
+
+The one-sentence version: **a component never names a colour and never receives
+one — it names a role, and the role resolves against its ground at render time.**
+
+### 1.1 The brand contract — a bounded set of slots, each with a safe range
+
+A tenant may set exactly these. The list is closed, and closing it is what makes
+whitelabel a feature rather than a support burden.
+
+| slot | range | what it moves |
+|---|---|---|
+| `accent` | any hue; chroma and lightness are re-fitted per ground (§1.3) | the one accent — primary action, active nav, focus |
+| `ambience` | a **family** (hue + intensity), chroma-capped | the ground wash behind an anchor (§7) |
+| `radius` | 8 – 24 | the whole shape ladder, proportionally |
+| `edge` | `none` \| `hairline` \| `defined` | border weight and where borders appear at all |
+| `elevation` | `flat` \| `soft` | whether floating things carry a shadow in light mode |
+| `density` | `comfortable` \| `compact` | one step on the spacing scale; never on the type scale |
+| `type` | from a curated set | the family only — never the size, weight or tracking ladder |
+| `logo` | mark + wordmark, light and dark | identity slots in the shell, auth, email, PWA, error pages |
+
+⚠️ **Every value in every range is safe, and that is the invariant, not the
+aspiration.** A slot's range is chosen so no combination inside it can produce an
+unreadable screen. "A tenant's bad palette is not their problem" is a claim that
+has to be true by construction — and it is only true if the brand surface is
+small enough to prove exhaustively. Eight bounded slots can be swept; an
+open token map cannot.
+
+**What is deliberately NOT themeable, and why each would break something:**
+
+- **Semantic hues.** Danger is not a brand decision. A tenant who could set it
+  could make a delete confirmation read as a success. §2.
+- **The type scale.** Sizes, weights, tracking and line-heights are one ladder.
+  A family swaps; the rhythm does not.
+- **Spacing.** `density` moves the whole scale one step. Individual values are
+  not exposed, because the 40% ink rule (§5) cannot survive them being.
+- **Motion.** §4 — the whole argument there is that timing is global.
+- **`*-foreground` tokens.** Derived by measurement (§1.3). Offering them would
+  let a tenant pair a colour with ink that fails against it, which is the one
+  thing the token exists to prevent.
+
+### 1.2 Furniture is lit, not painted — relative surface stepping
+
+A component does not ask for `surface-2`. It asks for **one step from its
+parent**, and the step is computed in a perceptual colour space from the ground.
+
+```
+step(n) from the current surface:
+  ΔL    a fixed perceptual lightness delta, in the direction with more headroom
+  ΔC    a fraction of the ground's chroma, so branded ground tints its furniture
+  H     the ground's hue, unchanged
+```
+
+Three consequences, and all three are the point:
+
+- **A card on a coloured ground is a coloured card, automatically.** Nobody
+  chooses a green card colour for the green screen. The tint is inherited.
+- **Nesting cannot collide.** Each step is a guaranteed perceptual distance from
+  the one below it, so a card inside a card inside a sheet is legible without
+  anybody counting levels. The direction flips when a step runs out of headroom
+  — near-white grounds step down, near-black grounds step up — which is why the
+  ladder does not saturate at either end of either theme.
+- **A wild accent cannot break it**, because no step is expressed as a constant.
+
+⚠️ **THE ACCENT IS RE-LIT AGAINST THE GROUND; IT IS NEVER RECOMPUTED PER
+SCREEN.** `accentOn(ground)` keeps the tenant's hue and re-fits lightness and
+chroma until it clears its contrast floor on that exact ground. The brand colour
+is therefore recognisably itself on every surface in the product, and legible on
+all of them.
+
+This is the honest answer to "how does a button stay readable on a coloured
+page". The tempting answer is to let the page choose a new primary — which
+produces a product whose brand colour is a different colour on every screen,
+where the button you press is a different button each time, and where the tenant
+who set their accent does not see it. Re-lighting solves the readability problem
+without giving up the identity.
+
+### 1.3 Ink is measured, never chosen
+
+The on-colour for any fill is computed: the contrast ratio of near-white **and**
+near-dark against that exact resolved colour, keep the winner. Not a lightness
+threshold — a threshold mis-calls mid-lightness saturated colours, where both
+candidates are borderline and the rule picks the wrong one silently.
+
+The floor is **AA (4.5:1) for text and 3:1 for meaningful non-text**, everywhere,
+including on a tenant's worst legal accent. This is checked, not assumed: §10.
+
+### 1.4 What "premium" is, materially
+
+Stated concretely so it can be reviewed rather than felt.
+
+1. **Depth from tone, not from blur or shadow.** Separation is a surface step, a
+   radius and space. Shadows exist only in light mode, only on floating things,
+   and only when `elevation: soft`.
+2. **Restraint with the accent.** One accent per screen: the ambience, the
+   primary action, the active nav item. Colour used sparingly is what reads as
+   expensive; colour used everywhere reads as a template.
+3. **Optical hairlines.** A border is a token that resolves against device pixel
+   ratio. A literal `1px` is heavy at 1×, invisible at 3×, and a system that
+   hardcodes it looks different on every screen it ships to.
+4. **Type does the work.** Large numerals, tight tracking, tabular figures, one
+   family, never a weight above 700. The number is the story.
+5. **Space is structural.** At rest, at least ~40% of any viewport is not ink.
+6. **Motion settles.** Things arrive by coming to rest, never by growing or
+   bouncing. §4.
+7. **No gradient on furniture.** Gradients belong to the ground and to nothing
+   else. A gradient button is the single fastest way to date an interface.
+
+### 1.5 Why not glassmorphism
+
+It is the obvious answer to "what works on any background" and it is the wrong
+one, for a reason that is structural rather than stylistic: **translucency makes
+contrast a property of whatever happens to be behind an element**, which is
+exactly the thing a design system cannot leave unbounded. A blurred panel over a
+photograph, over a chart, over a dense list and over an empty canvas produces
+four different contrast ratios for the same component, and only measurement at
+render time could tell you which of them fails.
+
+Relative surface stepping answers the same question — *what works on any
+background* — with a computed opaque surface whose contrast is known before it
+paints. It is the same idea done in the colour space instead of in the
+compositor: cheaper, provable, and it does not date.
+
+Translucency survives in exactly two places, both where it is a *statement about
+layering* rather than a way of avoiding a colour decision: the app bar and tab
+island blur the content scrolling beneath them, and a scrim dims what an overlay
+is covering.
+
+---
+
+## 2. Semantics on branded ground
+
+The sharp case: a success message on a green ambience.
+
+⚠️ **Contrast is not distinguishability.** Green-on-green can pass AA and still
+fail completely, because a signal's job is to differ from its *context*, not
+merely to be readable. A rule that only checks contrast ratios ships this bug.
+
+**The rule: a semantic signal differs from its ground on at least two axes.**
+
+The axes are: **word**, **icon**, **container**, **tone**. Tone is the least
+load-bearing of the four and the first to be given up.
+
+- On neutral ground: tone + word. The familiar case.
+- On branded ground where the semantic hue is close to the ground's, the
+  renderer **demotes the tone to an edge and an icon** and raises the signal onto
+  a neutral stepped surface. Same component, contained form, no author decision.
+
+**Collision is detected, not guessed.** The renderer compares the semantic hue
+and chroma against the resolved ground; under a hue-distance threshold at
+comparable chroma, the contained form is selected. An app never writes a
+conditional about this and never learns the threshold.
+
+Two policies that make the case rare in the first place:
+
+- ⚠️ **Outcomes do not live on the ambience.** Toasts, dialogs and callouts are
+  platform surfaces on neutral ground — the platform owns the surface for a
+  result (MANIFEST.md §2), so "success on a green page" is mostly a question
+  that does not arise. Where it does arise it is an *inline* status — a chip in a
+  row, a badge on a tile — and that is precisely what the contained form is for.
+- **Ambience is chroma-capped.** A wash cannot reach the saturation of a
+  semantic fill, so the two are separated by construction as well as by rule.
+
+**Never colour alone, at any saturation.** Every state carries a word. A
+greyscale screenshot and a person with deuteranopia must both read the same
+screen, and that is the floor, not an accommodation.
+
+---
+
+## 3. States — declared, exhaustive, and photographed
+
+A component is not finished when it renders; it is finished when every state it
+can be in has been designed. That has to be structural, because "did you do the
+loading state" is a review question that is asked in the first month and not in
+the sixth.
+
+**Interaction states — seven, closed:**
+
+`idle` · `hover` · `pressed` · `focus` · `busy` · `disabled` · `invalid`
+
+**Container data-states — five, closed:**
+
+`unknown` · `empty` · `partial` · `error` · `ready`
+
+⚠️ **`unknown` is not `empty`, and this is the state most systems omit.** A
+container that has not been answered yet is not a container with no results.
+Collapsing them makes a failed load, a pending load and a genuinely empty
+collection render identically — a confident, wrong fact, wearing a loading
+state's excuse. `null` until known; `[]` only when the answer is `[]`.
+
+**`partial` exists because responses are shaped.** An operation may withhold what
+the caller did not buy and say so (PLAN.md §3.4, `included`). The renderer turns
+that into a visible, explained absence — never a silently thinner screen, which
+would make "withheld" and "empty" the same pixel.
+
+### Three rules about refusal
+
+1. **A disabled control says why.** `disabled` without a reason is not
+   permitted — the reason is required alongside it and rendered (adjacent on
+   coarse pointers, on hover and focus on fine ones). A control that refuses
+   without explaining is the most common product failure there is.
+2. **Gated is not disabled — it is `locked`.** Anything withheld by a plan, an
+   entitlement or a permission renders as locked with the route out of it, not
+   as greyed-out furniture. A disabled control cannot explain itself, cannot be
+   focused, and cannot sell anything.
+3. **Busy belongs to the control that started the write, not to the screen.** It
+   is resolved by the outcome contract, so it cannot be left stuck: a rejected
+   write that leaves a button spinning is the same defect as a rejected write
+   that reports nothing.
+
+### The states are proved by photograph
+
+Every registered component declares its state map, and the conformance suite
+renders each component in each declared state, at both themes, and photographs
+it. A component with an undeclared state fails the build; a state whose image
+changes is a visible diff in review. This is the same suite that produces help
+screenshots and the marketing images (STANDARDS.md §6) — one set of images,
+which is what keeps them honest.
+
+<!-- DEFER(one-006) stage:4 — the state-matrix conformance suite: every registered component × every declared state × both themes, photographed by id. -->
+
+---
+
+## 4. Motion — one choreographer, and components do not animate
+
+⚠️ **The failure to design out is a jungle: forty elements each running their own
+tasteful 240ms animation, arriving at forty different times.** No individual
+animation is wrong and the screen is chaos. The fix is not taste. It is that
+**timing is not a component's to own.**
+
+**Components declare a role in a scene. They never declare a duration or a
+curve.**
+
+| role | what it is |
+|---|---|
+| `ground` | the atmosphere and the canvas |
+| `anchor` | the one thing the surface is about |
+| `content` | groups, rows, tiles, charts |
+| `chrome` | app bar, rail, tab island — always last |
+| `overlay` | sheets, dialogs, popovers |
+
+The **choreographer** owns one timeline per surface transition and derives every
+offset from role and document order. Two components physically cannot run
+competing timelines, because neither of them holds one.
+
+### The invariants
+
+- **One clock per transition.** Everything entering a surface enters on the same
+  timeline. Everything leaving leaves on one.
+- **Exit is enter, reversed, at 60%.** Not a second animation to design and get
+  out of step — the same named endpoints traversed the other way. Leaving should
+  feel decisive.
+- **Enter by settling down, never by growing up.** Content arrives fractionally
+  too large and comes to rest. This one detail is the difference between "an app
+  opened" and "an app was assembled in front of me".
+- **No overshoot, ever.** Springs are critically damped. Bounce reads as toy.
+- **Motion is a budget, not a property.** A surface has a maximum number of
+  simultaneously moving groups. Past it the choreographer collapses the stagger
+  rather than animating a hundred rows — so a long list gets shorter motion
+  automatically instead of a slow-network impression.
+- **Continuity beats transition.** A record that appears in two places is one
+  shared element with one identity, not a fade-out and a fade-in. The renderer
+  can do this because it owns both surfaces and the record has an id; an app
+  could not, which is most of why this lives here.
+- **Entrance is first-paint only, keyed by identity.** Nothing re-animates on a
+  re-render. A value that ticks counts up once.
+- **Reduced motion removes transforms.** Not "reduces" — removes, leaving
+  opacity. ⚠️ Layout may never depend on an animation having run, and the
+  reduced-motion pass is where that is proved rather than hoped.
+
+**The structural guard: no file outside the choreographer may contain a
+duration, an easing curve, a `@keyframes`, or a transition property.** Without
+it this decays back into per-component animation one reasonable exception at a
+time, and the symptom is invisible in every diff and obvious in the product.
+
+<!-- DEFER(one-007) stage:4 — the choreographer: role-derived timelines, the motion budget, shared-element continuity across surfaces. -->
+
+---
+
+## 5. Touch, reach and density
+
+The interface is designed for a thumb and adapted for a mouse, not the reverse.
+
+- **48×48 minimum, and the target is the row, not the glyph.** Hit area is
+  declared by the interactive component and expanded invisibly past its visual
+  bounds. A 24px icon in a 56px row is a 56px target.
+- **Reach is a layout constraint.** A phone's primary action lives in the lower
+  third; a desktop's lives in the header. The app declares *which action is
+  primary* — never where it goes. That is the renderer's, per shape, which is
+  also what stops the two widths drifting into two designs.
+- **Density follows the pointer, not the width.** `pointer: coarse` gets the
+  comfortable scale at any viewport. A tablet is not a small desktop.
+- **Hover is an enhancement and never a requirement.** Anything reachable by
+  hover is reachable by tap and by keyboard. Hover styles live behind
+  `pointer: fine` so a tap never leaves one stuck.
+- **Press feedback inside 100ms, always**, decoupled from the network. The
+  response to a touch is a local fact.
+- **No fixed viewport heights.** Mobile browser chrome changes the viewport
+  while you scroll; a layout pinned to it moves under the user's finger.
+- **Airy is measurable**: the 40% ink rule, a 4px grid with no exceptions, and
+  section separation at the widest step on the scale. Anything cramped is wrong
+  even when it fits.
+- **Everything focusable has a visible ring**, one token, never removed.
+
+---
+
+## 6. Navigation, and the overlay ladder
+
+### Three levels, and they are not interchangeable
+
+| level | what it is | where it lives | how many |
+|---|---|---|---|
+| **Destination** | a place in the product. A noun. Survives a reload | the tab island (phone) or the rail (≥md) — **one surface per width, never both** | **3–5.** Six means two are the same place |
+| **Section** | a view of ONE destination — a lens, a filter, a sub-tab | inside the content column | any, scrolling rather than wrapping |
+| **Record** | one thing from a collection | a page (phone) or the detail pane (≥lg) | — |
+
+- **One navigation surface at a time.** A rail *and* a top nav bar is two answers
+  to "where am I". The top bar carries identity, the account and this page's
+  chrome — never destinations.
+- **Depth is capped at destination → record → overlay.** A third pushed page
+  means the record needed sections, not more pages.
+- **A destination's icon and its label travel together.** An icon-only rail item
+  is unnamed to voice control and ambiguous to everybody else.
+
+### The overlay ladder
+
+**The question is what the user is doing, not what the content is.**
+
+| | for | dismissed by | stacking |
+|---|---|---|---|
+| **Popover** | choosing one value, anchored to the thing it changes | outside press, Esc | never stacks |
+| **Menu** | verbs on one specific thing | select, Esc | never stacks |
+| **Sheet** / **Panel** | *doing* — a form, a picker, a flow | drag, close, Esc | at most one |
+| **Dialog** | *deciding* — a question with two answers and a consequence | ⚠️ an explicit answer only | at most one; may cover a sheet |
+| **Drawer** | navigation, and nothing else | anywhere | at most one |
+
+The invariants:
+
+- **A sheet and a panel are one component with two placements** — bottom below
+  `md`, side above it. Not two components. This is where "the mobile version
+  looks different" comes from when it is allowed to be two.
+- **A sheet is a pinned header, a scrolling body and a pinned footer.** Only the
+  body scrolls, and the primary action is in the footer — so that on every sheet
+  in the product, the thumb lands in the same place. That is the real definition
+  of consistency here: not that sheets are the same size, but that they answer in
+  the same spot.
+- **Overlay depth is capped at two, and the second must be a dialog.** A sheet
+  opened from a sheet is a screen that should have been a route.
+- **Only a dialog blocks.** Everything else yields to Esc and to a gesture. A
+  dialog demands an answer because a decision is what it is for.
+- **Nothing destructive happens without a dialog, and the confirm names the
+  object.** "Delete" is wrong. "Delete Marion's plan" is right — it is the last
+  place a mistake can be caught, and a generic verb catches nothing.
+- **A drawer never contains content.** The moment it does it is a second
+  navigation surface, which rule one already refused.
+- **Configuration is never a tab strip.** An index of sections, each with its
+  current value in the sub-line, and a page per section. That lets somebody check
+  a setting by reading it — without opening it, and therefore without risking
+  changing it.
+
+---
+
+## 7. Layout, sections, disclosure, tabs, ambience
+
+### The column, and what a wider viewport is for
+
+**There is one content column and it never stretches.** Wider viewports get
+**more columns**, never wider cards — which is what makes a card designed once
+pixel-correct everywhere: it is never asked to be a different shape.
+
+A destination declares its **kind**, and the kind picks the shape at every width:
+`overview` (one column, an aside when wide), `collection` (two-pane from
+desktop — the list is how somebody works through ten records without going back
+nine times), `task` (full bleed, brings its own chrome, may not invent a second
+navigation surface).
+
+⚠️ **Inside a pane, a viewport breakpoint is a lie.** A record built for a
+full-width panel and dropped into a narrow pane keeps every one of its
+breakpoints answering yes, and nothing on it is wrong — it is answering a
+question about the wrong box. **Any surface that can appear in a pane sizes
+itself against its container.** Breakpoints remain for what is genuinely about
+the device: the shell's own shape, and whether a pane exists at all.
+
+### Sections
+
+**A section is a question somebody could ask in one breath.** If describing it
+needs "and", it is two sections. Sections are the unit of rhythm — the widest
+space step separates them, and nothing else in the layout gets that step.
+
+### Disclosure
+
+**A disclosure is for the exceptional, never for the required.** If most people
+need it open, it is a section with extra clicks.
+
+Two kinds, and only one of them may nest:
+
+| | shows collapsed | may nest |
+|---|---|---|
+| **summary** | the current value, so it can be read without opening | no |
+| **detail** | a label only — advanced or rare options | one level, and no more |
+
+⚠️ **A disclosure that is open by default is a bug in the information
+architecture**, not a configuration.
+
+### Tabs
+
+**Tabs are peer views of one subject.** Not steps, not configuration, not
+navigation.
+
+- **Four visible, maximum.** More means the subject is two subjects.
+- **A tab is a section**, so it does not appear in the rail and does not change
+  the breadcrumb's first segment.
+- **A tabbed surface's anchor belongs to the tab, not the page.** Each tab names
+  its own subject; the page's own title drops to an eyebrow, because the tab bar
+  already said it.
+
+### Ambience
+
+The signature ground: a brand wash at the top of a scroll container, decaying to
+canvas partway down.
+
+- **It belongs to the scroll container**, not the viewport. It scrolls away.
+- **Content sits on canvas, not on the wash.** The wash is behind the anchor and
+  nothing else, which is what makes the anchor read as the anchor.
+- **One per scroll container.** A pane has its own; nested ambiences are noise.
+- **⚠️ It never carries a value.** Nobody reads a colour as a number. The single
+  exception is a whole-surface degraded state — read-only, offline, expired —
+  where a state ground *replaces* the brand one and always arrives with words.
+- **⚠️ It never changes the accent.** A destination may name an ambience family,
+  which is a ground choice; the accent stays the tenant's and is re-lit against
+  it (§1.2). No screen recomputes a palette, ever.
+
+---
+
+## 8. Live surfaces — dock, pane, and detach
+
+A running workout, a playing channel preview, a sterilisation cycle timer, an
+upload, a long generation: surfaces that represent *an ongoing thing*, where
+navigating away today means losing it or hiding it.
+
+This is a platform primitive rather than a per-app trick, for one technical
+reason: **the tree must never be unmounted between presentations.** An app-level
+implementation re-renders and takes the render loop, the camera stream, the media
+element and the elapsed timer with it. Only whoever owns the shell can move a
+mounted subtree.
+
+A surface declares itself live in the manifest and gets four presentations of the
+same instance:
+
+| | where | fidelity |
+|---|---|---|
+| **full** | the task surface as designed | complete |
+| **dock** | above the tab island (phone) or a corner card (desktop) | the live value and the two controls that matter |
+| **pane** | the aside column at wide widths | complete, beside other work |
+| **detach** | an OS-level always-on-top window, via document Picture-in-Picture | complete, outside the browser |
+
+The invariants:
+
+- **At most one live surface per app.** Starting a second asks, explicitly, to
+  replace the first. Two running timers is a product bug, not a layout problem.
+- **The tree is moved, never remounted.** This is the whole reason it is here.
+- **The dock is the surface, smaller — not a notification about it.** Tapping it
+  restores full. It carries live state, not a summary of live state.
+- **It survives navigation; it does not survive a reload** — and where unsaved
+  work would be lost, it says so before the tab closes.
+- **`detach` degrades to absence.** Where document Picture-in-Picture is
+  unavailable, the control is not rendered. It is never emulated with a window
+  that behaves differently.
+- **Native media Picture-in-Picture is a separate thing** and stays with the
+  video element. Do not conflate the two; a live surface is an application
+  surface, not a video.
+
+<!-- DEFER(one-008) stage:4 — live surfaces: the persistent-subtree host, the four presentations, and the single-live-surface rule. -->
+
+---
+
+## 9. Where the boundary sits
+
+[PLAN.md](PLAN.md) §3.6 is the table. The one-sentence version: **the renderer
+owns the chrome and every state; the app owns the canvas.** "Canvas" means the
+content region of a surface that genuinely cannot be declared — a player, an
+editor, a camera flow, a visualisation. It is not a licence to re-implement a
+dialog, a toast, an empty state or a form control, and a canvas surface still
+uses the platform's chrome, states, motion and data access.
+
+⚠️ **This decision only survives if it is enforced rather than documented.**
+The failure is gradual and each individual step is reasonable: one bespoke
+dialog, one hand-rolled empty state, one `<button>`. §10 is what stops it.
+
+---
+
+## 10. The guards
+
+Each fails `one lint`, and each covers something that produces no error at
+runtime and no failing test anywhere.
+
+| guard | fails on |
+|---|---|
+| **contrast sweep** | any brand-slot combination in range producing ink below its floor, at either theme, on any ground |
+| **no literal colour** | a colour value anywhere outside the token layer |
+| **no literal motion** | a duration, curve, `@keyframes` or transition property outside the choreographer |
+| **state completeness** | a registered component with a state it does not declare and photograph |
+| **unknown ≠ empty** | a data container whose pending and empty states resolve to the same render |
+| **disabled has a reason** | a `disabled` prop with no accompanying explanation |
+| **gated is locked** | an entitlement or permission rendered as `disabled` rather than `locked` |
+| **renderer boundary** | an app defining a shell, dialog, toast, empty state or form primitive; a raw `<button>` or `<input>` |
+| **hover is not required** | an interaction reachable only by hover |
+| **container queries in panes** | a pane-capable surface sized by viewport breakpoints |
+| **one navigation surface** | a second destination surface at any width |
+| **target size** | an interactive element whose hit area resolves below the floor |
+
+⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder
+than the repository's existing guards because several are questions about
+*rendered output* rather than about source. The contrast sweep and the state
+matrix both want the component suite running, which is why they belong to the
+same stage as the renderer rather than to a script that could be written earlier.
+
+<!-- DEFER(one-009) stage:4 — the contrast sweep over the brand-slot ranges, proving §1.1's safety claim exhaustively rather than by sampling. -->
+<!-- DEFER(one-010) stage:4 — semantic collision detection and the contained form: hue-distance against the resolved ground selects the presentation, with no author decision. -->
+
+---
+
+## 11. Relationship to the existing UI language
+
+`UI-LANGUAGE.md` in the legacy tree is the largest body of interface thinking in
+this repository and most of it is right. It was written product-agnostically as
+an extraction target, which means it is already most of the way to being this
+document's ancestor rather than its competitor.
+
+**What carries over, and should not be re-derived:** the five-tier hierarchy and
+the vertical spine; the 4px grid and the row anatomy; the four-step tonal ladder;
+the type scale and its enforcement; the shape ladder; the component grammar; the
+sheet's three parts; the settings index; the entrance choreography; the
+navigation model and the four widths; the accessibility floor; and the discipline
+of stating a rule alongside the thing it prevents.
+
+**What this document changes, and why:**
+
+| | was | is |
+|---|---|---|
+| surfaces | four absolute tokens | relative steps computed from the ground (§1.2) |
+| accent on coloured ground | a per-screen palette decision | one re-lit accent, no recomputation (§1.2) |
+| semantics on brand | contrast checked | two-axis distinguishability, collision detected (§2) |
+| motion | tokens each component reaches for | one choreographer; components hold a role (§4) |
+| states | a review convention | declared, closed, and photographed (§3) |
+| live surfaces | — | a platform primitive (§8) |
+
+⚠️ **`UI-LANGUAGE.md` is not maintained against this document and will not be.**
+It governs the legacy tree, which is deleted at stage 9 (STANDARDS.md's opening
+note). Read it for the reasoning it carries; do not reconcile the two by hand.
+When they disagree, this file wins for `platform/**` and that file wins for
+everything else, and the disagreement resolves itself when the legacy tree goes.

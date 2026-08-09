@@ -250,7 +250,7 @@ Grouped by what it governs. **Bold** entries have day-zero consequences (§9).
 | `notifications` | §4 |
 | `sounds` | §5 |
 | `shortcuts` | keyboard registry — one place, so two features cannot claim `⌘K` |
-| `brand` | whitelabel slots, including auth screens, emails, errors and the PWA |
+| `brand` | whitelabel slots, including auth screens, emails, errors and the PWA. ⚠️ The slot list is closed and every value in range is provably safe — [UI.md](UI.md) §1.1 |
 | **`locale`** | per-user language, **per-tenant timezone**, week start, date and number format |
 | **`units`** | metric/imperial, per user, stored canonical |
 | `help` + `changes` | §6 and §7 of STANDARDS.md |

@@ -22,6 +22,19 @@ kind: index
 - `one-002` — bind to the real validator, and make `output` carry  
   <sub>kernel/src/operation.ts:110</sub>
 
+## Stage 4 — Renderer — shell, nav, collection views, whitelabel, PWA
+
+- `one-006` — the state-matrix conformance suite: every registered component × every declared state × both themes, photographed by id.  
+  <sub>docs/UI.md:268</sub>
+- `one-007` — the choreographer: role-derived timelines, the motion budget, shared-element continuity across surfaces.  
+  <sub>docs/UI.md:324</sub>
+- `one-008` — live surfaces: the persistent-subtree host, the four presentations, and the single-live-surface rule.  
+  <sub>docs/UI.md:521</sub>
+- `one-009` — the contrast sweep over the brand-slot ranges, proving §1.1's safety claim exhaustively rather than by sampling.  
+  <sub>docs/UI.md:566</sub>
+- `one-010` — semantic collision detection and the contained form: hue-distance against the resolved ground selects the presentation, with no author decision.  
+  <sub>docs/UI.md:567</sub>
+
 ## Stage 6 — Ops — notifications, help, versioning, data centre, CI
 
 - `one-003` — resolve against the declared help registry, so a  
