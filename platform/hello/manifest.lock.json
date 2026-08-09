@@ -10,6 +10,7 @@
     "commerce:read",
     "file:read",
     "file:write",
+    "guide:read",
     "inbox:read",
     "note:read",
     "note:write",

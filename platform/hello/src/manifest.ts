@@ -157,13 +157,13 @@ export const hello = defineApp({
     weekStart: 1,
   },
   access: {
-    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write"],
+    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read"],
     /*
       Anybody signed in may open a workspace — this is a self-serve product, and
       `workspace:create` is checked on a door that has no tenant to be a member
       of, so a role is the only place it could come from.
     */
-    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write"], reader: ["note:read"] },
+    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read"], reader: ["note:read", "guide:read"] },
     /*
       ⚠️ EVERY ENTRY NAMES HOW IT IS WITHHELD, and `defineApp` refuses one whose
       mechanism does not exist. `notes` is gated on the collection rather than on
@@ -276,6 +276,23 @@ export const hello = defineApp({
   },
 
   jobs: [tidy],
+
+  /*
+    ⚠️ DERIVED, NEVER TRACKED. Each step is answered by counting what is actually
+    there — so it cannot drift, survives a change of device, and un-checks itself
+    if the thing is deleted. `required` is the wizard; the rest is the checklist.
+  */
+  guide: {
+    steps: [
+      { id: "choose-plan", title: "Choose a plan", roles: ["owner"], required: true, answer: { kind: "platform", fact: "plan_chosen" } },
+      { id: "first-note", title: "Write your first note", roles: ["owner", "reader"], required: false, answer: { kind: "collection", collection: "note", atLeast: 1 }, does: "note.create", help: "notes" },
+      { id: "a-receipt", title: "Record something you spent", roles: ["owner"], required: false, answer: { kind: "collection", collection: "receipt", atLeast: 1 }, help: "receipts" },
+      { id: "a-passkey", title: "Add a passkey", roles: ["owner", "reader"], required: false, answer: { kind: "platform", fact: "passkey_registered" } },
+    ],
+    hints: [
+      { id: "search-notes", surface: "note", body: "Search looks inside every note, not just the titles.", roles: ["owner", "reader"] },
+    ],
+  },
 
   releases: [
     { version: "0.1.0", at: "2026-02-01", notes: ["Notes and receipts.", "You can now choose a plan."] },

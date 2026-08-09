@@ -26,6 +26,7 @@ import { COMMERCE, commerceOperations, customerOperations, providerOperations, t
 import { INBOX, inboxOperations, type InboxCarrier } from "./inbox-ops.js";
 import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
 import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files-ops.js";
+import { GUIDE, guideOperations, type GuideCarrier } from "./guide-ops.js";
 import { fetchMedia, usedBytes } from "./files.js";
 import { readMaintenance, refuses } from "./maintenance.js";
 import { runDue, type RunReport } from "./jobs.js";
@@ -144,6 +145,14 @@ export interface RuntimeOptions<B extends BindingSpec> {
    * roster and visible in the tests rather than silently empty.
    */
   audienceFor?(tenantId: string, db: SqlHandle): Promise<readonly { readonly userId: string; readonly role: string }[]>;
+  /**
+   * Which role a caller is acting in, for anything that differs per persona.
+   *
+   * ⚠️ DERIVED FROM PERMISSIONS THE APP ALREADY RESOLVED, never from the
+   * request. A checklist keyed on a role the caller could name would be one
+   * somebody can use to read another persona's list.
+   */
+  roleOf?(permissions: ReadonlySet<string>): string;
   /** How an interruption travels. The DECISION is the platform's; the sending is not. */
   send?(delivery: Delivery): Promise<void>;
   /**
@@ -214,7 +223,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...guideOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -603,7 +612,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GuideCarrier = {
         [INBOX]: { db: regionalDb, tenantId: at.tenant?.tenantId ?? "", userId: session?.accountId ?? null },
         [FILES]: {
           db: regionalDb,
@@ -621,6 +630,25 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           fileName: url.searchParams.get("name") ?? "",
           purpose: url.searchParams.get("purpose") ?? "",
           allowance: allowanceFrom(caller.entitlements[STORAGE_ENTITLEMENT]),
+        },
+        /*
+          ⚠️ THE FACTS ARE READ LAZILY, because the checklist is one surface of
+          many and three of these are queries into stores this request has not
+          otherwise opened. A person past their first week never sees them.
+        */
+        [GUIDE]: {
+          db: regionalDb,
+          tenantId: at.tenant?.tenantId ?? "",
+          userId: session?.accountId ?? "",
+          role: opts.roleOf?.(permissions) ?? "owner",
+          facts: async () => ({
+            plan_chosen: Boolean(sub.planId ?? sub.pendingPlanId),
+            passkey_registered: session ? (await identity.credentials(session.accountId).catch(() => [])).length > 0 : false,
+            file_stored: ((await regionalDb.first<{ n: number }>(
+              `SELECT COUNT(*) AS n FROM media WHERE tenant_id = ?`, at.tenant?.tenantId ?? "",
+            ).catch(() => null))?.n ?? 0) > 0,
+            colleague_invited: (await opts.audienceFor?.(at.tenant?.tenantId ?? "", regionalDb).catch(() => []))!.length > 1,
+          }),
         },
         [DATA]: {
           db: regionalDb,

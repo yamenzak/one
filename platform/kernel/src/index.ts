@@ -32,6 +32,7 @@ export * from "./notify.js";
 export * from "./help.js";
 export * from "./release.js";
 export * from "./job.js";
+export * from "./guide.js";
 export * from "./resolve.js";
 export * from "./ddl.js";
 export * from "./document.js";

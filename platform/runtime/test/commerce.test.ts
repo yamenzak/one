@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { createRuntime } from "../src/runtime.js";
 import { collectionOperations } from "../src/collection-ops.js";
 import { customerOperations, providerOperations } from "../src/commerce-ops.js";
+import { guideOperations } from "../src/guide-ops.js";
 import { attribute, verifySignature } from "../src/provider.js";
 import { PARKED, standingFor } from "../src/commerce.js";
 import { ALWAYS_ALLOWED, PUBLIC, cache, collection, defineBindings, field, laneOf, objects, s, sql, operation, type AppSpec, type Instant, type RegionId } from "@one/kernel";
@@ -65,6 +66,7 @@ const app = (over: Partial<AppSpec<typeof bindings>>): AppSpec<typeof bindings> 
   filePurposes: {},
   releases: [],
   jobs: [],
+  guide: { steps: [], hints: [] },
   retired: {},
   operations: [],
   problems: {},
@@ -229,6 +231,37 @@ describe("whose event is this", () => {
   it("tells an unclaimed reference from no reference at all", async () => {
     expect(await attribute(event, "hello", async () => null)).toEqual({ ok: false, why: "unclaimed" });
     expect(await attribute({ ...event, customerRef: null }, "hello", async () => null)).toEqual({ ok: false, why: "no_tenant" });
+  });
+});
+
+/* -------------------------------------------------------------- guidance --- */
+
+/**
+ * ⚠️ ABSENT WHERE NOTHING IS DECLARED, rather than present and answering with an
+ * empty list. An operation that exists and never has anything to say is one a
+ * screen renders a permanent empty state for — and one a later stage builds on,
+ * assuming it means something.
+ */
+describe("the checklist is mounted only where an app declares one", () => {
+  const aStep = { id: "a", title: "A", roles: ["owner"], required: false, answer: { kind: "platform" as const, fact: "plan_chosen" as const } };
+
+  it("mounts nothing at all when there are no steps and no hints", () => {
+    expect(guideOperations(app({}))).toEqual([]);
+  });
+
+  it("mounts the read alone when there are steps but no hints", () => {
+    expect(guideOperations(app({ guide: { steps: [aStep], hints: [] } })).map((op) => op.id)).toEqual(["guide.progress"]);
+  });
+
+  /*
+    ⚠️ THERE IS NO OPERATION THAT MARKS A STEP DONE, and the dismissal is the
+    only write here. A step is answered by counting, so a write that could set
+    one would be a way to tell somebody something untrue about their own
+    workspace.
+  */
+  it("adds only the hint dismissal when there are hints", () => {
+    const both = { steps: [aStep], hints: [{ id: "h", surface: "thing", body: "b", roles: ["owner"] }] };
+    expect(guideOperations(app({ guide: both })).map((op) => op.id).sort()).toEqual(["guide.hint.seen", "guide.progress"]);
   });
 });
 

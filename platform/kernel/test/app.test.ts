@@ -22,7 +22,7 @@ import { isArchived } from "../src/document.js";
 
 /** The smallest thing the coverage walk will read — it inspects four fields. */
 const stub = { id: "x.do", kind: "write", permission: "x" };
-const stubCollection = { id: "x", label: { one: "X", many: "Xs" }, scope: { of: "tenant" } };
+const stubCollection = { id: "x", label: { one: "X", many: "Xs" }, scope: { of: "tenant" }, fields: {} };
 
 import type { RowBase } from "../src/collection.js";
 import type { Result } from "../src/operation.js";
@@ -249,6 +249,7 @@ const base = {
   filePurposes: {},
   releases: [] as Release[],
   jobs: [],
+  guide: { steps: [], hints: [] },
   problems: {},
   operations: [] as never[],
 };

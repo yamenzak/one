@@ -61,6 +61,7 @@ const base = {
   },
   collections: [], notifications: {}, help: {}, filePurposes: {},
   releases: [], problems: {}, operations: [], jobs: [] as JobSpec[],
+  guide: { steps: [], hints: [] },
 };
 
 describe("what a manifest may not say about a job", () => {

@@ -13,6 +13,8 @@
 import type { BindingSpec } from "./bindings.js";
 import type { CollectionSpec } from "./collection.js";
 import type { FlagDef } from "./customer.js";
+import type { GuideSpec } from "./guide.js";
+import { guideProblems } from "./guide.js";
 import type { HelpRegistry } from "./help.js";
 import type { JobSpec } from "./job.js";
 import { danglingHelp, helpProblems } from "./help.js";
@@ -231,6 +233,13 @@ export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = Probl
    */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly jobs: readonly JobSpec<any>[];
+  /**
+   * ⚠️ A CHECKLIST, NOT A TOUR — and the wizard is the `required` half of the
+   * same list. Every step is DERIVED by counting, so it cannot drift from what
+   * is true, survives a change of device, and un-checks itself if the thing is
+   * deleted. A tour step can only record "seen".
+   */
+  readonly guide: GuideSpec;
   /** The changelog, as product copy. A commit message here is refused. */
   readonly releases: readonly Release[];
   /**
@@ -289,6 +298,14 @@ export interface Uncovered {
  * written before the registry it will be composed with, so its own declaration
  * site cannot see one.
  */
+/**
+ * ⚠️ THE OPERATIONS A COLLECTION IMPLIES, so a checklist step may offer one.
+ * Naming them here rather than importing the runtime keeps the check at
+ * composition time — and a verb added to the derivation without being added
+ * here makes a legitimate step look like a typo, which is the safe direction.
+ */
+const DERIVED_VERBS = ["list", "read", "create", "update", "delete", "submit", "cancel", "amend"] as const;
+
 export function undeclaredEmits(spec: {
   readonly notifications: NotificationRegistry;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
@@ -412,6 +429,7 @@ export function assertComposable(spec: {
   readonly notifications: NotificationRegistry;
   readonly help: HelpRegistry;
   readonly releases: readonly Release[];
+  readonly guide?: GuideSpec;
   readonly problems: Readonly<Record<string, unknown>>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly jobs?: readonly JobSpec<any>[];
@@ -483,6 +501,21 @@ export function assertComposable(spec: {
   const unbounded = (spec.jobs ?? []).filter((j) => !Number.isInteger(j.batch) || j.batch < 1).map((j) => j.id);
   if (unbounded.length) {
     throw new Error(`${spec.id}: job(s) ${unbounded.join(", ")} declare no bound on one run.`);
+  }
+
+  /*
+    ⚠️ A STEP COUNTING A COLLECTION THE APP DOES NOT HAVE IS ANSWERED "NO"
+    FOREVER — so a new workspace is told to do something that cannot be done,
+    and a `required` one of those is a wizard nobody can finish.
+  */
+  const guide = guideProblems(
+    spec.guide ?? { steps: [], hints: [] },
+    spec.collections,
+    [...spec.operations.map((op) => op.id), ...spec.collections.flatMap((c) => DERIVED_VERBS.map((v) => `${c.id}.${v}`))],
+    Object.keys(spec.help),
+  );
+  if (guide.length) {
+    throw new Error(`${spec.id}: guide — ${guide.map((g) => `"${g.id}" ${g.why}`).join("; ")}.`);
   }
 
   const notes = releaseProblems(spec.releases);

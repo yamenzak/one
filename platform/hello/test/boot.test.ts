@@ -76,21 +76,33 @@ describe("the app boots", () => {
 
 /* ------------------------------------------------------------- workspace --- */
 
-describe("a workspace is created, and only the platform may create it", () => {
-  const setup = "https://setup.hello.4dl.app/api/identity.workspace.create";
+const setup = "https://setup.hello.4dl.app/api/identity.workspace.create";
 
+/*
+    ⚠️ A FRESH ADDRESS PER ATTEMPT, because the suite retries once and creating a
+    workspace is NOT idempotent on its slug. A retry that reused the address
+    would be refused by the very rule the next test asserts — so a flake for any
+    reason at all becomes a second, confusing failure that looks like a bug in
+    workspace creation.
+
+    Same shape as the payment webhook's event ids: a retry has to be a real
+    second run, not one tripping over what the first one did.
+  */
+const mine = `acme-${crypto.randomUUID().replace(/[^a-z0-9]/g, "").slice(0, 8)}`;
+
+describe("a workspace is created, and only the platform may create it", () => {
   it("creates one on the setup door", async () => {
     const [status, body] = await json(await call(setup, {
-      method: "POST", as: "member", body: JSON.stringify({ slug: "acme" }),
+      method: "POST", as: "member", body: JSON.stringify({ slug: mine }),
     }));
     expect(status).toBe(200);
-    expect(body).toMatchObject({ slug: "acme", region: "auto" });
+    expect(body).toMatchObject({ slug: mine, region: "auto" });
     expect((body as { tenantId: string }).tenantId).toMatch(/^t_/);
   });
 
   it("refuses a second workspace at the same address", async () => {
     const [status, body] = await json(await call(setup, {
-      method: "POST", as: "member", body: JSON.stringify({ slug: "acme" }),
+      method: "POST", as: "member", body: JSON.stringify({ slug: mine }),
     }));
     expect(status).toBe(409);
     expect(body).toMatchObject({ code: "platform.conflict" });
@@ -161,22 +173,28 @@ describe("a request resolves to a tenant and its region", () => {
 
   /*
     ⚠️ THE REGION IS THE TENANT'S, RESOLVED BEFORE ANY STORE IS TOUCHED. `north`
-    is in `eu` and `acme` is in `auto`, so the same operation reads two different
+    is in `eu` and the other is in `auto`, so the same operation reads two different
     databases — and a note written in one is not visible in the other. That is
     the whole regional model, asserted end to end rather than by inspecting a
     resolver.
   */
   it("writes to the region the tenant lives in, and nowhere else", async () => {
+    /*
+      ⚠️ ASSERTED BY WHAT IS THERE, NOT BY HOW MANY. The suite retries once and
+      writing a note is not idempotent, so a count is an assertion about how many
+      times the test has run — which is the one thing it is not about.
+    */
+    const title = `in the EU ${crypto.randomUUID().slice(0, 8)}`;
     const write = await call("https://north.hello.4dl.app/api/note.create", {
-      method: "POST", as: "member", body: JSON.stringify({ title: "in the EU" }),
+      method: "POST", as: "member", body: JSON.stringify({ title }),
     });
     expect(write.status).toBe(200);
 
-    const [, mine] = await json(await call("https://north.hello.4dl.app/api/note.list", { as: "member" }));
-    expect((mine as { rows: unknown[] }).rows).toHaveLength(1);
+    const [, here] = await json(await call("https://north.hello.4dl.app/api/note.list", { as: "member" }));
+    expect((here as { rows: { title: string }[] }).rows.map((r) => r.title)).toContain(title);
 
-    const [, theirs] = await json(await call("https://acme.hello.4dl.app/api/note.list", { as: "member" }));
-    expect((theirs as { rows: unknown[] }).rows).toHaveLength(0);
+    const [, there] = await json(await call(`https://${mine}.hello.4dl.app/api/note.list`, { as: "member" }));
+    expect((there as { rows: { title: string }[] }).rows.map((r) => r.title)).not.toContain(title);
   });
 
   it("404s a workspace that does not exist", async () => {

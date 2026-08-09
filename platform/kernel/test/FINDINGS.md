@@ -1408,3 +1408,60 @@ Every sweep this platform has needed is "roughly this often", so that is what th
 declaration can say. Never-run is always due, because a first deployment, a new
 region and a job added later all have no last-run — and reading that as "not yet"
 means a weekly job starts a week late, during which somebody assumes it works.
+
+## 116. A checklist item is derived; a tour step is tracked
+
+That is the whole argument, and everything else follows. "Add your first client"
+is answered by counting clients: it needs no completion ledger, cannot drift
+from what is true, survives somebody moving to another device, and un-checks
+itself if the thing is deleted. A tour step can only ever record "seen", which
+is a fact about our interface rather than about their progress — and somebody
+who dismissed it once dismissed it forever, at the moment they had the least
+context to judge.
+
+A tour is an interruption on a schedule the product chose. A checklist waits,
+shows progress, and is still there when somebody comes back.
+
+## 117. The wizard is the `required` half of the same list
+
+Two systems is how the setup flow and the guidance come to disagree about what a
+new workspace still needs. One declaration split by a field means a step cannot
+be blocking in one place and optional in the other, and `blocking` is a subset
+of `steps` rather than a second list.
+
+Required steps sort first, because a blocking step buried under optional ones is
+a workspace that cannot proceed and cannot see why.
+
+## 118. There is deliberately no way to mark a step done
+
+A step is answered by counting, so a write that could set one would be a way to
+tell somebody something untrue about their own workspace. The only write in the
+guide is dismissing a HINT — and a hint is the one thing here that is genuinely
+tracked, because it says something not derivable.
+
+That is exactly the property that makes a tour bad, which is why hints are
+capped. Five is what stops a tour being rebuilt one hint at a time.
+
+## 119. A count that forgets soft-delete tells somebody their workspace has something it does not
+
+The checklist counted archived rows, so a step stayed ticked after the only note
+it counted had been deleted. The list operation had the predicate; the new
+counter did not, because the predicate lived as a local helper next to the
+first caller.
+
+`liveClause` is in the kernel now, beside `tableNameFor`, so the next reader of
+a row count inherits it. The general form: the moment a second place needs a
+predicate, the predicate has no business being local to the first.
+
+## 120. `retry: 1` is hostile to any test whose first attempt had side effects
+
+Finding 77 found this in the payment webhook. It is in the boot suite too, and
+worse: creating a workspace is not idempotent on its slug, so a retry was
+refused by the very rule the next test asserts — a flake for any reason became a
+confusing second failure that looked like a bug in workspace creation. A note
+count had the same shape: the retry saw two rows and expected one.
+
+Two habits fix it, and both are better tests anyway. Vary the key per attempt —
+a fresh slug, a fresh event id — so a retry is a real second run. And assert by
+CONTENT rather than by COUNT: a row count is an assertion about how many times
+the test has run, which is the one thing it is never about.

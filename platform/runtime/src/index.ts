@@ -23,6 +23,8 @@ export * from "./data.js";
 export * from "./data-ops.js";
 export * from "./maintenance.js";
 export * from "./jobs.js";
+export * from "./guide.js";
+export * from "./guide-ops.js";
 export * from "./exif.js";
 export * from "./files.js";
 export * from "./files-ops.js";

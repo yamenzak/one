@@ -940,6 +940,42 @@
       "impl": "runtime/test/jobs.test.ts",
       "proves": "carries on past a workspace that throws, and counts it as skipped",
       "fails": "one workspace's malformed row stopping a sweep for every other workspace, or one job's failure stopping the others"
+    },
+    {
+      "id": "guide-answerable",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/guide.test.ts",
+      "proves": "refuses one counting something that does not exist",
+      "fails": "a checklist step counting a collection the app does not have \u2014 answered 'no' forever, so a new workspace is told to do something impossible, and a required one is a wizard nobody can finish"
+    },
+    {
+      "id": "hint-cap",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/guide.test.ts",
+      "proves": "refuses a sixth, because past that it is a tour",
+      "fails": "more hints than the cap \u2014 a hint is the one tracked thing in the guide, and tracked is what makes a tour bad, so the number is bounded to stop one being rebuilt gradually"
+    },
+    {
+      "id": "checklist-derived",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "hello/test/guide.test.ts",
+      "proves": "opens again when the thing is deleted",
+      "fails": "a checklist step that stays ticked after the thing it counts is gone \u2014 the property no tour has, and the whole reason an item is derived rather than tracked"
+    },
+    {
+      "id": "no-marking-done",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "hello/test/guide.test.ts",
+      "proves": "has no operation that could mark a step complete",
+      "fails": "an operation that could mark a checklist step done, which is a way to tell somebody something untrue about their own workspace"
     }
   ]
 }

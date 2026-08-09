@@ -931,6 +931,10 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `job-emits-declared` | a job raising an event no notification declares — found on the night it finally has something to say, rather than the first time somebody uses a feature | **live** |
 | `job-clock-on-success` | a scheduler clock advanced by a failed run, or by one where every tenant was skipped — the run table fills with healthy-looking rows and the work stops | **live** |
 | `job-isolation` | one workspace's malformed row stopping a sweep for every other workspace, or one job's failure stopping the others | **live** |
+| `guide-answerable` | a checklist step counting a collection the app does not have — answered 'no' forever, so a new workspace is told to do something impossible, and a required one is a wizard nobody can finish | **live** |
+| `hint-cap` | more hints than the cap — a hint is the one tracked thing in the guide, and tracked is what makes a tour bad, so the number is bounded to stop one being rebuilt gradually | **live** |
+| `checklist-derived` | a checklist step that stays ticked after the thing it counts is gone — the property no tour has, and the whole reason an item is derived rather than tracked | **live** |
+| `no-marking-done` | an operation that could mark a checklist step done, which is a way to tell somebody something untrue about their own workspace | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

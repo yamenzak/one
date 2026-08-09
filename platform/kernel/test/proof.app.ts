@@ -242,6 +242,59 @@ export const kova = defineApp({
   */
   jobs: [dunning],
 
+  /*
+    ⚠️ A CHECKLIST, AND THE WIZARD IS THE `required` HALF OF IT. Every step is
+    answered by COUNTING, so it cannot drift from what is true, survives somebody
+    moving to another device, and un-checks itself if the thing is deleted. A
+    tour step could only ever record "seen" — a fact about our interface rather
+    than about their progress.
+
+    ⚠️ AND IT RUNS BOTH WAYS. The studio learning the product and a customer
+    learning what their coach set up are two declarations over one engine, split
+    by role — a tour would be two scripts and both would rot.
+  */
+  guide: {
+    steps: [
+      {
+        id: "choose-plan",
+        title: "Choose a plan",
+        roles: ["owner"],
+        required: true,
+        answer: { kind: "platform", fact: "plan_chosen" },
+      },
+      {
+        id: "first-package",
+        title: "Create your first package",
+        body: "A package is time plus what it lets somebody do.",
+        roles: ["owner"],
+        required: false,
+        answer: { kind: "collection", collection: "package", atLeast: 1 },
+        does: "package.create",
+        help: "packages",
+      },
+      {
+        id: "publish-package",
+        title: "Put a package on sale",
+        roles: ["owner"],
+        required: false,
+        answer: { kind: "collection", collection: "package", atLeast: 1, where: { field: "active", equals: true } },
+        help: "packages",
+      },
+      {
+        id: "add-a-passkey",
+        title: "Add a passkey so you can sign in with a tap",
+        roles: ["owner", "trainer", "customer"],
+        required: false,
+        answer: { kind: "platform", fact: "passkey_registered" },
+      },
+    ],
+    /* ⚠️ Capped, because a hint is the one tracked thing here — and tracked is
+       what makes a tour bad. Five is what stops one being rebuilt gradually. */
+    hints: [
+      { id: "swipe-weeks", surface: "package", body: "Swipe to compare weeks side by side.", roles: ["trainer"] },
+    ],
+  },
+
   /* Nothing has been withdrawn yet — and when it is, it is named here with a reason. */
   retired: {},
   problems: { ...appProblems, ...declareProblems({ "billing.quota_exceeded": { status: 402, title: "You've used everything in your plan", retryable: false } }) },

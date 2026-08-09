@@ -234,10 +234,10 @@ export const ${id.replace(/-/g, "")} = defineApp({
   },
 
   access: {
-    permissions: ["record:read", "record:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "file:read", "file:write"],
+    permissions: ["record:read", "record:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "file:read", "file:write", "guide:read"],
     roles: {
-      owner: ["record:read", "record:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "file:read", "file:write"],
-      reader: ["record:read", "inbox:read", "file:read"],
+      owner: ["record:read", "record:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "file:read", "file:write", "guide:read"],
+      reader: ["record:read", "inbox:read", "file:read", "guide:read"],
     },
     /* ⚠️ Every entry names HOW it is withheld, and composition refuses one whose
        mechanism does not exist. \`parked\` is what a workspace that never chose a
@@ -310,6 +310,22 @@ export const ${id.replace(/-/g, "")} = defineApp({
      Empty is a decision; the field is not optional. */
   jobs: [],
 
+  /*
+    ⚠️ A CHECKLIST, NOT A TOUR — and the wizard is the \`required\` half of it.
+    Every step is answered by COUNTING what is actually there, so it cannot drift
+    from the product, survives a change of device, and un-checks itself if the
+    thing is deleted. A tour step could only ever record "seen".
+  */
+  guide: {
+    steps: [
+      { id: "choose-plan", title: "Choose a plan", roles: ["owner"], required: true, answer: { kind: "platform", fact: "plan_chosen" } },
+      { id: "first-record", title: "Add your first record", roles: ["owner"], required: false, answer: { kind: "collection", collection: "record", atLeast: 1 }, does: "record.create", help: "records" },
+      { id: "a-passkey", title: "Add a passkey so you can sign in with a tap", roles: ["owner", "reader"], required: false, answer: { kind: "platform", fact: "passkey_registered" } },
+    ],
+    /* ⚠️ Capped by the platform, because a hint is the one tracked thing here. */
+    hints: [],
+  },
+
   releases: [{ version: "0.1.0", at: "2026-01-01", notes: ["First release."] }],
 
   /* Nothing has been withdrawn — and when it is, it is named here with a reason. */
@@ -342,7 +358,7 @@ import { deriveSchema, type Actor, type Resolved, type Session } from "@one/kern
 import {
   ACTIVITY_SCHEMA, applySchema, COMMERCE_SCHEMA, createRuntime, DIRECTORY_SCHEMA,
   DOMAIN_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA,
-  JOB_SCHEMA, MEDIA_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
+  GUIDE_SCHEMA, JOB_SCHEMA, MEDIA_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
 } from "@one/runtime";
 import { ${id.replace(/-/g, "")}, records } from "./manifest.js";
 
@@ -353,7 +369,7 @@ if (derived.problems.length) throw new Error(\`${id}: \${derived.problems.map((p
    trusting the array, because a wrong order produces an ALTER against a table
    that does not exist yet, swallowed, leaving a column that never appeared. */
 const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, PLATFORM_STATE_SCHEMA, JOB_SCHEMA];
-export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, INBOX_SCHEMA, MEDIA_SCHEMA, derived.module];
+export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, INBOX_SCHEMA, MEDIA_SCHEMA, GUIDE_SCHEMA, derived.module];
 
 /**
  * ⚠️ IDENTITY IS THE PLATFORM'S; AUTHORIZATION IS THE APP'S. What it returns is

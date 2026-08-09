@@ -100,6 +100,20 @@ export function systemColumns(spec: CollectionSpec): readonly Column[] {
 
 export const tableNameFor = (spec: CollectionSpec): string => `${columnName(spec.id)}s`;
 
+/**
+ * ⚠️ AN ARCHIVED ROW IS NOT A ROW, AND EVERY COUNT HAS TO AGREE ABOUT THAT.
+ *
+ * A collection that archives keeps the row and stamps it, so any query that
+ * forgets the predicate sees deleted records. The list got it right and the
+ * checklist did not — which showed up as a step that stayed ticked after
+ * somebody deleted the only thing it counted, telling them their workspace
+ * contained something it did not.
+ *
+ * One expression, one home, so the next reader of a row count inherits it.
+ */
+export const liveClause = (spec: CollectionSpec): string =>
+  spec.onDelete.on === "archive" ? " AND deleted_at IS NULL" : "";
+
 export interface DerivationProblem {
   readonly collectionId: string;
   readonly rule: string;

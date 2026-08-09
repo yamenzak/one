@@ -18,7 +18,7 @@ import type {
 } from "@one/kernel";
 import {
   columnName, columnsFor, deletionFor, operation, refusesChange,
-  s, tableNameFor, transition, type DocState,
+  liveClause, s, tableNameFor, transition, type DocState,
 } from "@one/kernel";
 
 /* ---------------------------------------------------------------- shapes --- */
@@ -78,8 +78,7 @@ function scopeClause(spec: CollectionSpec): { where: string; binds: (tenantId: s
   return { where: "tenant_id = ?", binds: (tenantId) => [tenantId] };
 }
 
-/** Archived rows are invisible to an ordinary read. */
-const liveClause = (spec: CollectionSpec): string => (spec.onDelete.on === "archive" ? " AND deleted_at IS NULL" : "");
+/* Archived rows are invisible to an ordinary read — `liveClause`, in the kernel. */
 
 /* ------------------------------------------------------------- operations --- */
 
