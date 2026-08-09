@@ -834,23 +834,27 @@ deliverability pre-flight — was mounted by Kova and by neither other app. Read
 before assuming a shared capability reaches every product, and before adding an
 app.
 
-⚠️ **[docs/DOCS-STANDARD.md](docs/DOCS-STANDARD.md) governs every document in
-this repository, including this one.** 44 markdown files, 18,105 lines, and six
-standing instructions to *"update this in the same commit"* — which is the
-failure rather than the fix, in a repo whose guards all exist because wiring that
-must be remembered is wiring that will be forgotten. The rules that bite:
-**a deferral is a `DEFER(id) stage:N` marker, never a sentence** — a marker is
-FOUND by a script rather than remembered, which is the only property that
-survives a compressed conversation, and a stage cannot be flipped to `shipped`
-while anything still defers to it; an inventory lives in a verified
-`<!-- generated: cmd -->` block or not at all; and every document declares a
-`kind`. [docs/README.md](docs/README.md) and
-[docs/DEFERRED.md](docs/DEFERRED.md) are generated — regenerate with
-`node scripts/docs.test.mjs --write`. Enforced by `scripts/docs.test.mjs` in
-`pnpm gate`.
+⚠️ **[platform/docs/STANDARDS.md](platform/docs/STANDARDS.md) governs
+`platform/**` — and this legacy tree not at all.** That is deliberate rather than
+an oversight: `apps/*`, `packages/@4dl/*` and every document beside this one are
+deleted at stage 9, and an exemption list for doomed files is a promise to fix
+something nobody intends to fix. The rules that bite over there: **a deferral is
+a marker in a comment, never a sentence** — it is FOUND by a script rather than
+remembered, which is the only property that survives a compressed conversation,
+and a stage cannot be flipped to `shipped` while anything still defers to it; an
+inventory lives in a verified generated block or not at all; every document
+declares a `kind`; and ⚠️ **a comment states the INVARIANT, never the incident**
+— "the reserve is a ceiling on revenue" stays true forever, while "Scena's copy
+under-counted four ways" describes a codebase that will not exist and reads as a
+live warning about an impossible problem. If a past defect is worth preventing,
+that is a test, not a paragraph.
+[platform/docs/README.md](platform/docs/README.md) and
+[platform/docs/DEFERRED.md](platform/docs/DEFERRED.md) are generated —
+`node platform/scripts/docs.test.mjs --write`. Enforced in `pnpm gate`;
+`pnpm one:test`, `one:typecheck` and `one:gate` run the platform alone.
 
-**[docs/ONE-PLATFORM.md](docs/ONE-PLATFORM.md) is the PLAN for what replaces all
-of this, and nothing in it is built.** A new framework directory that owns the
+**[platform/docs/PLAN.md](platform/docs/PLAN.md) is the PLAN for what replaces
+all of this, and nothing in it is built.** A new framework directory that owns the
 runtime, the data model, the surface (HTTP + AI tools + webhooks) and the chrome,
 driven by a typed manifest per app, with the apps living inside it. Four
 decisions are settled there — a declarative shell with code screens, absorbing

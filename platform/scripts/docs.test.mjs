@@ -1,10 +1,22 @@
 #!/usr/bin/env node
 /**
- * THE DOCUMENTATION GUARD — 18,105 lines of prose, maintained by remembering.
+ * THE DOCUMENTATION GUARD for `platform/**`.
  *
- * `docs/DOCS-STANDARD.md` is the argument; this file is the part that makes it
- * true. A documentation standard enforced by convention decays exactly like the
- * documents it governs, which is the failure it exists to prevent.
+ * `platform/docs/STANDARDS.md` is the argument; this file is what makes it true.
+ * A standard enforced by convention decays exactly like the documents it
+ * governs, which is the failure it exists to prevent.
+ *
+ * ⚠️ IT GOVERNS `platform/` AND NOTHING ELSE, WITH NO EXEMPTIONS.
+ *
+ * The first draft scanned the whole repository and grew a GRANDFATHERED list of
+ * eleven legacy documents plus a carve-out for the help corpus. That was the
+ * wrong shape: an exemption list is a promise to fix something, and the legacy
+ * tree is not going to be fixed — it is deleted at stage 9. Maintaining a
+ * shrinking allowance for doomed files is work that buys nothing, and it lets
+ * the new tree inherit the old tree's compromises on day one.
+ *
+ * So the legacy tree is UNGOVERNED, deliberately, and this tree has no
+ * exemptions at all.
  *
  * Four checks, each aimed at a failure that produces no error today:
  *
@@ -30,7 +42,9 @@ import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
 import { join, relative, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+/** The governed tree. Everything outside it is legacy and out of scope. */
+const ROOT = join(REPO, "platform");
 const WRITE = process.argv.includes("--write");
 
 let bad = 0;
@@ -57,21 +71,6 @@ const codeFiles = walk(ROOT, (n) => /\.(ts|tsx|mjs|js)$/.test(n));
 /* ------------------------------------------------------------------ 1. KIND */
 
 /**
- * Documents that predate the standard.
- *
- * ⚠️ This list may only SHRINK. An entry that gains front matter fails the guard
- * until it is deleted from here, so it cannot rot into a permanent exemption —
- * the same rule `KNOWN_UNENFORCED` follows in the entitlement guard, and for the
- * same reason: a gap list that outlives the gap tells the next reader the work
- * is still outstanding.
- */
-const GRANDFATHERED = new Set([
-  "AGENTS.md", "CLAUDE.md", "DEPLOY.md", "KOVA.md", "PLATFORM.md", "README.md",
-  "SCENA.md", "TESSA.md", "UI-LANGUAGE.md",
-  "apps/scena/DEPLOY.md", "packages/README.md",
-]);
-
-/**
  * `guide` is user-facing product documentation — it rots when the PRODUCT
  * changes rather than when the code does, and its reader is a customer rather
  * than whoever maintains the repo. Forcing it into `contract` would put a
@@ -95,27 +94,14 @@ function frontMatter(src) {
 const kinds = new Map();
 for (const file of mdFiles) {
   const rel = relative(ROOT, file);
-  // A package's own README is API documentation living beside its code — level
-  // 3 of the ranking, and already governed by the package boundary rules.
-  if (/^(packages|apps)\/[^/]+\/README\.md$/.test(rel)) continue;
+  // A package's own README is API documentation beside its code — level 3 of the
+  // ranking, and governed by the package boundary rules instead.
+  if (/^[^/]+\/README\.md$/.test(rel)) continue;
   const fm = frontMatter(readFileSync(file, "utf8"));
-  /*
-    ⚠️ A HELP ARTICLE IS ALREADY GOVERNED, by a stricter schema than this one.
-    `docs/help/**` carries `id`, `app`, `title`, `role` and `summary`, it is read
-    by the Help Centre, and under ONE it becomes a manifest declaration. A second
-    taxonomy over the top of a working one is how you get two answers to "what is
-    this file" — so the only thing checked here is that the front matter exists.
-  */
-  if (rel.startsWith("docs/help/") && fm?.id && fm?.app) continue;
   if (!fm?.kind) {
-    if (GRANDFATHERED.has(rel)) continue;
-    fail(`${rel} has no \`kind\` in front matter.\n` +
-         `       Add one of: ${[...KINDS].join(", ")} — see docs/DOCS-STANDARD.md §1.`);
+    fail(`platform/${rel} has no \`kind\` in front matter.\n` +
+         `       Add one of: ${[...KINDS].join(", ")} — see platform/docs/STANDARDS.md §2.`);
     continue;
-  }
-  if (GRANDFATHERED.has(rel)) {
-    fail(`${rel} HAS front matter now — delete it from GRANDFATHERED.\n` +
-         `       An exemption that outlives the gap reads as outstanding work.`);
   }
   if (!KINDS.has(fm.kind)) {
     fail(`${rel} declares kind "${fm.kind}", which is not one of ${[...KINDS].join(", ")}.`);
@@ -130,7 +116,7 @@ for (const file of mdFiles) {
     }
   }
 }
-ok(`kind: ${kinds.size} document(s) declared, ${GRANDFATHERED.size} grandfathered`);
+ok(`kind: ${kinds.size} document(s) declared, 0 exemptions`);
 
 /* ----------------------------------------------------------------- 2. DEFER */
 
@@ -176,7 +162,7 @@ const open = [];
 
 for (const file of [...mdFiles, ...codeFiles]) {
   const rel = relative(ROOT, file);
-  if (rel === "scripts/docs.test.mjs" || rel === "docs/DOCS-STANDARD.md") continue;
+  if (rel === "scripts/docs.test.mjs" || rel === "docs/STANDARDS.md") continue;
   const src = readFileSync(file, "utf8");
   const regions = commentRegions(src, file.endsWith(".md"));
   const inComment = (i) => regions.some(([a, b]) => i >= a && i < b);
@@ -242,7 +228,7 @@ const GEN_RE = /<!--\s*generated:\s*(.+?)\s*-->\n([\s\S]*?)<!--\s*\/generated\s*
 let genCount = 0;
 for (const file of mdFiles) {
   const rel = relative(ROOT, file);
-  if (rel === "docs/DOCS-STANDARD.md") continue;
+  if (rel === "docs/STANDARDS.md") continue;
   const src = readFileSync(file, "utf8");
   for (const m of src.matchAll(GEN_RE)) {
     const [, cmd, body] = m;
@@ -281,7 +267,7 @@ for (const file of mdFiles) {
   }
 }
 /** Entry points: nothing links to these and nothing should have to. */
-const ROOTS = new Set(["README.md", "CLAUDE.md", "AGENTS.md", "docs/DEFERRED.md", "docs/README.md"]);
+const ROOTS = new Set(["docs/PLAN.md", "docs/DEFERRED.md", "docs/README.md"]);
 let orphans = 0;
 for (const [rel, fm] of kinds) {
   if (ROOTS.has(rel) || linked.has(rel)) continue;
@@ -323,8 +309,7 @@ const KIND_BLURB = {
 const indexDoc =
   `---\nkind: index\n---\n\n# Documents\n\n` +
   `> ⚠️ GENERATED by \`node scripts/docs.test.mjs --write\`. Do not edit.\n` +
-  `> The standard is [DOCS-STANDARD.md](DOCS-STANDARD.md); ${GRANDFATHERED.size} document(s)\n` +
-  `> predate it and are listed in the guard's shrinking exemption list.\n\n` +
+  `> The standard is [STANDARDS.md](STANDARDS.md), and it has no exemptions.\n\n` +
   [...byKind]
     .map(([kind, rows]) =>
       `## ${kind}\n\n${KIND_BLURB[kind] ?? ""}\n\n` +

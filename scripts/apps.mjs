@@ -226,9 +226,22 @@ export function emailSql(id) {
 /** Every app directory that looks deployable — used to catch an unregistered one. */
 export function discoverWorkerDirs() {
   const out = [];
-  for (const name of readdirSync(join(ROOT, "apps"))) {
-    const dir = join("apps", name);
-    if (existsSync(join(ROOT, dir, "wrangler.jsonc"))) out.push(dir);
+  /*
+    ⚠️ BOTH TREES, and `platform/` is the one that would have been missed.
+
+    This walked `apps/` only, which was complete for as long as `apps/` was the
+    only place a worker could live. `platform/` changes that: a `wrangler.jsonc`
+    there would be invisible to the registry check, so it could ship — or fail to
+    ship — with nothing saying why. That is the same silence this guard exists to
+    break, one directory over, and it is cheaper to close before the directory
+    has anything in it than after.
+  */
+  for (const tree of ["apps", "platform"]) {
+    if (!existsSync(join(ROOT, tree))) continue;
+    for (const name of readdirSync(join(ROOT, tree))) {
+      const dir = join(tree, name);
+      if (existsSync(join(ROOT, dir, "wrangler.jsonc"))) out.push(dir);
+    }
   }
   return out;
 }

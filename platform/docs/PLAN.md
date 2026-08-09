@@ -9,9 +9,14 @@ kind: plan
 > for future ones. It supersedes nothing yet: `packages/@4dl/*` and `apps/*`
 > remain the shipping system until a stage below says otherwise.
 >
-> Read [PLATFORM.md](../PLATFORM.md) first for what exists today, and
-> [docs/PLATFORM-AUDIT.md](PLATFORM-AUDIT.md) for the three-app assessment this
-> grew out of. Those two documents are the evidence; this one is the response.
+> **[STANDARDS.md](STANDARDS.md) is how we write while building it** — the
+> invariant-not-the-incident rule, deferral markers, help, release notes and the
+> per-app test budget. Read it before the first commit; it governs `platform/**`
+> absolutely and the legacy tree not at all.
+>
+> Read [PLATFORM.md](../../PLATFORM.md) for what exists today, and
+> [docs/PLATFORM-AUDIT.md](../../docs/PLATFORM-AUDIT.md) for the three-app
+> assessment this grew out of. Those two are the evidence; this is the response.
 
 ---
 

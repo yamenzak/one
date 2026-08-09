@@ -1,3 +1,6 @@
 packages:
+  # The new platform. Inert by construction: nothing here is in apps.json,
+  # so `deploy.yml` can never select it — but its tests DO run.
+  - "platform/*"
   - "apps/*"
   - "packages/*"
