@@ -13,7 +13,8 @@
 import type { BindingSpec } from "./bindings.js";
 import type { CollectionSpec } from "./collection.js";
 import type { Currency, Locale, RegionId, TimeZone, UnitSystem } from "./primitives.js";
-import type { ProblemCatalog } from "./problem.js";
+import type { ProblemCatalog, ProblemDef } from "./problem.js";
+import { PLATFORM_PROBLEMS } from "./problem.js";
 import type { OperationSpec } from "./operation.js";
 
 /* -------------------------------------------------------------- identity --- */
@@ -118,7 +119,32 @@ export interface SoundSpec {
 
 /* ------------------------------------------------------------------ app --- */
 
-export interface AppSpec<B extends BindingSpec> {
+/**
+ * ⚠️ THE CODES AN OPERATION IS ALLOWED TO FAIL WITH.
+ *
+ * The app's own catalogue plus the platform's, because the platform raises its
+ * codes on an operation's behalf — the gate, the resolver and the router all
+ * answer before a handler runs — so requiring an app to re-declare them would be
+ * asking it to describe machinery it does not own.
+ */
+export type DeclaredCode<P extends ProblemCatalog> = (keyof P & string) | (keyof typeof PLATFORM_PROBLEMS & string);
+
+/**
+ * ⚠️ THE CHECK THAT MAKES A `Problem` CATALOGUE A CONTRACT RATHER THAN A LIST.
+ *
+ * An operation naming a code nobody declared is a failure with no copy, no
+ * status and no help link — which at runtime becomes a generic 503 wearing the
+ * shape of a specific answer, and no test anywhere fails. Resolving it at
+ * composition time is the only place both halves are in scope.
+ *
+ * The mechanism: this evaluates to `never` when every `fails` entry is declared,
+ * and to the offending literal otherwise — which `defineApp` turns into a type
+ * error naming the code.
+ */
+export type UndeclaredFailure<O extends readonly { readonly fails?: readonly string[] }[], P extends ProblemCatalog> =
+  Exclude<NonNullable<O[number]["fails"]>[number], DeclaredCode<P>>;
+
+export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = ProblemCatalog> {
   readonly id: string;
   readonly name: string;
   /** ⚠️ Live data once anything is sold: it tags every Stripe object we create. */
@@ -134,17 +160,36 @@ export interface AppSpec<B extends BindingSpec> {
 
   readonly collections: readonly CollectionSpec[];
   /*
-    DEFER(one-001) stage:1 — a builder that accumulates the operation union, so
-    `fails` can be checked against declared problems and `emits` against declared
-    notifications. See test/FINDINGS.md §4.
+    DEFER(one-013) stage:6 — the same treatment for `emits`, against the declared
+    notification registry. Deferred rather than done because notifications are
+    not declarable yet; the FAILURE half is the one with a live consequence, and
+    it is checked below.
   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
-  readonly operations: readonly OperationSpec<B, any, any>[];
-  readonly problems: ProblemCatalog;
+  readonly operations: readonly OperationSpec<B, any, any, string>[];
+  readonly problems: P;
 
   readonly sounds?: SoundSpec;
 }
 
-export function defineApp<const B extends BindingSpec>(spec: AppSpec<B>): AppSpec<B> {
+/**
+ * Compose an app.
+ *
+ * ⚠️ IT REFUSES AN OPERATION THAT FAILS WITH A CODE NOBODY DECLARED, and the
+ * error names the code. That check can only live here: an operation is written
+ * before the catalogue it will be composed with, so its own declaration site
+ * cannot see one.
+ */
+export function defineApp<
+  const B extends BindingSpec,
+  const P extends ProblemCatalog,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
+  const O extends readonly OperationSpec<B, any, any, string>[],
+>(
+  spec: AppSpec<B, P> & { readonly operations: O } & (
+    [UndeclaredFailure<O, P>] extends [never] ? unknown
+      : { readonly problems: { readonly [K in UndeclaredFailure<O, P>]: ProblemDef } }
+  ),
+): AppSpec<B, P> {
   return spec;
 }

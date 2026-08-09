@@ -13,6 +13,7 @@
  * package.json files.
  */
 export * from "./primitives.js";
+export * from "./validate.js";
 export * from "./bindings.js";
 export * from "./doors.js";
 export * from "./identity.js";

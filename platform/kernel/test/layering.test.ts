@@ -20,6 +20,7 @@ const SRC = join(import.meta.dirname, "..", "src");
 const LAYER: Record<string, number> = {
   "primitives.ts": 0,
   "bindings.ts": 1,
+  "validate.ts": 1,
   "problem.ts": 1,
   "doors.ts": 1,
   "standing.ts": 1,

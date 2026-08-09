@@ -867,6 +867,9 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `binding-chokepoint` | any runtime binding touched outside its owner — a query that will hit the wrong continent the day a second region exists | **live** |
 | `kv-key-space` | a KV write outside the allow-listed key space — the one store that cannot be regionalised may never hold anything personal | **live** |
 | `directory-columns` | a column on the global tenant directory outside the routing-data allow-list | **live** |
+| `operation-registry` | a route, tool or webhook that did not come from `operation()` | **live** |
+| `tool-subset-route` | an AI tool reachable where the equivalent route is not | **live** |
+| `problem-envelope` | a failure body that is not a `Problem`, a code with no copy, or a `catch` that re-throws or serialises a provider's error | **live** |
 | `schema-idempotent` | a schema module that is not re-runnable, a duplicate table across modules, or a module ordered before something it declares it needs | **live** |
 | `boot-per-region` | a deployment that composes one region's schema and serves another — the tenant resolves, reaches the right database, and finds nothing in it | **live** |
 | `standing-not-permission` | an always-allowed lane that skips the permission check with the standing gate | **live** |
@@ -874,9 +877,10 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `passkey-needs-session` | a credential registered with no session behind it, which turns the strongest factor into the cheapest account takeover | **live** |
 | `ceremony-refusals` | an assertion accepted for the wrong origin, the wrong relying party, a replayed challenge, a stalled counter or the wrong ceremony type | **live** |
 | `no-membership-oracle` | a sign-in endpoint that answers differently for an address with an account — type an address, learn whether that person uses the product | **live** |
-| `operation-registry` | a route, tool or webhook that did not come from `operation()` | stage 2 |
-| `tool-subset-route` | an AI tool reachable where the equivalent route is not | stage 2 |
-| `problem-envelope` | a failure body that is not a `Problem`, a code with no copy, or a `catch` that re-throws or serialises a provider's error | stage 2 |
+| `one-dispatcher` | a second path that invokes a handler — two dispatchers is how an agent ends up able to do something a route cannot | **live** |
+| `fails-declared` | an operation naming a failure code no catalogue declares, which becomes a generic 503 wearing the shape of a specific answer | **live** |
+| `agent-equals-caller` | a tool offered where the equivalent route would refuse, or an operation withheld from every model that is reachable by name | **live** |
+| `input-parsed` | an operation whose input is asserted rather than parsed — a type assertion compiles, reads like validation, and lets a number reach a text column | **live** |
 | `erasure-derived` | a table carrying a scope column and declaring none | stage 3 |
 | `schema-adjacency` | a module ordered where its dependency has not run | stage 3 |
 | `relocatable-do` | a Durable Object class that cannot seal, export and import its state | stage 3 |

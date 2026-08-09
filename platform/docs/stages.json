@@ -26,12 +26,12 @@
     {
       "id": "1",
       "title": "Kernel \u2014 bindings, identity, tenancy, regions, standing",
-      "status": "active"
+      "status": "shipped"
     },
     {
       "id": "2",
       "title": "Surface \u2014 operations to routes, tools, webhooks, OpenAPI",
-      "status": "active"
+      "status": "shipped"
     },
     {
       "id": "3",

@@ -17,7 +17,7 @@
  */
 
 import type { AnyOperation, AppSpec, BindingSpec, Credential, Instant, Session, SqlHandle, UserId } from "@one/kernel";
-import { operation, PUBLIC, shouldOfferRootCredential } from "@one/kernel";
+import { nothing, operation, PUBLIC, s, shouldOfferRootCredential } from "@one/kernel";
 import { b64u, verifyAssertion, verifyRegistration } from "./webauthn.js";
 import type { IdentityStore, SessionStore } from "./identity.js";
 import { sessionCookie, clearedCookie } from "./identity.js";
@@ -70,8 +70,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "identity.code.request",
     kind: "write",
     summary: "Send a one-time sign-in code to an email address.",
-    input: {} as { _t?: { email: string } },
-    output: {} as { _t?: { sent: boolean; retryAfter?: number } },
+    input: s.object({ email: s.text({ max: 320 }) }),
+    output: s.object({ sent: s.bool() }),
     permission: PUBLIC,
     idempotency: { mode: "natural", key: "email" },
     fails: ["platform.invalid", "platform.too_many"],
@@ -121,8 +121,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "identity.code.verify",
     kind: "write",
     summary: "Exchange a one-time code for a session.",
-    input: {} as { _t?: { email: string; code: string } },
-    output: {} as { _t?: { accountId: string; offerPasskey: boolean } },
+    input: s.object({ email: s.text({ max: 320 }), code: s.text({ min: 6, max: 6 }) }),
+    output: s.object({ accountId: s.text(), offerPasskey: s.bool() }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
     fails: ["platform.invalid", "platform.too_many"],
@@ -176,8 +176,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "identity.passkey.register.begin",
     kind: "write",
     summary: "Start adding a passkey to the signed-in account.",
-    input: {} as { _t?: Record<string, never> },
-    output: {} as { _t?: { challenge: string; relyingParty: string; accountId: string; exclude: string[] } },
+    input: nothing(),
+    output: s.object({ challenge: s.text(), relyingParty: s.text(), accountId: s.text(), exclude: s.array(s.text()) }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
     fails: ["platform.forbidden"],
@@ -209,8 +209,11 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "identity.passkey.register.finish",
     kind: "write",
     summary: "Finish adding a passkey.",
-    input: {} as { _t?: { challenge: string; attestationObject: string; clientDataJSON: string; label?: string } },
-    output: {} as { _t?: { credentialId: string; relyingParty: string } },
+    input: s.object({
+      challenge: s.text({ max: 200 }), attestationObject: s.text({ max: 8000 }),
+      clientDataJSON: s.text({ max: 4000 }), label: s.optional(s.text({ max: 60 })),
+    }),
+    output: s.object({ credentialId: s.text(), relyingParty: s.text() }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
     fails: ["platform.forbidden", "platform.invalid"],
@@ -253,8 +256,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "identity.passkey.begin",
     kind: "write",
     summary: "Start signing in with a passkey.",
-    input: {} as { _t?: { email: string } },
-    output: {} as { _t?: { challenge: string; relyingParty: string; allow: string[] } },
+    input: s.object({ email: s.text({ max: 320 }) }),
+    output: s.object({ challenge: s.text(), relyingParty: s.text(), allow: s.array(s.text()) }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
     tool: false,
@@ -281,8 +284,12 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "identity.passkey.finish",
     kind: "write",
     summary: "Finish signing in with a passkey.",
-    input: {} as { _t?: { challenge: string; credentialId: string; authenticatorData: string; clientDataJSON: string; signature: string } },
-    output: {} as { _t?: { accountId: string } },
+    input: s.object({
+      challenge: s.text({ max: 200 }), credentialId: s.text({ max: 500 }),
+      authenticatorData: s.text({ max: 4000 }), clientDataJSON: s.text({ max: 4000 }),
+      signature: s.text({ max: 2000 }),
+    }),
+    output: s.object({ accountId: s.text() }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
     fails: ["platform.invalid"],
@@ -332,14 +339,17 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "identity.session.read",
     kind: "read",
     summary: "Who is signed in on this origin.",
-    input: {} as { _t?: Record<string, never> },
-    output: {} as { _t?: { signedIn: boolean; email?: string; name?: string | null } },
+    input: nothing(),
+    output: s.object({ signedIn: s.bool(), email: s.optional(s.text()), name: s.optional(s.text()) }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
     async handler(ctx) {
       const d = deps(ctx);
       if (!d.session) return { signedIn: false };
-      return { signedIn: true, email: d.session.snapshot.email, name: d.session.snapshot.name };
+      // `?? undefined` rather than `null`: absent and empty are the same answer
+      // for a display name, and one shape on the wire is one fewer branch in a
+      // client that has to render it.
+      return { signedIn: true, email: d.session.snapshot.email, name: d.session.snapshot.name ?? undefined };
     },
   });
 
@@ -347,8 +357,8 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "identity.signout",
     kind: "write",
     summary: "End this session.",
-    input: {} as { _t?: { everywhere?: boolean } },
-    output: {} as { _t?: { ok: true } },
+    input: s.object({ everywhere: s.optional(s.bool()) }),
+    output: s.object({ ok: s.bool() }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
     tool: false,

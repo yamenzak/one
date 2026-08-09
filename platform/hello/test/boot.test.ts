@@ -183,6 +183,29 @@ describe("a request resolves to a tenant and its region", () => {
     expect((await call("https://nobody.hello.4dl.app/api/notes.list", { as: "member" })).status).toBe(404);
   });
 
+  /*
+    ⚠️ PARSED AT THE BOUNDARY, so a handler never sees a value it has to check.
+    A number in a text field is stored happily by SQLite — its types are per
+    value — and the row is wrong with nothing throwing anywhere.
+  */
+  it("refuses a body the shape does not describe, naming each field", async () => {
+    const [status, body] = await json(await call("https://north.hello.4dl.app/api/notes.create", {
+      method: "POST", as: "member", body: JSON.stringify({ title: 42 }),
+    }));
+    expect(status).toBe(400);
+    expect(body).toMatchObject({ code: "platform.invalid", fields: { title: "must be text" } });
+  });
+
+  it("drops a field nobody declared rather than forwarding it", async () => {
+    // A writer that spread its input would otherwise take `tenant_id` with it.
+    const [status] = await json(await call("https://north.hello.4dl.app/api/notes.create", {
+      method: "POST", as: "member", body: JSON.stringify({ title: "fine", tenant_id: "t_someone_else" }),
+    }));
+    expect(status).toBe(200);
+    const [, listed] = await json(await call("https://north.hello.4dl.app/api/notes.list", { as: "member" }));
+    expect((listed as { notes: { title: string }[] }).notes.some((n) => n.title === "fine")).toBe(true);
+  });
+
   it("reports a declared failure as a Problem, with a reference", async () => {
     const [status, body] = await json(await call("https://north.hello.4dl.app/api/notes.create", {
       method: "POST", as: "member", body: JSON.stringify({ title: "" }),

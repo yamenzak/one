@@ -8,16 +8,6 @@ kind: index
 > Every entry is a `DEFER` marker somewhere in the repository. Nothing here
 > was remembered — it was found, which is the point (docs/DOCS-STANDARD.md §2).
 
-## Stage 1 — Kernel — bindings, identity, tenancy, regions, standing
-
-- `one-001` — a builder that accumulates the operation union, so  
-  <sub>kernel/src/app.ts:137</sub>
-
-## Stage 2 — Surface — operations to routes, tools, webhooks, OpenAPI
-
-- `one-002` — bind to the real validator, and make `output` carry  
-  <sub>kernel/src/operation.ts:112</sub>
-
 ## Stage 3 — Data — collections, ledger, files, jobs, relocation
 
 - `one-012` — a durable actor binding, which arrives with the  
@@ -36,3 +26,5 @@ kind: index
 
 - `one-003` — resolve against the declared help registry, so a  
   <sub>kernel/src/problem.ts:20</sub>
+- `one-013` — the same treatment for `emits`, against the declared  
+  <sub>kernel/src/app.ts:163</sub>

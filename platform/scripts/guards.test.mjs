@@ -98,11 +98,29 @@ for (const g of guards.filter((x) => x.status === "live" && x.impl)) {
     if (!invocations.includes(`platform/${g.impl}`)) {
       fail(`${at}: ${g.impl} is not named by the root \`gate\` or \`one:gate\` script, so it never runs.`);
     }
-  } else if (!/^[^/]+\/test\/.+\.test\.ts$/.test(g.impl)) {
-    fail(`${at}: ${g.impl} is not where the test runner looks (\`<package>/test/*.test.ts\`), so it never runs.`);
+  } else if (/^[^/]+\/test\/.+\.test\.ts$/.test(g.impl)) {
+    // A vitest file under `<package>/test/`. `pnpm one:test` runs it.
+  } else if (/^[^/]+\/test\/.+\.ts$/.test(g.impl)) {
+    /*
+      ⚠️ A COMPILE-TIME ASSERTION IS INVOKED BY THE TYPE CHECKER, not by a test
+      runner — a file of `@ts-expect-error` directives has no assertions to run
+      and proves its point by compiling. It only counts if the package actually
+      checks it, so the tsconfig must include the directory and the package must
+      have a `typecheck` script. Neither is true by default, and a guard living
+      in a file nothing compiles is the same green line produced by nothing.
+    */
+    const pkg = g.impl.split("/")[0];
+    const cfgPath = join(ROOT, pkg, "tsconfig.json");
+    const pkgPath = join(ROOT, pkg, "package.json");
+    const cfg = existsSync(cfgPath) ? readFileSync(cfgPath, "utf8") : "";
+    const manifest = existsSync(pkgPath) ? JSON.parse(readFileSync(pkgPath, "utf8")) : {};
+    if (!/"test\/\*\*\/\*"/.test(cfg)) fail(`${at}: ${pkg}/tsconfig.json does not include \`test/**/*\`, so ${g.impl} is never compiled.`);
+    else if (!manifest.scripts?.typecheck) fail(`${at}: ${pkg} has no \`typecheck\` script, so ${g.impl} is never checked.`);
+  } else {
+    fail(`${at}: ${g.impl} is neither a guard script nor a file under \`<package>/test/\`, so nothing invokes it.`);
   }
 }
-ok(`invoked: every live guard is reached by \`pnpm gate\` or \`pnpm one:test\``);
+ok(`invoked: every live guard is reached by \`pnpm gate\`, \`pnpm one:test\` or \`pnpm one:typecheck\``);
 
 /* ------------------------------------------------------------------- 4. OWED */
 

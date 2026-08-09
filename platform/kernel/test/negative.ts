@@ -15,11 +15,13 @@
 import type { Instant, Money, PlainDate, Id, RegionId } from "../src/primitives.js";
 import { defineBindings, sql } from "../src/bindings.js";
 import type { RegionalBindings } from "../src/resolve.js";
+import { defineApp } from "../src/app.js";
+import { nothing, s } from "../src/validate.js";
+import { kova } from "./proof.app.js";
 import type { DirectoryEntry } from "../src/directory.js";
 import type { CacheStore } from "../src/bindings.js";
 import { collection, field } from "../src/collection.js";
 import { operation } from "../src/operation.js";
-import { z } from "./z.js";
 
 /* ---------------------------------------------------------------- time --- */
 
@@ -102,8 +104,8 @@ export const nonIdempotent = operation({
   id: "x.y",
   kind: "write",
   summary: "…",
-  input: z<{ a: string }>(),
-  output: z<{ b: string }>(),
+  input: s.object({ a: s.text() }),
+  output: s.object({ b: s.text() }),
   permission: "x:y",
   async handler() {
     return { b: "" };
@@ -116,8 +118,8 @@ export const unexplainedHide = operation({
   id: "x.z",
   kind: "write",
   summary: "…",
-  input: z<{ a: string }>(),
-  output: z<{ b: string }>(),
+  input: s.object({ a: s.text() }),
+  output: s.object({ b: s.text() }),
   permission: "x:z",
   idempotency: { mode: "none" },
   // @ts-expect-error — `{ why }` is required when hiding from the tool surface
@@ -156,3 +158,29 @@ export const leakyEntry: DirectoryEntry = {
   // property ⇒ annotate the property, as with a wrong value)
   ownerEmail: "someone@example.com",
 };
+
+/* -------------------------------------------------------------- failures --- */
+
+// ⚠️ AN OPERATION MAY NOT FAIL WITH A CODE NOBODY DECLARED.
+//
+// At runtime an undeclared code has no copy, no status and no help link, so it
+// becomes a generic 503 wearing the shape of a specific answer — and nothing
+// fails anywhere. The check can only live at composition: an operation is
+// written before the catalogue it will be composed with, so its own declaration
+// site cannot see one.
+const inventsAFailure = operation({
+  id: "notes.write", kind: "write", summary: "Write a note.",
+  input: nothing(), output: nothing(),
+  permission: "note:write", idempotency: { mode: "none" },
+  fails: ["notes.on_fire"],
+  async handler() { throw new Error("types only"); },
+});
+
+// @ts-expect-error — "notes.on_fire" is in no catalogue (the OBJECT is wrong, so
+// the error lands on the argument rather than on the call)
+defineApp({ ...kova, operations: [inventsAFailure], problems: {} });
+
+// A platform code needs no re-declaration: the gate and the resolver raise them
+// on an operation's behalf, long before its handler runs.
+const failsWithAPlatformCode = { ...inventsAFailure, fails: ["platform.conflict"] as const };
+defineApp({ ...kova, operations: [failsWithAPlatformCode], problems: {} });

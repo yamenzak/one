@@ -165,21 +165,27 @@
       "group": "platform",
       "fails": "a route, tool or webhook that did not come from `operation()`",
       "stage": "2",
-      "status": "owed"
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "hand-registered route"
     },
     {
       "id": "tool-subset-route",
       "group": "platform",
       "fails": "an AI tool reachable where the equivalent route is not",
       "stage": "2",
-      "status": "owed"
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "one filter, over one registry"
     },
     {
       "id": "problem-envelope",
       "group": "platform",
       "fails": "a failure body that is not a `Problem`, a code with no copy, or a `catch` that re-throws or serialises a provider's error",
       "stage": "2",
-      "status": "owed"
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "a caught error is being put into a response"
     },
     {
       "id": "erasure-derived",
@@ -418,6 +424,42 @@
       "status": "live",
       "impl": "hello/test/identity.test.ts",
       "proves": "answers a stranger exactly as it answers a member"
+    },
+    {
+      "id": "one-dispatcher",
+      "group": "platform",
+      "fails": "a second path that invokes a handler \u2014 two dispatchers is how an agent ends up able to do something a route cannot",
+      "stage": "2",
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "Exactly one may"
+    },
+    {
+      "id": "fails-declared",
+      "group": "kernel",
+      "fails": "an operation naming a failure code no catalogue declares, which becomes a generic 503 wearing the shape of a specific answer",
+      "stage": "2",
+      "status": "live",
+      "impl": "kernel/test/negative.ts",
+      "proves": "is in no catalogue"
+    },
+    {
+      "id": "agent-equals-caller",
+      "group": "platform",
+      "fails": "a tool offered where the equivalent route would refuse, or an operation withheld from every model that is reachable by name",
+      "stage": "2",
+      "status": "live",
+      "impl": "hello/test/tools.test.ts",
+      "proves": "offers exactly what a route would allow"
+    },
+    {
+      "id": "input-parsed",
+      "group": "kernel",
+      "fails": "an operation whose input is asserted rather than parsed \u2014 a type assertion compiles, reads like validation, and lets a number reach a text column",
+      "stage": "2",
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "asserted rather than parsed"
     }
   ]
 }

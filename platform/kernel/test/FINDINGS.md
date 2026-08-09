@@ -568,3 +568,43 @@ so `clientDataJSON` matched the noun `client`. The narrow fix was a file-scoped
 exemption naming ONE noun with a reason: a wire protocol's field names appear a
 dozen times in the file implementing it, and a dozen line exemptions teach
 everybody that exemptions are routine.
+
+## 42. `const` on the wrong parameter destroys inference
+
+Preserving `fails: ["a.b"]` as a literal looked like a job for `const S extends
+OperationSpec<B,I,O>`. It works, and it takes `I` and `O` with it: every
+`scope: (i) => …` and `audit: (i) => …` callback loses its parameter type,
+because `I` is now inferred from `S` rather than from `input`.
+
+The fix is to give the ONE field that needs literals its own type parameter.
+General advice with a specific edge: `const` on a whole spec is a blunt
+instrument, and the blast radius is every other inference site in it.
+
+## 43. A widened literal makes a type-level check vacuous, silently
+
+`defineApp` refuses an operation that fails with an undeclared code. It compiled,
+passed, and proved nothing: `fails` was typed `readonly string[]`, so the check
+computed `Exclude<string, "a" | "b">`, which is `string`, which satisfies the
+index signature it was compared against.
+
+⚠️ **A type-level assertion needs a negative case exactly as much as a runtime
+one does.** `@ts-expect-error` on a deliberately-wrong composition is what caught
+this — the directive reported itself unused, which is the type system saying the
+check was not firing.
+
+## 44. A `declare const` symbol is `undefined` at runtime
+
+The optional-field marker was `declare const OPTIONAL: unique symbol`, which is a
+type-only declaration. The type worked; the runtime lookup became
+`obj[undefined]`, so `isOptional` returned false for everything and every
+optional field silently became required.
+
+The rule: **a brand read at runtime must exist at runtime.** `const X: unique
+symbol = Symbol.for(…)` gives both halves; `declare const` gives only the type.
+
+## 45. The layering test refuses a module it has no layer for
+
+Adding `validate.ts` turned the suite red — not because it violated the
+direction, but because it was absent from the map. That is the check working:
+the alternative is a new module that quietly belongs to no layer and may import
+anything, which is how a layered design stops being one.

@@ -17,10 +17,10 @@
  * attempt, which is the actual output of stage 0.
  */
 
-import { z } from "./z.js";
 import { defineBindings, sql, objects, cache, actor, inference } from "../src/bindings.js";
 import { declareProblems } from "../src/problem.js";
 import { operation } from "../src/operation.js";
+import { s } from "../src/validate.js";
 
 /* ------------------------------------------------------------- bindings --- */
 
@@ -67,15 +67,17 @@ export const readProgress = operation({
   id: "coaching.progress.read",
   kind: "read",
   summary: "Read a client's progress across the lenses their package includes.",
-  input: z<{ clientId: string; from: string; to: string }>(),
-  output: z<{
-    wellness: unknown;
-    consistency: unknown;
-    body?: unknown;
-    training?: unknown;
-    nutrition?: unknown;
-    included: Record<string, boolean>;
-  }>(),
+  /*
+    ⚠️ THE INPUT TYPE IS INFERRED FROM THE SHAPE, never restated beside it. Two
+    declarations of the same thing is a pair that drifts, and the half that
+    drifts is always the one nothing runs.
+  */
+  input: s.object({ clientId: s.id("client"), from: s.plainDate(), to: s.plainDate() }),
+  output: s.object({
+    wellness: s.json(), consistency: s.json(),
+    body: s.optional(s.json()), training: s.optional(s.json()), nutrition: s.optional(s.json()),
+    included: s.json(),
+  }),
 
   permission: "client:read",
   scope: (i) => ({ client: i.clientId }),
@@ -106,8 +108,8 @@ export const publishPlan = operation({
   id: "training.plan.publish",
   kind: "write",
   summary: "Publish a training plan so the client can start it.",
-  input: z<{ planId: string; clientId: string }>(),
-  output: z<{ publishedAt: string }>(),
+  input: s.object({ planId: s.id("plan"), clientId: s.id("client") }),
+  output: s.object({ publishedAt: s.instant() }),
 
   permission: "plan:publish",
   entitlement: "trainingPlans",
@@ -148,8 +150,8 @@ export const applyPackageGrant = operation({
   id: "commerce.package.grant",
   kind: "write",
   summary: "Apply a purchased package's budgets and flags to a customer.",
-  input: z<{ subjectId: string; packageId: string; eventId: string }>(),
-  output: z<{ daysAdded: number }>(),
+  input: s.object({ subjectId: s.id("subject"), packageId: s.id("package"), eventId: s.text({ max: 200 }) }),
+  output: s.object({ daysAdded: s.number({ integer: true }) }),
 
   permission: "commerce:grant",
   entitlement: "customerPackages",

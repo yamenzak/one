@@ -15,6 +15,7 @@
  */
 
 import type { BindingSpec, ResolvedBindings } from "./bindings.js";
+import type { Shape } from "./validate.js";
 import type { Actor, Instant, RegionId, TenantId } from "./primitives.js";
 import type { HelpId, Problem } from "./problem.js";
 
@@ -107,15 +108,6 @@ export interface Ctx<B extends BindingSpec> {
 /* ------------------------------------------------------------- operation --- */
 
 /**
- * A stand-in for the runtime validator.
- *
- * DEFER(one-002) stage:2 — bind to the real validator, and make `output` carry
- * BRANDED types so an Instant is protected at the wire and not only in the
- * column. See test/FINDINGS.md §7.
- */
-export interface Schema<T> { readonly _t?: T }
-
-/**
  * ⚠️ READ OR WRITE, DECLARED. Stage 2 needed this and stage 0 did not have it.
  *
  * It decides three things at once, which is why it is worth a field rather than
@@ -128,13 +120,23 @@ export interface Schema<T> { readonly _t?: T }
  */
 export type OperationKind = "read" | "write";
 
-export interface OperationSpec<B extends BindingSpec, I, O> {
+export interface OperationSpec<B extends BindingSpec, I, O, F extends string = string> {
   readonly id: string;
   readonly kind: OperationKind;
   /** One sentence. It becomes the AI tool's description, so it is read by a model. */
   readonly summary: string;
-  readonly input: Schema<I>;
-  readonly output: Schema<O>;
+  /**
+   * ⚠️ PARSED, NOT ASSERTED, and the runtime does it before the handler runs.
+   * A handler therefore never sees a value it has to check — which is what makes
+   * "validate at the boundary" a property rather than a convention.
+   */
+  readonly input: Shape<I>;
+  /**
+   * Not parsed at runtime: the handler is ours and the cost is per response.
+   * It is declared because the API document and the typed client are generated
+   * from it, and a document that can disagree with the code is worthless.
+   */
+  readonly output: Shape<O>;
 
   /** RBAC. Checked before the handler, for every transport. */
   readonly permission: string;
@@ -169,8 +171,16 @@ export interface OperationSpec<B extends BindingSpec, I, O> {
   readonly outcome?: Outcome;
   /** Events this raises. The ONLY notification and webhook dispatcher. */
   readonly emits?: readonly string[];
-  /** Declared failures. A code invented at a throw site does not compile. */
-  readonly fails?: readonly string[];
+  /**
+   * Declared failures.
+   *
+   * ⚠️ ITS OWN TYPE PARAMETER, so the literals survive. Typed as
+   * `readonly string[]` the list widens the moment it is assigned, and
+   * `defineApp`'s check that every code is declared becomes vacuous —
+   * `Exclude<string, …>` is `string`, which satisfies any index signature. The
+   * check compiled, passed and proved nothing until this was captured.
+   */
+  readonly fails?: readonly F[];
   readonly help?: HelpId;
 
   /**
@@ -186,7 +196,9 @@ export interface OperationSpec<B extends BindingSpec, I, O> {
   handler(ctx: Ctx<B>, input: I): Promise<O>;
 }
 
-export function operation<B extends BindingSpec, I, O>(spec: OperationSpec<B, I, O>): OperationSpec<B, I, O> {
+export function operation<B extends BindingSpec, I, O, const F extends string = never>(
+  spec: OperationSpec<B, I, O, F>,
+): OperationSpec<B, I, O, F> {
   return spec;
 }
 

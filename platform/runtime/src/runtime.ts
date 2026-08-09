@@ -14,16 +14,16 @@
  */
 
 import type {
-  Actor, AnyOperation, AppSpec, BindingSpec, Caller, Ctx, Instant, Problem,
+  Actor, AnyOperation, AppSpec, AuditEntry, BindingSpec, Caller, Ctx, Instant, Problem,
   ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, Session, SqlHandle, TenantId,
 } from "@one/kernel";
 import {
-  ALWAYS_ALLOWED, check, cookieDomainFor, laneOf, PLATFORM_PROBLEMS, relyingPartyFor,
-  resolveRequest, routeFor, validateSession,
+  ALWAYS_ALLOWED, auditFor, check, cookieDomainFor, laneOf, PLATFORM_PROBLEMS,
+  relyingPartyFor, resolveRequest, routeFor, validateSession,
 } from "@one/kernel";
 import { bindingsFor, globalSql, type RawEnv } from "./env.js";
 import { sqlDirectory } from "./directory.js";
-import { DIRECTORY, platformOperations, type DirectoryCarrier } from "./platform-ops.js";
+import { DIRECTORY, TOOLS, platformOperations, toolOperations, type DirectoryCarrier, type ToolCarrier } from "./platform-ops.js";
 import { identityOperations, PLATFORM, type PlatformCarrier, type PlatformDeps } from "./identity-ops.js";
 import { identityStore, readCookie, SESSION_COOKIE, sessionStore } from "./identity.js";
 
@@ -109,7 +109,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app)]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
   for (const op of app.operations as readonly AnyOperation[]) {
     const path = routeFor(op).path;
     /*
@@ -268,12 +268,56 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       const verdict = check(op, forGate);
       if (!verdict.allowed) return problemResponse(refusalProblem(verdict.refusal), ref);
 
-      const input = request.method === "GET"
+      const raw = request.method === "GET"
         ? Object.fromEntries(url.searchParams)
         : await request.json().catch(() => ({}));
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier = {
+      /*
+        ⚠️ PARSED AT THE BOUNDARY, ONCE, BEFORE THE HANDLER RUNS. A type
+        assertion compiles, reads like validation, and lets a number reach a TEXT
+        column — where SQLite stores it happily, because its types are per value.
+        The row is wrong, nothing throws, and it surfaces later as a rendering
+        bug in a screen nobody associates with the write.
+
+        The issues come back per FIELD, so a form puts each message where it
+        belongs rather than showing one sentence about the whole request.
+      */
+      const parsed = op.input.parse(raw);
+      if (!parsed.ok) {
+        const fields: Record<string, string> = {};
+        for (const issue of parsed.issues) fields[issue.path] = issue.message;
+        return problemResponse({ ...PLATFORM_PROBLEMS["platform.invalid"], code: "platform.invalid", fields }, ref);
+      }
+      const input = parsed.value;
+
+      /*
+        ⚠️ ONE DISPATCH PATH FOR BOTH TRANSPORTS. A tool call runs the same
+        handler, behind the same gate, with the same context — the only
+        difference is the actor's kind and what the audit records. A second
+        dispatch path is how an agent ends up able to do something the route
+        cannot, and the divergence is invisible until somebody looks for it.
+      */
+      const dispatch = async (target: AnyOperation, payload: unknown, via: AuditEntry["via"]) => {
+        const entry = auditFor(target, payload, via);
+        if (entry) audit.push(entry);
+        return target.handler(ctx as never, payload as never);
+      };
+      const audit: AuditEntry[] = [];
+
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier = {
         [PLATFORM]: platform,
+        [TOOLS]: {
+          operations: [...byPath.values()],
+          caller,
+          /*
+            ⚠️ THE ACTOR BECOMES `tool`, WHICH IS VISIBLE AND NON-PRIVILEGING. An
+            operation may know it is being driven by a model — worth recording,
+            worth showing on an activity log — and that knowledge changes nothing
+            about what it is ALLOWED to do, because the gate already ran on the
+            same caller.
+          */
+          dispatch: (target, payload) => dispatch(target, payload, "tool"),
+        },
         /*
           ⚠️ The directory rides on a SYMBOL that `Ctx` does not declare, so a
           platform operation can reach it and an app's cannot — including by
@@ -289,7 +333,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
 
       try {
-        const out = await op.handler(ctx as never, input as never);
+        const out = await dispatch(op, input, "http");
         const res = Response.json(out);
         for (const c of cookies) res.headers.append("set-cookie", c);
         return res;

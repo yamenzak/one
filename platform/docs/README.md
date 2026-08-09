@@ -11,9 +11,9 @@ kind: index
 
 | | |
 |---|---|
-| active | **1** — Kernel — bindings, identity, tenancy, regions, standing<br>**2** — Surface — operations to routes, tools, webhooks, OpenAPI<br>**3** — Data — collections, ledger, files, jobs, relocation |
-| shipped | 0 |
-| open deferrals | 7 — see [DEFERRED.md](DEFERRED.md) |
+| active | **3** — Data — collections, ledger, files, jobs, relocation |
+| shipped | 0, 1, 2 |
+| open deferrals | 6 — see [DEFERRED.md](DEFERRED.md) |
 
 ⚠️ Resuming after a break, or after a compressed conversation?
 [STANDARDS.md §9](STANDARDS.md) is the checklist, in order. Start there rather

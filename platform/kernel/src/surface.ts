@@ -21,7 +21,7 @@ import type { StandingGate } from "./standing.js";
 import { permits } from "./standing.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature; see FINDINGS §4
-export type AnyOperation = OperationSpec<BindingSpec, any, any>;
+export type AnyOperation = OperationSpec<BindingSpec, any, any, string>;
 
 /* ------------------------------------------------------------------ route --- */
 

@@ -12,7 +12,7 @@
 
 import {
   cache, collection, declareProblems, defineApp, defineBindings, field,
-  objects, operation, sql,
+  nothing, objects, operation, s, sql,
   type Currency, type Locale, type RegionId, type TimeZone,
 } from "@one/kernel";
 import type { Ctx } from "@one/kernel";
@@ -65,8 +65,8 @@ export const listNotes = operation({
   id: "notes.list",
   kind: "read",
   summary: "List the notes in this workspace.",
-  input: {} as { _t?: Record<string, never> },
-  output: {} as { _t?: { notes: unknown[] } },
+  input: nothing(),
+  output: s.object({ notes: s.json() }),
   permission: "note:read",
   idempotency: { mode: "none" },
   async handler(ctx: Ctx<Bindings>) {
@@ -82,8 +82,8 @@ export const createNote = operation({
   id: "notes.create",
   kind: "write",
   summary: "Write a note in this workspace.",
-  input: {} as { _t?: { title: string; body?: string } },
-  output: {} as { _t?: { id: string } },
+  input: s.object({ title: s.text({ max: 200 }), body: s.optional(s.text({ max: 20_000 })) }),
+  output: s.object({ id: s.text() }),
   permission: "note:write",
   idempotency: { mode: "natural", key: "title" },
   audit: (i: { title: string }) => ({ subject: i.title, verb: "create" }),
@@ -91,7 +91,12 @@ export const createNote = operation({
   emits: ["note.created"],
   fails: ["notes.title_required"],
   async handler(ctx: Ctx<Bindings>, input: { title: string; body?: string }) {
-    if (!input.title) ctx.fail("notes.title_required");
+    /*
+      ⚠️ THE SHAPE ALREADY PROVED IT IS TEXT WITHIN A LENGTH. What is left is the
+      PRODUCT rule — a note with an empty title is useless to whoever has to find
+      it again — which no validator could know and every app has some of.
+    */
+    if (!input.title.trim()) ctx.fail("notes.title_required");
     const id = nowId(ctx);
     await ctx.bind.db.run(
       `INSERT INTO notes (id, version, created_at, updated_at, tenant_id, deleted_at, title, body, pinned)

@@ -12,8 +12,8 @@
  * region validation and standing default are the platform's.
  */
 
-import type { AnyOperation, AppSpec, BindingSpec, RegionId, SqlHandle, TenantId } from "@one/kernel";
-import { operation, UNIVERSAL_RESERVED } from "@one/kernel";
+import type { AnyOperation, AppSpec, BindingSpec, Caller, RegionId, SqlHandle, TenantId } from "@one/kernel";
+import { check, nothing, operation, PUBLIC, s, toolNameFor, toolsFor, UNIVERSAL_RESERVED } from "@one/kernel";
 import { placeTenant } from "./directory.js";
 
 /**
@@ -53,8 +53,8 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "identity.workspace.create",
     kind: "write",
     summary: "Create a workspace at a given address.",
-    input: {} as { _t?: { slug: string; region?: string } },
-    output: {} as { _t?: { tenantId: string; slug: string; region: string } },
+    input: s.object({ slug: s.text({ min: 2, max: 32 }), region: s.optional(s.text({ max: 16 })) }),
+    output: s.object({ tenantId: s.text(), slug: s.text(), region: s.text() }),
     permission: "workspace:create",
     idempotency: { mode: "natural", key: "slug" },
     audit: (i: { slug: string }) => ({ subject: i.slug, verb: "create" }),
@@ -104,4 +104,79 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
   });
 
   return [createWorkspace as unknown as AnyOperation];
+}
+
+/* ------------------------------------------------------------------ tools --- */
+
+/** ⚠️ A symbol, so an app cannot reach the registry by writing a property name. */
+export const TOOLS = Symbol.for("one.runtime.tools");
+
+export interface ToolDeps {
+  readonly operations: readonly AnyOperation[];
+  readonly caller: Caller;
+  dispatch(op: AnyOperation, input: unknown): Promise<unknown>;
+}
+export interface ToolCarrier { readonly [TOOLS]: ToolDeps }
+
+/**
+ * THE AI'S SURFACE, WHICH IS THE ROUTE SURFACE MASKED BY THE CALLER.
+ *
+ * ⚠️ THE SAFETY ARGUMENT IS THAT THERE IS NO SECOND LIST. `toolsFor` filters the
+ * one operation registry with the same `check` the router uses, so an
+ * assistant's reach IS the operator's reach by construction. Two registries kept
+ * in step by hand is how a product ships an agent that can do more than the
+ * person driving it, with nothing failing anywhere.
+ */
+export function toolOperations(): readonly AnyOperation[] {
+  const list = operation({
+    id: "tools.list",
+    kind: "read",
+    summary: "The operations this caller may drive.",
+    input: nothing(),
+    output: s.object({ tools: s.json() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const t = (ctx as unknown as ToolCarrier)[TOOLS];
+      return { tools: toolsFor(t.operations, t.caller) };
+    },
+  });
+
+  const call = operation({
+    id: "tools.call",
+    kind: "write",
+    summary: "Run one of the operations this caller may drive.",
+    input: s.object({ name: s.text({ max: 120 }), input: s.optional(s.json()) }),
+    output: s.object({ result: s.json() }),
+    permission: PUBLIC,
+    // vocabulary-exempt: the HTTP caller supplies the key, because only whoever
+    // is retrying knows that two attempts are one intent.
+    idempotency: { mode: "client-supplied" },
+    fails: ["platform.not_found", "platform.forbidden"],
+    /*
+      ⚠️ THE TOOL TRANSPORT IS NOT ITSELF A TOOL. Exposing it would let a model
+      call itself, which is a loop with a budget attached and no new capability
+      at the end of it.
+    */
+    tool: false,
+    async handler(ctx, input: { name: string; input?: unknown }) {
+      const t = (ctx as unknown as ToolCarrier)[TOOLS];
+      const target = t.operations.find((op) => toolNameFor(op) === input.name);
+
+      /*
+        ⚠️ RE-CHECKED HERE, NEVER TRUSTED BECAUSE IT CAME FROM THE CATALOGUE. The
+        catalogue was computed for a caller at a moment; a call arrives later,
+        possibly naming something that was never offered. `tool !== false` is
+        checked with it, so an operation withheld from every model cannot be
+        reached by spelling its name correctly.
+      */
+      if (!target || target.tool === false) ctx.fail("platform.not_found");
+      const verdict = check(target!, t.caller);
+      if (!verdict.allowed) ctx.fail("platform.forbidden", { refusal: verdict.refusal });
+
+      return { result: await t.dispatch(target!, input.input ?? {}) };
+    },
+  });
+
+  return [list, call] as unknown as readonly AnyOperation[];
 }
