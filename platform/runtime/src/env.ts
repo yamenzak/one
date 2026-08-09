@@ -196,3 +196,20 @@ function wrap(store: Store, raw: unknown, region: RegionId, cfg: RegionalConfig)
     }
   }
 }
+
+/**
+ * A plain secret from the deployment's own variables.
+ *
+ * ⚠️ IT LIVES HERE BECAUSE THIS IS THE ONLY FILE ALLOWED TO READ A RAW
+ * ENVIRONMENT, and a payment provider's signing secret is not a binding — it is
+ * a string, with no handle, no region and nothing to resolve. Reading it inline
+ * wherever it was needed would put the one thing this package exists to
+ * centralise back in three files.
+ *
+ * Absent returns `""`, which every caller already reads as "not configured" —
+ * and for the webhook secret specifically, "not configured" means REFUSE.
+ */
+export const secretFor = (env: RawEnv, name: string): string => {
+  const value = (env as Record<string, unknown>)[name];
+  return typeof value === "string" ? value : "";
+};

@@ -235,3 +235,48 @@ export type ObjectOf<F> =
 
 /** An operation that takes nothing still declares that it takes nothing. */
 export const nothing = (): Shape<Record<string, never>> => s.object({}) as Shape<Record<string, never>>;
+
+/* ----------------------------------------------------------- query string --- */
+
+/**
+ * A query string, made into the shape's own types before it is parsed.
+ *
+ * ⚠️ EVERY QUERY VALUE IS TEXT, AND A DECLARED `number` CAN THEREFORE NEVER BE
+ * SUPPLIED OVER GET. `?limit=1` arrives as `"1"`, the parser correctly refuses
+ * it, and the caller gets a 400 for a request that is completely well formed.
+ * Nothing is wrong with the parser — it is being handed a document the transport
+ * flattened, and the flattening is what has to be undone.
+ *
+ * ⚠️ IT COERCES BY THE DECLARATION, NEVER BY LOOKING AT THE VALUE. Guessing from
+ * the text means `?code=0123` becomes the number 123 and a leading zero is
+ * silently lost — a whole class of identifier corrupted by helpfulness. Only a
+ * field the shape says is a number is read as one, and anything the coercion
+ * cannot make sense of is passed through unchanged so the parser reports it.
+ */
+export function fromQuery(json: JsonShape, raw: Readonly<Record<string, string>>): unknown {
+  if (json.kind !== "object") return raw;
+  const out: Record<string, unknown> = {};
+  for (const [key, field] of Object.entries(json.fields)) {
+    const text = raw[key];
+    if (text === undefined) continue;
+    out[key] = coerce(field.shape, text);
+  }
+  return out;
+}
+
+function coerce(json: JsonShape, text: string): unknown {
+  switch (json.kind) {
+    case "number": {
+      const n = Number(text);
+      return text.trim() === "" || Number.isNaN(n) ? text : n;
+    }
+    case "bool":
+      return text === "true" ? true : text === "false" ? false : text;
+    case "json":
+    case "array":
+    case "object":
+      try { return JSON.parse(text); } catch { return text; }
+    default:
+      return text;
+  }
+}

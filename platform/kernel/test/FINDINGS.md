@@ -923,3 +923,90 @@ A test that grants the once-only package first makes the row's own package id
 equal to it, so the wrong implementation and the right one agree. The fixture has
 to sell a repeatable package first. The property under test was never about one
 purchase; it was about the second one.
+
+## 72. An event that cannot be placed has two honest answers, and `200` is neither
+
+A handler that could not work out whose payment event it was answered
+`200 {received: true}` — with the id already recorded, so the provider marked it
+delivered and never retried. Money captured, nothing granted, no error anywhere.
+The only surviving trace was a customer asking why they had been charged for
+something they did not have.
+
+Applied, or parked where an operator can read and replay it. There is no third,
+and a parked table nobody can read is the same silent success with an extra
+table — which is why the dead letter's surface is registered as a guard rather
+than left as a good intention.
+
+## 73. A signature over the body alone is a recording anybody can replay
+
+The timestamp is part of what is signed, and the tolerance is what makes it
+matter. Without it a captured request stays valid forever, so one successful
+payment notification can be posted back as often as somebody likes against as
+many event ids as they can mint. The applied-event key catches a replay of the
+*same* event; the tolerance is what stops the endpoint being a general-purpose
+oracle.
+
+An endpoint with no secret configured refuses. It is public by construction — a
+provider cannot hold a session — so the signature is the whole of the
+authentication, and a permissive default there is an open door that grants paid
+access to whoever finds it.
+
+## 74. A property no test can observe is still a property of the source
+
+A digest compared with `===` returns as soon as two characters differ, so how
+long the comparison takes measures how much of it was right — enough to forge a
+signature without ever knowing the key. A fast compare and a constant-time one
+agree on every input, so no functional test can tell them apart, and the
+mutation survived every assertion in the suite.
+
+Same shape as the live-surface host in stage 4: when behaviour cannot carry the
+property, the guard reads the file. Two of these now exist, which is enough to
+say it is a category rather than an exception.
+
+## 75. A claim resolves silence, never a contradiction
+
+One provider account serves every product here, so an event arrives that may
+belong to any of them. Attribution is metadata we wrote, then a lookup on the
+provider's customer reference — and the order is not a preference. If the event
+names an app and it is not this one, the lookup is not consulted at all;
+otherwise a reference that exists in two products lets one of them settle the
+other's payment, which is the worst outcome available and the one that looks
+most like it worked.
+
+The test that proves it asserts the lookup was never CALLED, because a lookup
+that returns the right answer for the wrong reason passes any assertion about
+its result.
+
+## 76. The renewal carries none of the metadata the checkout did
+
+A checkout event carries the fields we wrote. The renewal a month later carries
+the fields the provider thinks are interesting, which do not include ours — so
+unless the customer is recorded the first time an event places itself, every
+routine renewal parks. The dead letter fills with ordinary business and each row
+is a workspace whose plan quietly lapsed.
+
+The export was flagged as unproved before it was flagged as missing. A
+reachability check found a functional gap by asking a structural question.
+
+## 77. `retry: 1` absorbs a real failure in exactly the tests that assert idempotency
+
+The ladder-anchor mutation survived a suite that asserts the anchor does not
+move. The first attempt failed correctly; the retry reused the same event id,
+took the already-applied branch, changed nothing, and passed.
+
+The retry exists to absorb storage contention, and it does. It also absorbs any
+failure in a test whose second run is a no-op — which is every test of an
+idempotent path, which is every test of a payment webhook. A fresh key per
+attempt makes the retry a real second run; without one, the safety net is
+covering the assertions that need it least and hiding the ones that need it most.
+
+## 78. Every query value is text, so a declared number could never be supplied
+
+`?limit=1` arrives as `"1"`, the parser correctly refuses it, and a completely
+well-formed request gets a 400. Nothing was wrong with the parser — it was being
+handed a document the transport had flattened, and the flattening is what has to
+be undone.
+
+Coerced by the DECLARATION, never by looking at the value. Guessing from the
+text turns `?code=0123` into 123 and loses a leading zero, which is a whole class
+of identifier corrupted by helpfulness.

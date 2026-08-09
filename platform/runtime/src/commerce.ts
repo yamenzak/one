@@ -370,3 +370,48 @@ export async function customerFlagsFor(
     tenantHolds: heldEntitlements(entitlements),
   });
 }
+
+/* ----------------------------------------------------------- settlement --- */
+
+/**
+ * What a payment event does to a subscription.
+ *
+ * ⚠️ ONLY THIS PATH MAY WRITE `plan_id`. Choosing a plan records an intention;
+ * a settled payment is the only thing that grants one. Collapsing the two is how
+ * a signup wizard comes to hand out the paid tier to anybody who reaches step
+ * two — and it looks exactly like a working wizard until somebody checks.
+ *
+ * ⚠️ AND `past_due_at` IS SET ONCE. The ladder is anchored on when the charge
+ * FIRST failed; re-stamping it on every retry means a workspace never advances
+ * past the first rung however long it stays unpaid, and the ladder is decorative.
+ */
+export async function applyPayment(
+  db: SqlHandle,
+  tenantId: string,
+  event: { readonly kind: "paid" | "failed" | "cancelled" | "refunded" | "other"; readonly planId: string | null },
+  at: Instant,
+): Promise<void> {
+  const ensure = `INSERT INTO subscription (tenant_id, status, updated_at) VALUES (?, 'none', ?) ON CONFLICT(tenant_id) DO NOTHING`;
+  await db.run(ensure, tenantId, at);
+
+  switch (event.kind) {
+    case "paid":
+      await db.run(
+        `UPDATE subscription SET plan_id = COALESCE(?, plan_id, pending_plan_id), pending_plan_id = NULL, status = 'active', past_due_at = NULL, updated_at = ? WHERE tenant_id = ?`,
+        event.planId, at, tenantId,
+      );
+      return;
+    case "failed":
+      await db.run(
+        `UPDATE subscription SET status = 'past_due', past_due_at = COALESCE(past_due_at, ?), updated_at = ? WHERE tenant_id = ?`,
+        at, at, tenantId,
+      );
+      return;
+    case "cancelled":
+      await db.run(`UPDATE subscription SET status = 'cancelled', updated_at = ? WHERE tenant_id = ?`, at, tenantId);
+      return;
+    case "refunded":
+    case "other":
+      return;
+  }
+}

@@ -19,10 +19,10 @@ import type {
 } from "@one/kernel";
 import {
   ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, PLATFORM_PROBLEMS,
-  relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
+  fromQuery, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
-import { bindingsFor, globalSql, type RawEnv } from "./env.js";
-import { COMMERCE, commerceOperations, customerOperations, type CommerceCarrier } from "./commerce-ops.js";
+import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
+import { COMMERCE, commerceOperations, customerOperations, providerOperations, type CommerceCarrier } from "./commerce-ops.js";
 import { customerFlagsFor, PARKED, readSubscription, standingFor } from "./commerce.js";
 import { sqlDirectory } from "./directory.js";
 import { collectionOperations } from "./collection-ops.js";
@@ -127,6 +127,16 @@ export interface RuntimeOptions<B extends BindingSpec> {
    * app calls its roster, and no framework can know which of those rows count.
    */
   countQuota?(key: string, db: SqlHandle, tenantId: string): Promise<number>;
+  /**
+   * The NAME of the deployment variable holding the provider's signing secret.
+   *
+   * ⚠️ ABSENT MEANS THE WEBHOOK REFUSES, and that is the safe direction. The
+   * endpoint is public by construction — a provider cannot hold a session — so
+   * the signature is the whole of its authentication, and a deployment that has
+   * not configured one has an open door that grants paid access to anybody who
+   * finds it.
+   */
+  readonly webhookSecretVar?: string;
   /** Applied once per database, before the first request it serves. */
   readonly onBoot?: {
     /** The global store: the directory, and anything else routing needs. */
@@ -166,7 +176,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -409,9 +419,17 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         }
       }
 
+      /*
+        ⚠️ THE BODY IS READ AS TEXT AND PARSED FROM THAT, NEVER READ TWICE. A
+        signed webhook is verified over the EXACT bytes that were sent, so a
+        handler that re-serialises a parsed object is verifying a different
+        document — key order, number formatting and unicode escaping are all free
+        to differ, and the failure is intermittent rather than total.
+      */
+      const bodyText = request.method === "GET" ? "" : await request.text();
       const raw = request.method === "GET"
-        ? Object.fromEntries(url.searchParams)
-        : await request.json().catch(() => ({}));
+        ? fromQuery(op.input.json, Object.fromEntries(url.searchParams))
+        : ((): unknown => { try { return JSON.parse(bodyText || "{}"); } catch { return {}; } })();
 
       /*
         ⚠️ PARSED AT THE BOUNDARY, ONCE, BEFORE THE HANDLER RUNS. A type
@@ -447,7 +465,27 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
 
       const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier = {
         [PLATFORM]: platform,
-        [COMMERCE]: { db: regionalDb, tenantId: at.tenant?.tenantId ?? "", chargeable: opts.chargeable ?? false, entitlements: caller.entitlements },
+        [COMMERCE]: {
+          db: regionalDb,
+          tenantId: at.tenant?.tenantId ?? "",
+          chargeable: opts.chargeable ?? false,
+          entitlements: caller.entitlements,
+          global: directoryDb,
+          /*
+            ⚠️ A WEBHOOK WRITES TO A REGION THE REQUEST DID NOT ARRIVE IN. The
+            event names a customer, the global store says which workspace, and
+            that workspace's data may be on another continent — so the handler is
+            given a way to reach it rather than the one handle the host implied.
+          */
+          forTenant: async (tenantId: string) => {
+            const row = await directoryDb.first<{ region: string }>(`SELECT region FROM tenant_directory WHERE tenant_id = ?`, tenantId);
+            if (!row) return null;
+            return regional(env)(row.region as ResolvedRegion)[opts.sessionsBinding] as SqlHandle;
+          },
+          signature: request.headers.get("x-provider-signature") ?? "",
+          body: bodyText,
+          webhookSecret: opts.webhookSecretVar ? secretFor(env, opts.webhookSecretVar) : "",
+        },
         [TOOLS]: {
           operations: [...byPath.values()],
           caller,

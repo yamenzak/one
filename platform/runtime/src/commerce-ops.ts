@@ -16,12 +16,14 @@
 import type { Allowance, AnyOperation, AppSpec, BindingSpec, EntitlementDef, Money, PlanSpec, SqlHandle } from "@one/kernel";
 import {
   explainCustomerFlags, explainEntitlements, gateFor, heldEntitlements, mayPurchase,
-  operation, packageContradictions, runwayFor, s,
+  operation, packageContradictions, PUBLIC, runwayFor, s,
 } from "@one/kernel";
 import {
-  applyPackage, choosePlan, listPackages, priorGrants, readAccess, readPackage,
+  applyPackage, applyPayment, choosePlan, listPackages, priorGrants, readAccess, readPackage,
   readSubscription, savePackage, standingFor,
 } from "./commerce.js";
+import { attribute, claimByCustomer, claimEvent, listParked, park, rememberCustomer, resolveParked, verifySignature } from "./provider.js";
+import { parseStripeEvent } from "./provider-stripe.js";
 
 /** ⚠️ A symbol, so an app cannot reach the store by writing a property name. */
 export const COMMERCE = Symbol.for("one.runtime.commerce");
@@ -47,6 +49,14 @@ export interface CommerceDeps {
    * this is that answer, not a second read of the same row.
    */
   readonly entitlements: Readonly<Record<string, Allowance>>;
+  /** The store that knows which region a workspace is in. Routing data only. */
+  readonly global: SqlHandle;
+  /** ⚠️ A webhook settles in a region the request did not arrive in. */
+  forTenant(tenantId: string): Promise<SqlHandle | null>;
+  readonly signature: string;
+  /** The exact bytes that were signed. Never a re-serialisation of the parse. */
+  readonly body: string;
+  readonly webhookSecret: string;
 }
 
 export interface CommerceCarrier { readonly [COMMERCE]: CommerceDeps }
@@ -299,4 +309,162 @@ export function customerOperations<B extends BindingSpec>(app: AppSpec<B>): read
   });
 
   return [offer, save, grant, capabilities] as unknown as readonly AnyOperation[];
+}
+
+/* ------------------------------------------------------------- the wire --- */
+
+/**
+ * THE PAYMENT PROVIDER'S ENDPOINT, AND THE ONLY TWO ANSWERS IT HAS.
+ *
+ * ⚠️ APPLIED, OR PARKED. There is no third. A handler that could not work out
+ * whose event it was once answered `200 {received: true}` with the id already
+ * claimed, so the provider marked it delivered and never retried — money
+ * captured, nothing granted, and no error anywhere.
+ *
+ * ⚠️ AND THE DEAD LETTER HAS A SURFACE. A parked table nobody can read is the
+ * same silent success with an extra table, which is why the two operations
+ * beside this one are not optional.
+ */
+export function providerOperations<B extends BindingSpec>(app: AppSpec<B>): readonly AnyOperation[] {
+  const webhook = operation({
+    id: "webhook.provider",
+    kind: "write",
+    summary: "Receive a payment provider's notification.",
+    input: s.object({}),
+    output: s.object({ outcome: s.text() }),
+    /*
+      ⚠️ PUBLIC BY CONSTRUCTION — a provider cannot hold a session — so the
+      SIGNATURE is the whole of the authentication, and a deployment with no
+      secret configured refuses rather than accepts.
+    */
+    permission: PUBLIC,
+    // vocabulary-exempt: the provider retries, so it supplies the key that says
+    // two deliveries are one event.
+    idempotency: { mode: "client-supplied" },
+    fails: ["platform.forbidden", "platform.invalid"],
+    /*
+      ⚠️ NOT A TOOL, and this is the clearest case in the platform: it is the one
+      endpoint whose caller is authenticated by a shared secret rather than by a
+      person, and a model that could invoke it could grant itself anything.
+    */
+    tool: false,
+    async handler(ctx) {
+      const d = deps(ctx);
+      const at = ctx.now();
+
+      const verdict = await verifySignature({ secret: d.webhookSecret, body: d.body, header: d.signature, now: at });
+      if (!verdict.ok) {
+        /*
+          ⚠️ REFUSED, NOT PARKED. Parking would let anybody fill an operator's
+          dead letter with whatever they liked, and an unverified body is not
+          evidence of anything — there is nothing to recover.
+        */
+        ctx.fail("platform.forbidden", { reason: verdict.why });
+      }
+
+      const event = parseStripeEvent(d.body, app.stripeMetadataPrefix);
+      if (!event) ctx.fail("platform.invalid", { reason: "unreadable" });
+
+      const who = await attribute(event!, app.id, async (ref) => (await claimByCustomer(d.global)(ref)) ?? null);
+      if (!who.ok) {
+        await park(d.global, { id: event!.id, kind: event!.kind }, who.why, d.body, at);
+        return { outcome: `parked:${who.why}` };
+      }
+
+      /*
+        ⚠️ THE ID IS CLAIMED BEFORE ANYTHING IS APPLIED, and a claim that fails
+        is a SUCCESS. A provider redelivers; without a record, every redelivery
+        grants again — free access, silently, with a correct-looking 200 each
+        time. A caller that grants on the strength of a 200 still needs to know
+        nothing happened this time, which is why the outcome says so.
+      */
+      /*
+        ⚠️ REMEMBERED HERE, OR EVERY RENEWAL PARKS. A checkout carries the
+        metadata we wrote; the renewal that follows it a month later carries the
+        fields the PROVIDER thinks are interesting and none of ours. Recording
+        the customer the first time an event places itself is what lets the
+        second one be claimed — without it the dead letter fills up with routine
+        renewals, every one of them a workspace whose plan quietly lapses.
+      */
+      if (event!.customerRef) await rememberCustomer(d.global, event!.customerRef, who.tenantId, app.id, at);
+
+      if (!(await claimEvent(d.global, event!.id, who.tenantId, event!.kind, at))) return { outcome: "already_applied" };
+
+      const db = await d.forTenant(who.tenantId);
+      if (!db) {
+        await park(d.global, { id: event!.id, kind: event!.kind }, "no_tenant", d.body, at);
+        return { outcome: "parked:no_tenant" };
+      }
+      await applyPayment(db, who.tenantId, event!, at);
+      return { outcome: `applied:${event!.kind}` };
+    },
+  });
+
+  const parked = operation({
+    id: "billing.parked",
+    kind: "read",
+    summary: "Payment events this deployment could not attribute.",
+    input: s.object({ limit: s.optional(s.number({ integer: true, min: 1, max: 100 })) }),
+    output: s.object({ events: s.json(), dropped: s.number({ integer: true }) }),
+    permission: "billing:operate",
+    idempotency: { mode: "none" },
+    /*
+      ⚠️ NOT A TOOL, even though it is only a read. Each row carries a provider's
+      raw payload — customer references, amounts, whatever else the provider
+      chose to include — and the reason this table exists is that nobody knew
+      whose it was. Handing that to a model to summarise is the one operation
+      where "expose by default" is the wrong default.
+    */
+    tool: false,
+    async handler(ctx, input: { limit?: number }) {
+      const d = deps(ctx);
+      const limit = Math.min(input.limit ?? 25, 100);
+      const events = await listParked(d.global, limit + 1);
+      /*
+        ⚠️ WHAT WAS DROPPED IS REPORTED. A silently truncated list reads as
+        "that is all of them", and the whole purpose of this surface is that
+        somebody can tell how much money is sitting in it.
+      */
+      return { events: events.slice(0, limit), dropped: Math.max(0, events.length - limit) };
+    },
+  });
+
+  const replay = operation({
+    id: "billing.parked.replay",
+    kind: "write",
+    summary: "Attribute a parked event to a workspace and apply it.",
+    input: s.object({ eventId: s.text({ max: 200 }), tenantId: s.text({ max: 120 }) }),
+    output: s.object({ outcome: s.text() }),
+    permission: "billing:operate",
+    idempotency: { mode: "natural", key: "eventId" },
+    audit: (i: { eventId: string }) => ({ subject: i.eventId, verb: "replay" }),
+    fails: ["platform.not_found"],
+    tool: false,
+    async handler(ctx, input: { eventId: string; tenantId: string }) {
+      const d = deps(ctx);
+      const at = ctx.now();
+      const row = (await listParked(d.global, 100)).find((e) => e.eventId === input.eventId);
+      if (!row) ctx.fail("platform.not_found", { field: "eventId" });
+
+      const event = parseStripeEvent(row!.payload, app.stripeMetadataPrefix);
+      if (!event) ctx.fail("platform.not_found", { field: "eventId" });
+
+      const db = await d.forTenant(input.tenantId);
+      if (!db) ctx.fail("platform.not_found", { field: "tenantId" });
+
+      if (await claimEvent(d.global, event!.id, input.tenantId, event!.kind, at)) {
+        await applyPayment(db!, input.tenantId, event!, at);
+      }
+      /*
+        ⚠️ RESOLVED RATHER THAN DELETED. What was parked and later replayed is
+        the record of a gap in attribution, and that record is the only way
+        anybody learns the gap existed — a delete makes the recovery look like it
+        never had to happen.
+      */
+      await resolveParked(d.global, event!.id, at);
+      return { outcome: "applied" };
+    },
+  });
+
+  return [webhook, parked, replay] as unknown as readonly AnyOperation[];
 }

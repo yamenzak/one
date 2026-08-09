@@ -48,6 +48,13 @@ export default defineWorkersConfig({
           },
           r2Buckets: { MEDIA: "one-hello-media", MEDIA_EU: "one-hello-media-eu" },
           kvNamespaces: ["CACHE"],
+          /*
+            ⚠️ THE SECRET IS PRESENT IN THE SUITE AND ABSENT IN `hello`'s OWN
+            DEFAULTS, so both halves are exercised: a deployment with no provider
+            configured refuses the public endpoint, and one with a secret verifies
+            against the exact bytes that were signed.
+          */
+          bindings: { PROVIDER_WEBHOOK_SECRET: "whsec_test" },
         },
       },
     },

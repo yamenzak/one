@@ -15,6 +15,8 @@ export * from "./identity-ops.js";
 export * from "./collection-ops.js";
 export * from "./ledger.js";
 export * from "./commerce.js";
+export * from "./provider.js";
+export * from "./provider-stripe.js";
 export * from "./commerce-ops.js";
 export * from "./relocate.js";
 export * from "./platform-ops.js";

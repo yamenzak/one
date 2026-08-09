@@ -12,9 +12,10 @@
 import { describe, expect, it } from "vitest";
 import { createRuntime } from "../src/runtime.js";
 import { collectionOperations } from "../src/collection-ops.js";
-import { customerOperations } from "../src/commerce-ops.js";
+import { customerOperations, providerOperations } from "../src/commerce-ops.js";
+import { attribute, verifySignature } from "../src/provider.js";
 import { PARKED, standingFor } from "../src/commerce.js";
-import { cache, collection, defineBindings, field, objects, s, sql, operation, type AppSpec, type Instant, type RegionId } from "@one/kernel";
+import { ALWAYS_ALLOWED, PUBLIC, cache, collection, defineBindings, field, laneOf, objects, s, sql, operation, type AppSpec, type Instant, type RegionId } from "@one/kernel";
 
 const bindings = defineBindings({ db: sql(), media: objects({ jurisdictional: true }), cache: cache() });
 
@@ -100,6 +101,128 @@ describe("the customer rail is mounted only where an app declares one", () => {
   it("keeps the grant away from the assistant", () => {
     const grant = customerOperations(app({ access: withRail })).find((op) => op.id === "commerce.grant");
     expect(grant?.tool).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------- the signature --- */
+
+describe("the signature is the whole of the authentication", () => {
+  const body = '{"id":"evt_1","type":"invoice.paid"}';
+  const nowAt = "2026-01-10T00:00:00.000Z" as Instant;
+  const seconds = Math.floor(Date.parse(nowAt) / 1000);
+
+  const sign = async (text: string, t: number, secret: string) => {
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${t}.${text}`));
+    return `t=${t},v1=${[...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+  };
+
+  it("accepts what the provider actually signed", async () => {
+    const header = await sign(body, seconds, "whsec_1");
+    expect(await verifySignature({ secret: "whsec_1", body, header, now: nowAt })).toEqual({ ok: true });
+  });
+
+  /*
+    ⚠️ A DEPLOYMENT WITH NO SECRET REFUSES. The endpoint is public by
+    construction — a provider cannot hold a session — so an empty secret is not
+    a permissive default, it is an open door that grants paid access to whoever
+    finds it. Every other test in this file configures one, which is exactly why
+    this case has to be asserted on its own.
+  */
+  it("refuses everything when no secret is configured, including a correct signature", async () => {
+    /*
+      Signed with a real secret and verified against none — the case a
+      deployment that has not configured one is in, where every other check in
+      this file would otherwise pass.
+    */
+    const header = await sign(body, seconds, "whsec_1");
+    expect(await verifySignature({ secret: "", body, header, now: nowAt })).toEqual({ ok: false, why: "wrong" });
+  });
+
+  it("tells a malformed header from a stale one from a wrong one", async () => {
+    expect(await verifySignature({ secret: "whsec_1", body, header: "nonsense", now: nowAt })).toEqual({ ok: false, why: "malformed" });
+    expect(await verifySignature({ secret: "whsec_1", body, header: await sign(body, seconds - 4000, "whsec_1"), now: nowAt })).toEqual({ ok: false, why: "stale" });
+    expect(await verifySignature({ secret: "whsec_1", body, header: await sign(body, seconds, "whsec_2"), now: nowAt })).toEqual({ ok: false, why: "wrong" });
+  });
+});
+
+/* ------------------------------------------------------------- the wire --- */
+
+/**
+ * ⚠️ A DEAD LETTER NOBODY CAN READ IS THE SAME SILENT SUCCESS WITH AN EXTRA
+ * TABLE. The surface over the parked events is not optional, and neither is the
+ * permission on it — an operator console is where money that could not be
+ * placed becomes visible, and a public one is a list of every failed payment.
+ */
+describe("the provider lane comes with the surface that makes parking a recovery", () => {
+  const ops = providerOperations(app({}));
+  const by = (id: string) => ops.find((op) => op.id === id);
+
+  it("mounts the endpoint, the dead letter and the replay", () => {
+    expect(ops.map((op) => op.id).sort()).toEqual(["billing.parked", "billing.parked.replay", "webhook.provider"]);
+  });
+
+  /*
+    ⚠️ THE ENDPOINT IS ON THE `webhook` LANE, which survives every rung. Gating
+    it behind standing makes a suspension unrecoverable: the payment that would
+    lift it is refused because the workspace is suspended.
+  */
+  it("puts the endpoint on a lane that outlives every rung of the ladder", () => {
+    expect(laneOf(by("webhook.provider")!)).toBe("webhook");
+    expect(ALWAYS_ALLOWED).toContain("webhook");
+  });
+
+  it("keeps the endpoint public, because a provider cannot hold a session", () => {
+    expect(by("webhook.provider")!.permission).toBe(PUBLIC);
+  });
+
+  it("keeps the dead letter and the replay behind an operator permission", () => {
+    expect(by("billing.parked")!.permission).toBe("billing:operate");
+    expect(by("billing.parked.replay")!.permission).toBe("billing:operate");
+  });
+
+  /*
+    ⚠️ NONE OF THE THREE IS A TOOL. The endpoint is authenticated by a shared
+    secret rather than by a person, and the replay grants paid access on an
+    operator's say-so — a model that could reach either could grant itself
+    anything from a sentence in a document it was asked to read.
+  */
+  it("keeps all three away from the assistant", () => {
+    for (const op of ops) expect(op.tool, op.id).toBe(false);
+  });
+});
+
+/**
+ * ⚠️ A CLAIM RESOLVES SILENCE, NEVER A CONTRADICTION.
+ *
+ * A renewal carries the fields the PROVIDER thinks are interesting and none of
+ * ours, so the customer reference is how it gets placed. But a reference that
+ * exists in two products would then let one of them apply the other's payment —
+ * the worst outcome available, and the one that looks most like it worked.
+ */
+describe("whose event is this", () => {
+  const event = { id: "e", kind: "paid" as const, appId: null, tenantId: null, planId: null, customerRef: "cus_1", paidMinor: 900, refundedMinorTotal: 0 };
+  const claims = (appId: string) => async () => ({ tenantId: "t_1", appId });
+
+  it("trusts metadata we wrote ourselves over any lookup", async () => {
+    expect(await attribute({ ...event, tenantId: "t_stated" }, "hello", claims("hello"))).toEqual({ ok: true, tenantId: "t_stated" });
+  });
+
+  it("does not consult a claim at all when the event names another product", async () => {
+    let asked = false;
+    const verdict = await attribute({ ...event, appId: "elsewhere" }, "hello", async () => { asked = true; return { tenantId: "t_1", appId: "hello" }; });
+    expect(verdict).toEqual({ ok: false, why: "other_app" });
+    expect(asked, "a claim must not be able to overrule stated metadata").toBe(false);
+  });
+
+  it("refuses a claim that belongs to another product", async () => {
+    expect(await attribute(event, "hello", claims("elsewhere"))).toEqual({ ok: false, why: "other_app" });
+    expect(await attribute(event, "hello", claims("hello"))).toEqual({ ok: true, tenantId: "t_1" });
+  });
+
+  it("tells an unclaimed reference from no reference at all", async () => {
+    expect(await attribute(event, "hello", async () => null)).toEqual({ ok: false, why: "unclaimed" });
+    expect(await attribute({ ...event, customerRef: null }, "hello", async () => null)).toEqual({ ok: false, why: "no_tenant" });
   });
 });
 

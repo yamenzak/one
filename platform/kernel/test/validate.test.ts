@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { nothing, s } from "../src/validate.js";
+import { fromQuery, nothing, s } from "../src/validate.js";
 
 const fails = (r: { ok: boolean }): boolean => !r.ok;
 const value = <T>(r: { ok: true; value: T } | { ok: false }): T => {
@@ -120,3 +120,45 @@ describe("the description travels with the validator", () => {
     });
   });
 });
+
+/* ----------------------------------------------------------- query string --- */
+
+/**
+ * ⚠️ EVERY QUERY VALUE IS TEXT, so a declared `number` could never be supplied
+ * over GET at all: `?limit=1` arrives as `"1"`, the parser correctly refuses it,
+ * and a completely well-formed request gets a 400. The parser was right; it was
+ * being handed a document the transport had flattened.
+ */
+describe("a query string is made into the shape's types before it is parsed", () => {
+  const shape = s.object({
+    limit: s.optional(s.number({ integer: true })),
+    live: s.optional(s.bool()),
+    code: s.optional(s.text()),
+    filter: s.optional(s.json()),
+  });
+
+  it("reads a number as a number and a boolean as a boolean", () => {
+    expect(shape.parse(fromQuery(shape.json, { limit: "25", live: "true" }))).toEqual({ ok: true, value: { limit: 25, live: true } });
+  });
+
+  /*
+    ⚠️ COERCED BY THE DECLARATION, NEVER BY LOOKING AT THE VALUE. Guessing from
+    the text turns `?code=0123` into 123 and loses a leading zero — a whole class
+    of identifier corrupted by helpfulness.
+  */
+  it("leaves a text field that happens to look numeric alone", () => {
+    const parsed = shape.parse(fromQuery(shape.json, { code: "0123" }));
+    expect(parsed.ok && parsed.value.code).toBe("0123");
+  });
+
+  it("passes something it cannot make sense of straight through, so the parser reports it", () => {
+    const parsed = shape.parse(fromQuery(shape.json, { limit: "soon" }));
+    expect(parsed.ok).toBe(false);
+    if (!parsed.ok) expect(parsed.issues[0]!.path).toBe("limit");
+  });
+
+  it("ignores a parameter the shape does not declare", () => {
+    expect(fromQuery(shape.json, { nonsense: "1" })).toEqual({});
+  });
+});
+

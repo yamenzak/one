@@ -680,6 +680,60 @@
       "impl": "kernel/test/commerce.test.ts",
       "proves": "settles an unreported call at the reserve, never at a recount",
       "fails": "a settlement that recounts an unreported call, or a reserve computed from a different text than the one that was sent"
+    },
+    {
+      "id": "constant-time-signature",
+      "group": "platform",
+      "stage": "5",
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "constant time: the signature compare cannot be timed",
+      "fails": "a computed digest compared with ===, whose timing measures how much of the secret was right \u2014 a forgery no functional test can observe"
+    },
+    {
+      "id": "event-applied-or-parked",
+      "group": "platform",
+      "stage": "5",
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "dead letter: an unplaceable event is parked, and the parking is readable",
+      "fails": "an unattributable payment event answered 200 with its id claimed, so the provider never retries \u2014 or parked where nobody can read it"
+    },
+    {
+      "id": "webhook-region",
+      "group": "platform",
+      "stage": "5",
+      "status": "live",
+      "impl": "hello/test/provider.test.ts",
+      "proves": "settles a workspace that lives in another region",
+      "fails": "a webhook settling against the region the request arrived in rather than the one the workspace lives in \u2014 the row lands in the wrong database and nothing throws"
+    },
+    {
+      "id": "ladder-anchor",
+      "group": "platform",
+      "stage": "5",
+      "status": "live",
+      "impl": "hello/test/provider.test.ts",
+      "proves": "does not move the anchor on the next one",
+      "fails": "a ladder anchor re-stamped on every retry, so a workspace never advances past the first rung however long it stays unpaid"
+    },
+    {
+      "id": "query-coercion",
+      "group": "platform",
+      "stage": "5",
+      "status": "live",
+      "impl": "kernel/test/validate.test.ts",
+      "proves": "leaves a text field that happens to look numeric alone",
+      "fails": "a query string coerced by inspecting the value rather than the declaration, which turns ?code=0123 into 123"
+    },
+    {
+      "id": "renewal-claimable",
+      "group": "platform",
+      "stage": "5",
+      "status": "live",
+      "impl": "hello/test/provider.test.ts",
+      "proves": "so the renewal after it is claimed",
+      "fails": "a webhook that never records the customer it just placed, so every renewal \u2014 which carries no metadata of ours \u2014 parks and the workspace's plan quietly lapses"
     }
   ]
 }

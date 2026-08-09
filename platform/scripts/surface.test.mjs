@@ -254,6 +254,44 @@ if (!/function scopeClause/.test(collectionOps) || !/tenant_id = \?/.test(collec
   fail(`runtime/src/collection-ops.ts: the tenant predicate is no longer derived in one place.`);
 }
 
+/* ------------------------------------------------------ 4. THE SIGNATURE --- */
+
+/**
+ * ⚠️ A SECRET COMPARED WITH `===` LEAKS ITSELF, ONE BYTE AT A TIME.
+ *
+ * String equality returns as soon as two characters differ, so the time it takes
+ * is a measurement of how much of the digest was right. That is enough to forge
+ * a signature without ever knowing the key — and no functional test can see it,
+ * because a fast compare and a constant-time one agree on every input. It is a
+ * property of the SOURCE, so it is checked here.
+ *
+ * The webhook is where it matters most: the endpoint is public by construction,
+ * so the signature is the whole of its authentication.
+ */
+const provider = readFileSync(join(ROOT, "runtime/src/provider.ts"), "utf8");
+const providerCode = stripComments(provider);
+if (!/function sameBytes/.test(providerCode) || !/diff \|= /.test(providerCode)) {
+  fail(`runtime/src/provider.ts: the constant-time compare is gone.\n` +
+       `       A signature checked with === returns as soon as two characters differ, so how\n` +
+       `       long it takes measures how much of the digest was right. No test can observe it.`);
+} else if (/\bmac\s*===|===\s*mac\b/.test(providerCode)) {
+  fail(`runtime/src/provider.ts: a computed digest is compared with ===.\n` +
+       `       Use sameBytes — the timing of a fast compare is the secret.`);
+} else ok(`constant time: the signature compare cannot be timed`);
+
+/*
+  ⚠️ AND AN EVENT HAS EXACTLY TWO OUTCOMES: APPLIED, OR PARKED. A handler that
+  could not attribute an event once answered 200 with its id already claimed, so
+  the provider marked it delivered and never retried — money captured, nothing
+  granted, no error anywhere.
+*/
+const commerceOps = stripComments(readFileSync(join(ROOT, "runtime/src/commerce-ops.ts"), "utf8"));
+if (!/await park\(/.test(commerceOps) || !/listParked\(/.test(commerceOps)) {
+  fail(`runtime/src/commerce-ops.ts: an unattributable event has nowhere to go, or the dead\n` +
+       `       letter has no surface. A parked table nobody can read is the same silent\n` +
+       `       success with an extra table.`);
+} else ok(`dead letter: an unplaceable event is parked, and the parking is readable`);
+
 /* -------------------------------------------------------------------------- */
 
 if (bad) {

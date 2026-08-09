@@ -10,7 +10,7 @@
 import { deriveSchema, type Actor, type Resolved, type Session } from "@one/kernel";
 import {
   ACTIVITY_SCHEMA, applySchema, COMMERCE_SCHEMA, createRuntime, DIRECTORY_SCHEMA,
-  DOMAIN_SCHEMA, IDENTITY_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA, SESSION_SCHEMA, type RawEnv,
+  DOMAIN_SCHEMA, IDENTITY_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
 } from "@one/runtime";
 import { hello, notes, receipts } from "./manifest.js";
 
@@ -30,7 +30,7 @@ if (derived.problems.length) throw new Error(`hello: ${derived.problems.map((p) 
   array — a wrong order used to produce an ALTER against a table that did not
   exist yet, swallowed, leaving a column that silently never appeared.
 */
-const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA];
+const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA];
 export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, derived.module];
 
 
@@ -90,6 +90,14 @@ const runtime = createRuntime(hello, {
   identityBinding: "DIRECTORY",
   sessionsBinding: "db",
   deliverCode: async (email, code) => { delivered.set(email, code); },
+  /*
+    ⚠️ NO SECRET, SO THE WEBHOOK REFUSES AND `chargeable` STAYS FALSE. That is
+    the honest state of a deployment with no payment provider: a workspace that
+    has chosen no plan is not held to setup over our missing configuration, and
+    the public endpoint is not an open door. Both follow from one absent value
+    rather than from two settings somebody has to keep in step.
+  */
+  webhookSecretVar: "PROVIDER_WEBHOOK_SECRET",
   resolveCaller,
   /*
     ⚠️ THE DIRECTORY AND THE REGIONAL DATABASE ARE COMPOSED SEPARATELY, because
