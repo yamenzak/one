@@ -656,7 +656,7 @@ catch.
 
 ---
 
-## Tier 4 — `apps/_template` is half a template — ⚠️ **worker HALF DONE (2026-08-08)**
+## Tier 4 — `apps/_template` is half a template — ✅ **DONE (2026-08-08)**
 
 ```
 ls apps/_template                       # README package.json src test tsconfig vitest.config wrangler.jsonc
@@ -667,12 +667,30 @@ grep -c "app.route(" apps/api/src/index.ts              # 44
 This is the highest-leverage item in the document, because it is the one that
 decides what app #5 costs.
 
-**There is no SPA.** The template is a worker. A new app's browser half —
-`Shell`, `session`, `theme`, `host`, the admin console binding, the five doors'
-screens, `main.tsx`, the conformance tests, `vite.config.ts`, `tailwind`,
-`tokens.accents.css`, the PWA config — is copied by hand from whichever existing
-app the author happens to open. Every UI divergence in this document arrived
-that way.
+~~**There is no SPA.**~~ ✅ `apps/_template-app` exists. The browser half —
+`Shell`, `session`, `theme`, `screen.ts`, the admin console binding, the doors'
+screens, `main.tsx`, the accent registry, the build config and five conformance
+tests — was copied by hand from whichever existing app the author happened to
+open, and **every UI divergence in this document arrived that way.**
+
+What it carries is chosen by the same rule as the worker half: each file exists
+because of a bug that shipped, and says so in its header.
+
+| File | The defect it prevents |
+|---|---|
+| `screen.ts` | `pickScreen` as a PURE function. Inline in `main.tsx` it cannot be imported by a test — which is why two of its inputs (`gate.blocked`, `maintenance.level`) were declared and never read. |
+| `theme.tsx` | `<ThemeProvider branding={null}>`. Every layer upstream worked and the value was discarded at the last line, so a tenant's branding form saved, said "Saved", and changed nothing. |
+| `Shell.tsx` | `BottomTabs` is `md:hidden`, so an app that renders only it has **no navigation at all** above 768px. |
+| `screens/Login.tsx` | The Turnstile widget. `turnstile.*` is shared config, so an operator turning the check on from any console had every reason to think sign-in was covered; two apps never rendered the widget, so no token existed and the control did nothing. |
+| `screens/Blocked.tsx` | Rung two of the ladder, with both exits — the gate exempts `/api/tenant/close` at every rung, and a screen with no way out makes that exemption protect nothing. |
+| `screens/Admin.tsx` | Nine shared panels mounted, and the note that rebuilding one fails `admin-panels.conformance.test.ts`. |
+| `tones.ts` + `tokens.accents.css` | An unregistered tone resolves to an undefined custom property and a class Tailwind never emitted. The badge mounts, typechecks, and renders grey. |
+| `styles.css` | The `@source` list. A missed workspace package renders with a SUBSET of its classes and nothing warns. |
+
+⚠️ **And the three SPA guards now check it.** `api-door`, `motion-config` and
+`ui-ownership` derive from `apps.json`, which the template is deliberately absent
+from — so the one SPA every future app is copied from would have been the only
+unchecked one in the repo. That is this document's own thesis, one level up.
 
 **And the worker mounts five route trees out of the twelve the packages ship.**
 It applies `NOTIFY_SCHEMA`, `STORAGE_SCHEMA` and `BILLING_SCHEMA`, then mounts:
@@ -921,8 +939,7 @@ its whole baseline on one line.
 
 ### 4. Finish the template — *this is what makes app #5 cheap*
 
-Two halves. **The worker is done (2026-08-08); the SPA is not, and it is the
-bigger one.**
+Two halves, **both done (2026-08-08).**
 
 - ~~**Worker:**~~ ✅ All twelve trees mounted — `otpSendGuard`, `staffRoutes`,
   `mediaRoutes`, `notifyRoutes`, `tenantCloseRoutes`, `accountRoutes`,
@@ -948,11 +965,21 @@ bigger one.**
   comment**. A guard that matches its own documentation of a feature verifies
   only that the feature was once described.
 
-- **`apps/_template-app`:** a real SPA in the workspace, typechecked and tested
-  like the worker, carrying the shell, the doors, the session, the theme, the
-  admin console binding, the conformance tests and the build config — with the
-  product vocabulary removed. This is the single change that most affects how
-  fast the next app ships and how much it looks like the last one. Still open.
+- ~~**`apps/_template-app`:**~~ ✅ Shipped. 15 files, 19 tests, and the worker's
+  `assets` binding now points at it — with the turbo edge declared by hand,
+  because an `assets.directory` is a filesystem path rather than a package
+  dependency and a missing build makes a Miniflare suite report **"no tests"**,
+  which reads as a pass.
+
+  Two things worth knowing. `ui-ownership` picked the new SPA up on its own
+  (it derives from the presence of a `vite.config`, which is the better
+  derivation); the other three had to be told, and that asymmetry is the
+  argument for deriving from a FACT rather than from a list wherever there is
+  one. And the `save-lifecycle` lint fired on the new `Records.tsx` — correctly,
+  because an earlier draft of its header QUOTED both anti-patterns literally. A
+  rule that scans source cannot tell a warning about a shape from a use of it;
+  the fix is to describe rather than to exempt, since exempting the file would
+  have turned the check off for the screen that demonstrates it.
 
 ### 4b. The money path — ✅ **DONE (2026-08-08)**
 

@@ -120,6 +120,9 @@ const RULES = {
    * React-shaped weight on a device with 512 MB of RAM. See SCENA.md.
    */
   "@scena/player": { exempt: "a paired device with no session — see SCENA.md" },
+  /* The template goes through the kit, like the two apps above it — and it is
+     checked precisely because it is what app #5 copies. */
+  "@4dl/template-app": { door: "`api` from @4dl/app-kit", allow: [] },
 };
 
 /** Every `.ts`/`.tsx` file under `dir`, recursively, skipping build output. */
@@ -157,7 +160,17 @@ const spaDir = (pkgName) => {
 */
 const BARE = /(?<![A-Za-z0-9_$.])fetch\s*\(/g;
 
-const spas = REGISTRY.apps.map((a) => a.spa).filter(Boolean);
+/**
+ * ⚠️ THE TEMPLATE'S SPA IS APPENDED BY HAND.
+ *
+ * `apps/_template-app` is deliberately absent from `apps.json` — it deploys
+ * nowhere — so a guard that derives its list from the registry alone would leave
+ * the one SPA every future app is COPIED FROM as the only unchecked one in the
+ * repo. That is this guard's own failure mode, one level up.
+ */
+const TEMPLATE_SPA = "@4dl/template-app";
+
+const spas = [...REGISTRY.apps.map((a) => a.spa).filter(Boolean), TEMPLATE_SPA];
 if (spas.length < 3) {
   fail(`apps.json lists ${spas.length} SPA(s) — the registry reader is broken, not the registry.`);
 }

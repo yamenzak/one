@@ -33,6 +33,15 @@
       "dependsOn": ["^build", "@tessa/app#build"],
       "outputs": ["coverage/**"]
     },
+    "@4dl/template#test": {
+      // The template serves `apps/_template-app/dist` too, and gets the same
+      // hand-declared edge as the three products — because the whole point of a
+      // template is that a copy of it inherits the wiring that is easy to
+      // forget. A new app renamed from this one keeps the pattern; one that
+      // started from a product would have had to notice this line.
+      "dependsOn": ["^build", "@4dl/template-app#build"],
+      "outputs": ["coverage/**"]
+    },
     "@4dl/scena#test": {
       // Scena's worker serves `apps/scena-app/dist` through an `assets`
       // binding, and an `assets.directory` is a filesystem path, not a package

@@ -1,0 +1,72 @@
+/**
+ * THIS APP'S ACCENT TOKENS — the colours the product codes information with.
+ *
+ * ⚠️ **A tone must be REGISTERED, or it resolves to nothing and says nothing.**
+ *
+ * `@4dl/ui`'s `Tone` is five STATUS tones plus whatever an app registers by
+ * CONVENTION: a tone named `foo` resolves to `var(--foo)` and the Tailwind
+ * classes `bg-foo-soft text-foo`. That convention is what makes adding one
+ * cheap, and it is also why using an unregistered one does not error — it
+ * resolves to an undefined custom property and a class Tailwind never generated.
+ * The badge mounts, typechecks, and renders grey.
+ *
+ * Tessa shipped that: it borrowed Kova's `cardio`, `nutrition`, `activity` and
+ * `sleep` and defined none of them. Every icon badge in the app was uncoloured
+ * and nothing anywhere said why. Delete the two examples below and name the
+ * states THIS product actually sorts things into.
+ *
+ * ── Two rules that are not stylistic ────────────────────────────────────────
+ *
+ * **VALIDATE the set, in both modes.** These are categorical colours: they mean
+ * something by being distinguishable from each other. Run them through the
+ * data-viz palette validator (lightness band, chroma floor, CVD separation,
+ * normal-vision floor, contrast against the surface) as a SET, in each mode
+ * against that mode's surface. Two hues a protanope cannot separate are two
+ * labels that mean the same thing to that reader.
+ *
+ * **Dark is SELECTED, not a flip.** The dark band is roughly L 0.48–0.67
+ * against a dark surface; the light one is lower and more saturated. Re-stepping
+ * the same hues per mode is the work. An automatic inversion produces values
+ * that pass contrast and read as a different palette.
+ *
+ * The third slot per tone (`-foreground`) is ink laid ON the tone, for a filled
+ * pill. It is MEASURED rather than shared: one `--tone-foreground` per mode
+ * holds only while every accent sits at a similar lightness, which is true by
+ * construction here and false the moment a palette is derived. `@4dl/ui`'s
+ * `bestForeground` takes the WCAG ratio of near-white and near-dark against the
+ * tone and keeps the winner; `tokens.accents.test.ts` asserts the result rather
+ * than trusting this paragraph.
+ */
+
+@theme inline {
+  --color-subject: var(--subject);
+  --color-subject-soft: var(--subject-soft);
+  --color-subject-foreground: var(--subject-foreground);
+  --color-record: var(--record);
+  --color-record-soft: var(--record-soft);
+  --color-record-foreground: var(--record-foreground);
+}
+
+/* Dark is the default, matching `@4dl/ui`'s dark-first tokens. */
+:root {
+  --subject: oklch(0.66 0.17 270);
+  --subject-soft: oklch(0.28 0.07 270);
+  --subject-foreground: oklch(0.2 0.02 270);
+  --record: oklch(0.67 0.15 48);
+  --record-soft: oklch(0.28 0.07 48);
+  --record-foreground: oklch(0.2 0.02 48);
+}
+
+/**
+ * Light mode. The tone steps are darker so tone-coloured text and icons on their
+ * own pale `-soft` tint clear WCAG AA — the dark-mode values wash out on white.
+ * The `-soft` backgrounds stay pale.
+ */
+:root[data-theme="light"] {
+  --subject: oklch(0.52 0.17 270);
+  --subject-soft: oklch(0.94 0.05 270);
+  --subject-foreground: oklch(0.99 0.01 270);
+  --record: oklch(0.525 0.15 48);
+  --record-soft: oklch(0.94 0.06 48);
+  --record-foreground: oklch(0.99 0.01 48);
+}

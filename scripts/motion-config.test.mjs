@@ -48,7 +48,17 @@ for (const dir of readdirSync(join(ROOT, "apps"))) {
   byName.set(JSON.parse(readFileSync(pkg, "utf8")).name, join("apps", dir));
 }
 
-const spas = [...new Set(registry.apps.flatMap((a) => (a.spa ? [a.spa] : [])))];
+/**
+ * ⚠️ THE TEMPLATE'S SPA IS APPENDED BY HAND.
+ *
+ * `apps/_template-app` is deliberately absent from `apps.json` — it deploys
+ * nowhere — so a guard that derives its list from the registry alone would leave
+ * the one SPA every future app is COPIED FROM as the only unchecked one in the
+ * repo. That is this guard's own failure mode, one level up.
+ */
+const TEMPLATE_SPA = "@4dl/template-app";
+
+const spas = [...new Set([...registry.apps.flatMap((a) => (a.spa ? [a.spa] : [])), TEMPLATE_SPA])];
 
 let failures = 0;
 const fail = (msg) => { console.error(`✘ ${msg}`); failures++; };

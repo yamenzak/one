@@ -7,6 +7,37 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-07-01",
   "compatibility_flags": ["nodejs_compat"],
+  /**
+   * THE SPA, SERVED FROM THE SAME ORIGIN AS THE API.
+   *
+   * Not a convenience: the Better Auth session cookie is then same-origin with
+   * no CORS or credentials juggling, and every passkey ceremony binds to the one
+   * hostname the user actually came through.
+   *
+   * ⚠️ `html_handling: "none"` rather than the default. "auto-trailing-slash"
+   * answers `/index.html` with a 307 to `/`, and a redirected response cannot
+   * answer a navigation from a service worker's fallback — which took out every
+   * deep link in one app while `/` kept working. This app has one HTML file and
+   * routes itself, so there is nothing for that logic to help with.
+   *
+   * ⚠️ `run_worker_first` names the API prefixes. Without it the asset server
+   * answers first and `/api/*` returns the SPA's HTML with a 200 — which the
+   * fetch layer parses as JSON and reports as a parse error, two steps removed
+   * from its cause.
+   *
+   * ⚠️ AND THE SPA MUST BE BUILT BEFORE THIS WORKER'S TESTS RUN. An
+   * `assets.directory` is a filesystem path, not a package dependency, so turbo
+   * cannot infer the edge — `turbo.json` declares it by hand. A missing build
+   * makes the Miniflare suite abort reporting **"no tests"**, which reads as a
+   * pass. That is what turned the merge adding the second app's SPA red.
+   */
+  "assets": {
+    "directory": "../_template-app/dist",
+    "not_found_handling": "single-page-application",
+    "html_handling": "none",
+    "run_worker_first": ["/api/*", "/health"]
+  },
+
   "observability": { "enabled": true },
 
   /**

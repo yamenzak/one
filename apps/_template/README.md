@@ -1,14 +1,17 @@
 # apps/_template — a new 4DL app
 
-Every shared package wired up, and nothing product-specific. Copy the directory,
-rename it, and start adding routes.
+Every shared package wired up AND MOUNTED, and nothing product-specific. Copy
+the two directories, rename them, and start adding routes.
 
 ```
-cp -r apps/_template apps/inventory
-# then: package.json name, wrangler.jsonc name + ids + ROOT_DOMAIN,
+cp -r apps/_template      apps/inventory        # the worker
+cp -r apps/_template-app  apps/inventory-app    # the browser half — take BOTH
+# then: package.json names, wrangler.jsonc name + ids + ROOT_DOMAIN + assets dir,
 #       src/access.ts roles, src/entitlements.ts plan keys,
 #       src/host-context.ts DEFAULT_ROOT + reserved labels,
-#       src/mailer.ts brand + sender, src/db.ts your tables
+#       src/mailer.ts brand + sender, src/db.ts your tables,
+#       src/notifications.ts types, and the SPA's theme storage key (3 places)
+# finally: an entry in apps.json, which is what wires CI, deploy and provisioning
 pnpm install && pnpm --filter @<scope>/inventory test
 ```
 
@@ -152,14 +155,32 @@ pass. Scena carried `@4dl/notify` in exactly that state for three stages. This
 template shipped in it too, which is why the mounts are here now rather than
 described as an exercise.
 
+## The browser half is `apps/_template-app`
+
+**Copy both directories.** The SPA carries the parts every 4DL app needs and
+that were, until it existed, copied by hand from whichever product the author
+happened to open — which is where every UI divergence in this repo came from.
+
+| File | What it is |
+|---|---|
+| `screen.ts` | `pickScreen` — the whole client-side gate as one PURE function: the doors, the maintenance switch, the standing ladder. Unit-tested, which it cannot be while it lives inside `main.tsx`. |
+| `session.ts` | `createSession` — the host probe, the context cache, the 401 handler, the tenant switch that NAVIGATES. |
+| `theme.tsx` | `ThemeProvider` **with a branding actually passed to it**, plus the remembered boot brand that stops a branded tenant flashing the platform's colour on every visit. |
+| `Shell.tsx` | The chrome: bottom tabs AND the desktop rail, the maintenance strip, the standing chip, the bell, the hop to the operator door. |
+| `Notifications.tsx` | The bell and the inbox screen, with the per-type icon map. |
+| `screens/Doors.tsx` | Root signpost, no-tenant, wrong-door. |
+| `screens/Login.tsx` | The OTP form — with the Turnstile widget and the cooldown countdown. |
+| `screens/Blocked.tsx` | Rung two of the ladder, with both exits. |
+| `screens/Admin.tsx` | The operator console: nine shared panels, mounted. |
+| `screens/Settings.tsx` | Passkeys, and the two ways OUT. |
+| `tones.ts` + `tokens.accents.css` | The accent registry, and why an unregistered tone renders grey. |
+| five conformance tests | The UI rules, Tailwind's `@source` list, the shared admin panels, the accent tokens, and `pickScreen`. |
+
+Every one of those files carries, in its header, the bug it exists to prevent.
+Read them before deleting anything.
+
 ## What this template does NOT include
 
-- **A frontend.** `@4dl/app-kit` + `@4dl/ui` are the runtime and the design
-  system; the shell, nav and session provider are still per-app (see that
-  package's README for exactly which files stayed in Kova and why). ⚠️ This is
-  the biggest remaining gap, and `docs/PLATFORM-AUDIT.md` names it: **every UI
-  divergence in this repo happened where it did because there is no browser half
-  to copy.**
 - **The Stripe CHECKOUT routes and the webhook.** The two halves have separated
   since this was written, and only one is still the app's.
 

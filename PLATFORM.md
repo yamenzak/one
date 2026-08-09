@@ -12,7 +12,8 @@ a frozen ALLOW list that can only shrink. Thirteen of the fourteen are empty —
 `@4dl/core`'s is the only one with entries.
 
 **Starting a new app?** → [`apps/_template/README.md`](apps/_template/README.md).
-It typechecks and its tests pass in this workspace, so it cannot rot.
+The worker is `apps/_template`, its browser half is `apps/_template-app`, and
+both typecheck and pass their tests in this workspace, so neither can rot.
 
 ---
 
@@ -253,13 +254,18 @@ before it adopts the store.
 
 ### Adding an app
 
-Copy `apps/_template` — it typechecks and its tests run in this workspace, so it
-cannot rot. It also **mounts a route tree for every schema module it applies**,
+Copy `apps/_template` **and `apps/_template-app`** — the worker and its browser
+half. Both typecheck and their tests run in this workspace, so neither can rot.
+The worker **mounts a route tree for every schema module it applies**,
 which it did not for a long time: a new app inherited nine capabilities that had
 tables, a bound Durable Object, and no way for a person to reach them.
 `scripts/capability-reachable.test.mjs` (in `pnpm gate`) now fails on any app —
 the template included — that installs a package's schema and never mounts its
-routes.
+routes. The SPA carries the other half: the five doors' screens, the session,
+the theme, `pickScreen`, the Shell's maintenance strip and standing chip, the
+operator console binding, the accent registry and five conformance tests. Every
+UI divergence catalogued in `docs/PLATFORM-AUDIT.md` happened while that
+directory did not exist.
 
 Its README is the file-by-file guide;
 [`docs/SHIPPING-AN-APP.md`](docs/SHIPPING-AN-APP.md) is the walkthrough from
