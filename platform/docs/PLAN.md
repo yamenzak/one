@@ -10,6 +10,10 @@ kind: plan
 > for future ones. It supersedes nothing yet: `packages/@4dl/*` and `apps/*`
 > remain the shipping system until a stage below says otherwise.
 >
+> **[KOVA.md](KOVA.md) is the first app-shaped plan** — why migrating Kova means
+> writing a new product, how its one live tenant travels with its passkeys, and
+> the seven mechanisms the platform owes before it can be written.
+>
 > **[MANIFEST.md](MANIFEST.md) is what an app actually declares** — the full
 > surface, and §9 there is the split between what must exist in the types before
 > the first table and what is safe to add later. It is the specification stage 0
@@ -1012,8 +1016,9 @@ second-system effect, which is the largest risk here by a distance.
 | 4 | **Renderer** — shell, nav, collection views, settings, admin, whitelabel, PWA. The language is [UI.md](UI.md). | ✅ The contrast sweep walks every legal brand, the state matrix proves no two states render alike, the boundary guard holds, and `hello` has a screen that writes no chrome at all. A live surface moves between four presentations without remounting. Open: the settings and admin surfaces, the PWA, and `pnpm shots` |
 | 5 | **Commerce** — plans, entitlements, flags, the provider on one webhook, B2C packages, metering, parking state. | ✅ Both rails resolve through one explained walk each, and a manifest that would sell something nothing withholds does not boot. `hello` declares a catalogue, a ceiling and one sold capability; the ladder, the parking state, the quota, the package offer, the grant ledger, the intersection and the whole provider lane are derived. A signed event is applied or PARKED where an operator can read and replay it — there is no third answer — and one that belongs to a workspace on another continent settles there. Open: opening a checkout, which needs an account rather than a design |
 | 6 | **Ops** — notifications incl. the inbox, help centre, versioning + changelog, data & subscription centre, maintenance, provisioning. | ✅ `one new <id>` produces an app that boots, passes its own suite and is missing nothing — measured by generating one for real. `emits` drives the inbox, the webhook catalogue and the audit entry from one declaration; help and the changelog are checked manifest content; a lock makes a removal a decision rather than a diff; export and erasure read ONE derived plan; leaving works from the bottom rung; maintenance closes every door above the public lane. The template is held to `AppSpec` and to the runtime's own module list, so it cannot fall behind. Open: CI, and a deploy config that needs an account rather than a design |
-| 7 | **Kova** — §7. The long one. | Production tenants are served by `platform/kova` and `apps/api` is unrouted |
-| 8 | **Tessa, then Scena** | Both migrated; Scena's player proves the canvas boundary |
+| 6.5 | **Batteries** — files, jobs, guidance (the checklist), milestones, moments, the wizard, the marketplace. Seven mechanisms, all product-agnostic. | `hello` uploads a file, runs a scheduled sweep, shows a derived checklist and celebrates a milestone. **[KOVA.md](KOVA.md) §4** is why each one is the platform's rather than Kova's |
+| 7 | **Kova** — a NEW product on the platform, written version by version. §7 and **[KOVA.md](KOVA.md)**. The long one. | Production tenants are served by `platform/kova` and `apps/api` is unrouted |
+| 8 | **The tenant**, then Tessa, then Scena | Kova's one live tenant is copied, verified and flipped with its passkeys intact ([KOVA.md](KOVA.md) §6); both other apps migrated; Scena's player proves the canvas boundary |
 | 9 | **Delete** `packages/@4dl/*` and `apps/*` | The repo has one platform |
 
 **Stage 6 is the real deliverable of this project.** Stages 7–8 are the payoff;

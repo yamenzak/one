@@ -41,6 +41,13 @@ Generated. Never hand-written.
 
 - [docs/DEFERRED.md](../docs/DEFERRED.md)
 
+## plan
+
+Open intentions. Every open item is a `DEFER` marker — see docs/DEFERRED.md.
+
+- [docs/KOVA.md](../docs/KOVA.md)
+- [docs/PLAN.md](../docs/PLAN.md)
+
 ## contract
 
 Invariants and rationale. Do not rot; carry a `verified:` date.
@@ -48,12 +55,6 @@ Invariants and rationale. Do not rot; carry a `verified:` date.
 - [docs/MANIFEST.md](../docs/MANIFEST.md) — verified 2026-08-09
 - [docs/STANDARDS.md](../docs/STANDARDS.md) — verified 2026-08-09
 - [docs/UI.md](../docs/UI.md) — verified 2026-08-09
-
-## plan
-
-Open intentions. Every open item is a `DEFER` marker — see docs/DEFERRED.md.
-
-- [docs/PLAN.md](../docs/PLAN.md)
 
 ## record
 

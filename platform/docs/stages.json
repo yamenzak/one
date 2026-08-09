@@ -54,6 +54,11 @@
       "status": "shipped"
     },
     {
+      "id": "6.5",
+      "title": "Batteries Kova needs \u2014 files, jobs, guidance, milestones, moments, wizard, marketplace",
+      "status": "planned"
+    },
+    {
       "id": "7",
       "title": "Kova migration",
       "status": "planned"
