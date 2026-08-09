@@ -902,7 +902,7 @@ second-system effect, which is the largest risk here by a distance.
 
 | # | Stage | Ends when |
 |---|---|---|
-| 0 | **Contracts** — manifest schema, layer boundaries, naming, the operation and collection types. Throwaway code only. | The four types compile and three people agree on them |
+| 0 | **Contracts** — manifest schema, layer boundaries, naming, the operation and collection types. Types only. | ✅ built in `platform/kernel` — the four types compile, six real surfaces from two shipping products are expressed in them, and eight mistakes are rejected by the compiler. [FINDINGS.md](../kernel/test/FINDINGS.md) is what did not fit. Open: review |
 | 1 | **Kernel** — bindings from manifest, config, schema composition, shared identity + root-scoped passkeys, tenancy + doors, **region resolution and the global tenant directory**, standing. | A generated `hello` app boots, signs in with one passkey usable from a second app's origin, creates a tenant, answers `/health` — and no handler has seen a raw binding |
 | 2 | **Surface** — operations → routes + tools + webhooks + audit + OpenAPI. | An AI agent completes a CRUD round trip through tools, and is refused exactly what the user would be |
 | 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search, **and tenant relocation (§4.2) with the `Relocatable` DO contract**. | `hello` has a real collection with an activity log and a metered ledger — and a tenant can be copied to a second region and back, verified, with the source still bootable |

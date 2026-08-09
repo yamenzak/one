@@ -25,3 +25,9 @@ Invariants and rationale. Do not rot; carry a `verified:` date.
 Open intentions. Every open item is a `DEFER` marker — see docs/DEFERRED.md.
 
 - [docs/PLAN.md](../docs/PLAN.md)
+
+## record
+
+What happened and why. History, not current state.
+
+- [kernel/test/FINDINGS.md](../kernel/test/FINDINGS.md)

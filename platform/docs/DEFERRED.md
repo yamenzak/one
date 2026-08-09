@@ -8,4 +8,17 @@ kind: index
 > Every entry is a `DEFER` marker somewhere in the repository. Nothing here
 > was remembered — it was found, which is the point (docs/DOCS-STANDARD.md §2).
 
-Nothing is deferred. Every stage owes nothing to a later one.
+## Stage 1 — Kernel — bindings, identity, tenancy, regions, standing
+
+- `one-001` — a builder that accumulates the operation union, so  
+  <sub>kernel/src/app.ts:118</sub>
+
+## Stage 2 — Surface — operations to routes, tools, webhooks, OpenAPI
+
+- `one-002` — bind to the real validator, and make `output` carry  
+  <sub>kernel/src/operation.ts:110</sub>
+
+## Stage 6 — Ops — notifications, help, versioning, data centre, CI
+
+- `one-003` — resolve against the declared help registry, so a  
+  <sub>kernel/src/problem.ts:20</sub>
