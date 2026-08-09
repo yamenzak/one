@@ -65,6 +65,7 @@ void problems;
  */
 export const readProgress = operation({
   id: "coaching.progress.read",
+  kind: "read",
   summary: "Read a client's progress across the lenses their package includes.",
   input: z<{ clientId: string; from: string; to: string }>(),
   output: z<{
@@ -103,6 +104,7 @@ export const readProgress = operation({
  */
 export const publishPlan = operation({
   id: "training.plan.publish",
+  kind: "write",
   summary: "Publish a training plan so the client can start it.",
   input: z<{ planId: string; clientId: string }>(),
   output: z<{ publishedAt: string }>(),
@@ -144,6 +146,7 @@ export const publishPlan = operation({
  */
 export const applyPackageGrant = operation({
   id: "commerce.package.grant",
+  kind: "write",
   summary: "Apply a purchased package's budgets and flags to a customer.",
   input: z<{ subjectId: string; packageId: string; eventId: string }>(),
   output: z<{ daysAdded: number }>(),

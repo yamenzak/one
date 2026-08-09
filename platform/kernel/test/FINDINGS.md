@@ -287,6 +287,60 @@ vulnerability, a screen share, or a support session.
 
 ## What stage 1 still owes
 
+`DEFER` markers carry these; they are not prose here. The WebAuthn ceremony and
+the real regional resolver — both library bindings rather than design.
+
+---
+
+# Stage 2 findings — the surface
+
+## 19. `kind: "read" | "write"` had to be added, and stage 0 missed it
+
+Three things depend on it at once: the HTTP method, whether the standing gate
+refuses the call, and whether a response may be cached. Stage 0's operation had
+none of them, because nothing yet consumed the declaration.
+
+Inferring it from `outcome` or `audit` being present was the tempting
+alternative, and wrong: one subtle signal deciding three things, whose failure
+mode is a write treated as a read — a mutation surviving a read-only workspace.
+
+## 20. The operation id IS the path, deliberately against REST
+
+A resource-and-verb mapping has to decide which segment is an identifier, and
+which verb expresses "publish", "grant" or "reconcile". Those decisions have no
+right answer and must then be made IDENTICALLY by the router, the typed client,
+the OpenAPI document and whoever writes the tool description.
+
+The id is already unique and already the name. `GET /api/<id>` for a read,
+`POST /api/<id>` for a write. There is no mapping to get wrong in four places,
+which matters more here than REST's conventions do.
+
+## 21. ⚠️ Row scope is REPORTED, not skipped
+
+`check` is pure so that `toolsFor` can filter a catalogue without touching a
+store. Row-level scope needs a database read, so a pure gate cannot perform it.
+
+Returning `scopeRequired` makes it an OBLIGATION the runner must discharge rather
+than an omission nobody sees. A gate that silently dropped it would be the worst
+failure in the module — every other refusal is visible, and that one is not.
+
+## 22. The equivalence is asserted, not sampled
+
+Stage 2's exit criterion is that the assistant "is refused exactly what the user
+would be", which is an equivalence — so the test compares the tool catalogue
+against the gate for every operation against every caller, rather than checking
+a few cases.
+
+Mutation-tested by deleting the gate from `toolsFor`: the equivalence fails
+immediately, where a sampled test might not have covered the caller that
+exposed it.
+
+⚠️ The design point underneath: `toolsFor` calls `check`. It does not reimplement
+it, and it does not read a parallel list. Two registries kept in step by hand is
+how a product ships an assistant that can do more than the person operating it,
+with nothing failing anywhere.
+
+
 `DEFER` markers carry these; they are not prose here. Identity and Better Auth,
 config, schema composition, and turning `regionalBindings` from a shape into a
 real resolver.

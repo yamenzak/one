@@ -113,8 +113,22 @@ export interface Ctx<B extends BindingSpec> {
  */
 export interface Schema<T> { readonly _t?: T }
 
+/**
+ * ⚠️ READ OR WRITE, DECLARED. Stage 2 needed this and stage 0 did not have it.
+ *
+ * It decides three things at once, which is why it is worth a field rather than
+ * an inference: the HTTP method, whether the standing gate refuses it (reads are
+ * never gated, at any rung), and whether a response may be cached.
+ *
+ * Inferring it from `outcome` or `audit` being present would be one subtle
+ * signal deciding all three, and the failure — a write treated as a read — is a
+ * mutation surviving a read-only workspace.
+ */
+export type OperationKind = "read" | "write";
+
 export interface OperationSpec<B extends BindingSpec, I, O> {
   readonly id: string;
+  readonly kind: OperationKind;
   /** One sentence. It becomes the AI tool's description, so it is read by a model. */
   readonly summary: string;
   readonly input: Schema<I>;

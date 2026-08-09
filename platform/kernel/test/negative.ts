@@ -100,6 +100,7 @@ export const unexplainedPlatformScope = collection({
 // @ts-expect-error — `idempotency` is required (missing field ⇒ annotate the call)
 export const nonIdempotent = operation({
   id: "x.y",
+  kind: "write",
   summary: "…",
   input: z<{ a: string }>(),
   output: z<{ b: string }>(),
@@ -113,6 +114,7 @@ export const nonIdempotent = operation({
 // somebody forgets to extend; an unexplained opt-out is one nobody can review.
 export const unexplainedHide = operation({
   id: "x.z",
+  kind: "write",
   summary: "…",
   input: z<{ a: string }>(),
   output: z<{ b: string }>(),

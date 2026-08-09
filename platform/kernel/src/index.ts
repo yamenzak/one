@@ -26,4 +26,5 @@ export * from "./schema.js";
 export * from "./collection.js";
 export * from "./resolve.js";
 export * from "./operation.js";
+export * from "./surface.js";
 export * from "./app.js";
