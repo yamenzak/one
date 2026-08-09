@@ -45,6 +45,12 @@ export const problems = declareProblems({
     title: "This plan can't be published yet",
     detail: (m) => `It has ${m.emptyDays} day(s) with no exercises.`,
     retryable: false,
+    /*
+      ⚠️ NO LONGER A CAST. `HelpId` used to be a branded string with nothing
+      behind it, so this line named an article that did not exist and could not
+      be told from one that did — which is the second failure in a row for
+      somebody who is already looking at an error. The manifest declares it now.
+    */
     help: "plans.publishing" as never,
   },
 });

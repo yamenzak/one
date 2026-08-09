@@ -292,6 +292,31 @@ if (!/await park\(/.test(commerceOps) || !/listParked\(/.test(commerceOps)) {
        `       success with an extra table.`);
 } else ok(`dead letter: an unplaceable event is parked, and the parking is readable`);
 
+/* --------------------------------------------------------- 5. THE LOCK --- */
+
+/**
+ * ⚠️ AN APP WITHOUT A LOCK CAN REMOVE ANYTHING WITHOUT ANYBODY NOTICING.
+ *
+ * The comparison itself lives in each app's own suite, where the manifest can
+ * actually be evaluated. What a dependency-free script CAN check is that the
+ * file exists and that something checks it — because the failure mode is not a
+ * wrong lock, it is an app that quietly never had one, and that is invisible in
+ * a passing run.
+ */
+const apps = readdirSync(ROOT, { withFileTypes: true })
+  .filter((e) => e.isDirectory() && existsSync(join(ROOT, e.name, "src", "manifest.ts")))
+  .map((e) => e.name);
+for (const app of apps) {
+  if (!existsSync(join(ROOT, app, "manifest.lock.json"))) {
+    fail(`${app}: no manifest.lock.json.\n` +
+         `       Without one, removing a plan, a permission or an entitlement somebody holds\n` +
+         `       is a diff nobody reads and a failure the customer finds.`);
+  } else if (!walk(join(ROOT, app, "test")).some((f) => /removals\(/.test(readFileSync(f, "utf8")))) {
+    fail(`${app}: has a manifest.lock.json that nothing compares against.`);
+  }
+}
+ok(`manifest lock: ${apps.length} app(s) pin what they have already shipped`);
+
 /* -------------------------------------------------------------------------- */
 
 if (bad) {

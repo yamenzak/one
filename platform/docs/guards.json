@@ -244,9 +244,11 @@
     {
       "id": "manifest-diff",
       "group": "platform",
-      "fails": "a deploy removing a plan, permission or entitlement somebody holds",
+      "fails": "a manifest that stopped offering a plan, permission, entitlement, collection or operation somebody holds, without naming it as retired",
       "stage": "6",
-      "status": "owed"
+      "status": "live",
+      "impl": "hello/test/manifest.node.test.ts",
+      "proves": "has not removed anything without saying so"
     },
     {
       "id": "app-test-budget",
@@ -258,16 +260,20 @@
     {
       "id": "help-limits",
       "group": "platform",
-      "fails": "a help article over its length limit, naming a surface the manifest does not declare, or using developer vocabulary",
+      "fails": "a help article over its length limit, naming a surface the manifest does not declare, or written in developer vocabulary",
       "stage": "6",
-      "status": "owed"
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses an article longer than somebody will read"
     },
     {
       "id": "release-note-shape",
       "group": "platform",
-      "fails": "a release note reading like a commit message \u2014 a file path, a type name, a PR number, an internal id",
+      "fails": "a release note reading like a commit message \u2014 a file path, a type name, a pull-request number, an internal id",
       "stage": "6",
-      "status": "owed"
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses a commit subject in the changelog"
     },
     {
       "id": "shot-id-resolves",
@@ -779,6 +785,24 @@
       "impl": "runtime/test/inbox.test.ts",
       "proves": "tells only the roles the type is for",
       "fails": "a dispatch that names its own recipients rather than reading the registry \u2014 'everybody' and 'nobody' have both shipped"
+    },
+    {
+      "id": "help-link-resolves",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses a link to an article nobody wrote, from an operation or from a failure",
+      "fails": "a help cross-link naming an article that does not exist \u2014 rendered beside an error, so it is the second failure in a row"
+    },
+    {
+      "id": "lock-exists",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "manifest.lock.json\"))",
+      "fails": "an app with no manifest lock, so removing something somebody holds is a diff nobody reads and a failure the customer finds"
     }
   ]
 }

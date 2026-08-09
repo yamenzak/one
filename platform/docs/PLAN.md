@@ -876,6 +876,9 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `no-silent-cap` | a bounded sweep that does not log what it dropped | **live** |
 | `entitlement-enforced` | a sold entitlement no gate, quota or shaped response names — a capability on a price list that every workspace has anyway | **live** |
 | `flag-enforced` | a sold customer capability the interface hides and no route withholds, so anybody who calls it directly receives it | **live** |
+| `manifest-diff` | a manifest that stopped offering a plan, permission, entitlement, collection or operation somebody holds, without naming it as retired | **live** |
+| `help-limits` | a help article over its length limit, naming a surface the manifest does not declare, or written in developer vocabulary | **live** |
+| `release-note-shape` | a release note reading like a commit message — a file path, a type name, a pull-request number, an internal id | **live** |
 | `schema-idempotent` | a schema module that is not re-runnable, a duplicate table across modules, or a module ordered before something it declares it needs | **live** |
 | `boot-per-region` | a deployment that composes one region's schema and serves another — the tenant resolves, reaches the right database, and finds nothing in it | **live** |
 | `standing-not-permission` | an always-allowed lane that skips the permission check with the standing gate | **live** |
@@ -906,10 +909,9 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `inbox-never-optional` | a preference that removes the RECORD rather than the interruption, so 'I never got that' has no answer that does not depend on a mail provider | **live** |
 | `action-not-mutable` | an `action` notification that can be switched off, which makes the product silently stop working for whoever switched it off | **live** |
 | `notification-audience` | a dispatch that names its own recipients rather than reading the registry — 'everybody' and 'nobody' have both shipped | **live** |
-| `manifest-diff` | a deploy removing a plan, permission or entitlement somebody holds | stage 6 |
+| `help-link-resolves` | a help cross-link naming an article that does not exist — rendered beside an error, so it is the second failure in a row | **live** |
+| `lock-exists` | an app with no manifest lock, so removing something somebody holds is a diff nobody reads and a failure the customer finds | **live** |
 | `app-test-budget` | an app's own suite crossing its duration cap — the fixture problem gets solved rather than tolerated | stage 6 |
-| `help-limits` | a help article over its length limit, naming a surface the manifest does not declare, or using developer vocabulary | stage 6 |
-| `release-note-shape` | a release note reading like a commit message — a file path, a type name, a PR number, an internal id | stage 6 |
 | `shot-id-resolves` | a screenshot id the suite does not produce | stage 6 |
 <!-- /generated -->
 

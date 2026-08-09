@@ -13,7 +13,11 @@
 import type { BindingSpec } from "./bindings.js";
 import type { CollectionSpec } from "./collection.js";
 import type { FlagDef } from "./customer.js";
+import type { HelpRegistry } from "./help.js";
+import { danglingHelp, helpProblems } from "./help.js";
 import type { NotificationRegistry } from "./notify.js";
+import type { Release, Retired } from "./release.js";
+import { releaseProblems } from "./release.js";
 import { danglingLinks } from "./notify.js";
 import type { EntitlementDef, PlanSpec } from "./entitlement.js";
 import { parkingAboveFloor } from "./entitlement.js";
@@ -179,6 +183,23 @@ export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = Probl
    * that opens a screen the app does not have, are both refused at composition.
    */
   readonly notifications: NotificationRegistry;
+  /**
+   * ⚠️ HELP LIVES IN THE MANIFEST, so a cross-link cannot name an article that
+   * does not exist and an article cannot explain a screen the app does not have.
+   * A wiki is where documentation goes to describe a version of the product that
+   * no longer exists.
+   */
+  readonly help: HelpRegistry;
+  /** The changelog, as product copy. A commit message here is refused. */
+  readonly releases: readonly Release[];
+  /**
+   * ⚠️ WHAT THIS APP DELIBERATELY STOPPED OFFERING, AND WHY.
+   *
+   * Removing a plan, a permission or an entitlement is a decision about people
+   * currently holding it — and a deletion looks identical to a rename and to a
+   * typo. Naming it here is what makes the three different.
+   */
+  readonly retired: Retired;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly operations: readonly OperationSpec<B, any, any, string>[];
   readonly problems: P;
@@ -330,6 +351,9 @@ export function assertComposable(spec: {
   readonly access: AccessSpec;
   readonly collections: readonly CollectionSpec[];
   readonly notifications: NotificationRegistry;
+  readonly help: HelpRegistry;
+  readonly releases: readonly Release[];
+  readonly problems: Readonly<Record<string, unknown>>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly operations: readonly OperationSpec<any, any, any, string>[];
 }): void {
@@ -365,5 +389,37 @@ export function assertComposable(spec: {
   const dangling = danglingLinks(spec.notifications, spec.collections);
   if (dangling.length) {
     throw new Error(`${spec.id}: notification(s) ${dangling.join(", ")} link to a collection this app does not declare.`);
+  }
+
+  /*
+    ⚠️ REPORTED ALL AT ONCE. A check that stops at the first failure turns fixing
+    a manifest into a conversation of one sentence at a time.
+  */
+  const help = helpProblems(spec.help, spec.collections);
+  if (help.length) {
+    throw new Error(`${spec.id}: help — ${help.map((h) => `"${h.id}" ${h.why}`).join("; ")}.`);
+  }
+
+  /*
+    ⚠️ A CROSS-LINK IS RENDERED BESIDE AN ERROR, so somebody following it is
+    already stuck. A dead one there is the second failure in a row, which is
+    where people stop trying.
+  */
+  const referenced = [
+    ...spec.operations.flatMap((op) => (op.help ? [op.help as string] : [])),
+    ...Object.values(spec.problems).flatMap((p) => ((p as { help?: string }).help ? [(p as { help: string }).help] : [])),
+  ];
+  const missing = danglingHelp(spec.help, referenced);
+  if (missing.length) {
+    throw new Error(`${spec.id}: help article(s) ${missing.join(", ")} are linked to and not declared.`);
+  }
+
+  const notes = releaseProblems(spec.releases);
+  if (notes.length) {
+    throw new Error(
+      `${spec.id}: release notes — ` +
+        notes.map((n) => `${n.version}: "${n.note}" ${n.why}`).join("; ") +
+        `. A release note is product copy, not a commit message.`,
+    );
   }
 }

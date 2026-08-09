@@ -1,0 +1,49 @@
+{
+  "collections": [
+    "note",
+    "receipt"
+  ],
+  "permissions": [
+    "billing:manage",
+    "billing:operate",
+    "commerce:manage",
+    "commerce:read",
+    "inbox:read",
+    "note:read",
+    "note:write",
+    "receipt:read",
+    "receipt:write",
+    "workspace:create"
+  ],
+  "plans": [
+    "free",
+    "keeper"
+  ],
+  "entitlements": [
+    "notes",
+    "receiptsStored"
+  ],
+  "operations": [
+    "note.activity",
+    "note.create",
+    "note.delete",
+    "note.list",
+    "note.read",
+    "note.update",
+    "notes.digest",
+    "receipt.activity",
+    "receipt.amend",
+    "receipt.cancel",
+    "receipt.create",
+    "receipt.delete",
+    "receipt.list",
+    "receipt.read",
+    "receipt.submit",
+    "receipt.update"
+  ],
+  "notifications": [
+    "package.granted",
+    "plan.chosen",
+    "workspace.created"
+  ]
+}

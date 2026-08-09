@@ -222,6 +222,31 @@ export const hello = defineApp({
     not imply, and `hello` has none of that.
   */
   operations: [digest],
+
+  /*
+    ⚠️ HELP IS PART OF THE MANIFEST, so an article about a screen this app does
+    not have, and a cross-link to an article that does not exist, are both
+    refusals rather than something somebody discovers while stuck.
+  */
+  help: {
+    notes: {
+      title: "Keeping notes",
+      body: "A note is a short piece of text you want to find again. Everyone in this workspace can see them.",
+      steps: ["Open Notes", "Write it", "Save"],
+      surfaces: ["note"],
+    },
+    receipts: {
+      title: "Recording what you spent",
+      body: "A receipt records an amount and the day it happened. Once you submit one it stops being editable, which is the point of it.",
+      surfaces: ["receipt"],
+    },
+  },
+
+  releases: [
+    { version: "0.1.0", at: "2026-02-01", notes: ["Notes and receipts.", "You can now choose a plan."] },
+  ],
+
+  retired: {},
   /*
     ⚠️ EMPTY, HONESTLY. Every failure this app can produce is one the platform
     raises on its behalf — a refused shape, a stale version, a missing row. An

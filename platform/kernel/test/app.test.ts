@@ -16,6 +16,8 @@ import type { EntitlementDef, PlanSpec } from "../src/entitlement.js";
 import type { FlagDef } from "../src/customer.js";
 import type { CollectionSpec } from "../src/collection.js";
 import type { NotificationDef } from "../src/notify.js";
+import type { HelpRegistry } from "../src/help.js";
+import type { Release } from "../src/release.js";
 import { isArchived } from "../src/document.js";
 
 /** The smallest thing the coverage walk will read — it inspects four fields. */
@@ -243,6 +245,9 @@ const base = {
     },
   collections: [] as CollectionSpec[],
   notifications: {} as Record<string, NotificationDef>,
+  help: {} as HelpRegistry,
+  releases: [] as Release[],
+  problems: {},
   operations: [] as never[],
 };
 
@@ -389,5 +394,89 @@ describe("what an app can tell somebody", () => {
 
   it("holds the real manifest to that too", () => {
     expect(undeclaredEmits(kova)).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------- help and copy --- */
+
+/**
+ * ⚠️ THE PURE CHECKS ARE PROVED IN `help.test.ts`; THIS IS THE WIRING.
+ *
+ * A rule that is implemented and not called is the same as one that was never
+ * written, and it is worse to read: the function exists, the tests are green,
+ * and nothing runs it. Every one of these mutations survived until this block
+ * existed.
+ */
+describe("what a manifest says to a person", () => {
+  it("refuses an article longer than somebody will read", () => {
+    expect(() => assertComposable({
+      ...base,
+      help: { long: { title: "Fine", body: "x".repeat(2000) } },
+    })).toThrow(/over 900/);
+  });
+
+  it("refuses one written in developer vocabulary", () => {
+    expect(() => assertComposable({
+      ...base,
+      help: { api: { title: "Fine", body: "The endpoint returns nothing." } },
+    })).toThrow(/endpoint/);
+  });
+
+  it("refuses one about a screen this app does not have", () => {
+    expect(() => assertComposable({
+      ...base,
+      help: { ghost: { title: "Fine", body: "Short and clear.", surfaces: ["nowhere"] } },
+    })).toThrow(/does not declare/);
+  });
+
+  /*
+    ⚠️ A CROSS-LINK IS RENDERED BESIDE AN ERROR, so whoever follows it is already
+    stuck — a dead one is the second failure in a row.
+  */
+  it("refuses a link to an article nobody wrote, from an operation or from a failure", () => {
+    expect(() => assertComposable({
+      ...base,
+      operations: [{ ...stub, help: "missing" }] as never,
+    })).toThrow(/missing/);
+    expect(() => assertComposable({
+      ...base,
+      problems: { "x.y": { status: 400, title: "No", retryable: false, help: "absent" } },
+    })).toThrow(/absent/);
+  });
+
+  it("accepts one that is declared", () => {
+    expect(() => assertComposable({
+      ...base,
+      help: { there: { title: "Fine", body: "Short and clear." } },
+      operations: [{ ...stub, help: "there" }] as never,
+    })).not.toThrow();
+  });
+
+  /*
+    ⚠️ A RELEASE NOTE IS PRODUCT COPY. The changelog fills with commit subjects
+    because both describe a change and one is already written — and then somebody
+    writes a second, hand-curated changelog for customers, and the two disagree
+    within a month.
+  */
+  it("refuses a commit subject in the changelog", () => {
+    expect(() => assertComposable({
+      ...base,
+      releases: [{ version: "1.0.0", at: "2026-02-01", notes: ["refactor the settle path"] }],
+    })).toThrow(/commit/);
+    expect(() => assertComposable({
+      ...base,
+      releases: [{ version: "1.0.0", at: "2026-02-01", notes: ["Closes #12"] }],
+    })).toThrow(/pull request/);
+  });
+
+  it("accepts one somebody outside the team can act on", () => {
+    expect(() => assertComposable({
+      ...base,
+      releases: [{ version: "1.0.0", at: "2026-02-01", notes: ["You can now choose a plan."] }],
+    })).not.toThrow();
+  });
+
+  it("holds the real manifest to all of it", () => {
+    expect(() => assertComposable(kova)).not.toThrow();
   });
 });

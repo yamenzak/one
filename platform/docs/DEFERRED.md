@@ -8,7 +8,4 @@ kind: index
 > Every entry is a `DEFER` marker somewhere in the repository. Nothing here
 > was remembered — it was found, which is the point (docs/DOCS-STANDARD.md §2).
 
-## Stage 6 — Ops — notifications, help, versioning, data centre, CI
-
-- `one-003` — resolve against the declared help registry, so a  
-  <sub>kernel/src/problem.ts:20</sub>
+Nothing is deferred. Every stage owes nothing to a later one.

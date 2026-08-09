@@ -17,9 +17,13 @@
 import type { Id } from "./primitives.js";
 
 /**
- * DEFER(one-003) stage:6 — resolve against the declared help registry, so a
- * cross-link cannot name an article that does not exist. Until then a call site
- * casts, and the cast marks where a real link belongs. See test/FINDINGS.md §5.
+ * ⚠️ RESOLVED AGAINST THE DECLARED HELP REGISTRY AT COMPOSITION, so a cross-link
+ * cannot name an article that does not exist.
+ *
+ * The branding alone was never enough: it made two arbitrary strings different
+ * types and left both of them arbitrary. What matters is that this one is
+ * rendered BESIDE AN ERROR — whoever follows it is already stuck, so a dead link
+ * there is the second failure in a row, which is where people stop trying.
  */
 export type HelpId = Id<"help">;
 

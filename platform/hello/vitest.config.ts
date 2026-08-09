@@ -15,6 +15,8 @@ import { defineWorkersConfig } from "@cloudflare/vitest-pool-workers/config";
  */
 export default defineWorkersConfig({
   test: {
+    /* ⚠️ The lock check needs a filesystem, so it lives in the node project. */
+    exclude: ["**/*.node.test.ts", "**/node_modules/**"],
     /*
       ⚠️ The screen suite is plain React rendered to a string — no worker, no
       Miniflare. It runs in the same project because one command is worth more

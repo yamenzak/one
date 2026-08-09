@@ -1079,3 +1079,78 @@ What the app still owns is the roster: who is in a workspace, and in what role.
 That is the one thing a framework genuinely cannot know, and it is passed in
 rather than assumed — an app with no roster tells nobody, visibly, rather than
 telling everybody by accident.
+
+## 86. Length is a correctness property for help, not a style one
+
+Help is read by somebody who is stuck, on a phone, in the middle of something
+else. Past a screenful they stop reading and ask a human — which is the outcome
+the article existed to prevent. A long article is not a thorough one, it is a
+failed one, and the ceiling is set somewhere uncomfortable on purpose.
+
+The step limit works the same way. An eighth step is not a documentation
+problem; it is a missing feature, described.
+
+## 87. Nine words are enough to catch the habit
+
+"The endpoint returns null" is true and unusable. "Nothing is saved until you
+press Save" is the same fact, for somebody who has to act on it. Every word on
+the refused list means the author was describing the implementation rather than
+the task, and the list is small and unambiguous on purpose — a large one becomes
+a thesaurus argument in review, and the failure being caught is always the same
+one: writing for us.
+
+Word boundaries matter in both directions. `schematic` is not `schema`;
+`database-backed` is `database` with punctuation in it, and is the same habit.
+
+## 88. A help id that is only a branded type is still an arbitrary string
+
+`HelpId` made two arbitrary strings different types and left both arbitrary. The
+proof carried `help: "plans.publishing" as never` for six stages, and the article
+did not exist — which nothing could have discovered, because there was nothing to
+compare it against.
+
+The reason it matters more than a normal dead link: it is rendered beside an
+error. Whoever follows it is already stuck, so it is the second failure in a row,
+and that is where people stop trying.
+
+## 89. A changelog and a commit log describe the same change, and one is already written
+
+That is the whole mechanism by which a changelog fills with file paths, type
+names and pull-request numbers: the copy is right there, it is accurate, and
+pasting it is free. Then nobody outside the team can read it, so somebody starts
+a second hand-curated changelog for customers, and within a month the two
+disagree about what shipped.
+
+Five patterns catch it, and all five are about naming something the reader
+cannot look up.
+
+## 90. A deletion, a rename and a typo look identical in a diff
+
+They need opposite fixes. So a manifest may add anything freely — nobody holds
+what did not exist — and may only REMOVE something by naming it as retired, with
+a reason. The lock is the last surface that shipped, committed beside the code.
+
+It covers derived operations, which is the case a hand-kept list misses:
+renaming a collection silently removes seven operations at once, and every
+client calling any of them breaks together.
+
+## 91. A rule that is implemented and not called is worse than one never written
+
+The help and changelog checks were fully tested as pure functions and wired into
+composition — and three mutations that deleted the wiring entirely survived,
+because every test was of the function rather than of the manifest that has to
+run it.
+
+That is a category, not an oversight: a pure check has a natural home in a unit
+test, and its call site has no natural home at all. Every check reachable from
+`assertComposable` now has an assertion that goes through `assertComposable`.
+
+## 92. A worker has no filesystem, so the check about the repository lives elsewhere
+
+The manifest lock is a file the app commits, and the suite that can evaluate the
+manifest runs inside the Workers pool, which can read it and cannot write it.
+
+The split is on "does this need a worker", not on "is this a unit test" — one
+project for behaviour against the real runtime, one for the checks about the
+repository. Splitting on the other axis would put half the behavioural tests in
+front of a mock, which is how a suite comes to test the mock.

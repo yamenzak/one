@@ -196,6 +196,37 @@ export const kova = defineApp({
     },
   },
   operations: [readProgress, publishPlan, applyPackageGrant, inviteStaff],
+
+  /*
+    ⚠️ WRITTEN FOR THE PERSON USING THE PRODUCT, and the composition checks it —
+    length, developer vocabulary, and the surfaces it claims to explain. An
+    article past a screenful is not a thorough one, it is a failed one: whoever
+    is reading it is stuck, on a phone, in the middle of something else.
+  */
+  help: {
+    packages: {
+      title: "Selling a package",
+      body: "A package is a block of days you sell someone, plus what those days let them do. Buying more days adds to whatever they have left rather than starting again.",
+      steps: ["Open Packages", "Name it and set a price", "Choose how many days", "Turn on what it includes", "Save"],
+      surfaces: ["package"],
+    },
+    "plans.publishing": {
+      title: "Why a plan will not publish",
+      body: "A plan has to have at least one session in it, and every session needs at least one exercise. Fill in the empty days or remove them, then publish again.",
+    },
+    seats: {
+      title: "Adding someone to the team",
+      body: "Your plan includes a number of people. Invite someone and they get an email; they count towards that number from the moment they accept.",
+    },
+  },
+
+  /* ⚠️ PRODUCT COPY. A file path, a type name or a pull-request number here is refused. */
+  releases: [
+    { version: "0.1.0", at: "2026-01-15", notes: ["You can now sell packages that renew.", "Progress reports load faster on a phone."] },
+  ],
+
+  /* Nothing has been withdrawn yet — and when it is, it is named here with a reason. */
+  retired: {},
   problems: { ...appProblems, ...declareProblems({ "billing.quota_exceeded": { status: 402, title: "You've used everything in your plan", retryable: false } }) },
 
   // Registered per SURFACE rather than per action: a surface somebody is not
