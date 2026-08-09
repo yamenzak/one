@@ -834,6 +834,18 @@ deliverability pre-flight — was mounted by Kova and by neither other app. Read
 before assuming a shared capability reaches every product, and before adding an
 app.
 
+**[docs/ONE-PLATFORM.md](docs/ONE-PLATFORM.md) is the PLAN for what replaces all
+of this, and nothing in it is built.** A new framework directory that owns the
+runtime, the data model, the surface (HTTP + AI tools + webhooks) and the chrome,
+driven by a typed manifest per app, with the apps living inside it. Four
+decisions are settled there — a declarative shell with code screens, absorbing
+`@4dl/*` rather than wrapping it, Kova migrating first, and one 4DL identity with
+SSO — and each carries consequences that are cheap now and expensive later. Read
+it before starting anything structural, and read §7 before touching Kova's data:
+the migration pattern it prescribes is the one audit step 5.2 proved on Scena's
+billing tables, and it exists because the naive version is a total outage rather
+than a degraded feature.
+
 **That whole class is a guard now.** `scripts/capability-reachable.test.mjs` (in
 `pnpm gate`) fails on any app — the template included — that applies a package's
 `SchemaModule` and never mounts its route tree. The shape it catches is the one

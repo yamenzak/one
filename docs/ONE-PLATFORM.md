@@ -1,0 +1,624 @@
+# ONE — the platform, and the decisions that shape it
+
+> **Status: PLAN. Nothing here is built.** This is the design for a new
+> framework directory that becomes the home of every 4DL app and the standard
+> for future ones. It supersedes nothing yet: `packages/@4dl/*` and `apps/*`
+> remain the shipping system until a stage below says otherwise.
+>
+> Read [PLATFORM.md](../PLATFORM.md) first for what exists today, and
+> [docs/PLATFORM-AUDIT.md](PLATFORM-AUDIT.md) for the three-app assessment this
+> grew out of. Those two documents are the evidence; this one is the response.
+
+---
+
+## 0. What this is, and what it is not
+
+**It is:** one framework that owns the runtime, the data model, the surface
+(HTTP + AI + webhooks), the chrome and the operations story, driven by a typed
+manifest per app, with the apps living inside it.
+
+**It is not a rewrite of what the apps DO.** Kova's TDEE maths, Scena's
+`position(t) = (t − T0) mod cycleLength`, Tessa's sterilisation logic are pure
+modules with tests and they move across unchanged. What is being rewritten is
+everything around them — and "everything around them" is, measured below, about
+four fifths of the code.
+
+**The one-sentence goal:** a new app should be a manifest, a schema, a handful
+of pure domain modules and the screens that are genuinely its own — and be
+production-ready on day zero, with billing, auth, permissions, notifications,
+help, legal, offline, whitelabel, an API, AI tool-calling and an operator
+console it did not write.
+
+---
+
+## 1. What the three apps measured (2026-08-09)
+
+Not estimates. `wc -l` over `src`, `grep` over route registrations and DDL.
+
+| | worker | SPA | routes | tables | notes |
+|---|---:|---:|---:|---:|---|
+| Kova | 19,070 | 34,468 | 489 | 35 | B2B **and** B2C (client packages), production tenants |
+| Scena | 16,100 | 27,212 + 3,738 player | 379 | 36 | device door, 7 DOs, offline player, second worker |
+| Tessa | 6,803 | 6,641 | 109 | 12 | single plan, no customer rail |
+| template | 2,114 | 2,041 | — | — | the current "new app" starting point |
+| **`packages/@4dl/*`** | **46,764** | | | 39 | fourteen packages |
+
+**~165,000 lines. ~977 route registrations. ~122 tables.**
+
+Three numbers matter for planning:
+
+- **Tessa is 13,444 lines and does almost everything a SaaS must do.** That is
+  roughly the floor for a real product on today's platform. Most of it is not
+  Tessa.
+- **Kova's SPA is 34,468 lines — bigger than its worker, and bigger than every
+  shared package except `@4dl/ui`.** The UI is where the mass is, and the UI is
+  where the inconsistency you keep noticing lives. A platform that shares the
+  backend and not the screens shares the easy half.
+- **`packages/ui` is already 10,887 lines and product-agnostic.** The renderer
+  is not starting from zero; it is starting from a component library that has
+  already had the product vocabulary argued out of it.
+
+### What the audit found, restated as design pressure
+
+The three-app audit's headline was not "a missing mechanism". It was **a shared
+capability that shipped, and an app that did not mount it** — eight instances,
+the sharpest being that `otpSendGuard`, the only gate in front of the emailed
+sign-in code, was mounted by one app out of three. `capability-reachable.test.mjs`
+turned that class into a guard; step 5.2 of the audit found a ninth instance
+(`apps/_template` had a plan catalog and no route to enter a Stripe key) within
+a day of widening it.
+
+**That is the whole argument for a manifest.** Wiring that must be remembered is
+wiring that will be forgotten, and a guard that catches it afterwards is a worse
+version of never being able to express it wrong.
+
+---
+
+## 2. The four decisions
+
+Answered 2026-08-09. Each carries consequences that are cheap now and expensive
+later.
+
+### 2.1 UI: declarative shell + code screens
+
+The manifest owns the shell, nav, permissions, plans, settings, admin, and
+generic collection/document scaffolds. Product screens are React on the shared
+kit.
+
+**Why not fully declarative.** A renderer that tries to express Scena's `rAF`
+playout loop, Kova's camera-and-pose body scan or Tessa's cycle timelines grows
+a registered-widget escape hatch, and the escape hatch becomes the real API
+within two quarters. You would have paid for a renderer and be writing React
+inside it.
+
+**Why not wiring-only.** That is what exists today. It shares the backend and
+leaves 34,468 lines of Kova SPA to drift against 27,212 of Scena's, which is
+precisely the inconsistency this project is for.
+
+⚠️ **This decision is only safe if the boundary is enforced, not documented.**
+§3.6 has the rule and the guard. Without the guard this option decays into
+wiring-only within a year, one "just this once" at a time.
+
+### 2.2 The fourteen `@4dl/*` packages are absorbed and deleted
+
+The framework rewrites them as its own modules. `packages/@4dl/*` is deleted
+when the last app leaves.
+
+**The cost is real and should be stated once:** 46,764 lines of working,
+tested, argued-over code, much of which is *correct* and carries scars this
+repo paid for. None of it is thrown away — it is the specification. The
+`@4dl/billing` dunning ladder, `@4dl/tenancy`'s five doors, `@4dl/purge`'s
+derived erasure, `@4dl/ai`'s reserve-is-a-ceiling arithmetic: each is a solved
+problem whose solution moves, with its tests, into a module that no longer has
+to negotiate with an app about who owns which table.
+
+**The benefit is the one thing "wrap" cannot give:** the seams that exist purely
+because an app might have a different shape (`syncCatalog` injected because one
+app stored cents; `defaultSubscription` because one app parked on `incomplete`;
+`materialiseOnRead` because one app wrote a row on read) all collapse. Every one
+of those seams is a place two products can still differ, which is what you asked
+to stop.
+
+### 2.3 Kova migrates first
+
+⚠️ **This is the highest-risk of the four options and I want the risk named
+plainly, once, before the plan accommodates it.** Kova is the only app with
+production tenants. It is also the largest (53,538 lines across two packages),
+the only one with a B2C rail underneath the B2B one, and the one whose data
+model is most entangled (35 tables, `requireClientAccess` on every coaching
+route as a security invariant).
+
+Migrating it first means the framework's first real consumer is also the one
+where a mistake reaches paying customers.
+
+**I am not arguing against it** — it is defensible, and it has one genuine
+advantage the alternatives do not: Kova is where the inconsistencies you want
+gone actually live, so any other first mover proves the framework against a
+problem you were not complaining about. But the plan below buys that choice back
+with three things that are not optional:
+
+1. **Kova-on-ONE is built to parity in parallel, never in place.** The shipping
+   Kova keeps shipping from `apps/api` + `apps/app` throughout.
+2. **The cutover is rehearsed against a copy of production**, repeatedly, until
+   the rehearsal is boring.
+3. **The parity gate is the screenshot suite**, not a checklist. `pnpm shots`
+   already photographs every surface at phone/desktop × light/dark from a seeded
+   studio. Run it against both stacks and diff. That is the only parity check
+   that scales to a 34,468-line SPA.
+
+§7 has the mechanics.
+
+### 2.4 One 4DL account, with SSO
+
+One person, one identity, memberships in many tenants across many products.
+
+⚠️ **Two findings from the current code change how this must be built.**
+
+**Passkeys are per-app today, and the fix is graceful.** `rpIdFor` returns
+`shape.root`, which is `kova.4dl.app` / `tessa.4dl.app` / `scena.4dl.app` — so
+a passkey registered on Kova is, by WebAuthn's rules, unusable on Tessa. But a
+credential whose RP ID is `4dl.app` **is** usable from every subdomain of it. So
+the migration is additive, not destructive: existing credentials keep working on
+their own product, new registrations bind to the root, and a person is prompted
+once to add a root passkey. Nobody is locked out, and nothing has to be
+re-registered under duress. This requires per-credential RP ID at verification
+time — a detail, but one that must be designed in rather than discovered.
+
+**Do NOT get SSO by widening the session cookie.** `cookieDomainFor` widens to
+`.<root>` today and its own comment states the trade-off being accepted: a
+widened cookie reaches every studio subdomain, so an XSS on any one of them acts
+as that user in all of their studios. That is a considered risk across *one*
+product's tenants. Widening to `.4dl.app` extends it across *every product* —
+an XSS in a signage dashboard becomes an XSS in a personal-training record and a
+sterile-supply log. The blast radius stops being proportionate.
+
+**The design instead:** a dedicated identity origin (`id.4dl.app`) owns
+credentials and issues short-lived, audience-scoped tokens that each product
+exchanges for its own host-scoped session. One passkey, one sign-in, N sessions
+that cannot be replayed at each other. It is more work than a cookie attribute
+and it is the difference between SSO and a shared-blast-radius accident.
+
+**GDPR gets better, not worse.** One identity means one erasure request, one
+export, one place a person manages what they have. That is the Google-style data
+centre you described, and it is only buildable on unified identity.
+
+---
+
+## 3. The shape
+
+### 3.1 Directory and naming
+
+The repository root is already `one`, so a directory called `one/` nests badly
+(`/home/user/one/one/kova`). Recommendation:
+
+```
+platform/            # the new world. Package scope @one/*
+  kernel/            # @one/kernel  — runtime, identity, tenancy, standing, config
+  data/              # @one/data    — collections, ledgers, files, jobs, search
+  surface/           # @one/surface — operations → routes + tools + webhooks + OpenAPI
+  ui/                # @one/ui      — primitives, chrome, the renderer
+  cli/               # @one/cli     — manifest lint, codegen, provisioning, shots
+  kova/              # @one/kova
+  tessa/             # @one/tessa
+  scena/             # @one/scena
+```
+
+`@one/kova` reads as "one/kova" everywhere it matters (imports, package names,
+CI job names) without the path being silly. **Decide this before the first
+import is written** — it is free today and a repo-wide rename later.
+
+### 3.2 Six layers, and what may depend on what
+
+```
+L5  App          product screens, product domain modules
+L4  Renderer     shell, nav, collection views, settings, admin, whitelabel
+L3  Surface      operations → HTTP + AI tools + webhooks + audit + OpenAPI
+L2  Data         collections, ledgers, files, jobs, search
+L1  Kernel       identity, tenancy, doors, regions, standing, entitlements, config
+L0  Runtime      Cloudflare bindings — bound by the manifest, touched by nobody
+```
+
+Downward only, no skipping more than one layer, and **L0 has exactly one
+consumer**. An app that reaches `env.DB` has left the platform; the guard says
+so. This is `storage-chokepoint.test.mjs`'s rule generalised from R2 to every
+binding, and the reason is the same: an object written behind the ledger is
+invisible to the quota and to erasure, forever, and nothing else notices.
+
+### 3.3 The manifest
+
+**TypeScript, not JSON.** You asked for "powerful linting and enforcing to
+ensure everything is production ready from day 0", and the majority of that
+description is `tsc`, which you already run and which costs nothing. A JSON
+manifest requires re-implementing autocomplete, refactor-safety, exhaustiveness
+checking and cross-reference validation in a bespoke linter — and a bespoke
+linter is a thing that has bugs, as `pnpm gate` discovered twice this month when
+a widened guard's first two failures were the parser's rather than the apps'.
+
+The rule: **typed TS authoring, JSON-serialisable subset for anything that
+crosses a wire** (the tenant-visible changelog, the help index, the operator
+console's view of the app). `one build` emits the serialised form; `one lint`
+checks what types cannot.
+
+**Several files, one namespace.** A single god-manifest for Kova would be
+thousands of lines. `platform/kova/manifest/{app,plans,permissions,collections,
+notifications,nav,legal,offline}.ts`, composed by one `defineApp()`. Composition
+is a language feature here; that is the point of choosing a language.
+
+**Versioned and content-hashed.** Every deploy stamps `manifestVersion` and a
+hash. The diff between two versions is a real artifact — it drives the
+tenant-facing changelog, the operator's "what changed", and the migration
+check ("this deploy removes a plan two tenants are on").
+
+**What it generates.** Not "describes" — *generates*, so drift is impossible:
+
+| From the manifest | Generated |
+|---|---|
+| bindings | `wrangler.jsonc` — no hand-edited config, no placeholder-id class of bug |
+| collections | DDL + schema module + scope declaration for erasure |
+| operations | HTTP routes, AI tool catalog, webhook events, OpenAPI, typed client |
+| permissions | typed keys, the role builder's vocabulary, the UI's gate helpers |
+| plans + entitlements | catalog seed, Stripe sync input, the entitlement engine's registry |
+| notifications | types, copy, channel matrix, the bell's registry |
+| nav + collections | the shell, the routes, the screen index (which stops being hand-maintained) |
+| legal | the documents, their versions, the acceptance ledger |
+| offline | the precache list and the Background Sync policy |
+
+⚠️ The screen index in `KOVA.md` Part III and `SCENA.md` Part III is maintained
+by hand today, with a standing instruction to update it in the same commit. Once
+nav is declared, it is generated. That is one whole category of documentation
+drift deleted rather than policed.
+
+### 3.4 ⚠️ One declaration, three transports — the highest-leverage idea here
+
+This is the piece that makes half your list fall out for free, so it is worth
+stating precisely.
+
+You declare an **operation** once:
+
+```ts
+export const publishPlan = operation({
+  id: "training.plan.publish",
+  summary: "Publish a training plan to a client.",
+  input:  z.object({ planId: id("plan"), clientId: id("client") }),
+  output: z.object({ publishedAt: iso() }),
+
+  permission:  "plan:publish",          // RBAC
+  entitlement: "trainingPlans",         // what the tenant bought
+  clientFlag:  "trainingPlans",         // what the CUSTOMER bought (B2C rail)
+  scope:       (i) => ({ client: i.clientId }),   // row-level access
+  meter:       { credits: 0 },
+
+  audit:  (i) => ({ subject: i.planId, verb: "publish" }),
+  emits:  ["plan.published"],
+
+  async handler(ctx, input) { /* … */ },
+});
+```
+
+The framework derives, from that one object:
+
+- the **HTTP route**, with the five gates already applied
+- the **AI tool** — same input schema, **filtered by the caller's permissions and
+  entitlements at resolution time**
+- the **webhook event** for tenant subscribers
+- the **activity-log entry** on the document
+- the **OpenAPI** entry and the typed client method
+- the **optimistic-update contract** the renderer uses
+
+⚠️ **The safety property that must be structural, not disciplined: the AI's tool
+surface is the route surface masked by the caller.** Not a second list that is
+kept in sync — a filter over one registry. Two registries is how you ship an
+agent that can do more than the person operating it, and there would be no
+failing test anywhere.
+
+This single abstraction answers, from your list: ready CRUD and API endpoints,
+AI tool-calling parity with the UI, ready webhooks, the unified activity log,
+and the permission masking. Today none of the three apps has an external API,
+tool-calling over its own surface, or a webhook dispatcher — the `integrations`
+entitlement is `reserved: true` in Kova and enforced nowhere, and SPEC §11
+promises a data export that does not exist.
+
+### 3.5 Collections — the Frappe-shaped part
+
+```ts
+export const clients = collection({
+  id: "client",
+  label:   { one: "Client", many: "Clients" },
+  scope:   { tenant: "tenant_id" },
+  subject: true,                       // an erasure root in its own right
+  naming:  { series: "CL-.YYYY.-.####" },
+  docstatus: false,                    // draft/submit/cancel/amend, off here
+  onDelete:  "archive",                // vs "purge"
+  fields:  { /* typed, with per-field read/write permissions */ },
+  views:   { list: { … }, grid: { … }, detail: { tabs: [ … ] } },
+  activity: true,
+  offline:  "cache",
+  search:   ["name", "email"],
+});
+```
+
+Derives the table, the erasure scope, full CRUD as operations (and therefore as
+routes, tools and webhooks), the naming counter, the docstatus state machine with
+amendment, soft-delete semantics, the activity table, and the list/grid/detail
+screens.
+
+**This is where the manifest actually pays.** Kova's clients, packages, foods,
+exercises; Tessa's trays, cycles, loads, instruments; Scena's channels,
+playlists, slides, feeds, ads — all collections. Estimated from the three screen
+indexes: **75–80% of all surfaces are chrome or collection views.** The
+remaining fifth is §5.
+
+⚠️ **Docstatus is not free and should be opt-in per collection.** Frappe's
+draft → submitted → cancelled → amended is exactly right for a sterilisation
+cycle record and exactly wrong for a client profile. Making it universal is how
+a framework starts enforcing limitations you have to hack around.
+
+### 3.6 The renderer boundary, and the guard that holds it
+
+**The renderer owns the chrome. The app owns the canvas.**
+
+| Renderer (manifest-driven) | App (React) |
+|---|---|
+| shell, nav, breadcrumbs, page header, tabs | the content region of a non-collection page |
+| list / grid / detail / activity / settings / admin | bespoke visualisations, players, editors, camera |
+| empty, loading, error, permission-denied, offline states | — |
+| dialogs, sheets, drawers, popovers — and the *policy* for which | — |
+| forms, filters, pagination, bulk actions, save lifecycle | — |
+| toasts, confirmations, destructive-action patterns | — |
+| animation, skeletons, disabled/busy states | — |
+
+⚠️ **Enforced by `one lint`, failing the build**, on: an app defining a shell, a
+dialog, a toast, an empty state or a form primitive; an app importing a raw
+`<button>`/`<input>`; a route not declared in the manifest; a handler not going
+through `operation()`; a `fetch` outside the door; a binding touched outside L0.
+
+Every one of these has a working precedent in `pnpm gate` today —
+`ui-ownership`, `api-door`, `save-lifecycle`, `storage-chokepoint`. The
+difference is that they would now be *the framework's* rules rather than one
+app's, and they would fail at `one lint` rather than in a script somebody has to
+remember to widen.
+
+---
+
+## 4. The subsystems
+
+Your list, answered. Where a row says **new**, no app has it today.
+
+| Subsystem | Design | Source today |
+|---|---|---|
+| **Identity + SSO** | `id.4dl.app` owns credentials; audience-scoped tokens; per-product host sessions. Passkeys migrate additively (§2.4). One avatar, one profile. | `@4dl/auth`, per-app RP |
+| **Tenancy + doors** | Five doors kept — they are correct. Region added as a tenant property resolved at the host gate. | `@4dl/tenancy` |
+| **Regions (EU/global)** | §4.1 — the hardest item on the list | **new** |
+| **Standing + dunning** | One ladder, one set of rungs, per-app copy in the manifest. Reads never gated at any rung; leaving always allowed. | `@4dl/billing` + `@4dl/tenancy` |
+| **Plans + entitlements** | Manifest-declared. Grandfathering (raise-only) and operator adjustment (absolute) stay two lanes — they want opposite rules. | `@4dl/billing` |
+| **Feature flags** | One resolver, three layers (plan → grant → override), same gate shape for route, tool and UI. A flag that hides a tab but no route is a lint failure. | `@kova/domain` clientFlags |
+| **Permissions + roles** | Granular keys from the manifest; a tenant-facing role builder over them; the AI tool filter reads the same resolution. | `@4dl/auth` grant algebra |
+| **Billing rail** | One Stripe account, one webhook, event→app attribution, dead-letter for the unattributable. Already solved; moves as-is. | `@4dl/billing-rail` |
+| **B2C / customer rail** | Kova's access economy generalised: packages, budgets that queue rather than sum, lapse ladder, redemption codes. Available to any app that declares it. | `@4dl/commerce` |
+| **Ledger + metering** | One append-only ledger for every billable unit — AI credits, storage, seats, and a package's metered entitlements. Reserve → run → settle, where **settle caps at the reserve**. | `@4dl/billing` + `@4dl/ai` |
+| **Storage** | One chokepoint, ledgered, quota-gated, erasure-derived. Content-hash keys stay possible (Scena needs them). | `@4dl/storage` |
+| **Notifications** | Channel algebra (role × category → inbox / email / **web push**), one dispatch path, InboxDO. Push is new. | `@4dl/notify` |
+| **Help centre** | Per-app docs from the manifest's nav, in-app search, support chat, ticketing. | **new** |
+| **Versioning + changelog** | Manifest diff → tenant-visible release notes, with screenshots rendered by the existing Playwright shots suite. | **new** (shots exist) |
+| **Settings** | Three scopes — tenant app settings, user preferences, operator console — all declared, all rendered. | partial |
+| **Data & subscription centre** | Export, membership cancellation, tenancy close, erasure — one surface per person, across products. Only possible on unified identity. | partial |
+| **Whitelabel** | Palette, logos, fonts, custom domains; reaches auth screens, error pages, emails, the PWA manifest and the offline shell. | `@4dl/ui` Branding |
+| **PWA / offline** | Declared per collection (`offline: "cache" \| "queue" \| "none"`); app-shell precache + Background Sync replay. | Kova only |
+| **AI** | Model catalog, metered generation, tool-calling over the operation registry, per-actor budgets. | `@4dl/ai` |
+| **Legal** | ToS, privacy, cookies, DPA, sub-processors — versioned in the manifest, with an acceptance ledger per user per version. | **new** |
+| **Jobs / cron** | Declared, per-tenant, idempotent, with a visible failure surface. Replaces per-app `scheduled()` handlers. | ad hoc |
+| **Maintenance** | Deployment-wide read-only / full, plus per-tenant standing. Already right. | `@4dl/tenancy` |
+| **Datetime + units** | Store UTC and metric, convert at display from the person's preference, browser-derived default. | `@kova/domain` units |
+
+### 4.1 Regions — design it now, build it later
+
+⚠️ **This is the one item on the list that cannot be retrofitted cheaply**,
+because it constrains every binding, every schema and the tenant lookup.
+
+- **A tenant lives in exactly one region.** Region is resolved at the host gate,
+  before anything regional is touched.
+- **The tenant directory is global** and holds only routing data: slug → tenant
+  id → region → standing. Nothing personal, so it can live anywhere.
+- **Bindings are region-tuples**, not singletons. One worker script (Workers run
+  everywhere); D1 with location hints, R2 with `eu` jurisdiction, DOs with
+  `jurisdiction: "eu"`. The manifest declares one logical binding; the framework
+  resolves the regional instance per request.
+- **Identity: put the identity store in the EU for everyone.** It is the
+  strictest regime, so it is always sufficient; it removes an entire class of
+  "which region is this person in" routing bug; and the cost is one
+  cross-region hop per sign-in, not per request. The alternative — identity
+  region derived from first tenant — needs a global email-hash directory and
+  gets genuinely hard the moment somebody joins tenants in both.
+- **Not solved here:** AI provider residency. Workers AI and Gemini have their
+  own answers and they are contractual, not architectural. Flag it to whoever
+  signs the DPA; do not pretend the framework fixes it.
+
+**Recommendation: design the binding resolution and the tenant directory in
+Stage 1, ship single-region, and turn on the second region when a customer pays
+for it.** The expensive part is the shape, and the shape costs almost nothing
+if it is there from the first table.
+
+---
+
+## 5. What cannot be declarative — named, so nobody re-litigates it
+
+Written down per app so that the boundary in §3.6 is a fact rather than a
+judgement call in a code review.
+
+**Scena:** the player render loop, the timeline engine, the manifest compiler,
+the widget renderer, the pairing/device door, the board and kiosk surfaces.
+**Kova:** the body scan (camera + pose), Snap-a-Meal and the label reader
+(camera + vision), the workout player, the plan editor's copy-week and
+superset/circuit round-logging, the progress charts.
+**Tessa:** cycle timelines, the load builder.
+
+Everything else — rosters, packages, foods, exercises, channels, playlists,
+feeds, media, settings, billing, admin, help — is chrome and collections.
+
+⚠️ **Two rules about this list.** It may grow only by a deliberate edit with a
+reason, in review; and anything on it still uses the platform's chrome, states,
+motion and data access. "Canvas" means the content region, not a licence to
+re-implement a dialog.
+
+---
+
+## 6. The guards
+
+Types cover most of the manifest. These are the things they cannot, each of
+which has already happened here at least once:
+
+| Guard | Fails on |
+|---|---|
+| capability reachable | a module applied with no surface mounted (nine instances found) |
+| binding chokepoint | any L0 binding touched outside its owner |
+| operation registry | a route, tool or webhook that did not come from `operation()` |
+| tool ⊆ route | an AI tool reachable where the equivalent route is not |
+| entitlement enforced | a sold entitlement no gate names |
+| flag enforced | a sold capability the UI hides and no route withholds |
+| renderer boundary | an app defining chrome (§3.6) |
+| erasure derived | a table with a scope column and no declaration |
+| schema adjacency | a module ordered where its dependency has not run |
+| manifest diff | a deploy removing a plan or permission somebody holds |
+| no silent cap | a bounded sweep that does not log what it dropped |
+
+⚠️ **A widened guard finds bugs in itself first.** Two of the first failures
+when `pnpm gate`'s guards were widened to all apps were the parser's, not the
+apps'; step 5.2 found two more in `capability-reachable` (an import satisfying a
+mount check, and a comment stripper fooled by `"/api/auth/*"`). Budget for it.
+Mutation-test every guard — the repo already does this and it has caught a guard
+that passed a defect twice.
+
+---
+
+## 7. Migration — Kova first, safely
+
+### 7.1 The rule
+
+**The shipping Kova ships from `apps/api` + `apps/app` until the day it does
+not.** `platform/kova` is built beside it, never on top of it. No production
+tenant sees the new stack until the rehearsal is boring.
+
+### 7.2 The four migration classes, in increasing difficulty
+
+1. **Pure domain** — `@kova/domain`'s TDEE, body-fat, activity, progress maths.
+   Moves unchanged with its 237 tests. Do it first; it is free confidence.
+2. **Schema** — 35 Kova tables plus 39 shared ones onto collections. Mechanical
+   but wide.
+3. **Surface** — 489 route registrations onto operations. The bulk of the work,
+   and where the API, tools and webhooks arrive as a side effect.
+4. **Screens** — 34,468 lines, of which ~75–80% becomes manifest and ~20–25%
+   becomes canvas. The long pole, and the reason this is a multi-stage project
+   rather than a sprint.
+
+### 7.3 The data migration
+
+⚠️ **The pattern is already proven in this repo and should be copied exactly.**
+Audit step 5.2 migrated Scena's billing tables onto the shared shape last week,
+and everything that made it safe generalises:
+
+- **Reconcile before compose.** The reconciler runs *before* `applySchema`,
+  because the shared module indexes a column the old shape does not have — the
+  index throws, the batch throws, and every route touching D1 answers 500. That
+  outage has now been met twice (`AI_LEGACY_RESET`, then `credit_ledger.at`).
+- **Read `pragma_table_info`, do not attempt-and-swallow.** A declarative
+  backfill that names a column existing on only one of two shapes fails to
+  *parse* on the other, and the warning is noise on every fresh deploy forever.
+- **Convert values, not just names.** SQLite types are per-value, so a
+  millisecond integer sits happily in a TEXT column and `past_due_at + grace` is
+  string concatenation. Nothing throws; the ladder simply fires on the wrong day.
+- **Assert bytes, not parseability.** ISO comparison in SQL is lexicographic.
+- **Mutation-test the migration.** All four behaviours of the Scena reconciler
+  were verified by breaking them one at a time.
+
+### 7.4 The cutover
+
+1. **Parity build** — `platform/kova` reaches feature parity behind a flag.
+2. **Rehearsal** — restore a copy of production D1/R2 into a staging region, run
+   the reconcilers, boot the new stack against it. Repeat until nothing is
+   learned.
+3. **Screenshot parity** — `pnpm shots` against both stacks, diffed by shot id.
+   This is the only parity check that covers a 34k-line SPA honestly, and the
+   suite already exists.
+4. **Golden-path E2E** on the new stack: the three existing specs plus the
+   client-persona intake path that caught the 403 the integration suite
+   structurally could not see.
+5. **Dark launch** — the new worker serves a small allow-list of internal
+   tenants on the real data path.
+6. **Cutover per tenant**, not per deployment, with the old stack still bootable.
+7. **Reverse migration written and rehearsed before step 5.** If it does not
+   exist, step 5 does not happen.
+
+⚠️ **Do not migrate a tenant and a schema in the same step.** Reconcile the data
+in place first while `apps/api` still serves it; move the traffic second. Two
+reversible steps beat one that is not.
+
+---
+
+## 8. Stages
+
+Every stage ends with something that runs. That is the only defence against the
+second-system effect, which is the largest risk here by a distance.
+
+| # | Stage | Ends when |
+|---|---|---|
+| 0 | **Contracts** — manifest schema, layer boundaries, naming, the operation and collection types. Throwaway code only. | The four types compile and three people agree on them |
+| 1 | **Kernel** — bindings from manifest, config, schema composition, identity + SSO, tenancy + doors + region resolution, standing. | A generated `hello` app boots, signs in at `id.`, creates a tenant, answers `/health` |
+| 2 | **Surface** — operations → routes + tools + webhooks + audit + OpenAPI. | An AI agent completes a CRUD round trip through tools, and is refused exactly what the user would be |
+| 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search. | `hello` has a real collection with an activity log and a metered ledger |
+| 4 | **Renderer** — shell, nav, collection views, settings, admin, whitelabel, PWA. | `pnpm shots` photographs `hello` at 4 viewports × 2 themes and it looks like the product |
+| 5 | **Commerce** — plans, entitlements, flags, Stripe on one webhook, B2C packages, metering, parking state. | `hello` sells a plan and a package end to end in Stripe test mode |
+| 6 | **Ops** — notifications incl. web push, help centre, versioning + changelog, data & subscription centre, maintenance, provisioning, CI. | A new app is `one new` + a manifest + a deploy, with nothing hand-wired |
+| 7 | **Kova** — §7. The long one. | Production tenants are served by `platform/kova` and `apps/api` is unrouted |
+| 8 | **Tessa, then Scena** | Both migrated; Scena's player proves the canvas boundary |
+| 9 | **Delete** `packages/@4dl/*` and `apps/*` | The repo has one platform |
+
+**Stage 6 is the real deliverable of this project.** Stages 7–8 are the payoff;
+stage 6 is the promise. If stage 6 ships and stage 7 slips, you have still won —
+new apps are cheap and the old ones keep working.
+
+---
+
+## 9. Risks, ranked
+
+1. ⚠️ **The second-system effect.** Your list is ~35 subsystems. Building all of
+   them before shipping anything is the canonical way a project like this dies at
+   80% forever. Mitigation: §8's rule that every stage runs, and a willingness to
+   cut items into "after stage 9".
+2. ⚠️ **Kova first, with production tenants.** §2.3 and §7. The mitigation is
+   rehearsal and per-tenant cutover; the failure mode is a big-bang date.
+3. **The renderer boundary erodes.** One "just this once" at a time until you
+   have a component library with extra steps. Mitigation: §3.6's guard, in CI,
+   from stage 4 — not added later.
+4. **SSO's blast radius**, if it is built with a widened cookie instead of an
+   identity origin. §2.4.
+5. **Regions retrofitted.** Cheap in stage 1, a schema-wide rewrite in stage 7.
+6. **Test time gets worse.** You named this. It is real: `@kova/api` is 632 tests
+   each provisioning a world through real OTP sign-ins, ~2.5 minutes whenever
+   Kova's API changes. The fix is a seeded-fixture harness with a shared
+   provisioned world and per-test scoping — **not fewer tests**, and not a
+   narrower CI net. Turbo's cache already took a Tessa-only change from 5m to
+   27s; the same leverage applies here.
+7. **The manifest becomes a second language.** If expressing something in the
+   manifest is harder than writing it, people write it. Watch for the first
+   `escapeHatch:` field and treat it as a design failure, not a feature.
+
+---
+
+## 10. What I would do next
+
+Concretely, in order, and none of it is expensive:
+
+1. **Settle the naming** (§3.1) — `platform/` + `@one/*` is my recommendation.
+2. **Write the four core types** — `defineApp`, `operation`, `collection`,
+   `defineBindings` — as types only, with no implementation, and try to express
+   Kova's hardest three routes and Scena's hardest three collections in them. A
+   type that cannot express a real case fails cheaply on a Tuesday.
+3. **Decide regions** — design-now/build-later is my recommendation, and it is
+   the only item where deferring the *design* costs real money.
+4. **Prototype the operation → tool derivation** against three real Kova routes,
+   including one that is entitlement-gated and one that is row-scoped. If tool
+   masking is not clean there, the whole §3.4 story needs rethinking before
+   anything is built on it.
+
+Stage 0 is a week of types and arguments, and it is the highest-value week in
+the project.
