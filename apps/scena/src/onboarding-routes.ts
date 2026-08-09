@@ -65,10 +65,12 @@ export interface OnboardingPlanCard {
 const planCard = (p: PlanRow): OnboardingPlanCard => ({
   id: p.id,
   name: p.name,
-  priceCents: p.price_cents,
-  interval: p.interval,
+  // The wire contract stays CENTS — it is what the wizard renders and what
+  // Stripe speaks. Only the COLUMN moved to dollars.
+  priceCents: Math.round(p.price_usd_month * 100),
+  interval: "month",
   trialDays: resolveEntitlements(p.entitlements_json).trialDays,
-  entitlementsJson: p.entitlements_json,
+  entitlementsJson: p.entitlements_json ?? "{}",
 });
 
 export const onboardingRoutes = new Hono<AppEnv>()
@@ -76,7 +78,7 @@ export const onboardingRoutes = new Hono<AppEnv>()
    * The plan picker's feed. Session required, tenancy NOT required — this is
    * what step 2 renders before the workspace exists.
    *
-   * `listPlans(db, true)` is `active = 1 AND price_cents > 0`, so the `free`
+   * `listPlans(db, true)` is `active = 1 AND price_usd_month > 0`, so the `free`
    * parking row can never be offered here. That filter is this endpoint's whole
    * contract and `onboarding.test.ts` pins it.
    */
@@ -148,7 +150,7 @@ export const onboardingRoutes = new Hono<AppEnv>()
     // none until something reads it.
     await getSubscription(c.env.DB, who.tenantId);
     await c.env.DB.prepare("UPDATE subscriptions SET pending_plan_id = ?, updated_at = ? WHERE tenant_id = ?")
-      .bind(plan.id, Date.now(), who.tenantId)
+      .bind(plan.id, nowIso(), who.tenantId)
       .run();
 
     const cfg = await stripeCfg(c.env).catch(() => null);

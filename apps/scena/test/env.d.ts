@@ -9,6 +9,8 @@
 declare module "cloudflare:test" {
   interface ProvidedEnv {
     DB: D1Database;
+    /** Scratch database for `billing-reconcile.test.ts`. See vitest.config.ts. */
+    MIGRATION_DB: D1Database;
     PAIRING: KVNamespace;
     MEDIA: R2Bucket;
     SCREEN: DurableObjectNamespace;

@@ -12,7 +12,7 @@
  * these are the ship defaults.
  */
 
-import { bindBillingStore, getConfig, setConfig, type PackRow, type PlanSeed } from "@4dl/billing";
+import { bindBillingStore, getConfig, setConfig, type PackSeed, type PlanSeed } from "@4dl/billing";
 import { entitlementsEngine, type Entitlements } from "@kova/domain";
 import { j } from "./db.js";
 
@@ -272,7 +272,7 @@ export const GRANDFATHERED_PLANS: PlanSeed[] = [
 ];
 
 /** Scena-parity credit packs: 1 credit = $0.001, volume bonuses upward. */
-export const DEFAULT_PACKS: PackRow[] = [
+export const DEFAULT_PACKS: PackSeed[] = [
   { id: "pack_1k", name: "1,000 credits", credits: 1_000, price_usd: 1, ord: 0, active: 1 },
   { id: "pack_5k", name: "5,500 credits", credits: 5_500, price_usd: 5, ord: 1, active: 1 },
   { id: "pack_25k", name: "30,000 credits", credits: 30_000, price_usd: 25, ord: 2, active: 1 },

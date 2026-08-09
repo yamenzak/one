@@ -32,13 +32,14 @@ import { sharedConfigRoutes } from "@4dl/core/admin-routes";
 import { maintenanceAdminRoutes, maintenanceMiddleware } from "@4dl/tenancy";
 import { notifyRoutes } from "@4dl/notify/routes";
 import { aiCatalogAdminRoutes } from "@4dl/ai";
-import { planAdminRoutes } from "@4dl/billing";
+import { planAdminRoutes, stripeAdminRoutes, syncCatalog } from "@4dl/billing";
 import { otpSendGuard } from "./otp-guard.js";
 import { staffRoutes } from "./staff-routes.js";
 import { mediaRoutes } from "./media-routes.js";
 import { accountRoutes, tenantCloseRoutes } from "./exit-routes.js";
 import { entitlements, PLAN_FEATURE_META, PLAN_QUOTA_META } from "./entitlements.js";
 import { seedBilling } from "./billing-store.js";
+import { STRIPE_BRANDING } from "./stripe.js";
 // Declaring the notification vocabulary is a SIDE EFFECT of importing it —
 // `configureNotify` runs at module load, and `notifyRoutes` reads that registry.
 // An app that mounts the routes without this import serves an inbox whose every
@@ -203,6 +204,49 @@ app.route("/api", planAdminRoutes({
   engine: entitlements,
   quotaMeta: PLAN_QUOTA_META,
   featureMeta: PLAN_FEATURE_META,
+}) as unknown as Hono<AppEnv>);
+
+/**
+ * THE STRIPE CREDENTIALS, on the operator door — and the panel that edits the
+ * plan catalog above is useless without them.
+ *
+ * ⚠️ This was MISSING, and it is the exact shape this template exists to stop:
+ * `BILLING_SCHEMA` applied, `planAdminRoutes` mounted, a plan catalog an
+ * operator could price — and no route anywhere to enter a secret key, so nothing
+ * could ever be charged and `@4dl/admin`'s Stripe panel 404'd on every call. The
+ * tables existed, every test passed, and the capability was unreachable.
+ * `scripts/capability-reachable.test.mjs` asks for it by name now.
+ *
+ * Both LANES are stored at once, so going live is a mode flip rather than a
+ * re-paste, and the flip SWAPS the catalog's per-lane Stripe ids — one app's
+ * hand-written copy did not, and pressing its live switch left every plan
+ * pointing at a test price and every checkout failing with "No such price".
+ *
+ * `syncCatalog` is the package's own function: it needs the app's branding
+ * (`metadataPrefix` becomes live data on the first sale — see `stripe.ts`) and
+ * nothing else, because the catalog table is `@4dl/billing`'s.
+ */
+app.route("/api", stripeAdminRoutes({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  seed: seedBilling,
+  syncCatalog: (db, secretKey) => syncCatalog(db, secretKey, STRIPE_BRANDING),
+  /*
+    The rebuild repair. An ordinary sync skips any row that already carries a
+    `stripe_price_id`, so a row whose Stripe price drifted — edited in the
+    dashboard, deleted by hand, half-written by an interrupted sync — reports "0
+    synced" while every checkout fails. Nulling the ids lets the sync recreate
+    them; anyone already subscribed keeps their old price until they
+    re-subscribe, which is why the panel puts this behind a confirmation.
+  */
+  clearCatalogIds: async (db) => {
+    const plans = await db
+      .prepare("UPDATE plans SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)")
+      .run();
+    const packs = await db
+      .prepare("UPDATE credit_packs SET stripe_product_id = NULL, stripe_price_id = NULL WHERE active = 1 AND (stripe_product_id IS NOT NULL OR stripe_price_id IS NOT NULL)")
+      .run();
+    return { cleared: plans.meta?.changes ?? 0, clearedPacks: packs.meta?.changes ?? 0 };
+  },
 }) as unknown as Hono<AppEnv>);
 
 /**

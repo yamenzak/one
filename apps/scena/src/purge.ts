@@ -34,6 +34,7 @@
  * subscription. This module owns those.
  */
 
+import { nowIso } from "@4dl/core";
 import { applyCascade, tenantCascade } from "@4dl/purge";
 import { SCHEMA_MODULES } from "./db.js";
 import type { Env } from "./env.js";
@@ -188,7 +189,7 @@ export async function scheduleTenantClose(env: Env, tenantId: string): Promise<{
   // Epoch milliseconds, because that is what this app's `subscriptions` columns
   // hold — Tessa's are ISO strings and the shared route only ever echoes what it
   // is handed, so the two apps disagree here on purpose rather than by accident.
-  await run(env.DB, "UPDATE subscriptions SET status = 'closing', suspend_at = ?, delete_at = ? WHERE tenant_id = ?", Date.now(), at, tenantId);
+  await run(env.DB, "UPDATE subscriptions SET status = 'closing', suspend_at = ?, delete_at = ? WHERE tenant_id = ?", nowIso(), new Date(at).toISOString(), tenantId);
   return { deleteAt: new Date(at).toISOString() };
 }
 

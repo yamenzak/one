@@ -22,7 +22,6 @@ import {
   setConfig,
   listPlans,
   getPlan,
-  upsertPlan,
   getSubscription,
   updateSubscription,
   listSubscriptions,
@@ -336,7 +335,7 @@ export function registerBilling(app: App): void {
     const t = tenantOf(c);
     const sub = await getSubscription(c.env.DB, t);
     const current = await getPlan(c.env.DB, sub.plan_id);
-    const isDowngrade = (current?.price_cents ?? 0) > target.price_cents;
+    const isDowngrade = (current?.price_usd_month ?? 0) > target.price_usd_month;
 
     if (isDowngrade) {
       const ent = await import("./entitlements.js").then((m) => m.resolveEntitlements(target.entitlements_json));
@@ -346,7 +345,7 @@ export function registerBilling(app: App): void {
     }
 
     const cfg = await stripeCfg(c.env);
-    const paid = target.price_cents > 0 && !sub.comp;
+    const paid = target.price_usd_month > 0 && !sub.comp;
     if (stripeEnabled(cfg) && paid) {
       const origin = new URL(c.req.url).origin;
       try {
@@ -604,102 +603,18 @@ export function registerBilling(app: App): void {
     swap the catalog's per-lane price ids when the switch is pressed.
   */
 
-  /**
-   * THE PLAN CATALOG, on `@4dl/admin`'s contract.
-   *
-   * These are hand-written rather than `@4dl/billing`'s `planAdminRoutes`
-   * because Scena's `plans` table is still its own — `price_cents` + `currency`
-   * where the shared schema has `price_usd_month` — and that reconciliation is
-   * a data migration, not a wiring change (see `src/schema.ts`). What they DO
-   * speak is the shared wire contract, so the console renders the same panel
-   * every other app does, and the day the columns are reconciled this whole
-   * block is deleted rather than rewritten.
-   *
-   * Two things this gained on the way, and both were missing:
-   *
-   *   GRANDFATHERING. The old editor wrote the new entitlements and stopped, so
-   *   tightening a tier took the capability away from every workspace already on
-   *   it — immediately, silently, and described in the help text as intended.
-   *   `snapshotDowngrade` + `raiseOverride` hold each of them at what they
-   *   bought; raising a limit still applies to everybody at read time.
-   *
-   *   THE STRIPE ID NULL-OUT. `syncCatalog` skips a plan that already carries a
-   *   price id, so a repriced plan kept charging the OLD amount forever, with a
-   *   200 back and nothing in any log.
-   */
-  app.get("/api/admin/plans", async (c) => {
-    const deny = await requireAdmin(c);
-    if (deny) return deny;
-    const plans = await listPlans(c.env.DB);
-    const counts = await c.env.DB
-      .prepare("SELECT plan_id, COUNT(*) AS n FROM subscriptions WHERE status = 'active' GROUP BY plan_id")
-      .all<{ plan_id: string; n: number }>()
-      .catch(() => ({ results: [] as { plan_id: string; n: number }[] }));
-    const countMap = new Map((counts.results ?? []).map((r) => [r.plan_id, r.n]));
-    return c.json({
-      plans: plans.map((p) => ({
-        id: p.id,
-        name: p.name,
-        // The shared contract is dollars. Scena stores cents, which is the whole
-        // of the difference between this handler and the package's.
-        priceUsdMonth: p.price_cents / 100,
-        active: p.active,
-        ord: p.sort,
-        tenantCount: countMap.get(p.id) ?? 0,
-        entitlements: resolveEntitlements(p.entitlements_json),
-      })),
-      quotaKeys: QUOTA_KEYS,
-      featureKeys: FEATURE_KEYS,
-      quotaMeta: PLAN_QUOTA_META,
-      featureMeta: PLAN_FEATURE_META,
-    });
-  });
+  /*
+    THE PLAN CATALOG'S OPERATOR ROUTES ARE `@4dl/billing`'s NOW —
+    `planAdminRoutes`, mounted in index.ts beside the other package route trees.
 
-  app.patch("/api/admin/plans/:id", async (c) => {
-    const deny = await requireAdmin(c);
-    if (deny) return deny;
-    const body = await c.req
-      .json<{ name?: string; priceUsdMonth?: number; active?: boolean; entitlements?: Record<string, unknown> }>()
-      .catch(() => ({}) as Record<string, never>);
-    const id = c.req.param("id");
-    const plan = await getPlan(c.env.DB, id);
-    if (!plan) return c.json({ error: "unknown plan" }, 404);
+    Two hand-written handlers lived here, and the comment above them said what
+    they were waiting for: they spoke `@4dl/admin`'s wire contract (dollars,
+    `ord`) over a table that stored cents and `sort`, so they were a translation
+    layer and nothing else. `billing-reconcile.ts` moved the columns; the
+    translation had nothing left to translate, so the block was deleted rather
+    than rewritten, exactly as it said it would be.
+  */
 
-    const patch: Parameters<typeof upsertPlan>[1] = { id };
-    let grandfathered = 0;
-    if (body.entitlements) {
-      const oldEnt = resolveEntitlements(plan.entitlements_json);
-      // An omitted `trialDays` means "leave it alone", not "no trial": the panel
-      // posts back the matrix it rendered, and a client that predates the field
-      // must not retire a plan's free trial as a side effect of an unrelated edit.
-      const incoming = { ...body.entitlements, trialDays: (body.entitlements as { trialDays?: number }).trialDays ?? oldEnt.trialDays };
-      const newEnt = resolveEntitlements(JSON.stringify(incoming));
-      patch.entitlements_json = JSON.stringify(newEnt);
-      const grants = snapshotDowngrade(oldEnt, newEnt);
-      if (Object.keys(grants).length) {
-        const subs = await c.env.DB
-          .prepare("SELECT tenant_id, overrides_json FROM subscriptions WHERE plan_id = ? AND status = 'active'")
-          .bind(id)
-          .all<{ tenant_id: string; overrides_json: string | null }>();
-        const stmts = (subs.results ?? []).map((s) =>
-          c.env.DB
-            .prepare("UPDATE subscriptions SET overrides_json = ?, updated_at = ? WHERE tenant_id = ?")
-            .bind(raiseOverride(s.overrides_json, grants), Date.now(), s.tenant_id),
-        );
-        if (stmts.length) await c.env.DB.batch(stmts);
-        grandfathered = stmts.length;
-      }
-    }
-    if (body.name !== undefined) patch.name = body.name;
-    if (body.active !== undefined) patch.active = body.active ? 1 : 0;
-    const repriced = body.priceUsdMonth !== undefined && Math.round(body.priceUsdMonth * 100) !== plan.price_cents;
-    if (body.priceUsdMonth !== undefined) patch.price_cents = Math.round(body.priceUsdMonth * 100);
-    await upsertPlan(c.env.DB, patch);
-    if (repriced) {
-      await c.env.DB.prepare("UPDATE plans SET stripe_product_id = NULL, stripe_price_id = NULL WHERE id = ?").bind(id).run();
-    }
-    return c.json({ ok: true, grandfathered, stripeResyncRequired: repriced });
-  });
 
   /*
     THE AI CATALOG'S ADMIN ROUTES ARE `@4dl/ai`'s NOW — `aiCatalogAdminRoutes`,

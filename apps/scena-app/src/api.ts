@@ -1219,13 +1219,17 @@ export interface Balance {
 export interface Plan {
   id: string;
   name: string;
-  price_cents: number;
-  currency: string;
-  interval: string;
-  entitlements_json: string;
+  /**
+   * ⚠️ DOLLARS, not cents, and `ord`, not `sort` — `@4dl/billing`'s column names
+   * since the schema reconciliation. `currency` and `interval` are gone with
+   * them: every Scena plan was always `usd`/`month`, which is why the shared
+   * shape (`price_usd_month`) loses nothing by not having them.
+   */
+  price_usd_month: number;
+  entitlements_json: string | null;
   stripe_price_id: string | null;
   active: number;
-  sort: number;
+  ord: number;
 }
 
 /** A plan, as much of one as the promo picker needs to name it. */
@@ -1238,7 +1242,8 @@ export interface Pack {
   id: string;
   name: string;
   credits: number;
-  price_cents: number;
+  /** Dollars, as `plans.price_usd_month` is. */
+  price_usd: number;
   stripe_price_id: string | null;
 }
 
@@ -1247,9 +1252,10 @@ export interface Subscription {
   plan_id: string;
   status: string;
   comp: number;
-  current_period_end: number | null;
-  suspend_at: number | null;
-  delete_at: number | null;
+  /** ISO-8601 text. These held epoch milliseconds before the reconciliation. */
+  current_period_end: string | null;
+  suspend_at: string | null;
+  delete_at: string | null;
 }
 
 export interface LedgerEntry {
@@ -1258,7 +1264,8 @@ export interface LedgerEntry {
   balance: number;
   reason: string;
   ref: string | null;
-  created_at: number;
+  /** Epoch milliseconds. `@4dl/billing` calls this column `at`. */
+  at: number;
 }
 
 export interface Entitlements {

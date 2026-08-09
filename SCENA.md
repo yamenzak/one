@@ -286,9 +286,10 @@ inbox — the DO comes up empty and nothing says why.
 
 ## 11. The schema, and why its order matters
 
-`SCHEMA_MODULES` in `apps/scena/src/db.ts` is the migration's progress bar. Seven
-entries today: `AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_RAIL_SCHEMA`,
-`STORAGE_SCHEMA`, `NOTIFY_SCHEMA`, `AI_SCHEMA`, `SCENA_SCHEMA`. **The diff that
+`SCHEMA_MODULES` in `apps/scena/src/db.ts` is the migration's progress bar. Nine
+entries today: `AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_SCHEMA`,
+`BILLING_RAIL_SCHEMA`, `STORAGE_SCHEMA`, `NOTIFY_SCHEMA`, `AI_LEGACY_RESET`,
+`AI_SCHEMA`, `SCENA_SCHEMA`. **The diff that
 removes a table from Scena's own module is the same diff that adds its package
 here.**
 
@@ -306,12 +307,48 @@ setting (`app_config.updated_at`). The local declarations are gone, which is wha
 makes the order safe rather than merely conventional;
 `apps/scena/test/schema-module.test.ts` fails if any of the three comes back.
 
-**One module is deliberately still Scena's**, and the plan names it so nobody
-"fixes" it casually: the billing STORE (`BILLING_SCHEMA`). Its `plans`,
-`subscriptions`, `credit_packs` and `credit_ledger` share a NAME with Scena's and
-differ in COLUMNS — `price_cents` + `currency` + `interval` against
-`price_usd_month`, `at` against `created_at`, TEXT timestamps against INTEGER.
-Adopting it means reconciling the shapes first — a data change, not a wiring one.
+### `BILLING_SCHEMA`, and the migration it was waiting for
+
+This section used to say the billing store was deliberately still Scena's: its
+`plans`, `subscriptions`, `credit_packs` and `credit_ledger` shared a NAME with
+the shared ones and differed in COLUMNS — `price_cents` + `currency` +
+`interval` against `price_usd_month`, `sort` against `ord`, `created_at` against
+`at`, epoch milliseconds against ISO text. Adopting it meant reconciling the
+shapes first, which is a data change rather than a wiring one.
+
+`apps/scena/src/billing-reconcile.ts` is that data change, and three things
+about it matter more than the column list:
+
+⚠️ **It runs BEFORE `applySchema`, not as a module inside it.**
+`BILLING_SCHEMA` declares `CREATE INDEX … ON credit_ledger(tenant_id, at)`, and
+on a pre-migration database that column is `created_at` — so the index fails,
+the DDL batch throws, `applySchema` throws with it, and every route that touches
+D1 answers 500. That is `AI_LEGACY_RESET`'s outage in a different table.
+`ensureSchema` in `db.ts` is where the order is enforced.
+
+**It is a function, not a `SchemaModule`.** Every statement names a column that
+exists on exactly one of the two shapes, so as a declarative `backfill` each
+would fail to PARSE on a fresh database — the runner swallows that with a
+warning, and every fresh deploy and every test isolate would print ten alarming
+lines about columns that are correctly absent. Reading `pragma_table_info`
+first turns each step into a decision instead of an attempt.
+
+**The timestamps are the half that fails in silence.** SQLite types are
+per-value, so a millisecond integer sits happily in a TEXT-declared column, and
+then `sub.past_due_at + graceMs` is string CONCATENATION while `past_due_at < ?`
+compares a number against ISO text. A workspace is either never suspended or
+suspended the instant it goes past due, and nothing throws anywhere.
+`apps/scena/test/billing-reconcile.test.ts` asserts the converted value is the
+same BYTES `toISOString` writes, because the SQL comparison is lexicographic —
+a format that merely parses is a ladder that fires on the wrong day.
+
+What arrived with the adoption: the version-stamped catalog seed (Scena's
+`INSERT OR IGNORE` did nothing at all on a database that had booted once, so
+every price and entitlement edit since reached fresh deployments and no live
+one), `@4dl/billing`'s `planAdminRoutes`, and its `syncCatalog` — which pushes a
+plan RENAME to Stripe and survives one stale id, neither of which Scena's copy
+did. `currency` and `interval` are gone rather than migrated: every Scena plan
+was always `usd`/`month`.
 
 ### The AI catalog, and what adopting it took
 
@@ -639,10 +676,15 @@ active keys belong to the other lane, and **swaps the catalog's per-lane price
 ids when the mode flips** — without which every plan would keep pointing at the
 outgoing lane's price and every checkout would fail with "No such price".
 
-`syncCatalog` and the price rebuild are still Scena's, injected: `plans` and
-`credit_packs` here are `price_cents` + `currency` + `interval` where the shared
-store is `price_usd_month`, and reconciling that is the `BILLING_SCHEMA` data
-migration, not this wiring change.
+`syncCatalog` is the package's own function now, passed straight through. It was
+injected while `plans` and `credit_packs` here were `price_cents` + `currency` +
+`interval` against the shared store's `price_usd_month`; §11's reconciliation
+closed that, and the ~60-line copy in `stripe.ts` went with the difference —
+along with two defects it had. A plan renamed in the console kept its old name
+on every checkout page and invoice forever, because the loop skipped any row
+that already had a price id; and one stale id (a test id while live is active)
+threw out of the loop, so nothing was created and the console got an
+information-free 500.
 
 ## Token-gated surfaces
 
@@ -677,11 +719,10 @@ forever — which names the wrong subsystem entirely.
 all run. Stage 9 (this file, `apps/scena/DEPLOY.md`, the CLAUDE.md section) is
 the last of the plan.
 
-**Deliberately not adopted yet**, each for a stated reason: the billing STORE
-(§11 — a column collision, not a wiring gap) and the
-`NotificationBell` / `InboxScreen` surfaces from `@4dl/app-kit` (the server side
-of the inbox is wired end to end; until the bell lands, a notification is
-reachable at `GET /api/notifications`).
+**Deliberately not adopted yet**: the `NotificationBell` / `InboxScreen`
+surfaces from `@4dl/app-kit` — Scena has its own binding in
+`apps/scena-app/src/Notifications.tsx`. The billing STORE was on this list and is
+not any more; §11 has the migration.
 
 **Resource ids in `apps/scena/wrangler.jsonc` are placeholders** — the old
 account's real ids were replaced — so `deploy.yml` SKIPS Scena until the Provision

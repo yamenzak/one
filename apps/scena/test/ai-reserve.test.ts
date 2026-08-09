@@ -143,11 +143,16 @@ describe("planRun ties the prompt to the reserve", () => {
    * that the system prompt reaches the reserve at all, and by far more than the
    * 200 tokens that used to stand in for it.
    */
-  for (const [label, over] of [
+  // ⚠️ Annotated, not `as const`. `as const` makes `currentWidgets: readonly []`,
+  // which is not assignable to the mutable array the request type declares — and
+  // it typechecks nowhere while passing every test, because vitest transpiles
+  // rather than checks.
+  const CASES: [string, Partial<GenerateRequest>][] = [
     ["slide", {}],
-    ["widget", { options: { surface: "widget" as const, width: 400, height: 300 } }],
-    ["layout", { task: "layout" as const, options: { designW: 1920, designH: 1080, currentWidgets: [] } }],
-  ] as const) {
+    ["widget", { options: { surface: "widget", width: 400, height: 300 } }],
+    ["layout", { task: "layout", options: { designW: 1920, designH: 1080, currentWidgets: [] } }],
+  ];
+  for (const [label, over] of CASES) {
     it(`counts the ${label} system prompt, which a flat +200 pad did not`, () => {
       const plan = planRun(req(over), "workers-ai", "");
       const bare = sharedEstimate({ system: "", prompt: req().prompt, maxOutputTokens: 8000, provider: "workers-ai" });

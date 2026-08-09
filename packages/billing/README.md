@@ -152,11 +152,13 @@ still supplies is the part a package cannot know: which TABLES hold its catalog.
 prefix validation per slot, the refusal of a mode whose active keys belong to the
 other lane, the per-lane catalog swap on a flip. Those are facts about Stripe.
 
-`syncCatalog` and `clearCatalogIds` are injected because the catalog TABLE is the
-app's: `store.ts` reads `price_usd_month`, and Scena's `plans` still reads
-`price_cents` + `currency` + `interval`. Reconciling those is a data migration
-(CLAUDE.md's note on `BILLING_SCHEMA`), so the seam exists to let an app adopt the
-routes years before it adopts the store.
+`syncCatalog` and `clearCatalogIds` are injected because the catalog TABLE need
+not be this package's: `store.ts` reads `price_usd_month`, and an app that
+predates the platform may read something else. Scena did — `price_cents` +
+`currency` + `interval` — for four stages, which is exactly what the seam is for:
+an app adopts the ROUTES long before it can afford the data migration that lets
+it adopt the store. All three apps pass the package's own `syncCatalog` through
+today; the seam stays because app #5 will not, on day one.
 
 `clearCatalogIds` is **optional, and its absence is a refusal** — a rebuild
 request in an app with no rebuild path answers 400 rather than reporting "0

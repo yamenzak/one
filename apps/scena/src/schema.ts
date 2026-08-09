@@ -78,7 +78,7 @@ export const DEMO_TENANT = "tenant_demo";
 
 export const SCENA_SCHEMA: SchemaModule = {
   id: "scena",
-  version: "2026-08-08a",
+  version: "2026-08-09a",
   ddl: [
     "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, email TEXT, name TEXT, created_at INTEGER);",
     // Devices (screens). channel_id is the active/default channel; a device
@@ -136,36 +136,26 @@ export const SCENA_SCHEMA: SchemaModule = {
     // Health alerting (§23): rules + an append-only alert log.
     "CREATE TABLE IF NOT EXISTS alert_rules (id TEXT PRIMARY KEY, tenant_id TEXT, type TEXT, threshold_sec INTEGER, channel TEXT, target TEXT, enabled INTEGER);",
     "CREATE TABLE IF NOT EXISTS alerts (id TEXT PRIMARY KEY, tenant_id TEXT, screen_id TEXT, type TEXT, message TEXT, at INTEGER, resolved_at INTEGER);",
-    // Monetization (§25): plans + entitlements, per-tenant subscription,
-    // one-time credit packs, and the append-only credit ledger (mirror of
-    // the TenantBillingDO ledger, for invoices).
-    "CREATE TABLE IF NOT EXISTS plans (id TEXT PRIMARY KEY, name TEXT, price_cents INTEGER, currency TEXT, interval TEXT, entitlements_json TEXT, stripe_product_id TEXT, stripe_price_id TEXT, sort INTEGER, active INTEGER, created_at INTEGER);",
-    "CREATE TABLE IF NOT EXISTS subscriptions (tenant_id TEXT PRIMARY KEY, plan_id TEXT, status TEXT, comp INTEGER, stripe_customer_id TEXT, stripe_sub_id TEXT, pending_plan_id TEXT, current_period_end INTEGER, past_due_at INTEGER, suspend_at INTEGER, delete_at INTEGER, updated_at INTEGER, overrides_json TEXT);",
-    "CREATE TABLE IF NOT EXISTS credit_packs (id TEXT PRIMARY KEY, name TEXT, credits INTEGER, price_cents INTEGER, currency TEXT, stripe_product_id TEXT, stripe_price_id TEXT, sort INTEGER, active INTEGER);",
-    "CREATE TABLE IF NOT EXISTS credit_ledger (id TEXT PRIMARY KEY, tenant_id TEXT, delta INTEGER, balance INTEGER, reason TEXT, ref TEXT, created_at INTEGER);",
+    /*
+      ⚠️ `plans`, `subscriptions`, `credit_packs`, `credit_ledger` AND
+      `stripe_events` ARE `@4dl/billing`'s TABLES NOW.
+
+      All five used to be declared here, and four of them with different columns
+      from the shared ones — `price_cents` + `currency` + `interval` + `sort`
+      against `price_usd_month` + `ord`, `created_at` against `at`, epoch
+      milliseconds against ISO text. That difference is the whole reason
+      `BILLING_SCHEMA` sat outside `SCHEMA_MODULES` while every other package's
+      module went in: a `CREATE TABLE IF NOT EXISTS` is won by whichever module
+      runs first, and the loser's columns silently never exist.
+
+      `billing-reconcile.ts` moves an existing database onto the shared columns
+      before `applySchema` runs; `db.ts` has the ordering argument. Do not add
+      any of the five back here — `schema-module.test.ts` fails if you do, for
+      the same reason it does for the three AI tables.
+    */
     // Promo codes (§25 gifting/demo): redeemable for credits or a comped plan.
     "CREATE TABLE IF NOT EXISTS promo_codes (code TEXT PRIMARY KEY, kind TEXT, credits INTEGER, plan_id TEXT, plan_months INTEGER, max_redemptions INTEGER, redeemed_count INTEGER, per_tenant_limit INTEGER, expires_at INTEGER, note TEXT, active INTEGER, created_at INTEGER);",
     "CREATE TABLE IF NOT EXISTS promo_redemptions (id TEXT PRIMARY KEY, code TEXT, tenant_id TEXT, kind TEXT, credits INTEGER, plan_id TEXT, redeemed_at INTEGER);",
-    /*
-      WEBHOOK IDEMPOTENCY, and Scena had NONE.
-
-      Stripe retries on any non-2xx and occasionally redelivers a successful
-      one, so without a seen-set every retry of `checkout.session.completed`
-      ran `topUp` again — a credit pack granted twice, three times, as many
-      times as the delivery was repeated. Free credits, silently, with a
-      correct-looking 200 each time.
-
-      This is `@4dl/billing`'s table by rights, but adopting `BILLING_SCHEMA`
-      wholesale is not possible yet: its `plans`, `subscriptions`,
-      `credit_packs` and `credit_ledger` have DIFFERENT COLUMNS from Scena's
-      (`price_usd_month REAL` vs `price_cents INTEGER` + `currency` +
-      `interval`, `at` vs `created_at`, TEXT vs INTEGER timestamps). Whichever
-      module runs first wins a `CREATE TABLE IF NOT EXISTS`, and the loser's
-      columns simply never exist — which is precisely the `app_config.updated_at`
-      failure this schema already carries a scar from. The store moves when its
-      queries do; the idempotency cannot wait for that.
-    */
-    "CREATE TABLE IF NOT EXISTS stripe_events (id TEXT PRIMARY KEY, at INTEGER);",
     /*
       ⚠️ `ai_models`, `ai_cache` AND `ai_generations` ARE `@4dl/ai`'s TABLES NOW.
 
@@ -255,8 +245,6 @@ export const SCENA_SCHEMA: SchemaModule = {
     "ALTER TABLE tracks ADD COLUMN art_url TEXT",
     "ALTER TABLE library_tracks ADD COLUMN art_hash TEXT",
     "ALTER TABLE library_tracks ADD COLUMN art_url TEXT",
-    // Per-tenant entitlement overrides (admin gifts on top of the plan, §25).
-    "ALTER TABLE subscriptions ADD COLUMN overrides_json TEXT",
     // Reusable-entities restructure: channels reference playlists + a profile;
     // slides/tracks gain playlist_id; devices gain a detected resolution.
     "ALTER TABLE channels ADD COLUMN slide_playlist_id TEXT",
@@ -400,7 +388,9 @@ export const SCENA_SCHEMA: SchemaModule = {
       "feeds", "feed_items", "weather_sources", "alert_rules", "alerts",
       // `ai_generations` is deliberately absent: `AI_SCHEMA` declares it, and
       // naming it twice would make `@4dl/purge` emit two identical deletes.
-      "subscriptions", "credit_ledger", "promo_redemptions",
+      // `subscriptions` and `credit_ledger` are absent for the same reason —
+      // `BILLING_SCHEMA` declares both, with the same `tenant_id` column.
+      "promo_redemptions",
       "ads", "ad_profiles", "tracks",
     ],
   },

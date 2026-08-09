@@ -73,6 +73,21 @@ export default defineWorkersConfig({
         miniflare: {
           compatibilityFlags: ["nodejs_compat"],
           /*
+            A SECOND, EMPTY D1 — the only way to test a MIGRATION.
+
+            `billing-reconcile.test.ts` has to build a database in the shape
+            Scena shipped BEFORE it adopted `BILLING_SCHEMA` — `price_cents`,
+            `sort`, `created_at`, epoch-millisecond timestamps — and then watch
+            the reconciler move it. `env.DB` is by definition not in that shape:
+            it is the current one, seeded once in `beforeAll` and shared across
+            this whole suite because `isolatedStorage` is off. Rebuilding the
+            legacy tables inside it would take the catalog every other test
+            reads down with them.
+
+            It binds nothing else and no production config knows about it.
+          */
+          d1Databases: { MIGRATION_DB: { id: "scena-migration-test" } },
+          /*
             `ENVIRONMENT: development` is what lets `@4dl/auth` start without a
             real signing secret — outside development it REFUSES rather than
             signing sessions with a key that is public in this repo. Empty

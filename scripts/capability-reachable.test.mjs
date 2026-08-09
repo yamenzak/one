@@ -60,10 +60,81 @@ const REGISTRY = JSON.parse(readFileSync(join(ROOT, "apps.json"), "utf8"));
  * A guard that matches its own documentation of a feature is a guard that
  * verifies the feature was once described.
  */
-const stripComments = (src) =>
-  src
-    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
-    .replace(/\/\/[^\n]*/g, (m) => " ".repeat(m.length));
+/**
+ * ⚠️ IMPORTS ARE NOT MOUNTS, and stripping them is what makes this check mean
+ * anything.
+ *
+ * The search below is over the app's WHOLE `src`, because a route tree is often
+ * mounted somewhere other than `index.ts` — Kova binds `emailAdminRoutes` in
+ * `billing-routes.ts`, Scena binds `staffRoutes` in `member-routes.ts`. The cost
+ * of that breadth is that an `import { fooRoutes }` line satisfies the match on
+ * its own, so an app that imports a tree and never mounts it reads as wired. A
+ * mutation that renamed only the CALL passed, which is the whole failure mode
+ * this file is named after wearing a different hat.
+ */
+function stripImports(src) {
+  let inImport = false;
+  return src
+    .split("\n")
+    .map((line) => {
+      if (!inImport && /^\s*import\b/.test(line)) inImport = true;
+      if (!inImport) return line;
+      // An import statement ends at its module specifier, on whichever line
+      // that lands — these files wrap long specifier lists across many.
+      if (/\bfrom\s*["'][^"']*["']\s*;?\s*$/.test(line) || /^\s*import\s*["'][^"']*["']\s*;?\s*$/.test(line)) inImport = false;
+      return "";
+    })
+    .join("\n");
+}
+
+/**
+ * Blank out comments, PRESERVING LINE STRUCTURE — and without being fooled by a
+ * string.
+ *
+ * ⚠️ The two-regex version this replaces read the star inside `"/api/auth/*"` as
+ * the start of a block comment and swallowed everything up to the next comment
+ * terminator — in Kova's `index.ts`, ninety lines of route mounts. It went
+ * unnoticed for as long as an IMPORT satisfied the match on its own; the moment
+ * imports stopped counting, the guard accused Kova of never mounting its inbox.
+ *
+ * A regex literal containing `//` would still confuse this scanner. That is a
+ * known limit, not an oversight: it is rare, it fails LOUD (a name goes missing
+ * and the guard accuses), and the alternative is parsing TypeScript in a file
+ * whose whole point is having no dependencies.
+ */
+function stripComments(src) {
+  let out = "";
+  let mode = null; // '"' | "'" | "`" | "//" | "/*"
+  for (let i = 0; i < src.length; ) {
+    const c = src[i];
+    const d = src[i + 1];
+    if (mode === null) {
+      if (c === "/" && d === "/") { mode = "//"; out += "  "; i += 2; continue; }
+      if (c === "/" && d === "*") { mode = "/*"; out += "  "; i += 2; continue; }
+      if (c === '"' || c === "'" || c === "`") mode = c;
+      out += c;
+      i += 1;
+      continue;
+    }
+    if (mode === "//") {
+      if (c === "\n") { mode = null; out += c; } else out += " ";
+      i += 1;
+      continue;
+    }
+    if (mode === "/*") {
+      if (c === "*" && d === "/") { mode = null; out += "  "; i += 2; continue; }
+      out += c === "\n" ? "\n" : " ";
+      i += 1;
+      continue;
+    }
+    // Inside a string literal: an escape consumes its pair, a matching quote ends it.
+    if (c === "\\") { out += "  "; i += 2; continue; }
+    if (c === mode) mode = null;
+    out += c;
+    i += 1;
+  }
+  return out;
+}
 
 let bad = 0;
 const fail = (m) => (console.error(`BAD  ${m}`), bad++);
@@ -86,6 +157,20 @@ const REACHABLE = [
   { module: "storage", mount: "mediaRoutes", why: "upload, the storage meter, the authed read" },
   { module: "ai", mount: "aiCatalogAdminRoutes", why: "the model catalog and the shared-selection broadcast" },
   { module: "email", mount: "emailAdminRoutes", why: "a fresh deploy cannot send a sign-in code until this is configured" },
+  /*
+    THE TWO HALVES OF SELLING A PLAN, and neither is any use alone.
+
+    `planAdminRoutes` is what prices the catalog — with the grandfathering and
+    the reprice id null-out an app's own editor invariably lacks. `stripeAdminRoutes`
+    is the only place a secret key can be entered, so without it nothing can ever
+    be charged and `@4dl/admin`'s Stripe panel 404s on every call.
+
+    The template shipped the first and not the second, which is this guard's
+    exact subject: `BILLING_SCHEMA` applied, a catalog an operator could edit,
+    and no route to make any of it collect money — with every test green.
+  */
+  { module: "billing", mount: "planAdminRoutes", why: "the plan catalog. Without it a price can be shipped and never changed" },
+  { module: "billing", mount: "stripeAdminRoutes", why: "the two-lane credentials — the only place a secret key can be entered" },
 ];
 
 /**
@@ -148,14 +233,17 @@ if (apps.length < 4) {
  * integration suites' — each app probes its own surfaces for a 404, which is a
  * behavioural question a structural check cannot answer anyway.
  */
-function appSource(appDir) {
+function appSource(appDir, { keepImports = false } = {}) {
   const out = [];
   const walk = (d) => {
     for (const entry of readdirSync(d, { withFileTypes: true })) {
       if (entry.name === "node_modules" || entry.name === "dist") continue;
       const p = join(d, entry.name);
       if (entry.isDirectory()) walk(p);
-      else if (/\.tsx?$/.test(entry.name)) out.push(stripComments(readFileSync(p, "utf8")));
+      else if (/\.tsx?$/.test(entry.name)) {
+        const bare = stripComments(readFileSync(p, "utf8"));
+        out.push(keepImports ? bare : stripImports(bare));
+      }
     }
   };
   walk(join(ROOT, appDir, "src"));
@@ -196,6 +284,9 @@ for (const app of apps) {
     fail(`${app.id}: could not read SCHEMA_MODULES from ${app.dir}/src/db.ts — the parser is broken, not the app.`);
     continue;
   }
+  // Two views of the same source: `index0` keeps the imports (aliases are read
+  // from them), `index` has them stripped so an import alone is not a mount.
+  const index0 = appSource(app.dir, { keepImports: true });
   const index = appSource(app.dir);
   const known = KNOWN_UNMOUNTED[app.id] ?? {};
 
@@ -205,7 +296,17 @@ for (const app of apps) {
     rename looks like, and exactly the case this check exists for. The mutation
     test that renamed it passed silently until this was fixed.
   */
-  const mounts = (name) => new RegExp(`\\b${name}\\b`).test(index);
+  const mounts = (name) => {
+    /*
+      An ALIASED import still counts. Scena mounts `@4dl/auth`'s tree as
+      `import { staffRoutes as sharedStaffRoutes }` and wraps it, which is a
+      legitimate shape — the capability is reachable, it simply travels under a
+      second name. Reading the alias off the import is what keeps stripping the
+      imports from turning that into a false accusation.
+    */
+    const names = [name, ...[...index0.matchAll(new RegExp(`\\b${name}\\s+as\\s+(\\w+)`, "g"))].map((m) => m[1])];
+    return names.some((n) => new RegExp(`\\b${n}\\b`).test(index));
+  };
 
   const applicable = REACHABLE.filter((r) => installed.has(r.module));
   const missing = [];

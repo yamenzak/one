@@ -75,8 +75,10 @@ import { sharedConfigRoutes } from "@4dl/core/admin-routes";
 import { railAdminRoutes } from "@4dl/billing-rail/admin-routes";
 import { maintenanceAdminRoutes } from "@4dl/tenancy";
 import { aiCatalogAdminRoutes } from "@4dl/ai";
-import { stripeAdminRoutes } from "@4dl/billing";
-import { syncCatalog } from "./stripe.js";
+import { planAdminRoutes, stripeAdminRoutes, syncCatalog } from "@4dl/billing";
+import { stripeBranding, stripeCfg } from "./stripe.js";
+import { ensureBilling } from "./billing-store.js";
+import { entitlementEngine, PLAN_QUOTA_META, PLAN_FEATURE_META, type Entitlements } from "./entitlements.js";
 import { PLATFORM_FROM_DEFAULT } from "./mailer.js";
 // Importing the delivery binding also installs the notification REGISTRY
 // (`notifications.ts` calls `configureNotify` at module scope), so this import
@@ -323,22 +325,18 @@ app.route("/api", railAdminRoutes({
  * secret slot, a signing secret in either: all saved, none reported, and each
  * one a payment path that is dead or dangerous in a way no screen said.
  *
- * `syncCatalog` and the rebuild are injected because Scena's `plans` and
- * `credit_packs` are still its own tables — `price_cents` + `currency` +
- * `interval` where the shared store has `price_usd_month`. That reconciliation
- * is a data migration; this is a wiring change, and the two are deliberately
- * not the same commit.
+ * `syncCatalog` is `@4dl/billing`'s own function now, passed straight through
+ * rather than adapted. It was injected because Scena's `plans` and
+ * `credit_packs` carried `price_cents` + `currency` + `interval` where the
+ * shared store has `price_usd_month`; `billing-reconcile.ts` reconciled them,
+ * and the ~60-line copy in `stripe.ts` went with the difference.
  */
 app.route("/api", stripeAdminRoutes({
   isPlatformAdmin: (c) => isPlatformAdmin(c as never),
-  // Scena's seed is idempotent and runs on every `ensureBilling`, so there is
-  // nothing extra to do before a sync.
-  syncCatalog: async (db, secretKey) => {
-    const out = await syncCatalog({ DB: db } as Env, secretKey);
-    // The shared contract is COUNTS. Scena's returns the rows it touched, and
-    // the panel renders "N plans, M packs".
-    return { plans: out.plans.length, packs: out.packs.length };
-  },
+  // The catalog seed is idempotent and version-stamped, so a sync that runs
+  // against a database seeded on an older catalog reconciles it first.
+  seed: (db) => ensureBilling(db),
+  syncCatalog: (db, secretKey) => syncCatalog(db, secretKey, stripeBranding),
   /*
     The rebuild repair, which Scena had no path to at all. An ordinary sync
     skips any row already holding a `stripe_price_id`, so a row whose Stripe
@@ -378,6 +376,31 @@ app.route("/api", stripeAdminRoutes({
 app.route("/api", aiCatalogAdminRoutes({
   isPlatformAdmin: (c) => isPlatformAdmin(c as never),
   appName: "Scena",
+}) as unknown as Hono<AppEnv>);
+
+/**
+ * THE PLAN CATALOG'S OPERATOR ROUTES — `@4dl/billing`'s, replacing Scena's own.
+ *
+ * `billing-routes.ts` carried two handlers over `plans` that spoke `@4dl/admin`'s
+ * wire contract (dollars, `ord`) against a table storing cents and `sort`. They
+ * were a translation layer, they said so in a comment, and they said the block
+ * would be deleted rather than rewritten the day the columns were reconciled.
+ * `billing-reconcile.ts` reconciled them.
+ *
+ * The two rules that cost real money live in the shared tree and are the reason
+ * not to keep a second copy of it: GRANDFATHERING (`snapshotDowngrade` +
+ * `raiseOverride` hold every workspace already on a tier at what it bought, so
+ * tightening a plan does not silently take a capability away from paying
+ * customers) and THE STRIPE ID NULL-OUT (a repriced plan whose ids survive keeps
+ * charging the old amount forever, because `syncCatalog` skips anything that
+ * already has a price id).
+ */
+app.route("/api", planAdminRoutes<Entitlements>({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  seed: (db) => ensureBilling(db),
+  engine: entitlementEngine,
+  quotaMeta: PLAN_QUOTA_META,
+  featureMeta: PLAN_FEATURE_META,
 }) as unknown as Hono<AppEnv>);
 
 /**

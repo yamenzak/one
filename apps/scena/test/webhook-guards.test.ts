@@ -66,7 +66,7 @@ describe("the ladder clamp", () => {
     // unwinding it: `past_due` on an already-suspended row would restart the
     // grace window every time Stripe retried.
     const t = await tenantAt("suspended");
-    await updateSubscription(env.DB, t, { status: "past_due", past_due_at: Date.now() }, { unlessLadderOwned: true });
+    await updateSubscription(env.DB, t, { status: "past_due", past_due_at: new Date().toISOString() }, { unlessLadderOwned: true });
     expect(await statusOf(t)).toBe("suspended");
   });
 

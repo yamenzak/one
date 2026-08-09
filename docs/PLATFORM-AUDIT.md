@@ -469,7 +469,7 @@ renders `EntitlementFields` from `featureKeys` + `quotaKeys` plus a field for
 `trialDays`**. So the one screen that claims to set trial length is the one
 place you cannot; it is an API call or a redeploy.
 
-### The plan catalog editor is written twice and missing once
+### The plan catalog editor is written twice and missing once — ✅ FIXED
 
 | app | plan catalog surface |
 |---|---|
@@ -485,22 +485,31 @@ their labels, which is precisely the registry-injection seam the platform uses
 everywhere else. This is the next instance of the pattern in the pipeline, and
 it is the one an operator meets on day one.
 
-### The billing STORE and the dunning LADDER
+**Closed in two steps.** `@4dl/admin` gained `PlatformPlansSection` over
+`@4dl/billing`'s `planAdminRoutes` (step 4b), which gave Tessa an editor it had
+never had. Scena kept hand-written handlers behind that shared panel for one
+more step — they spoke the shared wire contract over a table storing cents, so
+they were a translation layer and said so — and 5.2's column reconciliation
+deleted them. All three apps mount the same routes under the same panel now,
+including the grandfathering and the reprice id null-out that neither app's own
+editor had.
+
+### The billing STORE — ✅ FIXED (2026-08-09) — and the dunning LADDER
 
 ```
-grep -rn "bindBillingStore" apps/*/src   # api ✓  tessa ✓  scena ✗
+grep -rn "bindBillingStore" apps/*/src   # api ✓  tessa ✓  scena ✓
 grep -rn "dailySweep\|DUNNING_DAYS" apps/*/src   # api ✓  tessa ✓  _template ✓  scena ✗
 ```
 
-The store half is **known and correctly deferred**: `BILLING_SCHEMA` is
+The store half was **known and correctly deferred**: `BILLING_SCHEMA` was
 deliberately absent from Scena's `SCHEMA_MODULES` because `plans`,
 `subscriptions`, `credit_packs` and `credit_ledger` share a name with Scena's
 and differ in columns (`price_cents`+`currency`+`interval` vs
-`price_usd_month`; `at` vs `created_at`; TEXT vs INTEGER timestamps). Adopting
-it is a **data migration**, not a wiring change, and `apps/scena/src/schema.ts`
-says so at the site. That judgement is right and should not be reversed
-casually — but it is the last thing standing between Scena and the shared
-money path, and it has been the stated blocker since Stage 4.
+`price_usd_month`; `sort` vs `ord`; `created_at` vs `at`; epoch milliseconds vs
+ISO text). Adopting it was a **data migration**, not a wiring change.
+`apps/scena/src/billing-reconcile.ts` is that migration — see step 5.2 in the
+ordered plan for what it does, why it runs before `applySchema`, and the three
+things Scena's own copies were getting wrong.
 
 The **ladder** is a separate and softer problem. `@4dl/billing`'s
 `DUNNING_DAYS` is four rungs — past_due → 7d read-only → 30d blocked → 37d
@@ -1037,10 +1046,16 @@ In this order, because each unblocks the next:
 1. **`ai.ts` + `gemini.ts` → `@4dl/ai`'s `generate`.** ⚠️ **Partly BLOCKED, and
    the reason is worth writing down before somebody re-attempts it.** What was
    done instead, and why, is below.
-2. **`BILLING_SCHEMA` reconciliation → `bindBillingStore`.** The data migration
-   the schema comment describes. Do it on its own, with a backfill test.
+2. **`BILLING_SCHEMA` reconciliation → `bindBillingStore`.** ✅ **DONE
+   (2026-08-09)** — 5.2 below.
 3. **The dunning ladder** onto `DUNNING_DAYS` + `dailySweep`, which falls out of
-   (2) nearly for free.
+   (2) nearly for free. Still open, and (2) narrowed it: the timestamps are now
+   ISO on both sides, so what is left is a genuine PRODUCT question rather than a
+   representation one. Scena's ladder is two rungs read from
+   `billing.grace_days` / `billing.delete_days` in `app_config`; the shared
+   `DUNNING_DAYS` is three fixed ones (7 read-only / 30 blocked / 37 purge).
+   Adopting it removes an operator-configurable setting, so decide that before
+   writing the code.
 4. **Decide what a platform promo code is** — a discount (Kova) or a grant
    (Scena) — then put the winner in `@4dl/billing` and migrate the loser. This
    is a product decision before it is an extraction.
@@ -1098,6 +1113,84 @@ and no assertion on the join, which is exactly what the defect was.
 implies, from one call. The caller cannot hand a different text to each. The same
 mutation now fails four assertions; a drifting cap fails one; restoring chars/4
 fails five.
+
+---
+
+#### 5.2 The billing store — a column collision, and the outage it was hiding — ✅ **DONE (2026-08-09)**
+
+Four tables shared a NAME with `@4dl/billing`'s and differed in COLUMNS:
+`price_cents` + `currency` + `interval` against `price_usd_month`, `sort`
+against `ord`, `created_at` against `at`, and — the one that mattered — five
+subscription timestamps holding **epoch milliseconds** where the shared shape
+holds **ISO-8601 text**.
+
+**The migration is `apps/scena/src/billing-reconcile.ts`, and three decisions in
+it are the whole of the work.**
+
+⚠️ **It runs BEFORE `applySchema`, and that ordering is the difference between a
+migration and an outage.** `BILLING_SCHEMA` declares `CREATE INDEX … ON
+credit_ledger(tenant_id, at)`. On a pre-migration database that column is
+`created_at`, so the index fails with `no such column: at`, the whole `db.exec`
+throws, `applySchema` throws with it, and **every route that touches D1 answers
+500** — not a degraded feature, a total outage, on precisely the databases this
+migration exists for. It is `AI_LEGACY_RESET`'s failure one table over, and the
+second time this repo has met it.
+
+**It is a FUNCTION, not a `SchemaModule`.** Every statement names a column that
+exists on exactly one of the two shapes, so as a declarative `backfill` each
+would fail to *parse* on a database created after the migration — swallowed with
+a warning, ten alarming lines on every fresh deploy and every test isolate about
+columns that are correctly absent. Noise that is expected is noise nobody reads.
+Reading `pragma_table_info` first makes each step a decision instead of an
+attempt, and costs four small reads once per isolate.
+
+**The timestamps are the half that would have failed silently and expensively.**
+SQLite types are per-value, so a millisecond integer sits happily in a
+TEXT-declared column. Then `sub.past_due_at + graceMs` is string CONCATENATION
+and `past_due_at < ?` compares a number against ISO text. A workspace is either
+never suspended or suspended the instant it goes past due, nothing throws, and
+the only symptom is a support ticket a month later.
+`apps/scena/test/billing-reconcile.test.ts` asserts the converted value is the
+same **bytes** `toISOString` writes, because the SQL comparison is
+lexicographic — a format that merely parses is a ladder that fires on the wrong
+day.
+
+**What came along, and what it was costing to keep:**
+
+| Adopted | What Scena's copy did instead |
+|---|---|
+| `bindBillingStore`'s version-stamped seed | `INSERT OR IGNORE` — a no-op on any database that had booted once, so every price, rename and entitlement edit since launch reached fresh deployments and no live one |
+| `planAdminRoutes` | two hand-written handlers translating dollars↔cents, whose own comment said they would be deleted rather than rewritten the day the columns moved |
+| `@4dl/billing`'s `syncCatalog` | ~60 lines that never pushed a plan RENAME to Stripe (so a renamed tier kept its old name on every invoice forever) and let one stale id abort the entire sync with an information-free 500 |
+
+`upsertPlan`, `setPlanStripe` and `setPackStripe` went with their callers.
+`currency` and `interval` were dropped rather than migrated — every Scena plan
+was always `usd`/`month`. The legacy COLUMNS are left in place on a migrated
+database: nothing reads them, and `DROP COLUMN` on a live table to reclaim four
+bytes a row is a risk taken for tidiness.
+
+**And the guard grew two rules, which immediately found a third instance of the
+Tier-1 shape.** `capability-reachable.test.mjs` now asks every app that applies
+`BILLING_SCHEMA` for `planAdminRoutes` **and** `stripeAdminRoutes`.
+**`apps/_template` had the first and not the second**: schema applied, a plan
+catalog an operator could price, and no route anywhere to enter a secret key —
+so `@4dl/admin`'s Stripe panel 404'd and every app copied from the template
+inherited a product that could not be sold.
+
+Strengthening the guard to see that exposed two defects in the guard itself,
+both worth knowing:
+
+- **An import satisfied the match.** The search runs over the app's whole `src`
+  (a tree is often mounted outside `index.ts`), so `import { fooRoutes }` alone
+  read as mounted. Imports are stripped now, and an ALIASED import is resolved
+  (Scena mounts `staffRoutes as sharedStaffRoutes`) so the strictness does not
+  become a false accusation.
+- **The comment stripper was fooled by a string.** `"/api/auth/*"` was read as
+  the start of a block comment, swallowing ninety lines of Kova's route mounts.
+  Invisible for as long as imports counted; the moment they stopped, the guard
+  accused Kova of never mounting its inbox. It is a character scanner now.
+
+All four reconciler behaviours and all three guard rules are mutation-tested.
 
 ---
 

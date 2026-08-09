@@ -11,18 +11,14 @@
  * Crypto for webhook signature verification — no SDK, Workers-native.
  */
 
-import type { ConfigSource } from "@4dl/core";
-import { hasPaymentMethod, resolveStripeConfig, reverseChargedCredits } from "@4dl/billing";
+import { nowIso, type ConfigSource } from "@4dl/core";
+import { hasPaymentMethod, resolveStripeConfig, reverseChargedCredits, type StripeBranding } from "@4dl/billing";
 import type { Env } from "./env.js";
 import { DEMO_TENANT } from "./db.js";
 import {
   getConfig,
-  listPlans,
-  listPacks,
   getPlan,
   getPack,
-  setPlanStripe,
-  setPackStripe,
   getSubscription,
   updateSubscription,
   type PlanRow,
@@ -41,6 +37,15 @@ import { notifyRole } from "./notify.js";
  * `scena_plan`, `scena_credits`) share the prefix and are the same promise.
  */
 export const SCENA_METADATA_PREFIX = "scena";
+
+/**
+ * The branding `@4dl/billing`'s shared Stripe helpers take.
+ *
+ * `productPrefix` is cosmetic — it is what a buyer reads on their receipt, and
+ * "Scena Pro" is what Scena's own sync has always written. `metadataPrefix` is
+ * not cosmetic at all; see the paragraph above it.
+ */
+export const stripeBranding: StripeBranding = { metadataPrefix: SCENA_METADATA_PREFIX, productPrefix: "Scena" };
 
 export interface StripeCfg {
   mode: string; // disabled | test | live
@@ -103,68 +108,34 @@ async function stripeApi<T = unknown>(cfg: StripeCfg, path: string, method: "GET
   return json;
 }
 
-/* ----------------------------- catalog sync ------------------------------ */
+/*
+  THE CATALOG SYNC IS `@4dl/billing`'s NOW — `syncCatalog(db, secretKey,
+  branding)`, mounted through `stripeAdminRoutes` in index.ts.
 
-export interface SyncSummary {
-  plans: { id: string; productId: string; priceId: string }[];
-  packs: { id: string; productId: string; priceId: string }[];
-}
+  What was here was ~60 lines that created a product and a price per paid plan
+  and per pack, and it read `price_cents` + `currency` + `interval` — which is
+  the ONE reason it could not be the shared function. `billing-reconcile.ts`
+  moved the columns.
 
-/**
- * Push the D1 catalog into Stripe: create a product + recurring price per paid
- * plan and a product + one-time price per credit pack, storing their ids back
- * in D1. Idempotent — skips anything that already has a `stripe_price_id`.
- */
-export async function syncCatalog(env: Env, secretKey?: string): Promise<SyncSummary> {
-  /*
-    `secretKey` is the seam `@4dl/billing`'s `stripeAdminRoutes` needs.
+  Three things the shared one does that this did not, and each is a real defect
+  rather than a nicety:
 
-    The shared route tree has ALREADY resolved the active lane's key — that is
-    the whole of what the two-lane model does — and re-reading it here would
-    resolve it a second time, from a config map that may have been written
-    microseconds earlier in the same request. One resolution, passed down.
-    Every other caller still hands nothing and gets the old behaviour.
-  */
-  const base = await stripeCfg(env);
-  const cfg = secretKey ? { ...base, secretKey } : base;
-  if (!stripeEnabled(cfg)) throw new Error("stripe not configured");
-  const out: SyncSummary = { plans: [], packs: [] };
+    A RENAMED PLAN REACHED NOBODY. This loop `continue`d past any row that
+    already had a price id, so a plan renamed in the console kept its old name
+    on every checkout page, invoice and card statement, permanently, with no way
+    to correct it from anywhere in the product. The shared loop pushes the name
+    to Stripe unconditionally — a Price is immutable, but a Product is not.
 
-  for (const p of await listPlans(env.DB)) {
-    if (p.price_cents <= 0 || p.active !== 1) continue;
-    if (p.stripe_price_id) {
-      out.plans.push({ id: p.id, productId: p.stripe_product_id ?? "", priceId: p.stripe_price_id });
-      continue;
-    }
-    const product = await stripeApi<{ id: string }>(cfg, "products", "POST", { name: `Scena ${p.name}`, metadata: { scena_plan: p.id } });
-    const price = await stripeApi<{ id: string }>(cfg, "prices", "POST", {
-      product: product.id,
-      currency: p.currency || "usd",
-      unit_amount: p.price_cents,
-      recurring: { interval: p.interval || "month" },
-      metadata: { scena_plan: p.id },
-    });
-    await setPlanStripe(env.DB, p.id, product.id, price.id);
-    out.plans.push({ id: p.id, productId: product.id, priceId: price.id });
-  }
+    ONE STALE ROW ABORTED THE WHOLE SYNC. Ids are lane-specific, so a row still
+    carrying test ids while live is active answers "No such product". Here that
+    threw out of the loop: no plan created, no pack created, and an
+    information-free 500. There it is counted as `renameFailed` and the loop
+    carries on creating what is missing.
 
-  for (const pk of await listPacks(env.DB)) {
-    if (pk.stripe_price_id) {
-      out.packs.push({ id: pk.id, productId: pk.stripe_product_id ?? "", priceId: pk.stripe_price_id });
-      continue;
-    }
-    const product = await stripeApi<{ id: string }>(cfg, "products", "POST", { name: `Scena ${pk.name}`, metadata: { scena_pack: pk.id } });
-    const price = await stripeApi<{ id: string }>(cfg, "prices", "POST", {
-      product: product.id,
-      currency: pk.currency || "usd",
-      unit_amount: pk.price_cents,
-      metadata: { scena_pack: pk.id },
-    });
-    await setPackStripe(env.DB, pk.id, product.id, price.id);
-    out.packs.push({ id: pk.id, productId: product.id, priceId: price.id });
-  }
-  return out;
-}
+    THE SUMMARY WAS ROWS, NOT COUNTS. `stripeAdminRoutes` wanted
+    `{plans, packs}` as numbers and got arrays, so the adapter in index.ts
+    existed purely to call `.length` twice. It is gone with this.
+*/
 
 /* ------------------------------- checkout -------------------------------- */
 
@@ -352,7 +323,10 @@ export async function handleWebhook(env: Env, event: StripeEvent): Promise<void>
     case "invoice.paid": {
       // Recurring renewal: extend the period, clear dunning, apply any queued
       // downgrade, and drop the monthly credit grant.
-      const periodEnd = Number((obj["lines"] as { data?: { period?: { end?: number } }[] } | undefined)?.data?.[0]?.period?.end ?? 0) * 1000 || null;
+      // Stripe reports period boundaries in epoch SECONDS; the column is ISO
+      // text, like every other timestamp on this row.
+      const periodEndMs = Number((obj["lines"] as { data?: { period?: { end?: number } }[] } | undefined)?.data?.[0]?.period?.end ?? 0) * 1000 || null;
+      const periodEnd = periodEndMs ? new Date(periodEndMs).toISOString() : null;
       const sub = await getSubscription(env.DB, tenantId);
       const nextPlan = sub.pending_plan_id ?? sub.plan_id;
       /*
@@ -431,7 +405,7 @@ export async function handleWebhook(env: Env, event: StripeEvent): Promise<void>
       // Enter dunning: mark past_due; the lifecycle cron schedules suspend/delete.
       // Guarded for the same reason `invoice.paid` is — a failed invoice on a
       // workspace already suspended must not reset it to the first rung.
-      await updateSubscription(env.DB, tenantId, { status: "past_due", past_due_at: Date.now() }, { unlessLadderOwned: true });
+      await updateSubscription(env.DB, tenantId, { status: "past_due", past_due_at: nowIso() }, { unlessLadderOwned: true });
       await notifyRole(env, tenantId, "owner", {
         type: "billing_past_due",
         message: "We couldn't process your latest payment. Update your card to keep your screens live — after a grace period the workspace is suspended.",

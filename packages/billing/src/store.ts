@@ -78,12 +78,24 @@ export interface PackRow {
   name: string;
   credits: number;
   price_usd: number;
+  stripe_product_id: string | null;
+  stripe_price_id: string | null;
   ord: number;
   active: number;
 }
 
 /** A plan as an app DECLARES it. The Stripe ids are minted by `syncCatalog`. */
 export type PlanSeed = Omit<PlanRow, "stripe_product_id" | "stripe_price_id">;
+/**
+ * A pack as an app DECLARES it, and the same omission for the same reason.
+ *
+ * `PackRow` carried no Stripe columns at all until an app needed to read one —
+ * `credit_packs` has held both since the table shipped, `syncCatalog` writes
+ * them and reads them back, and only the TYPE disagreed. A row type that is
+ * quietly a subset of its table is worse than a wrong one: every consumer
+ * compiles, and the fields simply are not there to be used.
+ */
+export type PackSeed = Omit<PackRow, "stripe_product_id" | "stripe_price_id">;
 
 export interface CatalogSeed {
   /**
@@ -100,7 +112,7 @@ export interface CatalogSeed {
    * quota the moment it ran.
    */
   retired?: PlanSeed[];
-  packs: PackRow[];
+  packs: PackSeed[];
   /**
    * Bumped when the seeds change in a way an EXISTING deployment must adopt.
    *

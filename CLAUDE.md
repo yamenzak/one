@@ -859,16 +859,23 @@ things per app; it did not hold for this one, and "presentation stays in the app
 is a rule that has to be re-argued per case rather than applied.
 
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
-moves. **Measured 2026-08-08** from one `pnpm turbo run test --force` (uncached,
-so every figure below is from that run), per package:
-**632 kova/api (+31 skipped) + 274 scena/api + 237 kova/domain + 163 tessa/api +
+moves. **Measured 2026-08-09** from one `pnpm turbo run test --concurrency=1`,
+per package:
+**632 kova/api (+31 skipped) + 282 scena/api + 237 kova/domain + 163 tessa/api +
 145 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 87 billing + 80 ai +
 63 commerce + 61 scena/widgets + 45 billing-rail + 44 core + 40 scena/timeline +
 35 auth + 35 scena/app + 24 notify + 23 scena/manifest + 23 tessa/app +
 20 template + 19 template/app + 18 scena/protocol + 18 storage + 18 app-kit +
 17 kova/protocol +
-14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,460 passing,
+14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,468 passing,
 31 skipped**, 60 turbo tasks, all green.
+
+⚠️ **`--concurrency=1`, and the reason is worth knowing before reading a red
+run.** A parallel root `pnpm test` still loses one Workers-pool suite to
+Miniflare storage contention now and then — `Isolated storage failed`, or
+`Network connection lost` out of an after-hook, never an assertion. `retry: 1`
+absorbs most of it; a serial run absorbs the rest. Re-run the failing suite on
+its own filter before believing a failure that has no assertion in it.
 
 The +81 since the earlier figure on the same day is all new coverage over
 behaviour that was previously in one app or in none: `@4dl/billing` 45 → 87 (the
@@ -1110,9 +1117,10 @@ its own — the owner's decision, cancellable for seven days, reversed by
 cancelling rather than by paying — and it shares the sweep's erasure branch with
 `suspended` so the two purge paths cannot drift.
 `SCHEMA_MODULES` in
-`apps/scena/src/db.ts` is the migration's progress bar — eight entries now
-(`AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_RAIL_SCHEMA`, `STORAGE_SCHEMA`,
-`NOTIFY_SCHEMA`, `AI_LEGACY_RESET`, `AI_SCHEMA`, `SCENA_SCHEMA`), and the diff
+`apps/scena/src/db.ts` is the migration's progress bar — nine entries now
+(`AUTH_SCHEMA`, `TENANCY_SCHEMA`, `BILLING_SCHEMA`, `BILLING_RAIL_SCHEMA`,
+`STORAGE_SCHEMA`, `NOTIFY_SCHEMA`, `AI_LEGACY_RESET`, `AI_SCHEMA`,
+`SCENA_SCHEMA`), and the diff
 that removes a table from Scena's module is the same diff that adds its package
 there. **Order in that
 list IS dependency order**: `NOTIFY_SCHEMA` ALTERs `tenant_settings`, which
@@ -1222,17 +1230,47 @@ matches a real route**. All three are mutation-tested. It reads the worker's
 registry as SOURCE rather than importing it — `apps/scena/src` is outside the
 SPA's `rootDir`.
 
-**ONE thing is still Scena's, and the plan names it so nobody "fixes" it
-casually: the billing STORE (`BILLING_SCHEMA`).** Its `plans`, `subscriptions`,
-`credit_packs` and `credit_ledger` share a NAME with Scena's and differ in
-COLUMNS — `price_cents` + `currency` + `interval` against `price_usd_month`, `at`
-against `created_at`, TEXT timestamps against INTEGER. A `CREATE TABLE IF NOT
-EXISTS` is won by whichever module runs first and the loser's columns silently
-never exist, which is exactly how a fresh Stage 1 deployment ended up unable to
-save any setting (`app_config.updated_at`). Adopting it means reconciling the
-shapes first — a data change, not a wiring one.
+**The billing STORE is `@4dl/billing`'s now, and the column reconciliation it
+was waiting for is `apps/scena/src/billing-reconcile.ts`.** This paragraph used
+to say `BILLING_SCHEMA` was deliberately absent: its `plans`, `subscriptions`,
+`credit_packs` and `credit_ledger` shared a NAME with Scena's and differed in
+COLUMNS — `price_cents` + `currency` + `interval` against `price_usd_month`,
+`sort` against `ord`, `created_at` against `at`, epoch milliseconds against ISO
+text — and a `CREATE TABLE IF NOT EXISTS` is won by whichever module runs first
+while the loser's columns silently never exist.
 
-**The `ai_models` CATALOG is `@4dl/ai`'s now** (`AI_SCHEMA` is entry seven of eight
+- ⚠️ **THE RECONCILER RUNS BEFORE `applySchema`, NOT AS A MODULE INSIDE IT.**
+  `BILLING_SCHEMA` indexes `credit_ledger(tenant_id, at)`, and on a
+  pre-migration database that column is `created_at` — so the index throws, the
+  DDL batch throws, `applySchema` throws, and every route that touches D1
+  answers 500. That is `AI_LEGACY_RESET`'s outage one table over.
+  `ensureSchema` in `db.ts` is where the order lives.
+- It is a FUNCTION rather than a `SchemaModule` because every statement names a
+  column that exists on exactly one of the two shapes: as a `backfill` each
+  would fail to PARSE on a fresh database, and the runner would print ten
+  alarming warnings about columns that are correctly absent on every deploy and
+  every test isolate. Reading `pragma_table_info` first makes each step a
+  decision instead of an attempt.
+- **The timestamps are the half that would have failed in silence.** SQLite
+  types are per-value, so a millisecond integer sits happily in a TEXT-declared
+  column — and then `sub.past_due_at + graceMs` is string CONCATENATION and
+  `past_due_at < ?` compares a number against ISO text. A workspace is either
+  never suspended or suspended the moment it goes past due, and nothing throws.
+  `apps/scena/test/billing-reconcile.test.ts` asserts the converted value is the
+  same BYTES `toISOString` writes, because the comparison is lexicographic.
+- What came with it: the version-stamped catalog seed (Scena's `INSERT OR
+  IGNORE` did nothing at all on any database that had booted once, so every
+  price and entitlement edit since reached fresh deployments and no live one),
+  `planAdminRoutes` and `@4dl/billing`'s `syncCatalog` — which pushes a RENAME
+  to Stripe and survives one stale id, neither of which Scena's copy did.
+  `upsertPlan`, `setPlanStripe`, `setPackStripe` and ~60 lines of sync went with
+  their callers.
+- `currency` and `interval` are gone rather than migrated: every Scena plan was
+  always `usd`/`month`, so they were generality nothing used. The legacy COLUMNS
+  are left in place on a migrated database — nothing reads them, and dropping a
+  column on a live table to reclaim four bytes a row is a risk taken for tidiness.
+
+**The `ai_models` CATALOG is `@4dl/ai`'s now** (`AI_SCHEMA` is entry eight of nine
 in `SCHEMA_MODULES`, right after the legacy reset), and the reconciliation it needed is done:
 
 - **`ai_models.id` IS the provider path** (`@cf/deepgram/aura-1`,

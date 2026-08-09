@@ -398,15 +398,25 @@ Mutation-tested.
 
 **Still outstanding, and deliberately:**
 
-- **The billing STORE stays Scena's.** `BILLING_SCHEMA`'s `plans`,
-  `subscriptions`, `credit_packs` and `credit_ledger` have DIFFERENT COLUMNS
-  from Scena's (`price_usd_month REAL` vs `price_cents` + `currency` +
-  `interval`; `at` vs `created_at`; TEXT vs INTEGER timestamps). A
-  `CREATE TABLE IF NOT EXISTS` is won by whichever module runs first and the
-  loser's columns silently never exist — the exact `app_config.updated_at`
-  failure this schema already carries a scar from. The store moves when its
-  ~1,000 lines of queries do. `stripe_events` was added to Scena's own module
-  because idempotency could not wait for that.
+- ~~**The billing STORE stays Scena's.**~~ — **DONE.** `BILLING_SCHEMA` is entry
+  three of nine in `SCHEMA_MODULES`, and the column reconciliation it was waiting
+  on is `apps/scena/src/billing-reconcile.ts`: `price_cents` + `currency` +
+  `interval` → `price_usd_month` (every Scena plan was `usd`/`month`), `sort` →
+  `ord`, `created_at` → `at`, and the five subscription timestamps from epoch
+  milliseconds to ISO text.
+
+  ⚠️ It runs BEFORE `applySchema`, and that is not tidiness: the shared module
+  indexes `credit_ledger(tenant_id, at)`, so on a pre-migration database the
+  index throws, the batch throws, and every route touching D1 answers 500 —
+  `AI_LEGACY_RESET`'s outage one table over. It is a FUNCTION rather than a
+  module because each statement names a column that exists on only one of the two
+  shapes; as declarative backfills they would fail to parse on every fresh
+  database and print warnings about columns that are correctly absent.
+
+  The store went with it — `bindBillingStore` for the version-stamped seed and
+  the catalog reads, `planAdminRoutes` for the editor, `@4dl/billing`'s
+  `syncCatalog` for the Stripe push. `upsertPlan`, `setPlanStripe`,
+  `setPackStripe` and ~60 lines of sync were deleted with their callers.
 - **The DUNNING ladder** is still Scena's `lifecycleSweep`.
 - **The compile-time entitlement gate** (§4.4) survives and now reads the clamped
   resolver, so both gates share one source — but the conformance test asserting

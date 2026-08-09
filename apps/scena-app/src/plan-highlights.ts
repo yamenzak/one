@@ -43,5 +43,18 @@ export function planHighlights(entitlementsJson: string | null | undefined): str
   return out;
 }
 
-/** Cents as a price a person reads. `$19`, `$19.50`. */
-export const dollars = (cents: number): string => `$${(cents / 100).toFixed(cents % 100 ? 2 : 0)}`;
+/**
+ * Dollars as a price a person reads. `$19`, `$19.50`.
+ *
+ * ⚠️ TWO FORMATTERS, BECAUSE THERE ARE TWO UNITS ON THE WIRE, and a single
+ * `dollars()` taking whichever a caller happened to have is how a $19 plan comes
+ * to be advertised at $0.19. The billing screen reads
+ * `plans.price_usd_month` — dollars, `@4dl/billing`'s column — while the
+ * onboarding feed still sends `priceCents`, because that is what Stripe speaks
+ * and what the wizard was written against. Neither is wrong; naming the unit at
+ * the call site is what keeps them apart.
+ */
+export const usd = (amount: number): string => `$${amount.toFixed(amount % 1 ? 2 : 0)}`;
+
+/** Cents as a price a person reads — the onboarding wire's unit. */
+export const dollars = (cents: number): string => usd(cents / 100);

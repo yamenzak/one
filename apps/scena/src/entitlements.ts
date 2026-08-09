@@ -224,6 +224,16 @@ export const FREE_ENTITLEMENTS: Entitlements = {
 
 const engine = bindEntitlements<Entitlements>(FREE_ENTITLEMENTS);
 
+/**
+ * The bound engine itself, for `bindBillingStore`.
+ *
+ * Every named helper below is one of its methods; the store wants the whole
+ * object rather than eight of them threaded through a config, and handing over
+ * the same instance is what keeps the store's resolution and every direct caller
+ * here reading one registry.
+ */
+export const entitlementEngine = engine;
+
 /** Merge a plan's stored blob onto the free baseline, coercing by type. */
 export const resolveEntitlements = (json: string | null | undefined): Entitlements => engine.resolve(json);
 

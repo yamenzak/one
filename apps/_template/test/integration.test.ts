@@ -210,6 +210,17 @@ describe("the platform's capabilities are mounted, not merely installed", () => 
     "/api/admin/turnstile/config",
     // @4dl/billing — the plan catalog, under @4dl/admin's PlatformPlansSection.
     "/api/admin/plans",
+    /*
+      …and the credentials WITHOUT which that catalog can never collect a penny.
+
+      `stripeAdminRoutes` was missing here for the template's whole life: the
+      billing schema applied, plans priced, and no route anywhere to enter a
+      secret key — so `@4dl/admin`'s Stripe panel 404'd on every call and a new
+      app copied from this one inherited a product that could not be sold.
+      `scripts/capability-reachable.test.mjs` asks for it by name now; this
+      asserts it actually answers.
+    */
+    "/api/admin/stripe/status",
     // @4dl/ai — the model catalog, under PlatformAiSection.
     "/api/admin/ai/models",
     "/api/admin/ai/config",
