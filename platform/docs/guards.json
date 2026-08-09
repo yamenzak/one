@@ -277,7 +277,9 @@
       "group": "interface",
       "fails": "any brand-slot combination in range producing ink below its floor, at either theme, on any ground",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "ui/test/contrast.test.ts",
+      "proves": "ink clears its floor on every surface, for every legal brand"
     },
     {
       "id": "no-literal-colour",
@@ -296,7 +298,7 @@
     {
       "id": "state-completeness",
       "group": "interface",
-      "fails": "a registered component with a state it does not declare and photograph",
+      "fails": "a registered component with a state it does not declare and photograph \u2014 the photograph half arrives with the component suite",
       "stage": "4",
       "status": "owed"
     },
@@ -305,21 +307,27 @@
       "group": "interface",
       "fails": "a data container whose pending and empty states resolve to the same render",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "ui/test/state.test.ts",
+      "proves": "tells an unanswered fetch from an empty one"
     },
     {
       "id": "disabled-has-reason",
       "group": "interface",
       "fails": "a `disabled` prop with no accompanying explanation",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "ui/test/state.test.ts",
+      "proves": "and still says why"
     },
     {
       "id": "gated-is-locked",
       "group": "interface",
       "fails": "an entitlement or permission rendered as `disabled` rather than `locked`",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "ui/test/state.test.ts",
+      "proves": "locks what a plan withholds"
     },
     {
       "id": "renderer-boundary",
@@ -368,7 +376,9 @@
       "group": "interface",
       "fails": "a layout that depends on an animation having run",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "ui/test/state.test.ts",
+      "proves": "removes every transform under reduced motion"
     },
     {
       "id": "schema-idempotent",
@@ -495,6 +505,51 @@
       "status": "live",
       "impl": "hello/test/data.test.ts",
       "proves": "without a line of routing"
+    },
+    {
+      "id": "brand-closed",
+      "group": "interface",
+      "fails": "a brand slot outside its declared range being clamped instead of refused, or a token emitted outside the closed set",
+      "stage": "4",
+      "status": "live",
+      "impl": "ui/test/contrast.test.ts",
+      "proves": "names the slot and its bounds"
+    },
+    {
+      "id": "accent-relit",
+      "group": "interface",
+      "fails": "a screen recomputing the accent instead of re-lighting it \u2014 a brand that is a different colour on every surface",
+      "stage": "4",
+      "status": "live",
+      "impl": "ui/test/contrast.test.ts",
+      "proves": "keeps the tenant's hue on every surface of every theme"
+    },
+    {
+      "id": "ladder-never-collapses",
+      "group": "interface",
+      "fails": "a surface step that saturates against the end of its range, leaving nested surfaces indistinguishable",
+      "stage": "4",
+      "status": "live",
+      "impl": "ui/test/contrast.test.ts",
+      "proves": "keeps every step visibly apart from the one below it"
+    },
+    {
+      "id": "one-clock",
+      "group": "interface",
+      "fails": "a component holding its own duration, or a scene whose stagger grows without a budget",
+      "stage": "4",
+      "status": "live",
+      "impl": "ui/test/state.test.ts",
+      "proves": "collapses the stagger rather than animating a long list in sequence"
+    },
+    {
+      "id": "state-declared",
+      "group": "interface",
+      "fails": "a component registered with no resting state, or a container declaring `empty` without `unknown`",
+      "stage": "4",
+      "status": "live",
+      "impl": "ui/test/state.test.ts",
+      "proves": "or it is not registered"
     }
   ]
 }

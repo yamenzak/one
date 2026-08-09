@@ -26,6 +26,7 @@ than from recall — that is the whole design.
 | `@one/hello` | a manifest, one collection, three operations. It exists to boot — every stage's exit criterion is asserted against it. |
 | `@one/kernel` | primitives, bindings, problems, collections, operations and defineApp. TYPES ONLY — stage 0 proves the shape before anything implements it. |
 | `@one/runtime` | the ONLY code that touches a raw binding. Resolves a request to a door, a tenant, a region and a set of handles, applies the composed schema, and dispatches operations. |
+| `@one/ui` | Northlight — the interface language. The ground is painted, the furniture is lit by it, and ink is measured. |
 
 ⚠️ Nothing here deploys. `platform/` is absent from `apps.json`, so the deploy
 workflow cannot select it — which is what lets this ship in small pull requests

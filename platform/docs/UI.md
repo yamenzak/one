@@ -320,7 +320,6 @@ duration, an easing curve, a `@keyframes`, or a transition property.** Without
 it this decays back into per-component animation one reasonable exception at a
 time, and the symptom is invisible in every diff and obvious in the product.
 
-<!-- DEFER(one-007) stage:4 — the choreographer: role-derived timelines, the motion budget, shared-element continuity across surfaces. -->
 
 ---
 
@@ -550,20 +549,25 @@ and is expensive to disprove, so it survives review indefinitely.
 <!-- generated: node scripts/guards.mjs table interface -->
 | guard | fails on | |
 |---|---|---|
-| `contrast-sweep` | any brand-slot combination in range producing ink below its floor, at either theme, on any ground | stage 4 |
+| `contrast-sweep` | any brand-slot combination in range producing ink below its floor, at either theme, on any ground | **live** |
+| `unknown-not-empty` | a data container whose pending and empty states resolve to the same render | **live** |
+| `disabled-has-reason` | a `disabled` prop with no accompanying explanation | **live** |
+| `gated-is-locked` | an entitlement or permission rendered as `disabled` rather than `locked` | **live** |
+| `reduced-motion` | a layout that depends on an animation having run | **live** |
+| `brand-closed` | a brand slot outside its declared range being clamped instead of refused, or a token emitted outside the closed set | **live** |
+| `accent-relit` | a screen recomputing the accent instead of re-lighting it — a brand that is a different colour on every surface | **live** |
+| `ladder-never-collapses` | a surface step that saturates against the end of its range, leaving nested surfaces indistinguishable | **live** |
+| `one-clock` | a component holding its own duration, or a scene whose stagger grows without a budget | **live** |
+| `state-declared` | a component registered with no resting state, or a container declaring `empty` without `unknown` | **live** |
 | `no-literal-colour` | a colour value anywhere outside the token layer | stage 4 |
 | `no-literal-motion` | a duration, easing curve, `@keyframes` or transition property outside the choreographer | stage 4 |
-| `state-completeness` | a registered component with a state it does not declare and photograph | stage 4 |
-| `unknown-not-empty` | a data container whose pending and empty states resolve to the same render | stage 4 |
-| `disabled-has-reason` | a `disabled` prop with no accompanying explanation | stage 4 |
-| `gated-is-locked` | an entitlement or permission rendered as `disabled` rather than `locked` | stage 4 |
+| `state-completeness` | a registered component with a state it does not declare and photograph — the photograph half arrives with the component suite | stage 4 |
 | `renderer-boundary` | an app defining a shell, dialog, toast, empty state or form primitive; a raw `<button>` or `<input>` | stage 4 |
 | `hover-not-required` | an interaction reachable only by hover | stage 4 |
 | `pane-container-queries` | a pane-capable surface sized by viewport breakpoints rather than by its container | stage 4 |
 | `one-navigation-surface` | a second destination surface at any width | stage 4 |
 | `target-size` | an interactive element whose hit area resolves below the floor | stage 4 |
 | `one-live-surface` | a second surface declared live, or a live surface remounted between presentations | stage 4 |
-| `reduced-motion` | a layout that depends on an animation having run | stage 4 |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder
@@ -572,7 +576,7 @@ than the repository's existing guards because several are questions about
 matrix both want the component suite running, which is why they belong to the
 same stage as the renderer rather than to a script that could be written earlier.
 
-<!-- DEFER(one-010) stage:4 — semantic collision detection and the contained form: hue-distance against the resolved ground selects the presentation, with no author decision. -->
+<!-- DEFER(one-010) stage:4 — the CONTAINED FORM itself. The detection is built and swept; what is owed is the component that renders a colliding semantic as an edge and an icon on a neutral surface. -->
 
 ---
 

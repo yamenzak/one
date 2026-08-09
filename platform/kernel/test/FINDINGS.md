@@ -660,3 +660,52 @@ workspace to a region missing part of itself.
 ⚠️ Both suites were green, both properties were "obviously" covered, and neither
 was. A mutation that survives is the only reliable way to find a test that
 asserts the wrong subject.
+
+## 50. An exhaustive sweep that verifies with the function under test proves consistency, not correctness
+
+The contrast sweep walks every hue at every ambience intensity in both themes and
+asserts that ink clears its floor everywhere. Replacing `bestForeground` with a
+lightness threshold — the exact rule the design rejects — left it green.
+
+Because the sweep reads its ratios back through `inkOn`, which calls
+`bestForeground`. With the wrong rule in place it was measuring the result of the
+wrong rule with the wrong rule, and agreeing with itself. Every one of the eleven
+other mutations was caught; this one survived a suite built specifically to catch
+it.
+
+⚠️ **A verifier that shares an implementation with the thing it verifies checks
+that they agree.** The fix is one assertion that computes both candidates in the
+test and demands the function return the better — the only check in the file that
+does not depend on what it is checking. Worth asking of any property test: if the
+implementation were wrong in the most plausible way, would this still fail?
+
+## 51. Two constraints on the accent, and the second is invisible until swept
+
+An accent must be visible AGAINST its surface and able to carry INK when used as
+a fill. Satisfying only the first passes every review: the colour looks right on
+the page. It fails for 74 of 144 hue-and-theme pairs at the moment somebody puts
+a label on the button — mid-lightness saturated colours, where near-white and
+near-dark are both borderline, so neither ink works.
+
+A hand-picked palette never meets this because a designer chose colours that
+happened to work. A tenant choosing their own hue meets it immediately.
+
+## 52. A cap on top of a range makes the range's upper half do nothing
+
+`RANGE.ambienceIntensity` allowed 0–0.06 and the ground resolver quietly capped
+it at 0.02. So a tenant could move the control across half its travel and see no
+change, and the sweep proved the safety of a range the product did not offer.
+
+⚠️ **A bound belongs in one place.** A second one downstream is not defence in
+depth — it is a different contract, silently winning.
+
+## 53. The hue-distance comparison was inverted, and it read as working
+
+`Math.abs(((a - b + 540) % 360) - 180)` is the circular distance: 0 for identical
+hues, 180 for opposites. The collision check tested `180 - distance < 30`, which
+fires on COMPLEMENTARY colours — the pairs least likely to be confused — and
+never on the identical ones it exists for.
+
+It looked like a considered piece of modular arithmetic. Nothing about reading it
+suggested the direction was backwards; the test that asserted "green on a green
+ground collides" is what said so.
