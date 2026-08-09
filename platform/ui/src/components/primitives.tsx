@@ -13,6 +13,9 @@
 import type { ReactNode } from "react";
 import type { Interaction } from "../state.js";
 import type { Role } from "../motion.js";
+import { semanticForm } from "../ground.js";
+import type { Oklch } from "../colour.js";
+import { SEMANTIC } from "../semantic.js";
 
 /* ---------------------------------------------------------------- surface --- */
 
@@ -173,8 +176,16 @@ export function Row({ lead, title, detail, value, onOpen }: RowProps) {
 
 export interface CalloutProps {
   readonly tone: "success" | "warning" | "danger" | "info";
-  /** ⚠️ Set when the tone would be confusable with its ground. See `semanticForm`. */
-  readonly contained?: boolean;
+  /**
+   * The ground this sits on, so the form is DECIDED rather than chosen.
+   *
+   * ⚠️ AN AUTHOR NEVER WRITES A CONDITIONAL ABOUT THIS AND NEVER LEARNS THE
+   * THRESHOLD. Green success on a green ambience can clear every contrast floor
+   * and still fail completely, because a signal's job is to differ from its
+   * CONTEXT — and a rule that has to be remembered per call site is one that is
+   * remembered on the screens somebody was thinking about.
+   */
+  readonly ground?: Oklch;
   readonly title: string;
   readonly children?: ReactNode;
 }
@@ -185,9 +196,16 @@ export interface CalloutProps {
  * screen. `contained` is the form a colliding tone takes: the colour demotes to
  * an edge and an icon on a neutral surface.
  */
-export function Callout({ tone, contained, title, children }: CalloutProps) {
+export function Callout({ tone, ground, title, children }: CalloutProps) {
+  /*
+    ⚠️ THE COLOUR DEMOTES TO AN EDGE AND AN ICON on a neutral surface when it
+    would be confusable — the signal keeps two of its four axes (word and icon)
+    and gives up the one that stopped working. Tone is the least load-bearing of
+    the four and is always the first to go.
+  */
+  const form = ground ? semanticForm(SEMANTIC[tone], ground) : "tone";
   return (
-    <div data-one="callout" data-tone={tone} data-form={contained ? "contained" : "tone"} role={tone === "danger" ? "alert" : "status"}>
+    <div data-one="callout" data-tone={tone} data-form={form} role={tone === "danger" ? "alert" : "status"}>
       <span data-one="callout-icon" aria-hidden="true" data-tone={tone} />
       <Text role="subtitle">{title}</Text>
       {children ? <Text role="body">{children}</Text> : null}

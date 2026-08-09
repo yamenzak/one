@@ -356,9 +356,11 @@
     {
       "id": "pane-container-queries",
       "group": "interface",
-      "fails": "a pane-capable surface sized by viewport breakpoints rather than by its container \u2014 checkable once surfaces carry stylesheets",
+      "fails": "a pane-capable surface sized by viewport breakpoints rather than by its container \u2014 every breakpoint answers yes about the wrong box",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "ui/test/shell.test.tsx",
+      "proves": "uses container queries for content and viewport queries only for the shell"
     },
     {
       "id": "one-navigation-surface",
@@ -383,7 +385,9 @@
       "group": "interface",
       "fails": "a second surface declared live, or a live surface remounted between presentations",
       "stage": "4",
-      "status": "owed"
+      "status": "live",
+      "impl": "ui/test/shell.test.tsx",
+      "proves": "keeps one instance across every presentation"
     },
     {
       "id": "reduced-motion",
@@ -600,6 +604,33 @@
       "status": "live",
       "impl": "ui/test/components.test.tsx",
       "proves": "refuses to render a refusal with no reason"
+    },
+    {
+      "id": "theme-both-ways",
+      "group": "interface",
+      "fails": "a palette defined only inside a media query, which has no value at all when the root carries an explicit theme",
+      "stage": "4",
+      "status": "live",
+      "impl": "ui/test/shell.test.tsx",
+      "proves": "lets an explicit choice win either way"
+    },
+    {
+      "id": "contained-form",
+      "group": "interface",
+      "fails": "a semantic tone rendered on a ground it would be confused with \u2014 decided by the renderer, never by an author's conditional",
+      "stage": "4",
+      "status": "live",
+      "impl": "ui/test/components.test.tsx",
+      "proves": "contains a tone that would be confusable with its ground"
+    },
+    {
+      "id": "continuity",
+      "group": "interface",
+      "fails": "two copies of one record crossfading instead of one element travelling, or unrelated records animated as though related",
+      "stage": "4",
+      "status": "live",
+      "impl": "ui/test/state.test.ts",
+      "proves": "moves one element when two surfaces show the same subject"
     }
   ]
 }

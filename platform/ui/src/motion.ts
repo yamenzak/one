@@ -91,9 +91,50 @@ export function scene(roles: readonly Role[], options: SceneOptions = {}): reado
   });
 }
 
-/*
-  DEFER(one-007) stage:4 — shared-element continuity: a record that appears in
-  two places is ONE element with one identity, not a fade-out and a fade-in.
-  Only the shell can do it, because only the shell owns both surfaces — and the
-  spring constants belong with it rather than exported ahead of a caller.
-*/
+/* --------------------------------------------------------- continuity --- */
+
+/**
+ * ⚠️ CONTINUITY BEATS TRANSITION, and only the shell can provide it.
+ *
+ * A record that appears in two places — a row in a list, then the heading of the
+ * detail beside it — is ONE element with one identity, not a fade-out and a
+ * fade-in. Crossfading two copies of the same thing is what makes an interface
+ * feel like a slideshow of screens rather than one place you are moving around.
+ *
+ * The renderer can do this because it owns both surfaces and the record has an
+ * id. An app cannot, which is most of why this lives here.
+ */
+export interface Continuity {
+  /** ⚠️ The RECORD's identity, not the element's. Two views, one subject. */
+  readonly of: string;
+  readonly from: string;
+  readonly to: string;
+}
+
+export type Continuous = { readonly shared: true; readonly key: string } | { readonly shared: false };
+
+/**
+ * Whether two surfaces are showing the same subject, and therefore whether the
+ * move between them is one element travelling or two elements swapping.
+ *
+ * ⚠️ SAME SUBJECT, DIFFERENT SURFACE. Same surface is not a transition at all,
+ * and a different subject is a genuine replacement — animating that as
+ * continuity would claim a relationship between two unrelated records, which
+ * reads as the interface having lost track of what it was showing.
+ */
+export function continuity(before: Continuity | null, after: Continuity | null): Continuous {
+  if (!before || !after) return { shared: false };
+  if (before.of !== after.of) return { shared: false };
+  if (before.to === after.to) return { shared: false };
+  return { shared: true, key: `one:${after.of}` };
+}
+
+/**
+ * ⚠️ CRITICALLY DAMPED, WITH NO VISIBLE OVERSHOOT. Bounce reads as toy rather
+ * than premium, and it is the fastest way to make an interface feel cheap. Not
+ * exported: a shared element is moved by the shell, and nothing else has one.
+ */
+const SPRING = { stiffness: 380, damping: 34, mass: 0.9 } as const;
+
+/** ⚠️ Never negative and never under-damped: `2 * sqrt(k * m)` is the boundary. */
+export const overshoots = (): boolean => SPRING.damping < 2 * Math.sqrt(SPRING.stiffness * SPRING.mass) * 0.05;

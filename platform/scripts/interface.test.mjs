@@ -78,7 +78,17 @@ ok(`no literal colour: ${interfaceFiles.length} file(s), ${colours} outside the 
 
 /* ------------------------------------------------------- 2. NO MOTION --- */
 
-const MOTION = /\b\d+m?s\b|cubic-bezier\s*\(|@keyframes|\btransition\s*:|\banimation\s*:/i;
+/*
+  ⚠️ `transition: none` IS THE OPPOSITE OF WHAT THIS REFUSES. The reduced-motion
+  reset REMOVES motion, and a guard that flagged it would push the removal
+  somewhere it is not obvious — which is the one place motion must be visible.
+
+  ⚠️ The lookahead sits directly after the colon rather than after a whitespace
+  class. Put it later and the class backtracks to empty, the lookahead inspects
+  " non" instead of "none", and the exemption never applies to the one line it
+  was written for.
+*/
+const MOTION = /\b\d+m?s\b|cubic-bezier\s*\(|@keyframes|\b(?:transition|animation)\s*:(?!\s*none\b)/i;
 let motion = 0;
 for (const file of interfaceFiles) {
   const r = rel(file);
@@ -151,6 +161,42 @@ for (const file of interfaceFiles.filter((f) => f.endsWith(".tsx"))) {
   }
 }
 ok(`hover is not required: ${hoverOnly} hover-only interaction(s)`);
+
+/* ------------------------------------------------------- 5. LIVE HOST --- */
+
+/**
+ * ⚠️ THE LIVE SUBTREE IS RENDERED IN EXACTLY ONE PLACE, AND ONLY THE SOURCE CAN
+ * SAY SO.
+ *
+ * A branch per presentation renders identically — one host, in one position, in
+ * every snapshot — so no output test can tell it from the correct version. What
+ * it actually does is tear down one child slot and build another, which is a
+ * REMOUNT: the render loop stops, the media element reloads, the elapsed timer
+ * restarts, and the thing the whole primitive exists to preserve is gone.
+ *
+ * The position is a data attribute. The element is the same element.
+ */
+const shell = join(ROOT, "ui/src/components/shell.tsx");
+if (!existsSync(shell)) fail(`ui/src/components/shell.tsx is missing — the live host has no owner.`);
+else {
+  const code = stripComments(readFileSync(shell, "utf8"));
+  const hosts = [...code.matchAll(/data-one="live"/g)];
+  if (hosts.length !== 1) {
+    fail(`ui/src/components/shell.tsx: the live subtree is rendered in ${hosts.length} places.\n` +
+         `       A branch per presentation renders identically and IS a remount — React tears\n` +
+         `       down one child slot and builds the other, taking the render loop, the media\n` +
+         `       element and the elapsed timer with it.`);
+  }
+  /*
+    And the subtree itself may appear once. Rendering `{liveSurface}` in two
+    branches is the same defect one level in, and just as invisible.
+  */
+  const children = [...code.matchAll(/\{liveSurface\}/g)];
+  if (children.length !== 1) {
+    fail(`ui/src/components/shell.tsx: the live children are rendered in ${children.length} places.`);
+  }
+  ok(`live host: rendered once, moved by attribute`);
+}
 
 /* -------------------------------------------------------------------------- */
 

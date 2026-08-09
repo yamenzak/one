@@ -751,3 +751,55 @@ sit in the tree, be registered, and never run.
 The check now reads the package's own vitest config and refuses a `.tsx` guard in
 a project that does not include one. Same shape as every other guard here — the
 failure it prevents produces a green line rather than a red one.
+
+## 58. A lookahead after `\s*` inspects the wrong characters
+
+The motion guard forbids a literal `transition:` outside `motion.ts`, and the
+reduced-motion reset legitimately writes `transition: none !important`. The
+exemption was a negative lookahead — and placed after the whitespace class it
+backtracked past it, so the regex matched with `\s*` consuming nothing and the
+lookahead inspected `" non"` rather than `"none"`. It refused the very line it
+was written to allow.
+
+A lookahead belongs at the position whose alternatives it is describing. Anything
+variable-width before it means the engine gets to choose where "there" is.
+
+## 59. A selector exported so a guard can compare against it is a second copy
+
+The shell first exported the string a stylesheet also contains, so the guard
+could assert the two agreed. That is two declarations of one fact, and the
+reachability graph correctly reported the export as unproved: nothing in the
+platform used it except a check about it.
+
+The structural form is the honest one — the guard reads the source and asserts
+the shape it needs. A named constant to keep in step with the CSS it describes is
+one more thing that can drift, added in order to detect drift.
+
+## 60. Server rendering cannot distinguish a moved subtree from a remounted one
+
+"The live surface is moved, never remounted" is the whole promise of a picture-in-
+picture host: the video keeps playing, the timer keeps counting, the scroll
+position survives. The natural implementation failure is a branch per
+presentation — one host inside the dock, another inside the pane — which React
+unmounts and rebuilds on every transition.
+
+`renderToStaticMarkup` produces byte-identical output for both. The mutation
+survived every behavioural test, and would survive any test that can be written
+against static output, because the difference is in the reconciler and not in the
+markup.
+
+So the check is structural: the host element and the slot it renders each appear
+exactly once in the shell's source. A property no runtime assertion can observe
+is one a reader of the file can, and the guard reads the file.
+
+## 61. Shipping a stage is what forces its deferrals to be discharged
+
+Stage 4 flipped to `shipped` and three markers came due at once — shared-element
+continuity, the persistent live host, the contained form. None was forgotten;
+each was waiting on the shell, which is the surface that owns both halves of a
+transition, hosts a subtree across presentations, and emits the tokens.
+
+That is the mechanism working as designed rather than a coincidence. A deferral
+attached to a stage cannot outlive it, so the last increment of a stage is
+always the one that collects everything the stage promised and could not do
+until its final piece existed.

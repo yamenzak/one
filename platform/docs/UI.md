@@ -516,7 +516,6 @@ The invariants:
   video element. Do not conflate the two; a live surface is an application
   surface, not a video.
 
-<!-- DEFER(one-008) stage:4 — live surfaces: the persistent-subtree host, the four presentations, and the single-live-surface rule. -->
 
 ---
 
@@ -558,8 +557,10 @@ and is expensive to disprove, so it survives review indefinitely.
 | `gated-is-locked` | an entitlement or permission rendered as `disabled` rather than `locked` | **live** |
 | `renderer-boundary` | an app defining a shell, dialog, toast, empty state or form primitive; a raw `<button>` or `<input>` | **live** |
 | `hover-not-required` | an interaction reachable only by hover | **live** |
+| `pane-container-queries` | a pane-capable surface sized by viewport breakpoints rather than by its container — every breakpoint answers yes about the wrong box | **live** |
 | `one-navigation-surface` | a second destination surface at any width | **live** |
 | `target-size` | an interactive element whose hit area resolves below the floor | **live** |
+| `one-live-surface` | a second surface declared live, or a live surface remounted between presentations | **live** |
 | `reduced-motion` | a layout that depends on an animation having run | **live** |
 | `brand-closed` | a brand slot outside its declared range being clamped instead of refused, or a token emitted outside the closed set | **live** |
 | `accent-relit` | a screen recomputing the accent instead of re-lighting it — a brand that is a different colour on every surface | **live** |
@@ -570,8 +571,9 @@ and is expensive to disprove, so it survives review indefinitely.
 | `shape-from-kind` | a screen choosing its own layout instead of taking it from the destination's kind — which is how a collection replaces its list on open | **live** |
 | `no-colour-on-the-wire` | a rendered component emitting a colour that is not a token reference | **live** |
 | `refusal-has-reason` | a control rendering a refusal with no explanation — a dead end nobody can get past and nobody can describe | **live** |
-| `pane-container-queries` | a pane-capable surface sized by viewport breakpoints rather than by its container — checkable once surfaces carry stylesheets | stage 4 |
-| `one-live-surface` | a second surface declared live, or a live surface remounted between presentations | stage 4 |
+| `theme-both-ways` | a palette defined only inside a media query, which has no value at all when the root carries an explicit theme | **live** |
+| `contained-form` | a semantic tone rendered on a ground it would be confused with — decided by the renderer, never by an author's conditional | **live** |
+| `continuity` | two copies of one record crossfading instead of one element travelling, or unrelated records animated as though related | **live** |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder
@@ -580,7 +582,6 @@ than the repository's existing guards because several are questions about
 matrix both want the component suite running, which is why they belong to the
 same stage as the renderer rather than to a script that could be written earlier.
 
-<!-- DEFER(one-010) stage:4 — the CONTAINED FORM itself. The detection is built and swept; what is owed is the component that renders a colliding semantic as an edge and an icon on a neutral surface. -->
 
 ---
 

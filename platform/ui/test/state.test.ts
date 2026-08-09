@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { dataStateOf, matrixFor, refusalFor, scene, validateStates, type ComponentStates } from "../src/index.js";
+import { continuity, dataStateOf, matrixFor, overshoots, refusalFor, scene, validateStates, type ComponentStates } from "../src/index.js";
 
 /* ----------------------------------------------------------------- data --- */
 
@@ -134,6 +134,34 @@ describe("one choreographer, and components hold a role", () => {
     const [leaving] = scene(["content"], { direction: "exit" });
     expect(leaving!.duration).toBeLessThan(entering!.duration);
     expect(leaving!.delay).toBe(0);
+  });
+
+  /*
+    ⚠️ CONTINUITY BEATS TRANSITION. A record in two places is ONE element with
+    one identity; crossfading two copies of the same thing is what makes an
+    interface feel like a slideshow of screens rather than one place.
+  */
+  it("moves one element when two surfaces show the same subject", () => {
+    const inList = { of: "note_1", from: "list", to: "list" };
+    const inDetail = { of: "note_1", from: "list", to: "detail" };
+    expect(continuity(inList, inDetail)).toEqual({ shared: true, key: "one:note_1" });
+  });
+
+  it("swaps rather than travels when the subject is different", () => {
+    // Animating this as continuity would claim a relationship between two
+    // unrelated records, which reads as having lost track of what was shown.
+    expect(continuity({ of: "note_1", from: "list", to: "list" }, { of: "note_2", from: "list", to: "detail" }))
+      .toEqual({ shared: false });
+    // And a surface that did not change is not a transition at all.
+    expect(continuity({ of: "note_1", from: "list", to: "detail" }, { of: "note_1", from: "list", to: "detail" }))
+      .toEqual({ shared: false });
+    expect(continuity(null, { of: "note_1", from: "list", to: "detail" })).toEqual({ shared: false });
+  });
+
+  it("never overshoots", () => {
+    // Bounce reads as toy rather than premium, and it is the fastest way to make
+    // an interface feel cheap.
+    expect(overshoots()).toBe(false);
   });
 
   /*

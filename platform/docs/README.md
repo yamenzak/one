@@ -12,8 +12,8 @@ kind: index
 | | |
 |---|---|
 | active | none |
-| shipped | 0, 1, 2, 3 |
-| open deferrals | 5 — see [DEFERRED.md](DEFERRED.md) |
+| shipped | 0, 1, 2, 3, 4 |
+| open deferrals | 2 — see [DEFERRED.md](DEFERRED.md) |
 
 ⚠️ Resuming after a break, or after a compressed conversation?
 [STANDARDS.md §9](STANDARDS.md) is the checklist, in order. Start there rather

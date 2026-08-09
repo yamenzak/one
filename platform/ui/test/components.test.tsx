@@ -16,7 +16,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   Button, Callout, Collection, Confirm, EmptyState, NoData, Overlay, Row, Skeleton, Surface, Text,
   COMPONENTS, RENDERER_OWNS, MAX_DEPTH, navProblems, paneCapable, shapeFor, stackProblem,
-  validateStates, matrixFor, type Destination, type Interaction, type Width,
+  validateStates, matrixFor, groundFor, DEFAULT_BRAND, SEMANTIC,
+  type Destination, type Interaction, type Width,
 } from "../src/index.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node as never);
@@ -143,6 +144,29 @@ describe("a refusal explains itself, and a locked one stays reachable", () => {
     expect(danger).toContain("Payment failed");
     expect(danger).toContain('role="alert"');
     expect(html(<Callout tone="success" title="Saved" />)).toContain('role="status"');
+  });
+
+  /*
+    ⚠️ THE FORM IS DECIDED, NOT CHOSEN. An author never writes a conditional
+    about this and never learns the threshold — which matters because a rule
+    that has to be remembered per call site is one that is remembered on the
+    screens somebody was thinking about.
+  */
+  it("contains a tone that would be confusable with its ground", () => {
+    const greenGround = groundFor({ ...DEFAULT_BRAND, ambience: { hue: SEMANTIC.success.h, intensity: 0.05 } }, "light");
+    const blueGround = groundFor({ ...DEFAULT_BRAND, ambience: { hue: 250, intensity: 0.05 } }, "light");
+    expect(html(<Callout tone="success" title="Saved" ground={greenGround.canvas} />)).toContain('data-form="contained"');
+    expect(html(<Callout tone="success" title="Saved" ground={blueGround.canvas} />)).toContain('data-form="tone"');
+    // With no ground given there is nothing to collide with, and the tone stands.
+    expect(html(<Callout tone="success" title="Saved" />)).toContain('data-form="tone"');
+  });
+
+  it("keeps the word and the icon whichever form it takes", () => {
+    const greenGround = groundFor({ ...DEFAULT_BRAND, ambience: { hue: SEMANTIC.success.h, intensity: 0.05 } }, "light");
+    const contained = html(<Callout tone="success" title="Saved" ground={greenGround.canvas} />);
+    // Two of the four axes survive; tone is the least load-bearing and goes first.
+    expect(contained).toContain("Saved");
+    expect(contained).toContain('data-one="callout-icon"');
   });
 
   it("renders absence as words rather than as a dash", () => {
