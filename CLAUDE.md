@@ -853,8 +853,16 @@ that is a test, not a paragraph.
 `node platform/scripts/docs.test.mjs --write`. Enforced in `pnpm gate`;
 `pnpm one:test`, `one:typecheck` and `one:gate` run the platform alone.
 
+⚠️ **Picking the platform work back up? Start at
+[platform/docs/README.md](platform/docs/README.md)** — generated, so it cannot be
+stale: which stage is active, how many deferrals are open, every governed
+document by kind. [STANDARDS.md §9](platform/docs/STANDARDS.md) is the six-minute
+checklist after it. **Start there rather than from recall** — the repository is
+the memory, which is the reason a deferral is a marker a script finds rather than
+a sentence somebody has to remember.
+
 **[platform/docs/PLAN.md](platform/docs/PLAN.md) is the PLAN for what replaces
-all of this, and nothing in it is built.** A new framework directory that owns the
+all of this, and much of it is not built.** A new framework directory that owns the
 runtime, the data model, the surface (HTTP + AI tools + webhooks) and the chrome,
 driven by a typed manifest per app, with the apps living inside it. Four
 decisions are settled there — a declarative shell with code screens, absorbing

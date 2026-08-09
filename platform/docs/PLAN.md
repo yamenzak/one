@@ -264,6 +264,33 @@ platform/            # the new world. Package scope @one/*
 CI job names) without the path being silly. **Decide this before the first
 import is written** — it is free today and a repo-wide rename later.
 
+### 3.1a How this ships — trunk-based, and safe because of `apps.json`
+
+**No long-lived branch, and no fork.** Short-lived branches, small pull
+requests, straight into `main`.
+
+That sounds reckless for a rewrite and is not, because this repository already
+solved it: **`deploy.yml` derives its app list from `apps.json`**, so a directory
+absent from that registry cannot be selected by `affected.mjs` and cannot be
+shipped. `platform/` is therefore **inert by construction** — it compiles, its
+tests run in CI, and it deploys nothing. `apps/_template` is the standing proof:
+in the repo, tested on every push, never deployed.
+
+The alternative is a months-long branch carrying a rewrite of 165,000 lines,
+drifting against a moving `main`, with no CI signal until a big-bang merge. That
+is risk #1 in §9, and small pull requests into an inert directory avoid it
+outright.
+
+⚠️ **Two things keep the inertness structural rather than incidental**, and both
+are already in place: `platform/*` is in `pnpm-workspace.yaml` so turbo actually
+runs its tests, and `discoverWorkerDirs` walks `platform/` as well as `apps/` so
+a `wrangler.jsonc` there cannot ship unregistered. Without the first, a package's
+tests are silently not run at all; without the second, a worker could deploy with
+nothing saying why.
+
+`pnpm one:test`, `one:typecheck` and `one:gate` run the platform alone, so a
+platform change never waits on three apps.
+
 ### 3.2 Six layers, and what may depend on what
 
 ```

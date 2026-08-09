@@ -293,6 +293,45 @@ thirty.
 
 ---
 
+## 9. ⚠️ Resuming — what to read when the conversation is gone
+
+A long build outlives any single working session. Whoever picks this up next —
+a person returning after a fortnight, or an assistant whose context was
+compressed — starts from the repository, never from recall.
+
+**That is not a hope, it is the design.** §3's whole argument is that a marker
+lives in the repository and is *found* by a script, because being found is the
+only property that survives a conversation ending. The same reasoning applies to
+everything else here.
+
+**The checklist, in order. Six minutes.**
+
+1. **`platform/docs/README.md`** — generated. Which stage is active, what is
+   deferred, every governed document by kind. Start here because it cannot be
+   stale.
+2. **`platform/docs/DEFERRED.md`** — generated. Everything outstanding, grouped
+   by the stage that owes it. Nothing here was remembered; it was found.
+3. **`PLAN.md` §2** — the four decisions and the consequence of each. Read
+   before questioning one: they were argued, and §2.3 in particular records a
+   risk that was accepted knowingly rather than missed.
+4. **`STANDARDS.md` §1** — write the invariant, never the incident. The rule
+   most easily broken while feeling diligent.
+5. **`platform/kernel/test/FINDINGS.md`** — what did not fit, per stage. The
+   record of what was learned the expensive way.
+6. **`pnpm one:test && pnpm gate`** — under a second and a few seconds. Green
+   means the ground is solid; red means read the failure before reading anything
+   else.
+
+Then `git log --oneline -20`. The commit messages in this repository carry the
+reasoning, deliberately — they are the one record that cannot drift from the
+change it describes.
+
+⚠️ **What compression genuinely costs, stated plainly:** not the decisions, which
+are all written above, but the *texture* — why a sentence was phrased one way, or
+a half-formed idea that had not earned a commit yet. The mitigation is not better
+recall. It is that anything worth keeping gets committed before it is needed
+again, which is the discipline this whole document exists to impose.
+
 ## What is deliberately NOT enforced
 
 - **Prose quality, length or tone in `contract` documents.** These are dense and
