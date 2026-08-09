@@ -223,6 +223,68 @@ role carries.
 Invisible without the check: no error, no log, and nobody notices until somebody
 has been an owner for a month. Mutation-tested.
 
+## 15. The schema version is computed now, and the scar is designed out
+
+The previous runner carried a hand-written version per module and short-circuited
+on a marker row. Forgetting the bump made a new table INVISIBLE on a fresh
+database and fatal on every existing one — never created, and every route
+touching it answering 500. The mitigation was a paragraph asking people to
+remember, and it shipped anyway at least once.
+
+Hashing the content removes the choice: a module that changed re-runs, one that
+did not does not, and there is nothing to forget. Per SECTION, so editing a
+backfill does not re-run the DDL.
+
+⚠️ Re-running has to be safe by construction for this to work, so
+`validateModule` refuses anything that is not — non-`IF NOT EXISTS` DDL, an
+`ALTER` that is not `ADD COLUMN`. **A module that cannot be re-run cannot be
+declared.** The hash is only sound because that rule is enforced above it.
+
+FNV-1a rather than a cryptographic hash: the question is "did this change", not
+"can an adversary forge a collision", and a synchronous pure function keeps the
+whole module testable without Web Crypto.
+
+## 16. Dependencies are declared, not implied by array order
+
+The previous runner took order from the array and explained the rule in a
+comment. A wrong order did not fail — the `ALTER` hit a table that did not exist,
+the runner swallowed it, and a column silently never appeared. `after` makes it a
+validation error at composition time.
+
+Two modules creating the same table is caught the same way, and it is the more
+expensive one: `CREATE TABLE IF NOT EXISTS` is won by whichever runs first, the
+loser's columns never exist, and the failure surfaces as a query error on one
+route long after the change that caused it.
+
+## 17. `unscopedTables` reports rather than refuses
+
+An unscoped table is not automatically wrong. A plan catalogue, a licensed
+library and a webhook seen-set are all correctly outside a tenant cascade —
+putting one in deletes it for everybody on the first erasure.
+
+So the check surfaces the list rather than failing on it. The decision belongs to
+the app, made once, in the open, instead of by omission — which is what the
+hand-written delete list it replaces was.
+
+## 18. Config falls through on EMPTY, not on ABSENT
+
+Every consumer reads `""` as unconfigured, so a blank local row must fall
+through to the shared value rather than mask it. Otherwise an operator who opens
+a settings screen and saves it without typing anything silently switches off a
+key that was working.
+
+⚠️ The consequence is real and worth stating at the declaration: you cannot turn
+a shared key off for one app by blanking it. Give that app its own value, or do
+not share the key.
+
+Sharing is also enforced on WRITE, not only on read. An unshared key that reaches
+the shared store is invisible until a second app resolves it, and by then it is
+another product's problem with no trace of where it came from.
+
+And a secret is write-only: settable, its *set-ness* visible, its value never
+returned. A console that can display a secret key leaks one through any read
+vulnerability, a screen share, or a support session.
+
 ## What stage 1 still owes
 
 `DEFER` markers carry these; they are not prose here. Identity and Better Auth,
