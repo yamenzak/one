@@ -454,6 +454,23 @@ remote bindings without editing the config (this is what the E2E suite does).
   typed is how a live key ends up active by accident. `syncCatalog` / `seed` /
   `clearCatalogIds` stay injected, because the catalog TABLE is still the app's
   (Scena's `price_cents` against the shared store's `price_usd_month`).
+- **A RESERVE IS A CEILING ON REVENUE, not an estimate.** `settle` caps the
+  charge at what was held (`Math.min(held.credits, actual)`), so every token an
+  estimate fails to count is a token the platform pays for and the tenant does
+  not — silently, on every call. Scena's own copy under-counted four ways at
+  once, all measured: the run asked Gemini for **32,768** output tokens on a
+  slide while the reserve budgeted **8,000**; the system prompt was a flat
+  `+200` pad against 3,207 chars (`SLIDE_SYSTEM`) and 6,875
+  (`layoutSystem()`); the char→token ratio was 4 (the English average — Arabic
+  runs nearer 2); and nothing widened for a thinking model. `@4dl/ai`'s
+  `estimateUsage` is all four fixes and the token lanes delegate to it. **A
+  missing usage report falls back to the RESERVE, never to a character count** —
+  a guess can only ever under-charge, because the cap catches the other
+  direction.
+  - ⚠️ **The fix is a SHAPE, not a test.** `planRun` returns the system prompt
+    AND the reserve it implies from one call, so a caller cannot hand a different
+    text to each. Unit tests on the two halves separately passed a mutation that
+    restored the original defect — which is what the defect WAS.
 - **Credits**: `TenantBillingDO` (`billing-do.ts`) is the authoritative balance;
   AI goes through `@4dl/ai` `generate()` = reserve → run (Workers AI | Gemini |
   the dev-only mock) → settle; `apps/api/src/ai.ts` binds Kova's feature registry
@@ -844,13 +861,13 @@ is a rule that has to be re-argued per case rather than applied.
 **Tests** — recount with `pnpm test` before quoting a figure anywhere; the suite
 moves. **Measured 2026-08-08** from one `pnpm turbo run test --force` (uncached,
 so every figure below is from that run), per package:
-**632 kova/api (+31 skipped) + 261 scena/api + 237 kova/domain + 163 tessa/api +
+**632 kova/api (+31 skipped) + 274 scena/api + 237 kova/domain + 163 tessa/api +
 145 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 87 billing + 80 ai +
 63 commerce + 61 scena/widgets + 45 billing-rail + 44 core + 40 scena/timeline +
 35 auth + 35 scena/app + 24 notify + 23 scena/manifest + 23 tessa/app +
 20 template + 19 template/app + 18 scena/protocol + 18 storage + 18 app-kit +
 17 kova/protocol +
-14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,447 passing,
+14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,460 passing,
 31 skipped**, 60 turbo tasks, all green.
 
 The +81 since the earlier figure on the same day is all new coverage over
@@ -1240,6 +1257,14 @@ in `SCHEMA_MODULES`, right after the legacy reset), and the reconciliation it ne
   from Google's — so `WHERE task = 'tts'` silently cannot see any Gemini voice.
   Every selection path goes through it (`ai.ts`'s model match,
   `defaultModelForTask`, `PUT /api/ai/defaults`).
+- **The RESERVE ARITHMETIC is the package's too, as of 2026-08-08** — see the
+  "a reserve is a ceiling on revenue" note above for the four under-counts it
+  fixed. What is NOT the package's, and cannot be: `generateImage` writes a
+  tenant-prefixed media key and **Scena's R2 key is the content hash**, so the
+  image lane keeps its own writer; and there is no `generateMusic` at all
+  (Lyria bills per song, a third metering shape). The wholesale replacement of
+  `ai.ts` is therefore blocked, and pretending otherwise would produce a rewrite
+  wearing an extraction's clothes.
 - Two latent defects went with it: `lyria-3-clip` was an id Google has never
   answered to (every music generation on that row 404'd), and
   `syncGeminiFromGoogle` priced each newly-discovered model by LANE — flash-tier

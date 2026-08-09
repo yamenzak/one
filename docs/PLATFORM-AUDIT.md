@@ -1034,9 +1034,9 @@ three landed; what each turned up on the way is worth recording:
 
 In this order, because each unblocks the next:
 
-1. **`ai.ts` + `gemini.ts` → `@4dl/ai`'s `generate`.** 1,161 lines out, and
-   Scena gains the per-actor daily credit cap it does not have. The catalog is
-   already shared, so this is the last mile.
+1. **`ai.ts` + `gemini.ts` → `@4dl/ai`'s `generate`.** ⚠️ **Partly BLOCKED, and
+   the reason is worth writing down before somebody re-attempts it.** What was
+   done instead, and why, is below.
 2. **`BILLING_SCHEMA` reconciliation → `bindBillingStore`.** The data migration
    the schema comment describes. Do it on its own, with a backfill test.
 3. **The dunning ladder** onto `DUNNING_DAYS` + `dailySweep`, which falls out of
@@ -1044,6 +1044,62 @@ In this order, because each unblocks the next:
 4. **Decide what a platform promo code is** — a discount (Kova) or a grant
    (Scena) — then put the winner in `@4dl/billing` and migrate the loser. This
    is a product decision before it is an extraction.
+
+#### 5.1 The AI lane — what moved, what cannot, and the money it was losing — ✅ **DONE (2026-08-08)**
+
+**Two of the four lanes cannot take the shared path, and both reasons are
+structural rather than effort:**
+
+- **Image.** `@4dl/ai`'s `generateImage` writes through `putMedia` and returns a
+  tenant-prefixed media KEY. Scena's R2 key is the **content hash** — the
+  compiled manifest references an asset by hash, the player caches
+  `/api/assets/<hash>` immutably for months offline, and `library_tracks` is a
+  platform-wide catalog every workspace draws from. Adopting the shared writer
+  breaks all three. (Same reason `mediaRoutes` is in `capability-reachable`'s
+  `KNOWN_UNMOUNTED`.)
+- **Music.** The package has no `generateMusic` at all. Lyria bills per SONG
+  rather than per second, which is a third metering shape.
+
+So the wholesale replacement is not available, and pretending otherwise would
+have produced a rewrite wearing an extraction's clothes — which the contribution
+rules forbid for good reason.
+
+**What DID move is the arithmetic, and measuring it found four defects that were
+losing money on every generation.** `settle` caps the charge at the reserve, so
+a reserve that lands under the real usage is revenue the platform silently
+absorbs. There is no failing request, no log line, and no screen that looks
+wrong.
+
+| defect | measured |
+|---|---|
+| **The output cap disagreed with itself** | The run asked Gemini for **32,768** output tokens on a slide; the reserve budgeted **8,000**. Four-fold under-reserve on the most-used lane in the product. |
+| **The system prompt was not counted** | A flat `+200` tokens stood in for `SLIDE_SYSTEM` (3,207 chars ≈ 1,283 tokens) and `+1500` for `layoutSystem()` (6,875 chars, most of it `describeWidgets(WIDGET_REGISTRY)` at 4,334). |
+| **Four chars per token** | The English average, used as a bound. Arabic runs nearer two. `@4dl/ai` uses 2.5. |
+| **No thinking budget** | Gemini 2.5+ bills `thoughtsTokenCount` at the output rate from a budget the request does not cap. |
+
+The last three are `@4dl/ai`'s `estimateUsage`, which the token lanes now
+delegate to. The unit-metered lanes (tts per character, image per tile, music per
+second) stay Scena's: they are not token estimates, and the shapes do not
+correspond.
+
+⚠️ **And the settle side had the same bug.** A streaming response that reports no
+usage used to fall back to `chars / 4`. It falls back to the RESERVE now, which
+is the conservative direction: the reserve is the worst case the workspace
+already had held, so charging it can never exceed what they agreed to.
+
+**The fix is a SHAPE, not a test, and that distinction was earned.** The first
+attempt was `outputCap()` plus a delegated estimator, with unit tests on each.
+A mutation restoring the original defect — the system prompt replaced with `""`
+inside `generate` — **passed every one of them**, because the tests called the
+estimator directly and supplied a system prompt themselves. Two correct halves
+and no assertion on the join, which is exactly what the defect was.
+
+`planRun(req, provider, brief)` returns the system prompt **and** the reserve it
+implies, from one call. The caller cannot hand a different text to each. The same
+mutation now fails four assertions; a drifting cap fails one; restoring chars/4
+fails five.
+
+---
 
 ### 6. The standing items neither app has resolved
 
