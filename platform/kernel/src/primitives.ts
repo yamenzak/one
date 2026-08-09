@@ -123,3 +123,17 @@ export interface Actor {
  * non-privileging is what stops "the assistant can do more than the person".
  */
 export type ActorKind = "user" | "tool" | "device" | "system" | "operator";
+
+/* --------------------------------------------------------------- feeling --- */
+
+/**
+ * HOW A THING FEELS TO THE PERSON READING IT.
+ *
+ * ⚠️ A PRIMITIVE BECAUSE THREE LAYERS NEED IT — an operation's outcome, a
+ * notification, and a callout on a surface. Declaring it in each is three
+ * four-value unions that agree today and drift the day one of them gains a
+ * fifth, at which point a value that renders in one place renders as nothing in
+ * another.
+ */
+export type Tone = "success" | "info" | "warning" | "danger";
+

@@ -28,6 +28,7 @@ export * from "./collection.js";
 export * from "./entitlement.js";
 export * from "./customer.js";
 export * from "./meter.js";
+export * from "./notify.js";
 export * from "./resolve.js";
 export * from "./ddl.js";
 export * from "./document.js";

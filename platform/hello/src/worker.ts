@@ -9,7 +9,7 @@
 
 import { deriveSchema, type Actor, type Resolved, type Session } from "@one/kernel";
 import {
-  ACTIVITY_SCHEMA, applySchema, COMMERCE_SCHEMA, createRuntime, DIRECTORY_SCHEMA,
+  ACTIVITY_SCHEMA, applySchema, COMMERCE_SCHEMA, createRuntime, DIRECTORY_SCHEMA, INBOX_SCHEMA,
   DOMAIN_SCHEMA, IDENTITY_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
 } from "@one/runtime";
 import { hello, notes, receipts } from "./manifest.js";
@@ -31,7 +31,7 @@ if (derived.problems.length) throw new Error(`hello: ${derived.problems.map((p) 
   exist yet, swallowed, leaving a column that silently never appeared.
 */
 const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA];
-export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, derived.module];
+export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, INBOX_SCHEMA, derived.module];
 
 
 /* -------------------------------------------------------------- identity --- */
@@ -98,6 +98,23 @@ const runtime = createRuntime(hello, {
     rather than from two settings somebody has to keep in step.
   */
   webhookSecretVar: "PROVIDER_WEBHOOK_SECRET",
+  /*
+    ⚠️ WHO IS IN THIS WORKSPACE IS THE APP'S ANSWER, and `hello` has no roster —
+    so everybody who has ever signed in here is its owner. A product with a
+    membership table reads it; this is the smallest honest version, and it is
+    the ONE thing a framework cannot supply.
+  */
+  audienceFor: async (_tenantId, db) => {
+    const rows = await db.all<{ account_id: string }>(`SELECT DISTINCT account_id FROM sessions`);
+    return rows.map((r) => ({ userId: r.account_id, role: "owner" }));
+  },
+  /*
+    ⚠️ NO SENDER, SO NOTHING INTERRUPTS ANYBODY — and the inbox row is written
+    anyway. That is the shape the whole design turns on: a preference, a missing
+    provider and a bounced address all remove the interruption and never the
+    record.
+  */
+
   resolveCaller,
   /*
     ⚠️ THE DIRECTORY AND THE REGIONAL DATABASE ARE COMPOSED SEPARATELY, because

@@ -163,6 +163,38 @@ export const kova = defineApp({
   },
 
   collections: [packages],
+
+  /*
+    ⚠️ EVERY `emits` IN THE OPERATIONS BELOW IS DECLARED HERE, and composition
+    refuses one that is not. An undeclared event is two failures at once: a
+    subscription nobody can make, and a notification with no copy, no icon and
+    no destination — which renders, if anything renders it at all, as an
+    anonymous bell.
+
+    ⚠️ AND A LINK NAMES A DECLARED COLLECTION. Four types in a shipping product
+    pointed at a path that was not a route, and were wrong for three stages
+    because nothing rendered a notification. There is no string to get wrong.
+  */
+  notifications: {
+    "plan.published": {
+      category: "activity", tone: "success", icon: "check",
+      title: "{name} published a plan for you",
+      link: { to: "row", collection: "package" },
+      roles: ["customer"],
+    },
+    "package.granted": {
+      category: "billing", tone: "success", icon: "gift",
+      title: "{days} days added",
+      link: { to: "collection", collection: "package" },
+      roles: ["customer", "owner"],
+    },
+    "staff.invited": {
+      category: "action", tone: "info", icon: "person",
+      title: "{email} was invited",
+      link: { to: "inbox" },
+      roles: ["owner"],
+    },
+  },
   operations: [readProgress, publishPlan, applyPackageGrant, inviteStaff],
   problems: { ...appProblems, ...declareProblems({ "billing.quota_exceeded": { status: 402, title: "You've used everything in your plan", retryable: false } }) },
 

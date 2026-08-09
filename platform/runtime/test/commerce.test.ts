@@ -60,6 +60,7 @@ const app = (over: Partial<AppSpec<typeof bindings>>): AppSpec<typeof bindings> 
   },
   governance: { legal: [], impersonation: { maxMinutes: 30, announce: true }, auditRetentionDays: 365 },
   collections: [],
+  notifications: {},
   operations: [],
   problems: {},
   ...over,

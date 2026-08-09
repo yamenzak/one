@@ -11,10 +11,11 @@ import { describe, expect, it } from "vitest";
 import { kova } from "./proof.app.js";
 import { PLATFORM_PROBLEMS, type Problem, type ProblemCode, type ProviderAdapter } from "../src/problem.js";
 import { TENANT_DOORS, TENANTLESS_DOORS, DIRECTORY_REGION, classifyHost, cookieDomainFor, type Door, type DoorConfig } from "../src/doors.js";
-import { assertComposable, coverage } from "../src/app.js";
+import { assertComposable, coverage, undeclaredEmits } from "../src/app.js";
 import type { EntitlementDef, PlanSpec } from "../src/entitlement.js";
 import type { FlagDef } from "../src/customer.js";
 import type { CollectionSpec } from "../src/collection.js";
+import type { NotificationDef } from "../src/notify.js";
 import { isArchived } from "../src/document.js";
 
 /** The smallest thing the coverage walk will read — it inspects four fields. */
@@ -231,8 +232,8 @@ describe("the row a collection implies", () => {
  * expensive thing for anybody who asks for it directly — which is the first
  * thing an API consumer, an assistant or a curious customer does.
  */
-describe("a sold capability is withheld by something", () => {
-  const base = {
+/** Everything `assertComposable` reads that a given case is not about. */
+const base = {
     id: "test",
     access: {
       permissions: [], roles: {}, plans: [] as PlanSpec[],
@@ -240,10 +241,12 @@ describe("a sold capability is withheld by something", () => {
       customerRail: false, customerFlags: {} as Record<string, FlagDef>,
       seats: { counts: [] },
     },
-    collections: [] as CollectionSpec[],
-    operations: [] as never[],
-  };
+  collections: [] as CollectionSpec[],
+  notifications: {} as Record<string, NotificationDef>,
+  operations: [] as never[],
+};
 
+describe("a sold capability is withheld by something", () => {
   it("refuses an entitlement declared as a gate that no operation names", () => {
     expect(() => assertComposable({
       ...base,
@@ -329,5 +332,62 @@ describe("a sold capability is withheld by something", () => {
 
   it("holds the real manifest to all of it", () => {
     expect(coverage(kova)).toEqual([]);
+  });
+});
+
+/* --------------------------------------------------------- notifications --- */
+
+/**
+ * ⚠️ AN OPERATION MAY ONLY RAISE SOMETHING SOMEBODY CAN RECEIVE.
+ *
+ * `emits` drives the webhook catalogue AND the inbox, so an undeclared event is
+ * a subscription nobody can make and a notification with no copy, icon or
+ * destination — which renders, if anything renders it at all, as an anonymous
+ * bell that says nothing and goes nowhere.
+ */
+describe("what an app can tell somebody", () => {
+  const told: NotificationDef = {
+    category: "activity", tone: "info", icon: "bell",
+    title: "{who} did a thing", link: { to: "inbox" }, roles: ["owner"],
+  };
+
+  it("refuses an operation raising an event no notification declares", () => {
+    expect(() => assertComposable({
+      ...base,
+      operations: [{ ...stub, emits: ["thing.happened"] }] as never,
+    })).toThrow(/thing\.happened/);
+  });
+
+  it("accepts it once the registry declares it", () => {
+    expect(() => assertComposable({
+      ...base,
+      notifications: { "thing.happened": told },
+      operations: [{ ...stub, emits: ["thing.happened"] }] as never,
+    })).not.toThrow();
+  });
+
+  /*
+    ⚠️ A LINK NAMES A DECLARED COLLECTION. Four types in a shipping product
+    pointed at a path that was not a route, and one at a path whose route had
+    been renamed; they were wrong for three stages because nothing rendered a
+    notification, and an integration test was asserting the broken path.
+  */
+  it("refuses a link to a collection this app does not have", () => {
+    expect(() => assertComposable({
+      ...base,
+      notifications: { "thing.happened": { ...told, link: { to: "row", collection: "ghost" } } },
+    })).toThrow(/thing\.happened/);
+  });
+
+  it("accepts a link to one it does", () => {
+    expect(() => assertComposable({
+      ...base,
+      notifications: { "thing.happened": { ...told, link: { to: "row", collection: "x" } } },
+      collections: [stubCollection] as never,
+    })).not.toThrow();
+  });
+
+  it("holds the real manifest to that too", () => {
+    expect(undeclaredEmits(kova)).toEqual([]);
   });
 });

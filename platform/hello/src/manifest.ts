@@ -132,13 +132,13 @@ export const hello = defineApp({
     weekStart: 1,
   },
   access: {
-    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate"],
+    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read"],
     /*
       Anybody signed in may open a workspace — this is a self-serve product, and
       `workspace:create` is checked on a door that has no tenant to be a member
       of, so a role is the only place it could come from.
     */
-    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate"], reader: ["note:read"] },
+    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read"], reader: ["note:read"] },
     /*
       ⚠️ EVERY ENTRY NAMES HOW IT IS WITHHELD, and `defineApp` refuses one whose
       mechanism does not exist. `notes` is gated on the collection rather than on
@@ -187,6 +187,34 @@ export const hello = defineApp({
   },
 
   collections: [notes, receipts],
+
+  /*
+    ⚠️ EVERY EVENT THE PLATFORM'S OWN OPERATIONS RAISE IS DECLARED HERE, and an
+    app that omits one does not boot. That is deliberate: a workspace created, a
+    plan chosen, a package granted and a payment settled are all things somebody
+    should be told about, and "the platform emits it so the platform will handle
+    it" is how a product ships an event nobody ever sees.
+  */
+  notifications: {
+    "workspace.created": {
+      category: "service", tone: "success", icon: "sparkle",
+      title: "{slug} is ready",
+      link: { to: "inbox" },
+      roles: ["owner"],
+    },
+    "plan.chosen": {
+      category: "billing", tone: "info", icon: "card",
+      title: "You chose {planId}",
+      link: { to: "inbox" },
+      roles: ["owner"],
+    },
+    "package.granted": {
+      category: "billing", tone: "success", icon: "gift",
+      title: "{days} days added",
+      link: { to: "inbox" },
+      roles: ["owner"],
+    },
+  },
   /*
     ⚠️ EMPTY, AND THAT IS THE POINT. Every surface this app has is derived from
     the two collections above — list, read, create, update, delete, the document

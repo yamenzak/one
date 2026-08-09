@@ -13,6 +13,8 @@
 import type { BindingSpec } from "./bindings.js";
 import type { CollectionSpec } from "./collection.js";
 import type { FlagDef } from "./customer.js";
+import type { NotificationRegistry } from "./notify.js";
+import { danglingLinks } from "./notify.js";
 import type { EntitlementDef, PlanSpec } from "./entitlement.js";
 import { parkingAboveFloor } from "./entitlement.js";
 import type { Currency, Locale, RegionId, TimeZone, UnitSystem } from "./primitives.js";
@@ -170,12 +172,13 @@ export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = Probl
   readonly governance: GovernanceSpec;
 
   readonly collections: readonly CollectionSpec[];
-  /*
-    DEFER(one-013) stage:6 — the same treatment for `emits`, against the declared
-    notification registry. Deferred rather than done because notifications are
-    not declarable yet; the FAILURE half is the one with a live consequence, and
-    it is checked below.
-  */
+  /**
+   * ⚠️ WHAT THIS APP CAN TELL SOMEBODY, DECLARED. An operation may only `emit`
+   * something named here, and a notification may only link to a collection this
+   * manifest declares — so a type that renders as an anonymous bell, and one
+   * that opens a screen the app does not have, are both refused at composition.
+   */
+  readonly notifications: NotificationRegistry;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly operations: readonly OperationSpec<B, any, any, string>[];
   readonly problems: P;
@@ -210,6 +213,29 @@ export interface Uncovered {
   readonly rail: "entitlement" | "customer_flag";
   readonly key: string;
   readonly declared: string;
+}
+
+/**
+ * ⚠️ AN OPERATION MAY ONLY RAISE SOMETHING SOMEBODY CAN RECEIVE.
+ *
+ * `emits` drives the webhook catalogue AND the inbox, so an undeclared event is
+ * two failures at once: a subscription nobody can make, and a notification with
+ * no copy, no icon and no destination — which renders, if anything renders it at
+ * all, as an anonymous bell.
+ *
+ * The same treatment as a failure code, for the same reason: an operation is
+ * written before the registry it will be composed with, so its own declaration
+ * site cannot see one.
+ */
+export function undeclaredEmits(spec: {
+  readonly notifications: NotificationRegistry;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
+  readonly operations: readonly OperationSpec<any, any, any, string>[];
+}): readonly string[] {
+  const declared = new Set(Object.keys(spec.notifications));
+  const out = new Set<string>();
+  for (const op of spec.operations) for (const event of op.emits ?? []) if (!declared.has(event)) out.add(event);
+  return [...out];
 }
 
 export function coverage(spec: {
@@ -303,6 +329,7 @@ export function assertComposable(spec: {
   readonly id: string;
   readonly access: AccessSpec;
   readonly collections: readonly CollectionSpec[];
+  readonly notifications: NotificationRegistry;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly operations: readonly OperationSpec<any, any, any, string>[];
 }): void {
@@ -325,5 +352,18 @@ export function assertComposable(spec: {
 
   if (!spec.access.customerRail && Object.keys(spec.access.customerFlags).length) {
     throw new Error(`${spec.id}: declares customer capabilities with customerRail false, so nothing resolves them.`);
+  }
+
+  const unheard = undeclaredEmits(spec);
+  if (unheard.length) {
+    throw new Error(
+      `${spec.id}: operation(s) raise ${unheard.join(", ")}, which no notification declares — ` +
+        `nobody can subscribe to it and it has no copy, icon or destination.`,
+    );
+  }
+
+  const dangling = danglingLinks(spec.notifications, spec.collections);
+  if (dangling.length) {
+    throw new Error(`${spec.id}: notification(s) ${dangling.join(", ")} link to a collection this app does not declare.`);
   }
 }

@@ -1010,3 +1010,72 @@ be undone.
 Coerced by the DECLARATION, never by looking at the value. Guessing from the
 text turns `?code=0123` into 123 and loses a leading zero, which is a whole class
 of identifier corrupted by helpfulness.
+
+## 79. A preference must remove the interruption and never the record
+
+Email can be declined, filtered, greylisted, or sent to an address somebody left
+two jobs ago. Push can be revoked without telling anybody. If a preference can
+suppress the inbox row too, then "I never got that" has no answer that does not
+depend on a mail provider — and the honest answer is usually that we do not know.
+
+So the inbox row is written first and unconditionally, and the preference
+governs only what interrupts. The mutation that inverts this is one line and
+produces a product that appears to work perfectly.
+
+## 80. One category may never be muted, and it is the one that blocks the product
+
+`action` means nothing proceeds until somebody does something: a plan lapsing, a
+document waiting to be signed, a workspace about to be erased. Letting it be
+switched off makes the product silently stop working for whoever switched it
+off, and they will not connect the two — they turned off notifications months
+ago and this is a different problem, as far as they can tell.
+
+Categories rather than types, for the related reason: a per-type preference
+screen is a list nobody maintains, where every notification added later arrives
+switched to whatever the default is. Somebody who carefully turned eleven things
+off has a twelfth they never asked for.
+
+## 81. A missing interpolation value should be visibly wrong, not plausibly wrong
+
+`undefined did a thing` reads as a bug in the data. `{who} did a thing` reads as
+a bug in the copy, which is what it is, and the first person to see it says so.
+The version that ships is the one that looks like somebody else's problem.
+
+## 82. The copy is rendered on read, so a row cannot outlive its wording
+
+Storing the finished sentence is faster and it is what most inboxes do. It also
+means the text cannot be translated after the fact, cannot be corrected when it
+turns out to be wrong, and keeps saying the old thing forever for everyone who
+already received it. What is stored is the type and the values; the words come
+from the manifest every time somebody looks.
+
+The corollary is that a row whose type no longer exists is SKIPPED rather than
+rendered blank. An anonymous entry with no words is worse than an absence — it
+is a thing the reader has to open to discover it says nothing.
+
+## 83. A failed interruption is not a failed operation
+
+The inbox row is already written and the write already succeeded. Letting a mail
+provider's outage throw out of the dispatcher reports a completed change as an
+error, and the caller retries — which is how one grant becomes two.
+
+## 84. Copy is read by people, so only scalars may reach it
+
+A template with access to an arbitrary object renders `[object Object]` in the
+best case and carries a nested value nobody vetted in the worst — into a
+sentence a person reads, and that an email sometimes puts in a subject line.
+The interpolation source is the operation's own input and result, filtered to
+strings and numbers, and that filter is the whole of the boundary.
+
+## 85. The dispatcher belongs to the runtime, because a handler can forget
+
+`emits` already drove the webhook catalogue. Wiring the inbox to the same
+declaration means one statement produces the subscription, the inbox row and the
+audit entry — and there is no call site that can omit one of the three, send
+something different from what the catalogue advertises, or put untranslatable
+copy next to a database write.
+
+What the app still owns is the roster: who is in a workspace, and in what role.
+That is the one thing a framework genuinely cannot know, and it is passed in
+rather than assumed — an app with no roster tells nobody, visibly, rather than
+telling everybody by accident.

@@ -16,12 +16,12 @@
 
 import type { BindingSpec, ResolvedBindings } from "./bindings.js";
 import type { Shape } from "./validate.js";
-import type { Actor, Instant, RegionId, TenantId } from "./primitives.js";
+import type { Actor, Instant, RegionId, TenantId, Tone } from "./primitives.js";
 import type { HelpId, Problem } from "./problem.js";
 
 /* --------------------------------------------------------------- outcome --- */
 
-export type Tone = "success" | "info" | "warning" | "danger";
+export type { Tone } from "./primitives.js";
 /** Semantic intent. The platform owns the audio, as it owns colour tokens. */
 export type SoundId = "commit" | "error" | "alert" | "arrive" | "scan";
 

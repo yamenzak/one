@@ -23,6 +23,8 @@ import {
 } from "@one/kernel";
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
 import { COMMERCE, commerceOperations, customerOperations, providerOperations, type CommerceCarrier } from "./commerce-ops.js";
+import { INBOX, inboxOperations, type InboxCarrier } from "./inbox-ops.js";
+import { dispatch, interpolatable, type Delivery } from "./inbox.js";
 import { customerFlagsFor, PARKED, readSubscription, standingFor } from "./commerce.js";
 import { sqlDirectory } from "./directory.js";
 import { collectionOperations } from "./collection-ops.js";
@@ -128,6 +130,18 @@ export interface RuntimeOptions<B extends BindingSpec> {
    */
   countQuota?(key: string, db: SqlHandle, tenantId: string): Promise<number>;
   /**
+   * Who is in this workspace, and in what role.
+   *
+   * ⚠️ THE PLATFORM DECIDES WHETHER TO TELL SOMEBODY; THE APP SAYS WHO THERE IS.
+   * A roster is the one thing a framework genuinely cannot know — in one product
+   * it is a membership table, in another every signed-in account. Absent means
+   * notifications are recorded nowhere, which is honest for an app with no
+   * roster and visible in the tests rather than silently empty.
+   */
+  audienceFor?(tenantId: string, db: SqlHandle): Promise<readonly { readonly userId: string; readonly role: string }[]>;
+  /** How an interruption travels. The DECISION is the platform's; the sending is not. */
+  send?(delivery: Delivery): Promise<void>;
+  /**
    * The NAME of the deployment variable holding the provider's signing secret.
    *
    * ⚠️ ABSENT MEANS THE WEBHOOK REFUSES, and that is the safe direction. The
@@ -176,7 +190,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -456,14 +470,41 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         dispatch path is how an agent ends up able to do something the route
         cannot, and the divergence is invisible until somebody looks for it.
       */
-      const dispatch = async (target: AnyOperation, payload: unknown, via: AuditEntry["via"]) => {
+      const run = async (target: AnyOperation, payload: unknown, via: AuditEntry["via"]) => {
         const entry = auditFor(target, payload, via);
         if (entry) audit.push(entry);
-        return target.handler(ctx as never, payload as never);
+        const result = await target.handler(ctx as never, payload as never);
+
+        /*
+          ⚠️ THE INBOX IS WRITTEN FROM `emits`, AFTER THE HANDLER SUCCEEDS, AND
+          NEVER BY THE HANDLER ITSELF. A handler that sends its own notification
+          can forget one, can send something different from what the webhook
+          catalogue advertises, and puts its copy at the call site where nothing
+          can translate or check it. Here one declaration produces the inbox row,
+          the webhook event and the audit entry.
+
+          ⚠️ AND A FAILED DISPATCH NEVER FAILS THE OPERATION. The write already
+          happened and was already answered; throwing here would report a
+          successful change as an error and invite a retry that duplicates it.
+        */
+        if (target.emits?.length && at.tenant && opts.audienceFor) {
+          const audience = await opts.audienceFor(at.tenant.tenantId, regionalDb).catch(() => []);
+          for (const type of target.emits) {
+            await dispatch({
+              db: regionalDb, registry: app.notifications, tenantId: at.tenant.tenantId,
+              type, audience,
+              values: interpolatable(payload, result),
+              at: new Date().toISOString() as Instant,
+              send: opts.send,
+            }).catch(() => undefined);
+          }
+        }
+        return result;
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier = {
+        [INBOX]: { db: regionalDb, tenantId: at.tenant?.tenantId ?? "", userId: session?.accountId ?? null },
         [PLATFORM]: platform,
         [COMMERCE]: {
           db: regionalDb,
@@ -496,7 +537,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             about what it is ALLOWED to do, because the gate already ran on the
             same caller.
           */
-          dispatch: (target, payload) => dispatch(target, payload, "tool"),
+          dispatch: (target, payload) => run(target, payload, "tool"),
         },
         /*
           ⚠️ The directory rides on a SYMBOL that `Ctx` does not declare, so a
@@ -513,7 +554,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
 
       try {
-        const out = await dispatch(op, input, "http");
+        const out = await run(op, input, "http");
         const res = Response.json(out);
         for (const c of cookies) res.headers.append("set-cookie", c);
         return res;
@@ -556,4 +597,5 @@ const refusalProblem = (refusal: string): Omit<Problem, "ref"> =>
   refusal === "standing"
     ? { code: "platform.read_only", status: 402, title: "This workspace is read-only", retryable: false }
     : { code: "platform.forbidden", status: 403, title: "You don't have access to this", retryable: false };
+
 

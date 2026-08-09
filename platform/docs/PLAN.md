@@ -901,6 +901,11 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `ladder-anchor` | a ladder anchor re-stamped on every retry, so a workspace never advances past the first rung however long it stays unpaid | **live** |
 | `query-coercion` | a query string coerced by inspecting the value rather than the declaration, which turns ?code=0123 into 123 | **live** |
 | `renewal-claimable` | a webhook that never records the customer it just placed, so every renewal — which carries no metadata of ours — parks and the workspace's plan quietly lapses | **live** |
+| `emits-declared` | an operation raising an event no notification declares — a subscription nobody can make, and a notification with no copy, icon or destination | **live** |
+| `notification-link` | a notification linking somewhere the app does not have, which renders and then goes nowhere | **live** |
+| `inbox-never-optional` | a preference that removes the RECORD rather than the interruption, so 'I never got that' has no answer that does not depend on a mail provider | **live** |
+| `action-not-mutable` | an `action` notification that can be switched off, which makes the product silently stop working for whoever switched it off | **live** |
+| `notification-audience` | a dispatch that names its own recipients rather than reading the registry — 'everybody' and 'nobody' have both shipped | **live** |
 | `manifest-diff` | a deploy removing a plan, permission or entitlement somebody holds | stage 6 |
 | `app-test-budget` | an app's own suite crossing its duration cap — the fixture problem gets solved rather than tolerated | stage 6 |
 | `help-limits` | a help article over its length limit, naming a surface the manifest does not declare, or using developer vocabulary | stage 6 |

@@ -734,6 +734,51 @@
       "impl": "hello/test/provider.test.ts",
       "proves": "so the renewal after it is claimed",
       "fails": "a webhook that never records the customer it just placed, so every renewal \u2014 which carries no metadata of ours \u2014 parks and the workspace's plan quietly lapses"
+    },
+    {
+      "id": "emits-declared",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses an operation raising an event no notification declares",
+      "fails": "an operation raising an event no notification declares \u2014 a subscription nobody can make, and a notification with no copy, icon or destination"
+    },
+    {
+      "id": "notification-link",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses a link to a collection this app does not have",
+      "fails": "a notification linking somewhere the app does not have, which renders and then goes nowhere"
+    },
+    {
+      "id": "inbox-never-optional",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "kernel/test/notify.test.ts",
+      "proves": "keeps writing the inbox row for a category the person has muted",
+      "fails": "a preference that removes the RECORD rather than the interruption, so 'I never got that' has no answer that does not depend on a mail provider"
+    },
+    {
+      "id": "action-not-mutable",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "kernel/test/notify.test.ts",
+      "proves": "refuses to let the one category that blocks the product be silenced",
+      "fails": "an `action` notification that can be switched off, which makes the product silently stop working for whoever switched it off"
+    },
+    {
+      "id": "notification-audience",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "runtime/test/inbox.test.ts",
+      "proves": "tells only the roles the type is for",
+      "fails": "a dispatch that names its own recipients rather than reading the registry \u2014 'everybody' and 'nobody' have both shipped"
     }
   ]
 }
