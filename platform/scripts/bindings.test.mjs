@@ -179,6 +179,44 @@ ok(`reachable: ${appDirs.length} app(s), ${unreachable} module(s) declared and u
 
 /* -------------------------------------------------------------------------- */
 
+/* -------------------------------------------------- 5. THE OBJECT STORE --- */
+
+/**
+ * ⚠️ ONE MODULE MAY TOUCH THE OBJECT STORE, AND THE REASON IS ACCOUNTING.
+ *
+ * An object written outside the ledger is invisible to the quota and invisible
+ * to erasure, forever. It costs money every month, it survives the workspace
+ * that made it being forgotten, and nothing anywhere reports it — the only way
+ * to find one is to list a bucket by hand and compare.
+ *
+ * A shipping product needed this as a guard across three apps, and it caught a
+ * real one. Here the ledger is a chokepoint by construction; this is what stops
+ * a second door being added later by somebody who only needed to write one file.
+ */
+const OBJECT_DOOR = "runtime/src/files.js";
+
+/**
+ * ⚠️ THE DISCRIMINATOR IS THE HANDLE'S TYPE, NOT THE METHOD NAME. `put` and
+ * `delete` are the two most common method names in the language — a durable
+ * object's own storage has both — so matching on them alone reported a correct
+ * file on the first run. A file only reaches the object store if it is HOLDING
+ * one, and holding one means naming the type.
+ */
+const HOLDS_HANDLE = /\bObjectHandle\b/;
+const WRITES = /\.(put|delete)\s*\(/;
+
+for (const file of files) {
+  const r = rel(file);
+  if (r === "runtime/src/files.ts" || r === "runtime/src/env.ts") continue;
+  const src = stripComments(readFileSync(file, "utf8"));
+  if (HOLDS_HANDLE.test(src) && WRITES.test(src)) {
+    fail(`${r}: writes to the object store outside the ledger.\n` +
+         `       Go through ${OBJECT_DOOR}. An object with no ledger row is invisible to the\n` +
+         `       quota and to erasure forever, and nothing else would ever notice.`);
+  }
+}
+ok(`object door: ${files.length} source file(s), one module writes objects`);
+
 if (bad) {
   console.error(`\n${bad} chokepoint failure(s).`);
   process.exit(1);

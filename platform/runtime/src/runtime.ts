@@ -15,16 +15,18 @@
 
 import type {
   Actor, AnyOperation, AppSpec, AuditEntry, BindingSpec, Caller, Ctx, Instant, Problem,
-  ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
+  ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
 } from "@one/kernel";
 import {
-  ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, PLATFORM_PROBLEMS,
+  ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, PLATFORM_PROBLEMS, STORAGE_ENTITLEMENT,
   fromQuery, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
 import { COMMERCE, commerceOperations, customerOperations, providerOperations, type CommerceCarrier } from "./commerce-ops.js";
 import { INBOX, inboxOperations, type InboxCarrier } from "./inbox-ops.js";
 import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
+import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files-ops.js";
+import { fetchMedia, usedBytes } from "./files.js";
 import { readMaintenance, refuses } from "./maintenance.js";
 import { dispatch, interpolatable, type Delivery } from "./inbox.js";
 import { customerFlagsFor, PARKED, readSubscription, standingFor } from "./commerce.js";
@@ -152,6 +154,8 @@ export interface RuntimeOptions<B extends BindingSpec> {
    * and the sweep reported success while a deleted workspace kept eighteen.
    */
   readonly regionalModules?: readonly SchemaModule[];
+  /** Where files live. `media` by convention, named so an app may differ. */
+  readonly objectsBinding?: keyof B & string;
   /**
    * The NAME of the deployment variable holding the provider's signing secret.
    *
@@ -201,7 +205,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -257,6 +261,14 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       const row = await db.first<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table} WHERE tenant_id = ?`, tenantId);
       return row?.n ?? 0;
     });
+  }
+  /*
+    ⚠️ THE PLATFORM COUNTS ITS OWN CEILING. Storage is bytes stored rather than
+    rows kept, so no collection can count it — and leaving it to the app would
+    make an upload surface that silently enforces nothing the default.
+  */
+  if (Object.keys(app.filePurposes ?? {}).length) {
+    counters.set(STORAGE_ENTITLEMENT, (db, tenantId) => usedBytes(db, tenantId));
   }
   for (const op of byPath.values()) {
     if (op.quota && !counters.has(op.quota) && !opts.countQuota) {
@@ -470,8 +482,19 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         document — key order, number formatting and unicode escaping are all free
         to differ, and the failure is intermittent rather than total.
       */
-      const bodyText = request.method === "GET" ? "" : await request.text();
-      const raw = request.method === "GET"
+      /*
+        ⚠️ AN UPLOAD IS READ AS BYTES AND NEVER AS TEXT. Decoding a photograph as
+        UTF-8 replaces every invalid sequence with a replacement character, and
+        re-encoding it produces a file that is the right length, the right type,
+        and corrupt — with nothing anywhere reporting a failure.
+
+        Everything ABOUT the file travels in the query string, so the body stays
+        exactly what the browser sent and progress can be reported on it.
+      */
+      const isUpload = op.id === "file.upload";
+      const rawBody = isUpload ? await request.arrayBuffer() : new ArrayBuffer(0);
+      const bodyText = request.method === "GET" || isUpload ? "" : await request.text();
+      const raw = request.method === "GET" || isUpload
         ? fromQuery(op.input.json, Object.fromEntries(url.searchParams))
         : ((): unknown => { try { return JSON.parse(bodyText || "{}"); } catch { return {}; } })();
 
@@ -533,8 +556,25 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier = {
         [INBOX]: { db: regionalDb, tenantId: at.tenant?.tenantId ?? "", userId: session?.accountId ?? null },
+        [FILES]: {
+          db: regionalDb,
+          objects: bind[opts.objectsBinding ?? "media"] as ObjectHandle,
+          tenantId: at.tenant?.tenantId ?? "",
+          actorId: actor.userId ?? "system",
+          body: rawBody,
+          /*
+            ⚠️ THE TYPE COMES FROM THE HEADER AND IS TRIMMED OF ITS PARAMETERS.
+            A browser sends `image/jpeg` and a form sends
+            `multipart/form-data; boundary=…`; comparing the whole header against
+            a declared list refuses the first the day somebody adds a charset.
+          */
+          contentType: (request.headers.get("content-type") ?? "").split(";")[0]!.trim(),
+          fileName: url.searchParams.get("name") ?? "",
+          purpose: url.searchParams.get("purpose") ?? "",
+          allowance: allowanceFrom(caller.entitlements[STORAGE_ENTITLEMENT]),
+        },
         [DATA]: {
           db: regionalDb,
           tenantId: at.tenant?.tenantId ?? "",
@@ -591,6 +631,33 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
 
       try {
         const out = await run(op, input, "http");
+
+        /*
+          ⚠️ A FILE READ ANSWERS WITH THE BYTES, NOT WITH JSON ABOUT THEM. An
+          envelope means base64, which is a third larger, cannot be streamed and
+          cannot be put in an `<img>` — so every consumer decodes it by hand and
+          one of them gets it wrong.
+
+          It is still an OPERATION: the same gates, the same row scope, the same
+          audit. Only the envelope differs.
+        */
+        if (op.id === "file.read" && at.tenant) {
+          const found = await fetchMedia(regionalDb, bind[opts.objectsBinding ?? "media"] as ObjectHandle, at.tenant.tenantId, (input as { id: string }).id);
+          if (found) {
+            const bytes = new Response(found.body, {
+              headers: {
+                "content-type": found.row.contentType,
+                /* ⚠️ PRIVATE. A shared cache holding one workspace's photograph
+                   is the one place a caching header is a disclosure. */
+                "cache-control": "private, max-age=3600",
+                "content-disposition": `inline; filename="${found.row.name.replace(/["\\]/g, "")}"`,
+              },
+            });
+            for (const c of cookies) bytes.headers.append("set-cookie", c);
+            return bytes;
+          }
+        }
+
         const res = Response.json(out);
         for (const c of cookies) res.headers.append("set-cookie", c);
         return res;

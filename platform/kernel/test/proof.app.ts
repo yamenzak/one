@@ -221,6 +221,16 @@ export const kova = defineApp({
   },
 
   /* ⚠️ PRODUCT COPY. A file path, a type name or a pull-request number here is refused. */
+  /*
+    ⚠️ A PURPOSE IS A POLICY, not a folder. What may be uploaded here, which
+    types, how large — and a free-form string makes every one of those questions
+    unanswerable at the moment somebody is uploading.
+  */
+  filePurposes: {
+    progressPhoto: { label: "Progress photo", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000 },
+    exerciseClip: { label: "Exercise demonstration", accept: ["video/mp4"], maxBytes: 20_000_000 },
+  },
+
   releases: [
     { version: "0.1.0", at: "2026-01-15", notes: ["You can now sell packages that renew.", "Progress reports load faster on a phone."] },
   ],

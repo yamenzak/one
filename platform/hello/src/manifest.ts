@@ -132,13 +132,13 @@ export const hello = defineApp({
     weekStart: 1,
   },
   access: {
-    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close"],
+    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write"],
     /*
       Anybody signed in may open a workspace — this is a self-serve product, and
       `workspace:create` is checked on a door that has no tenant to be a member
       of, so a role is the only place it could come from.
     */
-    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close"], reader: ["note:read"] },
+    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write"], reader: ["note:read"] },
     /*
       ⚠️ EVERY ENTRY NAMES HOW IT IS WITHHELD, and `defineApp` refuses one whose
       mechanism does not exist. `notes` is gated on the collection rather than on
@@ -148,6 +148,9 @@ export const hello = defineApp({
     entitlements: {
       notes: { parked: true, enforcement: "gate" },
       receiptsStored: { parked: 5, enforcement: "quota" },
+      /* ⚠️ BYTES, not files. A ceiling counted in rows is one a single large
+         upload walks straight past. */
+      storedBytes: { parked: 2_000_000, enforcement: "quota" },
     },
     plans: [
       {
@@ -156,7 +159,7 @@ export const hello = defineApp({
         price: { minor: 0, currency: "EUR" as Currency },
         period: "month",
         trialDays: 0,
-        entitlements: { notes: true, receiptsStored: 5 },
+        entitlements: { notes: true, receiptsStored: 5, storedBytes: 2_000_000 },
       },
       {
         id: "keeper",
@@ -164,7 +167,7 @@ export const hello = defineApp({
         price: { minor: 500, currency: "EUR" as Currency },
         period: "month",
         trialDays: 14,
-        entitlements: { notes: true, receiptsStored: UNLIMITED },
+        entitlements: { notes: true, receiptsStored: UNLIMITED, storedBytes: 50_000_000 },
       },
     ],
     /*
@@ -240,6 +243,11 @@ export const hello = defineApp({
       body: "A receipt records an amount and the day it happened. Once you submit one it stops being editable, which is the point of it.",
       surfaces: ["receipt"],
     },
+  },
+
+  /* ⚠️ A closed set: what may be uploaded, which types, how large. */
+  filePurposes: {
+    attachment: { label: "Attachment", accept: ["image/jpeg", "image/png", "text/plain"], maxBytes: 4_000_000 },
   },
 
   releases: [

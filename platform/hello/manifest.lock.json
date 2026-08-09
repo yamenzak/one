@@ -8,6 +8,8 @@
     "billing:operate",
     "commerce:manage",
     "commerce:read",
+    "file:read",
+    "file:write",
     "inbox:read",
     "note:read",
     "note:write",
@@ -22,7 +24,8 @@
   ],
   "entitlements": [
     "notes",
-    "receiptsStored"
+    "receiptsStored",
+    "storedBytes"
   ],
   "operations": [
     "note.activity",

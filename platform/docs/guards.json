@@ -868,6 +868,42 @@
       "impl": "cli/test/scaffold.node.test.ts",
       "proves": "refuses a door and a platform package",
       "fails": "an app id that is not a DNS label, or one that is a door \u2014 it is the relying party's subdomain, the value stamped into every payment object, and not renameable"
+    },
+    {
+      "id": "object-door",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "scripts/bindings.test.mjs",
+      "proves": "HOLDS_HANDLE.test(src) && WRITES.test(src)",
+      "fails": "a write to the object store outside the media ledger \u2014 an object with no ledger row is invisible to the quota and to erasure forever, costs money every month, and nothing else would ever notice"
+    },
+    {
+      "id": "metadata-stripped",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "runtime/test/files.test.ts",
+      "proves": "says so rather than claiming a format it does not parse",
+      "fails": "a stored file recorded as stripped when its format was never parsed \u2014 a written claim that somebody's location was removed when it was not, and stripping later never fixes what is already stored"
+    },
+    {
+      "id": "storage-counts-stored",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "runtime/test/files.test.ts",
+      "proves": "refuses the file that would CROSS the workspace ceiling, not merely the one after it",
+      "fails": "a storage ceiling checked as 'are we full', which admits one more file of any size \u2014 the difference between a limit and a suggestion"
+    },
+    {
+      "id": "file-read-is-bytes",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "hello/test/files.test.ts",
+      "proves": "never lets a shared cache keep it",
+      "fails": "a file served through a JSON envelope, or one a shared cache may keep \u2014 a shared cache holding one workspace's photograph is the one place a caching header is a disclosure"
     }
   ]
 }

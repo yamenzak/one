@@ -246,6 +246,7 @@ const base = {
   collections: [] as CollectionSpec[],
   notifications: {} as Record<string, NotificationDef>,
   help: {} as HelpRegistry,
+  filePurposes: {},
   releases: [] as Release[],
   problems: {},
   operations: [] as never[],

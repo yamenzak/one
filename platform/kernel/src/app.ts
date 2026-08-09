@@ -26,6 +26,29 @@ import type { ProblemCatalog, ProblemDef } from "./problem.js";
 import { PLATFORM_PROBLEMS } from "./problem.js";
 import type { OperationSpec } from "./operation.js";
 
+/**
+ * ⚠️ `accept` IS THE CONTENT TYPE, NOT THE EXTENSION. An extension is whatever
+ * somebody typed; the content type is what the browser said and what the reader
+ * will trust.
+ */
+/**
+ * ⚠️ THE ONE ENTITLEMENT KEY THE PLATFORM ITSELF ENFORCES, and it is named here
+ * so an app cannot choose a different word for it.
+ *
+ * Storage is a ceiling every app with files has, counted the same way — bytes
+ * stored, not files kept — and the operation that counts against it is the
+ * platform's. An app that declared its own key would get a ceiling nothing
+ * checks, which is the exact failure the coverage rule exists for.
+ */
+export const STORAGE_ENTITLEMENT = "storedBytes";
+
+export interface FilePurpose {
+  readonly accept: readonly string[];
+  readonly maxBytes: number;
+  /** One line, for the picker. What this is for, in the reader's words. */
+  readonly label: string;
+}
+
 /* -------------------------------------------------------------- identity --- */
 
 /**
@@ -190,6 +213,16 @@ export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = Probl
    * no longer exists.
    */
   readonly help: HelpRegistry;
+  /**
+   * ⚠️ WHAT MAY BE UPLOADED, AS A CLOSED SET. A purpose is a POLICY — what a
+   * file is for, which types it takes, how large it may be — and a free-form
+   * string makes every one of those questions unanswerable at the moment they
+   * matter, which is the moment somebody is uploading.
+   *
+   * Empty means this app takes no files at all, and the whole surface is absent
+   * rather than present and refusing.
+   */
+  readonly filePurposes: Readonly<Record<string, FilePurpose>>;
   /** The changelog, as product copy. A commit message here is refused. */
   readonly releases: readonly Release[];
   /**
@@ -261,6 +294,7 @@ export function undeclaredEmits(spec: {
 
 export function coverage(spec: {
   readonly access: AccessSpec;
+  readonly filePurposes?: Readonly<Record<string, FilePurpose>>;
   /**
    * ⚠️ COLLECTIONS COUNT, and forgetting them would make this check vacuous for
    * exactly the apps it matters most to. An app whose whole surface is derived
@@ -280,6 +314,13 @@ export function coverage(spec: {
     if (c.entitlement) gated.add(c.entitlement);
     if (c.quota) quotaed.add(c.quota);
   }
+  /*
+    ⚠️ THE PLATFORM'S OWN DERIVED OPERATIONS COUNT TOO. An app that declares a
+    file purpose gets an upload it did not write, and that upload counts against
+    storage — so a coverage check reading only what the APP declared would
+    report the ceiling as unenforced and refuse a perfectly correct manifest.
+  */
+  if (Object.keys(spec.filePurposes ?? {}).length) quotaed.add(STORAGE_ENTITLEMENT);
   for (const op of spec.operations) {
     if (op.entitlement) gated.add(op.entitlement);
     if (op.quota) quotaed.add(op.quota);
@@ -349,6 +390,7 @@ export function defineApp<
 export function assertComposable(spec: {
   readonly id: string;
   readonly access: AccessSpec;
+  readonly filePurposes?: Readonly<Record<string, FilePurpose>>;
   readonly collections: readonly CollectionSpec[];
   readonly notifications: NotificationRegistry;
   readonly help: HelpRegistry;

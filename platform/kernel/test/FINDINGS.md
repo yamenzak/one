@@ -1287,3 +1287,68 @@ The first thing anybody does with this repository is scaffold an app, and that
 happens in a fresh checkout before `pnpm install`. A CLI that needed the
 workspace installed and built would be unable to do the one thing it exists for
 at the only moment it matters.
+
+## 105. Metadata is stripped on the way in or it is not stripped
+
+A phone photograph carries GPS coordinates, a device serial, the owner's name
+and a timestamp to the second. A client photographs a meal at home and the file
+knows where they live; a coach shares a progress photo and it carries the model
+and serial of the phone that took it.
+
+Stripping later fixes nothing: every copy already taken, every cache, every
+backup and every link already shared still has it. So it runs before the object
+exists, and the pixels are copied byte for byte — no re-encode, because
+re-compressing every photograph a product stores is something nobody asked for.
+
+## 106. A format nobody parsed must not be recorded as stripped
+
+`confident: false` means "this format was not understood", not "there was
+nothing to remove". A ledger recording `true` for a format the stripper skipped
+is a written claim that somebody's location was removed when it was not — which
+is worse than not offering the feature at all, because it is believed.
+
+The PNG rule is the general form: keep chunks whose first letter is uppercase,
+because that is the format's own definition of critical, and every metadata
+chunk is ancillary by construction. Naming the four that exist today would miss
+the one somebody invents next year, which is exactly how a stripper goes quietly
+out of date.
+
+## 107. A storage ceiling checked as "are we full" admits one more file of any size
+
+For rows that is a rounding error. For media it is the difference between a
+limit and a suggestion: a workspace one byte under its limit can be handed a
+gigabyte. The incoming file has to be counted, which means the check happens
+after the bytes are in hand and before the object is written — and stripping
+comes first, because the size that counts is the size that is stored.
+
+Two ceilings, refusing with different codes. Over the per-file limit is a 400:
+the file is wrong and a smaller one would work. Over the workspace's is a 402:
+nothing about the file is wrong and the way out is deleting something or paying.
+
+## 108. Deleting the ledger row first is choosing the better failure
+
+If the object delete fails afterwards, an orphan stays in the bucket — money,
+and a cleanup job. If the row went last and the object delete had succeeded, the
+row would point at nothing: a broken image on somebody's screen with no way to
+tell it from a bug. Of two failures, take the one that costs money over the one
+that looks like a defect.
+
+## 109. `put` and `delete` are the two most common method names in the language
+
+The object-store chokepoint first matched on the method name and immediately
+reported a correct file: a durable object's own storage has both. The
+discriminator has to be the HANDLE'S TYPE — a file can only reach the object
+store if it is holding one, and holding one means naming the type.
+
+Third time a widened guard has found a bug in itself before finding one in the
+code. Budget for it.
+
+## 110. The returned record and the stored record can disagree
+
+`storeMedia` returns a row it assembles in memory and writes a row to the
+ledger, and a mutation that wrote the wrong value into one column while
+returning the right one survived every assertion — because every assertion read
+the return value.
+
+What anybody looks at later is the stored row. A test that asserts the return
+value proves the function agrees with itself, which it always does.

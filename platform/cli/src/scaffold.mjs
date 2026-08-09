@@ -234,16 +234,19 @@ export const ${id.replace(/-/g, "")} = defineApp({
   },
 
   access: {
-    permissions: ["record:read", "record:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read"],
+    permissions: ["record:read", "record:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "file:read", "file:write"],
     roles: {
-      owner: ["record:read", "record:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read"],
-      reader: ["record:read", "inbox:read"],
+      owner: ["record:read", "record:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "file:read", "file:write"],
+      reader: ["record:read", "inbox:read", "file:read"],
     },
     /* ⚠️ Every entry names HOW it is withheld, and composition refuses one whose
        mechanism does not exist. \`parked\` is what a workspace that never chose a
        plan gets — and what a deployment with no payment rail at all serves. */
     entitlements: {
       records: { parked: true, enforcement: "gate" },
+      /* ⚠️ BYTES, NOT FILES. A ceiling counted in rows is one a single large
+         upload walks straight past. The platform enforces this key itself. */
+      storedBytes: { parked: 20_000_000, enforcement: "quota" },
     },
     plans: [
       {
@@ -252,7 +255,7 @@ export const ${id.replace(/-/g, "")} = defineApp({
         price: { minor: 0, currency: "EUR" as Currency },
         period: "month",
         trialDays: 0,
-        entitlements: { records: true },
+        entitlements: { records: true, storedBytes: 20_000_000 },
       },
     ],
     customerRail: false,
@@ -283,6 +286,13 @@ export const ${id.replace(/-/g, "")} = defineApp({
       category: "billing", tone: "success", icon: "gift",
       title: "{days} days added", link: { to: "inbox" }, roles: ["owner"],
     },
+  },
+
+  /* ⚠️ A closed set: what may be uploaded, which types, how large. A purpose is
+     a POLICY, and a free-form string makes every question about it unanswerable
+     at the moment somebody is uploading. */
+  filePurposes: {
+    attachment: { label: "Attachment", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000 },
   },
 
   help: {
@@ -326,7 +336,7 @@ import { deriveSchema, type Actor, type Resolved, type Session } from "@one/kern
 import {
   ACTIVITY_SCHEMA, applySchema, COMMERCE_SCHEMA, createRuntime, DIRECTORY_SCHEMA,
   DOMAIN_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA,
-  PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
+  MEDIA_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
 } from "@one/runtime";
 import { ${id.replace(/-/g, "")}, records } from "./manifest.js";
 
@@ -337,7 +347,7 @@ if (derived.problems.length) throw new Error(\`${id}: \${derived.problems.map((p
    trusting the array, because a wrong order produces an ALTER against a table
    that does not exist yet, swallowed, leaving a column that never appeared. */
 const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, PLATFORM_STATE_SCHEMA];
-export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, INBOX_SCHEMA, derived.module];
+export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, INBOX_SCHEMA, MEDIA_SCHEMA, derived.module];
 
 /**
  * ⚠️ IDENTITY IS THE PLATFORM'S; AUTHORIZATION IS THE APP'S. What it returns is
@@ -367,6 +377,7 @@ const runtime = createRuntime(${id.replace(/-/g, "")}, {
   directoryBinding: "DIRECTORY",
   identityBinding: "DIRECTORY",
   sessionsBinding: "db",
+  objectsBinding: "media",
   /* ⚠️ Export and erasure are derived from these, so a module added later is
      covered by both paths on the same commit. */
   regionalModules: REGIONAL_MODULES,

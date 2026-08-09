@@ -923,6 +923,10 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `template-day-zero` | a scaffold missing a field `AppSpec` requires — read from the type itself, so a day-zero field added to the platform is a red run until the template sets it | **live** |
 | `template-mounts-modules` | a scaffold that imports a schema module and never composes it — the name is present, the reader sees it, and the table is never created | **live** |
 | `app-id-is-a-label` | an app id that is not a DNS label, or one that is a door — it is the relying party's subdomain, the value stamped into every payment object, and not renameable | **live** |
+| `object-door` | a write to the object store outside the media ledger — an object with no ledger row is invisible to the quota and to erasure forever, costs money every month, and nothing else would ever notice | **live** |
+| `metadata-stripped` | a stored file recorded as stripped when its format was never parsed — a written claim that somebody's location was removed when it was not, and stripping later never fixes what is already stored | **live** |
+| `storage-counts-stored` | a storage ceiling checked as 'are we full', which admits one more file of any size — the difference between a limit and a suggestion | **live** |
+| `file-read-is-bytes` | a file served through a JSON envelope, or one a shared cache may keep — a shared cache holding one workspace's photograph is the one place a caching header is a disclosure | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 
