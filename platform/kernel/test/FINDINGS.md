@@ -1235,3 +1235,55 @@ comment.
 Every way of coming in under it is a good change — fewer fixtures, a shared
 world, a unit test where an integration test was doing its work. The bad way,
 deleting coverage, is visible in the same diff.
+
+## 100. The value of a scaffold is not the typing it saves
+
+It is that everything the platform learned arrives switched on. A hand-started
+app is one where somebody chose which pieces to wire, and the pieces they did not
+choose are invisible: an inbox with no surface, a maintenance switch nothing
+reads, an erasure covering whichever tables were fashionable that week. Every
+audit this repository has run found exactly that shape, in every app.
+
+`one new` emits an app with the five doors, passkeys, a plan catalogue and the
+standing ladder, an inbox wired to what its operations emit, derived export and
+erasure, a maintenance switch and a manifest lock — before its author has made a
+single decision.
+
+## 101. A template rots silently and in one direction
+
+The platform gains a required field, a schema module, a wired capability, and the
+template keeps emitting what it emitted last year. Nothing fails: the generated
+app compiles, boots, and is missing precisely the thing that was added since
+anybody last looked at it.
+
+So the scaffold checks read the PLATFORM and compare — the required fields come
+from `AppSpec` itself, the schema modules from what the runtime exports. A list
+of expected strings would be a second copy of the template, rotting beside it.
+
+## 102. "Imported" is not "mounted", and searching the file cannot tell them apart
+
+The module check first asked whether each schema module's name appeared in the
+generated worker. A mutation that removed one from the composed array while
+leaving the import survived — the name was there, a reader would see it, and the
+table would never be created.
+
+It reads the two `_MODULES = [...]` arrays now. The general form: when a check
+asks "is X present", establish where present has to mean something.
+
+## 103. Generating the app for real is the only test of a generator
+
+Two template bugs surfaced on the first generated run and neither was findable by
+inspection. The boot test asked a workspace address nobody had taken for a price
+list and got a 404 — correct behaviour, wrong premise. And the manifest declared
+one region while pointing its directory at another, so every tenantless door
+resolved to a binding that did not exist and the sign-in screen answered 503.
+
+Both are the kind of mistake a template makes once and every app inherits
+forever.
+
+## 104. The CLI is plain JavaScript because of when it runs
+
+The first thing anybody does with this repository is scaffold an app, and that
+happens in a fresh checkout before `pnpm install`. A CLI that needed the
+workspace installed and built would be unable to do the one thing it exists for
+at the only moment it matters.

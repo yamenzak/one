@@ -1,0 +1,15 @@
+{
+  "name": "@one/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "`one new` — a whole app from one word. Plain JavaScript, so it runs in a fresh checkout before anything is installed.",
+  "bin": { "one": "./src/one.mjs" },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "devDependencies": { "typescript": "^5.9.3", "vitest": "^3.2.4" }
+}

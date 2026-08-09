@@ -841,6 +841,33 @@
       "impl": "runtime/test/data.test.ts",
       "proves": "reads a value nobody can parse as open rather than as closed",
       "fails": "an unreadable maintenance row read as closed, which takes a whole deployment down over a malformed string an operator would need a working request to fix"
+    },
+    {
+      "id": "template-day-zero",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "cli/test/scaffold.node.test.ts",
+      "proves": "sets every required field",
+      "fails": "a scaffold missing a field `AppSpec` requires \u2014 read from the type itself, so a day-zero field added to the platform is a red run until the template sets it"
+    },
+    {
+      "id": "template-mounts-modules",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "cli/test/scaffold.node.test.ts",
+      "proves": "mounts every schema module the runtime ships",
+      "fails": "a scaffold that imports a schema module and never composes it \u2014 the name is present, the reader sees it, and the table is never created"
+    },
+    {
+      "id": "app-id-is-a-label",
+      "group": "platform",
+      "stage": "6",
+      "status": "live",
+      "impl": "cli/test/scaffold.node.test.ts",
+      "proves": "refuses a door and a platform package",
+      "fails": "an app id that is not a DNS label, or one that is a door \u2014 it is the relying party's subdomain, the value stamped into every payment object, and not renameable"
     }
   ]
 }

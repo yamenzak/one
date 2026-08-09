@@ -12,7 +12,7 @@ kind: index
 | | |
 |---|---|
 | active | none |
-| shipped | 0, 1, 2, 3, 4, 5 |
+| shipped | 0, 1, 2, 3, 4, 5, 6 |
 | open deferrals | 0 — see [DEFERRED.md](DEFERRED.md) |
 
 ⚠️ Resuming after a break, or after a compressed conversation?
@@ -23,6 +23,7 @@ than from recall — that is the whole design.
 
 | | |
 |---|---|
+| `@one/cli` | `one new` — a whole app from one word. Plain JavaScript, so it runs in a fresh checkout before anything is installed. |
 | `@one/hello` | a manifest, one collection, three operations. It exists to boot — every stage's exit criterion is asserted against it. |
 | `@one/kernel` | primitives, bindings, problems, collections, operations and defineApp. TYPES ONLY — stage 0 proves the shape before anything implements it. |
 | `@one/runtime` | the ONLY code that touches a raw binding. Resolves a request to a door, a tenant, a region and a set of handles, applies the composed schema, and dispatches operations. |
