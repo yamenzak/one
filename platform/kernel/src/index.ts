@@ -25,6 +25,8 @@ export * from "./membership.js";
 export * from "./schema.js";
 export * from "./collection.js";
 export * from "./resolve.js";
+export * from "./ddl.js";
+export * from "./document.js";
 export * from "./operation.js";
 export * from "./surface.js";
 export * from "./app.js";

@@ -11,7 +11,7 @@ kind: index
 
 | | |
 |---|---|
-| active | **0** — Contracts — the four core types<br>**1** — Kernel — bindings, identity, tenancy, regions, standing<br>**2** — Surface — operations to routes, tools, webhooks, OpenAPI |
+| active | **0** — Contracts — the four core types<br>**1** — Kernel — bindings, identity, tenancy, regions, standing<br>**2** — Surface — operations to routes, tools, webhooks, OpenAPI<br>**3** — Data — collections, ledger, files, jobs, relocation |
 | shipped | none yet |
 | open deferrals | 5 — see [DEFERRED.md](DEFERRED.md) |
 

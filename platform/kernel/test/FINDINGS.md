@@ -344,3 +344,71 @@ with nothing failing anywhere.
 `DEFER` markers carry these; they are not prose here. Identity and Better Auth,
 config, schema composition, and turning `regionalBindings` from a shape into a
 real resolver.
+
+---
+
+# Stage 3 findings — data
+
+## 23. The derived DDL is put through the runner's own validator
+
+Stage 1's rules exist because each fails SILENTLY: a missing terminator
+concatenates statements, a `--` swallows the batch, a non-idempotent `CREATE`
+breaks the second run. A generator is precisely the thing that could violate them
+at scale and consistently.
+
+So `deriveSchema`'s output is fed to `validateModule` and `validateComposition`
+rather than trusted alongside them. That assertion is where stages 1 and 3 meet,
+and it is the cheapest possible way to keep a generator honest.
+
+## 24. A column collision has to be caught by us, not by SQLite
+
+`lastSeen` and `last_seen` both become `last_seen`. SQLite would reject the
+`CREATE` naming the column but not the two declarations that produced it — and a
+field colliding with a SYSTEM column (`version`, `id`, `tenant_id`) would shadow
+machinery the platform depends on, which is worse than a rejection.
+
+`deriveSchema` returns problems rather than throwing, because a generator that
+stops at the first one reports one of five.
+
+## 25. Money becoming two columns is what makes the type real
+
+`Money` as a type is a promise; `total_minor INTEGER` + `total_currency TEXT` is
+the promise kept. A single `REAL` column would reintroduce the floating-point
+total the type exists to prevent, and an amount stored without its currency is a
+number somebody eventually adds to a different currency's number.
+
+Mutation-tested by collapsing it to one column.
+
+## 26. ⚠️ The naming series had a real bug on the first attempt
+
+`.YYYY.` is delimited on both sides because something follows it. The counter is
+written `.####` at the END of a series — `INV-.YYYY.-.####` — where there is
+nothing to delimit against, and requiring the closing dot left the placeholder in
+the output verbatim.
+
+Every document would have been named `INV-2026-.####`. Caught by a test written
+against the convention people actually write rather than against the
+implementation, which is the argument for writing the assertion from the
+requirement.
+
+## 27. Optimistic concurrency is about the tool, not the two humans
+
+Two people editing one record is the case everybody pictures when arguing for a
+version column. The case that actually bites is a tool call racing a person:
+same defect, worse timing, and nobody watching. The assistant reads, the person
+saves, the assistant writes back what it read, and the person's change is gone
+with no error anywhere.
+
+The expected version must come from the READ the writer based its change on,
+which is why it is a parameter rather than something the function could look up
+for itself — a lookup would compare the row to itself and always succeed.
+
+## 28. Relocation and erasure derive from one declaration, and media is COPIED
+
+A relocation is the purge with `SELECT` instead of `DELETE`, so a collection
+cannot be forgotten by one without being forgotten by the other.
+
+⚠️ Media is copy-only. A content-addressed object is referenced by every tenant
+whose content hashed the same; moving it breaks all of them, and the breakage
+surfaces weeks later on a device replaying a cached manifest offline. The bucket
+deduplicates; the accounting does not.
