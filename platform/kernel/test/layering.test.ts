@@ -21,8 +21,12 @@ const LAYER: Record<string, number> = {
   "primitives.ts": 0,
   "bindings.ts": 1,
   "problem.ts": 1,
+  "doors.ts": 1,
+  "standing.ts": 1,
+  "directory.ts": 2,
   "collection.ts": 2,
   "operation.ts": 3,
+  "resolve.ts": 3,
   "app.ts": 4,
   "index.ts": 5,
 };

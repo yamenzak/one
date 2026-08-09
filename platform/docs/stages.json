@@ -1,32 +1,72 @@
 {
   "$comment": [
-    "THE STAGE REGISTRY — what a DEFER marker is allowed to name.",
+    "THE STAGE REGISTRY \u2014 what a DEFER marker is allowed to name.",
     "",
     "`scripts/docs.test.mjs` reads this file. A DEFER naming a stage that is not",
     "here fails; a DEFER naming a stage whose status is `shipped` fails.",
     "",
-    "⚠️ THAT SECOND RULE IS THE WHOLE MECHANISM. Flipping a stage to `shipped`",
+    "\u26a0\ufe0f THAT SECOND RULE IS THE WHOLE MECHANISM. Flipping a stage to `shipped`",
     "is what forces every deferral pointing at it to be done, re-targeted with a",
     "reason, or deleted on purpose. A stage cannot be declared finished while",
-    "something still expects work from it — which is exactly the failure that",
+    "something still expects work from it \u2014 which is exactly the failure that",
     "made this registry necessary: a sentence in a document survives a",
     "compressed conversation, and the intent behind it does not.",
     "",
-    "Stages mirror docs/ONE-PLATFORM.md §8. Keep the ids stable — a marker in a",
+    "Stages mirror docs/ONE-PLATFORM.md \u00a78. Keep the ids stable \u2014 a marker in a",
     "file elsewhere in the repo names one of them.",
     "",
     "status: planned | active | shipped"
   ],
   "stages": [
-    { "id": "0", "title": "Contracts — the four core types", "status": "active" },
-    { "id": "1", "title": "Kernel — bindings, identity, tenancy, regions, standing", "status": "planned" },
-    { "id": "2", "title": "Surface — operations to routes, tools, webhooks, OpenAPI", "status": "planned" },
-    { "id": "3", "title": "Data — collections, ledger, files, jobs, relocation", "status": "planned" },
-    { "id": "4", "title": "Renderer — shell, nav, collection views, whitelabel, PWA", "status": "planned" },
-    { "id": "5", "title": "Commerce — plans, entitlements, flags, Stripe, metering", "status": "planned" },
-    { "id": "6", "title": "Ops — notifications, help, versioning, data centre, CI", "status": "planned" },
-    { "id": "7", "title": "Kova migration", "status": "planned" },
-    { "id": "8", "title": "Tessa and Scena migration", "status": "planned" },
-    { "id": "9", "title": "Delete packages/@4dl/* and apps/*", "status": "planned" }
+    {
+      "id": "0",
+      "title": "Contracts \u2014 the four core types",
+      "status": "active"
+    },
+    {
+      "id": "1",
+      "title": "Kernel \u2014 bindings, identity, tenancy, regions, standing",
+      "status": "active"
+    },
+    {
+      "id": "2",
+      "title": "Surface \u2014 operations to routes, tools, webhooks, OpenAPI",
+      "status": "planned"
+    },
+    {
+      "id": "3",
+      "title": "Data \u2014 collections, ledger, files, jobs, relocation",
+      "status": "planned"
+    },
+    {
+      "id": "4",
+      "title": "Renderer \u2014 shell, nav, collection views, whitelabel, PWA",
+      "status": "planned"
+    },
+    {
+      "id": "5",
+      "title": "Commerce \u2014 plans, entitlements, flags, Stripe, metering",
+      "status": "planned"
+    },
+    {
+      "id": "6",
+      "title": "Ops \u2014 notifications, help, versioning, data centre, CI",
+      "status": "planned"
+    },
+    {
+      "id": "7",
+      "title": "Kova migration",
+      "status": "planned"
+    },
+    {
+      "id": "8",
+      "title": "Tessa and Scena migration",
+      "status": "planned"
+    },
+    {
+      "id": "9",
+      "title": "Delete packages/@4dl/* and apps/*",
+      "status": "planned"
+    }
   ]
 }

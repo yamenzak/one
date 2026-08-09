@@ -12,6 +12,8 @@ kind: index
 
 - `one-001` — a builder that accumulates the operation union, so  
   <sub>kernel/src/app.ts:118</sub>
+- `one-004` — turn `regionalBindings` into a real resolver over  
+  <sub>kernel/src/resolve.ts:134</sub>
 
 ## Stage 2 — Surface — operations to routes, tools, webhooks, OpenAPI
 

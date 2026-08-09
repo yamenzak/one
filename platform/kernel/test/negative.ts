@@ -12,7 +12,10 @@
  * level 5.
  */
 
-import type { Instant, Money, PlainDate, Id } from "../src/primitives.js";
+import type { Instant, Money, PlainDate, Id, RegionId } from "../src/primitives.js";
+import { defineBindings, sql } from "../src/bindings.js";
+import { regionalBindings } from "../src/resolve.js";
+import type { DirectoryEntry } from "../src/directory.js";
 import type { CacheStore } from "../src/bindings.js";
 import { collection, field } from "../src/collection.js";
 import { operation } from "../src/operation.js";
@@ -121,3 +124,32 @@ export const unexplainedHide = operation({
     return { b: "" };
   },
 });
+
+/* --------------------------------------------------------------- regions --- */
+
+// ⚠️ THE ASSERTION BEHIND "no handler ever sees a raw binding".
+//
+// A regional store can only be reached with a region that came from a directory
+// lookup. A handler cannot guess one, cannot default to one, and cannot read one
+// from a header — the brand on `ResolvedRegion` has exactly one producer.
+//
+// In the legacy tree this rule is a lint over source text. Here it is the type
+// system, which is a level better on the ranking and costs a `unique symbol`.
+const someSpec = defineBindings({ db: sql() });
+// @ts-expect-error — "eu" is a RegionId, not a ResolvedRegion
+regionalBindings(someSpec).for("eu");
+
+// Nor can one be minted by asserting the string type.
+declare const plainRegion: RegionId;
+// @ts-expect-error — RegionId is not assignable to ResolvedRegion
+regionalBindings(someSpec).for(plainRegion);
+
+// ⚠️ And the directory may not grow a personal field. It is replicated to every
+// region precisely because nothing in it is governed by residency.
+export const leakyEntry: DirectoryEntry = {
+  tenantId: "t" as never, slug: "gym", region: "eu", domains: [],
+  standing: { standing: "active", reason: "ok" },
+  // @ts-expect-error — `ownerEmail` is not part of a directory entry (EXCESS
+  // property ⇒ annotate the property, as with a wrong value)
+  ownerEmail: "someone@example.com",
+};

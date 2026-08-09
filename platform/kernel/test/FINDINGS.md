@@ -39,16 +39,24 @@ cascade will read it.
 
 Verified negatively: `scope: { of: "platform" }` with no `why` does not compile.
 
-## 3. Annotating a *missing* field and a *wrong* field differ
+## 3. `@ts-expect-error` placement has three cases, not one
 
-`@ts-expect-error` for a missing required property must sit on the **call**;
-for a wrong value it sits on the **property**. Getting it backwards produces
-`TS2578: Unused '@ts-expect-error' directive`, which reads exactly like the
-guard having failed to fire.
+Where the directive goes depends on the KIND of mistake:
 
-Two of the first eight assertions were misplaced this way. Both guards were
-working. Worth knowing before writing the next negative proof, because the
-failure mode is a false negative that looks like a real one.
+| mistake | error is reported on |
+|---|---|
+| a **missing** required field | the call, or the declaration line |
+| a **wrong** value | the property |
+| an **excess** property | the property |
+
+Getting it backwards produces `TS2578: Unused '@ts-expect-error' directive`,
+which reads exactly like the guard having failed to fire. Three of eleven
+assertions across stages 0 and 1 were misplaced this way and every guard was
+working.
+
+Worth knowing before writing the next negative proof: the failure mode is a
+false negative that looks precisely like a real one, and the instinct on seeing
+it is to weaken the type rather than move the comment.
 
 ## 4. `AppSpec.operations` needs `any`, and that is a real gap
 
@@ -118,3 +126,65 @@ compiler rather than by review: epoch milliseconds as an instant, a wall date as
 an instant, a float as money, money without a currency, a client id as a plan id,
 a cache holding personal data, a collection without a version, an operation
 without an idempotency decision, and a tool hidden with no stated reason.
+
+
+---
+
+# Stage 1 findings — the resolution spine
+
+Doors, the global directory, region resolution, standing. Identity, config and
+schema composition are still ahead; this is the part everything else hangs off.
+
+## 8. The region brand works, and it replaces a lint
+
+`ResolvedRegion` is `RegionId` intersected with a `unique symbol`, produced by
+exactly one function and consumed by exactly one. So a handler cannot reach a
+regional store by guessing a region, defaulting to one, or reading one from a
+header — only by being handed the one its request resolved to.
+
+Verified negatively in all three forms a mistake would take: a literal (`"eu"`),
+a variable typed `RegionId`, and a bare `string`. And mutation-tested — deleting
+the brand fails the build with two unused directives.
+
+⚠️ **This is the rule the legacy tree enforces with a lint over source text**
+(`storage-chokepoint.test.mjs`), moved up a level. Same guarantee, checked by the
+compiler, no script to keep in step with the code.
+
+## 9. `unclaimed` had to be its own door
+
+A well-formed subdomain nobody owns and a *reserved* label must answer
+identically to an outsider, or probing for `admin` and `_acme-challenge` tells
+somebody which names are special. But the product needs the distinction
+internally, to explain a refused signup rather than a mysterious 404.
+
+Same status, same body, different `door`. A single `invalid` could not carry
+both, and a boolean beside it would have been read as "which 404 is this" rather
+than as a decision.
+
+## 10. Tenantless doors must not read the directory at all
+
+`root`, `setup`, `admin` and `device` resolve no tenant, and the test asserts
+this by injecting a directory that **throws** — so "does not need the lookup"
+is proved rather than assumed.
+
+⚠️ `device` is the one worth knowing. A screen resolves no tenant from its host
+because the tenant arrives from the pairing claim: a tenant subdomain would give
+every workspace's screens a different address, and re-pairing would orphan a
+cache that a television has been living on for months.
+
+## 11. The credential and the session now return different scopes, deliberately
+
+`relyingPartyFor` returns the PLATFORM root; `cookieDomainFor` returns the APP
+root. The test asserts they differ, which reads oddly until you know why: one
+passkey across every product is the feature, and one session across every product
+is the blast radius.
+
+A custom domain is excluded from both. WebAuthn requires the first — there is no
+suffix relationship to our root — and whitelabel requires the second, because a
+tenant's client bounced to a domain they do not recognise reads as phishing.
+
+## What stage 1 still owes
+
+`DEFER` markers carry these; they are not prose here. Identity and Better Auth,
+config, schema composition, and turning `regionalBindings` from a shape into a
+real resolver.

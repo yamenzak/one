@@ -14,7 +14,11 @@
  */
 export * from "./primitives.js";
 export * from "./bindings.js";
+export * from "./doors.js";
+export * from "./standing.js";
 export * from "./problem.js";
+export * from "./directory.js";
 export * from "./collection.js";
+export * from "./resolve.js";
 export * from "./operation.js";
 export * from "./app.js";
