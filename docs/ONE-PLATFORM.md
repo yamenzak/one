@@ -537,6 +537,136 @@ lookup changes shape while serving traffic; and the identity store has to be
 split or moved while people are signed in. Done in Stage 1, it is a resolver, a
 directory table and a lint rule.
 
+### 4.2 Moving a tenant — the engine, not the upsell
+
+The proposal was a paid on-demand switch between regions. **Build the mechanism,
+and build it earlier than a region feature would justify — but do not ship it as
+a €25 microtransaction.** Both halves of that need arguing.
+
+#### It is not a region feature. It is six features.
+
+"Move one tenant's entire footprint from store A to store B, verifiably, with a
+rollback" is the same operation as:
+
+| | |
+|---|---|
+| region change | the thing that was asked for |
+| **the GDPR data export** | on your list, and unbuilt in all three apps |
+| **backup and restore per tenant** | nobody has this today; it is a real gap |
+| tenant clone | demo studios, sandboxes, support reproduction |
+| evacuation | a degraded region, or a database that must be split |
+| ⚠️ **Kova's own per-tenant cutover** | §7 step 6 — *this is the same operation* |
+
+That last row is the argument for building it in Stage 3 rather than as a later
+add-on. §7 already requires moving production tenants one at a time from the old
+stack to `platform/kova` with a rollback. If the framework owns "relocate a
+tenant", that migration is a *call*, not a bespoke script written once under
+pressure against live customer data.
+
+#### Two thirds of it is already derived
+
+`tenantCascade(SCHEMA_MODULES)` returns every table holding a tenant's rows,
+derived from the `scoped` declaration each module carries. `applyCascade` runs
+`DELETE` over those steps. **The same steps with `SELECT` are a complete tenant
+export**, and `purge-cascade.test.ts` already fails on a table that carries a
+scope column and declares none — so a table added later cannot be silently
+skipped by the migration any more than it can be silently skipped by erasure.
+
+R2 is the same story: the media ledger already lists every object per tenant,
+because the quota needed it.
+
+⚠️ **Content-addressed objects are COPIED, never moved.** Scena's R2 key is the
+content hash and `library_tracks` is a platform-wide catalog, so one object may
+be referenced by many tenants. The ledger already models this correctly
+(`ledgerKey` = `<tenantId>:<hash>` — one row per tenant, one copy in the bucket).
+A migration that moves the object instead of the reference silently breaks every
+other tenant pointing at it, and the manifests those tenants' screens replay
+offline for weeks.
+
+#### The cost is the Durable Objects, and it compounds
+
+Eleven DO classes across four apps today — `TenantBillingDO` and `InboxDO`
+everywhere, plus Scena's `ScreenDO`, `ChannelDO`, `QueueDO`, `RoomBoardDO` and
+`ScoreDO`. **None of them can export or import its state.** DO storage cannot be
+relocated between jurisdictions, and a jurisdiction-scoped namespace mints
+different ids, so a move is: seal → export → create in the target jurisdiction →
+import → verify → repoint.
+
+⚠️ **This has to be a framework contract from Stage 1**, because every DO written
+before the rule exists is one that has to be retrofitted:
+
+```ts
+interface Relocatable {
+  seal(): Promise<{ hash: string }>;   // refuse further writes, return a fingerprint
+  exportState(): Promise<Uint8Array>;
+  importState(b: Uint8Array): Promise<void>;
+}
+```
+
+`seal()` is not ceremony. **`TenantBillingDO` holds the authoritative credit
+balance**, and a move that gets it wrong either mints credits or destroys them —
+silently, on the money path, which is the failure class this repo has the most
+scars from. The source must refuse writes and must never be reopened; that is a
+state machine on the object, not a discipline in a script.
+
+#### The window is a mechanism you already have
+
+Do not build dual-write or a change-log replay. **Put the tenant in `readOnly`
+for the duration** — a first-class standing state with a resolver, a gate, copy
+and a banner already shipped. Reads are served throughout, which is the rule this
+platform already keeps at every rung of the dunning ladder. For an operation the
+tenant *asked for and can schedule*, a few minutes read-only is honest and
+cheap; dual-write across regions is neither.
+
+Order: seal → copy → verify (row counts per cascade step, object count and bytes,
+DO state hashes) → **one write to the global directory** → cooling period →
+delete the source. The flip is the only non-idempotent step; everything before it
+is re-runnable, and the source is not deleted until somebody could still change
+their mind.
+
+#### Two corrections to the framing
+
+⚠️ **"Global edge" is not a thing you can promise.** The *Worker* runs
+everywhere; D1 has a primary location, R2 has a bucket, a DO has a home. What a
+tenant chooses is where their data LIVES, not whether it is everywhere. Telling a
+DPO their data is "on the global edge" is a claim you cannot support in a
+procurement questionnaire, and that questionnaire is exactly who is asking.
+
+⚠️ **A jurisdiction is not a location hint.** Cloudflare's `jurisdiction: "eu"`
+is a contractual guarantee that data does not leave the EU; a location hint is
+best-effort placement. They read similarly in a config file and differently in a
+DPA. Sell the first; the second will not survive review by the customer who
+cares.
+
+So the axis is not "global edge vs EU" but **where is this tenant's home** —
+`auto` (Cloudflare places it, the default) or `eu` (jurisdiction-pinned), with
+`us` and `apac` later if anyone pays for them.
+
+#### On charging €25
+
+**€25 is priced for a customer who does not exist.** Someone who needs EU
+residency needs it at contract time, has it in their procurement checklist, and
+would pay very much more; someone who does not need it will not pay €25 for it
+either. The price does not gate the people you want to gate and does not earn
+from the people who would pay.
+
+⚠️ **And "pay us to comply" reads badly to precisely the buyer who asks.** GDPR
+does not require EU residency — that is a widespread misconception — so a fee
+attached to it invites the reading that you were non-compliant before, or that a
+right is being monetised. A hospital's DPO evaluating Tessa is the wrong audience
+for that conversation.
+
+The shape that works instead:
+
+- **Region at signup: free.** This is the 90% case and it costs nothing once
+  §4.1's resolver exists. It is also the one that wins deals.
+- **Region change: free, rate-limited** (once a year, say). It is a real
+  operation with real cost, and a rate limit stops idle switching without
+  putting a price on residency.
+- **If residency is to earn**, make it a plan attribute — an EU-resident tier
+  with the DPA, the sub-processor list and the support terms that actually go
+  with it — not a €25 button. That is what the buyer is trying to purchase.
+
 ---
 
 ## 5. What cannot be declarative — named, so nobody re-litigates it
@@ -644,6 +774,9 @@ and everything that made it safe generalises:
 5. **Dark launch** — the new worker serves a small allow-list of internal
    tenants on the real data path.
 6. **Cutover per tenant**, not per deployment, with the old stack still bootable.
+   ⚠️ Use §4.2's relocation engine — this step IS a tenant relocation, and a
+   bespoke script written once, under pressure, against live customer data is the
+   worst possible place to discover that the cascade missed a table.
 7. **Reverse migration written and rehearsed before step 5.** If it does not
    exist, step 5 does not happen.
 
@@ -663,7 +796,7 @@ second-system effect, which is the largest risk here by a distance.
 | 0 | **Contracts** — manifest schema, layer boundaries, naming, the operation and collection types. Throwaway code only. | The four types compile and three people agree on them |
 | 1 | **Kernel** — bindings from manifest, config, schema composition, shared identity + root-scoped passkeys, tenancy + doors, **region resolution and the global tenant directory**, standing. | A generated `hello` app boots, signs in with one passkey usable from a second app's origin, creates a tenant, answers `/health` — and no handler has seen a raw binding |
 | 2 | **Surface** — operations → routes + tools + webhooks + audit + OpenAPI. | An AI agent completes a CRUD round trip through tools, and is refused exactly what the user would be |
-| 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search. | `hello` has a real collection with an activity log and a metered ledger |
+| 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search, **and tenant relocation (§4.2) with the `Relocatable` DO contract**. | `hello` has a real collection with an activity log and a metered ledger — and a tenant can be copied to a second region and back, verified, with the source still bootable |
 | 4 | **Renderer** — shell, nav, collection views, settings, admin, whitelabel, PWA. | `pnpm shots` photographs `hello` at 4 viewports × 2 themes and it looks like the product |
 | 5 | **Commerce** — plans, entitlements, flags, Stripe on one webhook, B2C packages, metering, parking state. | `hello` sells a plan and a package end to end in Stripe test mode |
 | 6 | **Ops** — notifications incl. web push, help centre, versioning + changelog, data & subscription centre, maintenance, provisioning, CI. | A new app is `one new` + a manifest + a deploy, with nothing hand-wired |
