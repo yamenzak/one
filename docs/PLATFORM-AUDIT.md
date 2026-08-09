@@ -656,7 +656,7 @@ catch.
 
 ---
 
-## Tier 4 — `apps/_template` is half a template
+## Tier 4 — `apps/_template` is half a template — ⚠️ **worker HALF DONE (2026-08-08)**
 
 ```
 ls apps/_template                       # README package.json src test tsconfig vitest.config wrangler.jsonc
@@ -679,23 +679,43 @@ It applies `NOTIFY_SCHEMA`, `STORAGE_SCHEMA` and `BILLING_SCHEMA`, then mounts:
 
 | package route tree | in the template |
 |---|---|
-| `domainRoutes` / `domainAdminRoutes` | ✅ |
-| `emailAdminRoutes`, `sharedConfigRoutes`, `maintenanceAdminRoutes` | ✅ |
-| `notifyRoutes` | ❌ — tables and `InboxDO` present, unreachable |
-| `mediaRoutes` | ❌ — `STORAGE_SCHEMA` present, no upload/meter/read |
-| `staffRoutes` | ❌ — no roster, no invite, no revoke |
-| `accountRoutes` | ❌ — no self-delete |
-| `tenantCloseRoutes` | ❌ — and "leaving is always allowed" is a documented invariant of the gate it already enforces |
-| `aiCatalogAdminRoutes` | ❌ |
-| `bindBillingStore` | ❌ |
-| `turnstileAdminRoutes` | ✅ (via `domain-routes.ts`) |
-| `otpSendGuard` | ❌ |
+| package route tree | was | now |
+|---|---|---|
+| `domainRoutes` / `domainAdminRoutes` | ✅ | ✅ |
+| `emailAdminRoutes`, `sharedConfigRoutes`, `maintenanceAdminRoutes` | ✅ | ✅ |
+| `turnstileAdminRoutes` | ✅ (via `domain-routes.ts`) | ✅ |
+| `notifyRoutes` | ❌ tables and `InboxDO` present, unreachable | ✅ |
+| `mediaRoutes` | ❌ `STORAGE_SCHEMA` present, no upload/meter/read | ✅ |
+| `staffRoutes` | ❌ no roster, no invite, no revoke | ✅ |
+| `accountRoutes` | ❌ no self-delete | ✅ |
+| `tenantCloseRoutes` | ❌ and "leaving is always allowed" is an invariant of the gate it already enforces | ✅ |
+| `aiCatalogAdminRoutes` | ❌ | ✅ |
+| `planAdminRoutes` | ❌ | ✅ |
+| `bindBillingStore` | ❌ hand-written lookups instead | ✅ |
+| `otpSendGuard` | ❌ | ✅ |
 
-A new app copying this inherits the **exact** "mechanism with no surface" bug
-`PLATFORM-GAPS.md` is about — pre-installed, five ways over, in the file that is
-supposed to be the answer to it. The template's own README is excellent and its
-17 tests are real; what it is missing is the mounts, and each one is between two
-and fifteen lines.
+A new app copying this inherited the **exact** "mechanism with no surface" bug
+`PLATFORM-GAPS.md` is about — pre-installed, seven ways over, in the file that is
+supposed to be the answer to it.
+
+**What was hand-written and is now the package's.** `entitlements.ts` carried its
+own `tenantEntitlements` / `hasFeature` / `withinQuota`. They read correctly and
+were the wrong thing to ship in a template, because a re-implementation does not
+arrive with the three rules the package's versions carry: a failed D1 read is not
+an answer (these caught it into `null`, which resolves to the free baseline — so
+a transient failure silently downgrades a PAYING tenant), a retired plan must
+still resolve, and the parking row's status is a decision rather than a default.
+
+**And the mounts are now a GUARD rather than a checklist.**
+`scripts/capability-reachable.test.mjs` fails on any app — the template
+included — that applies a package's `SchemaModule` and never mounts its route
+tree, and the template's integration suite probes every surface for a 404.
+Running it across all four apps found the template's seven and confirmed the
+other three are complete, with one deliberate divergence: Scena keeps its own
+asset door because **its R2 key is the content hash**, which the shared routes
+cannot issue.
+
+⚠️ **The SPA half is still open, and it is the bigger one.**
 
 ---
 
@@ -901,17 +921,38 @@ its whole baseline on one line.
 
 ### 4. Finish the template — *this is what makes app #5 cheap*
 
-Two halves, and the second is the big one:
+Two halves. **The worker is done (2026-08-08); the SPA is not, and it is the
+bigger one.**
 
-- **Worker:** mount the six missing route trees (`notifyRoutes`, `mediaRoutes`,
-  `staffRoutes`, `accountRoutes`, `tenantCloseRoutes`, `aiCatalogAdminRoutes`),
-  `bindBillingStore`, and `otpSendGuard`. Ten to fifteen lines each, and every
-  one of them turns an already-applied schema into a reachable capability.
+- ~~**Worker:**~~ ✅ All twelve trees mounted — `otpSendGuard`, `staffRoutes`,
+  `mediaRoutes`, `notifyRoutes`, `tenantCloseRoutes`, `accountRoutes`,
+  `planAdminRoutes`, `aiCatalogAdminRoutes` — plus `bindBillingStore` replacing
+  three hand-written D1 lookups, and the supporting files each needed
+  (`notifications.ts`, `action-otp.ts`, `billing-store.ts`, and the four route
+  bindings). 17 → 20 tests.
+
+  The part worth keeping is not the mounts, it is that **they stopped being a
+  checklist.** `scripts/capability-reachable.test.mjs` (in `pnpm gate`) fails on
+  any app that applies a package's `SchemaModule` and never mounts its route
+  tree, and it reads `apps.json` plus the template — so app #5 is asked the same
+  question the day it is registered. It found the template's seven immediately
+  and confirmed the other three products are complete.
+
+  Two things about writing that guard are worth carrying forward, because both
+  made it pass while checking nothing. It first read `index.ts` alone and
+  reported four FALSE failures — Kova binds `emailAdminRoutes` in
+  `billing-routes.ts`, Scena binds `staffRoutes` in `member-routes.ts`, and both
+  are correct. And once widened to the whole `src`, a rename to
+  `notifyRoutesXX` still passed twice: once because `includes` matches
+  substrings, and once because `notifications.ts` mentions `notifyRoutes` **in a
+  comment**. A guard that matches its own documentation of a feature verifies
+  only that the feature was once described.
+
 - **`apps/_template-app`:** a real SPA in the workspace, typechecked and tested
   like the worker, carrying the shell, the doors, the session, the theme, the
   admin console binding, the conformance tests and the build config — with the
   product vocabulary removed. This is the single change that most affects how
-  fast the next app ships and how much it looks like the last one.
+  fast the next app ships and how much it looks like the last one. Still open.
 
 ### 4b. The money path — ✅ **DONE (2026-08-08)**
 

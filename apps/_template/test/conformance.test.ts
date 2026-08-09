@@ -133,3 +133,17 @@ describe("the erasure cascade", () => {
     expect(steps.find((s) => s.table === "subscriptions")).toMatchObject({ column: "tenant_id" });
   });
 });
+
+
+/*
+  "EVERY INSTALLED CAPABILITY IS REACHABLE" LIVES IN `pnpm gate`, NOT HERE.
+
+  The check — an app that applies a package's `SchemaModule` must also mount its
+  route tree — was written in this file first and moved, for two reasons.
+
+  It needs `readFileSync`, and this suite runs in the Workers pool where that
+  throws. But the better reason is that the question is not the template's: it
+  is the same question of every app in `apps.json`, and asking it here would ask
+  it of the one app least likely to get it wrong. See
+  `scripts/capability-reachable.test.mjs`.
+*/

@@ -119,11 +119,31 @@ owner id, and wrote without re-checking.
 `WHERE id = ? AND tenant_id = ?` is **not sufficient** for anything a customer
 owns.
 
-## 6. Add your routes
+## 6. Add your routes — and keep the ones you inherited
 
 Mount after `sessionMiddleware` and `guard`, in that order. Routes mounted before
 them are ungoverned; the one legitimate exception is a provider webhook that
 carries its own signature and no session.
+
+⚠️ **The template already mounts a route tree for every schema module it
+applies** — the inbox, the roster, media, leaving, the plan catalog, the AI
+catalog, and `otpSendGuard` in front of the sign-in code. Do not delete one
+because the product "does not need it yet". A capability with tables and no route
+is the single most common defect in this repo's history: nothing fails, every
+suite stays green, and the feature is simply absent until somebody goes looking
+years later.
+
+`scripts/capability-reachable.test.mjs` (in `pnpm gate`) enforces this for every
+app in `apps.json`, so deleting a mount fails the build with the reason. If your
+app genuinely diverges — Scena keeps its own asset door because its R2 key is a
+content hash the shared routes cannot issue — the entry goes in
+`KNOWN_UNMOUNTED` with the argument, where it has to be re-read rather than
+silently absent.
+
+⚠️ **And the OTP guard goes BEFORE Better Auth's `/api/auth/*` catch-all.** Hono
+matches in registration order, so mounting it after is a bypass that typechecks,
+passes every test, and looks identical in a route list.
+`scripts/otp-gate.test.mjs` asserts the order.
 
 ## 7. Wire the operator console
 

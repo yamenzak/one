@@ -163,6 +163,112 @@ describe("sign-up, then the app", () => {
   });
 });
 
+/*
+  EVERY SHARED CAPABILITY IS ACTUALLY MOUNTED.
+
+  ⚠️ This is the check the whole platform audit was written about. A shared route
+  tree that an app does not mount fails NOTHING: the schema still applies, the
+  Durable Object still binds, the package's own tests still pass, and the
+  capability is simply absent. Scena went three stages with `@4dl/notify` wired
+  end to end — schema, InboxDO, sixteen dispatch sites — and no route to read a
+  notification back. Two apps out of three never mounted `otpSendGuard`, the one
+  gate in front of the emailed sign-in code.
+
+  A 404 here means the tree was never mounted. Anything else — 200, 401, 403,
+  503 — means the surface exists and its own guard is doing its job, which is a
+  different question and one the package's tests already answer.
+*/
+describe("the platform's capabilities are mounted, not merely installed", () => {
+  const SURFACES = [
+    // @4dl/notify — the inbox. The four routes and the socket.
+    "/api/notifications",
+    // @4dl/auth — the roster, with pending invitations folded in.
+    "/api/staff",
+    // @4dl/storage — the storage meter. Upload and read are POST/keyed.
+    "/api/media/usage",
+    // @4dl/tenancy — LEAVING. The standing ladder exempts this at every rung, so
+    // its absence turns that exemption into a trap rather than a feature.
+    "/api/tenant/close/status",
+    // @4dl/tenancy — the public host probe and the custom-domain surface.
+    "/api/host",
+  ];
+
+  /**
+   * ⚠️ The WRITE-only trees, which a GET cannot probe.
+   *
+   * Hono answers 404 for a path that exists on another method, so listing
+   * `@4dl/auth`'s self-delete above would fail for the wrong reason and read as
+   * "not mounted" — a false alarm in the guard whose whole job is to be believed.
+   */
+  const POST_SURFACES = ["/api/me/delete/request-otp"];
+
+  const ADMIN_SURFACES = [
+    "/api/admin/email",
+    "/api/admin/shared-config",
+    "/api/admin/maintenance",
+    "/api/admin/domains/config",
+    "/api/admin/turnstile/config",
+    // @4dl/billing — the plan catalog, under @4dl/admin's PlatformPlansSection.
+    "/api/admin/plans",
+    // @4dl/ai — the model catalog, under PlatformAiSection.
+    "/api/admin/ai/models",
+    "/api/admin/ai/config",
+  ];
+
+  it("answers on every tenant-facing surface a shared package ships", async () => {
+    const email = `mounted-${crypto.randomUUID().slice(0, 8)}@example.com`;
+    const slug = `mount-${crypto.randomUUID().slice(0, 6)}`;
+    const jar = await signIn(email);
+    await SELF.fetch(`${SETUP}/api/auth/organization/create`, {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: SETUP, cookie: jar },
+      body: JSON.stringify({ name: "Mounted", slug }),
+    });
+    const origin = `http://${slug}.localhost:8787`;
+    for (const path of SURFACES) {
+      const res = await SELF.fetch(`${origin}${path}`, { headers: { cookie: jar } });
+      expect(res.status, `${path} is not mounted`).not.toBe(404);
+    }
+    for (const path of POST_SURFACES) {
+      const res = await SELF.fetch(`${origin}${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin, cookie: jar },
+        body: "{}",
+      });
+      expect(res.status, `${path} is not mounted`).not.toBe(404);
+    }
+  });
+
+  it("answers on every operator surface, on the door that owns them", async () => {
+    // ⚠️ `admin.` and nowhere else — `/api/admin/*` is restricted to the
+    // operator door. This suite runs on loopback, where `isDevRoot` correctly
+    // stands that restriction down, so what is asserted here is only that the
+    // routes EXIST. That is the half that was missing.
+    const jar = await signIn(`op-${crypto.randomUUID().slice(0, 8)}@example.com`);
+    for (const path of ADMIN_SURFACES) {
+      const res = await SELF.fetch(`http://admin.localhost:8787${path}`, { headers: { cookie: jar } });
+      expect(res.status, `${path} is not mounted`).not.toBe(404);
+    }
+  });
+
+  it("puts the OTP gate in FRONT of Better Auth's catch-all", async () => {
+    /*
+      Hono matches in registration order, so mounting the guard after
+      `/api/auth/*` is a bypass that typechecks, passes every other test, and
+      looks identical in the route list. The observable difference is the
+      wrong-door refusal: the guard answers 400 on the ROOT, where there is no
+      tenant to sign in to, and Better Auth's handler would happily send a code.
+    */
+    const res = await SELF.fetch("http://localhost:8787/api/auth/email-otp/send-verification-otp", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "http://localhost:8787" },
+      body: JSON.stringify({ email: "nobody@example.com" }),
+    });
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe("wrong_door");
+  });
+});
+
 describe("what an unauthenticated caller can reach", () => {
   it("is the public lane, and nothing that touches a tenant's data", async () => {
     expect((await SELF.fetch(`${SETUP}/health`)).status).toBe(200);

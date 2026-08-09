@@ -33,6 +33,13 @@ template that is not built is a template that rots.
 | `org-guard.ts` | the noun in the copy | A tenant's slug becomes an ORIGIN, so the DNS-label + reserved-label check is a security control, not validation. |
 | `domain-routes.ts` | the feature key gating it | Custom-domain binding: `@4dl/tenancy`'s routes, with authorization passed in. |
 | `purge.ts` | the non-D1 side effects | The D1 cascade is DERIVED. Do not add a table list. |
+| `billing-store.ts` | **yes** — the plans | `bindBillingStore`: seeding, the reads, and the parking row's status (which is a decision — see the file). |
+| `notifications.ts` | **yes** — the types | The inbox's vocabulary. `notifyRoutes` reads this registry, so nothing dispatches until it exists. |
+| `otp-guard.ts` | the eligibility rule | The one gate in front of the emailed sign-in code. **Two apps out of three shipped without it.** |
+| `staff-routes.ts` | role copy, the invite email | Invite, revoke, re-role, remove — with pending invitations folded into the roster. |
+| `media-routes.ts` | the `purpose` set | Upload, the storage meter, the authed read. A purpose is a path segment. |
+| `exit-routes.ts` | the copy | Leaving. The route guard exempts these at every rung, so their absence is a trap. |
+| `action-otp.ts` | the email | Step-up codes, for the two actions that cannot be undone. |
 | `index.ts` | **yes** — your routes | The worker. |
 | `test/conformance.test.ts` | **keep** | See below. |
 | `test/integration.test.ts` | **keep, and grow it** | See below. |
@@ -125,16 +132,51 @@ Read the sign-in code out of the `verification` table, never out of a log. The
 mock mailer prints it, but a test that scrapes stdout passes for the wrong reason
 the moment the provider changes.
 
+## Every shared capability is MOUNTED, and a guard says so
+
+The worker mounts a route tree for every schema module it applies:
+`otpSendGuard`, `staffRoutes`, `mediaRoutes`, `notifyRoutes`, the two exit
+routes, the plan catalog and the AI catalog, alongside the domain, email, shared
+config and maintenance consoles it already had.
+
+That is not a checklist somebody has to remember.
+`scripts/capability-reachable.test.mjs` (in `pnpm gate`) fails on any app —
+**this one included** — that applies a package's `SchemaModule` and never mounts
+its routes, and `test/integration.test.ts` probes every surface for a 404.
+
+⚠️ **Why both.** A shared package ships a schema, sometimes a Durable Object, and
+a route tree. An app that adopts the first two and forgets the third has tables,
+a bound DO, dispatch sites writing rows — and no way for a person to reach any of
+it. Nothing fails: typecheck passes, the package's tests pass, the app's tests
+pass. Scena carried `@4dl/notify` in exactly that state for three stages. This
+template shipped in it too, which is why the mounts are here now rather than
+described as an exercise.
+
 ## What this template does NOT include
 
 - **A frontend.** `@4dl/app-kit` + `@4dl/ui` are the runtime and the design
   system; the shell, nav and session provider are still per-app (see that
-  package's README for exactly which files stayed in Kova and why).
-- **Stripe routes.** Both rails' reconciliation logic is extracted —
-  `@4dl/billing/webhook.ts` is the platform rail (subscription sync, the dunning
-  clamp, refund reversal), `@4dl/commerce/connect.ts` is the connected-account
-  rail. What did NOT move is the route TREE: Kova's handlers are woven through
-  its notification registry, its entitlement gates and its row-level scope
-  function, and each of those has to become an injection first. Copy from
-  `apps/api/src/stripe-routes.ts` when the app starts charging, and take the two
-  packages rather than re-deriving what they already hold.
+  package's README for exactly which files stayed in Kova and why). ⚠️ This is
+  the biggest remaining gap, and `docs/PLATFORM-AUDIT.md` names it: **every UI
+  divergence in this repo happened where it did because there is no browser half
+  to copy.**
+- **The Stripe CHECKOUT routes and the webhook.** The two halves have separated
+  since this was written, and only one is still the app's.
+
+  The OPERATOR half moved: `@4dl/billing`'s `stripeAdminRoutes` answers
+  `/admin/stripe/status|config|sync` under `@4dl/admin`'s
+  `PlatformStripeSection`, with both lanes stored at once, the mode-flip catalog
+  swap and the price rebuild. Mount it — with `syncCatalog` and
+  `clearCatalogIds` injected, because the catalog TABLES are yours — the day the
+  app starts charging. Three apps carried three copies of those handlers before
+  it moved, and one of them turned its own console's **live** switch into a
+  payments outage.
+
+  What is still the app's is the customer-facing tree: checkout, the portal, and
+  the webhook LISTENER. Their handlers are woven through the notification
+  registry, the entitlement gates and the row-level scope function. The
+  reconciliation inside them is not: `@4dl/billing/webhook.ts` owns event
+  idempotency, subscription-status sync with the `LADDER_OWNED` clamp, and the
+  refund→credit reversal. Copy the shape from `apps/tessa/src/billing-routes.ts`
+  (the smaller of the two) and take the packages rather than re-deriving what
+  they already hold.

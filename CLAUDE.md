@@ -48,8 +48,11 @@ apps/
   app/   # ONE role-adaptive PWA (client / trainer / owner / platform admin)
   www/   # marketing site (dependency-free static generator)
   e2e/   # Playwright — the golden paths, in a browser against the real worker
-  _template/ # a NEW 4DL app: every shared package wired, no product vocabulary.
-             # Typechecks + tests in this workspace so it cannot rot. Copy it.
+  _template/ # a NEW 4DL app: every shared package wired AND MOUNTED, no product
+             # vocabulary. Typechecks + tests in this workspace so it cannot rot.
+             # Copy it. ⚠️ It has no SPA — that half is still copied by hand from
+             # whichever app the author happens to open, and it is where every UI
+             # divergence in this repo came from.
 packages/
   core/      # @4dl/core — the floor every 4DL package stands on: ids, defensive
              # JSON columns, the STRUCTURAL BINDINGS CONTRACT (HasDb/HasMedia/…),
@@ -806,10 +809,17 @@ found *a mechanism with no surface*. This one finds the surface shipped, shared
 and good — and **an app that does not mount it**, which fails nothing anywhere.
 Eight instances, the sharpest being that `otpSendGuard` — the one gate in front of
 the emailed sign-in code, carrying the bot check, the per-IP ceiling and the
-deliverability pre-flight — is mounted by Kova and by neither other app. Read it
+deliverability pre-flight — was mounted by Kova and by neither other app. Read it
 before assuming a shared capability reaches every product, and before adding an
-app: `apps/_template` has **no SPA**, which is why every UI divergence in this
-repo happened where it did.
+app: `apps/_template` still has **no SPA**, which is why every UI divergence in
+this repo happened where it did.
+
+**That whole class is a guard now.** `scripts/capability-reachable.test.mjs` (in
+`pnpm gate`) fails on any app — the template included — that applies a package's
+`SchemaModule` and never mounts its route tree. The shape it catches is the one
+this document is a catalogue of: tables applied, a Durable Object bound, dispatch
+sites writing rows, and no route to reach any of it, with every suite green. It
+reads `apps.json`, so app #5 is asked the same question the day it is registered.
 
 Three things are still Kova's on purpose, and each README says why: `Shell.tsx`
 (role-adaptive nav is a product decision, extraction plan §3.2), the presentation
@@ -835,8 +845,8 @@ so every figure below is from that run), per package:
 145 ui + 107 tenancy + 104 kova/app + 87 tessa/domain + 87 billing + 80 ai +
 63 commerce + 61 scena/widgets + 45 billing-rail + 44 core + 40 scena/timeline +
 35 auth + 35 scena/app + 24 notify + 23 scena/manifest + 23 tessa/app +
-18 scena/protocol + 18 storage + 18 app-kit + 17 kova/protocol + 17 template +
-14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,425 passing,
+20 template + 18 scena/protocol + 18 storage + 18 app-kit + 17 kova/protocol +
+14 purge + 9 email + 7 i18n + 6 scena/brand + 5 admin** — **2,428 passing,
 31 skipped**, 58 turbo tasks, all green.
 
 The +81 since the earlier figure on the same day is all new coverage over
@@ -852,8 +862,13 @@ Scena's 449 (234 api + 30 app + 185 across its five pure packages) were never in
 the older figure at all; nor were Tessa's. `@scena/timeline`'s 40 are the ones
 that matter most per line — they prove
 `position(t) = (t − T0) mod cycleLength`, which is the whole product.
-The template's 17 are 11 conformance (plain Node, no fixtures) + 6 integration
-(the real worker through Miniflare, on the real `*.localhost` host topology).
+The template's 20 are 11 conformance (declarations only — no database, no
+fixtures) + 9 integration (the real worker through Miniflare, on the real
+`*.localhost` host topology). Three of the nine are new and are the ones to
+copy into a new app: they probe every shared surface for a 404, and assert the
+OTP guard is registered BEFORE Better Auth's catch-all — mounting it after is a
+bypass that typechecks, passes every other test, and looks identical in a route
+list.
 Package counts shift as the extraction proceeds — Stage 1 moved 68 tests from
 `@4dl/platform` to `@4dl/tenancy`; the split moves tests, it does not add any.
 The pricing and normalizer suites live

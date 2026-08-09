@@ -30,6 +30,20 @@ import { orgCreateGuard, orgUpdateGuard } from "./org-guard.js";
 import { emailAdminRoutes } from "@4dl/email/admin-routes";
 import { sharedConfigRoutes } from "@4dl/core/admin-routes";
 import { maintenanceAdminRoutes, maintenanceMiddleware } from "@4dl/tenancy";
+import { notifyRoutes } from "@4dl/notify/routes";
+import { aiCatalogAdminRoutes } from "@4dl/ai";
+import { planAdminRoutes } from "@4dl/billing";
+import { otpSendGuard } from "./otp-guard.js";
+import { staffRoutes } from "./staff-routes.js";
+import { mediaRoutes } from "./media-routes.js";
+import { accountRoutes, tenantCloseRoutes } from "./exit-routes.js";
+import { entitlements, PLAN_FEATURE_META, PLAN_QUOTA_META } from "./entitlements.js";
+import { seedBilling } from "./billing-store.js";
+// Declaring the notification vocabulary is a SIDE EFFECT of importing it —
+// `configureNotify` runs at module load, and `notifyRoutes` reads that registry.
+// An app that mounts the routes without this import serves an inbox whose every
+// type is unknown.
+import "./notifications.js";
 import type { MiddlewareHandler } from "hono";
 
 export { TenantBillingDO } from "./billing-do.js";
@@ -53,7 +67,20 @@ app.get("/health", (c) => c.json({ ok: true }));
 app.use("/api/auth/organization/create", orgCreateGuard);
 app.use("/api/auth/organization/update", orgUpdateGuard);
 
-/** Better Auth owns its whole lane: OTP, passkeys, sessions, organizations. */
+/**
+ * ⚠️ THE ONE GATE IN FRONT OF THE SIGN-IN CODE, and it must be mounted BEFORE
+ * the catch-all below.
+ *
+ * Hono matches in registration order, so the wildcard `/api/auth/*` would
+ * otherwise answer this path first and the guard would never run — a bypass that
+ * typechecks, passes every test, and looks identical in the route list.
+ * `scripts/otp-gate.test.mjs` asserts the ORDER for exactly that reason.
+ *
+ * See `otp-guard.ts` for what the guard carries. Two apps shipped without it.
+ */
+app.post("/api/auth/email-otp/send-verification-otp", otpSendGuard);
+
+/** Better Auth owns the rest of its lane: OTP verify, passkeys, sessions, orgs. */
 app.on(["GET", "POST"], "/api/auth/*", (c) => {
   const auth = createAuth(c.env, new URL(c.req.url).origin, c.get("host").shape);
   return auth.handler(c.req.raw);
@@ -103,6 +130,31 @@ app.route("/api", domainRoutes);
 app.route("/api", domainAdminRoutes);
 
 /**
+ * THE INBOX. Four routes, one hibernating WebSocket per user, and a registry
+ * this app declared in `notifications.ts`.
+ *
+ * Mounted from day one because the alternative is what Scena shipped: the schema
+ * applied, `InboxDO` bound, sixteen dispatch sites writing rows — and no route
+ * to read one back, so every notification the product produced was reachable
+ * nowhere a person would look, for three stages.
+ */
+app.route("/api", notifyRoutes<AppEnv>({ currentUserId: (c) => c.get("user")?.id ?? null }));
+
+/** The roster: invite, revoke, re-role, remove. See `staff-routes.ts`. */
+app.route("/api", staffRoutes);
+
+/** Upload, the storage meter, the authed read. See `media-routes.ts`. */
+app.route("/api", mediaRoutes);
+
+/**
+ * LEAVING. The standing ladder exempts both of these at every rung, so their
+ * absence turns that exemption into a trap rather than a feature — see
+ * `exit-routes.ts`.
+ */
+app.route("/api", tenantCloseRoutes);
+app.route("/api", accountRoutes);
+
+/**
  * Email configuration, on the operator door. Mounted from day one on purpose:
  * `@4dl/email` fails closed until `email.provider` and `email.from` are set, so
  * an app without these routes is an app whose first deploy cannot send the
@@ -129,6 +181,45 @@ app.route("/api", emailAdminRoutes(
  * still win — see `packages/core/src/config.ts`.
  */
 app.route("/api", sharedConfigRoutes({ isPlatformAdmin: (c) => isPlatformAdmin(c as never) }) as unknown as Hono<AppEnv>);
+
+/**
+ * THE PLAN CATALOG, on the operator door — `@4dl/billing`'s routes under
+ * `@4dl/admin`'s `PlatformPlansSection`.
+ *
+ * Three rules ride in with them and every one is invisible from outside: a price
+ * change NULLS the plan's Stripe id pair (without which a repriced plan charges
+ * the old amount forever, with no error anywhere), lowering a limit
+ * GRANDFATHERS whoever is already on the tier, and an omitted `trialDays` means
+ * "leave it alone" rather than "no trial". An app that hand-rolls this editor
+ * gets none of them — one did, and its help text described the missing
+ * grandfathering as the design.
+ *
+ * The key LIST comes off the bound engine, so a quota added to `entitlements.ts`
+ * appears in the editor with no client release. Only the LABELS are here.
+ */
+app.route("/api", planAdminRoutes({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  seed: seedBilling,
+  engine: entitlements,
+  quotaMeta: PLAN_QUOTA_META,
+  featureMeta: PLAN_FEATURE_META,
+}) as unknown as Hono<AppEnv>);
+
+/**
+ * THE AI MODEL CATALOG, on the operator door — `@4dl/ai`'s routes under
+ * `@4dl/admin`'s `PlatformAiSection`.
+ *
+ * The rates in `ai_models` are parsed from two public pricing pages and are
+ * identical in every product, so a successful sync PUBLISHES them to the shared
+ * store and a new app seeds its whole priced catalog the first time this panel
+ * is opened — instead of living on the eleven-row hardcoded floor until somebody
+ * presses Sync. `appName` is what the "apply to every 4DL app" broadcast is
+ * attributed to.
+ */
+app.route("/api", aiCatalogAdminRoutes({
+  isPlatformAdmin: (c) => isPlatformAdmin(c as never),
+  appName: "Template",
+}) as unknown as Hono<AppEnv>);
 
 /**
  * The maintenance switch, on the operator door.

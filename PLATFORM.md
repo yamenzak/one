@@ -254,7 +254,14 @@ before it adopts the store.
 ### Adding an app
 
 Copy `apps/_template` — it typechecks and its tests run in this workspace, so it
-cannot rot. Its README is the file-by-file guide;
+cannot rot. It also **mounts a route tree for every schema module it applies**,
+which it did not for a long time: a new app inherited nine capabilities that had
+tables, a bound Durable Object, and no way for a person to reach them.
+`scripts/capability-reachable.test.mjs` (in `pnpm gate`) now fails on any app —
+the template included — that installs a package's schema and never mounts its
+routes.
+
+Its README is the file-by-file guide;
 [`docs/SHIPPING-AN-APP.md`](docs/SHIPPING-AN-APP.md) is the walkthrough from
 nothing to deployed.
 
