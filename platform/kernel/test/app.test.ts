@@ -362,6 +362,31 @@ describe("a sold capability is withheld by something", () => {
  * destination — which renders, if anything renders it at all, as an anonymous
  * bell that says nothing and goes nowhere.
  */
+describe("punctuation is refused by the whole manifest", () => {
+  const declaring = (outcome: Record<string, unknown>) => ({
+    ...base,
+    operations: [{ id: "thing.save", outcome }] as never[],
+  });
+
+  /*
+    ⚠️ FATAL, NOT REPORTED. A manifest is evaluated when the worker boots, so a
+    refusal is a deployment that does not start — which is the correct outcome
+    for a product about to celebrate something on every call, and it is loud in a
+    way a warning in a log is not.
+  */
+  it("refuses an operation that celebrates, because that belongs to a milestone", () => {
+    expect(() => assertComposable(declaring({ message: "Done", tone: "success", moment: "celebrate" }))).toThrow(/milestone/);
+  });
+
+  it("refuses punctuation on a danger outcome, which is a chime over lost work", () => {
+    expect(() => assertComposable(declaring({ message: "Deleted", tone: "danger", moment: "acknowledge" }))).toThrow(/danger/);
+  });
+
+  it("accepts an ordinary acknowledgement", () => {
+    expect(() => assertComposable(declaring({ message: "Saved", tone: "success", moment: "acknowledge" }))).not.toThrow();
+  });
+});
+
 describe("a milestone is refused by the whole manifest or by nothing", () => {
   const announced = {
     ...base.notifications,

@@ -17,13 +17,12 @@
 import type { BindingSpec, ResolvedBindings } from "./bindings.js";
 import type { Shape } from "./validate.js";
 import type { Actor, Instant, RegionId, TenantId, Tone } from "./primitives.js";
+import type { MomentId } from "./moment.js";
 import type { HelpId, Problem } from "./problem.js";
 
 /* --------------------------------------------------------------- outcome --- */
 
 export type { Tone } from "./primitives.js";
-/** Semantic intent. The platform owns the audio, as it owns colour tokens. */
-export type SoundId = "commit" | "error" | "alert" | "arrive" | "scan";
 
 /**
  * WHAT HAPPENED — declared by the app, PRESENTED by the platform.
@@ -37,9 +36,19 @@ export type SoundId = "commit" | "error" | "alert" | "arrive" | "scan";
  * feedback.
  */
 export interface Outcome {
+  /** ⚠️ One line. It is read in passing — see `OUTCOME_MESSAGE_MAX`. */
   readonly message: string;
   readonly tone: Tone;
-  readonly sound?: SoundId;
+  /**
+   * ⚠️ PUNCTUATION, AND THE SOUND COMES WITH IT. An outcome says what happened;
+   * a moment says that it mattered — most writes deserve neither, because a
+   * product that celebrates a saved field has nothing left for anything else.
+   *
+   * There is no `sound` field beside this on purpose: an app that chose both
+   * could pair a celebration with the error chime, and would, the first time
+   * somebody copied a declaration and edited half of it.
+   */
+  readonly moment?: MomentId;
   /** Collections whose cached reads this invalidates. */
   readonly invalidates?: readonly string[];
   /** Whether the client may apply the change before the server confirms. */

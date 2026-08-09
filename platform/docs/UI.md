@@ -315,6 +315,53 @@ competing timelines, because neither of them holds one.
   opacity. ⚠️ Layout may never depend on an animation having run, and the
   reduced-motion pass is where that is proved rather than hoped.
 
+### Moments — punctuation, and the only thing above a scene
+
+**An outcome says what happened; a moment says that it mattered.** Most writes
+deserve neither a sound nor an animation — a row appearing is its own feedback,
+and a product that celebrates a saved field has nothing left to celebrate
+anything else with.
+
+The vocabulary is four words, and a fifth would be a shade of one of them:
+
+| moment | what it marks | sound |
+|---|---|---|
+| `acknowledge` | a write the person cannot see happen | `commit` |
+| `welcome` | an arrival — a workspace made, somebody changing their mind about leaving | `arrive` |
+| `farewell` | a deliberate ending | `depart` |
+| `celebrate` | ⚠️ a milestone, and **never an app's to declare** | `earn` |
+
+The invariants:
+
+- **The sound is derived from the moment, never chosen beside it.** An app that
+  picked both could pair a celebration with the error chime, and would, the first
+  time somebody copied a declaration and edited half of it.
+- **A moment never reports a failure.** A failure is a `Problem`: a code, copy, a
+  status and a way out. `error` and `alert` are unreachable from this vocabulary,
+  and a `danger` outcome may not carry a moment at all — the tone already says
+  this is the destructive one, so punctuating it is the product being pleased
+  about somebody's lost work.
+- **`celebrate` belongs to a milestone**, which is a rule over a declared event,
+  earned once per person for the rest of their account. An operation that could
+  celebrate on every call is the leaderboard problem arriving through another
+  door, and the first one written would be on whatever the product most wants
+  people to do. Composition refuses it.
+- **One at a time, and a second replaces rather than queues.** A queue is how a
+  batch of writes produces four celebrations in a row, each meaning less than the
+  last. When two land together the heavier wins *and brings its own words* —
+  "saved" is not news standing next to "you earned something".
+- **A moment is a scene with a hold**, not a second animation system. Same clock,
+  same reduced-motion pass.
+- ⚠️ **Reduced motion removes the transform and never shortens the hold.** It is
+  about movement, not reading speed; cutting the time somebody has to read the
+  words is the one adaptation that makes the setting worse for the people who
+  turn it on.
+- ⚠️ **A sound needs a gesture and a surface that asked for one.** Every browser
+  refuses audio no gesture caused, so a design that ignores it produces silence
+  in production and a chime in every demo. Sound is declared **per surface** —
+  a station in a gym is audible, a dashboard in an office is not — and an app
+  that declares none is silent.
+
 **The structural guard: no file outside the choreographer may contain a
 duration, an easing curve, a `@keyframes`, or a transition property.** Without
 it this decays back into per-component animation one reasonable exception at a
@@ -574,6 +621,9 @@ and is expensive to disprove, so it survives review indefinitely.
 | `theme-both-ways` | a palette defined only inside a media query, which has no value at all when the root carries an explicit theme | **live** |
 | `contained-form` | a semantic tone rendered on a ground it would be confused with — decided by the renderer, never by an author's conditional | **live** |
 | `continuity` | two copies of one record crossfading instead of one element travelling, or unrelated records animated as though related | **live** |
+| `moment-hold-survives-reduced-motion` | reduced motion shortening how long somebody has to read — the one adaptation that makes the setting worse for the people who turn it on | **live** |
+| `sound-needs-a-gesture` | a sound with no gesture behind it — every browser refuses it, so the design produces silence in production and a chime in every demo | **live** |
+| `one-moment-at-a-time` | a queue of moments — a batch of writes producing four celebrations in a row, each meaning less than the last, long after the thing that caused them | **live** |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder

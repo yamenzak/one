@@ -1048,6 +1048,78 @@
       "impl": "kernel/test/app.test.ts",
       "proves": "refuses a manifest that declares no copy for one of them",
       "fails": "an app with no notification for an event the platform raises \u2014 dispatch answers an unknown type by returning nothing, so a workspace creation, a plan choice and a grant announce nothing at all"
+    },
+    {
+      "id": "no-app-celebrations",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/moment.test.ts",
+      "proves": "refuses an operation that celebrates",
+      "fails": "an operation that can celebrate on every call \u2014 a celebration belongs to a milestone, earned once per person, and the first one an app declares would be on whatever the product most wants people to do"
+    },
+    {
+      "id": "no-chime-over-loss",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/moment.test.ts",
+      "proves": "refuses punctuation on a danger outcome",
+      "fails": "a moment on a danger outcome \u2014 the tone already says this is the destructive one, so punctuating it is the product being pleased about somebody's lost work"
+    },
+    {
+      "id": "sound-is-derived",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "runtime/test/outcome.test.ts",
+      "proves": "derives the sound rather than carrying a chosen one",
+      "fails": "a moment and a sound chosen separately, which pairs a celebration with the error chime the first time somebody copies a declaration and edits half of it"
+    },
+    {
+      "id": "outcome-delivered",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "hello/test/boot.test.ts",
+      "proves": "expect(readOutcome(made.headers)).toMatchObject",
+      "fails": "an outcome declared on every write and delivered to nobody \u2014 the mechanism-with-no-surface failure, inside the platform, invisible because nothing consuming it exists yet"
+    },
+    {
+      "id": "outcome-fits-a-header",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "runtime/test/outcome.test.ts",
+      "proves": "carries a message no header could hold, by escaping it to ASCII",
+      "fails": "an outcome message a header cannot carry \u2014 a character above U+00FF throws when the header is set, in the success path after the write already happened, so German, Arabic and every emoji turn a completed operation into a 503"
+    },
+    {
+      "id": "moment-hold-survives-reduced-motion",
+      "group": "interface",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "ui/test/motion.test.ts",
+      "proves": "drops the transform under reduced motion and keeps the hold",
+      "fails": "reduced motion shortening how long somebody has to read \u2014 the one adaptation that makes the setting worse for the people who turn it on"
+    },
+    {
+      "id": "sound-needs-a-gesture",
+      "group": "interface",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "ui/test/motion.test.ts",
+      "proves": "plays only when the surface is audible and somebody just acted",
+      "fails": "a sound with no gesture behind it \u2014 every browser refuses it, so the design produces silence in production and a chime in every demo"
+    },
+    {
+      "id": "one-moment-at-a-time",
+      "group": "interface",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "ui/test/motion.test.ts",
+      "proves": "replaces what was showing",
+      "fails": "a queue of moments \u2014 a batch of writes producing four celebrations in a row, each meaning less than the last, long after the thing that caused them"
     }
   ]
 }

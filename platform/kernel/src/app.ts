@@ -18,6 +18,7 @@ import { guideProblems } from "./guide.js";
 import type { HelpRegistry } from "./help.js";
 import type { JobSpec } from "./job.js";
 import type { MilestoneRegistry } from "./milestone.js";
+import { momentProblems } from "./moment.js";
 import { MILESTONE_EARNED, milestoneProblems } from "./milestone.js";
 import { danglingHelp, helpProblems } from "./help.js";
 import type { NotificationRegistry } from "./notify.js";
@@ -158,7 +159,15 @@ export interface GovernanceSpec {
 export interface SoundSpec {
   /** The platform's audio set. An app names intent and never ships a file. */
   readonly pack: string;
-  /** Per SURFACE, not per action: a station is audible, a dashboard is silent. */
+  /**
+   * ⚠️ PER SURFACE, NOT PER ACTION, and per surface is the only granularity that
+   * is a real decision. A station in a gym is audible and a dashboard in an
+   * office is not; whether one particular save makes a noise is a question
+   * nobody has ever wanted to answer twice.
+   *
+   * An app with no `sounds` at all is SILENT — which is the right default, and
+   * the reason this is optional rather than defaulted to on.
+   */
   readonly surfaces: Readonly<Record<string, "on" | "off">>;
 }
 
@@ -581,6 +590,17 @@ export function assertComposable(spec: {
   const milestones = milestoneProblems(spec.milestones ?? {}, recognisableEvents(spec), spec.notifications[MILESTONE_EARNED]);
   if (milestones.length) {
     throw new Error(`${spec.id}: milestones — ${milestones.map((m) => `"${m.id}" ${m.why}`).join("; ")}.`);
+  }
+
+  /*
+    ⚠️ PUNCTUATION IS RATIONED, AND `celebrate` IS NOT AN APP'S TO DECLARE. A
+    celebration belongs to a milestone — a rule over an event, earned once per
+    person — not to an operation that can run all day. And a moment on a `danger`
+    outcome is a chime over somebody's lost work.
+  */
+  const moments = momentProblems(spec.operations);
+  if (moments.length) {
+    throw new Error(`${spec.id}: outcomes — ${moments.map((m) => `"${m.id}" ${m.why}`).join("; ")}.`);
   }
 
   const notes = releaseProblems(spec.releases);

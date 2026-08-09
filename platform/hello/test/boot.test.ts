@@ -10,7 +10,7 @@ import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "../src/worker.js";
 import { signIn } from "./session.js";
-import { BindingMissing, bindingsFor, physicalName } from "@one/runtime";
+import { BindingMissing, bindingsFor, physicalName, readOutcome } from "@one/runtime";
 import type { RegionId, ResolvedRegion } from "@one/kernel";
 import { cache, sql } from "@one/kernel";
 
@@ -92,12 +92,21 @@ const mine = `acme-${crypto.randomUUID().replace(/[^a-z0-9]/g, "").slice(0, 8)}`
 
 describe("a workspace is created, and only the platform may create it", () => {
   it("creates one on the setup door", async () => {
-    const [status, body] = await json(await call(setup, {
-      method: "POST", as: "member", body: JSON.stringify({ slug: mine }),
-    }));
+    const made = await call(setup, { method: "POST", as: "member", body: JSON.stringify({ slug: mine }) });
+    const [status, body] = await json(made);
     expect(status).toBe(200);
     expect(body).toMatchObject({ slug: mine, region: "auto" });
     expect((body as { tenantId: string }).tenantId).toMatch(/^t_/);
+
+    /*
+      ⚠️ AND THE OUTCOME ARRIVES. It was declared on twelve operations here and
+      delivered on none of them — a mechanism with no surface, inside the
+      platform, invisible because nothing consuming it existed yet.
+
+      This is the one arrival a product gets: everything after it is somebody
+      using the thing, and this is the moment they have one.
+    */
+    expect(readOutcome(made.headers)).toMatchObject({ message: "Workspace created", moment: "welcome", sound: "arrive" });
   });
 
   it("refuses a second workspace at the same address", async () => {

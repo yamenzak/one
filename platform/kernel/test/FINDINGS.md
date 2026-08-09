@@ -1544,3 +1544,69 @@ A test helper defaulting the announcement supplied one to the single case whose
 whole point was that there was none — so the assertion passed by never asking
 the question. Mutation caught it. Any helper whose absent-value case is the
 interesting one must take the argument explicitly.
+
+## 128. An outcome was declared on every write and delivered to nobody
+
+Twelve operations in the runtime carry an `outcome`, every collection derives two
+more, and the response was the handler's return value and nothing else. A
+mechanism with no surface — the failure this whole platform was started over —
+sitting inside the platform, invisible because nothing that consumed it existed
+yet to notice it was missing.
+
+The general form: a field that only producers touch is not verified by anything.
+The moment a consumer exists it is either right or obviously absent, and until
+then it is neither.
+
+## 129. A header is bytes, and that is a 503 waiting on a translator
+
+The outcome travels in `x-one-outcome` rather than in the body, because the body
+is the operation's declared `output` and the API document, the typed client and
+every test are written against it. A header is the honest place for presentation
+metadata about a response.
+
+But a header value is a **ByteString**: setting one containing a character above
+U+00FF *throws*, in the success path, after the write has already happened —
+turning a completed operation into a 503. Between U+0080 and U+00FF it does not
+throw and is carried as latin-1, so it comes back mangled instead, which is worse
+because a 503 is noticed.
+
+So "Gespeichert ✓", every Arabic outcome and every emoji anybody will ever put in
+a confirmation were a 503 or a corruption, decided by copy in a manifest, in a
+code path with no error of its own. Escaping to pure ASCII is still valid JSON —
+`\uXXXX` inside a string is exactly what JSON has for this.
+
+## 130. Mutation testing found a defence that defended nothing
+
+The first version escaped control characters, with a comment explaining that
+`JSON.stringify` leaves a literal newline inside a string alone. It does not — it
+escapes newline, carriage return and the whole C0 range. The mutation that
+deleted the entire `replace` survived, which is what sent me to check the claim.
+
+Two lessons, and the second is the one worth keeping. A surviving mutation is not
+always a missing test: sometimes it is dead code, and the fastest way to tell is
+that the justification is a claim about somebody else's library. And the real risk
+was one range over from the one being defended — the alphabet, not the control
+characters.
+
+## 131. The sound is derived from the moment, so the two cannot part
+
+An app that declared a moment AND a sound could pair a celebration with the error
+chime, and would, the first time somebody copied a declaration and edited half of
+it. There is no field to get out of step because there is no field — the same
+reduction the design system makes for colour, where a component names a role and
+never a value.
+
+`error` and `alert` are unreachable from the moment vocabulary for the same
+reason: a failure is a `Problem`, and dressing one in this vocabulary is how a
+product ends up playing a chime over somebody's lost work.
+
+## 132. Punctuation has to be rationed by the platform, not by taste
+
+If everything is a moment, nothing is. Two rules do the rationing structurally
+rather than asking an app to show restraint: `celebrate` is not an app's to
+declare — it belongs to a milestone, which is a rule over an event, earned once
+per person — and a `danger` tone may carry no moment at all.
+
+The failure both prevent is the same shape as the leaderboard: a product where
+the most-celebrated action is whichever one the business most wants people to
+take, arriving one reasonable declaration at a time.

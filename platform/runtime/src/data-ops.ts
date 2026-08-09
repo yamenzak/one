@@ -100,7 +100,8 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
     permission: "workspace:close",
     idempotency: { mode: "none" },
     audit: () => ({ subject: "workspace", verb: "reopen" }),
-    outcome: { message: "Welcome back", tone: "success", invalidates: ["billing.standing"] },
+    /* ⚠️ Somebody changed their mind about leaving. That is worth saying properly. */
+    outcome: { message: "Welcome back", tone: "success", moment: "welcome", invalidates: ["billing.standing"] },
     async handler(ctx) {
       const d = deps(ctx);
       await d.db.run(`UPDATE subscription SET closing_at = NULL, updated_at = ? WHERE tenant_id = ?`, ctx.now(), d.tenantId);

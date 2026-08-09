@@ -130,7 +130,8 @@ export const publishPlan = operation({
   outcome: {
     message: "Plan published",
     tone: "success",
-    sound: "commit",
+    /* ⚠️ The moment, not a sound: the sound is derived, so the two cannot part. */
+    moment: "acknowledge",
     invalidates: ["plan", "client.plans"],
     optimistic: true,
   },

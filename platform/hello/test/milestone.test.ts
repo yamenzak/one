@@ -13,7 +13,7 @@ import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "../src/worker.js";
 import { post, SETUP, signIn } from "./session.js";
-import { bindingsFor, dayIn, recognise, talliesFor } from "@one/runtime";
+import { bindingsFor, dayIn, readOutcome, recognise, talliesFor } from "@one/runtime";
 import { sql, type Instant, type MilestoneRegistry, type PlainDate, type ResolvedRegion, type SqlHandle } from "@one/kernel";
 
 const ORIGIN = "https://shelf.hello.4dl.app";
@@ -28,7 +28,7 @@ const call = async (path: string, body?: unknown, headers: Record<string, string
     }),
     env as never,
   );
-  return { status: res.status, body: (await res.json()) as Record<string, never> };
+  return { status: res.status, body: (await res.json()) as Record<string, never>, outcome: readOutcome(res.headers) };
 };
 
 type Row = { id: string; title: string; earned: boolean; have: number; need: number };
@@ -62,7 +62,20 @@ describe("the shelf exists before anything is on it", () => {
 
 describe("an event the manifest already declares is the whole instrumentation", () => {
   it("awards and announces from one operation nobody told about milestones", async () => {
-    expect((await call("/api/billing.choose", { planId: "keeper" })).status).toBe(200);
+    const chose = await call("/api/billing.choose", { planId: "keeper" });
+    expect(chose.status).toBe(200);
+
+    /*
+      ⚠️ AND IT PUNCTUATES THE RESPONSE THAT CAUSED IT. The inbox row is the
+      record; the moment is the acknowledgement in the place the person is
+      actually looking. It REPLACES the operation's own "Plan selected" and
+      brings the milestone's own words — "saved" is not news standing next to
+      "you earned something", and the smaller thing's copy under the larger
+      thing's animation reads as the product having lost track.
+    */
+    expect(chose.outcome).toMatchObject({ moment: "celebrate", sound: "earn", message: "You chose a plan" });
+    /* The body is still exactly the declared output — the outcome rides beside it. */
+    expect(chose.body).toHaveProperty("pendingPlanId");
 
     const earned = (await shelf()).find((r) => r.id === "picked-a-plan")!;
     expect(earned).toMatchObject({ earned: true, have: 1, need: 1 });
@@ -86,8 +99,12 @@ describe("an event the manifest already declares is the whole instrumentation", 
   */
   it("does not announce it a second time when the rule is satisfied again", async () => {
     const before = (await inboxTypes()).filter((r) => r.type === "milestone.earned").length;
-    expect((await call("/api/billing.choose", { planId: "free" })).status).toBe(200);
+    const again = await call("/api/billing.choose", { planId: "free" });
+    expect(again.status).toBe(200);
     expect((await inboxTypes()).filter((r) => r.type === "milestone.earned").length).toBe(before);
+    /* And the second one is an ordinary save again, with the operation's own copy. */
+    expect(again.outcome).toMatchObject({ message: "Plan selected" });
+    expect(again.outcome!.moment).toBeUndefined();
   });
 
   /*

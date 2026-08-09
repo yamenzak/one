@@ -58,7 +58,13 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
     permission: "workspace:create",
     idempotency: { mode: "natural", key: "slug" },
     audit: (i: { slug: string }) => ({ subject: i.slug, verb: "create" }),
-    outcome: { message: "Workspace created", tone: "success", invalidates: ["workspaces"] },
+    /*
+      ⚠️ THE ONE ARRIVAL A PRODUCT GETS. Everything after this is somebody using
+      the thing; this is the moment they have one — which is exactly the kind of
+      event the vocabulary exists for, and exactly the kind a product forgets to
+      mark because the code path is a `INSERT`.
+    */
+    outcome: { message: "Workspace created", tone: "success", moment: "welcome", invalidates: ["workspaces"] },
     emits: ["workspace.created"],
     fails: ["platform.invalid", "platform.conflict"],
     /*

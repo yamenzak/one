@@ -29,6 +29,7 @@ import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files
 import { GUIDE, guideOperations, type GuideCarrier } from "./guide-ops.js";
 import { MILESTONES, milestoneOperations, type MilestoneCarrier } from "./milestone-ops.js";
 import { MILESTONE_EARNED, dayIn, earnerOf, recognise } from "./milestone.js";
+import { OUTCOME_HEADER, outcomeHeader, type Raised } from "./outcome.js";
 import { fetchMedia, usedBytes } from "./files.js";
 import { readMaintenance, refuses } from "./maintenance.js";
 import { runDue, type RunReport } from "./jobs.js";
@@ -617,6 +618,13 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         dispatch path is how an agent ends up able to do something the route
         cannot, and the divergence is invisible until somebody looks for it.
       */
+      /**
+       * ⚠️ RAISED BY THE PLATFORM, NEVER DECLARED BY AN APP. A celebration
+       * belongs to a milestone — a rule over an event, earned once per person —
+       * and `momentProblems` refuses an operation that tries to declare one.
+       */
+      let celebrated: Raised | undefined;
+
       const run = async (target: AnyOperation, payload: unknown, via: AuditEntry["via"]) => {
         const entry = auditFor(target, payload, via);
         if (entry) audit.push(entry);
@@ -667,6 +675,15 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
               userId: earner, role: personRole, event, today: day,
               at: new Date().toISOString() as Instant,
             }).catch(() => [] as readonly string[]);
+            /*
+              ⚠️ EARNING SOMETHING PUNCTUATES THE RESPONSE THAT CAUSED IT. The
+              inbox row is the record; the moment is the acknowledgement, in the
+              place the person is actually looking — and it REPLACES the
+              operation's own "Saved", because "saved" is not news standing next
+              to "you earned something". `strongest` is what decides, once.
+            */
+            const first = earned[0];
+            if (first) celebrated = { moment: "celebrate", message: (app.milestones ?? {})[first]!.title };
             for (const id of earned) {
               await dispatch({
                 db: regionalDb, registry: app.notifications, tenantId: at.tenant.tenantId,
@@ -813,6 +830,23 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
 
         const res = Response.json(out);
         for (const c of cookies) res.headers.append("set-cookie", c);
+        /*
+          ⚠️ THE OUTCOME TRAVELS IN A HEADER, AND THE BODY STAYS THE DECLARED
+          OUTPUT. Every operation declares an `output` shape; the API document,
+          the typed client and every test are written against it — so wrapping
+          the body in `{ data, outcome }` would make all three describe a shape
+          the manifest does not mention.
+
+          It is presentation metadata about the response rather than part of the
+          resource, which is the same reason `Content-Disposition` is a header.
+
+          ⚠️ AND IT WAS DECLARED EVERYWHERE AND DELIVERED NOWHERE. Twelve
+          operations in this runtime carry an `outcome` and not one of them
+          reached a client — a mechanism with no surface, which is the failure
+          this platform was started over, sitting inside the platform itself.
+        */
+        const punctuation = outcomeHeader(op.outcome, celebrated);
+        if (punctuation) res.headers.set(OUTCOME_HEADER, punctuation);
         return res;
       } catch (e) {
         if (e instanceof DeclaredFailure) {

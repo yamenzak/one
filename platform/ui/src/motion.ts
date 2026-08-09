@@ -138,3 +138,71 @@ const SPRING = { stiffness: 380, damping: 34, mass: 0.9 } as const;
 
 /** ⚠️ Never negative and never under-damped: `2 * sqrt(k * m)` is the boundary. */
 export const overshoots = (): boolean => SPRING.damping < 2 * Math.sqrt(SPRING.stiffness * SPRING.mass) * 0.05;
+
+/* ------------------------------------------------------------ a moment --- */
+
+/**
+ * A MOMENT — punctuation, and the only thing that interrupts the choreographer.
+ *
+ * ⚠️ IT IS STILL ONE CLOCK. A moment is a scene with one `overlay` role and a
+ * HOLD, not a second animation system — so it cannot drift from everything else,
+ * and the reduced-motion pass covers it for free.
+ *
+ * ⚠️ THE VOCABULARY IS THE KERNEL'S (`MomentId`), and this file is the timing.
+ * They are two halves of one decision in two packages that do not import one
+ * another, so `ui/test/motion.test.ts` pins them to each other — a hold for a
+ * moment nobody can declare is dead, and a moment with no hold plays for zero
+ * milliseconds, which is invisible rather than wrong.
+ */
+export const MOMENT_HOLD: Record<"acknowledge" | "welcome" | "farewell" | "celebrate", number> = {
+  /* Barely there. It confirms; it does not perform. */
+  acknowledge: 900,
+  welcome: 1800,
+  farewell: 1400,
+  /* The longest, and the only one anybody should remember seeing. */
+  celebrate: 2400,
+};
+
+export interface Moment {
+  readonly steps: readonly Step[];
+  /** How long it stays before leaving, in milliseconds. */
+  readonly hold: number;
+  /** ⚠️ Null unless the surface is audible AND a person just did something. */
+  readonly sound: string | null;
+}
+
+export interface MomentOptions {
+  readonly reduced?: boolean;
+  /** Whether this surface declared itself audible — `SoundSpec.surfaces`. */
+  readonly audible?: boolean;
+  /**
+   * ⚠️ WHETHER A PERSON JUST DID SOMETHING. Every browser refuses to play audio
+   * that no gesture asked for, so a design that ignores this produces silence in
+   * production and a chime in every demo. It is also simply correct: a sound
+   * nobody's action caused is a sound arriving out of nowhere.
+   */
+  readonly gesture?: boolean;
+}
+
+export function moment(id: keyof typeof MOMENT_HOLD, sound: string, options: MomentOptions = {}): Moment {
+  return {
+    steps: scene(["overlay"], { reduced: options.reduced }),
+    /*
+      ⚠️ THE HOLD IS NOT SHORTENED BY REDUCED MOTION. Reduced motion is about
+      movement, not about reading speed — cutting the time somebody has to read
+      the words is the one adaptation that makes the setting worse for the people
+      who turn it on.
+    */
+    hold: MOMENT_HOLD[id],
+    sound: options.audible && options.gesture ? sound : null,
+  };
+}
+
+/**
+ * Which of two moments is on screen.
+ *
+ * ⚠️ ONE AT A TIME, AND A SECOND REPLACES RATHER THAN QUEUES. A queue is how a
+ * batch of writes produces four celebrations in a row, each meaning less than
+ * the last, long after the thing that caused them.
+ */
+export const supersede = <T>(current: T | null, next: T | null): T | null => next ?? current;
