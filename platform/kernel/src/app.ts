@@ -41,6 +41,16 @@ export interface IdentitySpec {
 /* --------------------------------------------------------------- tenancy --- */
 
 export interface TenancySpec {
+  /**
+   * The host this app's doors hang off — `kova.4dl.app`.
+   *
+   * ⚠️ Declared rather than derived from `id` + the platform root, because a
+   * deployment that differs (a preview, a local `localhost`, an app whose
+   * product name is not its host) would otherwise have to override the identity
+   * root to move its host, which silently moves the relying party with it and
+   * invalidates every credential.
+   */
+  readonly appRoot: string;
   readonly doors: readonly ("root" | "setup" | "admin" | "slug" | "custom" | "device")[];
   readonly regions: readonly RegionId[];
   readonly defaultRegion: RegionId;

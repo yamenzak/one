@@ -65,6 +65,7 @@ export const kova = defineApp({
   },
 
   tenancy: {
+    appRoot: "kova.4dl.app",
     doors: ["root", "setup", "admin", "slug", "custom"],
     regions: ["eu", "auto"] as RegionId[],
     defaultRegion: "auto" as RegionId,

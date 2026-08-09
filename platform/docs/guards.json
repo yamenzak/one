@@ -1,23 +1,23 @@
 {
   "$comment": [
-    "THE GUARD REGISTRY — every enforcement promise this platform makes.",
+    "THE GUARD REGISTRY \u2014 every enforcement promise this platform makes.",
     "",
     "`scripts/guards.test.mjs` reads this file. Three rules make it more than a",
     "list:",
     "",
     "  1. A `live` guard must name an implementation AND a literal string that",
     "     implementation contains. Rename or delete the check and the registry",
-    "     fails — so a guard cannot quietly stop existing.",
+    "     fails \u2014 so a guard cannot quietly stop existing.",
     "  2. A `live` guard must actually RUN: an .mjs guard is named by the root",
     "     `gate` or `one:gate` script, a .ts guard sits where the test runner",
     "     finds it. A check nobody invokes is the same as no check.",
-    "  3. An `owed` guard names a stage, and ⚠️ a SHIPPED stage may owe",
+    "  3. An `owed` guard names a stage, and \u26a0\ufe0f a SHIPPED stage may owe",
     "     nothing. This is the DEFER mechanism applied to enforcement: flipping a",
     "     stage to shipped is what forces every guard it promised to be built,",
     "     re-targeted with a reason, or dropped on purpose.",
     "",
-    "And the tables in PLAN.md §6 and UI.md §10 are GENERATED from this file, so",
-    "prose cannot promise a guard that has no entry here — which is the failure",
+    "And the tables in PLAN.md \u00a76 and UI.md \u00a710 are GENERATED from this file, so",
+    "prose cannot promise a guard that has no entry here \u2014 which is the failure",
     "this registry exists for. Documentation claiming enforcement nobody built is",
     "worse than no documentation, because it is expensive to disprove.",
     "",
@@ -37,7 +37,7 @@
     {
       "id": "docs-defer",
       "group": "docs",
-      "fails": "a deferral with no id, a duplicate id, no description, an unknown stage — or a stage that is SHIPPED",
+      "fails": "a deferral with no id, a duplicate id, no description, an unknown stage \u2014 or a stage that is SHIPPED",
       "stage": "0",
       "status": "live",
       "impl": "scripts/docs.test.mjs",
@@ -46,7 +46,7 @@
     {
       "id": "docs-generated",
       "group": "docs",
-      "fails": "a generated block whose command now produces different output — a hand-edited inventory",
+      "fails": "a generated block whose command now produces different output \u2014 a hand-edited inventory",
       "stage": "0",
       "status": "live",
       "impl": "scripts/docs.test.mjs",
@@ -82,7 +82,7 @@
     {
       "id": "kernel-day-zero",
       "group": "kernel",
-      "fails": "a day-zero declaration from MANIFEST.md §9 with no type expressing it, or one expressed as optional",
+      "fails": "a day-zero declaration from MANIFEST.md \u00a79 with no type expressing it, or one expressed as optional",
       "stage": "0",
       "status": "live",
       "impl": "scripts/kernel.test.mjs",
@@ -91,7 +91,7 @@
     {
       "id": "kernel-vocabulary",
       "group": "kernel",
-      "fails": "a product noun in kernel code — an identifier, a type or a string literal",
+      "fails": "a product noun in kernel code \u2014 an identifier, a type or a string literal",
       "stage": "0",
       "status": "live",
       "impl": "scripts/kernel.test.mjs",
@@ -100,7 +100,7 @@
     {
       "id": "kernel-no-escape",
       "group": "kernel",
-      "fails": "an escape hatch on a manifest type — a passthrough, a raw blob, an unchecked extension point",
+      "fails": "an escape hatch on a manifest type \u2014 a passthrough, a raw blob, an unchecked extension point",
       "stage": "0",
       "status": "live",
       "impl": "scripts/kernel.test.mjs",
@@ -134,23 +134,29 @@
     {
       "id": "binding-chokepoint",
       "group": "platform",
-      "fails": "any runtime binding touched outside its owner — a query that will hit the wrong continent the day a second region exists",
-      "stage": "1",
-      "status": "owed"
+      "fails": "any runtime binding touched outside its owner \u2014 a query that will hit the wrong continent the day a second region exists",
+      "status": "live",
+      "impl": "scripts/bindings.test.mjs",
+      "proves": "outside ${BINDING_OWNER}",
+      "stage": "1"
     },
     {
       "id": "kv-key-space",
       "group": "platform",
-      "fails": "a KV write outside the allow-listed key space — the one store that cannot be regionalised may never hold anything personal",
-      "stage": "1",
-      "status": "owed"
+      "fails": "a KV write outside the allow-listed key space \u2014 the one store that cannot be regionalised may never hold anything personal",
+      "status": "live",
+      "impl": "scripts/bindings.test.mjs",
+      "proves": "take no namespace",
+      "stage": "1"
     },
     {
       "id": "directory-columns",
       "group": "platform",
       "fails": "a column on the global tenant directory outside the routing-data allow-list",
-      "stage": "1",
-      "status": "owed"
+      "status": "live",
+      "impl": "scripts/bindings.test.mjs",
+      "proves": "DIRECTORY_COLUMNS",
+      "stage": "1"
     },
     {
       "id": "operation-registry",
@@ -225,7 +231,7 @@
     {
       "id": "app-test-budget",
       "group": "platform",
-      "fails": "an app's own suite crossing its duration cap — the fixture problem gets solved rather than tolerated",
+      "fails": "an app's own suite crossing its duration cap \u2014 the fixture problem gets solved rather than tolerated",
       "stage": "6",
       "status": "owed"
     },
@@ -239,7 +245,7 @@
     {
       "id": "release-note-shape",
       "group": "platform",
-      "fails": "a release note reading like a commit message — a file path, a type name, a PR number, an internal id",
+      "fails": "a release note reading like a commit message \u2014 a file path, a type name, a PR number, an internal id",
       "stage": "6",
       "status": "owed"
     },
@@ -347,6 +353,33 @@
       "fails": "a layout that depends on an animation having run",
       "stage": "4",
       "status": "owed"
+    },
+    {
+      "id": "schema-idempotent",
+      "group": "platform",
+      "fails": "a schema module that is not re-runnable, a duplicate table across modules, or a module ordered before something it declares it needs",
+      "stage": "1",
+      "status": "live",
+      "impl": "runtime/test/schema.test.ts",
+      "proves": "never reaches the database"
+    },
+    {
+      "id": "boot-per-region",
+      "group": "platform",
+      "fails": "a deployment that composes one region's schema and serves another \u2014 the tenant resolves, reaches the right database, and finds nothing in it",
+      "stage": "1",
+      "status": "live",
+      "impl": "hello/test/boot.test.ts",
+      "proves": "writes to the region the tenant lives in"
+    },
+    {
+      "id": "standing-not-permission",
+      "group": "platform",
+      "fails": "an always-allowed lane that skips the permission check with the standing gate",
+      "stage": "1",
+      "status": "live",
+      "impl": "hello/test/boot.test.ts",
+      "proves": "refuses a caller without the permission"
     }
   ]
 }

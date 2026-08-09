@@ -127,15 +127,83 @@ export function defineBindings<const B extends BindingSpec>(spec: B): B {
 
 /** What a handler actually receives: resolved handles, never a region parameter. */
 export type ResolvedBindings<B extends BindingSpec> = {
-  readonly [K in keyof B]: Handle<B[K]["kind"]>;
+  readonly [K in keyof B]: Handle<B[K]>;
 };
 
+/* --------------------------------------------------------------- handles --- */
+
 /**
- * Deliberately opaque at stage 0.
+ * What a handler may do with a store, and nothing more.
  *
- * The point being proved here is that a handler CANNOT reach a raw binding, and
- * an opaque handle proves it more honestly than a plausible-looking interface
- * would. The real shapes arrive with the implementation in stage 1.
+ * ⚠️ THESE ARE DELIBERATELY NARROWER THAN THE PLATFORM UNDERNEATH THEM. A handle
+ * is not a wrapper around a vendor's client — it is the subset an app is allowed
+ * to reach, chosen so the things the platform must account for cannot be gone
+ * around. An object written outside the ledger is invisible to the quota and to
+ * erasure forever, and nothing else would notice; so `ObjectHandle` has no
+ * unaccounted write, rather than a documented rule against one.
+ *
+ * They name no vendor. The contract layer describes what an app needs; which
+ * product provides it is the runtime's problem, and swapping one is a change in
+ * one package rather than in every handler.
  */
-declare const HANDLE: unique symbol;
-export type Handle<K extends StoreKind> = { readonly [HANDLE]: K };
+
+export interface SqlHandle {
+  all<T>(sql: string, ...params: readonly unknown[]): Promise<T[]>;
+  first<T>(sql: string, ...params: readonly unknown[]): Promise<T | null>;
+  run(sql: string, ...params: readonly unknown[]): Promise<void>;
+  /** One transaction-ish unit. ⚠️ A DDL batch must arrive as ONE call. */
+  batch(statements: readonly string[]): Promise<void>;
+}
+
+export interface ObjectHandle {
+  /** Returns the ledger key. ⚠️ There is no write that skips the ledger. */
+  put(key: string, body: ArrayBuffer | ReadableStream, contentType: string): Promise<string>;
+  get(key: string): Promise<ArrayBuffer | null>;
+  delete(key: string): Promise<void>;
+}
+
+/**
+ * ⚠️ A CACHE KEY IS TYPED, and the reason is residency rather than tidiness.
+ *
+ * A cache is globally replicated with no jurisdiction option, so anything in it
+ * is in every point of presence on earth. Keys therefore come from a declared
+ * space — routing, ephemeral codes, operator configuration — and there is no
+ * method taking a free-form string, because a free-form string is where a
+ * tenant's data eventually lands.
+ */
+export type CacheNamespace = "route" | "pairing" | "config";
+export interface CacheHandle {
+  get(ns: CacheNamespace, key: string): Promise<string | null>;
+  put(ns: CacheNamespace, key: string, value: string, ttlSeconds?: number): Promise<void>;
+  delete(ns: CacheNamespace, key: string): Promise<void>;
+}
+
+export interface ActorHandle {
+  /** One actor per name. The jurisdiction is already decided by the region. */
+  for(name: string): { fetch(request: Request): Promise<Response> };
+}
+
+export interface InferenceHandle {
+  run(model: string, input: unknown): Promise<unknown>;
+  /** ⚠️ A region's sub-processor allow-list, resolved. May be empty. */
+  readonly permitted: readonly string[];
+}
+
+export interface QueueHandle {
+  send(body: unknown): Promise<void>;
+}
+
+/**
+ * ⚠️ A HANDLE IS ALL A HANDLER EVER RECEIVES, and it arrives already pointed at
+ * one region. There is no method to change region, no field naming one, and no
+ * way to obtain a second — which is what makes "a query cannot hit the wrong
+ * continent" a property of the type rather than of a review.
+ */
+export type Handle<S extends Store> =
+  S extends SqlStore ? SqlHandle
+  : S extends ObjectStore ? ObjectHandle
+  : S extends CacheStore ? CacheHandle
+  : S extends ActorStore ? ActorHandle
+  : S extends InferenceStore ? InferenceHandle
+  : S extends QueueStore ? QueueHandle
+  : never;

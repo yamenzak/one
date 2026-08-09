@@ -314,6 +314,18 @@ const KIND_BLURB = {
   nothing writes it by hand. Which stage is active and what is outstanding are
   DERIVED, exactly as STANDARDS.md §2 requires of any statement of state.
 */
+/*
+  ⚠️ THE PACKAGE MAP IS DERIVED TOO. A hand-written directory index is the exact
+  rot this standard exists to prevent — it is correct on the day it is written
+  and silently wrong the first time a package is added. Each package's own
+  `description` is the one-line answer, so there is one place to change it.
+*/
+const packageRows = readdirSync(ROOT, { withFileTypes: true })
+  .filter((e) => e.isDirectory() && existsSync(join(ROOT, e.name, "package.json")))
+  .map((e) => JSON.parse(readFileSync(join(ROOT, e.name, "package.json"), "utf8")))
+  .sort((a, b) => a.name.localeCompare(b.name))
+  .map((pkg) => `| \`${pkg.name}\` | ${(pkg.description ?? "").split(":").slice(1).join(":").trim() || pkg.description || ""} |`);
+
 const activeStages = [...stages.values()].filter((x) => x.status === "active");
 const shippedStages = [...stages.values()].filter((x) => x.status === "shipped");
 const stateBlock =
@@ -324,7 +336,11 @@ const stateBlock =
   `| open deferrals | ${open.length} — see [DEFERRED.md](DEFERRED.md) |\n\n` +
   `⚠️ Resuming after a break, or after a compressed conversation?\n` +
   `[STANDARDS.md §9](STANDARDS.md) is the checklist, in order. Start there rather\n` +
-  `than from recall — that is the whole design.\n\n`;
+  `than from recall — that is the whole design.\n\n` +
+  `## Packages\n\n| | |\n|---|---|\n${packageRows.join("\n")}\n\n` +
+  `⚠️ Nothing here deploys. \`platform/\` is absent from \`apps.json\`, so the deploy\n` +
+  `workflow cannot select it — which is what lets this ship in small pull requests\n` +
+  `into \`main\` rather than on a long-lived branch drifting against a moving trunk.\n\n`;
 
 const indexDoc =
   `---\nkind: index\n---\n\n# The ONE platform\n\n` +

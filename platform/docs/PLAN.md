@@ -4,7 +4,8 @@ kind: plan
 
 # ONE — the platform, and the decisions that shape it
 
-> **Status: PLAN. Nothing here is built.** This is the design for a new
+> **Status: PLAN, and stages 0–3 are partly built.** `platform/README.md` is
+> generated and says which. This is the design for a new
 > framework directory that becomes the home of every 4DL app and the standard
 > for future ones. It supersedes nothing yet: `packages/@4dl/*` and `apps/*`
 > remain the shipping system until a stage below says otherwise.
@@ -24,6 +25,8 @@ kind: plan
 > invariant-not-the-incident rule, deferral markers, help, release notes and the
 > per-app test budget. Read it before the first commit; it governs `platform/**`
 > absolutely and the legacy tree not at all.
+>
+> [../README.md](../README.md) is the directory map.
 >
 > Read [PLATFORM.md](../../PLATFORM.md) for what exists today, and
 > [docs/PLATFORM-AUDIT.md](../../docs/PLATFORM-AUDIT.md) for the three-app
@@ -860,10 +863,13 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `kernel-no-escape` | an escape hatch on a manifest type — a passthrough, a raw blob, an unchecked extension point | **live** |
 | `kernel-unproved-export` | an exported symbol no proof or test exercises | **live** |
 | `kernel-unstated-any` | an `any` with no stated reason beside it | **live** |
+| `binding-chokepoint` | any runtime binding touched outside its owner — a query that will hit the wrong continent the day a second region exists | **live** |
+| `kv-key-space` | a KV write outside the allow-listed key space — the one store that cannot be regionalised may never hold anything personal | **live** |
+| `directory-columns` | a column on the global tenant directory outside the routing-data allow-list | **live** |
+| `schema-idempotent` | a schema module that is not re-runnable, a duplicate table across modules, or a module ordered before something it declares it needs | **live** |
+| `boot-per-region` | a deployment that composes one region's schema and serves another — the tenant resolves, reaches the right database, and finds nothing in it | **live** |
+| `standing-not-permission` | an always-allowed lane that skips the permission check with the standing gate | **live** |
 | `capability-reachable` | a module applied with no surface mounted to reach it | stage 1 |
-| `binding-chokepoint` | any runtime binding touched outside its owner — a query that will hit the wrong continent the day a second region exists | stage 1 |
-| `kv-key-space` | a KV write outside the allow-listed key space — the one store that cannot be regionalised may never hold anything personal | stage 1 |
-| `directory-columns` | a column on the global tenant directory outside the routing-data allow-list | stage 1 |
 | `operation-registry` | a route, tool or webhook that did not come from `operation()` | stage 2 |
 | `tool-subset-route` | an AI tool reachable where the equivalent route is not | stage 2 |
 | `problem-envelope` | a failure body that is not a `Problem`, a code with no copy, or a `catch` that re-throws or serialises a provider's error | stage 2 |
@@ -964,7 +970,7 @@ second-system effect, which is the largest risk here by a distance.
 | # | Stage | Ends when |
 |---|---|---|
 | 0 | **Contracts** — manifest schema, layer boundaries, naming, the operation and collection types. Types only. | ✅ built in `platform/kernel` — the four types compile, six real surfaces from two shipping products are expressed in them, and eight mistakes are rejected by the compiler. [FINDINGS.md](../kernel/test/FINDINGS.md) is what did not fit. Open: review |
-| 1 | **Kernel** — bindings from manifest, config, schema composition, shared identity + root-scoped passkeys, tenancy + doors, **region resolution and the global tenant directory**, standing. | A generated `hello` app boots, signs in with one passkey usable from a second app's origin, creates a tenant, answers `/health` — and no handler has seen a raw binding |
+| 1 | **Kernel** — bindings from manifest, config, schema composition, shared identity + root-scoped passkeys, tenancy + doors, **region resolution and the global tenant directory**, standing. | A generated `hello` app boots, signs in with one passkey usable from a second app's origin, creates a tenant, answers `/health` — and no handler has seen a raw binding. **Done except identity:** `platform/hello` boots through `platform/runtime` on the real host topology, composes its schema per region, creates a workspace and serves it. The passkey ceremony is the remainder |
 | 2 | **Surface** — operations → routes + tools + webhooks + audit + OpenAPI. | An AI agent completes a CRUD round trip through tools, and is refused exactly what the user would be |
 | 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search, **and tenant relocation (§4.2) with the `Relocatable` DO contract**. | `hello` has a real collection with an activity log and a metered ledger — and a tenant can be copied to a second region and back, verified, with the source still bootable |
 | 4 | **Renderer** — shell, nav, collection views, settings, admin, whitelabel, PWA. The language is [UI.md](UI.md). | `pnpm shots` photographs `hello` at 4 viewports × 2 themes and it looks like the product — and the state matrix, the contrast sweep over every legal brand and the boundary guard all pass |

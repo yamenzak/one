@@ -454,3 +454,63 @@ prose cannot name a guard that does not exist.
 
 ⚠️ The registry immediately caught six of its own entries pointing at checks
 nothing invoked, because `pnpm gate` did not yet call them.
+
+## 32. The directory read is itself a query, so boot cannot run after resolution
+
+The pipeline resolved the host, read the tenant from the directory, then applied
+the schema. On a fresh database that reads a table that does not exist — and the
+failure is not a degraded feature, it is every request 500ing from the first line
+of the pipeline, including the ones that would have created the schema.
+
+The general shape: **a step that discovers where to look cannot come after the
+step that prepares where to look.** Boot is memoised as a promise rather than a
+boolean, because concurrent first requests would otherwise each start their own
+composition, and two runners racing on one marker table leave a state neither of
+them describes.
+
+## 33. One composition per REGION, not one per deployment
+
+`onBoot` was handed the default region's bindings, so a tenant placed in a second
+region resolved correctly, reached the right database, and found nothing in it.
+Every part of that is working except the one that matters.
+
+Booting is now lazy per region: a region nobody is in costs nothing, and the
+first request to one composes it. PLAN.md §4.3 predicted this ("`applySchema`
+runs per app × region — six gates, not one"); it still had to be met to be
+believed.
+
+## 34. An always-allowed lane opens the STANDING gate and nothing else
+
+Standing is a fact about a workspace; permission is a fact about a caller. The
+pipeline skipped the whole of `check` for the lanes that survive every rung of
+the billing ladder — so signing in, paying, leaving and every webhook would have
+answered to anybody who asked for them.
+
+The fix is one line and the lesson is the shape: a bypass must name the gate it
+opens, not the function it skips. `check` is one call answering four questions,
+and "this lane is exempt" was true of exactly one of them.
+
+## 35. A guard's first failures are its own — again, four times out of four
+
+The chokepoint guard's opening run reported four violations. Three were the
+guard: it read comments (which state the rule and therefore name the very thing
+being refused), and its pattern read the module specifier `./env.js` as a
+property access, flagging every import of the chokepoint itself.
+
+The fourth was real, and it is the one worth having: a second place indexed the
+environment, for a reason that cannot be designed away — the directory is what
+answers the region, so it cannot be reached through a resolver that requires one.
+Moving it INTO the chokepoint kept the count of files that touch an environment
+at one, which is the whole value of the word.
+
+## 36. Reachability needs private declarations, and an entry file is a root
+
+An "unproved export" check over exported symbols alone reports the base of a
+hierarchy as dead: a private type is often how an exported one is reached. And an
+app's worker is exercised by driving it over HTTP rather than by naming its
+symbols, so an entry point's glue is a root — while a BARREL is not, because
+re-exporting everything would make everything reachable and the check vacuous.
+
+Neither refinement weakens it: only exports are reported, and an entry's root is
+its imports and default export rather than its declarations, so an unused export
+in an entry file is still found.

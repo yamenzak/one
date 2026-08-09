@@ -10,7 +10,7 @@
  * change or a rewrite.
  */
 
-import type { BindingSpec, Handle, ResolvedBindings } from "./bindings.js";
+import type { BindingSpec, ResolvedBindings } from "./bindings.js";
 import type { Directory, DirectoryEntry, ResolvedRegion } from "./directory.js";
 import { resolveRegion } from "./directory.js";
 import type { Door, DoorConfig, HostShape } from "./doors.js";
@@ -123,8 +123,8 @@ export interface RegionalBindings<B extends BindingSpec> {
 export function regionalBindings<B extends BindingSpec>(spec: B): RegionalBindings<B> {
   return {
     for(_region: ResolvedRegion): ResolvedBindings<B> {
-      const out: Record<string, Handle<never>> = {};
-      for (const key of Object.keys(spec)) out[key] = {} as Handle<never>;
+      const out: Record<string, unknown> = {};
+      for (const key of Object.keys(spec)) out[key] = {};
       return out as ResolvedBindings<B>;
     },
   };

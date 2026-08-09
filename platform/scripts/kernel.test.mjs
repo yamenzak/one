@@ -235,18 +235,48 @@ ok(`unstated any: ${anyHits} found`);
  * something proved refers to it. What survives is genuinely unreachable — no
  * proof touches it directly, and nothing that a proof touches leads to it.
  */
-const EXPORT_RE = /^export\s+(?:declare\s+)?(?:abstract\s+)?(type|interface|const|function|class|enum)\s+([A-Za-z_$][\w$]*)/gm;
+const DECL_RE = /^(export\s+)?(?:declare\s+)?(?:abstract\s+)?(type|interface|const|function|class|enum)\s+([A-Za-z_$][\w$]*)/gm;
 
-/** A declaration runs from its `export` line to the next top-level one. */
+/**
+ * A declaration runs from its own line to the next top-level one.
+ *
+ * ⚠️ PRIVATE DECLARATIONS ARE NODES TOO. Only exports are REPORTED, but a
+ * private type is how an exported one is reached — `StoreKind` is named by a
+ * non-exported `StoreCommon` that every exported store extends. A graph of
+ * exports alone reports the base of a hierarchy as dead.
+ */
 const decls = new Map();
+/**
+ * ⚠️ A FILE WITH A DEFAULT EXPORT IS AN ENTRY POINT, and its body is a root.
+ * An app's worker is exercised by driving it over HTTP, not by naming its
+ * symbols — so without this the whole of an app reads as unreachable while its
+ * tests are in fact running every line. A BARREL is excluded for the mirror
+ * reason: re-exporting everything would make everything reachable and the check
+ * vacuous.
+ */
+const entryBodies = [];
 for (const file of srcFiles) {
-  if (file.endsWith("index.ts")) continue; // a barrel re-exports; it declares nothing
   const src = read(file);
-  const found = [...src.matchAll(EXPORT_RE)];
+  if (file.endsWith("index.ts")) continue;
+  const found = [...src.matchAll(DECL_RE)];
+  /*
+    ⚠️ THE ROOT IS THE ENTRY'S GLUE, NOT ITS DECLARATIONS. Seeding the whole file
+    would prove every symbol it happens to declare, so an unused export in an
+    entry file could never be reported. What is a root is the part nothing else
+    could reach: the imports and the default export itself.
+  */
+  if (/^export default/m.test(src)) {
+    let glue = src;
+    for (let i = found.length - 1; i >= 0; i--) {
+      const end = i + 1 < found.length ? found[i + 1].index : src.length;
+      glue = glue.slice(0, found[i].index) + glue.slice(end);
+    }
+    entryBodies.push(glue);
+  }
   found.forEach((m, i) => {
     const end = i + 1 < found.length ? found[i + 1].index : src.length;
-    decls.set(m[2], {
-      name: m[2], kind: m[1], file,
+    decls.set(m[3], {
+      name: m[3], kind: m[2], file, exported: Boolean(m[1]),
       line: src.slice(0, m.index).split("\n").length,
       body: src.slice(m.index, end),
     });
@@ -255,25 +285,33 @@ for (const file of srcFiles) {
 
 const proved = new Set();
 const frontier = [];
-for (const [name, d] of decls) {
-  if (new RegExp(`\\b${name}\\b`).test(testCorpus)) { proved.add(name); frontier.push(d); }
+const seed = (name) => {
+  if (proved.has(name) || !decls.has(name)) return;
+  proved.add(name);
+  frontier.push(decls.get(name));
+};
+for (const name of decls.keys()) {
+  if (new RegExp(`\\b${name}\\b`).test(testCorpus)) seed(name);
+  else if (entryBodies.some((b) => new RegExp(`\\b${name}\\b`).test(b))) seed(name);
 }
 while (frontier.length) {
   const d = frontier.pop();
-  for (const [name, target] of decls) {
-    if (proved.has(name)) continue;
-    if (new RegExp(`\\b${name}\\b`).test(d.body)) { proved.add(name); frontier.push(target); }
+  for (const name of decls.keys()) {
+    if (!proved.has(name) && new RegExp(`\\b${name}\\b`).test(d.body)) seed(name);
   }
 }
 
+let exported = 0;
 for (const [name, d] of decls) {
+  if (!d.exported) continue;
+  exported++;
   if (proved.has(name)) continue;
   const isType = d.kind === "type" || d.kind === "interface";
   fail(`${rel(d.file)}:${d.line}: "${name}" is exported and nothing reachable from a proof ${isType ? "refers to it" : "calls it"}.\n` +
        `       Exercise it, make it non-exported, or delete it — unproved surface is what\n` +
        `       a later stage builds on by mistake.`);
 }
-ok(`exports: ${decls.size} declared, ${proved.size} reachable from a proof`);
+ok(`exports: ${exported} declared, ${exported - bad} reachable from a proof`);
 
 /* -------------------------------------------------------------------------- */
 

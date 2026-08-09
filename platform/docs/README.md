@@ -11,13 +11,25 @@ kind: index
 
 | | |
 |---|---|
-| active | **0** — Contracts — the four core types<br>**1** — Kernel — bindings, identity, tenancy, regions, standing<br>**2** — Surface — operations to routes, tools, webhooks, OpenAPI<br>**3** — Data — collections, ledger, files, jobs, relocation |
-| shipped | none yet |
-| open deferrals | 8 — see [DEFERRED.md](DEFERRED.md) |
+| active | **1** — Kernel — bindings, identity, tenancy, regions, standing<br>**2** — Surface — operations to routes, tools, webhooks, OpenAPI<br>**3** — Data — collections, ledger, files, jobs, relocation |
+| shipped | 0 |
+| open deferrals | 10 — see [DEFERRED.md](DEFERRED.md) |
 
 ⚠️ Resuming after a break, or after a compressed conversation?
 [STANDARDS.md §9](STANDARDS.md) is the checklist, in order. Start there rather
 than from recall — that is the whole design.
+
+## Packages
+
+| | |
+|---|---|
+| `@one/hello` | a manifest, one collection, three operations. It exists to boot — every stage's exit criterion is asserted against it. |
+| `@one/kernel` | primitives, bindings, problems, collections, operations and defineApp. TYPES ONLY — stage 0 proves the shape before anything implements it. |
+| `@one/runtime` | the ONLY code that touches a raw binding. Resolves a request to a door, a tenant, a region and a set of handles, applies the composed schema, and dispatches operations. |
+
+⚠️ Nothing here deploys. `platform/` is absent from `apps.json`, so the deploy
+workflow cannot select it — which is what lets this ship in small pull requests
+into `main` rather than on a long-lived branch drifting against a moving trunk.
 
 ## Documents
 

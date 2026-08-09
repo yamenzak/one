@@ -11,16 +11,23 @@ kind: index
 ## Stage 1 — Kernel — bindings, identity, tenancy, regions, standing
 
 - `one-001` — a builder that accumulates the operation union, so  
-  <sub>kernel/src/app.ts:127</sub>
+  <sub>kernel/src/app.ts:137</sub>
 - `one-004` — turn `regionalBindings` into a real resolver over  
   <sub>kernel/src/resolve.ts:134</sub>
 - `one-005` — the WebAuthn ceremony itself: attestation parsing,  
   <sub>kernel/src/identity.ts:129</sub>
+- `one-011` — the real session read. Identity is the half of stage 1  
+  <sub>hello/src/worker.ts:30</sub>
 
 ## Stage 2 — Surface — operations to routes, tools, webhooks, OpenAPI
 
 - `one-002` — bind to the real validator, and make `output` carry  
   <sub>kernel/src/operation.ts:112</sub>
+
+## Stage 3 — Data — collections, ledger, files, jobs, relocation
+
+- `one-012` — a durable actor binding, which arrives with the  
+  <sub>hello/src/manifest.ts:27</sub>
 
 ## Stage 4 — Renderer — shell, nav, collection views, whitelabel, PWA
 
