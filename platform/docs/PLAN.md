@@ -9,6 +9,11 @@ kind: plan
 > for future ones. It supersedes nothing yet: `packages/@4dl/*` and `apps/*`
 > remain the shipping system until a stage below says otherwise.
 >
+> **[MANIFEST.md](MANIFEST.md) is what an app actually declares** — the full
+> surface, and §9 there is the split between what must exist in the types before
+> the first table and what is safe to add later. It is the specification stage 0
+> implements.
+>
 > **[STANDARDS.md](STANDARDS.md) is how we write while building it** — the
 > invariant-not-the-incident rule, deferral markers, help, release notes and the
 > per-app test budget. Read it before the first commit; it governs `platform/**`
