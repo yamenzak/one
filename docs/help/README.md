@@ -1,3 +1,7 @@
+---
+kind: guide
+---
+
 # The Help Center
 
 One documentation surface for every 4DL app. Docs and support in the same place,

@@ -1,3 +1,7 @@
+---
+kind: plan
+---
+
 # The three-app assessment
 
 Audited 2026-08-08, with three products live (Kova, Tessa, Scena) and a

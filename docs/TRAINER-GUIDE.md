@@ -1,3 +1,7 @@
+---
+kind: guide
+---
+
 # Kova — Guide for Coaches and Studio Owners
 
 Everything in this guide describes features that work today. Anything not yet

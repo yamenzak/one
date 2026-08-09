@@ -1,3 +1,8 @@
+---
+kind: contract
+verified: 2026-08-09
+---
+
 # Kova — Privacy Policy
 
 

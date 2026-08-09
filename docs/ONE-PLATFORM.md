@@ -1,3 +1,7 @@
+---
+kind: plan
+---
+
 # ONE — the platform, and the decisions that shape it
 
 > **Status: PLAN. Nothing here is built.** This is the design for a new

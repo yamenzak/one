@@ -1,3 +1,7 @@
+---
+kind: record
+---
+
 # Stage 7 — the UI inventory
 
 Every surface in `apps/scena-app`, measured before the rewrite starts rather

@@ -1,3 +1,8 @@
+---
+kind: contract
+verified: 2026-08-09
+---
+
 # Shipping an app on the platform
 
 From nothing to deployed. This is the walkthrough; [`PLATFORM.md`](../PLATFORM.md)

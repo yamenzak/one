@@ -834,6 +834,21 @@ deliverability pre-flight — was mounted by Kova and by neither other app. Read
 before assuming a shared capability reaches every product, and before adding an
 app.
 
+⚠️ **[docs/DOCS-STANDARD.md](docs/DOCS-STANDARD.md) governs every document in
+this repository, including this one.** 44 markdown files, 18,105 lines, and six
+standing instructions to *"update this in the same commit"* — which is the
+failure rather than the fix, in a repo whose guards all exist because wiring that
+must be remembered is wiring that will be forgotten. The rules that bite:
+**a deferral is a `DEFER(id) stage:N` marker, never a sentence** — a marker is
+FOUND by a script rather than remembered, which is the only property that
+survives a compressed conversation, and a stage cannot be flipped to `shipped`
+while anything still defers to it; an inventory lives in a verified
+`<!-- generated: cmd -->` block or not at all; and every document declares a
+`kind`. [docs/README.md](docs/README.md) and
+[docs/DEFERRED.md](docs/DEFERRED.md) are generated — regenerate with
+`node scripts/docs.test.mjs --write`. Enforced by `scripts/docs.test.mjs` in
+`pnpm gate`.
+
 **[docs/ONE-PLATFORM.md](docs/ONE-PLATFORM.md) is the PLAN for what replaces all
 of this, and nothing in it is built.** A new framework directory that owns the
 runtime, the data model, the surface (HTTP + AI tools + webhooks) and the chrome,
@@ -1054,7 +1069,8 @@ Two neighbours: **[docs/SCENA-REWRITE.md](docs/SCENA-REWRITE.md) is the plan** �
 what was kept, what was rewired, the six decisions and their rationale, and the
 ten stages — and **[docs/SCENA-UI-INVENTORY.md](docs/SCENA-UI-INVENTORY.md)** is
 the record of the UI rewrite, one section per sub-stage, each naming the defects
-it closed. **[apps/scena/DEPLOY.md](apps/scena/DEPLOY.md)** is how it ships, and
+it closed. **[apps/scena/DEPLOY.md](apps/scena/DEPLOY.md)** is how it ships
+(Tessa's own is [apps/tessa/DEPLOY.md](apps/tessa/DEPLOY.md)), and
 it is genuinely different from the other two apps' — Scena deploys **two workers
 and a marketing site**, and `tv.4dl.app` (where the player bundle is served) and
 `play.scena.4dl.app` (the device door the bundle calls) are two different things

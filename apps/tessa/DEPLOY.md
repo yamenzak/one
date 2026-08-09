@@ -1,3 +1,8 @@
+---
+kind: contract
+verified: 2026-08-09
+---
+
 # Deploying Tessa
 
 Kova's `DEPLOY.md` is the long version and most of it transfers, because both
