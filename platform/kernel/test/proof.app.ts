@@ -95,12 +95,12 @@ export const kova = defineApp({
       is why it is not simply zero.
     */
     entitlements: {
-      trainingPlans: { parked: false, enforcement: "gate" },
-      customerPackages: { parked: false, enforcement: "gate" },
-      seats: { parked: 1, enforcement: "quota" },
+      trainingPlans: { label: "Training plans", parked: false, enforcement: "gate" },
+      customerPackages: { label: "Packages you can sell", parked: false, enforcement: "gate" },
+      seats: { label: "People on your team", parked: 1, enforcement: "quota" },
       // Sold nowhere, enforced nowhere — and the reason is the exemption. A
       // boolean here would be indistinguishable from an oversight in a year.
-      chat: { parked: false, enforcement: { unenforced: "no plan in the catalogue enables it; inert until one does" } },
+      chat: { label: "Messaging", parked: false, enforcement: { unenforced: "no plan in the catalogue enables it; inert until one does" } },
     },
 
     /*
@@ -139,14 +139,14 @@ export const kova = defineApp({
       coincidence, not a mechanism.
     */
     customerFlags: {
-      trainingPlans: { parked: false, enforcement: "gate", scope: "training", requires: "trainingPlans" },
-      bodyReport: { parked: false, enforcement: "shape", scope: "body" },
-      strengthReport: { parked: false, enforcement: "shape", scope: "training" },
-      nutritionReport: { parked: false, enforcement: "shape", scope: "nutrition" },
+      trainingPlans: { label: "Training plans", parked: false, enforcement: "gate", scope: "training", requires: "trainingPlans" },
+      bodyReport: { label: "Body report", parked: false, enforcement: "shape", scope: "body" },
+      strengthReport: { label: "Strength report", parked: false, enforcement: "shape", scope: "training" },
+      nutritionReport: { label: "Nutrition report", parked: false, enforcement: "shape", scope: "nutrition" },
       // The one honest exemption: computed entirely from the customer's own
       // entries, so there is nothing a route could withhold without breaking
       // the thing that produced it.
-      macroBreakdown: { parked: true, enforcement: { derived: "computed from the customer's own logged entries" } },
+      macroBreakdown: { label: "Macro breakdown", parked: true, enforcement: { derived: "computed from the customer's own logged entries" } },
     },
 
     seats: { counts: ["owner", "trainer"] },

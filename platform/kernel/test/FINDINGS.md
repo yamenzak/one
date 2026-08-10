@@ -1680,3 +1680,68 @@ merge rather than as a tool bug.
 
 A backup path is per-process and per-case now. The general form: any tool that
 edits the working tree in place has to assume a second copy of itself is running.
+
+## 138. A price list written beside the declarations drifts from what is enforced
+
+Every plan's `entitlements` map went out to the client as-is — `{ receiptsStored: 5 }`
+— which is a machine's answer. A screen showing that either prints the key or
+carries a translation table of its own, and the second one drifts from what the
+gate actually enforces. The drift is discovered by somebody who bought a thing
+the product then refuses, which is the coverage rule's failure one layer up:
+there a capability was sold and withheld by nothing; here it is ADVERTISED as
+something other than what it is.
+
+So `label` is required on an entitlement and on a customer flag, for the same
+reason `enforcement` is: there is now nowhere to put the copy except the
+declaration the gate reads.
+
+## 139. A shelf card carries every declared key, not every key the plan mentions
+
+A plan omitting a key is a plan on which the parking value applies. Walking the
+plan's own map gives ragged columns, and a comparison table with different rows
+per column is one nobody can read — the cheapest plan looks like it has fewer
+*features* rather than smaller *numbers*, which is the opposite of true.
+
+The same applies to a package on the other rail: two flags on is not two
+features, it is two of eight, and a customer comparing packages has to see the
+six.
+
+## 140. Unlimited is the top, and it sorts as the bottom
+
+`-1` is smaller than zero as a number and larger than everything as an allowance.
+A comparison that forgets reports every upgrade to an unlimited plan as a loss of
+everything — and a card that forgets prints "-1 receipts". Both are read once, in
+the kernel, so no renderer ever sees the sentinel.
+
+## 141. No plan is the parking state, not zero
+
+A workspace that has never chosen anything is on the parking values. A comparison
+treating "no plan" as nothing advertises every plan as pure gain, including the
+ones that take something away from what a workspace already had without paying —
+which is exactly the shape the parking-above-floor rule exists to catch, arriving
+through the storefront instead of the catalogue.
+
+## 142. The shelf and the gate count the same thing, or the shelf is lying
+
+A preview that estimated usage its own way promises a downgrade the very next
+write then refuses. That is a surface which is not the mechanism — harder to spot
+than a mechanism with no surface, because everything renders and nothing throws.
+So the preview takes the runtime's own quota counters as an argument; there is no
+second way to count a ceiling.
+
+Two smaller rules fell out. A key nothing can count is a switch rather than a
+number, so an absent counter is absent rather than zero. And a counter that
+throws must not take the price list down: somebody looking at plans is doing the
+one thing the business wants them to do.
+
+## 143. The storefront states, it never refuses
+
+A downgrade below current usage strands nothing — reads are never gated, so the
+rows stay and only the next one is refused. Somebody moving down deserves to know
+that before they choose, and to be allowed to choose anyway: refusing traps them
+on a plan they no longer want, which is the same shape as the rule that leaving
+is always allowed.
+
+Usage travels on the card as well as inside a strain. "5 of 5" is what somebody
+needs to see BEFORE they are over, and a storefront that only speaks up once a
+ceiling is breached mentions the problem at the moment it is already theirs.

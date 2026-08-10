@@ -55,6 +55,12 @@ export type FlagEnforcement =
   | { readonly derived: string };
 
 export interface FlagDef {
+  /**
+   * ⚠️ WHAT THIS IS CALLED TO THE CUSTOMER BUYING IT. Same argument as the other
+   * rail's: a package is sold from a screen, and the alternative to a label here
+   * is copy written beside the declaration, which drifts from what is enforced.
+   */
+  readonly label: string;
   readonly enforcement: FlagEnforcement;
   /** The budget scope whose days gate it. Absent means time does not gate it. */
   readonly scope?: string;

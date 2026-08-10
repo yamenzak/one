@@ -1,18 +1,18 @@
 {
   "$comment": [
-    "THE STAGE REGISTRY \u2014 what a DEFER marker is allowed to name.",
+    "THE STAGE REGISTRY — what a DEFER marker is allowed to name.",
     "",
     "`scripts/docs.test.mjs` reads this file. A DEFER naming a stage that is not",
     "here fails; a DEFER naming a stage whose status is `shipped` fails.",
     "",
-    "\u26a0\ufe0f THAT SECOND RULE IS THE WHOLE MECHANISM. Flipping a stage to `shipped`",
+    "⚠️ THAT SECOND RULE IS THE WHOLE MECHANISM. Flipping a stage to `shipped`",
     "is what forces every deferral pointing at it to be done, re-targeted with a",
     "reason, or deleted on purpose. A stage cannot be declared finished while",
-    "something still expects work from it \u2014 which is exactly the failure that",
+    "something still expects work from it — which is exactly the failure that",
     "made this registry necessary: a sentence in a document survives a",
     "compressed conversation, and the intent behind it does not.",
     "",
-    "Stages mirror docs/ONE-PLATFORM.md \u00a78. Keep the ids stable \u2014 a marker in a",
+    "Stages mirror docs/ONE-PLATFORM.md §8. Keep the ids stable — a marker in a",
     "file elsewhere in the repo names one of them.",
     "",
     "status: planned | active | shipped"
@@ -20,43 +20,43 @@
   "stages": [
     {
       "id": "0",
-      "title": "Contracts \u2014 the four core types",
+      "title": "Contracts — the four core types",
       "status": "shipped"
     },
     {
       "id": "1",
-      "title": "Kernel \u2014 bindings, identity, tenancy, regions, standing",
+      "title": "Kernel — bindings, identity, tenancy, regions, standing",
       "status": "shipped"
     },
     {
       "id": "2",
-      "title": "Surface \u2014 operations to routes, tools, webhooks, OpenAPI",
+      "title": "Surface — operations to routes, tools, webhooks, OpenAPI",
       "status": "shipped"
     },
     {
       "id": "3",
-      "title": "Data \u2014 collections, ledger, files, jobs, relocation",
+      "title": "Data — collections, ledger, files, jobs, relocation",
       "status": "shipped"
     },
     {
       "id": "4",
-      "title": "Renderer \u2014 shell, nav, collection views, whitelabel, PWA",
+      "title": "Renderer — shell, nav, collection views, whitelabel, PWA",
       "status": "shipped"
     },
     {
       "id": "5",
-      "title": "Commerce \u2014 plans, entitlements, flags, Stripe, metering",
+      "title": "Commerce — plans, entitlements, flags, Stripe, metering",
       "status": "shipped"
     },
     {
       "id": "6",
-      "title": "Ops \u2014 notifications, help, versioning, data centre, CI",
+      "title": "Ops — notifications, help, versioning, data centre, CI",
       "status": "shipped"
     },
     {
       "id": "6.5",
-      "title": "Batteries Kova needs \u2014 files, jobs, guidance, milestones, moments, wizard, marketplace",
-      "status": "planned"
+      "title": "Batteries Kova needs — files, jobs, guidance, milestones, moments, wizard, marketplace",
+      "status": "shipped"
     },
     {
       "id": "7",

@@ -35,6 +35,7 @@ export * from "./job.js";
 export * from "./guide.js";
 export * from "./milestone.js";
 export * from "./moment.js";
+export * from "./market.js";
 export * from "./resolve.js";
 export * from "./ddl.js";
 export * from "./document.js";

@@ -15,7 +15,7 @@
 
 import type { Allowance, AnyOperation, AppSpec, BindingSpec, EntitlementDef, Money, PlanSpec, SqlHandle } from "@one/kernel";
 import {
-  explainCustomerFlags, explainEntitlements, gateFor, heldEntitlements, mayPurchase,
+  explainCustomerFlags, explainEntitlements, gateFor, heldEntitlements, mayPurchase, packageLines,
   operation, packageContradictions, PUBLIC, runwayFor, s,
 } from "@one/kernel";
 import {
@@ -24,6 +24,7 @@ import {
 } from "./commerce.js";
 import { attribute, claimByCustomer, claimEvent, listParked, park, rememberCustomer, resolveParked, verifySignature } from "./provider.js";
 import { parseStripeEvent } from "./provider-stripe.js";
+import { previewOf, shelf } from "./market.js";
 
 /** ⚠️ A symbol, so an app cannot reach the store by writing a property name. */
 export const COMMERCE = Symbol.for("one.runtime.commerce");
@@ -53,6 +54,13 @@ export interface CommerceDeps {
   readonly global: SqlHandle;
   /** ⚠️ A webhook settles in a region the request did not arrive in. */
   forTenant(tenantId: string): Promise<SqlHandle | null>;
+  /** What this workspace is on now, for a comparison that has a left column. */
+  readonly currentPlanId?: string | null;
+  /**
+   * ⚠️ THE RUNTIME'S OWN QUOTA COUNTERS. A preview that counted its own way
+   * would promise a downgrade the next write then refuses.
+   */
+  usage(key: string): Promise<number> | null;
   readonly signature: string;
   /** The exact bytes that were signed. Never a re-serialisation of the parse. */
   readonly body: string;
@@ -63,15 +71,13 @@ export interface CommerceCarrier { readonly [COMMERCE]: CommerceDeps }
 
 const deps = (ctx: unknown): CommerceDeps => (ctx as CommerceCarrier)[COMMERCE];
 
-/** What a plan looks like on the wire. The catalogue, never the manifest object. */
-const publicPlan = (p: PlanSpec) => ({
-  id: p.id,
-  name: p.name,
-  price: p.price,
-  period: p.period,
-  trialDays: p.trialDays,
-  entitlements: p.entitlements,
-});
+/*
+  ⚠️ A PLAN GOES OUT AS A SHELF CARD — `offerOf`, from the same declarations the
+  gate reads. It used to go out as its raw `entitlements` map, which is a
+  machine's answer: a screen showing `{ receiptsStored: 5 }` either prints the
+  key or carries a translation table of its own, and the second one drifts from
+  what is enforced. There is nowhere to put that copy now except the manifest.
+*/
 
 export function commerceOperations<B extends BindingSpec>(app: AppSpec<B>): readonly AnyOperation[] {
   const plans = operation({
@@ -87,7 +93,35 @@ export function commerceOperations<B extends BindingSpec>(app: AppSpec<B>): read
     permission: "public",
     idempotency: { mode: "none" },
     async handler(ctx) {
-      return { plans: app.access.plans.map(publicPlan), chargeable: deps(ctx).chargeable };
+      return { plans: shelf(app.access.plans, app.access.entitlements), chargeable: deps(ctx).chargeable };
+    },
+  });
+
+  /**
+   * ⚠️ WHAT CHANGING WOULD ACTUALLY DO, BEFORE ANYBODY CHANGES ANYTHING.
+   *
+   * It is a READ, and it refuses nothing — see `Preview.strains`. A storefront
+   * that blocked a downgrade would trap somebody on a plan they no longer want,
+   * which is the same shape as the rule that leaving is always allowed.
+   */
+  const preview = operation({
+    id: "market.preview",
+    kind: "read",
+    summary: "What moving to a plan would gain, lose, and strain.",
+    input: s.object({ planId: s.text({ max: 60 }) }),
+    output: s.object({ preview: s.json() }),
+    permission: "billing:manage",
+    idempotency: { mode: "none" },
+    fails: ["platform.not_found"],
+    async handler(ctx, input: { planId: string }) {
+      const d = deps(ctx);
+      const out = await previewOf({
+        app, db: d.db, tenantId: d.tenantId,
+        currentPlanId: d.currentPlanId ?? null, toPlanId: input.planId,
+        usage: d.usage,
+      });
+      if (!out) ctx.fail("platform.not_found", { field: "planId" });
+      return { preview: out };
     },
   });
 
@@ -153,7 +187,7 @@ export function commerceOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
-  return [plans, standing, choose] as unknown as readonly AnyOperation[];
+  return [plans, preview, standing, choose] as unknown as readonly AnyOperation[];
 }
 
 /* -------------------------------------------------------- the other rail --- */
@@ -188,7 +222,17 @@ export function customerOperations<B extends BindingSpec>(app: AppSpec<B>): read
         says so and the person decides.
       */
       return {
-        packages: packages.map((p) => ({ ...p, problems: packageContradictions(p, app.access.customerFlags) })),
+        packages: packages.map((p) => ({
+          ...p,
+          /*
+            ⚠️ THE SAME CARD SHAPE AS A PLAN, from the same declarations the
+            customer gate reads. A package that turns two things on is not a
+            package with two features — it is a package with two of eight on, and
+            a customer comparing packages has to be able to see the six.
+          */
+          includes: packageLines(p.flags, app.access.customerFlags),
+          problems: packageContradictions(p, app.access.customerFlags),
+        })),
       };
     },
   });

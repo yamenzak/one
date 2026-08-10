@@ -40,6 +40,7 @@ const LAYER: Record<string, number> = {
   "notify.ts": 3,
   "help.ts": 3,
   "guide.ts": 3,
+  "market.ts": 3,
   "release.ts": 3,
   "operation.ts": 3,
   "resolve.ts": 3,

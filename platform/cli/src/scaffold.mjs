@@ -243,10 +243,10 @@ export const ${id.replace(/-/g, "")} = defineApp({
        mechanism does not exist. \`parked\` is what a workspace that never chose a
        plan gets — and what a deployment with no payment rail at all serves. */
     entitlements: {
-      records: { parked: true, enforcement: "gate" },
+      records: { label: "Records", parked: true, enforcement: "gate" },
       /* ⚠️ BYTES, NOT FILES. A ceiling counted in rows is one a single large
          upload walks straight past. The platform enforces this key itself. */
-      storedBytes: { parked: 20_000_000, enforcement: "quota" },
+      storedBytes: { label: "Storage", unit: "bytes", parked: 20_000_000, enforcement: "quota" },
     },
     plans: [
       {

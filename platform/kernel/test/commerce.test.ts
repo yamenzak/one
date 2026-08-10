@@ -22,9 +22,9 @@ const OPEN = gateFor({ standing: "active", reason: "ok" });
 const SHUT = gateFor({ standing: "blocked", reason: "arrears" });
 
 const declared: Record<string, EntitlementDef> = {
-  reports: { parked: false, enforcement: "gate" },
-  seats: { parked: 1, enforcement: "quota" },
-  chat: { parked: false, enforcement: { unenforced: "nothing sells it yet" } },
+  reports: { label: "Some capability", parked: false, enforcement: "gate" },
+  seats: { label: "Some capability", parked: 1, enforcement: "quota" },
+  chat: { label: "Some capability", parked: false, enforcement: { unenforced: "nothing sells it yet" } },
 };
 
 const starter: PlanSpec = {
@@ -118,22 +118,22 @@ describe("what the workspace bought", () => {
   */
   it("refuses a parking state more generous than the cheapest plan", () => {
     expect(parkingAboveFloor(declared, [starter])).toEqual([]);
-    expect(parkingAboveFloor({ ...declared, seats: { parked: 5, enforcement: "quota" } }, [starter])).toEqual(["seats"]);
-    expect(parkingAboveFloor({ ...declared, reports: { parked: true, enforcement: "gate" } }, [starter])).toEqual([]);
+    expect(parkingAboveFloor({ ...declared, seats: { label: "Some capability", parked: 5, enforcement: "quota" } }, [starter])).toEqual(["seats"]);
+    expect(parkingAboveFloor({ ...declared, reports: { label: "Some capability", parked: true, enforcement: "gate" } }, [starter])).toEqual([]);
   });
 
   it("compares against the CHEAPEST plan, not the first declared", () => {
     const pro: PlanSpec = { ...starter, id: "pro", price: { minor: 2900, currency: "USD" }, entitlements: { ...starter.entitlements, seats: 20 } };
-    expect(parkingAboveFloor({ ...declared, seats: { parked: 10, enforcement: "quota" } }, [pro, starter])).toEqual(["seats"]);
+    expect(parkingAboveFloor({ ...declared, seats: { label: "Some capability", parked: 10, enforcement: "quota" } }, [pro, starter])).toEqual(["seats"]);
   });
 });
 
 /* ----------------------------------------------------- the customer rail --- */
 
 const flags: Record<string, FlagDef> = {
-  bodyReport: { parked: false, enforcement: "shape", scope: "body" },
-  plans: { parked: false, enforcement: "gate", scope: "training", requires: "reports" },
-  breakdown: { parked: true, enforcement: { derived: "from their own entries" } },
+  bodyReport: { label: "Some capability", parked: false, enforcement: "shape", scope: "body" },
+  plans: { label: "Some capability", parked: false, enforcement: "gate", scope: "training", requires: "reports" },
+  breakdown: { label: "Some capability", parked: true, enforcement: { derived: "from their own entries" } },
 };
 
 const pkg: PackageSpec = {

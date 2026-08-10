@@ -1210,6 +1210,78 @@
       "impl": "hello/test/guide.test.ts",
       "proves": "finishes a workspace's wizard on a deployment that cannot take money",
       "fails": "a mandatory paid step that strands every workspace on a self-host or before the payment provider is configured \u2014 failing closed on our own misconfiguration rather than on theirs"
+    },
+    {
+      "id": "shelf-is-the-declaration",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/market.test.ts",
+      "proves": "carries a row for everything declared, whether the plan mentions it or not",
+      "fails": "a price list written beside the declarations rather than from them \u2014 it drifts from what the gate enforces, and the drift is found by somebody who bought a thing the product then refuses"
+    },
+    {
+      "id": "unlimited-is-the-top",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/market.test.ts",
+      "proves": "reads unlimited as more, not as less than five",
+      "fails": "-1 compared as a number \u2014 every upgrade to an unlimited plan reported as a loss of everything, and every price list printing 'minus one'"
+    },
+    {
+      "id": "no-plan-is-the-parking-state",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/market.test.ts",
+      "proves": "compares against the parking values when there is no plan yet",
+      "fails": "a comparison treating 'no plan' as zero \u2014 advertising every plan as pure gain, including the ones that take something away from what a workspace already had"
+    },
+    {
+      "id": "strain-is-over-not-at",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/market.test.ts",
+      "proves": "says nothing when the usage fits",
+      "fails": "a ceiling reported as strained when the usage exactly meets it \u2014 a warning on every workspace that is precisely where it is supposed to be"
+    },
+    {
+      "id": "plans-sell-what-exists",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses a plan selling a key this app does not declare",
+      "fails": "a plan naming an entitlement nobody declared \u2014 sold, paid for, resolved by nothing at the gate, and indistinguishable from a capability that happens to be generous"
+    },
+    {
+      "id": "shelf-counts-what-the-gate-counts",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "runtime/test/market.test.ts",
+      "proves": "asks the caller's counter for each key it can count",
+      "fails": "a storefront counting usage its own way \u2014 it promises a downgrade the very next write then refuses, which is a surface that is not the mechanism"
+    },
+    {
+      "id": "price-list-survives-a-failed-count",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "runtime/test/market.test.ts",
+      "proves": "survives a counter that fails",
+      "fails": "a failed usage count taking the price list down \u2014 somebody looking at plans is doing the one thing the business wants, and a broken count is not a reason to show them an error"
+    },
+    {
+      "id": "packages-card-every-flag",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "hello/test/commerce.test.ts",
+      "proves": "cards a package against every sellable flag, not only the ones it turns on",
+      "fails": "a package shown as the features it enables rather than as its position among all of them, so a customer cannot see what a more expensive one would add"
     }
   ]
 }

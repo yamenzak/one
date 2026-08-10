@@ -19,6 +19,7 @@ import type { HelpRegistry } from "./help.js";
 import type { JobSpec } from "./job.js";
 import type { MilestoneRegistry } from "./milestone.js";
 import { momentProblems } from "./moment.js";
+import { marketProblems } from "./market.js";
 import { MILESTONE_EARNED, milestoneProblems } from "./milestone.js";
 import { danglingHelp, helpProblems } from "./help.js";
 import type { NotificationRegistry } from "./notify.js";
@@ -492,6 +493,16 @@ export function assertComposable(spec: {
         uncovered.map((u) => `${u.key} (declared "${u.declared}" on the ${u.rail} rail)`).join(", ") +
         `. Name it on an operation, or declare it unenforced with a reason.`,
     );
+  }
+
+  /*
+    ⚠️ A PLAN SELLING A KEY NOBODY DECLARED IS A PRICE LIST PROMISING SOMETHING
+    THAT DOES NOT EXIST — sold, paid for, resolved by nothing at the gate, and
+    indistinguishable from a capability that happens to be generous.
+  */
+  const market = marketProblems(spec.access.plans, spec.access.entitlements);
+  if (market.length) {
+    throw new Error(`${spec.id}: plans — ${market.map((m) => `"${m.id}" ${m.why}`).join("; ")}.`);
   }
 
   const generous = parkingAboveFloor(spec.access.entitlements, spec.access.plans);

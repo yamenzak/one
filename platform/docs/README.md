@@ -12,7 +12,7 @@ kind: index
 | | |
 |---|---|
 | active | none |
-| shipped | 0, 1, 2, 3, 4, 5, 6 |
+| shipped | 0, 1, 2, 3, 4, 5, 6, 6.5 |
 | open deferrals | 0 — see [DEFERRED.md](DEFERRED.md) |
 
 ⚠️ Resuming after a break, or after a compressed conversation?

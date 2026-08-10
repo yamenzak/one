@@ -783,6 +783,16 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             if (!row) return null;
             return regional(env)(row.region as ResolvedRegion)[opts.sessionsBinding] as SqlHandle;
           },
+          currentPlanId: sub.planId ?? null,
+          /*
+            ⚠️ THE SAME COUNTERS THE QUOTA GATE USES, handed over rather than
+            re-derived. A storefront that counted its own way would promise a
+            downgrade the very next write then refuses.
+          */
+          usage: (key: string) => {
+            const count = counters.get(key);
+            return count && at.tenant ? count(regionalDb, at.tenant.tenantId) : null;
+          },
           signature: request.headers.get("x-provider-signature") ?? "",
           body: bodyText,
           webhookSecret: opts.webhookSecretVar ? secretFor(env, opts.webhookSecretVar) : "",

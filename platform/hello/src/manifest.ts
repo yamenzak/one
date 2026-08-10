@@ -199,11 +199,11 @@ export const hello = defineApp({
       a gate seven times is how six get it.
     */
     entitlements: {
-      notes: { parked: true, enforcement: "gate" },
-      receiptsStored: { parked: 5, enforcement: "quota" },
+      notes: { label: "Notes", parked: true, enforcement: "gate" },
+      receiptsStored: { label: "Receipts kept", parked: 5, enforcement: "quota" },
       /* ⚠️ BYTES, not files. A ceiling counted in rows is one a single large
          upload walks straight past. */
-      storedBytes: { parked: 2_000_000, enforcement: "quota" },
+      storedBytes: { label: "Storage", unit: "bytes", parked: 2_000_000, enforcement: "quota" },
     },
     plans: [
       {
@@ -232,7 +232,7 @@ export const hello = defineApp({
     */
     customerRail: true,
     customerFlags: {
-      digest: { parked: false, enforcement: "gate", scope: "reading", requires: "notes" },
+      digest: { label: "Rolled-up notes", parked: false, enforcement: "gate", scope: "reading", requires: "notes" },
     },
     seats: { counts: ["owner"] },
   },

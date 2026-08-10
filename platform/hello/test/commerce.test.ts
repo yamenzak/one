@@ -14,6 +14,7 @@
 import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "../src/worker.js";
+import { hello } from "../src/manifest.js";
 import { accountIds, post, SETUP, signIn } from "./session.js";
 import { bindingsFor } from "@one/runtime";
 import { sql, type ResolvedRegion } from "@one/kernel";
@@ -305,5 +306,89 @@ describe("the assistant sees the same ceiling", () => {
   it("keeps offering an operation whose ceiling still has room", async () => {
     const tools = (await call("/api/tools.list")).body.tools as unknown as { name: string }[];
     expect(tools.map((t) => t.name)).toContain("note_create");
+  });
+});
+
+/* --------------------------------------------------------- the storefront --- */
+
+/**
+ * ⚠️ THE SHELF AND THE GATE COUNT THE SAME THING. A preview that estimated usage
+ * its own way would promise a downgrade that the very next write then refuses —
+ * a surface that is not the mechanism, which is harder to see than a mechanism
+ * with no surface, because everything renders.
+ */
+describe("the storefront is derived from what the gate enforces", () => {
+  it("gives every plan a row per declared key, in the reader's words", async () => {
+    const res = await call("/api/billing.plans", undefined, "");
+    const plans = res.body.plans as unknown as { id: string; includes: { key: string; label: string; unlimited: boolean }[] }[];
+    const free = plans.find((p) => p.id === "free")!;
+
+    /* Every declared key, so two plans are columns of one table rather than two lists. */
+    expect(free.includes.map((l) => l.key).sort()).toEqual(["notes", "receiptsStored", "storedBytes"]);
+    expect(free.includes.find((l) => l.key === "receiptsStored")!.label).toBe("Receipts kept");
+  });
+
+  /* ⚠️ `-1` is read once, in the kernel. A renderer never sees it. */
+  it("says unlimited rather than handing out a negative one", async () => {
+    const plans = (await call("/api/billing.plans", undefined, "")).body.plans as unknown as
+      { id: string; includes: { key: string; unlimited: boolean }[] }[];
+    const keeper = plans.find((p) => p.id === "keeper")!;
+    expect(keeper.includes.find((l) => l.key === "receiptsStored")!.unlimited).toBe(true);
+  });
+
+  it("names what moving up would gain", async () => {
+    const res = await call("/api/market.preview?planId=keeper");
+    const preview = res.body.preview as unknown as { gains: { key: string }[]; losses: unknown[]; strains: unknown[] };
+    expect(preview.gains.map((g) => g.key)).toContain("receiptsStored");
+    expect(preview.losses).toEqual([]);
+  });
+
+  /*
+    ⚠️ AND IT NEVER REFUSES A MOVE. A storefront that blocked a downgrade would
+    trap somebody on a plan they no longer want, which is the same shape as the
+    rule that leaving is always allowed — so a strain is something it SAYS.
+    This workspace sits exactly at the free plan's receipt ceiling, which is the
+    boundary worth pinning: `at the limit` is not `over` it.
+  */
+  it("reports no strain at exactly the ceiling, and allows the move regardless", async () => {
+    const preview = (await call("/api/market.preview?planId=free")).body.preview as unknown as
+      { from: string | null; losses: { key: string }[]; strains: { key: string }[]; usage: Record<string, number> };
+
+    /*
+      ⚠️ THE COUNT IS REAL, AND IT IS THE GATE'S. Five receipts were written
+      earlier in this file and refused at the sixth; the storefront reads the
+      same counter, so a preview cannot promise room the next write denies.
+    */
+    expect(preview.usage.receiptsStored).toBe(5);
+
+    /*
+      ⚠️ `from` IS NULL AND THE COMPARISON IS AGAINST THE PARKING STATE, because
+      choosing a plan RECORDS an intention and grants nothing — only the payment
+      provider may stamp one. This deployment cannot take money at all, so the
+      workspace is still parked, and `free` is exactly the parking values: moving
+      there takes nothing away.
+    */
+    expect(preview.from).toBeNull();
+    expect(preview.losses).toEqual([]);
+    /* Five receipts against a ceiling of five: at the limit is not over it. */
+    expect(preview.strains).toEqual([]);
+    expect((await call("/api/billing.choose", { planId: "free" })).status).toBe(200);
+  });
+
+  it("404s a plan nobody sells rather than previewing nothing", async () => {
+    expect((await call("/api/market.preview?planId=nope")).status).toBe(404);
+  });
+
+  /*
+    ⚠️ THE OTHER RAIL, THE SAME CARD. A package that turns two things on is not a
+    package with two features — it is a package with two of the declared set on,
+    and a customer comparing packages has to be able to see the rest.
+  */
+  it("cards a package against every sellable flag, not only the ones it turns on", async () => {
+    const packages = (await call("/api/commerce.packages")).body.packages as unknown as
+      { id: string; includes: { key: string; label: string; on: boolean; scope?: string }[] }[];
+    const one = packages[0]!;
+    expect(one.includes.map((l) => l.key)).toEqual(Object.keys(hello.access.customerFlags));
+    expect(one.includes[0]).toMatchObject({ label: "Rolled-up notes", scope: "reading" });
   });
 });

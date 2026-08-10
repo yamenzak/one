@@ -106,7 +106,7 @@ const opts = {
  * do that here" — rather than as "this product does not have that".
  */
 describe("the customer rail is mounted only where an app declares one", () => {
-  const withRail = { ...app({}).access, customerRail: true, customerFlags: { digest: { parked: false, enforcement: { derived: "n/a here" } as const } } };
+  const withRail = { ...app({}).access, customerRail: true, customerFlags: { digest: { label: "Some capability", parked: false, enforcement: { derived: "n/a here" } as const } } };
 
   it("mounts nothing at all when the app has no rail", () => {
     expect(customerOperations(app({}))).toEqual([]);
@@ -372,7 +372,7 @@ describe("a collection's gates reach what it derives", () => {
 describe("the runtime refuses a manifest that would sell something it cannot withhold", () => {
   it("refuses an entitlement no operation, collection or shaped response names", () => {
     expect(() => createRuntime(app({
-      access: { ...app({}).access, entitlements: { reports: { parked: false, enforcement: "gate" } } },
+      access: { ...app({}).access, entitlements: { reports: { label: "Some capability", parked: false, enforcement: "gate" } } },
     }), opts)).toThrow(/reports/);
   });
 
@@ -383,14 +383,14 @@ describe("the runtime refuses a manifest that would sell something it cannot wit
   */
   it("refuses an operation counting against a key nothing can count", () => {
     expect(() => createRuntime(app({
-      access: { ...app({}).access, entitlements: { seats: { parked: 3, enforcement: "quota" } } },
+      access: { ...app({}).access, entitlements: { seats: { label: "Some capability", parked: 3, enforcement: "quota" } } },
       operations: [counted] as never,
     }), opts)).toThrow(/which nothing can count/);
   });
 
   it("accepts it once a collection declares the same key", () => {
     expect(() => createRuntime(app({
-      access: { ...app({}).access, entitlements: { seats: { parked: 3, enforcement: "quota" } } },
+      access: { ...app({}).access, entitlements: { seats: { label: "Some capability", parked: 3, enforcement: "quota" } } },
       collections: [{ ...stored, quota: "seats" }],
       operations: [counted] as never,
     }), opts)).not.toThrow();
@@ -398,7 +398,7 @@ describe("the runtime refuses a manifest that would sell something it cannot wit
 
   it("accepts it when the app says how to count", () => {
     expect(() => createRuntime(app({
-      access: { ...app({}).access, entitlements: { seats: { parked: 3, enforcement: "quota" } } },
+      access: { ...app({}).access, entitlements: { seats: { label: "Some capability", parked: 3, enforcement: "quota" } } },
       operations: [counted] as never,
     }), { ...opts, countQuota: async () => 0 })).not.toThrow();
   });

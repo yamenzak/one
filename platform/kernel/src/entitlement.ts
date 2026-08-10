@@ -53,6 +53,24 @@ export type Enforcement =
 
 export interface EntitlementDef {
   /**
+   * ⚠️ WHAT THIS IS CALLED ON A PRICE LIST, and it is required for the same
+   * reason `enforcement` is.
+   *
+   * A storefront needs a row per key, and the alternative to a label here is a
+   * pricing page written by hand — which drifts from what the gate actually
+   * enforces, and the drift is discovered by somebody who bought a thing that is
+   * then refused. Making it optional means the first price list ships with
+   * `receiptsStored` printed on it.
+   *
+   * The reader's words, not the key's: "Receipts kept", not "receipts_stored".
+   */
+  readonly label: string;
+  /**
+   * How the number is read. A ceiling of `2_000_000` is two megabytes or two
+   * million receipts, and only the declaration knows which.
+   */
+  readonly unit?: "count" | "bytes";
+  /**
    * ⚠️ THE PARKING VALUE — what a workspace has before it has chosen anything,
    * NOT a default that plans override casually.
    *

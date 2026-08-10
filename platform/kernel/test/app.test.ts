@@ -267,14 +267,14 @@ describe("a sold capability is withheld by something", () => {
   it("refuses an entitlement declared as a gate that no operation names", () => {
     expect(() => assertComposable({
       ...base,
-      access: { ...base.access, entitlements: { reports: { parked: false, enforcement: "gate" } } },
+      access: { ...base.access, entitlements: { reports: { label: "Some capability", parked: false, enforcement: "gate" } } },
     })).toThrow(/reports/);
   });
 
   it("accepts it once an operation names it", () => {
     expect(() => assertComposable({
       ...base,
-      access: { ...base.access, entitlements: { reports: { parked: false, enforcement: "gate" } } },
+      access: { ...base.access, entitlements: { reports: { label: "Some capability", parked: false, enforcement: "gate" } } },
       operations: [{ ...stub, entitlement: "reports" }] as never,
     })).not.toThrow();
   });
@@ -288,7 +288,7 @@ describe("a sold capability is withheld by something", () => {
   it("accepts a quota a collection counts against", () => {
     expect(() => assertComposable({
       ...base,
-      access: { ...base.access, entitlements: { stored: { parked: 5, enforcement: "quota" } } },
+      access: { ...base.access, entitlements: { stored: { label: "Some capability", parked: 5, enforcement: "quota" } } },
       collections: [{ ...stubCollection, quota: "stored" }] as never,
     })).not.toThrow();
   });
@@ -296,7 +296,7 @@ describe("a sold capability is withheld by something", () => {
   it("refuses a quota nothing counts against, even where a gate names the key", () => {
     expect(() => assertComposable({
       ...base,
-      access: { ...base.access, entitlements: { stored: { parked: 5, enforcement: "quota" } } },
+      access: { ...base.access, entitlements: { stored: { label: "Some capability", parked: 5, enforcement: "quota" } } },
       operations: [{ ...stub, entitlement: "stored" }] as never,
     })).toThrow(/stored/);
   });
@@ -308,18 +308,18 @@ describe("a sold capability is withheld by something", () => {
   it("accepts one declared unenforced, with a reason", () => {
     expect(() => assertComposable({
       ...base,
-      access: { ...base.access, entitlements: { chat: { parked: false, enforcement: { unenforced: "nothing sells it yet" } } } },
+      access: { ...base.access, entitlements: { chat: { label: "Some capability", parked: false, enforcement: { unenforced: "nothing sells it yet" } } } },
     })).not.toThrow();
   });
 
   it("refuses a customer capability the interface hides and no route withholds", () => {
     expect(() => assertComposable({
       ...base,
-      access: { ...base.access, customerRail: true, customerFlags: { bodyReport: { parked: false, enforcement: "shape" } } },
+      access: { ...base.access, customerRail: true, customerFlags: { bodyReport: { label: "Some capability", parked: false, enforcement: "shape" } } },
     })).toThrow(/bodyReport/);
     expect(() => assertComposable({
       ...base,
-      access: { ...base.access, customerRail: true, customerFlags: { bodyReport: { parked: false, enforcement: "shape" } } },
+      access: { ...base.access, customerRail: true, customerFlags: { bodyReport: { label: "Some capability", parked: false, enforcement: "shape" } } },
       operations: [{ ...stub, shape: { body: "bodyReport" } }] as never,
     })).not.toThrow();
   });
@@ -327,7 +327,7 @@ describe("a sold capability is withheld by something", () => {
   it("refuses customer capabilities on an app with no rail to resolve them", () => {
     expect(() => assertComposable({
       ...base,
-      access: { ...base.access, customerFlags: { bodyReport: { parked: false, enforcement: { derived: "their own data" } } } },
+      access: { ...base.access, customerFlags: { bodyReport: { label: "Some capability", parked: false, enforcement: { derived: "their own data" } } } },
     })).toThrow(/customerRail/);
   });
 
@@ -341,7 +341,7 @@ describe("a sold capability is withheld by something", () => {
       ...base,
       access: {
         ...base.access,
-        entitlements: { seats: { parked: 5, enforcement: { unenforced: "not the point of this case" } } },
+        entitlements: { seats: { label: "Some capability", parked: 5, enforcement: { unenforced: "not the point of this case" } } },
         plans: [{ id: "entry", name: "Entry", price: { minor: 499, currency: "USD" }, period: "month", trialDays: 0, entitlements: { seats: 1 } }],
       },
     })).toThrow(/not paying would buy more/);
@@ -362,6 +362,25 @@ describe("a sold capability is withheld by something", () => {
  * destination — which renders, if anything renders it at all, as an anonymous
  * bell that says nothing and goes nowhere.
  */
+describe("a price list may only promise what exists", () => {
+  /*
+    ⚠️ A PLAN NAMING A KEY NOBODY DECLARED IS SOLD, PAID FOR AND ENFORCED BY
+    NOTHING. It resolves to nothing at the gate, so every workspace has it and
+    the ones that paid got nothing — and it looks exactly like a capability that
+    happens to be generous.
+  */
+  it("refuses a plan selling a key this app does not declare", () => {
+    expect(() => assertComposable({
+      ...base,
+      access: {
+        ...base.access,
+        entitlements: { real: { label: "Real", parked: false, enforcement: { unenforced: "not the point of this test" } } },
+        plans: [{ id: "p", name: "P", price: { minor: 0, currency: "EUR" }, period: "month", trialDays: 0, entitlements: { ghosts: true } }],
+      },
+    } as never)).toThrow(/ghosts/);
+  });
+});
+
 describe("a checklist step is refused against the rest of the manifest", () => {
   /*
     ⚠️ THE REST OF THE MANIFEST DECIDES WHETHER A STEP IS ANSWERABLE. An app
