@@ -122,7 +122,7 @@ describe("a preference removes the interruption, never the record", () => {
     does not depend on a mail provider.
   */
   it("still writes the row for a category the person has muted", async () => {
-    expect((await call("/api/inbox.preferences.set", { muted: ["billing"], email: false, push: false })).status).toBe(200);
+    expect((await call("/api/inbox.preferences.set", { muted: ["billing"], email: false })).status).toBe(200);
     const before = (await inbox()).rows.length;
 
     await call("/api/billing.choose", { planId: "free" });
@@ -138,6 +138,6 @@ describe("a preference removes the interruption, never the record", () => {
   });
 
   it("refuses a category the platform does not have", async () => {
-    expect((await call("/api/inbox.preferences.set", { muted: ["gossip"], email: true, push: false })).status).toBe(400);
+    expect((await call("/api/inbox.preferences.set", { muted: ["gossip"], email: true })).status).toBe(400);
   });
 });

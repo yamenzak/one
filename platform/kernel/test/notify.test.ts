@@ -26,18 +26,29 @@ const prefs = (over: Partial<Preferences> = {}): Preferences => ({ ...DEFAULT_PR
 describe("where one notification goes for one person", () => {
   it("reaches the inbox and, by default, an email", () => {
     expect(channelsFor(told(), prefs())).toEqual(["inbox", "email"]);
-    expect(channelsFor(told(), prefs({ push: true }))).toEqual(["inbox", "email", "push"]);
+    expect(channelsFor(told(), prefs({ email: false }))).toEqual(["inbox"]);
   });
 
   /*
-    ⚠️ THE INBOX IS NEVER OPTIONAL. Email and push can be declined, filtered, or
-    sent to an address somebody has left — so a preference must remove the
-    INTERRUPTION and never the information, or "I never got that" has no answer
-    that does not depend on a mail provider.
+    ⚠️ THE INBOX IS NEVER OPTIONAL. Email can be declined, filtered, or sent to an
+    address somebody has left — so a preference must remove the INTERRUPTION and
+    never the information, or "I never got that" has no answer that does not
+    depend on a mail provider.
   */
   it("keeps writing the inbox row for a category the person has muted", () => {
     expect(channelsFor(told(), prefs({ muted: ["activity"] }))).toEqual(["inbox"]);
-    expect(channelsFor(told(), prefs({ muted: ["activity"], push: true }))).toEqual(["inbox"]);
+    expect(channelsFor(told(), prefs({ muted: ["activity"], email: false }))).toEqual(["inbox"]);
+  });
+
+  /*
+    ⚠️ AND THERE IS NO THIRD CHANNEL. `push` was declared, switchable and
+    delivered by nothing — a settings toggle that silently did nothing, which is
+    worse than an absent feature because somebody turns it on and stops watching
+    their inbox. It returns with the offline work that gives it a device to
+    reach.
+  */
+  it("offers only the channels something actually delivers", () => {
+    expect(channelsFor(told(), prefs())).not.toContain("push");
   });
 
   it("leaves an unrelated category alone", () => {

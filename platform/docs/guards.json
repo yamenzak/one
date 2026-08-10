@@ -2785,6 +2785,60 @@
       "impl": "kernel/test/discount.test.ts",
       "proves": "rounds the discount up rather than the price",
       "fails": "a business quietly charging one minor unit more than its own poster said, on every sale, forever"
+    },
+    {
+      "id": "ci-runs-the-guards",
+      "group": "docs",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/guards.test.mjs",
+      "proves": "ci: both workflows run every command a live guard depends on",
+      "fails": "a workflow that decides whether a change merges and ships without running the command a third of the guards live behind \u2014 which is how 36 of them ran only on the machine of whoever remembered"
+    },
+    {
+      "id": "a-declared-registry-is-read",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/surface.test.mjs",
+      "proves": "registries: every declaration is classified and reachable",
+      "fails": "a registry declared, validated, guarded and unreachable \u2014 help checked for length and vocabulary that no route served, legal documents with mustAccept roles against no ledger, and twenty-one versions of release notes the runtime never read"
+    },
+    {
+      "id": "a-collection-does-not-shadow-a-lane",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/commerce.test.ts",
+      "proves": "refuses a collection whose derived operations would replace one",
+      "fails": "a collection named after a word the platform already uses silently replacing a platform operation \u2014 nobody wrote the colliding line, and the only symptom is a route answering about the wrong thing"
+    },
+    {
+      "id": "consent-is-per-version",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/telling.test.ts",
+      "proves": "asks again when the document changes",
+      "fails": "an acceptance recorded against a document rather than a version, so publishing new terms silently inherits every consent ever given"
+    },
+    {
+      "id": "consent-comes-from-a-person",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/telling.test.ts",
+      "proves": "is not offered to a model",
+      "fails": "a model agreeing to terms on somebody's behalf, which makes the ledger worthless as evidence \u2014 the only thing it is for"
+    },
+    {
+      "id": "a-channel-is-a-promise-about-delivery",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/notify.test.ts",
+      "proves": "offers only the channels something actually delivers",
+      "fails": "a switch in a settings screen that silently does nothing \u2014 somebody turns it on and stops watching their inbox"
     }
   ]
 }

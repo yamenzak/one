@@ -77,6 +77,26 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      # ── The GATE, and it belongs here rather than nowhere ─────────────────
+      #
+      # This workflow ran `turbo run typecheck test` and never `pnpm gate`, so
+      # 36 of the repository's guards — every one whose implementation is a
+      # script rather than a vitest file — ran only when somebody typed the
+      # command on their own machine. That includes all eight platform checks:
+      # the documentation kinds, the guard registry itself (which is what stops
+      # a guard being renamed away silently), kernel layering and vocabulary,
+      # the binding chokepoint, the surface rules, the interface rules and the
+      # per-app test budget.
+      #
+      # A guard nothing invokes is the exact failure the guards exist to catch,
+      # and it was sitting on the mechanism that catches it.
+      #
+      # ⚠️ THE THREE ABOVE STAY ABOVE, and this does not replace them. They run
+      # BEFORE install on purpose — a check that needs the workspace installed
+      # cannot guard the workspace's own install — and `pnpm gate` re-runs them
+      # in a second, which is cheaper than reasoning about whether it should.
+      - run: pnpm gate
+
       # ── The single biggest lever on this workflow's runtime ────────────────
       #
       # Measured on this repo, from cold: typecheck 1m17s, tests 4m25s, the SPA

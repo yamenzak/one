@@ -9,8 +9,7 @@
  * trail are three readings of one declaration.
  *
  * ⚠️ AND THE INBOX ROW IS WRITTEN EVEN WHEN EVERY OTHER CHANNEL IS DECLINED.
- * Email and push can be muted, filtered, or sent to an address somebody has
- * left. The inbox is the RECORD, so a preference removes the interruption and
+ * Email can be muted, filtered, or sent to an address somebody has left. The inbox is the RECORD, so a preference removes the interruption and
  * never the information — and "I never got that" has an answer that does not
  * depend on a mail provider.
  */
@@ -62,19 +61,19 @@ const parse = <T>(text: string, fallback: T): T => {
 };
 
 export async function preferencesFor(db: SqlHandle, tenantId: string, userId: string): Promise<Preferences> {
-  const row = await db.first<{ muted_json: string; email: number; push: number }>(
-    `SELECT muted_json, email, push FROM inbox_prefs WHERE tenant_id = ? AND user_id = ?`,
+  const row = await db.first<{ muted_json: string; email: number }>(
+    `SELECT muted_json, email FROM inbox_prefs WHERE tenant_id = ? AND user_id = ?`,
     tenantId, userId,
   );
   if (!row) return DEFAULT_PREFERENCES;
-  return { muted: parse<Category[]>(row.muted_json, []), email: row.email === 1, push: row.push === 1 };
+  return { muted: parse<Category[]>(row.muted_json, []), email: row.email === 1 };
 }
 
 export async function setPreferences(db: SqlHandle, tenantId: string, userId: string, prefs: Preferences): Promise<void> {
   await db.run(
-    `INSERT INTO inbox_prefs (tenant_id, user_id, muted_json, email, push) VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(tenant_id, user_id) DO UPDATE SET muted_json = excluded.muted_json, email = excluded.email, push = excluded.push`,
-    tenantId, userId, JSON.stringify(prefs.muted), prefs.email ? 1 : 0, prefs.push ? 1 : 0,
+    `INSERT INTO inbox_prefs (tenant_id, user_id, muted_json, email) VALUES (?, ?, ?, ?)
+     ON CONFLICT(tenant_id, user_id) DO UPDATE SET muted_json = excluded.muted_json, email = excluded.email`,
+    tenantId, userId, JSON.stringify(prefs.muted), prefs.email ? 1 : 0,
   );
 }
 
@@ -158,7 +157,7 @@ export interface Delivery {
  * that names its own recipients is one that reaches everybody the day somebody
  * passes the wrong list — and both "everybody" and "nobody" have shipped.
  *
- * Email and push are HOOKS rather than implementations: what actually carries a
+ * Email is a HOOK rather than an implementation: what actually carries a
  * message is a deployment's decision, and a platform that owned it would own
  * every product's sender reputation with it. The decision of whether to send is
  * the platform's; the sending is not.

@@ -417,6 +417,47 @@ describe("a collection's gates reach what it derives", () => {
   });
 });
 
+/* ------------------------------------------------------- reserved lanes --- */
+
+/**
+ * ⚠️ A COLLECTION MAY NOT SHADOW A PLATFORM OPERATION EITHER, and for a long
+ * while only an app's HAND-WRITTEN operations were checked — which made the
+ * whole rule one collection id away from being decorative.
+ *
+ * It happened. Kova declares a collection called `release` (a coach asking to be
+ * let go of a client); its derived `release.list` quietly replaced the
+ * platform's changelog reader, so the route answered with the collection's
+ * permission about the wrong thing, and the only symptom was a 403 for somebody
+ * who should have been told what changed.
+ *
+ * A derived collision is worse than a declared one because nobody wrote the
+ * colliding line: it appears the day somebody names a collection after a word
+ * the platform already uses.
+ */
+describe("the platform's own lanes are reserved", () => {
+  const named = (id: string) => ({ ...stored, id });
+
+  it("refuses a collection whose derived operations would replace one", () => {
+    for (const id of ["help", "settings", "member", "inbox", "legal"]) {
+      expect(() => createRuntime(app({ collections: [named(id)] }), opts), id)
+        .toThrow(/collides with a platform operation/);
+    }
+  });
+
+  /* ⚠️ And it names both sides, because "something collides" is a message that
+     sends somebody reading the whole surface to find out what. */
+  it("names the collection and the operation", () => {
+    expect(() => createRuntime(app({ collections: [named("help")] }), opts))
+      .toThrow(/collection "help" derives "help\.list"/);
+  });
+
+  /* ⚠️ The negative half, or the check above passes for a runtime that refuses
+     every collection. `thing` is the ordinary one every other test here uses. */
+  it("leaves an ordinary collection alone", () => {
+    expect(() => createRuntime(app({ collections: [stored] }), opts)).not.toThrow();
+  });
+});
+
 describe("the runtime refuses a manifest that would sell something it cannot withhold", () => {
   it("refuses an entitlement no operation, collection or shaped response names", () => {
     expect(() => createRuntime(app({

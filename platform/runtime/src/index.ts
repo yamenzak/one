@@ -45,6 +45,8 @@ export * from "./settings-ops.js";
 export * from "./mail.js";
 export * from "./commerce-ops.js";
 export * from "./relocate.js";
+export * from "./reference-ops.js";
+export * from "./replay.js";
 export * from "./platform-ops.js";
 export * from "./modules.js";
 export * from "./runtime.js";

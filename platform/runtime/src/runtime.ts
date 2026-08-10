@@ -53,6 +53,7 @@ import { collectionOperations } from "./collection-ops.js";
 import { DIRECTORY, FOUNDER, TOOLS, platformOperations, toolOperations, type DirectoryCarrier, type FounderCarrier, type ToolCarrier } from "./platform-ops.js";
 import { identityOperations, PLATFORM, type PlatformCarrier, type PlatformDeps } from "./identity-ops.js";
 import { identityStore, readCookie, SESSION_COOKIE, sessionStore } from "./identity.js";
+import { REFERENCE, referenceOperations, type ReferenceCarrier } from "./reference-ops.js";
 
 /* -------------------------------------------------------------------- ref --- */
 
@@ -297,7 +298,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...operatorOperations(app), ...configOperations(app), ...settingsOperations(app), ...domainAdminOperations(OPERATE), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...operatorOperations(app), ...configOperations(app), ...settingsOperations(app), ...domainAdminOperations(OPERATE), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...referenceOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -307,7 +308,31 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     started over, and here it cannot be written.
   */
   for (const spec of app.collections) {
-    for (const op of collectionOperations(spec, {}, app.schemas ?? {})) byPath.set(routeFor(op).path, op);
+    for (const op of collectionOperations(spec, {}, app.schemas ?? {})) {
+      const path = routeFor(op).path;
+      /*
+        ⚠️ AND A COLLECTION MAY NOT SHADOW ONE EITHER — which was checked for an
+        app's HAND-WRITTEN operations and not for its DERIVED ones, so the whole
+        rule was one collection id away from being decorative.
+
+        It happened: this app declares a collection called `release` (a coach
+        asking to be let go of a client), whose derived `release.list` quietly
+        replaced the platform's changelog reader. The route answered, with the
+        collection's permission, about the wrong thing — and the only symptom was
+        a 403 for a reader who should have been told what changed.
+
+        A derived collision is worse than a declared one, because nobody wrote
+        the colliding line: it appears the day somebody names a collection after
+        a word the platform already uses.
+      */
+      if (byPath.has(path)) {
+        throw new Error(
+          `${app.id}: collection "${spec.id}" derives "${op.id}", which collides with a platform operation. ` +
+          `Rename the collection — the platform's own ids are reserved.`,
+        );
+      }
+      byPath.set(path, op);
+    }
   }
   for (const op of app.operations as readonly AnyOperation[]) {
     const path = routeFor(op).path;
@@ -1065,7 +1090,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & LookupCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & LookupCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier & ReferenceCarrier = {
         [CONFIG]: {
           own: directoryDb,
           /*
@@ -1129,6 +1154,11 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           */
           fetcher: opts.lookup ?? ((url, init) => fetch(url, init as RequestInit)),
         },
+        /*
+          ⚠️ THE ROLE TRAVELS, because which documents somebody must accept
+          depends on what they are acting as here rather than on who they are.
+        */
+        [REFERENCE]: { directory: directoryDb, session, role: personRole },
         [SETTINGS]: {
           db: regionalDb,
           /* ⚠️ The branding copy and the domain claims are looked up before a

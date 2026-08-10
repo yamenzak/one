@@ -73,12 +73,12 @@ export function inboxOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
     kind: "read",
     summary: "Which interruptions you have asked for.",
     input: s.object({}),
-    output: s.object({ muted: s.json(), email: s.bool(), push: s.bool() }),
+    output: s.object({ muted: s.json(), email: s.bool() }),
     permission: "inbox:read",
     idempotency: { mode: "none" },
     async handler(ctx) {
       const d = deps(ctx);
-      if (!d.userId) return { muted: [], email: false, push: false };
+      if (!d.userId) return { muted: [], email: false };
       return preferencesFor(d.db, d.tenantId, d.userId);
     },
   });
@@ -93,12 +93,12 @@ export function inboxOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
       default is, and somebody who carefully turned eleven things off has a
       twelfth they never asked for.
     */
-    input: s.object({ muted: s.array(s.enum(["billing", "activity", "action", "service"])), email: s.bool(), push: s.bool() }),
+    input: s.object({ muted: s.array(s.enum(["billing", "activity", "action", "service"])), email: s.bool() }),
     output: s.object({ ok: s.bool() }),
     permission: "inbox:read",
     idempotency: { mode: "none" },
     outcome: { message: "Saved", tone: "success", invalidates: ["inbox.preferences"] },
-    async handler(ctx, input: { muted: Category[]; email: boolean; push: boolean }) {
+    async handler(ctx, input: { muted: Category[]; email: boolean }) {
       const d = deps(ctx);
       if (!d.userId) return { ok: false };
       await setPreferences(d.db, d.tenantId, d.userId, input);

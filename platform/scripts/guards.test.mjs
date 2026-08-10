@@ -133,6 +133,43 @@ for (const g of guards.filter((x) => x.status === "live" && x.impl)) {
 }
 ok(`invoked: every live guard is reached by \`pnpm gate\`, \`pnpm one:test\` or \`pnpm one:typecheck\``);
 
+/* ------------------------------------------------------- 3b. INVOKED BY CI */
+
+/**
+ * ⚠️ AND THE INVOKING COMMAND HAS TO BE RUN BY SOMETHING NOBODY HAS TO REMEMBER.
+ *
+ * The check above asks whether a script names the guard. It said yes for all 36
+ * script-implemented guards while NEITHER workflow ran `pnpm gate` — both ran
+ * `turbo run typecheck test` directly, which is not the root `test` script and
+ * therefore never reached the gate. So a third of the enforcement in this
+ * repository ran only when somebody typed the command on their own machine,
+ * including every check that guards the guards.
+ *
+ * That is this registry's own failure class landing on the registry, which is
+ * why the fix is a check rather than a line in a document: the workflows that
+ * decide whether a change merges and whether it ships must name each command a
+ * live guard depends on.
+ */
+const NEEDED = [
+  { command: "pnpm gate", why: "the script-implemented guards" },
+  { command: "turbo run test", why: "the vitest-implemented guards" },
+  { command: "turbo run typecheck", why: "the compile-time guards" },
+];
+for (const file of ["ci.yml", "deploy.yml"]) {
+  const path = join(REPO, ".github", "workflows", file);
+  const text = existsSync(path) ? readFileSync(path, "utf8") : "";
+  if (!text) { fail(`.github/workflows/${file} is missing, so nothing runs the guards on the way in.`); continue; }
+  /* ⚠️ Comments stripped first — this file explains the rule in its own prose,
+     and a check satisfied by a sentence about itself proves nothing. */
+  const runs = text.split("\n").filter((l) => !/^\s*#/.test(l)).join("\n");
+  for (const { command, why } of NEEDED) {
+    if (!runs.includes(command)) {
+      fail(`.github/workflows/${file} never runs \`${command}\`, so ${why} run only when somebody types it.`);
+    }
+  }
+}
+ok(`ci: both workflows run every command a live guard depends on`);
+
 /* ------------------------------------------------------------------- 4. OWED */
 
 /**

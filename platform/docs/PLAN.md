@@ -277,6 +277,19 @@ platform/            # the new world. Package scope @one/*
 CI job names) without the path being silly. **Decide this before the first
 import is written** — it is free today and a repo-wide rename later.
 
+⚠️ **What was actually built is four packages, not seven, and the difference is
+worth recording rather than quietly reading as the plan.** `data/` and
+`surface/` do not exist: both are inside `@one/runtime`, because both are the
+same dispatcher over the same per-request binding resolution, and splitting them
+would have meant exporting that resolver across a package boundary purely to
+honour a diagram. The LAYERS are unchanged and still enforced — `kernel-layering`
+reads a per-module registry rather than a per-package one, so a module importing
+one at its own layer or above still fails.
+
+The cost of the divergence is real and small: `@one/runtime` is 12,435 lines,
+which is the largest thing here, and "which layer is this file" is a lookup
+rather than a directory. Revisit if it passes 20,000.
+
 ### 3.1a How this ships — trunk-based, and safe because of `apps.json`
 
 **No long-lived branch, and no fork.** Short-lived branches, small pull
@@ -340,6 +353,14 @@ checks what types cannot.
 thousands of lines. `platform/kova/manifest/{app,plans,permissions,collections,
 notifications,nav,legal,offline}.ts`, composed by one `defineApp()`. Composition
 is a language feature here; that is the point of choosing a language.
+
+⚠️ **This was predicted and then not done: `kova/src/manifest.ts` is 4,003
+lines.** Nothing broke, which is why it kept not being done — the file
+typechecks, the composition refusals fire, and the guards read it fine. What it
+costs is the thing a plan cannot measure: every increment appends, nobody reads
+it whole, and two declarations about the same feature can sit six hundred lines
+apart. The split is mechanical and is worth doing before the second app, because
+the second app will copy whatever shape the first one has.
 
 **Versioned and content-hashed.** Every deploy stamps `manifestVersion` and a
 hash. The diff between two versions is a real artifact — it drives the
@@ -495,7 +516,7 @@ Your list, answered. Where a row says **new**, no app has it today.
 | **B2C / customer rail** | Kova's access economy generalised: packages, budgets that queue rather than sum, lapse ladder, redemption codes. Available to any app that declares it. | `@4dl/commerce` |
 | **Ledger + metering** | One append-only ledger for every billable unit — AI credits, storage, seats, and a package's metered entitlements. Reserve → run → settle, where **settle caps at the reserve**. | `@4dl/billing` + `@4dl/ai` |
 | **Storage** | One chokepoint, ledgered, quota-gated, erasure-derived. Content-hash keys stay possible (Scena needs them). | `@4dl/storage` |
-| **Notifications** | Channel algebra (role × category → inbox / email / **web push**), one dispatch path, InboxDO. Push is new. | `@4dl/notify` |
+| **Notifications** | Channel algebra (role × category → inbox / email), one dispatch path, the workspace's own wording and sign-off. ⚠️ **Web push is deliberately absent**: it was declared as a third `Channel` with a preference somebody could switch on and nothing that delivered one, which is a settings toggle that silently does nothing — worse than an absent feature, because it stops somebody watching their inbox. It returns with the offline work below, which is what gives it a device to reach. | `@4dl/notify` |
 | **Help centre** | Per-app docs from the manifest's nav, in-app search, support chat, ticketing. | **new** |
 | **Versioning + changelog** | Manifest diff → tenant-visible release notes, with screenshots rendered by the existing Playwright shots suite. | **new** (shots exist) |
 | **Settings** | Three scopes — tenant app settings, user preferences, operator console — all declared, all rendered. | partial |
@@ -1133,8 +1154,23 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-discount-is-spent-when-money-moves` | a code for twenty exhausted by twenty people who looked at a price and closed the tab | **live** |
 | `a-code-that-does-not-work-is-refused` | quietly charging full price to somebody who typed a code, discovered from a receipt on a page we do not own | **live** |
 | `a-discount-rounds-towards-the-customer` | a business quietly charging one minor unit more than its own poster said, on every sale, forever | **live** |
+| `ci-runs-the-guards` | a workflow that decides whether a change merges and ships without running the command a third of the guards live behind — which is how 36 of them ran only on the machine of whoever remembered | **live** |
+| `a-declared-registry-is-read` | a registry declared, validated, guarded and unreachable — help checked for length and vocabulary that no route served, legal documents with mustAccept roles against no ledger, and twenty-one versions of release notes the runtime never read | **live** |
+| `a-collection-does-not-shadow-a-lane` | a collection named after a word the platform already uses silently replacing a platform operation — nobody wrote the colliding line, and the only symptom is a route answering about the wrong thing | **live** |
+| `consent-is-per-version` | an acceptance recorded against a document rather than a version, so publishing new terms silently inherits every consent ever given | **live** |
+| `consent-comes-from-a-person` | a model agreeing to terms on somebody's behalf, which makes the ledger worthless as evidence — the only thing it is for | **live** |
+| `a-channel-is-a-promise-about-delivery` | a switch in a settings screen that silently does nothing — somebody turns it on and stops watching their inbox | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
+
+⚠️ **AND THE COMMAND HAS TO BE RUN BY SOMETHING NOBODY HAS TO REMEMBER.** The
+registry checked that a script NAMED each guard, and said yes for all 36
+script-implemented ones while neither workflow ran `pnpm gate` — both ran
+`turbo run typecheck test`, which is not the root `test` script and never
+reached it. So a third of the enforcement in this repository ran only on the
+machine of whoever remembered, including every check that guards the guards.
+`guards.test.mjs` now asserts that `ci.yml` and `deploy.yml` each name every
+command a live guard depends on.
 
 ⚠️ **A widened guard finds bugs in itself first.** Two of the first failures
 when `pnpm gate`'s guards were widened to all apps were the parser's, not the
@@ -1222,12 +1258,12 @@ second-system effect, which is the largest risk here by a distance.
 | 0 | **Contracts** — manifest schema, layer boundaries, naming, the operation and collection types. Types only. | ✅ built in `platform/kernel` — the four types compile, six real surfaces from two shipping products are expressed in them, and eight mistakes are rejected by the compiler. [FINDINGS.md](../kernel/test/FINDINGS.md) is what did not fit. Open: review |
 | 1 | **Kernel** — bindings from manifest, config, schema composition, shared identity + root-scoped passkeys, tenancy + doors, **region resolution and the global tenant directory**, standing. | A generated `hello` app boots, signs in with one passkey usable from a second app's origin, creates a tenant, answers `/health` — and no handler has seen a raw binding. ✅ `platform/hello` boots through `platform/runtime` on the real host topology, composes its schema per region, creates a workspace, signs a person in with an emailed code, registers a passkey at the ROOT relying party and signs in with it from a second origin. Open: review |
 | 2 | **Surface** — operations → routes + tools + webhooks + audit + OpenAPI. | ✅ An agent lists tools, completes a CRUD round trip and is refused exactly what the user would be — asserted over the whole catalogue rather than sampled. Input is parsed at the boundary rather than asserted |
-| 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search, **and tenant relocation (§4.2) with the `Relocatable` DO contract**. | ✅ `hello` declares two collections and writes no routing at all: list, read, create, update, archive, the document lifecycle and the activity log are derived. A metered ledger sums rather than stores, and a tenant copies to a second region, verifies by counting, and leaves the source bootable. Open: files, jobs |
-| 4 | **Renderer** — shell, nav, collection views, settings, admin, whitelabel, PWA. The language is [UI.md](UI.md). | ✅ The contrast sweep walks every legal brand, the state matrix proves no two states render alike, the boundary guard holds, and `hello` has a screen that writes no chrome at all. A live surface moves between four presentations without remounting. Open: the settings and admin surfaces, the PWA, and `pnpm shots` |
+| 3 | **Data** — collections, docstatus, naming, activity, soft delete, ledger, files, jobs, search, **and tenant relocation (§4.2) with the `Relocatable` DO contract**. | ✅ `hello` declares two collections and writes no routing at all: list, read, create, update, archive, the document lifecycle and the activity log are derived. A metered ledger sums rather than stores, and a tenant copies to a second region, verifies by counting, and leaves the source bootable. Files and jobs landed in 6.5. Open: nothing |
+| 4 | **Renderer** — shell, nav, collection views, settings, admin, whitelabel, PWA. The language is [UI.md](UI.md). | ✅ The contrast sweep walks every legal brand, the state matrix proves no two states render alike, the boundary guard holds, and `hello` has a screen that writes no chrome at all. A live surface moves between four presentations without remounting. ⚠️ Open, and all of it is SCREENS rather than mechanism: the settings and admin surfaces exist as operations and are not rendered, there is no PWA (so `OfflinePolicy` is declared on every collection and read by nothing), and `pnpm shots` does not exist — which is the parity gate §2.3 calls non-optional for the cutover, and the one guard still owed |
 | 5 | **Commerce** — plans, entitlements, flags, the provider on one webhook, B2C packages, metering, parking state. | ✅ Both rails resolve through one explained walk each, and a manifest that would sell something nothing withholds does not boot. `hello` declares a catalogue, a ceiling and one sold capability; the ladder, the parking state, the quota, the package offer, the grant ledger, the intersection and the whole provider lane are derived. A signed event is applied or PARKED where an operator can read and replay it — there is no third answer — and one that belongs to a workspace on another continent settles there. Open: opening a checkout, which needs an account rather than a design |
-| 6 | **Ops** — notifications incl. the inbox, help centre, versioning + changelog, data & subscription centre, maintenance, provisioning. | ✅ `one new <id>` produces an app that boots, passes its own suite and is missing nothing — measured by generating one for real. `emits` drives the inbox, the webhook catalogue and the audit entry from one declaration; help and the changelog are checked manifest content; a lock makes a removal a decision rather than a diff; export and erasure read ONE derived plan; leaving works from the bottom rung; maintenance closes every door above the public lane. The template is held to `AppSpec` and to the runtime's own module list, so it cannot fall behind. Open: CI, and a deploy config that needs an account rather than a design |
+| 6 | **Ops** — notifications incl. the inbox, help centre, versioning + changelog, data & subscription centre, maintenance, provisioning. | ✅ `one new <id>` produces an app that boots, passes its own suite and is missing nothing — measured by generating one for real. `emits` drives the inbox, the webhook catalogue and the audit entry from one declaration; help and the changelog are checked manifest content; a lock makes a removal a decision rather than a diff; export and erasure read ONE derived plan; leaving works from the bottom rung; maintenance closes every door above the public lane. The template is held to `AppSpec` and to the runtime's own module list, so it cannot fall behind. ⚠️ CI is CLOSED as of 2026-08-10 and was worse than this row said: both workflows ran `turbo run typecheck test` and neither ran `pnpm gate`, so 36 guards — every script-implemented one, including all eight platform checks — ran only when somebody typed the command. `guards.test.mjs` now asserts both workflows name every command a live guard depends on. Open: a deploy config, which needs an account rather than a design |
 | 6.5 | **Batteries** — files, jobs, guidance (the checklist), milestones, moments, the wizard, the marketplace. Seven mechanisms, all product-agnostic. | `hello` uploads a file, runs a scheduled sweep, shows a derived checklist and celebrates a milestone. **[KOVA.md](KOVA.md) §4** is why each one is the platform's rather than Kova's. ✅ **DONE** — files, jobs, guidance, milestones, moments, the wizard and **the marketplace**: a shelf derived from the same declarations the gate enforces, counting usage with the same counters the quota gate uses |
-| 7 | **Kova** — a NEW product on the platform, written version by version. §7 and **[KOVA.md](KOVA.md)**. The long one. | Production tenants are served by `platform/kova` and `apps/api` is unrouted. ▶ **steps 1–3 done**: [KOVA-INVENTORY.md](KOVA-INVENTORY.md) — 153 capabilities as outcomes across six personas, plus the data survey — and `platform/kova` **0.3.0** — the core loop, the nutrition half and reporting in, from ten collections, three operations and two pure arithmetic modules. 46 of 153 built; progress is derived from the registry, not narrated |
+| 7 | **Kova** — a NEW product on the platform, written version by version. §7 and **[KOVA.md](KOVA.md)**. The long one. | Production tenants are served by `platform/kova` and `apps/api` is unrouted. ▶ **The inventory is complete**: [KOVA-INVENTORY.md](KOVA-INVENTORY.md) — **153 of 153** capabilities built across six personas, at manifest version **0.21.0**, progress derived from the registry rather than narrated. ⚠️ **That is not the same as the stage being done.** What remains is §7.4: the rehearsal against a copy of production, the screenshot parity gate (which does not exist), the golden-path E2E on the new stack, the dark launch, and the per-tenant cutover through §4.2's relocation engine. There is also no `wrangler.jsonc` under `platform/`, so nothing here deploys yet — inert by construction, and the thing to change first |
 | 8 | **The tenant**, then Tessa, then Scena | Kova's one live tenant is copied, verified and flipped with its passkeys intact ([KOVA.md](KOVA.md) §6); both other apps migrated; Scena's player proves the canvas boundary |
 | 9 | **Delete** `packages/@4dl/*` and `apps/*` | The repo has one platform |
 

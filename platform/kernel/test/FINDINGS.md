@@ -3143,3 +3143,111 @@ host check made exactly that promise and lost: it blocked `/`, `:` and `*`, and
 accepted `example.test?a=1`, which puts the whole escaped path inside a query
 string. It is an allow-list now — labels and dots — because a hostname has a
 shape and everything else is a mistake whatever it would have done.
+
+## 246. A third of the guards ran only where somebody remembered
+
+`ci.yml` and `deploy.yml` both ran `pnpm turbo run typecheck` and
+`pnpm turbo run test`. Neither ran `pnpm test`, which is `pnpm gate && turbo run
+test`, and no package's own `test` script invokes a gate script.
+
+So the 36 guards whose implementation is a script rather than a vitest file ran
+only when a person typed the command on their own machine — including all eight
+platform checks: the documentation kinds, the deferral markers, the generated
+blocks, kernel layering, the vocabulary rule, the day-zero declarations, the
+binding chokepoint, the surface rules, the interface rules, the test budget and
+the capability inventory.
+
+⚠️ AND THE REGISTRY SAID THEY WERE FINE. Its "invoked" check asks whether a
+SCRIPT names each guard, and `pnpm gate` did — so a guard could be correctly
+registered, correctly implemented, correctly named by a command, and reached by
+nothing that runs. The check that guards the guards had the guards' own failure
+in it.
+
+The fix is a check rather than a line in a document: `guards.test.mjs` now reads
+both workflows and requires each to name every command a live guard depends on —
+`pnpm gate`, `turbo run test`, `turbo run typecheck`. Comments are stripped
+first, because this file explains the rule in its own prose and a check
+satisfied by a sentence about itself proves nothing.
+
+## 247. Three registries declared, validated, guarded and unreadable
+
+`help`, `governance.legal` and `releases` were all declared by the manifest,
+checked at composition, covered by guards, and served by no route.
+
+- Eleven help articles. `helpProblems` checked their length, their step count and
+  their vocabulary; `danglingHelp` refused a cross-link to one that did not
+  exist; `help-limits` was live in `pnpm gate`. Nothing served a word of any of
+  them.
+- Two legal documents with `mustAccept` roles, against no acceptance ledger and
+  no endpoint. A compliance obligation expressed as a type.
+- Twenty-one versions of release notes, shape-checked by `release-note-shape`,
+  read by nothing in the runtime.
+
+⚠️ THE CHECKING IS WHAT MADE IT INVISIBLE. Thorough validation of a thing nobody
+can reach reads exactly like coverage, and the more careful the validation the
+more convincing it is — a guard that asks whether an article is short enough and
+free of developer vocabulary cannot ask whether anybody can open it.
+
+`capability-reachable` catches this shape for a schema module. It did not ask the
+same question of a manifest REGISTRY, so `scripts/surface.test.mjs` now
+classifies every field on `AppSpec` as either read by a person — with the
+expression an operation reads it by — or consumed by the platform, with what acts
+on it. A field added later fails until somebody says which, which is the only
+moment the question is cheap.
+
+## 248. A collection quietly replaced a platform operation
+
+Adding a changelog reader called `release.list` produced a 403. Kova declares a
+collection called `release` — a coach asking to be let go of a client — and its
+derived `release.list` had taken the route.
+
+The runtime already refused an app's HAND-WRITTEN operation colliding with a
+platform one, with a comment explaining why last-registration-wins would let a
+manifest replace tenant creation or erasure with its own version. The derived
+surface was registered with a bare `byPath.set` and no check at all.
+
+⚠️ A DERIVED COLLISION IS WORSE THAN A DECLARED ONE, because nobody wrote the
+colliding line. It appears the day somebody names a collection after a word the
+platform already uses, and the symptom is a route answering, with the wrong
+permission, about the wrong thing.
+
+The refusal now covers both, and names the collection and the operation. The
+changelog reader is `changelog.list`: the collision is refused, but a platform
+lane that reads like an ordinary noun is one every app has to avoid naming a
+collection after, and that is a cost worth not imposing.
+
+## 249. A test that asserted an array of undefined did not contain a string
+
+The consent test checked that `legal.accept` is not offered to a model:
+
+```ts
+const tools = (await owner.get("/api/tools.list")).body.tools as { id: string }[];
+expect(tools.map((t) => t.id)).not.toContain("legal.accept");
+```
+
+A `Tool` has `operationId`, not `id`. So the assertion mapped every tool to
+`undefined` and checked that a list of `undefined` did not contain a string,
+which is true for every possible answer — including an empty list, a broken
+endpoint, and the mutation that offers consent to a model. It survived that
+mutation, which is how it was found.
+
+⚠️ THE FIX IS THE POSITIVE HALF, not the corrected field name. A negative
+assertion over a collection proves nothing until something proves the collection
+is not empty and is the shape you think — so it now asserts an operation that
+SHOULD be listed as well as the one that should not.
+
+## 250. A channel that delivered nothing
+
+`Channel` was `"inbox" | "email" | "push"`. `channelsFor` returned `push` when a
+preference asked for it, `Preferences` carried the flag, `inbox_prefs` stored it,
+and the settings operation took it on the wire.
+
+There is no service worker in this platform, no subscription store and no device
+to receive anything. What shipped was a switch somebody could turn on that
+silently did nothing — which is worse than an absent feature, because turning it
+on is a reason to stop watching the inbox.
+
+⚠️ REMOVED RATHER THAN IMPLEMENTED, and that is the honest end of the decision. A
+channel is a promise about delivery; it comes back with the offline work that
+gives it something to reach. The `push` COLUMN stays on the preferences table —
+dropping a column on a live table to reclaim a byte is a risk taken for tidiness.

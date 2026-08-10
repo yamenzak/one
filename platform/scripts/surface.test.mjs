@@ -317,6 +317,94 @@ for (const app of apps) {
 }
 ok(`manifest lock: ${apps.length} app(s) pin what they have already shipped`);
 
+/* ------------------------------------------------------- 8. READ BY SOMEBODY */
+
+/**
+ * ⚠️ EVERY REGISTRY AN APP DECLARES IS EITHER READ BY A PERSON OR CONSUMED BY
+ * THE PLATFORM, AND WHICH ONE IS A DECISION SOMEBODY MAKES RATHER THAN A GAP.
+ *
+ * Three of them were neither. `help` was validated for length, vocabulary and
+ * dangling cross-links by a guard that could not ask whether any route served an
+ * article — and none did. `governance.legal` declared documents with
+ * `mustAccept` roles against no ledger and no endpoint. `releases` carried
+ * twenty-one versions of notes the runtime never read.
+ *
+ * All three looked covered. That is the property that makes this the platform's
+ * own failure class rather than an oversight: thorough checking of a thing
+ * nobody can reach reads exactly like coverage, and the more careful the
+ * checking the more convincing it is.
+ *
+ * So every field on `AppSpec` is classified here. A new one fails until somebody
+ * says which kind it is, which is the only moment the question is cheap.
+ */
+
+/** Registries a person reads. Each needs an operation whose handler reads it. */
+const READ_BY_A_PERSON = {
+  help: "app.help",
+  releases: "app.releases",
+  governance: "app.governance.legal",
+};
+
+/**
+ * Everything else, with what consumes it. ⚠️ A REASON, NOT A LIST — an entry
+ * here is a claim that something in the platform acts on the declaration, and
+ * the claim is what a reviewer checks.
+ */
+const CONSUMED_BY_THE_PLATFORM = {
+  id: "the relying party's subdomain and the payment metadata prefix",
+  name: "the product's own name, in mail and on the shell",
+  stripeMetadataPrefix: "event attribution on the shared payment rail",
+  manifestVersion: "stamped on the lock and answered beside the changelog",
+  bindings: "resolved per region and handed to a handler as `ctx.bind`",
+  identity: "the relying party, the session scope and the directory's region",
+  tenancy: "the doors, the regions and the reserved labels",
+  format: "currency, time zone, locale and units at the boundary",
+  access: "permissions, roles, plans, entitlements and the customer rail",
+  collections: "tables, routes, tools, webhooks, erasure and export",
+  notifications: "the inbox, the dispatch and the webhook catalogue",
+  filePurposes: "the upload path segment and the permission each purpose needs",
+  ai: "the model catalogue, the reserve and the per-actor ceiling",
+  schemas: "the named shapes a json field is validated against",
+  settings: "the settings surface and every reader's fallback",
+  services: "the outbound hosts a lookup may reach",
+  jobs: "the scheduler, its bound and its run record",
+  guide: "the derived checklist and the wizard's position",
+  milestones: "recognition, earned once per person from a declared event",
+  retired: "the lock, so removing something somebody holds is a decision",
+  operations: "routes, tools, webhooks, audit and the OpenAPI document",
+  problems: "the failure catalogue every declared code resolves through",
+  sounds: "the moment's audio, derived rather than chosen twice",
+};
+
+const appSpec = readFileSync(join(ROOT, "kernel", "src", "app.ts"), "utf8");
+const specBody = /export interface AppSpec<[^>]*>\s*\{([\s\S]*?)\n\}/.exec(appSpec)?.[1] ?? "";
+const declared = [...specBody.matchAll(/\n  readonly (\w+)\??[:<]/g)].map((m) => m[1]);
+if (declared.length < 10) fail(`kernel/src/app.ts: could not read AppSpec's fields, so this check proves nothing.`);
+
+const opsSource = walk(join(ROOT, "runtime", "src"))
+  .filter((f) => f.endsWith("-ops.ts"))
+  .map((f) => readFileSync(f, "utf8")).join("\n");
+
+for (const field of declared) {
+  if (field in CONSUMED_BY_THE_PLATFORM) continue;
+  const reader = READ_BY_A_PERSON[field];
+  if (!reader) {
+    fail(`kernel/src/app.ts: AppSpec declares \`${field}\` and this check does not know what reads it.\n` +
+         `       Add it to READ_BY_A_PERSON with the expression an operation reads it by,\n` +
+         `       or to CONSUMED_BY_THE_PLATFORM with what acts on it. A registry nobody\n` +
+         `       classified is one nobody notices is unreachable.`);
+    continue;
+  }
+  if (!opsSource.includes(reader)) {
+    fail(`kernel/src/app.ts: \`${field}\` is declared for a person to read and no operation reads \`${reader}\`.\n` +
+         `       Declared, validated and unreachable is the failure this platform exists to end.`);
+  }
+}
+/* ⚠️ A literal, because a guard binds to the words rather than to the line —
+   a template-literal title cannot anchor one, so it could be renamed away. */
+ok(`registries: every declaration is classified and reachable`
+   + ` — ${declared.length} field(s), ${Object.keys(READ_BY_A_PERSON).length} read by an operation`);
+
 /* -------------------------------------------------------------------------- */
 
 if (bad) {

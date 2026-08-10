@@ -114,7 +114,20 @@ export const PLATFORM_EVENTS = ["workspace.created", "plan.chosen", "package.gra
 
 /* ---------------------------------------------------------- the channels --- */
 
-export type Channel = "inbox" | "email" | "push";
+/**
+ * ⚠️ NO `push`, AND ITS REMOVAL IS THE POINT.
+ *
+ * It was here — a third channel, a preference somebody could switch on, a branch
+ * in `channelsFor` that returned it — and nothing anywhere delivered one. There
+ * is no service worker in this platform, no subscription store and no device to
+ * receive anything, so what shipped was a switch in a settings screen that
+ * silently did nothing, which is worse than an absent feature: somebody turns it
+ * on and stops watching their inbox.
+ *
+ * It comes back with the offline work that gives it something to reach — see
+ * PLAN.md §4 — and not before. A channel is a promise about delivery.
+ */
+export type Channel = "inbox" | "email";
 
 /**
  * ⚠️ THE INBOX IS NEVER OPTIONAL, and that is the whole shape of this function.
@@ -128,10 +141,9 @@ export interface Preferences {
   /** Per category, the interruptions this person wants. The inbox is not listed. */
   readonly muted: readonly Category[];
   readonly email: boolean;
-  readonly push: boolean;
 }
 
-export const DEFAULT_PREFERENCES: Preferences = { muted: [], email: true, push: false };
+export const DEFAULT_PREFERENCES: Preferences = { muted: [], email: true };
 
 /**
  * Where one notification goes for one person.
@@ -146,7 +158,6 @@ export function channelsFor(def: NotificationDef, prefs: Preferences): readonly 
   const out: Channel[] = ["inbox"];
   const muted = def.category !== "action" && prefs.muted.includes(def.category);
   if (!muted && prefs.email) out.push("email");
-  if (!muted && prefs.push) out.push("push");
   return out;
 }
 

@@ -89,7 +89,7 @@ describe("who is told", () => {
 describe("the interruption and the record are different things", () => {
   it("writes the row and skips the interruption for a muted category", async () => {
     const db = store();
-    await setPreferences(db, "t", "u_owner", { muted: ["billing"], email: true, push: true });
+    await setPreferences(db, "t", "u_owner", { muted: ["billing"], email: true });
     const sent = await dispatch({ db, registry, tenantId: "t", type: "money.moved", audience: [{ userId: "u_owner", role: "owner" }], values: { amount: "€9" }, at: AT });
     expect(sent.map((d) => d.channel)).toEqual(["inbox"]);
     expect(db.rows.length).toBe(1);
