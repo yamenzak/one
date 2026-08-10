@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import { kova } from "./proof.app.js";
 import { PLATFORM_PROBLEMS, type Problem, type ProblemCode, type ProviderAdapter } from "../src/problem.js";
 import { TENANT_DOORS, TENANTLESS_DOORS, DIRECTORY_REGION, classifyHost, cookieDomainFor, type Door, type DoorConfig } from "../src/doors.js";
-import { legalProblems, assertComposable, coverage, undeclaredEmits, type AccessSpec } from "../src/app.js";
+import { legalProblems, assertComposable, consentGate, coverage, undeclaredEmits, type AccessSpec } from "../src/app.js";
 import type { EntitlementDef, PlanSpec } from "../src/entitlement.js";
 import type { FlagDef } from "../src/customer.js";
 import { collection, field, type CollectionSpec } from "../src/collection.js";
@@ -959,5 +959,55 @@ describe("every region says which models it permits", () => {
   it("asks nothing of a single-region app, or one with no model runner", () => {
     expect(() => assertComposable({ ...base, tenancy: { regions: ["auto"] }, bindings: { ai: { kind: "inference", subprocessors: ["a"] } } })).not.toThrow();
     expect(() => assertComposable({ ...base, tenancy: { regions: ["auto", "eu"] }, bindings: { db: { kind: "sql" } } })).not.toThrow();
+  });
+});
+
+/* --------------------------------------------------------------- consent --- */
+
+/**
+ * ⚠️ THE LEDGER RECORDED AN OBLIGATION AND DISCHARGED NOTHING. `outstandingFor`
+ * was computed by one read operation and enforced by no route, no gate and no
+ * guard, so a person could use an entire product forever without accepting the
+ * terms, the privacy notice or the processing agreement.
+ */
+describe("what somebody may do before agreeing to anything", () => {
+  const owed = ["terms", "privacy"];
+
+  /*
+    ⚠️ READS ARE NEVER REFUSED FOR THIS. Withholding somebody's own records
+    because they have not clicked anything is punitive and helps nobody;
+    refusing to record NEW information about a person until they have been told
+    what will be done with it is the actual obligation.
+  */
+  it("serves every read", () => {
+    expect(consentGate({ kind: "read", lane: "client", outstanding: owed })).toEqual({ allowed: true, documents: [] });
+  });
+
+  it("refuses a write and names what is standing in the way", () => {
+    expect(consentGate({ kind: "write", lane: "client", outstanding: owed }))
+      .toEqual({ allowed: false, documents: owed });
+  });
+
+  it("allows a write once nothing is outstanding", () => {
+    expect(consentGate({ kind: "write", lane: "client", outstanding: [] }).allowed).toBe(true);
+  });
+
+  /*
+    ⚠️ AND THE EXEMPT LANES ARE NOT A CONVENIENCE. Identity, because somebody
+    has to be able to sign in to reach the document. Exit, because leaving is
+    always allowed and a person who declines must be able to take their account
+    with them. And accepting itself, or agreeing to the terms would require
+    having agreed to the terms.
+  */
+  it("lets somebody sign in, leave, and accept", () => {
+    for (const lane of ["identity", "exit", "legal", "health"]) {
+      expect(consentGate({ kind: "write", lane, outstanding: owed }).allowed, lane).toBe(true);
+    }
+  });
+
+  it("does not exempt the product's own lanes", () => {
+    for (const lane of ["client", "commerce", "settings", "files"]) {
+      expect(consentGate({ kind: "write", lane, outstanding: owed }).allowed, lane).toBe(false);
+    }
   });
 });

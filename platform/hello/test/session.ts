@@ -83,7 +83,35 @@ export async function signIn(email: string, origin: string): Promise<string> {
   const code = /\b(\d{4,8})\b/.exec(sent?.body ?? "")?.[1];
   const { res, body } = await post(origin, "/api/identity.code.verify", { email, code });
   if (typeof body.accountId === "string") accountIds.set(email, body.accountId);
-  return (res.headers.get("set-cookie") ?? "").split(";")[0]!;
+  const cookie = (res.headers.get("set-cookie") ?? "").split(";")[0]!;
+
+  /*
+    ⚠️ AND THEY AGREE TO WHAT THEY HAVE TO AGREE TO, because a real person does.
+    Every write is refused with 451 until the documents this role must accept are
+    accepted — which is the point of the gate, and which made 81 fixtures fail
+    the moment it was enforced. Doing it HERE rather than exempting the suite is
+    what keeps those tests describing a real session: a fixture that skipped the
+    ceremony would leave the gate covered by one test instead of by all of them.
+  */
+  await acceptEverything(origin, cookie);
+  return cookie;
+}
+
+/**
+ * ⚠️ WHATEVER THIS ROLE STILL OWES, READ FROM THE PRODUCT RATHER THAN LISTED.
+ * A fixture naming the documents by hand is one that keeps passing when a new
+ * one is added and every real person is blocked by it.
+ */
+export async function acceptEverything(origin: string, cookie: string): Promise<void> {
+  /* ⚠️ A GET, because `legal.list` is a read and the router routes it as one. */
+  const res = await worker.fetch(
+    new Request(`${origin}/api/legal.list`, { headers: cookie ? { cookie } : {} }),
+    env as never,
+  );
+  const body = (await res.json()) as { outstanding?: { id: string; version: string }[] };
+  for (const doc of body.outstanding ?? []) {
+    await post(origin, "/api/legal.accept", { document: doc.id, version: doc.version }, cookie);
+  }
 }
 
 /**

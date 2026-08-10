@@ -3170,7 +3170,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.28.0",
+  manifestVersion: "0.29.0",
   bindings,
 
   identity: {
@@ -3986,6 +3986,13 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.29.0",
+      at: "2026-08-10",
+      notes: [
+        "The terms, the privacy notice and the processing agreement are now actually asked for: nothing new can be recorded until whoever is recording it has agreed to them. Reading what is already there is never withheld.",
+      ],
+    },
     {
       version: "0.28.0",
       at: "2026-08-10",

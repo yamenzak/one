@@ -1196,6 +1196,10 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-model-suits-what-it-is-priced-for` | a vision feature pointed at a text model, whose reserve is computed from the prompt alone and settles at almost nothing while the platform pays for every picture | **live** |
 | `every-region-says-what-it-permits` | a residency promise that stops at storage — the allow-list mechanism existed, generate enforced it, and no app ever declared one, so an EU workspace's photographs went to exactly the same models as everybody else | **live** |
 | `the-region-s-model-list-is-published` | a workspace choosing a region without being able to read what still leaves it — and a published claim that can differ from the binding the runtime enforces | **live** |
+| `a-consent-is-enforced-not-merely-recorded` | a consent ledger nothing gates — outstandingFor was computed by one read operation and read by no route, so a person could use an entire product forever without accepting the terms, the privacy notice or the processing agreement while the ledger faithfully recorded that they never had | **live** |
+| `a-consent-gate-never-withholds-reads` | somebody's own records withheld because they have not clicked anything — punitive, helps nobody, and not what Articles 13 and 14 ask for, which is about the moment of collection | **live** |
+| `agreeing-does-not-require-having-agreed` | a gate that refuses the acceptance itself, or the sign-in that reaches the document, or the exit a person who declines needs — each of which makes the product unusable rather than compliant | **live** |
+| `the-product-s-own-lanes-are-not-exempt` | an exemption list that grew until it covered the writes that actually collect data, leaving a gate that refuses nothing anybody does | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

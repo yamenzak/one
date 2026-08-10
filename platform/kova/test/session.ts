@@ -88,7 +88,7 @@ export const post = async (origin: string, path: string, body: unknown, cookie =
 export const accountIds = new Map<string, string>();
 
 /** Returns the cookie for that origin. Sessions are per origin, so it matters. */
-export async function signIn(email: string, origin: string): Promise<string> {
+export async function signIn(email: string, origin: string, opts: { accept?: boolean } = {}): Promise<string> {
   await seedMail();
   /*
     ⚠️ ONE RETRY OF THE WHOLE CEREMONY, AND THE REASON IS THE STORE RATHER THAN
@@ -104,14 +104,21 @@ export async function signIn(email: string, origin: string): Promise<string> {
     clears `recorded`: several files are mid-sign-in against one map, and a
     tidy-up that emptied it took another file's undelivered code with it.
   */
-  const once = await attemptSignIn(email, origin);
+  /*
+    ⚠️ `accept: false` IS FOR THE TESTS THAT ARE ABOUT CONSENT ITSELF, and for
+    nothing else. Every other fixture accepts, because every real person does —
+    exempting the suite would leave the gate covered by one test instead of by
+    all of them.
+  */
+  const accept = opts.accept ?? true;
+  const once = await attemptSignIn(email, origin, accept);
   if (once) return once;
-  const again = await attemptSignIn(email, origin);
+  const again = await attemptSignIn(email, origin, accept);
   if (again) return again;
   throw new Error(`signing ${email} in did not work twice — is a mail provider configured?`);
 }
 
-async function attemptSignIn(email: string, origin: string): Promise<string | null> {
+async function attemptSignIn(email: string, origin: string, accept: boolean): Promise<string | null> {
   const held = recorded.get(email.toLowerCase());
   const asked = await post(origin, "/api/identity.code.request", { email });
   /*
@@ -133,7 +140,36 @@ async function attemptSignIn(email: string, origin: string): Promise<string | nu
 
   const { res, body } = await post(origin, "/api/identity.code.verify", { email, code });
   if (typeof body.accountId === "string") accountIds.set(email, body.accountId);
-  return (res.headers.get("set-cookie") ?? "").split(";")[0] || null;
+  const cookie = (res.headers.get("set-cookie") ?? "").split(";")[0] || null;
+  /*
+    ⚠️ AND THEY AGREE TO WHAT THEY HAVE TO AGREE TO, because a real person does.
+    Every write is refused with 451 until the documents this role must accept
+    are accepted — which is the point of the gate, and which made most of this
+    suite fail the moment it was enforced. Doing it HERE rather than exempting
+    the tests is what keeps them describing a real session: a fixture that
+    skipped the ceremony would leave the gate covered by one test instead of by
+    all of them.
+  */
+  if (cookie && accept) await acceptEverything(origin, cookie);
+  return cookie;
+}
+
+/**
+ * ⚠️ WHATEVER THIS ROLE STILL OWES, READ FROM THE PRODUCT RATHER THAN LISTED.
+ * A fixture naming the documents by hand is one that keeps passing when a new
+ * one is added and every real person is blocked by it — which is how a studio
+ * comes to be unable to save anything on the morning a new notice ships.
+ */
+export async function acceptEverything(origin: string, cookie: string): Promise<void> {
+  /* ⚠️ A GET, because `legal.list` is a read and the router routes it as one. */
+  const res = await worker.fetch(
+    new Request(`${origin}/api/legal.list`, { headers: { cookie } }),
+    env as never,
+  );
+  const body = (await res.json().catch(() => ({}))) as { outstanding?: { id: string; version: string }[] };
+  for (const doc of body.outstanding ?? []) {
+    await post(origin, "/api/legal.accept", { document: doc.id, version: doc.version }, cookie);
+  }
 }
 
 /**

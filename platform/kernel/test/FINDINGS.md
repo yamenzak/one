@@ -3634,3 +3634,52 @@ keep and a capability we remove, the third option is the true statement.
 ⚠️ AND THE TRUE STATEMENT HAS TO BE PUBLISHED. `protection.list` now carries the
 per-region model map, read off the binding, asserted equal to it — so a studio
 reads what still leaves before choosing a region rather than after.
+
+## 270. The consent ledger recorded an obligation and discharged nothing
+
+`outstandingFor` computed which documents a person still owed, `legal.list`
+returned it, and no route, no gate and no guard ever read it. So somebody could
+use an entire product, forever, without accepting the terms, the privacy notice
+or the processing agreement — and the ledger would faithfully record that they
+never had. That is worse than having no ledger: it is evidence, produced on
+request, that the obligation was known and not met.
+
+`consentGate` is the enforcement, in the request pipeline above the handler.
+⚠️ WRITES ONLY, and the asymmetry is the design rather than a softening.
+Withholding somebody's own records because they have not clicked anything is
+punitive and helps nobody; refusing to record NEW information about a person
+until they have been told what will be done with it is the actual obligation —
+Articles 13 and 14 are about the moment of collection. It is the same shape as
+the standing gate's read-only rung, for the same reason.
+
+⚠️ 451 RATHER THAN 403, because a legal precondition is not a lack of permission
+and not an unpaid bill. Those two are things a person can do nothing about; this
+one they can read and agree to, so the status says so and the detail names which
+documents.
+
+⚠️ AND THE EXEMPT LANES ARE LOAD-BEARING. Identity, because somebody has to be
+able to sign in to reach the document at all. Exit, because leaving is always
+allowed and a person who declines must be able to take their account with them.
+And `legal` itself, or agreeing to the terms would require having agreed to the
+terms.
+
+## 271. Enforcing it broke 81 tests, and that was the measurement
+
+Every fixture in both apps signed somebody in and immediately wrote, having
+agreed to nothing. The temptation was to exempt the suite; what was done instead
+was to make `signIn` accept on the way through, reading the outstanding list from
+the product rather than naming the documents by hand.
+
+⚠️ THE FIXTURE NOW DESCRIBES A REAL SESSION, which is the whole value. Exempting
+the tests would have left the gate covered by one test instead of by all of them —
+and a fixture that listed the documents itself would keep passing on the morning a
+new notice ships and every real person is blocked by it.
+
+`signIn(email, origin, { accept: false })` is the opt-out, and it exists for the
+three tests that are about consent itself and for nothing else.
+
+⚠️ ONE MUTATION SURVIVED AND THE FIX WAS A TEST, NOT A CHANGE. Removing the
+lane check inside `consentGate` changed no behaviour, because the runtime
+short-circuits on the same list to keep the directory query off every sign-in.
+The duplication is a deliberate fast path; what it means is that `consentGate`
+needs unit coverage of its own, which it now has — four mutations, all killed.

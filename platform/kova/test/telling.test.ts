@@ -131,6 +131,20 @@ describe("what changed in this product", () => {
 /* ----------------------------------------------------------------- legal --- */
 
 describe("the documents this product asks you to agree to", () => {
+  /*
+    ⚠️ A PERSON WHO HAS AGREED TO NOTHING, which every other fixture in this
+    repository no longer is: `signIn` accepts on the way through, because a real
+    person does and because the gate refuses every write until they have. These
+    tests are about the state before that, so they ask for it explicitly.
+  */
+  let unsigned: ReturnType<typeof at>;
+  let unsignedCookie = "";
+  const FRESH = freshSlug("unread");
+  beforeAll(async () => {
+    unsignedCookie = await signIn(`${FRESH}@example.test`, STUDIO, { accept: false });
+    unsigned = at(unsignedCookie);
+  });
+
   /* ⚠️ Readable before signing up, because somebody deciding whether to sign up
      has to be able to read the terms first. */
   it("are readable by somebody who is not signed in", async () => {
@@ -146,7 +160,7 @@ describe("the documents this product asks you to agree to", () => {
   });
 
   it("says what this person still has to accept", async () => {
-    const out = await owner.get("/api/legal.list");
+    const out = await unsigned.get("/api/legal.list");
     const outstanding = out.body.outstanding as unknown as { id: string; version: string }[];
     /* ⚠️ An owner must accept all three and has accepted none. The third is the
        PROCESSING AGREEMENT, which only the owner is asked for — it is the one
@@ -156,8 +170,8 @@ describe("the documents this product asks you to agree to", () => {
   });
 
   it("stops asking once they have", async () => {
-    expect((await owner.call("/api/legal.accept", { document: "terms", version: "2026-01-01" })).status).toBe(200);
-    const outstanding = (await owner.get("/api/legal.list")).body.outstanding as unknown as { id: string }[];
+    expect((await unsigned.call("/api/legal.accept", { document: "terms", version: "2026-01-01" })).status).toBe(200);
+    const outstanding = (await unsigned.get("/api/legal.list")).body.outstanding as unknown as { id: string }[];
     expect(outstanding.map((d) => d.id)).toEqual(["privacy", "dpa"]);
   });
 
@@ -472,5 +486,62 @@ describe("what a region actually promises", () => {
     for (const region of kova.tenancy.regions) {
       expect(inference.ai![region]).toEqual([...declared[region]!]);
     }
+  });
+});
+
+/* ------------------------------------------------------------ the gate --- */
+
+/**
+ * ⚠️ THE LEDGER WAS A RECORD OF AN OBLIGATION RATHER THAN A DISCHARGE OF ONE.
+ *
+ * `outstandingFor` was computed by `legal.list` and read by no route, no gate
+ * and no guard — so a person could use this entire product, forever, without
+ * accepting the terms, the privacy notice or the processing agreement, and the
+ * ledger would faithfully record that they never had.
+ */
+describe("what somebody may do before they have agreed to anything", () => {
+  /*
+    ⚠️ THEIR OWN WORKSPACE, because a 403 for not being a member would look
+    exactly like the refusal under test and prove nothing. Founding one is on
+    the identity lane, which the gate exempts — somebody has to be able to get
+    far enough to be SHOWN a document before they can be held to it.
+  */
+  const NEW = freshSlug("unagreed");
+  let fresh: ReturnType<typeof at>;
+  beforeAll(async () => {
+    const founding = await signIn(`${NEW}@example.test`, SETUP, { accept: false });
+    await post(SETUP, "/api/identity.workspace.create", { slug: NEW }, founding);
+    const origin = `https://${NEW}.kova.4dl.app`;
+    fresh = at(await signIn(`${NEW}@example.test`, origin, { accept: false }), origin);
+  });
+
+  /*
+    ⚠️ READS ARE SERVED, AND THE ASYMMETRY IS THE DESIGN. Withholding somebody's
+    own records because they have not clicked anything is punitive and helps
+    nobody; refusing to record NEW information about a person until they have
+    been told what will be done with it is the actual obligation. It is the same
+    shape as the standing gate's read-only rung, for the same reason.
+  */
+  it("lets them read", async () => {
+    expect((await fresh.get("/api/client.list")).status).toBe(200);
+  });
+
+  it("refuses a write, and names the documents standing in the way", async () => {
+    const out = await fresh.call("/api/client.create", { name: "Someone" });
+    /* ⚠️ 451, not 403. A legal precondition is a different thing from lacking
+       permission, and this one the person can actually do something about. */
+    expect(out.status).toBe(451);
+    expect(String((out.body as Record<string, Record<string, string>>).meta?.documents)).toContain("privacy");
+  });
+
+  /* ⚠️ AND ACCEPTING IS ITSELF A WRITE, so exempting its lane is what stops
+     agreeing to the terms from requiring having agreed to the terms. */
+  it("lets them accept, which is the one write that must survive the gate", async () => {
+    const docs = (await fresh.get("/api/legal.list")).body.outstanding as unknown as { id: string; version: string }[];
+    for (const doc of docs) {
+      expect((await fresh.call("/api/legal.accept", { document: doc.id, version: doc.version })).status).toBe(200);
+    }
+    /* ⚠️ And the write goes through afterwards, or the gate is a wall. */
+    expect((await fresh.call("/api/client.create", { name: "Someone" })).status).toBe(200);
   });
 });

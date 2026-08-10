@@ -11,4 +11,4 @@ kind: index
 ## Stage 7 — Kova migration
 
 - `one-172` — the operator door admits any signed-in  
-  <sub>runtime/src/runtime.ts:784</sub>
+  <sub>runtime/src/runtime.ts:785</sub>

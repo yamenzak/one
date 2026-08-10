@@ -1079,3 +1079,47 @@ export function assertComposable(spec: {
     );
   }
 }
+
+/* ------------------------------------------------------------- consent --- */
+
+/**
+ * WHETHER SOMEBODY MAY WRITE BEFORE THEY HAVE AGREED TO ANYTHING.
+ *
+ * ⚠️ `outstandingFor` WAS COMPUTED AND ENFORCED BY NOTHING. It was returned by
+ * `legal.list` and read by no route, no gate and no guard — so a person could
+ * use an entire product, forever, without accepting the terms, the privacy
+ * notice or the processing agreement, and the ledger would faithfully record
+ * that they never did. A consent ledger nothing gates is a record of an
+ * obligation rather than a discharge of one.
+ *
+ * ⚠️ WRITES ONLY, AND THE ASYMMETRY IS THE WHOLE DESIGN. It is the same shape as
+ * the standing gate's read-only rung and for the same reason: withholding
+ * somebody's own records because they have not clicked anything is punitive and
+ * helps nobody. Refusing to record NEW information about a person until they
+ * have been told what will be done with it is the actual obligation — Articles
+ * 13 and 14 are about the moment of collection.
+ *
+ * ⚠️ AND THE LANES THAT SURVIVE IT ARE NOT A CONVENIENCE. Identity, because
+ * somebody has to be able to sign in to reach the document at all. Exit, because
+ * leaving is always allowed and a person who declines the terms must be able to
+ * take their account with them. And accepting itself, or agreeing to the terms
+ * would require having agreed to the terms.
+ */
+export const CONSENT_EXEMPT_LANES: readonly string[] = ["identity", "exit", "health", "legal"];
+
+export interface ConsentVerdict {
+  readonly allowed: boolean;
+  /** The documents standing in the way, so the refusal names them. */
+  readonly documents: readonly string[];
+}
+
+export function consentGate(input: {
+  readonly kind: "read" | "write";
+  readonly lane: string;
+  readonly outstanding: readonly string[];
+}): ConsentVerdict {
+  if (input.kind !== "write") return { allowed: true, documents: [] };
+  if (CONSENT_EXEMPT_LANES.includes(input.lane)) return { allowed: true, documents: [] };
+  if (!input.outstanding.length) return { allowed: true, documents: [] };
+  return { allowed: false, documents: input.outstanding };
+}

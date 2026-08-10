@@ -3163,6 +3163,42 @@
       "impl": "kova/test/telling.test.ts",
       "proves": "matches the manifest exactly, so the published claim cannot drift from the binding",
       "fails": "a workspace choosing a region without being able to read what still leaves it — and a published claim that can differ from the binding the runtime enforces"
+    },
+    {
+      "id": "a-consent-is-enforced-not-merely-recorded",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/telling.test.ts",
+      "proves": "refuses a write, and names the documents standing in the way",
+      "fails": "a consent ledger nothing gates — outstandingFor was computed by one read operation and read by no route, so a person could use an entire product forever without accepting the terms, the privacy notice or the processing agreement while the ledger faithfully recorded that they never had"
+    },
+    {
+      "id": "a-consent-gate-never-withholds-reads",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "serves every read",
+      "fails": "somebody's own records withheld because they have not clicked anything — punitive, helps nobody, and not what Articles 13 and 14 ask for, which is about the moment of collection"
+    },
+    {
+      "id": "agreeing-does-not-require-having-agreed",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "lets somebody sign in, leave, and accept",
+      "fails": "a gate that refuses the acceptance itself, or the sign-in that reaches the document, or the exit a person who declines needs — each of which makes the product unusable rather than compliant"
+    },
+    {
+      "id": "the-product-s-own-lanes-are-not-exempt",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "does not exempt the product's own lanes",
+      "fails": "an exemption list that grew until it covered the writes that actually collect data, leaving a gate that refuses nothing anybody does"
     }
   ]
 }

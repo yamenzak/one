@@ -18,7 +18,7 @@ import type {
   ConfigRegistry, InferenceHandle, ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
 } from "@one/kernel";
 import {
-  ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, weekStarting, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT, SUPPORT_SESSION,
+  ALWAYS_ALLOWED, CONSENT_EXEMPT_LANES, assertComposable, auditFor, check, consentGate, cookieDomainFor, gateFor, laneOf, weekStarting, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT, SUPPORT_SESSION,
   catalogueOf, detailFor, floorPlan, fromQuery, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
@@ -29,6 +29,7 @@ import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
 import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files-ops.js";
 import { GENERATION, generationOperations, type GenerationCarrier } from "./generate-ops.js";
 import { choicesOf, disabledFrom } from "./generate.js";
+import { consentsOf, outstandingFor } from "./reference-ops.js";
 import { OPERATE, OPERATOR, operatorOperations, planOverrides, type OperatorCarrier } from "./operator-ops.js";
 import { CONFIG, configOperations, type ConfigCarrier } from "./config-ops.js";
 import { SETTINGS, settingsFor, settingsOperations, domainAdminOperations, type SettingsCarrier } from "./settings-ops.js";
@@ -860,6 +861,19 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       const caller: Caller = { permissions, customerFlags, entitlements, gate };
 
       /*
+        ⚠️ THE MEMBERSHIP KNOWS IT, so nothing has to guess. `roleOf` derives one
+        from a permission set, which is a reconstruction of something the row
+        already says — and a reconstruction that disagrees is a person who is an
+        owner to the checklist and a reader to the shelf.
+
+        ⚠️ RESOLVED HERE RATHER THAN AT THE DISPATCH, because the consent gate
+        below needs it: which documents somebody must accept depends on what they
+        are acting AS, and the same person is an owner in one workspace and
+        somebody's customer in another.
+      */
+      const personRole = membership?.role ?? opts.roleOf?.(permissions) ?? (session ? "owner" : "guest");
+
+      /*
         ⚠️ THE GATE RUNS ONCE, FOR EVERY TRANSPORT, FROM HERE. A per-route check
         is one somebody forgets on the four hundredth route, and the symptom is a
         single endpoint that answers when it should not.
@@ -882,6 +896,43 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         : caller;
       const verdict = check(op, forGate);
       if (!verdict.allowed) return problemResponse(refusalProblem(verdict.refusal), ref);
+
+      /*
+        ⚠️ AND WHETHER THEY HAVE AGREED TO ANYTHING YET.
+
+        `outstandingFor` was computed by `legal.list` and enforced by nothing —
+        no route, no gate, no guard — so a person could use an entire product,
+        forever, without accepting the terms, the privacy notice or the
+        processing agreement, and the ledger would faithfully record that they
+        never did. A consent ledger nothing gates records an obligation instead
+        of discharging one.
+
+        ⚠️ WRITES ONLY, AND ONLY WITH A SESSION, so the query is not on the read
+        path and not on the public one. Reading is never refused for this:
+        withholding somebody's own records because they have not clicked
+        anything is punitive, while refusing to record NEW information about a
+        person until they have been told what will be done with it is the actual
+        obligation.
+      */
+      /* ⚠️ The lane is checked HERE as well as inside `consentGate`, and the
+         duplication is deliberate: it is what keeps the directory query off
+         every sign-in, every exit and every acceptance. `consentGate` still owns
+         the rule, and `kernel/test/app.test.ts` covers it on its own. */
+      if (op.kind === "write" && session && !CONSENT_EXEMPT_LANES.includes(laneOf(op))) {
+        const outstanding = outstandingFor(
+          app.governance.legal, personRole, await consentsOf(directoryDb, session.accountId),
+        );
+        const consent = consentGate({ kind: "write", lane: laneOf(op), outstanding: outstanding.map((d) => d.id) });
+        if (!consent.allowed) {
+          return problemResponse(
+            {
+              ...problems["platform.consent_required"]!, code: "platform.consent_required",
+              meta: { documents: consent.documents.join(", ") },
+            } as never,
+            ref,
+          );
+        }
+      }
 
       /*
         ⚠️ HOW OFTEN, WHERE THE OPERATION SAID SO. Declared since stage 0 and
@@ -991,13 +1042,6 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         three separate resolutions is how a person comes to be an owner to one
         and a reader to the next.
       */
-      /*
-        ⚠️ THE MEMBERSHIP KNOWS IT, so nothing has to guess. `roleOf` derives one
-        from a permission set, which is a reconstruction of something the row
-        already says — and a reconstruction that disagrees is a person who is an
-        owner to the checklist and a reader to the shelf.
-      */
-      const personRole = membership?.role ?? opts.roleOf?.(permissions) ?? (session ? "owner" : "guest");
       /*
         ⚠️ THE DEVICE SAYS WHERE IT IS STANDING; THE MANIFEST IS THE FALLBACK.
         A day boundary is the one thing a streak is made of, and UTC is nobody's

@@ -128,6 +128,19 @@ export const PLATFORM_PROBLEMS = declareProblems({
   "platform.rate_limited": { status: 429, title: "Too many attempts — wait a moment", retryable: true },
   "platform.read_only": { status: 402, title: "This workspace is read-only right now", retryable: false },
   /*
+    ⚠️ 451, AND THE STATUS IS THE POINT. This is not "you lack permission" and
+    not "your workspace has not paid" — it is a legal precondition that has not
+    been met, and giving it 403 puts it in the same bucket as the two things a
+    person can do nothing about. What they can do about this is read a document
+    and agree to it, so the code says so and the detail names which one.
+  */
+  "platform.consent_required": {
+    status: 451,
+    title: "There is something to read first",
+    detail: (m) => `Agree to the ${m.documents} before continuing.`,
+    retryable: false,
+  },
+  /*
     ⚠️ ITS OWN CODE RATHER THAN A SHARE OF `forbidden`. "Your plan does not
     include this" and "your plan includes twenty and you have twenty" are
     different problems with different ways out — one is an upgrade, the other is
