@@ -153,7 +153,7 @@ without one.
 | `[ ]` | `op-catalog` | operator | Edit what the platform sells: prices, ceilings, features, trials |
 | `[x]` | `op-comp` | operator | Put a studio on a plan without a payment, for a reason |
 | `[ ]` | `op-domains` | operator | See and troubleshoot studios' custom domains |
-| `[ ]` | `op-email` | operator | Configure how the deployment sends mail, and prove it works |
+| `[x]` | `op-email` | operator | Configure how the deployment sends mail, and prove it works |
 | `[x]` | `op-maintenance` | operator | Close the deployment for work, read-only or fully, and say so |
 | `[x]` | `op-parked` | operator | Read the payment events nothing could place, and replay them |
 | `[x]` | `op-stripe` | operator | Configure the payment provider, in test and live, without re-pasting keys |
@@ -168,10 +168,10 @@ without one.
 | | **roster** | | |
 | `[x]` | `client-add` | trainer | Add somebody they coach, by inviting them or by entering them directly |
 | `[x]` | `client-archive` | trainer | Stop coaching somebody without losing what they did |
-| `[ ]` | `client-assign` | owner | Decide which coach works with which client, and change it |
+| `[x]` | `client-assign` | owner | Decide which coach works with which client, and change it |
 | `[ ]` | `client-audit` | owner | See what was changed on somebody's record, by whom, and when |
 | `[x]` | `client-browse` | trainer | Find one person among many, by name, by state, or by who is falling behind |
-| `[ ]` | `client-coaches` | client | See who is coaching them, with their faces |
+| `[x]` | `client-coaches` | client | See who is coaching them, with their faces |
 | `[ ]` | `client-delete` | owner | Remove somebody entirely, on request, and have that be final |
 | `[x]` | `client-invite-self` | client | Accept an invitation and land in the right studio without being told an address |
 | `[ ]` | `client-offboard-request` | trainer | Ask an owner to release a client, and have the owner decide |
@@ -196,10 +196,10 @@ without one.
 | `[ ]` | `studio-domain` | owner | Serve the product from a domain they own, with a certificate that works |
 | `[ ]` | `studio-settings` | owner | Set how the studio behaves: what a lapsed client loses, and when |
 | | **supplements** | | |
-| `[ ]` | `lab-request` | trainer | Ask a client for a lab test and record the result |
-| `[ ]` | `lab-upload` | client | Send in a lab report as a photograph or a file |
-| `[ ]` | `supplement-log` | client | Record that they took what was prescribed |
-| `[ ]` | `supplement-prescribe` | trainer | Prescribe supplements with a dose and a reason |
+| `[x]` | `lab-request` | trainer | Ask a client for a lab test and record the result |
+| `[x]` | `lab-upload` | client | Send in a lab report as a photograph or a file |
+| `[x]` | `supplement-log` | client | Record that they took what was prescribed |
+| `[x]` | `supplement-prescribe` | trainer | Prescribe supplements with a dose and a reason |
 | | **training** | | |
 | `[ ]` | `exercise-alternatives` | trainer | Say which movements stand in for which, so a swap is not a guess |
 | `[x]` | `exercise-detail` | trainer | Describe a movement well enough that somebody could do it unsupervised |

@@ -7,7 +7,34 @@
  */
 
 import { env } from "cloudflare:test";
-import worker, { delivered } from "../src/worker.js";
+import { sql, type ResolvedRegion } from "@one/kernel";
+import { bindingsFor } from "@one/runtime";
+import worker, { recorded } from "../src/worker.js";
+
+/**
+ * ⚠️ THE DEPLOYMENT HAS TO CHOOSE A MAIL PROVIDER BEFORE IT CAN SEND ANYTHING,
+ * and no screen can do it first: reaching the console needs a session, which
+ * needs a code, which needs mail. Provisioning breaks that circle in production
+ * — a workflow with database access does what a login cannot — and this is the
+ * same two rows, written by the fixture that stands in for it.
+ *
+ * ⚠️ IT IS SEEDED HERE RATHER THAN DEFAULTED IN THE WORKER. A worker that fell
+ * back to `recorded` when nothing was configured is a production deployment
+ * quietly recording its sign-in codes and answering as though the mail went out.
+ */
+let seeded = false;
+const seedMail = async () => {
+  if (seeded) return;
+  seeded = true;
+  const db = bindingsFor({ db: sql() }, { DB: (env as Record<string, unknown>).DIRECTORY }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
+  await db.batch([`CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, at TEXT NOT NULL);`]);
+  for (const [key, value] of [["email.provider", "recorded"], ["email.from", "Kova <noreply@4dl.app>"]]) {
+    await db.run(
+      `INSERT INTO app_config (key, value, at) VALUES (?, ?, ?) ON CONFLICT(key) DO NOTHING`,
+      key, value, new Date().toISOString(),
+    );
+  }
+};
 
 export const SETUP = "https://setup.kova.4dl.app";
 
@@ -34,8 +61,16 @@ export const accountIds = new Map<string, string>();
 
 /** Returns the cookie for that origin. Sessions are per origin, so it matters. */
 export async function signIn(email: string, origin: string): Promise<string> {
+  await seedMail();
   await post(origin, "/api/identity.code.request", { email });
-  const { res, body } = await post(origin, "/api/identity.code.verify", { email, code: delivered.get(email) });
+  /*
+    ⚠️ READ OUT OF THE MESSAGE THAT WAS SENT, not out of a map the worker kept.
+    The `recorded` provider is one a deployment CHOOSES, so this drives the same
+    path production drives and stops one step short of a network call.
+  */
+  const sent = recorded.get(email.toLowerCase());
+  const code = /\b(\d{4,8})\b/.exec(sent?.body ?? "")?.[1];
+  const { res, body } = await post(origin, "/api/identity.code.verify", { email, code });
   if (typeof body.accountId === "string") accountIds.set(email, body.accountId);
   return (res.headers.get("set-cookie") ?? "").split(";")[0]!;
 }

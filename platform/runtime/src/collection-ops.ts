@@ -515,6 +515,22 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
  */
 function fromColumns(spec: CollectionSpec, row: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
+  /*
+    ⚠️ THE SUBJECT IS PART OF THE ROW, and it is not one of the declared fields —
+    so a merge that walked `fields` alone handed every rule a row belonging to
+    nobody. A rule that narrows by customer then finds no customer, takes its
+    "not enough to judge" branch, and passes every update. It is the same defect
+    as merging under column names, one column over.
+  */
+  if (spec.scope.of === "subject") out[spec.scope.subject] = row[subjectColumn(spec)];
+  /*
+    ⚠️ THE SUBJECT IS PART OF THE ROW, and it is not one of the declared fields —
+    so a merge that walked `fields` alone handed every rule a row belonging to
+    nobody. A rule that narrows by customer then finds no customer, takes its
+    "not enough to judge" branch, and passes every update. It is the same defect
+    as merging under column names, one column over.
+  */
+
   for (const [name, f] of Object.entries(spec.fields)) {
     if (f.kind === "money") continue;
     const column = columnName(name);

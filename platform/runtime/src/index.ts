@@ -39,6 +39,7 @@ export * from "./generate-ops.js";
 export * from "./operator-ops.js";
 export * from "./config.js";
 export * from "./config-ops.js";
+export * from "./mail.js";
 export * from "./commerce-ops.js";
 export * from "./relocate.js";
 export * from "./platform-ops.js";

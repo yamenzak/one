@@ -1064,6 +1064,13 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-published-rate-cannot-be-unmetered` | one row making a model free for every app behind the store, while the provider invoices as usual | **live** |
 | `a-catalogue-row-cannot-become-a-feature` | a rate saved for something no reserve reads, because the system text, the output ceiling and the daily bound are the app's and nothing here supplies them | **live** |
 | `unbound-changes-nothing` | a single-app deployment broken by a sharing mechanism it does not use | **live** |
+| `nothing-leaves-while-anything-is-missing` | a best-effort send to nobody, or a queued retry — either way a person waiting for a code that was never addressed to anybody | **live** |
+| `the-recorded-provider-is-a-choice` | a fallback reachable by getting config wrong — a production deployment recording its sign-in codes in a map and answering as though the mail went out | **live** |
+| `a-sender-is-split-the-way-the-provider-wants` | a message refused, or arriving from `Kova <noreply@4dl.app>@example.com`, depending on the provider | **live** |
+| `a-code-that-could-not-be-sent-is-not-a-code` | telling somebody to check their inbox for a message that was never addressed to anybody | **live** |
+| `a-rule-sees-whose-row-it-is` | a rule that narrows by customer handed a row belonging to nobody, taking its 'not enough to judge' branch and passing every update | **live** |
+| `reading-what-was-prescribed-is-not-prescribing` | a coaching record turned self-service by one line, because `supplement:write` sat next to `dose:write` in a list | **live** |
+| `a-package-belongs-to-one-workspace` | two workspaces that both name something `full` sharing one row — the second to save overwriting the first's price, capabilities and days, and taking the row's tenant with it, so the package MOVES between workspaces | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

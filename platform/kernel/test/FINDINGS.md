@@ -2689,3 +2689,52 @@ console offering a shared scope that quietly writes somewhere else is a key that
 works here and nowhere, discovered by the second app. So the reference app is
 the unshared one and Kova is the shared one, and each proves what the other
 cannot.
+
+## 219. A package belonged to whoever saved it last
+
+`customer_package` was keyed on `id` alone, and the id is the STUDIO'S OWN WORD —
+every other table here generates its key, and this one is right not to. Keyed on
+the word alone, two workspaces that both call something `full` share one row: the
+second to save overwrites the first's price, its capabilities and its days, and
+takes the row's `tenant_id` with it. The package does not merely change, it
+MOVES — out of one workspace's list and into another's.
+
+`full`, `standard`, `monthly` are the names people actually pick.
+
+⚠️ IT WAS FOUND BY THE SECOND CUSTOMER, not by a clever test. A new suite named a
+package `full` in a second studio because that is the obvious name, and three
+assertions in an unrelated file went red — a client's days halved, a write
+refused, and a grant ledger with entries nobody made. Nothing in the commerce
+suite could have found it: one workspace cannot collide with itself.
+
+## 220. Every app shipped a Map instead of a mailer
+
+`deliverCode` was injected "because an app owns how it travels", and every app
+that owned it wrote `new Map()`. So nothing this platform sends had ever left a
+worker: not one sign-in code, not one notification. The seam was real and the
+implementation behind it was a stub in every instance of it.
+
+The lane is the deployment's now, chosen from its own configuration, and a
+deployment that has chosen nothing SENDS NOTHING and says so — a code that could
+not be sent is not a code that was, and answering the request cleanly is what
+tells somebody to check their inbox for a message that was never addressed to
+anybody.
+
+⚠️ AND THE MOCK IS A PROVIDER SOMEBODY CHOOSES. `email.provider = "recorded"` is
+a row, not a branch this file takes when something is missing — because a
+fallback reachable by getting config wrong is how a production deployment comes
+to record its sign-in codes and answer as though the mail went out. The same
+argument as the AI runner, one lane over, and it is the second time the shape has
+come up in three increments.
+
+## 221. A rule was handed a row belonging to nobody
+
+The subject column is not one of a collection's declared fields, so the merge
+that builds the row a rule sees on an UPDATE walked `fields` and dropped it. A
+rule that narrows by customer then finds no customer, takes its "not enough to
+judge" branch, and passes every update — silently, for every subject-scoped
+collection with a rule.
+
+It is the same defect as merging under column names, one column over, and it
+survived until a test edited a row in a way that had to be refused BECAUSE of
+whose row it was.

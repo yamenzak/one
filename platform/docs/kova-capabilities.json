@@ -154,14 +154,14 @@
       "persona": "owner",
       "area": "roster",
       "outcome": "Decide which coach works with which client, and change it",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-coaches",
       "persona": "client",
       "area": "roster",
       "outcome": "See who is coaching them, with their faces",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-audit",
@@ -434,28 +434,28 @@
       "persona": "trainer",
       "area": "supplements",
       "outcome": "Prescribe supplements with a dose and a reason",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "supplement-log",
       "persona": "client",
       "area": "supplements",
       "outcome": "Record that they took what was prescribed",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "lab-request",
       "persona": "trainer",
       "area": "supplements",
       "outcome": "Ask a client for a lab test and record the result",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "lab-upload",
       "persona": "client",
       "area": "supplements",
       "outcome": "Send in a lab report as a photograph or a file",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "measurements",
@@ -1044,7 +1044,7 @@
       "persona": "operator",
       "area": "operator",
       "outcome": "Configure how the deployment sends mail, and prove it works",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "op-ai",

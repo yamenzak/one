@@ -413,6 +413,142 @@ export const goals = collection({
   },
 });
 
+/* ----------------------------------------------------------- supplements --- */
+
+/**
+ * Something a coach asked somebody to take.
+ *
+ * ⚠️ THE REASON IS REQUIRED, AND IT IS NOT DECORATION. A supplement with a dose
+ * and no stated reason is a prescription nobody can review — not the client
+ * deciding whether to keep taking it, not the next coach, and not the coach
+ * themselves in six months. It is also the one field that makes the difference
+ * between advice and a list.
+ */
+export const supplements = collection({
+  id: "supplement",
+  label: { one: "Supplement", many: "Supplements" },
+  scope: { of: "subject", subject: "client" },
+  customerFlag: "nutrition",
+  version: true,
+  retention: { days: null, onTenantClose: "export-then-purge" },
+  onDelete: { on: "archive" },
+  activity: true,
+  fields: {
+    name: field.text({ required: true, min: 1, max: 120 }),
+    dose: field.text({ required: true, max: 120, label: "How much" }),
+    timing: field.text({ max: 200, label: "When" }),
+    why: field.text({ required: true, multiline: true, max: 1_000, label: "Why" }),
+    startedOn: field.plainDate({ label: "From" }),
+    /* ⚠️ Null means open-ended, which is what most of them are. */
+    untilOn: field.plainDate({ label: "Until" }),
+  },
+});
+
+/**
+ * That somebody took what was prescribed, on a day.
+ *
+ * ⚠️ A DAY AND A COUNT, NOT A TICK. "Did you take it" over a week is a question
+ * a coach asks and a client half-remembers; a row per day is the only version
+ * either of them can look back at.
+ */
+export const doses = collection({
+  id: "dose",
+  label: { one: "Dose", many: "Doses" },
+  scope: { of: "subject", subject: "client" },
+  customerFlag: "nutrition",
+  version: true,
+  retention: { days: null, onTenantClose: "export-then-purge" },
+  onDelete: { on: "purge" },
+  fields: {
+    supplement: field.ref("supplement", { onDelete: "cascade" }),
+    /** ⚠️ THE PERSON'S OWN DAY, from their device. See `entry.day`. */
+    day: field.plainDate({ required: true, label: "Day" }),
+    taken: field.bool({ required: true, label: "Taken" }),
+  },
+});
+
+/* ----------------------------------------------------------------- labs --- */
+
+/**
+ * A test a coach asked for, and the report that came back.
+ *
+ * ⚠️ ONE RECORD, NOT TWO. A request and a result as separate collections is two
+ * rows that have to be matched by somebody, and the matching is what gets lost —
+ * so the ask and the answer are one row that fills in.
+ *
+ * ⚠️ AND THE REPORT IS A FILE THE STUDIO STORES, which is why it is a media
+ * field rather than a link: a link to somebody's clinic portal is a credential
+ * or an expiry, and neither belongs in a coaching record.
+ */
+export const labs = collection({
+  id: "lab",
+  label: { one: "Lab test", many: "Lab tests" },
+  scope: { of: "subject", subject: "client" },
+  version: true,
+  /*
+    ⚠️ KEPT UNTIL THE STUDIO SAYS OTHERWISE, and exported when it closes. This is
+    the most sensitive thing in the product; a retention window measured in
+    months would delete somebody's own record of their health.
+  */
+  retention: { days: null, onTenantClose: "export-then-purge" },
+  onDelete: { on: "archive" },
+  activity: true,
+  fields: {
+    panel: field.text({ required: true, min: 1, max: 200, label: "What to test" }),
+    why: field.text({ multiline: true, max: 1_000, label: "Why" }),
+    askedOn: field.plainDate({ required: true, label: "Asked" }),
+    /* ⚠️ Null until it comes back, which is the state most of them are in. */
+    takenOn: field.plainDate({ label: "Taken" }),
+    report: field.media({ accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000, label: "Report" }),
+    notes: field.text({ multiline: true, max: 4_000, label: "What it said" }),
+  },
+});
+
+/* ------------------------------------------------------------- coaching --- */
+
+/**
+ * Which coach works with which client.
+ *
+ * ⚠️ A COLLECTION RATHER THAN A COLUMN, because it is many to many and because
+ * it changes. A `coach` column on a client loses the second coach a studio adds
+ * for the same person, and loses the history of who it used to be — which is
+ * the question anybody asks when a client says something was prescribed and the
+ * coach in front of them has never seen it.
+ */
+export const assignments = collection({
+  id: "assignment",
+  label: { one: "Assignment", many: "Assignments" },
+  scope: { of: "subject", subject: "client" },
+  version: true,
+  retention: { days: null, onTenantClose: "purge" },
+  onDelete: { on: "purge" },
+  activity: true,
+  fields: {
+    /* ⚠️ A membership id: staff are memberships here, not a collection. */
+    coach: field.text({ required: true, max: 40, label: "Coach" }),
+    since: field.plainDate({ required: true, label: "Since" }),
+    lead: field.bool({ label: "Lead coach" }),
+  },
+  rule: {
+    why: "already_assigned" as const,
+    async check({ db, tenantId, table, id, row }) {
+      const coach = String(row.coach ?? "");
+      const client = String(row.client ?? row.client_id ?? "");
+      if (!coach || !client) return true;
+      /*
+        ⚠️ ONE ROW PER COACH PER CLIENT. A second is not a second relationship —
+        it is the same one, entered twice, and it doubles somebody on every
+        screen that lists who is coaching whom.
+      */
+      const held = await db.all<{ id: string }>(
+        `SELECT id FROM ${table} WHERE tenant_id = ? AND client_id = ? AND coach = ?`,
+        tenantId, client, coach,
+      );
+      return !held.some((h) => h.id !== id);
+    },
+  },
+});
+
 /* -------------------------------------------------------------- bookings --- */
 
 /**
@@ -968,6 +1104,8 @@ const STAFF = [
   "checkin:read", "checkin:write", "goal:read", "goal:write",
   "inbox:read", "file:read", "file:write", "guide:read", "milestone:read", "commerce:read", "report:read",
   "ai:use", "booking:read", "booking:write", "article:read", "article:write", "article:feed",
+  "supplement:read", "supplement:write", "dose:read", "dose:write", "lab:read", "lab:write",
+  "assignment:read", "assignment:write",
 ];
 
 /* ------------------------------------------------------------ publishing --- */
@@ -1182,7 +1320,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.14.0",
+  manifestVersion: "0.15.0",
   bindings,
 
   identity: {
@@ -1233,7 +1371,7 @@ export const kova = defineApp({
       /* ⚠️ The front desk sees people and BOOKINGS, and prescribes nothing —
          which is why `session:write` is here and nothing else new is. */
       assistant: ["client:read", "workout:read", "inbox:read", "guide:read", "milestone:read", "commerce:read", "file:read", "member:read",
-        "booking:read", "booking:write", "article:feed"],
+        "booking:read", "booking:write", "article:feed", "assignment:read"],
       /*
         ⚠️ A CLIENT WRITES THEIR OWN RECORD AND READS WHAT WAS PRESCRIBED. The
         row scope does the narrowing — `session`, `set` and `entry` are subject
@@ -1248,6 +1386,9 @@ export const kova = defineApp({
            `article:feed` is the published feed, never the collection's own read,
            which would hand them every draft in the studio. */
         "booking:read", "article:feed",
+        /* ⚠️ They READ what was prescribed and RECORD taking it; prescribing is
+           staff's, and so is writing up what a report said. */
+        "supplement:read", "dose:read", "dose:write", "lab:read", "assignment:read",
         "inbox:read", "guide:read", "milestone:read", "file:read", "commerce:read",
         /* ⚠️ A client may say a generation was wrong. They are the one who read it. */
         "ai:use",
@@ -1388,7 +1529,7 @@ export const kova = defineApp({
     auditRetentionDays: 730,
   },
 
-  collections: [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles],
+  collections: [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles, supplements, doses, labs, assignments],
 
   notifications: {
     "workspace.created": {
@@ -1659,6 +1800,18 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.15.0",
+      at: "2026-08-10",
+      notes: [
+        "Sign-in codes and notifications are sent by mail now, through whichever provider the deployment is configured with — and a deployment configured with none sends nothing and says so rather than reporting a delivery.",
+        "There is a button that actually sends a test message, because a screen that says Saved has told you nothing about whether mail works.",
+        "Prescribe supplements with a dose and a reason. The reason is required: a prescription nobody can review is a list.",
+        "A client records taking them, day by day, and cannot prescribe anything.",
+        "Ask for a lab test and file the report against the same record. What it said is written up by a coach; the client reads it.",
+        "Say which coach works with which client, and change it. A client sees who theirs are, and the same coach cannot be added twice.",
+      ],
+    },
     {
       version: "0.14.0",
       at: "2026-08-10",

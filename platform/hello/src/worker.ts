@@ -45,13 +45,14 @@ export const REGIONAL_MODULES = [...PLATFORM_REGIONAL, derived.module];
 /* --------------------------------------------------------------- runtime --- */
 
 /**
- * ⚠️ A CODE THAT IS ONLY EVER LOGGED IS A CODE THAT NEVER ARRIVES. Delivery is
- * injected because the platform owns the code and an app owns how it travels —
- * and because a test needs to read one without a mail server. `hello` records
- * the last code; a real app sends mail here and this is the ONE place that
- * differs between them.
+ * ⚠️ A CODE THAT IS ONLY EVER LOGGED IS A CODE THAT NEVER ARRIVES, and every app
+ * here shipped a Map that did exactly that — which is why nothing this platform
+ * sends had ever left a worker. Delivery is the deployment's own mail lane now,
+ * chosen from its configuration. A test reads what the `recorded` provider
+ * recorded, and that is a provider somebody CHOSE rather than a fallback a
+ * worker takes when something is missing.
  */
-export const delivered = new Map<string, string>();
+export { recorded } from "@one/runtime";
 
 const runtime = createRuntime(hello, {
   /*
@@ -77,7 +78,6 @@ const runtime = createRuntime(hello, {
     the sweep reported success while a deleted workspace kept eighteen.
   */
   regionalModules: REGIONAL_MODULES,
-  deliverCode: async (email, code) => { delivered.set(email, code); },
   /*
     ⚠️ NO SECRET, SO THE WEBHOOK REFUSES AND `chargeable` STAYS FALSE. That is
     the honest state of a deployment with no payment provider: a workspace that

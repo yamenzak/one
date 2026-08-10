@@ -56,7 +56,17 @@ export const COMMERCE_SCHEMA: SchemaModule = {
       edit. Only the capability KEYS are the app's, and those come from
       `access.customerFlags`.
     */
-    `CREATE TABLE IF NOT EXISTS customer_package (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, name TEXT NOT NULL, price_minor INTEGER NOT NULL, price_currency TEXT NOT NULL, flags_json TEXT NOT NULL DEFAULT '{}', budgets_json TEXT NOT NULL DEFAULT '{}', once_per_customer INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL);`,
+    /*
+      ⚠️ KEYED ON (tenant, id), AND THE ID IS THE STUDIO'S OWN WORD. Every other
+      table here generates its key; this one lets a workspace name its packages,
+      which is right — and keyed on the name alone it means two workspaces that
+      both call something `full` share one row. The second to save overwrites the
+      first's price, its capabilities and its days, and takes the row's tenant
+      with it: the package does not merely change, it MOVES, disappearing from
+      one workspace's list and appearing in another's. `full`, `standard`,
+      `monthly` are the names people actually pick.
+    */
+    `CREATE TABLE IF NOT EXISTS customer_package (id TEXT NOT NULL, tenant_id TEXT NOT NULL, name TEXT NOT NULL, price_minor INTEGER NOT NULL, price_currency TEXT NOT NULL, flags_json TEXT NOT NULL DEFAULT '{}', budgets_json TEXT NOT NULL DEFAULT '{}', once_per_customer INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL, PRIMARY KEY (tenant_id, id));`,
     `CREATE INDEX IF NOT EXISTS idx_package_tenant ON customer_package(tenant_id);`,
     /*
       ⚠️ THE SNAPSHOT IS COPIED WHOLE AT GRANT TIME AND THE OVERRIDES ARE A DIFF.
@@ -297,7 +307,7 @@ export async function savePackage(db: SqlHandle, tenantId: string, pkg: Omit<Sto
   await db.run(
     `INSERT INTO customer_package (id, tenant_id, name, price_minor, price_currency, flags_json, budgets_json, once_per_customer, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET name = excluded.name, price_minor = excluded.price_minor, price_currency = excluded.price_currency,
+     ON CONFLICT(tenant_id, id) DO UPDATE SET name = excluded.name, price_minor = excluded.price_minor, price_currency = excluded.price_currency,
        flags_json = excluded.flags_json, budgets_json = excluded.budgets_json, once_per_customer = excluded.once_per_customer, updated_at = excluded.updated_at`,
     pkg.id, tenantId, pkg.name, pkg.price.minor, pkg.price.currency,
     JSON.stringify(pkg.flags), JSON.stringify(pkg.budgets), pkg.oncePerCustomer ? 1 : 0, at,

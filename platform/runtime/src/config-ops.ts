@@ -12,6 +12,7 @@
 import type { AnyOperation, AppSpec, BindingSpec, ConfigRegistry, Instant, SqlHandle } from "@one/kernel";
 import { modelFor, operation, s } from "@one/kernel";
 import { lines, readAll, readRates, refuseRate, refuseWrite, writeOne, writeRate } from "./config.js";
+import { chooseProvider, send, type Post } from "./mail.js";
 import { OPERATE } from "./operator-ops.js";
 
 /** ⚠️ A symbol, so an app cannot reach the secret store by writing a property name. */
@@ -20,6 +21,8 @@ export const CONFIG = Symbol.for("one.runtime.config");
 export interface ConfigDeps {
   /** This app's own store. Always present. */
   readonly own: SqlHandle;
+  /** ⚠️ Injected, so the one file that reaches the network is the one that sends. */
+  readonly post: Post;
   /** ⚠️ Null where a deployment binds no shared store, which is most of them. */
   readonly shared: SqlHandle | null;
   readonly registry: ConfigRegistry;
@@ -189,5 +192,79 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
       ]
     : [];
 
-  return [read, write, ...catalogue] as unknown as readonly AnyOperation[];
+  /* --------------------------------------------------------------- mail --- */
+
+  /*
+    ⚠️ "AND PROVE IT WORKS" IS THE HALF THAT IS USUALLY MISSING. A configuration
+    screen that accepts a key and says "Saved" has told an operator nothing: the
+    first real message is a sign-in code, and the person who does not receive it
+    cannot report what they did not get. One button that actually sends is the
+    difference between a deployment somebody has configured and one somebody
+    believes they have configured.
+  */
+  const prove = operation({
+    id: "admin.email.test",
+    kind: "write",
+    summary: "Send a message to an address you can check, and report what happened.",
+    input: s.object({ to: s.text({ min: 3, max: 200 }) }),
+    output: s.object({ sent: s.bool(), provider: s.optional(s.text()), why: s.optional(s.text()) }),
+    permission: OPERATE,
+    idempotency: { mode: "none" },
+    audit: (i: { to: string }) => ({ subject: i.to, verb: "test-email" }),
+    /*
+      ⚠️ NOT A TOOL. It sends mail to an address in its input, which is a spam
+      cannon with a permission check in front of it.
+    */
+    tool: false,
+    async handler(ctx, input: { to: string }) {
+      const d = deps(ctx);
+      const values = { ...(await readAll(d.shared)), ...nonEmpty(await readAll(d.own)) };
+      const out = await send(values, {
+        to: input.to,
+        subject: "Test message",
+        body: "This is a test from your deployment's configuration screen. If you are reading it, mail is working.",
+      }, d.post, ctx.now() as Instant);
+
+      /*
+        ⚠️ A FAILURE IS AN ANSWER, NOT A PROBLEM. Refusing the request with a 503
+        would tell an operator that the CONSOLE is broken; what they asked was
+        whether the mail lane is, and "no, because no sender is configured" is
+        the useful version of that.
+      */
+      return out.ok
+        ? { sent: true, provider: out.provider }
+        : { sent: false, why: out.why };
+    },
+  });
+
+  const lane = operation({
+    id: "admin.email",
+    kind: "read",
+    summary: "Which provider this deployment sends with, or what is missing.",
+    input: s.object({}),
+    output: s.object({ ready: s.bool(), provider: s.optional(s.text()), from: s.optional(s.text()), why: s.optional(s.text()) }),
+    permission: OPERATE,
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const d = deps(ctx);
+      const values = { ...(await readAll(d.shared)), ...nonEmpty(await readAll(d.own)) };
+      const chosen = chooseProvider(values);
+      return chosen.ok
+        ? { ready: true, provider: chosen.provider, from: chosen.from }
+        : { ready: false, why: chosen.why };
+    },
+  });
+
+  return [read, write, lane, prove, ...catalogue] as unknown as readonly AnyOperation[];
 }
+
+/**
+ * ⚠️ NON-EMPTY WINS, NOT PRESENT WINS — the same rule the resolver follows, and
+ * for the same reason: every consumer reads `""` as unconfigured, so a blank
+ * local row must fall THROUGH to the shared value rather than mask it.
+ */
+const nonEmpty = (values: Readonly<Record<string, string>>): Record<string, string> => {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(values)) if (value !== "") out[key] = value;
+  return out;
+};

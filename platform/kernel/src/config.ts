@@ -119,6 +119,8 @@ export const PLATFORM_CONFIG = declareConfig({
   "turnstile.site_key": { shared: true, secret: false },
   "turnstile.secret_key": { shared: true, secret: true },
   "email.provider": { shared: true, secret: false },
+  "email.brevo.key": { shared: true, secret: true },
+  "email.resend.key": { shared: true, secret: true },
   "email.from": {
     shared: false, secret: false,
     why: "One verified address serves the platform, but the display name in front of it is the product's. Shared, the last app to save renames the sender for all of them.",

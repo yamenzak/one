@@ -2164,6 +2164,69 @@
       "impl": "hello/test/config.test.ts",
       "proves": "still resolves this app's own values",
       "fails": "a single-app deployment broken by a sharing mechanism it does not use"
+    },
+    {
+      "id": "nothing-leaves-while-anything-is-missing",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/mail.test.ts",
+      "proves": "does not call a provider when the deployment is not configured",
+      "fails": "a best-effort send to nobody, or a queued retry \u2014 either way a person waiting for a code that was never addressed to anybody"
+    },
+    {
+      "id": "the-recorded-provider-is-a-choice",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/mail.test.ts",
+      "proves": "takes the recorded provider without a key, and only when it is named",
+      "fails": "a fallback reachable by getting config wrong \u2014 a production deployment recording its sign-in codes in a map and answering as though the mail went out"
+    },
+    {
+      "id": "a-sender-is-split-the-way-the-provider-wants",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/mail.test.ts",
+      "proves": "sends what Brevo expects, with the sender split",
+      "fails": "a message refused, or arriving from `Kova <noreply@4dl.app>@example.com`, depending on the provider"
+    },
+    {
+      "id": "a-code-that-could-not-be-sent-is-not-a-code",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/config.test.ts",
+      "proves": "reports what is missing rather than refusing the request",
+      "fails": "telling somebody to check their inbox for a message that was never addressed to anybody"
+    },
+    {
+      "id": "a-rule-sees-whose-row-it-is",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/caring.test.ts",
+      "proves": "refuses a coach being swapped onto somebody who already has them",
+      "fails": "a rule that narrows by customer handed a row belonging to nobody, taking its 'not enough to judge' branch and passing every update"
+    },
+    {
+      "id": "reading-what-was-prescribed-is-not-prescribing",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/caring.test.ts",
+      "proves": "is read by the client and written by nobody else",
+      "fails": "a coaching record turned self-service by one line, because `supplement:write` sat next to `dose:write` in a list"
+    },
+    {
+      "id": "a-package-belongs-to-one-workspace",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/caring.test.ts",
+      "proves": "keep their own package",
+      "fails": "two workspaces that both name something `full` sharing one row \u2014 the second to save overwriting the first's price, capabilities and days, and taking the row's tenant with it, so the package MOVES between workspaces"
     }
   ]
 }

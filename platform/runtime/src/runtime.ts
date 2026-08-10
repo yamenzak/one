@@ -31,6 +31,7 @@ import { GENERATION, generationOperations, type GenerationCarrier } from "./gene
 import { OPERATOR, operatorOperations, type OperatorCarrier } from "./operator-ops.js";
 import { CONFIG, configOperations, type ConfigCarrier } from "./config-ops.js";
 import { chargeableFrom, readAll, readRates } from "./config.js";
+import { send, type Post } from "./mail.js";
 import { SHARED_MODULES } from "./modules.js";
 import { GUIDE, guideOperations, type GuideCarrier } from "./guide-ops.js";
 import { MILESTONES, milestoneOperations, type MilestoneCarrier } from "./milestone-ops.js";
@@ -96,8 +97,16 @@ export interface RuntimeOptions<B extends BindingSpec> {
   /** Where a session's regional row lives. Read per request; never global. */
   readonly sessionsBinding: keyof B & string;
   readonly sessionDays?: number;
-  /** The platform owns the code; an app owns how it travels. */
-  deliverCode(email: string, code: string): Promise<void>;
+  /**
+   * How a sign-in code travels.
+   *
+   * ⚠️ OPTIONAL, AND OMITTING IT IS RIGHT FOR ALMOST EVERY APP. The default is
+   * the deployment's own mail lane, chosen from its configuration — because an
+   * app that supplies this owns a decision that is a deployment's, and every app
+   * that supplied one wrote a `Map`. A map is not a mail provider; it is a
+   * sign-in code nobody receives, reported as delivered.
+   */
+  deliverCode?(email: string, code: string): Promise<void>;
   /**
    * What this caller may do, given who they are.
    *
@@ -159,6 +168,14 @@ export interface RuntimeOptions<B extends BindingSpec> {
    */
   readonly sharedConfigBinding?: string;
   /**
+   * How anything this platform sends actually leaves the process.
+   *
+   * ⚠️ INJECTED SO A SUITE CAN DRIVE THE REAL PATH. The alternative is a test
+   * that stubs the mailer, which leaves the request a provider actually receives
+   * — the one place a wrong sender or a wrong field lives — asserted by nothing.
+   */
+  readonly post?: Post;
+  /**
    * How to count what a key's ceiling applies to, where a collection cannot.
    *
    * ⚠️ SEATS ARE THE CASE THIS EXISTS FOR. A collection's quota is counted from
@@ -186,7 +203,14 @@ export interface RuntimeOptions<B extends BindingSpec> {
    * somebody can use to read another persona's list.
    */
   roleOf?(permissions: ReadonlySet<string>): string;
-  /** How an interruption travels. The DECISION is the platform's; the sending is not. */
+  /**
+   * How an interruption travels.
+   *
+   * ⚠️ THE DECISION IS THE PLATFORM'S; THE SENDING IS NOT — but "not sending at
+   * all" is not a third option. Absent, the deployment's own mail lane carries
+   * it, so a notification whose channel says `email` actually leaves the process
+   * rather than being computed, recorded, and dropped.
+   */
   send?(delivery: Delivery): Promise<void>;
   /**
    * The regional modules this app composes.
@@ -518,6 +542,16 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         inert rather than a cross-product compromise. Braces as well as belt, on
         the one thing where the belt alone would be a bad trade.
       */
+      /*
+        ⚠️ THE SHARED STORE IS BOOTED THE FIRST TIME ANY APP TOUCHES IT, and by
+        the platform rather than by an app's own boot hook. Every app binds it by
+        the same id, so leaving the composition to each of them means N chances
+        to forget — and the failure is a table that is not there, read through a
+        `catch` that answers "nothing configured".
+      */
+      const sharedConfigDb = opts.sharedConfigBinding ? globalSql(env, opts.sharedConfigBinding) : null;
+      if (sharedConfigDb) await once("shared-config", () => applySchema(sharedConfigDb, SHARED_MODULES).then(() => undefined));
+
       const identity = identityStore(identityDb);
       const sessions = sessionStore(bind[opts.sessionsBinding] as SqlHandle);
       const cookieId = readCookie(request.headers.get("cookie"), SESSION_COOKIE);
@@ -550,7 +584,21 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         sessionDays: opts.sessionDays ?? 30,
         session,
         setCookie: (value) => cookies.push(value),
-        deliverCode: opts.deliverCode,
+        /*
+          ⚠️ THE DEPLOYMENT'S OWN LANE UNLESS THE APP INSISTS. A refusal here is
+          reported by `identity.code.request` rather than swallowed: a code that
+          could not be sent and a code that was are not the same answer, and
+          telling somebody to check their inbox for neither is the failure.
+        */
+        deliverCode: opts.deliverCode ?? (async (email, code) => {
+          const values = { ...(await readAll(sharedConfigDb)), ...await readAll(directoryDb) };
+          const out = await send(values, {
+            to: email,
+            subject: `${app.name}: your sign-in code`,
+            body: `Your code is ${code}. It is good for a few minutes and can be used once.`,
+          }, opts.post ?? ((url, init) => fetch(url, init as RequestInit).then((r) => ({ ok: r.ok }))), new Date().toISOString() as Instant);
+          if (!out.ok) throw new Error(`mail:${out.why}`);
+        }),
       };
 
       /*
@@ -634,16 +682,6 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         failure is not a 500, it is every workspace on a self-host stranded in
         setup over OUR misconfiguration.
       */
-      /*
-        ⚠️ THE SHARED STORE IS BOOTED THE FIRST TIME ANY APP TOUCHES IT, and by
-        the platform rather than by an app's own boot hook. Every app binds it by
-        the same id, so leaving the composition to each of them means N chances
-        to forget — and the failure is a table that is not there, read through a
-        `catch` that answers "nothing configured".
-      */
-      const sharedConfigDb = opts.sharedConfigBinding ? globalSql(env, opts.sharedConfigBinding) : null;
-      if (sharedConfigDb) await once("shared-config", () => applySchema(sharedConfigDb, SHARED_MODULES).then(() => undefined));
-
       const chargeable = chargeableFrom(await readAll(directoryDb));
       const sub = at.tenant ? await readSubscription(regionalDb, at.tenant.tenantId) : PARKED;
       const standingState = at.tenant
@@ -909,6 +947,12 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           */
           shared: sharedConfigDb,
           registry: opts.config ?? {},
+          /*
+            ⚠️ THE NETWORK, INJECTED. One file reaches it, and a test supplies
+            its own — so nothing in a suite can reach a real provider by
+            accident, and the send path is exercised rather than stubbed out.
+          */
+          post: opts.post ?? ((url, init) => fetch(url, init as RequestInit).then((r) => ({ ok: r.ok }))),
         },
         [OPERATOR]: {
           global: directoryDb,

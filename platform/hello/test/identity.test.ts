@@ -9,7 +9,15 @@
 
 import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
-import worker, { delivered } from "../src/worker.js";
+import worker, { recorded } from "../src/worker.js";
+
+/**
+ * ⚠️ READ OUT OF THE MESSAGE THAT WAS SENT, not out of a map the worker kept.
+ * The `recorded` provider is one a deployment CHOOSES, so this drives the same
+ * path production drives and stops one step short of a network call.
+ */
+const codeFor = (email: string): string | undefined =>
+  /\b(\d{4,8})\b/.exec(recorded.get(email.toLowerCase())?.body ?? "")?.[1];
 import { authenticator } from "./authenticator.js";
 import { post, SETUP, signIn } from "./session.js";
 
@@ -35,7 +43,7 @@ const call = async (path: string, body?: unknown, o: { origin?: string; cookie?:
 /** Through the real ceremony, and it sets the ambient cookie the way a browser would. */
 const signInHere = async (email: string) => {
   await call("/api/identity.code.request", { email });
-  return call("/api/identity.code.verify", { email, code: delivered.get(email) });
+  return call("/api/identity.code.verify", { email, code: codeFor(email) });
 };
 
 beforeAll(async () => {
@@ -76,13 +84,13 @@ describe("the emailed code, which is what proves an address", () => {
     }
     // Six digits is a number an attacker counts to. The row is discarded rather
     // than locked — a lockout here is a denial of service aimed at any address.
-    const real = delivered.get("grace@example.test")!;
+    const real = codeFor("grace@example.test")!;
     expect((await call("/api/identity.code.verify", { email: "grace@example.test", code: real })).status).toBe(400);
   });
 
   it("consumes the code, so it cannot be used twice", async () => {
     await call("/api/identity.code.request", { email: "linus@example.test" });
-    const code = delivered.get("linus@example.test")!;
+    const code = codeFor("linus@example.test")!;
     expect((await call("/api/identity.code.verify", { email: "linus@example.test", code })).status).toBe(200);
     expect((await call("/api/identity.code.verify", { email: "linus@example.test", code })).status).toBe(400);
   });

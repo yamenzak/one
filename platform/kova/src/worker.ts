@@ -17,9 +17,9 @@ import {
   applySchema, createRuntime,
   PLATFORM_GLOBAL, PLATFORM_REGIONAL, type RawEnv,
 } from "@one/runtime";
-import { articles, bookings, checkins, clients, entries, foods, goals, kova, movements, portions, programmes, sets, workouts } from "./manifest.js";
+import { articles, assignments, bookings, checkins, clients, doses, entries, foods, goals, kova, labs, movements, portions, programmes, sets, supplements, workouts } from "./manifest.js";
 
-const derived = deriveSchema("kova", [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles]);
+const derived = deriveSchema("kova", [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles, supplements, doses, labs, assignments]);
 if (derived.problems.length) throw new Error(`kova: ${derived.problems.map((p) => p.detail).join("; ")}`);
 
 /* ⚠️ ORDER IS DEPENDENCY ORDER, DECLARED — the runner validates it rather than
@@ -29,8 +29,15 @@ const GLOBAL_MODULES = PLATFORM_GLOBAL;
 export const REGIONAL_MODULES = [...PLATFORM_REGIONAL, derived.module];
 
 
-/** ⚠️ A code that is only ever logged is a code that never arrives. */
-export const delivered = new Map<string, string>();
+/**
+ * ⚠️ THE MAP IS GONE, AND THAT IS THE POINT. A code that is only ever recorded
+ * in the process is a code that never arrives — and every app here shipped one,
+ * which is why nothing this platform sends had ever left a worker. Delivery is
+ * the deployment's own mail lane now, chosen from its configuration; a test
+ * reads what the `recorded` provider recorded, which is a provider somebody
+ * CHOSE rather than a fallback this worker takes when something is missing.
+ */
+export { recorded } from "@one/runtime";
 
 const runtime = createRuntime(kova, {
   /*
@@ -56,7 +63,6 @@ const runtime = createRuntime(kova, {
   /* ⚠️ No secret, so the payment endpoint refuses and `chargeable` stays false —
      which is the honest state of a deployment with no provider. */
   webhookSecretVar: "PROVIDER_WEBHOOK_SECRET",
-  deliverCode: async (email, code) => { delivered.set(email, code); },
   /* ⚠️ Who is in this workspace is the app's answer, and the ONE thing a
      framework cannot supply. */
   audienceFor: async (_tenantId, db) => {

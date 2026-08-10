@@ -11,7 +11,7 @@
 
 import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
-import worker from "../src/worker.js";
+import worker, { recorded } from "../src/worker.js";
 import { post, SETUP, signIn } from "./session.js";
 
 const ORIGIN = "https://alone.hello.4dl.app";
@@ -82,5 +82,65 @@ describe("configuration with no shared store", () => {
 
   it("is not reachable from inside a workspace", async () => {
     expect((await member("/api/admin.config")).status).toBe(403);
+  });
+});
+
+/* ----------------------------------------------------------------- mail --- */
+
+/**
+ * ⚠️ "AND PROVE IT WORKS" IS THE HALF USUALLY MISSING. A screen that accepts a
+ * key and says "Saved" has told an operator nothing: the first real message is a
+ * sign-in code, and the person who does not receive it cannot report what they
+ * did not get.
+ */
+describe("proving the mail lane", () => {
+  it("says which provider is in use once one is configured", async () => {
+    const out = await operator("/api/admin.email");
+    expect(out.status).toBe(200);
+    expect(out.body).toMatchObject({ ready: true, provider: "recorded" });
+  });
+
+  it("actually sends, and says which provider carried it", async () => {
+    const out = await operator("/api/admin.email.test", { to: "check@example.test" });
+    expect(out.status).toBe(200);
+    expect(out.body).toMatchObject({ sent: true, provider: "recorded" });
+    expect(recorded.get("check@example.test")!.subject).toContain("Test");
+  });
+
+  /*
+    ⚠️ A FAILURE IS AN ANSWER, NOT A PROBLEM. Refusing the request would tell an
+    operator the CONSOLE is broken; what they asked was whether the mail lane is,
+    and "no, because no sender is configured" is the useful version of that.
+  */
+  it("reports what is missing rather than refusing the request", async () => {
+    await operator("/api/admin.config.set", { key: "email.from", value: "", scope: "app" });
+    const lane = await operator("/api/admin.email");
+    expect(lane.body).toMatchObject({ ready: false, why: "no_sender" });
+
+    const sent = await operator("/api/admin.email.test", { to: "check@example.test" });
+    expect(sent.status).toBe(200);
+    expect(sent.body).toMatchObject({ sent: false, why: "no_sender" });
+
+    /*
+      ⚠️ AND A CODE THAT COULD NOT BE SENT IS NOT A CODE THAT WAS. Answering the
+      request cleanly and telling somebody to check their inbox for a message
+      that was never addressed to anybody is the failure this whole lane exists
+      to end — it is what a `Map` did, silently, in every app here.
+    */
+    const asked = await worker.fetch(
+      new Request(`${ORIGIN}/api/identity.code.request`, {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: "nowhere@example.test" }),
+      }),
+      env as never,
+    );
+    expect(asked.status).toBe(503);
+
+    /* Put it back, or every later sign-in in this file has nowhere to come from. */
+    await operator("/api/admin.config.set", { key: "email.from", value: "Hello <noreply@4dl.app>", scope: "app" });
+  });
+
+  it("is not reachable from inside a workspace", async () => {
+    expect((await member("/api/admin.email.test", { to: "check@example.test" })).status).toBe(403);
   });
 });
