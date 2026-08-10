@@ -93,13 +93,25 @@ describe("the app's own sweep", () => {
     expect(history.some((h) => h.job === "notes.tidy")).toBe(true);
   });
 
+  /*
+    ⚠️ ON THE OPERATOR DOOR, AND NOT ON A WORKSPACE'S. The run table is the whole
+    deployment's — every workspace any sweep visited — so a workspace owner
+    holding the key to it is reading somebody else's operations.
+  */
   it("answers the operator surface too", async () => {
+    const operator = await signIn("op@tidy.example.test", "https://admin.hello.4dl.app");
     const res = await worker.fetch(
-      new Request(`${ORIGIN}/api/billing.jobs`, { headers: { cookie: member } }),
+      new Request(`https://admin.hello.4dl.app/api/billing.jobs`, { headers: { cookie: operator } }),
       env as never,
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { runs: { job: string }[] };
     expect(body.runs.length).toBeGreaterThan(0);
+
+    const refused = await worker.fetch(
+      new Request(`${ORIGIN}/api/billing.jobs`, { headers: { cookie: member } }),
+      env as never,
+    );
+    expect(refused.status).toBe(403);
   });
 });

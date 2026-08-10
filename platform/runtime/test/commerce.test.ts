@@ -66,7 +66,7 @@ const app = (over: Partial<AppSpec<typeof bindings>>): AppSpec<typeof bindings> 
       naming a permission nothing declares 403s for everybody, forever, and reads
       as a feature nobody uses.
     */
-    permissions: ["seat:take", "thing:read", "thing:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "commerce:read", "commerce:manage", "file:read", "file:write", "guide:read", "milestone:read", "member:read", "member:manage"],
+    permissions: ["seat:take", "thing:read", "thing:write", "workspace:create", "workspace:close", "billing:manage", "inbox:read", "commerce:read", "commerce:manage", "file:read", "file:write", "guide:read", "milestone:read", "member:read", "member:manage", "platform:operate"],
     /*
       ⚠️ AND A ROLE THAT HOLDS THEM. Declaring a permission is not the same as
       anybody being able to hold one: an operation whose permission appears in no
@@ -74,7 +74,7 @@ const app = (over: Partial<AppSpec<typeof bindings>>): AppSpec<typeof bindings> 
       reads exactly like a feature nobody uses.
     */
     roles: {
-      owner: ["seat:take", "thing:read", "thing:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "commerce:read", "commerce:manage", "file:read", "file:write", "guide:read", "milestone:read", "member:read", "member:manage"],
+      owner: ["seat:take", "thing:read", "thing:write", "workspace:create", "workspace:close", "billing:manage", "inbox:read", "commerce:read", "commerce:manage", "file:read", "file:write", "guide:read", "milestone:read", "member:read", "member:manage", "platform:operate"],
     },
     entitlements: {}, plans: [],
     customerRail: false as const, customerFlags: {}, seats: { counts: [] }, personal: ["workspace:create"],
@@ -248,8 +248,8 @@ describe("the provider lane comes with the surface that makes parking a recovery
   });
 
   it("keeps the dead letter and the replay behind an operator permission", () => {
-    expect(by("billing.parked")!.permission).toBe("billing:operate");
-    expect(by("billing.parked.replay")!.permission).toBe("billing:operate");
+    expect(by("billing.parked")!.permission).toBe("platform:operate");
+    expect(by("billing.parked.replay")!.permission).toBe("platform:operate");
   });
 
   /*

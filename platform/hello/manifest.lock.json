@@ -6,7 +6,6 @@
   ],
   "permissions": [
     "billing:manage",
-    "billing:operate",
     "commerce:manage",
     "commerce:read",
     "entry:read",
@@ -20,6 +19,7 @@
     "milestone:read",
     "note:read",
     "note:write",
+    "platform:operate",
     "receipt:read",
     "receipt:write",
     "workspace:close",

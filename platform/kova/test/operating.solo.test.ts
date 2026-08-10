@@ -1,0 +1,334 @@
+/**
+ * THE OPERATOR DOOR — the five things somebody running a deployment has to be
+ * able to do, and could not.
+ *
+ * ⚠️ SOLO, BECAUSE THREE OF THESE ACT ON THE WHOLE DEPLOYMENT. The workspace
+ * list is every workspace any suite has made, and the maintenance switch closes
+ * every door in the process — run beside anything else it refuses their
+ * requests, and the symptom is four unrelated suites failing on data that was
+ * correct when they wrote it. The line is "does this act on the whole
+ * deployment", not the subject.
+ *
+ * ⚠️ AND EVERY ONE OF THEM WAS A MECHANISM WITH NO SURFACE. The directory knew
+ * every workspace and nothing listed them; `adjusted_json` was read by the
+ * entitlement walk and written by nobody; the ledger summed a balance nothing
+ * could add to; the maintenance switch was read on every request and had no way
+ * to be turned on. Declared, tested, correct, unreachable.
+ */
+
+import { env } from "cloudflare:test";
+import { beforeAll, describe, expect, it } from "vitest";
+import { sql, type ResolvedRegion } from "@one/kernel";
+import { bindingsFor } from "@one/runtime";
+import worker from "../src/worker.js";
+import { post, SETUP, signIn } from "./session.js";
+
+/** ⚠️ The store directly, because only a payment provider's webhook sets this. */
+const db = () =>
+  bindingsFor({ db: sql() }, { DB: (env as Record<string, unknown>).DB }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
+
+const SLUG = "bowland";
+const STUDIO = `https://${SLUG}.kova.4dl.app`;
+/* ⚠️ The operator door, and the only place `platform:operate` is ever held. */
+const ADMIN = "https://admin.kova.4dl.app";
+
+const at = (origin: string) => (cookie: string) => async (path: string, body?: unknown) => {
+  const res = await worker.fetch(
+    new Request(`${origin}${path}`, {
+      method: body === undefined ? "GET" : "POST",
+      headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    }),
+    env as never,
+  );
+  return { status: res.status, body: (await res.json()) as Record<string, never> };
+};
+
+type Listed = { tenantId: string; slug: string; plan: string | null; status: string | null; reachable: boolean };
+
+let operator: ReturnType<ReturnType<typeof at>>;
+let coach: ReturnType<ReturnType<typeof at>>;
+let tenantId = "";
+
+beforeAll(async () => {
+  const founding = await signIn(`${SLUG}@example.test`, SETUP);
+  const made = await post(SETUP, "/api/identity.workspace.create", { slug: SLUG }, founding);
+  tenantId = made.body.tenantId as string;
+  expect(tenantId, "the studio fixture must have been created").toBeTruthy();
+
+  coach = at(STUDIO)(await signIn(`${SLUG}@example.test`, STUDIO));
+  operator = at(ADMIN)(await signIn("op@bowland.example.test", ADMIN));
+});
+
+/* ------------------------------------------------------------- the door --- */
+
+describe("who holds this at all", () => {
+  /*
+    ⚠️ THE DOOR IS THE CONTROL. `platform:operate` is granted by the operator
+    role, and the operator role is applied on the `admin` door and nowhere else —
+    so a studio's own owner, on their own origin, holds none of it. The previous
+    generation shipped a console that RENDERED inside a studio and 404'd on every
+    call, which is the same mistake with a screen attached.
+  */
+  it("is not a studio owner, on their own studio", async () => {
+    expect((await coach("/api/admin.tenants")).status).toBe(403);
+    expect((await coach("/api/admin.comp", { tenantId, planId: "solo", reason: "mine now" })).status).toBe(403);
+    expect((await coach("/api/admin.maintenance.set", { mode: "full", message: "brb" })).status).toBe(403);
+  });
+
+  it("is not somebody with no session", async () => {
+    expect((await at(ADMIN)("")("/api/admin.tenants")).status).toBe(403);
+  });
+});
+
+/* ------------------------------------------------------------- the list --- */
+
+describe("every workspace on the deployment", () => {
+  /*
+    ⚠️ THE PLAN COMES FROM THE WORKSPACE'S OWN REGION. The directory holds
+    routing only, deliberately, so what a workspace is ON is not in it — and a
+    list showing standing without a plan answers half the question anybody opens
+    this screen with.
+  */
+  it("lists them with what each one is on", async () => {
+    const out = await operator("/api/admin.tenants");
+    expect(out.status).toBe(200);
+    const rows = out.body.tenants as unknown as Listed[];
+    const mine = rows.find((r) => r.tenantId === tenantId);
+    expect(mine).toBeTruthy();
+    expect(mine!.slug).toBe(SLUG);
+    expect(mine!.reachable).toBe(true);
+  });
+
+  it("finds one by name", async () => {
+    const out = await operator(`/api/admin.tenants?search=${SLUG}`);
+    const rows = out.body.tenants as unknown as Listed[];
+    expect(rows.every((r) => r.slug.includes(SLUG))).toBe(true);
+    expect(rows.length).toBeGreaterThan(0);
+  });
+});
+
+/* -------------------------------------------------------------- comping --- */
+
+describe("putting a workspace on a plan without a payment", () => {
+  it("moves them onto it and says so on the list", async () => {
+    const out = await operator("/api/admin.comp", { tenantId, planId: "studio", reason: "launch partner" });
+    expect(out.status).toBe(200);
+
+    const rows = (await operator("/api/admin.tenants")).body.tenants as unknown as Listed[];
+    const mine = rows.find((r) => r.tenantId === tenantId)!;
+    expect(mine.plan).toBe("studio");
+    expect(mine.status).toBe("active");
+  });
+
+  /*
+    ⚠️ AND WHAT IT BUYS IS REAL. A comp that moved a row and did not widen the
+    ceilings is a screen saying one thing and a gate doing another — the studio
+    plan is twenty-five clients where the entry plan is three.
+  */
+  it("gives them what that plan includes", async () => {
+    for (let i = 0; i < 5; i++) {
+      const made = await coach("/api/client.create", { name: `Person ${i}` });
+      expect(made.status, `client ${i} must fit under the comped plan`).toBe(200);
+    }
+  });
+
+  /*
+    ⚠️ A PLAN THIS APP DOES NOT SELL RESOLVES TO NOTHING AT THE GATE, so the
+    workspace lands on the parking floor while every screen shows them on a plan.
+  */
+  it("refuses a plan nobody sells", async () => {
+    const out = await operator("/api/admin.comp", { tenantId, planId: "platinum", reason: "why not" });
+    expect(out.status).toBe(400);
+    expect(out.body.meta).toMatchObject({ field: "planId" });
+  });
+
+  it("refuses a workspace that is not there", async () => {
+    expect((await operator("/api/admin.comp", { tenantId: "ten_nothing", planId: "solo", reason: "does not exist" })).status).toBe(404);
+  });
+
+  /*
+    ⚠️ AND IT CLEARS THE DUNNING ANCHOR. A workspace comped while the ladder was
+    counting keeps `past_due_at`, so the sweep suspends it on schedule for an
+    invoice nobody is waiting for — and the operator who comped them has no
+    reason to look at it again. The row would read `active` throughout.
+  */
+  it("stops a ladder that was already counting", async () => {
+    const longAgo = new Date(Date.now() - 40 * 86_400_000).toISOString();
+    await db().run(
+      `INSERT INTO subscription (tenant_id, status, past_due_at, updated_at) VALUES (?, 'past_due', ?, ?)
+       ON CONFLICT(tenant_id) DO UPDATE SET status = 'past_due', past_due_at = excluded.past_due_at`,
+      tenantId, longAgo, longAgo,
+    );
+    /*
+      ⚠️ A WRITE, because reads are never gated at any rung — withholding
+      somebody's own records over an invoice is not the same as withholding a
+      product, and `movement` has no ceiling of its own to confuse the answer.
+    */
+    expect((await coach("/api/movement.create", { name: "Not now", pattern: "squat" })).status).toBe(402);
+
+    expect((await operator("/api/admin.comp", { tenantId, planId: "studio", reason: "launch partner" })).status).toBe(200);
+    expect((await coach("/api/movement.create", { name: "Back in service", pattern: "squat" })).status).toBe(200);
+    const left = await db().first<{ past_due_at: string | null }>(
+      `SELECT past_due_at FROM subscription WHERE tenant_id = ?`, tenantId,
+    );
+    expect(left!.past_due_at).toBeNull();
+  });
+
+  /*
+    ⚠️ THE REASON IS REQUIRED, and it is the whole difference between this and a
+    way to give the product away. Somebody reads the row a year later asking why
+    a workspace pays nothing.
+  */
+  it("refuses one with no reason", async () => {
+    expect((await operator("/api/admin.comp", { tenantId, planId: "solo", reason: "" })).status).toBe(400);
+  });
+});
+
+/* ------------------------------------------------------------ adjusting --- */
+
+describe("adjusting one workspace's ceilings", () => {
+  /*
+    ⚠️ ABSOLUTE, EITHER DIRECTION, PER KEY — and a different column from the
+    grandfathering one for exactly that reason. Sharing a blob and a grant-only
+    write path made "give this studio ten seats" a one-way door whose only undo
+    discarded what they were originally sold.
+  */
+  it("raises a ceiling above what the plan includes", async () => {
+    const out = await operator("/api/admin.adjust", { tenantId, set: { clients: 30 } });
+    expect(out.status).toBe(200);
+    expect(out.body.adjusted).toMatchObject({ clients: 30 });
+  });
+
+  it("lowers one below it, which grandfathering could never do", async () => {
+    const out = await operator("/api/admin.adjust", { tenantId, set: { clients: 6 } });
+    expect(out.body.adjusted).toMatchObject({ clients: 6 });
+
+    /* Six exist by now, so the gate refuses the seventh. */
+    expect((await coach("/api/client.create", { name: "One too many" })).status).toBe(402);
+  });
+
+  it("clears one and puts them back on the plan", async () => {
+    const out = await operator("/api/admin.adjust", { tenantId, set: { clients: null } });
+    expect(out.body.adjusted).not.toHaveProperty("clients");
+    expect((await coach("/api/client.create", { name: "Back under the plan" })).status).toBe(200);
+  });
+
+  /*
+    ⚠️ A KEY THIS APP DOES NOT SELL IS READ BY NOTHING. Stored, it is an
+    adjustment an operator can see on a screen and no gate will ever consult.
+  */
+  it("refuses a key this app does not declare", async () => {
+    const out = await operator("/api/admin.adjust", { tenantId, set: { unicorns: 5 } });
+    expect(out.status).toBe(400);
+    expect(out.body.meta).toMatchObject({ field: "unicorns" });
+  });
+
+  it("refuses a value that is not a ceiling", async () => {
+    expect((await operator("/api/admin.adjust", { tenantId, set: { clients: "lots" } })).status).toBe(400);
+  });
+});
+
+/* -------------------------------------------------------------- credits --- */
+
+describe("giving a workspace credits", () => {
+  it("adds them, and the workspace can see what it has", async () => {
+    const out = await operator("/api/admin.topup", { tenantId, amount: 5_000, reason: "goodwill", ref: "gift-1" });
+    expect(out.status).toBe(200);
+    expect(out.body).toMatchObject({ applied: true });
+    expect(Number(out.body.balance)).toBe(5_000);
+    expect(Number((await coach("/api/ai.spending")).body.balance)).toBe(5_000);
+  });
+
+  /*
+    ⚠️ THE SAME INTENT TWICE IS ONE GRANT, and `applied: false` is a SUCCESS. A
+    double-submitted form must not give a workspace twice what somebody meant to
+    give them — and a caller reading a 200 as "it happened" would say it did.
+  */
+  it("does not give it twice for the same intent", async () => {
+    const again = await operator("/api/admin.topup", { tenantId, amount: 5_000, reason: "goodwill", ref: "gift-1" });
+    expect(again.status).toBe(200);
+    expect(again.body).toMatchObject({ applied: false });
+    expect(Number(again.body.balance)).toBe(5_000);
+  });
+
+  it("gives it again for a different one", async () => {
+    const more = await operator("/api/admin.topup", { tenantId, amount: 1_000, reason: "goodwill", ref: "gift-2" });
+    expect(more.body).toMatchObject({ applied: true });
+    expect(Number(more.body.balance)).toBe(6_000);
+  });
+
+  it("refuses a workspace that is not there", async () => {
+    expect((await operator("/api/admin.topup", { tenantId: "ten_nothing", amount: 1, reason: "does not exist", ref: "ghost-1" })).status).toBe(404);
+  });
+});
+
+/* ---------------------------------------------------------- maintenance --- */
+
+describe("closing the deployment", () => {
+  /*
+    ⚠️ A MESSAGE IS REQUIRED TO CLOSE. A closed deployment with no message is a
+    product that has vanished; whoever is holding it has nothing to tell the
+    person in front of them.
+  */
+  it("refuses to close with nothing to say", async () => {
+    const out = await operator("/api/admin.maintenance.set", { mode: "full", message: "  " });
+    expect(out.status).toBe(400);
+    expect(out.body.meta).toMatchObject({ field: "message" });
+  });
+
+  /*
+    ⚠️ `readonly` SERVES READS AND REFUSES WRITES. Nobody is signed out and
+    nothing is withheld that was already recorded — the same rule the payment
+    ladder follows one level down.
+  */
+  it("refuses writes and serves reads in readonly", async () => {
+    expect((await operator("/api/admin.maintenance.set", { mode: "readonly", message: "Back in an hour" })).status).toBe(200);
+
+    expect((await coach("/api/client.list")).status).toBe(200);
+    const refused = await coach("/api/client.create", { name: "Not now" });
+    expect(refused.status).toBe(503);
+    expect(refused.body).toMatchObject({ code: "platform.maintenance" });
+  });
+
+  /*
+    ⚠️ AND THE OPERATOR IS EXEMPT, which is not a convenience: the way out of
+    maintenance is a request, and a switch that refused the person holding it
+    would be one nobody could turn off.
+  */
+  it("does not close the door it is set from", async () => {
+    expect((await operator("/api/admin.tenants")).status).toBe(200);
+    expect((await operator("/api/admin.maintenance")).body).toMatchObject({ mode: "readonly", message: "Back in an hour" });
+  });
+
+  it("withholds everything in full, and opens again", async () => {
+    await operator("/api/admin.maintenance.set", { mode: "full", message: "Down for work" });
+    expect((await coach("/api/client.list")).status).toBe(503);
+
+    expect((await operator("/api/admin.maintenance.set", { mode: "off" })).status).toBe(200);
+    expect((await coach("/api/client.list")).status).toBe(200);
+    expect((await operator("/api/admin.maintenance")).body).toMatchObject({ mode: "off" });
+  });
+});
+
+/* --------------------------------------------------------- the dead letter --- */
+
+describe("payment events nothing could place", () => {
+  /*
+    ⚠️ A DEAD LETTER NOBODY CAN READ IS THE SAME SILENT SUCCESS WITH AN EXTRA
+    TABLE. The old handler answered an unattributable event 200 with its id
+    already claimed, so the provider never retried — money captured, nothing
+    granted, and no way to find out. Parking it only helps if somebody can look.
+  */
+  it("is readable on the operator door and nowhere else", async () => {
+    const out = await operator("/api/billing.parked");
+    expect(out.status).toBe(200);
+    expect(Array.isArray(out.body.events)).toBe(true);
+    expect((await coach("/api/billing.parked")).status).toBe(403);
+  });
+
+  it("says so rather than pretending, when the event is not there", async () => {
+    expect((await operator("/api/billing.parked.replay", { eventId: "evt_nothing", tenantId })).status).toBe(404);
+    expect((await coach("/api/billing.parked.replay", { eventId: "evt_nothing", tenantId })).status).toBe(403);
+  });
+});

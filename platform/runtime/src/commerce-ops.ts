@@ -27,6 +27,7 @@ import {
   readSubscription, savePackage, standingFor,
 } from "./commerce.js";
 import { attribute, claimByCustomer, claimEvent, listParked, park, rememberCustomer, resolveParked, verifySignature } from "./provider.js";
+import { OPERATE } from "./operator-ops.js";
 import { parseStripeEvent } from "./provider-stripe.js";
 import { previewOf, shelf } from "./market.js";
 
@@ -945,7 +946,7 @@ export function providerOperations<B extends BindingSpec>(app: AppSpec<B>): read
     summary: "Payment events this deployment could not attribute.",
     input: s.object({ limit: s.optional(s.number({ integer: true, min: 1, max: 100 })) }),
     output: s.object({ events: s.json(), dropped: s.number({ integer: true }) }),
-    permission: "billing:operate",
+    permission: OPERATE,
     idempotency: { mode: "none" },
     /*
       ⚠️ NOT A TOOL, even though it is only a read. Each row carries a provider's
@@ -974,7 +975,7 @@ export function providerOperations<B extends BindingSpec>(app: AppSpec<B>): read
     summary: "Attribute a parked event to a workspace and apply it.",
     input: s.object({ eventId: s.text({ max: 200 }), tenantId: s.text({ max: 120 }) }),
     output: s.object({ outcome: s.text() }),
-    permission: "billing:operate",
+    permission: OPERATE,
     idempotency: { mode: "natural", key: "eventId" },
     audit: (i: { eventId: string }) => ({ subject: i.eventId, verb: "replay" }),
     fails: ["platform.not_found"],

@@ -2011,6 +2011,69 @@
       "impl": "kova/test/writing.test.ts",
       "proves": "cannot reach the drafts through the collection",
       "fails": "a correct feed beside a collection read the same person holds, so every draft in the studio is one request away"
+    },
+    {
+      "id": "the-operator-door-is-the-only-door",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "is not a studio owner, on their own studio",
+      "fails": "a console rendered inside a workspace by somebody who holds none of it \u2014 the previous generation shipped exactly that, drawing every panel and 404ing on every call"
+    },
+    {
+      "id": "a-comp-stops-the-ladder",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "stops a ladder that was already counting",
+      "fails": "a comped workspace keeping its dunning anchor and being suspended on schedule for an invoice nobody is waiting for, with the row reading active throughout"
+    },
+    {
+      "id": "an-adjustment-is-absolute-and-clearable",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "clears one and puts them back on the plan",
+      "fails": "an operator setting shared with the grandfathering blob, where raising a ceiling is a one-way door whose only undo discards what a workspace was originally sold"
+    },
+    {
+      "id": "one-intent-is-one-grant",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "does not give it twice for the same intent",
+      "fails": "a double-submitted form giving a workspace twice what somebody meant to give them, behind two identical 200s"
+    },
+    {
+      "id": "a-closed-deployment-says-something",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "refuses to close with nothing to say",
+      "fails": "a product that has simply vanished, with nothing for whoever is holding it to tell the person in front of them"
+    },
+    {
+      "id": "the-switch-does-not-close-its-own-door",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "does not close the door it is set from",
+      "fails": "a maintenance switch nobody can turn off, because the way out of maintenance is a request"
+    },
+    {
+      "id": "a-deployment-key-is-not-held-inside-a-workspace",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/jobs.solo.test.ts",
+      "proves": "answers the operator surface too",
+      "fails": "a workspace owner holding the key to the payment dead letter and the scheduler's run table \u2014 both of which are the whole deployment's, so it is a cross-tenant read with a screen in front of it"
     }
   ]
 }

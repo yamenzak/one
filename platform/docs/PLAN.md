@@ -1047,6 +1047,13 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-subject-scoped-row-says-whose-it-is` | staff reading a whole workspace's subject-scoped rows through the same list and getting a column of records with nobody's name against any of them | **live** |
 | `a-draft-is-not-in-the-feed` | a studio's unfinished thinking sent to the people it coaches | **live** |
 | `the-door-beside-the-feed-is-shut` | a correct feed beside a collection read the same person holds, so every draft in the studio is one request away | **live** |
+| `the-operator-door-is-the-only-door` | a console rendered inside a workspace by somebody who holds none of it — the previous generation shipped exactly that, drawing every panel and 404ing on every call | **live** |
+| `a-comp-stops-the-ladder` | a comped workspace keeping its dunning anchor and being suspended on schedule for an invoice nobody is waiting for, with the row reading active throughout | **live** |
+| `an-adjustment-is-absolute-and-clearable` | an operator setting shared with the grandfathering blob, where raising a ceiling is a one-way door whose only undo discards what a workspace was originally sold | **live** |
+| `one-intent-is-one-grant` | a double-submitted form giving a workspace twice what somebody meant to give them, behind two identical 200s | **live** |
+| `a-closed-deployment-says-something` | a product that has simply vanished, with nothing for whoever is holding it to tell the person in front of them | **live** |
+| `the-switch-does-not-close-its-own-door` | a maintenance switch nobody can turn off, because the way out of maintenance is a request | **live** |
+| `a-deployment-key-is-not-held-inside-a-workspace` | a workspace owner holding the key to the payment dead letter and the scheduler's run table — both of which are the whole deployment's, so it is a cross-tenant read with a screen in front of it | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

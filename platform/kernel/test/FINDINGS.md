@@ -2572,3 +2572,42 @@ and every half-written piece in the studio is one request away. The feed is a
 separate operation behind a permission staff and clients hold, and the
 collection's own read is one clients do not — because a correct feed is no
 defence if the door beside it is open.
+
+## 211. A deployment key held inside a workspace
+
+`billing:operate` guarded the payment dead letter and the scheduler's run table.
+Both read the WHOLE deployment — every workspace any sweep visited, every event
+nobody could attribute, each carrying a provider's raw payload — and the key was
+in every app's OWNER role. So any workspace owner, on their own origin, could
+read other workspaces' operations and other workspaces' payment payloads.
+
+It had a test. The test drove it as an owner and passed, because the defect was
+in the declaration rather than in the code — which is the shape a permission bug
+takes: nothing throws, nothing 403s, and the assertion says the surface works.
+
+The fix is not a narrower role. There is one key now — `platform:operate`, held
+by the operator role, which is applied on the operator door and nowhere else —
+because two names for "acts on the deployment" is how an app comes to half-grant
+one. What these operations have in common is not money; it is acting on ANOTHER
+workspace from outside it, which is the one power no member of a workspace holds.
+
+⚠️ IT WAS FOUND BY A TEST WRITTEN TO CONFIRM SOMETHING ELSE. The assertion was
+"a studio owner cannot reach the dead letter", added to earn a capability flip,
+and it failed. The inventory flip is what forced somebody to check.
+
+## 212. Five mechanisms with no surface, in the platform itself
+
+The directory knew every workspace and nothing listed them.
+`subscription.adjusted_json` was read by the entitlement walk, explained by
+`explainEntitlements`, and written by nobody. The ledger summed a balance
+nothing could add to. The maintenance switch was read on every request,
+enforced above the public gate, and had no way to be turned on.
+
+Each was declared, tested, correct and unreachable — which is precisely the
+failure this platform is a reaction to, committed by the platform, four times,
+while a guard existed for exactly that class in the app tree it replaces.
+
+⚠️ AND A COMP HAS TO CLEAR THE DUNNING ANCHOR. A workspace comped while the
+ladder was counting keeps `past_due_at` and is suspended on schedule for an
+invoice nobody is waiting for. The row reads `active` throughout, and the
+operator who comped them has no reason to look again.

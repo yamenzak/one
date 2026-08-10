@@ -148,17 +148,17 @@ without one.
 | `[x]` | `nutrition-report` | trainer | See how a client has been eating, over time, without reading every entry |
 | `[x]` | `nutrition-week` | client | See a week of eating rather than one day at a time |
 | | **operator** | | |
-| `[ ]` | `op-adjust` | operator | Adjust one studio's ceilings without editing the plan everybody is on |
+| `[x]` | `op-adjust` | operator | Adjust one studio's ceilings without editing the plan everybody is on |
 | `[ ]` | `op-ai` | operator | Choose which models are on, and what they cost |
 | `[ ]` | `op-catalog` | operator | Edit what the platform sells: prices, ceilings, features, trials |
-| `[ ]` | `op-comp` | operator | Put a studio on a plan without a payment, for a reason |
+| `[x]` | `op-comp` | operator | Put a studio on a plan without a payment, for a reason |
 | `[ ]` | `op-domains` | operator | See and troubleshoot studios' custom domains |
 | `[ ]` | `op-email` | operator | Configure how the deployment sends mail, and prove it works |
-| `[ ]` | `op-maintenance` | operator | Close the deployment for work, read-only or fully, and say so |
-| `[ ]` | `op-parked` | operator | Read the payment events nothing could place, and replay them |
+| `[x]` | `op-maintenance` | operator | Close the deployment for work, read-only or fully, and say so |
+| `[x]` | `op-parked` | operator | Read the payment events nothing could place, and replay them |
 | `[ ]` | `op-stripe` | operator | Configure the payment provider, in test and live, without re-pasting keys |
-| `[ ]` | `op-tenants` | operator | See every studio on the deployment and what it is on |
-| `[ ]` | `op-topup` | operator | Give a studio credits |
+| `[x]` | `op-tenants` | operator | See every studio on the deployment and what it is on |
+| `[x]` | `op-topup` | operator | Give a studio credits |
 | | **reports** | | |
 | `[x]` | `attention` | trainer | Be told who needs them today rather than deciding by scrolling |
 | `[x]` | `client-report` | trainer | See one client's whole picture: body, training, nutrition, consistency |

@@ -1016,28 +1016,28 @@
       "persona": "operator",
       "area": "operator",
       "outcome": "See every studio on the deployment and what it is on",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "op-comp",
       "persona": "operator",
       "area": "operator",
       "outcome": "Put a studio on a plan without a payment, for a reason",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "op-adjust",
       "persona": "operator",
       "area": "operator",
       "outcome": "Adjust one studio's ceilings without editing the plan everybody is on",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "op-topup",
       "persona": "operator",
       "area": "operator",
       "outcome": "Give a studio credits",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "op-email",
@@ -1058,7 +1058,7 @@
       "persona": "operator",
       "area": "operator",
       "outcome": "Close the deployment for work, read-only or fully, and say so",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "op-stripe",
@@ -1086,7 +1086,7 @@
       "persona": "operator",
       "area": "operator",
       "outcome": "Read the payment events nothing could place, and replay them",
-      "status": "old"
+      "status": "built"
     }
   ]
 }

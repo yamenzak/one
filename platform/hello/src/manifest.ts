@@ -185,18 +185,18 @@ export const hello = defineApp({
     weekStart: 1,
   },
   access: {
-    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage"],
+    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage", "platform:operate"],
     /*
       Anybody signed in may open a workspace — this is a self-serve product, and
       `workspace:create` is checked on a door that has no tenant to be a member
       of, so a role is the only place it could come from.
     */
-    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage"], reader: ["note:read", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read"],
+    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage"], reader: ["note:read", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read"],
       /* ⚠️ WHAT SOMEBODY MAY DO ON THE OPERATOR DOOR, where there is no
          workspace to be a member of. The door is the control; this says what it
          opens onto. Deliberately narrow: the deployment's own checklist and the
          billing lane, never a workspace's records. */
-      operator: ["guide:read", "billing:operate", "inbox:read"] },
+      operator: ["guide:read", "inbox:read", "platform:operate"] },
     /*
       ⚠️ EVERY ENTRY NAMES HOW IT IS WITHHELD, and `defineApp` refuses one whose
       mechanism does not exist. `notes` is gated on the collection rather than on
@@ -387,7 +387,15 @@ export const hello = defineApp({
     { version: "0.1.0", at: "2026-02-01", notes: ["Notes and receipts.", "You can now choose a plan."] },
   ],
 
-  retired: {},
+  /*
+    ⚠️ `billing:operate` WAS A DEPLOYMENT KEY GRANTED TO A WORKSPACE OWNER. Every
+    operation behind it — the payment dead letter, the scheduler's run table —
+    reads the WHOLE deployment, so holding it inside one workspace was a
+    cross-tenant read with a screen in front of it. It is `platform:operate` now,
+    which is granted by the operator role on the operator door and by nothing
+    else.
+  */
+  retired: { "billing:operate": "folded into platform:operate — see the note above" },
   /*
     ⚠️ EMPTY, HONESTLY. Every failure this app can produce is one the platform
     raises on its behalf — a refused shape, a stale version, a missing row. An

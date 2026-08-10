@@ -18,13 +18,35 @@ import { sql, type ResolvedRegion } from "@one/kernel";
 
 const ORIGIN = "https://rail.hello.4dl.app";
 const SECRET = "whsec_test";
+/**
+ * ⚠️ THE DEAD LETTER IS READ ON THE OPERATOR DOOR AND NOWHERE ELSE. Every row in
+ * it carries a provider's raw payload for an event nobody could attribute — which
+ * means it may belong to any workspace on the deployment. A workspace owner
+ * holding the key to it is a cross-tenant disclosure with a screen in front of
+ * it, and this suite read it as one until the key moved.
+ */
+const ADMIN = "https://admin.hello.4dl.app";
 let member = "";
+let operator = "";
 let tenantId = "";
 
 const handle = (binding: string) =>
   bindingsFor({ db: sql() }, { DB: (env as Record<string, unknown>)[binding] }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
 
 const global_ = () => handle("DIRECTORY");
+
+/** ⚠️ The operator door: the only place `platform:operate` is ever held. */
+const asOperator = async (path: string, body?: unknown) => {
+  const res = await worker.fetch(
+    new Request(`${ADMIN}${path}`, {
+      method: body === undefined ? "GET" : "POST",
+      headers: { "content-type": "application/json", cookie: operator },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    }),
+    env as never,
+  );
+  return { status: res.status, body: (await res.json()) as Record<string, never> };
+};
 
 const call = async (path: string, body?: unknown, cookie = member) => {
   const res = await worker.fetch(
@@ -73,6 +95,7 @@ beforeAll(async () => {
   const made = await post(SETUP, "/api/identity.workspace.create", { slug: "rail" }, staff);
   tenantId = made.body.tenantId as string;
   member = await signIn("rail@example.test", ORIGIN);
+  operator = await signIn("op@rail.example.test", ADMIN);
   expect(accountIds.get("rail@example.test")).toBeTruthy();
 });
 
@@ -125,7 +148,7 @@ describe("the signature is the whole of the authentication", () => {
     recover from a body that is not evidence of anything.
   */
   it("parks nothing it refused", async () => {
-    const before = (await call("/api/billing.parked")).body.events as unknown as { eventId: string }[];
+    const before = (await asOperator("/api/billing.parked")).body.events as unknown as { eventId: string }[];
     expect(before.map((e) => e.eventId)).not.toContain("evt_nosig");
   });
 });
@@ -156,7 +179,7 @@ describe("an event this worker cannot place is parked, never answered clean", ()
   it("parks an event belonging to a different product", async () => {
     const res = await deliver(paid("evt_other", { app: "somewhere-else", tenant: tenantId }));
     expect(res.body.outcome).toBe("parked:other_app");
-    const parked = (await call("/api/billing.parked")).body.events as unknown as { eventId: string; why: string }[];
+    const parked = (await asOperator("/api/billing.parked")).body.events as unknown as { eventId: string; why: string }[];
     expect(parked.find((e) => e.eventId === "evt_other")?.why).toBe("other_app");
   });
 
@@ -299,7 +322,7 @@ describe("what a payment event does to standing", () => {
 
 describe("a dead letter nobody can read is the same silent success", () => {
   it("is readable, and says what it dropped rather than truncating quietly", async () => {
-    const res = await call("/api/billing.parked?limit=1");
+    const res = await asOperator("/api/billing.parked?limit=1");
     expect(res.status).toBe(200);
     expect((res.body.events as unknown as unknown[]).length).toBe(1);
     expect(res.body.dropped).toBeGreaterThan(0);
@@ -311,16 +334,16 @@ describe("a dead letter nobody can read is the same silent success", () => {
     replayed is the evidence that a gap in attribution existed at all.
   */
   it("replays a parked event onto the workspace an operator names", async () => {
-    const res = await call("/api/billing.parked.replay", { eventId: "evt_bare", tenantId });
+    const res = await asOperator("/api/billing.parked.replay", { eventId: "evt_bare", tenantId });
     expect(res.status).toBe(200);
 
-    const open = (await call("/api/billing.parked")).body.events as unknown as { eventId: string }[];
+    const open = (await asOperator("/api/billing.parked")).body.events as unknown as { eventId: string }[];
     expect(open.map((e) => e.eventId)).not.toContain("evt_bare");
     const row = await global_().first<{ resolved_at: string | null }>(`SELECT resolved_at FROM parked_event WHERE event_id = ?`, "evt_bare");
     expect(row?.resolved_at).toBeTruthy();
   });
 
   it("refuses to replay an event it never parked", async () => {
-    expect((await call("/api/billing.parked.replay", { eventId: "evt_never", tenantId })).status).toBe(404);
+    expect((await asOperator("/api/billing.parked.replay", { eventId: "evt_never", tenantId })).status).toBe(404);
   });
 });

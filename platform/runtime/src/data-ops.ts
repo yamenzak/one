@@ -15,6 +15,7 @@
 
 import type { AnyOperation, AppSpec, BindingSpec, Instant, ObjectHandle, SchemaModule, SqlHandle } from "@one/kernel";
 import { operation, s } from "@one/kernel";
+import { OPERATE } from "./operator-ops.js";
 import { erasurePlan, eraseTenant, exportTenant } from "./data.js";
 import { jobHistory } from "./jobs.js";
 
@@ -159,7 +160,7 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
     summary: "What the scheduler has actually been doing.",
     input: s.object({ limit: s.optional(s.number({ integer: true, min: 1, max: 100 })) }),
     output: s.object({ runs: s.json() }),
-    permission: "billing:operate",
+    permission: OPERATE,
     idempotency: { mode: "none" },
     async handler(ctx, input: { limit?: number }) {
       const d = deps(ctx);

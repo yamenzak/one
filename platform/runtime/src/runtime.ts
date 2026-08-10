@@ -27,6 +27,7 @@ import { INBOX, inboxOperations, type InboxCarrier } from "./inbox-ops.js";
 import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
 import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files-ops.js";
 import { GENERATION, generationOperations, type GenerationCarrier } from "./generate-ops.js";
+import { OPERATOR, operatorOperations, type OperatorCarrier } from "./operator-ops.js";
 import { GUIDE, guideOperations, type GuideCarrier } from "./guide-ops.js";
 import { MILESTONES, milestoneOperations, type MilestoneCarrier } from "./milestone-ops.js";
 import { MILESTONE_EARNED, dayIn, earnerOf, recognise } from "./milestone.js";
@@ -244,7 +245,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...operatorOperations(app), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -862,7 +863,21 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier = {
+        [OPERATOR]: {
+          global: directoryDb,
+          /*
+            ⚠️ ANOTHER WORKSPACE'S REGION, BOOTED. An operator acts from one door
+            on workspaces in every region, and a region nobody has visited yet
+            has no tables until something opens it.
+          */
+          regionalIn: async (region) => {
+            const there = regional(env)(region as ResolvedRegion);
+            if (opts.onBoot) await once(region, () => opts.onBoot!.region(there, region));
+            return there.db as SqlHandle;
+          },
+          actorId: actor.userId ?? "system",
+        },
         [GENERATION]: {
           db: regionalDb,
           /*

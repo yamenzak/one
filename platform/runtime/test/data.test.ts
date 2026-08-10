@@ -297,7 +297,7 @@ describe("the way out", () => {
   */
   it("puts the scheduler's record beside the other operator reads", () => {
     const runs = ops.find((op) => op.id === "billing.jobs");
-    expect(runs?.permission).toBe("billing:operate");
+    expect(runs?.permission).toBe("platform:operate");
   });
 
   /*

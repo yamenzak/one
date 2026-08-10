@@ -1182,7 +1182,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.11.0",
+  manifestVersion: "0.12.0",
   bindings,
 
   identity: {
@@ -1214,8 +1214,8 @@ export const kova = defineApp({
 
   access: {
     permissions: [
-      ...STAFF, "workspace:create", "workspace:close", "billing:manage", "billing:operate", "commerce:manage",
-      "member:read", "member:manage", "report:read", "ai:read",
+      ...STAFF, "workspace:create", "workspace:close", "billing:manage", "commerce:manage",
+      "member:read", "member:manage", "report:read", "ai:read", "platform:operate",
     ],
     roles: {
       /*
@@ -1226,7 +1226,7 @@ export const kova = defineApp({
       */
       /* ⚠️ `ai:read` is the OWNER's alone — what the studio's credits went on is
          a question about the bill, and the bill is theirs. */
-      owner: [...STAFF, "workspace:create", "workspace:close", "billing:manage", "billing:operate", "commerce:manage", "member:read", "member:manage", "ai:read"],
+      owner: [...STAFF, "workspace:create", "workspace:close", "billing:manage", "commerce:manage", "member:read", "member:manage", "ai:read"],
       /* ⚠️ A coach SEES the team and cannot change it — hiring is the owner's. */
       trainer: [...STAFF, "workspace:create", "member:read"],
       /* ⚠️ The front desk sees people and bookings, and prescribes nothing. */
@@ -1261,7 +1261,10 @@ export const kova = defineApp({
         and it is deliberately narrow — the deployment's own checklist and its
         payment plumbing, never a studio's records.
       */
-      operator: ["guide:read", "billing:operate", "inbox:read"],
+      /* ⚠️ `platform:operate` is the key that acts on ANOTHER workspace from
+         outside it — the one power no member of a studio holds, and the reason
+         it is not folded into the payment lane. */
+      operator: ["guide:read", "inbox:read", "platform:operate"],
     },
 
     /*
@@ -1657,6 +1660,18 @@ export const kova = defineApp({
 
   releases: [
     {
+      version: "0.12.0",
+      at: "2026-08-10",
+      notes: [
+        "Whoever runs the deployment can see every studio on it and what each one is on.",
+        "Put a studio on a plan without a payment, with a reason — and it stops any arrears clock that was already running.",
+        "Change one studio's ceilings without editing the plan everybody else is on, in either direction, and clear it again to put them back.",
+        "Give a studio credits. The same intent twice is one grant, not two.",
+        "Close the deployment for work — read-only or fully — with something to say. The door it is set from stays open, because the way out is a request.",
+        "None of that is reachable from inside a studio, including by its owner.",
+      ],
+    },
+    {
       version: "0.11.0",
       at: "2026-08-10",
       notes: [
@@ -1775,7 +1790,15 @@ export const kova = defineApp({
     },
   ],
 
-  retired: {},
+  /*
+    ⚠️ `billing:operate` WAS A DEPLOYMENT KEY GRANTED TO A WORKSPACE OWNER. Every
+    operation behind it — the payment dead letter, the scheduler's run table —
+    reads the WHOLE deployment, so holding it inside one workspace was a
+    cross-tenant read with a screen in front of it. It is `platform:operate` now,
+    which is granted by the operator role on the operator door and by nothing
+    else.
+  */
+  retired: { "billing:operate": "folded into platform:operate — see the note above" },
 
   problems: {
     "coaching.programme_has_no_client": {
