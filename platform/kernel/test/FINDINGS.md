@@ -2386,3 +2386,73 @@ time would otherwise archive every record it had ever created, on day one.
 The second case is reachable through an ordinary product path — an exception set
 by hand opens a customer's access row with no budgets in it — which is why it is
 a test rather than a comment.
+
+## 196. Erasure reached the rows and not the bytes
+
+`files.ts` opens with the rule: an object written behind the ledger is invisible
+to the quota and to erasure forever, it costs money every month, and the only way
+to find it again is to list the bucket by hand. The platform then committed
+exactly that failure itself — `eraseTenant` ran the derived cascade, which
+includes the `media` table, and deleted every row naming an object while the
+objects stayed where they were.
+
+The rows are the ONLY index of the keys, so the order is the opposite of deleting
+a single file. There the row goes first, because an orphaned object costs money
+and a row pointing at nothing is a broken image somebody reports. Here the bytes
+go first, and a row is dropped only when its object is gone.
+
+## 197. A ceiling on the sweep reintroduces the leak it bounds
+
+The first version took one page of five hundred, deleted those objects, and
+reported a clean run — after which the cascade behind it dropped the rows naming
+every other one. A bound is necessary and it is not a stopping condition: what is
+left when the ceiling is genuinely reached has to be REPORTED, and reported in a
+way that stops the cascade rather than one that is merely logged.
+
+`stranded > 0` is that report, and it makes the operation re-runnable instead of
+partial — which matters because the alternative to refusing is a workspace whose
+files we cannot find and cannot say we still hold.
+
+## 198. A declared policy that nothing reads does not exist
+
+`field.media({ accept, maxBytes })` compiles to a text column. Every reader of
+the manifest — the form, the API document, anybody working out what a face may
+be — takes it as a rule, and nothing enforced it: a face could be a video that
+uploaded perfectly well under a different purpose, a file deleted last week, or a
+string somebody typed. All three render identically, as a broken image on a
+screen a long way from the write that caused it.
+
+The check reads the LEDGER rather than the value, because the type and the size
+are facts only where the upload wrote them down after stripping and measuring.
+
+## 199. The create is not where a form saves
+
+Landing the media check on `create` alone leaves the same unverified id one
+`update` away — and the save after the first is the write a real form actually
+makes, so the version with the hole would have passed every fixture that sets a
+photograph while creating a record and failed for everybody who added one later.
+
+## 200. Deleting a file is a question about the whole manifest
+
+A file the library deletes cleanly is a broken image somewhere else, and nothing
+connects the two: the delete succeeds, and the failure surfaces later on a screen
+whose own code is correct. What points at a file is derivable — every media field
+on every collection — so the refusal is derived and a media field added next year
+is covered by the same commit that adds it.
+
+Archived rows deliberately do not count. A soft-deleted record is on nobody's
+screen, and counting it would hold a workspace's storage against records it has
+already thrown away, permanently, since an archived row never comes back to
+release it.
+
+## 201. A field no upload can fill is a composition error
+
+A media field whose `accept` shares no type with any declared purpose is a form
+control that cannot be used — and the failure arrives at the worst possible
+moment, after the person has chosen a file and the upload has already succeeded.
+It is decidable from the manifest alone, so it is refused at composition.
+
+⚠️ ONE TYPE IN COMMON IS ENOUGH. Requiring all of them refuses a field that takes
+both a photograph and a scan beside a purpose that takes only the photograph,
+which is perfectly fillable — and a mutation from `some` to `every` survived
+until the fixture had a field wider than its purpose to distinguish them.

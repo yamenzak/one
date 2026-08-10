@@ -850,7 +850,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.8.0",
+  manifestVersion: "0.9.0",
   bindings,
 
   identity: {
@@ -1302,6 +1302,17 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.9.0",
+      at: "2026-08-10",
+      notes: [
+        "Upload photographs and demonstration video, reuse what you have already uploaded, and see how much of your storage is spoken for.",
+        "Give a client a face. A photograph on somebody's record is checked against what the record accepts, so a video cannot become a portrait.",
+        "A file something is still using cannot be deleted — you are told where it is used instead of finding out from a broken image later.",
+        "What a phone attaches to a photograph — where it was taken, on what, and when — is removed before anything is stored.",
+        "Closing a studio now takes its files with it, and says so rather than reporting a clean sweep over bytes it could not reach.",
+      ],
+    },
     {
       version: "0.8.0",
       at: "2026-08-10",

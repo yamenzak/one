@@ -658,6 +658,25 @@ export function assertComposable(spec: {
   }
 
   /*
+    ⚠️ A MEDIA FIELD NO PURPOSE CAN FILL IS A FORM CONTROL THAT CANNOT BE USED.
+    The upload is governed by the declared purposes and the field by its own
+    `accept`, so a field naming a type no purpose takes is one where every file
+    a person can produce is refused at the save — after the upload has already
+    succeeded, which is the worst place to learn it. An app with a media field
+    and no purposes at all is the same failure with nothing to compare against.
+  */
+  const purposeTypes = Object.values(spec.filePurposes ?? {}).flatMap((p) => p.accept);
+  const unfillable = spec.collections.flatMap((c) =>
+    Object.entries(c.fields)
+      .filter(([, f]) => f.kind === "media" && !(f as { accept: readonly string[] }).accept.some((t) => purposeTypes.includes(t)))
+      .map(([name]) => `${c.id}.${name}`));
+  if (unfillable.length) {
+    throw new Error(
+      `${spec.id}: media field(s) ${unfillable.join(", ")} accept nothing any declared file purpose can produce, so no upload could ever fill them.`,
+    );
+  }
+
+  /*
     ⚠️ AN UNBOUNDED SWEEP IS ONE THAT STOPS. It works on every deployment until
     the largest tenant crosses the runtime's time limit — and then it fails, is
     retried, fails at the same size, and the work never happens again.

@@ -17,7 +17,8 @@
  * They differ by one verb.
  */
 
-import { tenantCascade, type CascadeStep, type Instant, type SchemaModule, type SqlHandle } from "@one/kernel";
+import { tenantCascade, type CascadeStep, type Instant, type ObjectHandle, type SchemaModule, type SqlHandle } from "@one/kernel";
+import { eraseObjects } from "./files.js";
 
 /**
  * ⚠️ THE PLAN IS `tenantCascade`, NOT A SECOND DERIVATION OF THE SAME THING.
@@ -38,6 +39,13 @@ export interface Export {
   readonly at: Instant;
   readonly tables: Readonly<Record<string, readonly unknown[]>>;
   /**
+   * ⚠️ A DOCUMENT CARRIES ROWS, NOT BYTES. The media table travels with every
+   * file's id, name, type and size — but a photograph is not a row, and folding
+   * megabytes into a JSON document as text would make the export fail at exactly
+   * the size that makes it worth having. Each file is fetched by its id, from
+   * the same read the app uses, for as long as the workspace exists; erasing
+   * first and exporting after is the order that loses them.
+   *
    * ⚠️ WHAT WAS LEFT OUT, PER TABLE, AND WHY IT IS NOT OPTIONAL. A truncated
    * export that says nothing reads as "this is everything you had" — which is a
    * claim about somebody's own records that we would be making falsely, in
@@ -86,6 +94,15 @@ export interface Erased {
   readonly tables: readonly string[];
   /** ⚠️ Tables the plan named that this database does not have. Reported, not hidden. */
   readonly absent: readonly string[];
+  /** Objects whose bytes were deleted from the store. */
+  readonly objects: number;
+  /**
+   * ⚠️ OBJECTS STILL IN THE STORE, AND A NON-ZERO IS A FAILED ERASURE. The rows
+   * are the only index of the keys, so bytes left behind after the ledger goes
+   * are unfindable forever — which is not a cost, it is somebody's photographs
+   * still on our disks after we told them they were gone.
+   */
+  readonly stranded: number;
 }
 
 /**
@@ -100,7 +117,25 @@ export interface Erased {
  * never existed here" and "erasure has silently stopped covering it" visible to
  * whoever reads the result. The structural guard is what stops the second.
  */
-export async function eraseTenant(db: SqlHandle, plan: readonly Erasable[], tenantId: string): Promise<Erased> {
+export async function eraseTenant(
+  db: SqlHandle,
+  plan: readonly Erasable[],
+  tenantId: string,
+  objects: ObjectHandle | null,
+): Promise<Erased> {
+  /*
+    ⚠️ THE BYTES FIRST, AND THE CASCADE DOES NOT RUN WHILE ANY ARE LEFT. The
+    cascade would delete the media rows along with everything else, and those
+    rows are the only place the object keys are written down — so a run that
+    proceeded past a failed object delete would leave somebody's files in the
+    store with no way left to find them, having reported a complete erasure.
+
+    Refusing is safe because this operation is re-runnable: the second attempt
+    starts from what is still there.
+  */
+  const bytes = await eraseObjects(db, objects, tenantId);
+  if (bytes.stranded > 0) return { tables: [], absent: [], objects: bytes.objects, stranded: bytes.stranded };
+
   const tables: string[] = [];
   const absent: string[] = [];
   for (const { table, column } of plan) {
@@ -111,5 +146,5 @@ export async function eraseTenant(db: SqlHandle, plan: readonly Erasable[], tena
       absent.push(table);
     }
   }
-  return { tables, absent };
+  return { tables, absent, objects: bytes.objects, stranded: 0 };
 }

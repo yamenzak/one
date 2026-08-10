@@ -1,17 +1,17 @@
 {
   "$comment": [
-    "THE CAPABILITY INVENTORY — what a person can accomplish in Kova today.",
+    "THE CAPABILITY INVENTORY \u2014 what a person can accomplish in Kova today.",
     "",
-    "⚠️ OUTCOMES, NEVER SCREENS. 'A coach can see how a client's strength is",
+    "\u26a0\ufe0f OUTCOMES, NEVER SCREENS. 'A coach can see how a client's strength is",
     "trending' is a capability; 'the Progress tab has four lenses' is an",
     "implementation, and writing it that way is how a rewrite becomes a port",
-    "wearing different colours. See docs/KOVA.md §1.1.",
+    "wearing different colours. See docs/KOVA.md \u00a71.1.",
     "",
     "It is the ONE artefact that crosses from the old codebase to the new one, and",
     "it is the acceptance contract for stage 7 and stage 8: every line is performed",
     "against the migrated tenant, by the persona named, in a browser.",
     "",
-    "status: old | built | dropped. A `dropped` entry carries a `why` — a removal",
+    "status: old | built | dropped. A `dropped` entry carries a `why` \u2014 a removal",
     "and an oversight look identical without one."
   ],
   "capabilities": [
@@ -69,7 +69,7 @@
       "id": "studio-brand",
       "persona": "owner",
       "area": "studio",
-      "outcome": "Make the product look like their business — name, logo, colours",
+      "outcome": "Make the product look like their business \u2014 name, logo, colours",
       "status": "old"
     },
     {
@@ -805,7 +805,7 @@
       "id": "billing-portal",
       "persona": "owner",
       "area": "billing",
-      "outcome": "Change a card, read an invoice, cancel — on the payment provider",
+      "outcome": "Change a card, read an invoice, cancel \u2014 on the payment provider",
       "status": "old"
     },
     {
@@ -820,28 +820,28 @@
       "persona": "trainer",
       "area": "media",
       "outcome": "Upload an image or a video and watch it arrive",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "media-library",
       "persona": "trainer",
       "area": "media",
       "outcome": "Reuse something they already uploaded rather than uploading it again",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "media-quota",
       "persona": "owner",
       "area": "media",
       "outcome": "See how much storage they are using against what they bought",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "avatar",
       "persona": "trainer",
       "area": "media",
       "outcome": "Give a client a face, so a roster is people rather than rows",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "ai-draft-plan",
@@ -931,7 +931,7 @@
       "id": "ai-budget",
       "persona": "owner",
       "area": "ai",
-      "outcome": "Not be surprised by a bill — a ceiling per day, per person",
+      "outcome": "Not be surprised by a bill \u2014 a ceiling per day, per person",
       "status": "old"
     },
     {

@@ -14,12 +14,13 @@
  */
 
 import type {
-  AnyOperation, CollectionSpec, Field, Instant, Shape, SqlHandle,
+  AnyOperation, CollectionSpec, Field, Instant, MediaField, Shape, SqlHandle,
 } from "@one/kernel";
 import {
   columnName, columnsFor, deletionFor, operation, refusesChange,
   liveClause, s, tableNameFor, transition, type DocState,
 } from "@one/kernel";
+import { mediaRefused } from "./files.js";
 
 /* ---------------------------------------------------------------- shapes --- */
 
@@ -155,6 +156,27 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     };
   };
 
+  /**
+   * ⚠️ EVERY WRITE THAT CAN SET A MEDIA FIELD CHECKS IT, and there are two of
+   * them. Checking on create alone leaves the same unverified id one `update`
+   * away, which is the write a form actually makes after the first save.
+   */
+  const media = Object.entries(spec.fields).filter(([, f]) => f.kind === "media") as [string, MediaField][];
+
+  const checkMedia = async (ctx: { fail(code: "platform.invalid", meta: Record<string, string>): never }, body: Record<string, unknown>, db: SqlHandle, tenantId: string) => {
+    for (const [name, f] of media) {
+      const value = body[name];
+      /*
+        ⚠️ CLEARING ONE IS NOT SETTING ONE. An empty value removes the reference,
+        which is what "no photograph" is — refusing it would make a face
+        impossible to take back off somebody's record.
+      */
+      if (value === undefined || value === null || value === "") continue;
+      const why = await mediaRefused(db, tenantId, String(value), f);
+      if (why) ctx.fail("platform.invalid", { field: name, reason: why });
+    }
+  };
+
   /** The append-only record of who changed what. Off only for pure caches. */
   const note = async (ctx: unknown, rowId: string, verb: string, at: Instant) => {
     if (!spec.activity) return;
@@ -223,6 +245,7 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
       const { db, tenantId, subjectId } = store(ctx);
       const at = ctx.now();
       const id = `${spec.id.slice(0, 3)}_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
+      await checkMedia(ctx, input, db, tenantId);
       const [names, values] = columnValues(spec, input);
       /*
         ⚠️ A SUBJECT-SCOPED ROW WITH NO SUBJECT IS A ROW NOBODY OWNS. The column
@@ -290,6 +313,7 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
         if (refused.length) ctx.fail("platform.invalid", { fields: refused.join(", ") });
       }
 
+      await checkMedia(ctx, input.changes, db, tenantId);
       const [names, values] = columnValues(spec, input.changes);
       if (!names.length) return { version: current!.version };
       const at = ctx.now();

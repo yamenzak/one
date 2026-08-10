@@ -99,10 +99,128 @@ describe("being forgotten", () => {
   */
   it("continues past a table this database does not have, and says which", async () => {
     const rows = { notes: [{ i: 1 }], inbox: [{ i: 2 }] };
-    const out = await eraseTenant(store(rows, ["receipts"]), erasurePlan(modules), "t");
+    const out = await eraseTenant(store(rows, ["receipts"]), erasurePlan(modules), "t", null);
     expect(out.tables).toEqual(["notes", "inbox"]);
     expect(out.absent).toEqual(["receipts"]);
     expect(rows).toEqual({ notes: [], inbox: [] });
+  });
+});
+
+/* --------------------------------------------------------------- objects --- */
+
+/**
+ * ⚠️ THE ROWS ARE THE ONLY INDEX OF THE KEYS.
+ *
+ * A cascade that drops the media table leaves every object in the store with
+ * nothing anywhere naming it: it costs money every month, it survives the
+ * workspace being forgotten, and the only way to find it again is to list the
+ * bucket by hand. `files.ts` says so at the top of itself, and the erasure it
+ * warns about was this one.
+ */
+describe("the bytes, not just the rows", () => {
+  /** A store that answers the two statements `eraseObjects` issues, over one table. */
+  const withMedia = (media: { id: string; object_key: string }[], rest: Record<string, unknown[]> = {}): SqlHandle => ({
+    async all<T>(sql: string, _tenant: unknown, limit: number) {
+      if (/FROM media/.test(sql)) return media.slice(0, limit) as T[];
+      return ((rest[/FROM (\w+)/.exec(sql)![1]!] ?? []) as T[]).slice(0, limit);
+    },
+    async first<T>(sql: string) {
+      if (/FROM media/.test(sql)) return { n: media.length } as T;
+      return { n: 0 } as T;
+    },
+    async run(sql: string, _tenant: unknown, id?: unknown) {
+      if (/DELETE FROM media/.test(sql) && id !== undefined) {
+        const at = media.findIndex((m) => m.id === id);
+        if (at >= 0) media.splice(at, 1);
+        return;
+      }
+      const table = /FROM (\w+)/.exec(sql)![1]!;
+      if (table === "media") media.length = 0;
+      else rest[table] = [];
+    },
+  } as unknown as SqlHandle);
+
+  const bucket = (refuse: readonly string[] = []) => {
+    const gone: string[] = [];
+    /* ⚠️ Counted, because "gave up" is a claim about attempts rather than results. */
+    const tried: string[] = [];
+    return {
+      gone,
+      tried,
+      handle: {
+        async put() { return ""; },
+        async get() { return null; },
+        async delete(key: string) {
+          tried.push(key);
+          if (refuse.includes(key)) throw new Error("no");
+          gone.push(key);
+        },
+      },
+    };
+  };
+
+  it("deletes every object the workspace stored", async () => {
+    const store2 = withMedia([{ id: "m1", object_key: "t/aa" }, { id: "m2", object_key: "t/bb" }], { notes: [{ i: 1 }] });
+    const store3 = bucket();
+    const out = await eraseTenant(store2, erasurePlan(modules), "t", store3.handle);
+    expect(store3.gone).toEqual(["t/aa", "t/bb"]);
+    expect(out.objects).toBe(2);
+    expect(out.stranded).toBe(0);
+    expect(out.tables).toContain("notes");
+  });
+
+  /*
+    ⚠️ AND THE CASCADE DOES NOT RUN WHILE ONE IS LEFT. Proceeding past a failed
+    delete would drop the row naming that key and report a complete erasure —
+    somebody's file still on our disks, unfindable, after we told them it was
+    gone. Erasure is re-runnable, so refusing costs a retry and nothing else.
+  */
+  it("stops rather than dropping the rows that name what it could not delete", async () => {
+    const store2 = withMedia([{ id: "m1", object_key: "t/aa" }], { notes: [{ i: 1 }] });
+    const out = await eraseTenant(store2, erasurePlan(modules), "t", bucket(["t/aa"]).handle);
+    expect(out.stranded).toBe(1);
+    expect(out.tables).toEqual([]);
+    expect(await store2.first<{ n: number }>("SELECT COUNT(*) AS n FROM media")).toEqual({ n: 1 });
+  });
+
+  /*
+    ⚠️ NO STORE AND SOMETHING STORED IS NOT THE SAME AS NOTHING STORED. A
+    deployment with no object binding cannot delete what it cannot reach, and a
+    silent zero there is the leak wearing a clean run's clothes.
+  */
+  it("refuses when there are files and no store to delete them from", async () => {
+    const out = await eraseTenant(withMedia([{ id: "m1", object_key: "t/aa" }]), erasurePlan(modules), "t", null);
+    expect(out.stranded).toBe(1);
+    expect(out.tables).toEqual([]);
+  });
+
+  /*
+    ⚠️ PAGES UNTIL THERE ARE NONE, NOT ONE PAGE. A single bounded pass deletes
+    the first page and reports a clean run, and the cascade behind it drops the
+    rows naming every other object — the same leak, reintroduced by the ceiling
+    that was meant to bound the work.
+  */
+  it("keeps going past one page", async () => {
+    const many = Array.from({ length: 1_100 }, (_, i) => ({ id: `m${i}`, object_key: `t/${i}` }));
+    const store3 = bucket();
+    const out = await eraseTenant(withMedia(many), erasurePlan(modules), "t", store3.handle);
+    expect(out.objects).toBe(1_100);
+    expect(out.stranded).toBe(0);
+  });
+
+  /*
+    ⚠️ A PAGE THAT DELETED NOTHING ENDS THE RUN. The rows that failed are still
+    the first page of the next query, so without it a store that is simply down
+    is called ten thousand times before anybody is told.
+  */
+  it("gives up on a store that is refusing everything", async () => {
+    const keys = Array.from({ length: 3 }, (_, i) => `t/${i}`);
+    const store3 = bucket(keys);
+    const out = await eraseTenant(withMedia(keys.map((k, i) => ({ id: `m${i}`, object_key: k }))), erasurePlan(modules), "t", store3.handle);
+    expect(out.stranded).toBe(3);
+    expect(out.objects).toBe(0);
+    /* Once each, and then it stops asking. */
+    expect(store3.tried).toEqual(keys);
   });
 });
 

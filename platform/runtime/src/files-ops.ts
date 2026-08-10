@@ -14,7 +14,7 @@
 
 import type { AnyOperation, AppSpec, BindingSpec, ObjectHandle, SqlHandle } from "@one/kernel";
 import { operation, s, STORAGE_ENTITLEMENT } from "@one/kernel";
-import { fetchMedia, forgetMedia, listMedia, storeMedia, UNLIMITED_BYTES, usedBytes } from "./files.js";
+import { fetchMedia, forgetMedia, listMedia, mediaUses, storeMedia, UNLIMITED_BYTES, usedBytes, usesOf } from "./files.js";
 
 /** ⚠️ A symbol, so an app cannot reach the object store by writing a property name. */
 export const FILES = Symbol.for("one.runtime.files");
@@ -152,6 +152,14 @@ export function fileOperations<B extends BindingSpec>(app: AppSpec<B>): readonly
     },
   });
 
+  /*
+    ⚠️ DERIVED ONCE, FROM THE MANIFEST. Every media field on every collection is
+    a place a record can point at a file, and a list written by hand here would
+    be right until the next field was added — after which deleting a file breaks
+    that field silently, which is the whole failure this refusal exists to stop.
+  */
+  const uses = mediaUses(app.collections);
+
   const forget = operation({
     id: "file.delete",
     kind: "write",
@@ -161,9 +169,25 @@ export function fileOperations<B extends BindingSpec>(app: AppSpec<B>): readonly
     permission: "file:write",
     idempotency: { mode: "natural", key: "id" },
     audit: (i: { id: string }) => ({ subject: i.id, verb: "delete" }),
-    fails: ["platform.not_found"],
+    fails: ["platform.not_found", "platform.conflict"],
     async handler(ctx, input: { id: string }) {
       const d = deps(ctx);
+      /*
+        ⚠️ A FILE SOMETHING POINTS AT IS REFUSED, AND WHERE IT IS USED IS PART OF
+        THE REFUSAL. Deleting it would leave a broken image on a screen a long
+        way from the library the delete was pressed in, with nothing to connect
+        the two — and "it is used" without "where" is a refusal nobody can act
+        on. There is deliberately no way to force it: clearing the reference
+        first is one extra step and is the order that leaves nothing broken.
+      */
+      const used = await usesOf(d.db, d.tenantId, input.id, uses);
+      if (used.length > 0) {
+        ctx.fail("platform.conflict", {
+          reason: "in_use",
+          used: used.map((u) => `${u.collection}.${u.field}:${u.count}`).join(", "),
+        });
+      }
+
       const gone = await forgetMedia(d.db, d.objects, d.tenantId, input.id);
       if (!gone) ctx.fail("platform.not_found");
       return { deleted: true };

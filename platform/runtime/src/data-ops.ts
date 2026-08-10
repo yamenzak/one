@@ -13,7 +13,7 @@
  * would be a collection tactic wearing an off-boarding flow's clothes.
  */
 
-import type { AnyOperation, AppSpec, BindingSpec, Instant, SchemaModule, SqlHandle } from "@one/kernel";
+import type { AnyOperation, AppSpec, BindingSpec, Instant, ObjectHandle, SchemaModule, SqlHandle } from "@one/kernel";
 import { operation, s } from "@one/kernel";
 import { erasurePlan, eraseTenant, exportTenant } from "./data.js";
 import { jobHistory } from "./jobs.js";
@@ -25,6 +25,14 @@ export interface DataDeps {
   readonly db: SqlHandle;
   /** The global store, where a job's run record lives. */
   readonly global: SqlHandle;
+  /**
+   * ⚠️ NULL ONLY WHERE A DEPLOYMENT GENUINELY HAS NO OBJECT STORE. Erasure
+   * refuses rather than proceeding when there are files it cannot reach, so a
+   * missing binding surfaces as a workspace that will not erase — which is the
+   * loud failure. Passing one that is not the store the files are in is the
+   * quiet one, and nothing here can tell.
+   */
+  readonly objects: ObjectHandle | null;
   readonly tenantId: string;
   readonly modules: readonly SchemaModule[];
   /** Whether this caller may act for the whole deployment rather than one workspace. */
@@ -114,7 +122,7 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
     kind: "write",
     summary: "Forget this workspace now, without waiting out the seven days.",
     input: s.object({ confirm: s.text({ max: 120 }) }),
-    output: s.object({ tables: s.json(), absent: s.json() }),
+    output: s.object({ tables: s.json(), absent: s.json(), objects: s.number({ integer: true }), stranded: s.number({ integer: true }) }),
     permission: "workspace:close",
     idempotency: { mode: "none" },
     audit: () => ({ subject: "workspace", verb: "erase" }),
@@ -128,7 +136,12 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
         and this is the one operation in the platform with no undo at all.
       */
       if (input.confirm !== d.tenantId) ctx.fail("platform.invalid", { field: "confirm", reason: "type the workspace id to confirm" });
-      return eraseTenant(d.db, erasurePlan(d.modules), d.tenantId);
+      /*
+        ⚠️ THE FILES GO WITH IT, AND A `stranded` ABOVE ZERO MEANS THEY DID NOT.
+        The caller is told rather than reassured: erasure is re-runnable, and the
+        second attempt starts from whatever is still there.
+      */
+      return eraseTenant(d.db, erasurePlan(d.modules), d.tenantId, d.objects);
     },
   });
 

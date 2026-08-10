@@ -123,10 +123,10 @@ without one.
 | `[x]` | `sign-in` | everyone | Sign in with a code sent to their email address, with no password anywhere |
 | `[ ]` | `units` | everyone | Choose whether they read weights and measures in metric or imperial |
 | | **media** | | |
-| `[ ]` | `avatar` | trainer | Give a client a face, so a roster is people rather than rows |
-| `[ ]` | `media-library` | trainer | Reuse something they already uploaded rather than uploading it again |
-| `[ ]` | `media-quota` | owner | See how much storage they are using against what they bought |
-| `[ ]` | `media-upload` | trainer | Upload an image or a video and watch it arrive |
+| `[x]` | `avatar` | trainer | Give a client a face, so a roster is people rather than rows |
+| `[x]` | `media-library` | trainer | Reuse something they already uploaded rather than uploading it again |
+| `[x]` | `media-quota` | owner | See how much storage they are using against what they bought |
+| `[x]` | `media-upload` | trainer | Upload an image or a video and watch it arrive |
 | | **notifications** | | |
 | `[ ]` | `email-templates` | owner | Change the words the studio sends, and sign them |
 | `[x]` | `inbox` | everyone | See what happened while they were away, in one list |

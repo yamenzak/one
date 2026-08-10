@@ -457,6 +457,48 @@ describe("a price list may only promise what exists", () => {
   });
 });
 
+describe("a media field is refused against the file purposes", () => {
+  /*
+    ⚠️ A FIELD NO UPLOAD CAN FILL IS A FORM CONTROL THAT CANNOT BE USED, and the
+    failure arrives at the worst possible moment: the person picks a file, the
+    upload succeeds against a purpose that takes it, and the SAVE refuses. An app
+    with a media field and no purposes at all is the same defect with nothing to
+    compare against, so both are one check.
+  */
+  const withField = (accept: readonly string[], purposes: Record<string, unknown>) => ({
+    ...base,
+    collections: [{
+      ...stubCollection,
+      id: "person",
+      fields: { face: { kind: "media", accept, maxBytes: 1_000 } },
+    }] as unknown as CollectionSpec[],
+    filePurposes: purposes,
+  }) as never;
+
+  it("accepts a field a declared purpose can produce", () => {
+    expect(() => assertComposable(withField(["image/png"], { photo: { label: "P", accept: ["image/png"], maxBytes: 1_000 } }))).not.toThrow();
+  });
+
+  /*
+    ⚠️ ONE TYPE IN COMMON IS ENOUGH, and requiring all of them is the mistake to
+    guard against: a field that takes both a photograph and a scan, beside a
+    purpose that only takes the photograph, is perfectly fillable — refusing it
+    would make a field narrower than its purpose the only legal shape.
+  */
+  it("accepts a field that takes more than the purpose does, so long as they overlap", () => {
+    expect(() => assertComposable(withField(["image/png", "image/jpeg"], { photo: { label: "P", accept: ["image/png"], maxBytes: 1_000 } }))).not.toThrow();
+  });
+
+  it("refuses a field whose types no purpose takes", () => {
+    expect(() => assertComposable(withField(["image/heic"], { photo: { label: "P", accept: ["image/png"], maxBytes: 1_000 } })))
+      .toThrow(/person\.face/);
+  });
+
+  it("refuses a media field in an app that declares no purposes at all", () => {
+    expect(() => assertComposable(withField(["image/png"], {}))).toThrow(/person\.face/);
+  });
+});
+
 describe("a checklist step is refused against the rest of the manifest", () => {
   /*
     ⚠️ THE REST OF THE MANIFEST DECIDES WHETHER A STEP IS ANSWERABLE. An app

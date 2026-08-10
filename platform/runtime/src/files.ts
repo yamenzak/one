@@ -18,7 +18,8 @@
  * does not guess.
  */
 
-import type { Instant, ObjectHandle, SchemaModule, SqlHandle } from "@one/kernel";
+import type { CollectionSpec, Instant, ObjectHandle, SchemaModule, SqlHandle } from "@one/kernel";
+import { columnName, liveClause, tableNameFor } from "@one/kernel";
 import { stripMetadata } from "./exif.js";
 
 export const MEDIA_SCHEMA: SchemaModule = {
@@ -194,6 +195,174 @@ export async function fetchMedia(
   if (!body) return null;
   return { row: toRow(row), body };
 }
+
+/* ------------------------------------------------------------ references --- */
+
+/**
+ * Why a record may not point at this file.
+ *
+ * ⚠️ `unknown` COVERS A DELETED FILE, A TYPO AND ANOTHER WORKSPACE'S ID, and it
+ * says the same thing to all three on purpose. Distinguishing "not yours" from
+ * "not there" tells whoever is guessing which ids exist, and neither answer is
+ * one the caller can act on differently.
+ */
+export type MediaRefusal = "unknown" | "type" | "size";
+
+/**
+ * Whether a media field may hold this id.
+ *
+ * ⚠️ A DECLARED `accept` THAT NOTHING CHECKS IS A POLICY THAT DOES NOT EXIST. A
+ * media field compiles to a text column, so without this a face can be set to a
+ * twenty-megabyte video, to a file that was deleted last week, or to a string
+ * somebody typed — and every one of those renders as a broken image on a screen
+ * far away from the write that caused it.
+ *
+ * ⚠️ IT IS CHECKED AGAINST THE LEDGER, NEVER AGAINST THE VALUE. The type and the
+ * size come from the row the upload wrote after stripping and measuring, which
+ * is the only place either is a fact rather than a claim.
+ */
+export async function mediaRefused(
+  db: SqlHandle,
+  tenantId: string,
+  id: string,
+  field: { readonly accept: readonly string[]; readonly maxBytes: number },
+): Promise<MediaRefusal | null> {
+  const row = await db.first<{ content_type: string; bytes: number }>(
+    `SELECT content_type, bytes FROM media WHERE tenant_id = ? AND id = ?`, tenantId, id,
+  ).catch(() => null);
+  if (!row) return "unknown";
+  if (field.accept.length > 0 && !field.accept.includes(row.content_type)) return "type";
+  if (field.maxBytes > 0 && row.bytes > field.maxBytes) return "size";
+  return null;
+}
+
+/**
+ * Every place a record can point at a file — derived, never listed.
+ *
+ * ⚠️ A HAND-WRITTEN LIST HERE IS THE SAME BUG AS A HAND-WRITTEN ERASURE LIST.
+ * It would be right on the day it was written and wrong on the day somebody adds
+ * a media field, and the failure is silent in the direction that matters: the
+ * new field is simply not consulted, so deleting a file breaks it and nothing
+ * anywhere reports that it did.
+ */
+export interface MediaUse {
+  readonly collection: string;
+  readonly field: string;
+  readonly table: string;
+  readonly column: string;
+  readonly tenanted: boolean;
+  readonly live: string;
+}
+
+export const mediaUses = (collections: readonly CollectionSpec[]): readonly MediaUse[] =>
+  collections.flatMap((spec) =>
+    Object.entries(spec.fields)
+      .filter(([, f]) => f.kind === "media")
+      .map(([name]) => ({
+        collection: spec.id,
+        field: name,
+        table: tableNameFor(spec),
+        column: columnName(name),
+        tenanted: spec.scope.of !== "platform",
+        live: liveClause(spec),
+      })));
+
+/**
+ * What still points at this file.
+ *
+ * ⚠️ ARCHIVED ROWS DO NOT COUNT, and that is a decision rather than an oversight.
+ * A soft-deleted record is not on anybody's screen, so counting it would hold a
+ * workspace's storage against records it has already thrown away — permanently,
+ * because an archived row is never coming back to release it.
+ */
+export async function usesOf(
+  db: SqlHandle,
+  tenantId: string,
+  id: string,
+  uses: readonly MediaUse[],
+): Promise<readonly { readonly collection: string; readonly field: string; readonly count: number }[]> {
+  const found: { collection: string; field: string; count: number }[] = [];
+  for (const use of uses) {
+    const where = use.tenanted ? `tenant_id = ? AND ${use.column} = ?` : `${use.column} = ?`;
+    const binds = use.tenanted ? [tenantId, id] : [id];
+    const row = await db.first<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM ${use.table} WHERE ${where}${use.live}`, ...binds,
+    ).catch(() => null);
+    if (row && row.n > 0) found.push({ collection: use.collection, field: use.field, count: row.n });
+  }
+  return found;
+}
+
+/**
+ * Forget a workspace's stored bytes.
+ *
+ * ⚠️ THE OBJECTS GO BEFORE THE ROWS, WHICH IS THE OPPOSITE OF DELETING ONE FILE.
+ * There the row goes first, because an orphaned object costs money and a row
+ * pointing at nothing is a broken image somebody reports. Here the row is the
+ * ONLY record of the key: delete it first and the bytes cannot be found again by
+ * any means short of listing the bucket by hand.
+ *
+ * ⚠️ A ROW IS DROPPED ONLY WHEN ITS OBJECT IS GONE, so a store that refused one
+ * delete leaves that row for the next run to retry rather than losing the key.
+ */
+export async function eraseObjects(
+  db: SqlHandle,
+  objects: ObjectHandle | null,
+  tenantId: string,
+  ceiling = OBJECT_CEILING,
+): Promise<{ readonly objects: number; readonly stranded: number }> {
+  const left = async (): Promise<number> =>
+    (await db.first<{ n: number }>(`SELECT COUNT(*) AS n FROM media WHERE tenant_id = ?`, tenantId).catch(() => null))?.n ?? 0;
+
+  /*
+    ⚠️ NO STORE AND NOTHING STORED IS FINE; NO STORE AND SOMETHING STORED IS NOT.
+    A deployment with no object binding cannot delete what it cannot reach, and
+    saying so is the difference between "there was nothing" and "we could not".
+  */
+  if (!objects) return { objects: 0, stranded: await left() };
+
+  let gone = 0;
+  let failed = 0;
+  /*
+    ⚠️ TAKEN IN PAGES UNTIL THERE ARE NONE, NOT ONE PAGE. A single bounded pass
+    would delete the first five hundred objects and report a clean run, and the
+    cascade behind it would then drop the rows naming every other one — which is
+    exactly the leak this function exists to close, reintroduced by its own
+    ceiling. What is left over when the ceiling IS reached is reported as
+    stranded, which stops the cascade and leaves the work for the next run.
+  */
+  while (gone + failed < ceiling) {
+    const rows = await db.all<{ id: string; object_key: string }>(
+      `SELECT id, object_key FROM media WHERE tenant_id = ? LIMIT ?`,
+      tenantId, Math.min(OBJECT_PAGE, ceiling - gone - failed),
+    ).catch(() => []);
+    if (rows.length === 0) break;
+
+    let progressed = 0;
+    for (const row of rows) {
+      try {
+        await objects.delete(row.object_key);
+        await db.run(`DELETE FROM media WHERE tenant_id = ? AND id = ?`, tenantId, row.id);
+        gone++;
+        progressed++;
+      } catch {
+        failed++;
+      }
+    }
+    /*
+      ⚠️ A PAGE THAT DELETED NOTHING ENDS THE RUN. The rows that failed are still
+      the first page of the next query, so without this the same objects are
+      attempted over and over until the ceiling — which turns a store that is
+      simply down into ten thousand calls to it.
+    */
+    if (progressed === 0) break;
+  }
+  return { objects: gone, stranded: await left() };
+}
+
+/** One page of deletes, and the most one run will attempt. */
+const OBJECT_PAGE = 500;
+export const OBJECT_CEILING = 10_000;
 
 /* -------------------------------------------------------------- removing --- */
 

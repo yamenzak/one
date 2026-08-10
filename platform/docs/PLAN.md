@@ -1029,6 +1029,12 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `idle-is-not-a-failed-sweep` | one skip per workspace that has not configured the feature — which is most of them — turning an ordinary deployment into a permanently failing job, the alarm nobody ends up reading | **live** |
 | `a-code-tops-up-never-creates` | a leaked code minting access for anybody holding the string — and every attempt burning a use belonging to the person it was given to | **live** |
 | `a-refused-claim-spends-nothing` | a spent code decremented past zero on every further attempt, so the uses a workspace is shown counts down forever for a code that no longer works | **live** |
+| `erasure-reaches-the-bucket` | a forgotten workspace's files left in the store with nothing naming them — money every month, somebody's photographs on our disks after they were told they were gone, and no way to find either short of listing the bucket by hand | **live** |
+| `the-rows-outlive-the-bytes-or-nothing-does` | one failed object delete turning into a permanent leak, because the cascade behind it drops the only index of the key and reports a complete erasure | **live** |
+| `a-media-field-is-checked-against-the-ledger` | a declared accept list enforcing nothing, so a face can be a video or a file that is not there — and it renders as a broken image on a screen a long way from the write that caused it | **live** |
+| `every-write-that-sets-a-file-checks-it` | the check landing on the create alone, leaving the same unverified id one save away — and the save after the first is the write a form actually makes | **live** |
+| `a-file-in-use-is-not-deleted` | a delete pressed in the library leaving a broken image on a screen somewhere else, with nothing connecting the two | **live** |
+| `a-media-field-no-upload-can-fill` | a form control nobody can use, discovered at the save after the upload has already succeeded | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

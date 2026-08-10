@@ -930,6 +930,8 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           tenantId: at.tenant?.tenantId ?? "",
           modules: opts.regionalModules ?? [],
           isOperator: at.door === "admin",
+          /* ⚠️ The same store the uploads went to, so erasure reaches the bytes. */
+          objects: (bind[opts.objectsBinding ?? "media"] as ObjectHandle | undefined) ?? null,
         },
         [PLATFORM]: platform,
         [FOUNDER]: {

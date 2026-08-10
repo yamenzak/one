@@ -10,9 +10,9 @@
 
 import { describe, expect, it } from "vitest";
 import { stripMetadata } from "../src/exif.js";
-import { digestOf, forgetMedia, keyFor, listMedia, MEDIA_SCHEMA, readMedia, storeMedia, UNLIMITED_BYTES, usedBytes } from "../src/files.js";
+import { digestOf, forgetMedia, keyFor, listMedia, MEDIA_SCHEMA, mediaRefused, mediaUses, readMedia, storeMedia, UNLIMITED_BYTES, usedBytes, usesOf } from "../src/files.js";
 import { allowanceFrom, MAX_FILE_BYTES } from "../src/files-ops.js";
-import type { Instant, ObjectHandle, SqlHandle } from "@one/kernel";
+import type { CollectionSpec, Instant, ObjectHandle, SqlHandle } from "@one/kernel";
 
 const AT = "2026-01-10T00:00:00.000Z" as Instant;
 
@@ -300,5 +300,133 @@ describe("the surface", () => {
     const a = await digestOf(bytes([1, 2, 3]));
     expect(a).toBe(await digestOf(bytes([1, 2, 3])));
     expect(a).not.toBe(await digestOf(bytes([1, 2, 4])));
+  });
+});
+
+/* ------------------------------------------------------------ references --- */
+
+/**
+ * A MEDIA FIELD IS A TEXT COLUMN, and a declared `accept` that nothing checks is
+ * a policy that does not exist.
+ *
+ * ⚠️ THE CHECK READS THE LEDGER, NEVER THE VALUE. The type and the size come
+ * from the row the upload wrote after stripping and measuring, which is the only
+ * place either is a fact rather than something a caller said.
+ */
+describe("what a record may point at", () => {
+  const ledger = (rows: { id: string; content_type: string; bytes: number }[]): SqlHandle => ({
+    async first<T>(_sql: string, _tenant: unknown, id: unknown) {
+      return (rows.find((r) => r.id === id) ?? null) as T | null;
+    },
+  } as unknown as SqlHandle);
+
+  const face = { accept: ["image/jpeg", "image/png"], maxBytes: 4_000_000 };
+  const db = ledger([
+    { id: "med_photo", content_type: "image/jpeg", bytes: 100_000 },
+    { id: "med_film", content_type: "video/mp4", bytes: 8_000_000 },
+    { id: "med_huge", content_type: "image/jpeg", bytes: 9_000_000 },
+  ]);
+
+  it("accepts a file of the declared type and size", async () => {
+    expect(await mediaRefused(db, "t", "med_photo", face)).toBeNull();
+  });
+
+  /*
+    ⚠️ A DELETED FILE, A TYPO AND ANOTHER WORKSPACE'S ID ARE ONE ANSWER. Telling
+    them apart tells whoever is guessing which ids exist, and none of the three
+    is one the caller can act on differently.
+  */
+  it("refuses an id nothing in this workspace names", async () => {
+    expect(await mediaRefused(db, "t", "med_ghost", face)).toBe("unknown");
+  });
+
+  it("refuses a type the field does not take, however it was uploaded", async () => {
+    expect(await mediaRefused(db, "t", "med_film", face)).toBe("type");
+  });
+
+  it("refuses a file larger than the field allows", async () => {
+    expect(await mediaRefused(db, "t", "med_huge", face)).toBe("size");
+  });
+
+  /*
+    ⚠️ AND A DATABASE WITH NO LEDGER REFUSES RATHER THAN ADMITS. An app whose
+    media table is absent has nothing that could have uploaded the file, so every
+    id it is handed is a fabrication.
+  */
+  it("refuses when there is no ledger to check against", async () => {
+    const broken = { async first() { throw new Error("no such table"); } } as unknown as SqlHandle;
+    expect(await mediaRefused(broken, "t", "med_photo", face)).toBe("unknown");
+  });
+});
+
+/* ----------------------------------------------------------------- uses --- */
+
+/**
+ * ⚠️ DERIVED FROM THE MANIFEST, NEVER LISTED. A hand-written list of the places
+ * a file can be referenced is right on the day it is written and wrong on the
+ * day somebody adds a media field — and the failure is silent: the new field is
+ * not consulted, so deleting a file breaks it and nothing reports that it did.
+ */
+describe("where a file is used", () => {
+  const spec = (id: string, fields: Record<string, unknown>, platform = false, archive = true) => ({
+    id, label: { one: id, many: id },
+    scope: platform ? { of: "platform" } : { of: "tenant" },
+    onDelete: { on: archive ? "archive" : "purge" },
+    retention: { days: null, onTenantClose: "purge" },
+    fields,
+  }) as unknown as CollectionSpec;
+
+  const media = { kind: "media", accept: ["image/jpeg"], maxBytes: 1 };
+  const text = { kind: "text" };
+
+  it("finds every media field on every collection and nothing else", () => {
+    const uses = mediaUses([
+      spec("client", { name: text, avatar: media }),
+      spec("movement", { demo: media }),
+      spec("note", { body: text }),
+    ]);
+    expect(uses.map((u) => `${u.collection}.${u.field}`)).toEqual(["client.avatar", "movement.demo"]);
+    expect(uses[0]!.table).toBe("clients");
+    expect(uses[0]!.column).toBe("avatar");
+  });
+
+  /*
+    ⚠️ A PLATFORM-SCOPED COLLECTION HAS NO TENANT COLUMN, so a query written as
+    though it did would throw — and the `catch` around the count would read that
+    as "nobody points at it", which is the answer that deletes the file.
+  */
+  it("does not ask a platform-scoped collection about a tenant", () => {
+    expect(mediaUses([spec("badge", { icon: media }, true)])[0]!.tenanted).toBe(false);
+  });
+
+  const counting = (answers: Record<string, number>): SqlHandle => ({
+    async first<T>(sql: string) {
+      const table = /FROM (\w+)/.exec(sql)![1]!;
+      if (!(table in answers)) throw new Error("no such table");
+      return { n: answers[table] } as T;
+    },
+  } as unknown as SqlHandle);
+
+  it("reports every collection pointing at the file, with how many", async () => {
+    const uses = mediaUses([spec("client", { avatar: media }), spec("movement", { demo: media })]);
+    expect(await usesOf(counting({ clients: 2, movements: 0 }), "t", "med_x", uses))
+      .toEqual([{ collection: "client", field: "avatar", count: 2 }]);
+  });
+
+  it("says nothing points at a file nothing points at", async () => {
+    const uses = mediaUses([spec("client", { avatar: media })]);
+    expect(await usesOf(counting({ clients: 0 }), "t", "med_x", uses)).toEqual([]);
+  });
+
+  /*
+    ⚠️ ARCHIVED ROWS DO NOT COUNT. A soft-deleted record is on nobody's screen,
+    and counting it would hold a workspace's storage against records it has
+    already thrown away — permanently, since an archived row never comes back to
+    release it.
+  */
+  it("ignores rows the collection has archived", () => {
+    const [archived, purged] = mediaUses([spec("client", { avatar: media }), spec("movement", { demo: media }, false, false)]);
+    expect(archived!.live).toContain("deleted_at");
+    expect(purged!.live).toBe("");
   });
 });
