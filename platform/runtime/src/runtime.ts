@@ -656,11 +656,9 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       if (!verdict.allowed) return problemResponse(refusalProblem(verdict.refusal), ref);
 
       /*
-        ⚠️ THE OBLIGATION `check` RETURNED, DISCHARGED HERE. It is reported rather
-        than performed there because counting needs a query and the gate is pure
-        so a whole tool catalogue can be filtered without touching a store — but a
-        returned obligation nobody acts on is worse than one that was never
-        mentioned, because the code reads as though the limit is enforced.
+        ⚠️ AND THE CEILING, the same way. Counting needs a query, so the gate
+        reports the obligation rather than discharging it — and a returned
+        obligation nobody acts on reads as though the limit were enforced.
       */
       if (verdict.quotaRequired && at.tenant) {
         const key = verdict.quotaRequired.key;
@@ -717,6 +715,26 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       const input = parsed.value;
 
       /*
+        ⚠️ THE ROW-LEVEL OBLIGATION, DISCHARGED. `check` reports it rather than
+        performing it, because performing it needs the parsed input and the gate
+        is pure so a whole tool catalogue can be filtered without touching a
+        store. A returned obligation nobody acts on is worse than one that was
+        never mentioned: the code reads as though the narrowing happens.
+
+        ⚠️ THE RULE IS THE ONE A SUBJECT-SCOPED COLLECTION ALREADY USES. A caller
+        who IS a customer may address only themselves; a caller who is not one is
+        staff, and their reach is decided by their permissions. Without it, any
+        customer holding a read permission could name somebody else's id and be
+        answered — which is the whole of what row scope exists to stop.
+      */
+      if (verdict.scopeRequired && op.scope && subjectId) {
+        const required = op.scope(input as never);
+        const mine = Object.values(required).every((value) => value === subjectId);
+        if (!mine) return problemResponse(refusalProblem("scope"), ref);
+      }
+
+
+      /*
         ⚠️ ONE ROLE, RESOLVED ONCE, FOR EVERY SURFACE THAT IS PER-PERSON. The
         checklist, the shelf and a milestone's announcement all filter by it, and
         three separate resolutions is how a person comes to be an owner to one
@@ -754,7 +772,17 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       const run = async (target: AnyOperation, payload: unknown, via: AuditEntry["via"]) => {
         const entry = auditFor(target, payload, via);
         if (entry) audit.push(entry);
-        const result = await target.handler(ctx as never, payload as never);
+        const raw = await target.handler(ctx as never, payload as never);
+        /*
+          ⚠️ THE HANDLER WITHHOLDS AND THE PLATFORM REPORTS, so a caller can tell
+          a lens they did not buy from one that is empty. Merged rather than
+          returned by the handler, because an operation that had to remember to
+          report it is one that will not — and then a thinner payload and an
+          empty one are the same answer again.
+        */
+        const result = target.shape
+          ? { ...(raw as Record<string, unknown>), included: ctx.included }
+          : raw;
 
         /*
           ⚠️ THE INBOX IS WRITTEN FROM `emits`, AFTER THE HANDLER SUCCEEDS, AND
@@ -966,6 +994,13 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         actor,
         tenantId: (at.tenant?.tenantId ?? null) as TenantId,
         ...(subjectId ? { subjectId } : {}),
+        /*
+          ⚠️ RESOLVED BY THE GATE, HANDED TO THE HANDLER, AND MERGED BACK INTO
+          THE ANSWER. `check` has always computed this and, until now, nothing
+          read it — the shape mechanism was declared, resolved, and reachable by
+          nobody, which is the exact failure this platform is a reaction to.
+        */
+        included: verdict.included ?? {},
         region: at.region,
         now: () => new Date().toISOString() as Instant,
         fail: (code, meta) => { throw new DeclaredFailure(code, meta); },

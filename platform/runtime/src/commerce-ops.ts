@@ -19,7 +19,8 @@ import {
   operation, packageContradictions, PUBLIC, runwayFor, s,
 } from "@one/kernel";
 import {
-  applyPackage, applyPayment, choosePlan, listPackages, priorGrants, readAccess, readPackage,
+  applyPackage, applyPayment, choosePlan, grantsFor, listPackages, priorGrants, readAccess, readPackage,
+  setOverrides, setRemainingDays,
   readSubscription, savePackage, standingFor,
 } from "./commerce.js";
 import { attribute, claimByCustomer, claimEvent, listParked, park, rememberCustomer, resolveParked, verifySignature } from "./provider.js";
@@ -352,7 +353,113 @@ export function customerOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
-  return [offer, save, grant, capabilities] as unknown as readonly AnyOperation[];
+  const override = operation({
+    id: "commerce.override",
+    kind: "write",
+    summary: "Make an exception for one customer, without changing the package.",
+    input: s.object({ subjectId: s.text({ max: 120 }), changes: s.json() }),
+    output: s.object({ subjectId: s.text(), flags: s.json(), exceptions: s.json() }),
+    permission: "commerce:manage",
+    idempotency: { mode: "none" },
+    audit: (i: { subjectId: string }) => ({ subject: i.subjectId, verb: "override" }),
+    outcome: { message: "Exception saved", tone: "success", invalidates: ["commerce.capabilities"] },
+    fails: ["platform.invalid"],
+    /*
+      ⚠️ NOT REACHABLE BY A TOOL. Widening what one customer may do is a decision
+      somebody makes about a person, not one a model should take from a sentence
+      in a document it was asked to summarise.
+    */
+    tool: false,
+    async handler(ctx, input: { subjectId: string; changes: Record<string, boolean | null> }) {
+      const d = deps(ctx);
+      const changes = input.changes && typeof input.changes === "object" ? input.changes : {};
+      /*
+        ⚠️ A CAPABILITY THE MANIFEST DOES NOT SELL CANNOT BE EXCEPTED. Storing
+        one puts a key in the walk that no gate reads — an exception that appears
+        to do something and does nothing, for as long as anybody looks at it.
+      */
+      const unknown = Object.keys(changes).filter((k) => !(k in app.access.customerFlags));
+      if (unknown.length) ctx.fail("platform.invalid", { field: "changes", reason: `not sold here: ${unknown.join(", ")}` });
+
+      await setOverrides(d.db, d.tenantId, input.subjectId, changes, ctx.now());
+
+      const access = await readAccess(d.db, d.tenantId, input.subjectId);
+      const pkg = access.packageId ? await readPackage(d.db, d.tenantId, access.packageId) : null;
+      return {
+        subjectId: input.subjectId,
+        /*
+          ⚠️ WHICH EXCEPTIONS ARE ACTUALLY IN FORCE, and it is not decoration:
+          clearing one has to REMOVE the key rather than store a null beside it.
+          The resolver reads a null as "no exception", so the two look identical
+          to the gate — and a workspace's list of people it has made exceptions
+          for then grows forever with entries that mean nothing.
+        */
+        exceptions: access.overrides,
+        /* ⚠️ The walk with its working shown, so the caller sees what the gate will. */
+        flags: explainCustomerFlags({
+          declared: app.access.customerFlags,
+          pkg,
+          snapshot: access.snapshot,
+          overrides: access.overrides,
+          runway: runwayFor(access.budgets, ctx.now()),
+          tenantHolds: heldEntitlements(d.entitlements),
+        }),
+      };
+    },
+  });
+
+  const repair = operation({
+    id: "commerce.days",
+    kind: "write",
+    summary: "Correct how many days a customer has left, with a reason.",
+    input: s.object({
+      subjectId: s.text({ max: 120 }),
+      scope: s.text({ max: 60 }),
+      days: s.number({ integer: true, min: 0, max: 3_650 }),
+      /* ⚠️ REQUIRED. A correction with no reason is indistinguishable from a
+         mistake, six months later, to whoever has to explain it. */
+      reason: s.text({ min: 3, max: 400 }),
+    }),
+    output: s.object({ subjectId: s.text(), runway: s.json() }),
+    permission: "commerce:manage",
+    idempotency: { mode: "none" },
+    audit: (i: { subjectId: string }) => ({ subject: i.subjectId, verb: "days" }),
+    outcome: { message: "Days corrected", tone: "success", invalidates: ["commerce.capabilities"] },
+    fails: ["platform.invalid"],
+    tool: false,
+    async handler(ctx, input: { subjectId: string; scope: string; days: number; reason: string }) {
+      const d = deps(ctx);
+      /*
+        ⚠️ A SCOPE NOTHING GATES BUYS NOTHING AND STILL COUNTS DOWN. The declared
+        flags are where scopes come from, so a typo here is days somebody paid
+        attention to and nobody can spend.
+      */
+      const scopes = new Set(Object.values(app.access.customerFlags).flatMap((f) => (f.scope ? [f.scope] : [])));
+      if (!scopes.has(input.scope)) {
+        ctx.fail("platform.invalid", { field: "scope", reason: `nothing is gated on it: ${[...scopes].join(", ")}` });
+      }
+      const budgets = await setRemainingDays(d.db, d.tenantId, input.subjectId, input.scope, input.days, ctx.now());
+      return { subjectId: input.subjectId, runway: runwayFor(budgets, ctx.now()) };
+    },
+  });
+
+  const history = operation({
+    id: "commerce.history",
+    kind: "read",
+    summary: "What this customer has been given, most recent first.",
+    input: s.object({ subjectId: s.text({ max: 120 }) }),
+    output: s.object({ grants: s.json() }),
+    permission: "commerce:read",
+    /* ⚠️ Row scope: a customer may read their own history and staff anybody's. */
+    scope: (i: { subjectId: string }) => ({ subject: i.subjectId }),
+    idempotency: { mode: "none" },
+    async handler(ctx, input: { subjectId: string }) {
+      const d = deps(ctx);
+      return { grants: await grantsFor(d.db, d.tenantId, input.subjectId) };
+    },
+  });
+
+  return [offer, save, grant, capabilities, override, repair, history] as unknown as readonly AnyOperation[];
 }
 
 /* ------------------------------------------------------------- the wire --- */

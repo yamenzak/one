@@ -13,7 +13,7 @@ kind: index
 |---|---|
 | active | **7** — Kova migration |
 | shipped | 0, 1, 2, 3, 4, 5, 6, 6.5 |
-| open deferrals | 2 — see [DEFERRED.md](DEFERRED.md) |
+| open deferrals | 1 — see [DEFERRED.md](DEFERRED.md) |
 
 ⚠️ Resuming after a break, or after a compressed conversation?
 [STANDARDS.md §9](STANDARDS.md) is the checklist, in order. Start there rather

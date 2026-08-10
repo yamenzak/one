@@ -119,7 +119,18 @@ export function check(op: AnyOperation, caller: Caller): Verdict {
   if (!permits(caller.gate, laneOf(op), op.kind === "write")) return { allowed: false, refusal: "standing" };
   if (op.permission !== PUBLIC && !caller.permissions.has(op.permission)) return { allowed: false, refusal: "permission" };
   if (op.entitlement && !grants(caller.entitlements[op.entitlement] ?? false)) return { allowed: false, refusal: "entitlement" };
-  if (op.customerFlag && !(caller.customerFlags?.has(op.customerFlag) ?? false)) {
+  /*
+    ⚠️ THE CUSTOMER RAIL WITHHOLDS FROM CUSTOMERS AND SAYS NOTHING ABOUT ANYBODY
+    ELSE. An absent set means this caller is not one — staff, an operator, a
+    machine — and defaulting that to "refused" is the gate exactly backwards: it
+    withholds from the coach and admits the client.
+
+    It stayed invisible because the first app to have this rail made every
+    signed-in person their own customer, so the absent case never occurred. Staff
+    are held by their permissions and by the workspace's own plan, which are the
+    two rails that are about them.
+  */
+  if (op.customerFlag && caller.customerFlags && !caller.customerFlags.has(op.customerFlag)) {
     return { allowed: false, refusal: "customer_flag" };
   }
   /*
@@ -157,7 +168,17 @@ export const laneOf = (op: AnyOperation): string => op.id.split(".")[0] ?? "";
 export function shapeFor(op: AnyOperation, caller: Caller): Readonly<Record<string, boolean>> {
   const out: Record<string, boolean> = {};
   for (const [key, flag] of Object.entries(op.shape ?? {})) {
-    out[key] = caller.customerFlags?.has(flag) ?? grants(caller.entitlements[flag] ?? false);
+    /*
+      ⚠️ WHICH RAIL THE KEY IS ON DECIDES WHO IT WITHHOLDS FROM, and the resolved
+      entitlements are what says: they carry every key the app DECLARED, so a
+      name missing from them is a customer capability rather than a workspace
+      one. Reading the entitlement first and falling back to the customer set
+      answered `false` for every staff caller — a coach shown an empty report
+      because they are not their client's customer.
+    */
+    out[key] = flag in caller.entitlements
+      ? grants(caller.entitlements[flag]!)
+      : caller.customerFlags?.has(flag) ?? true;
   }
   return out;
 }

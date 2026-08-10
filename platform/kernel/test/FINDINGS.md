@@ -2142,3 +2142,92 @@ way to make the setup door work, and it is a bypass on every other door.
 
 The empty list is a real answer — an app nobody may join except by invitation —
 which is why it is required rather than optional.
+
+## 176. The row-level rule was returned as an obligation and discharged by nobody
+
+`check` reports `scopeRequired` rather than performing the narrowing, because
+performing it needs the parsed input and the gate is pure so a whole tool
+catalogue can be filtered without touching a store. The comment beside it says a
+gate that silently skipped this "would be the worst failure in the file", which
+is why it is a returned obligation rather than an omission.
+
+Nothing in the runtime read it. Every row-scoped operation — a customer's
+capabilities, their purchase history, their report — accepted whatever id the
+caller named. In Kova that is a roster of paying customers able to read each
+other's packages, remaining days and purchases, using an ordinary read
+permission every client holds.
+
+The same class as the quota obligation one line below it, which WAS discharged.
+One of two obligations acted on is the shape that reads as done.
+
+## 177. The customer gate refused everybody who was not a customer
+
+`caller.customerFlags?.has(flag) ?? false` — an absent set defaulted to refused.
+An absent set means the caller is not a customer at all: staff, an operator, a
+machine. So the gate withheld the product from the workspace paying for it and
+admitted the customers it was written to withhold from, in exactly the arrangement
+the second rail exists for.
+
+It could not be seen until the second app, because the first made every signed-in
+person their own customer — so the absent case never occurred. That is the third
+time in this project that a defect was invisible until a second product had the
+shape the first happened not to have.
+
+## 178. `shape` resolved the wrong rail, and a coach was shown an empty report
+
+`shapeFor` read the entitlement first and fell back to the customer set, which
+answers `false` for every staff caller on a key that is a customer capability —
+so the report a coach opens about their client came back with every lens
+withheld. The fix is to dispatch on which registry the key belongs to: the
+resolved entitlements carry every key the app DECLARED, so a name missing from
+them is a customer capability rather than a workspace one.
+
+## 179. The shape mechanism was declared, resolved, and reachable by nobody
+
+`check` computed `included` on every request and nothing ever read it. An
+operation could declare `shape`, the platform would resolve exactly who may see
+what, and the handler had no way to ask and the response no way to say. Three
+layers of a feature, and the only missing one was the wire.
+
+It is `ctx.included` now, and the platform MERGES the same map into the answer.
+Merged rather than returned by the handler, because an operation that had to
+remember to report it is one that will not — and then a thinner payload and an
+empty one are the same answer again, which is the thing shaping exists to avoid.
+
+## 180. A customer flag gates writes; an entitlement gates everything
+
+They look like the same mechanism on two rails and they are not. An entitlement
+is "this workspace never bought that", so there is usually nothing to read. A
+customer flag is "this person's access has run out", and their history is
+something they recorded themselves — every meal, set and measurement. Withholding
+it is holding somebody's own records hostage over a payment, which is a different
+act from withholding a product.
+
+The same argument already spares reads from a quota, one field along. Two of the
+three ceilings now agree; the entitlement is the odd one, and it is odd for a
+reason rather than by oversight.
+
+## 181. The one number a coach must not be shown is the headline
+
+A customer's runway is a MAXIMUM across scopes, and that is the right number to
+show the person themselves — "you have ninety days". It is exactly the wrong one
+for a list of people whose access is running out: somebody with ninety days of
+training and three of nutrition reads as fully covered, right up until the part
+they use every day stops working.
+
+`soonest` is the minimum, and null when they hold nothing. Null rather than zero
+matters as much: counting "no access at all" as "no days left" puts every client
+who never bought anything at the top of the list, which is the fastest way to
+teach a coach to stop opening it.
+
+## 182. Clearing an exception has to remove the key, and nothing could tell
+
+`explainCustomerFlags` reads a stored `null` as "no exception", so deleting the
+key and storing a null resolve identically — the mutation that replaced the
+delete survived every test. The distinction is real anyway: a workspace's list of
+the people it has made exceptions for otherwise grows forever with entries that
+mean nothing.
+
+Same resolution as finding 167. The fix was to surface it — `commerce.override`
+reports the exceptions in force — rather than to assert on a store nobody reads
+or to delete a correct distinction because nothing observed it.

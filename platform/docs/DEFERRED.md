@@ -10,7 +10,5 @@ kind: index
 
 ## Stage 7 — Kova migration
 
-- `one-171` — `endingIn` needs the access economy, which is Kova 0.5.  
-  <sub>kova/src/manifest.ts:629</sub>
 - `one-172` — the operator door admits any signed-in  
   <sub>runtime/src/runtime.ts:583</sub>

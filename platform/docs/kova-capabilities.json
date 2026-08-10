@@ -483,7 +483,7 @@
       "persona": "client",
       "area": "body",
       "outcome": "See how their body has changed over months, not days",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "progress-photos",
@@ -658,14 +658,14 @@
       "persona": "owner",
       "area": "commerce",
       "outcome": "Design what they sell: a block of days and what it lets a client do",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "package-contradictions",
       "persona": "owner",
       "area": "commerce",
       "outcome": "Be told when a package sells something it also switches off",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "package-sell",
@@ -686,7 +686,7 @@
       "persona": "owner",
       "area": "commerce",
       "outcome": "Give somebody access directly, with a reason, recorded",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "package-buy",
@@ -700,28 +700,28 @@
       "persona": "client",
       "area": "commerce",
       "outcome": "See how many days they have left, per thing they hold",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "access-capabilities",
       "persona": "client",
       "area": "commerce",
       "outcome": "See what their package actually lets them do",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "access-override",
       "persona": "owner",
       "area": "commerce",
       "outcome": "Make an exception for one client without changing the package",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "access-repair",
       "persona": "owner",
       "area": "commerce",
       "outcome": "Correct somebody's remaining days by hand, with a reason, audited",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "redemption-code",
@@ -749,7 +749,7 @@
       "persona": "client",
       "area": "commerce",
       "outcome": "See what they have bought from this studio",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "lapse-ladder",

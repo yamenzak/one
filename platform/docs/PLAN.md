@@ -1006,6 +1006,15 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-declared-permission-is-a-held-one` | an operation refusing every caller forever, including the owner, with a 403 indistinguishable from a permission somebody forgot to grant | **live** |
 | `nobody-grants-what-they-lack` | a two-step escalation — anybody who can edit permissions grants themselves the key they lack, then uses it, and the only sign is that somebody has been an owner for a month | **live** |
 | `a-narrowing-is-a-diff` | a stored permission set instead of an exception — so a role gaining a key next month reaches nobody who was ever narrowed, and one losing a key keeps working for them | **live** |
+| `row-scope-is-discharged` | the obligation `check` returns and nothing performs — any customer holding an ordinary read permission names somebody else's id and is answered, which for a studio's roster is every client reading every other client's packages, days and purchases | **live** |
+| `row-scope-does-not-narrow-staff` | a coach locked out of their own clients because the rule was applied to callers it says nothing about | **live** |
+| `a-customer-flag-withholds-from-customers` | the customer gate exactly backwards — an absent set defaulting to refused, so the product is withheld from the workspace paying for it while its customers sail through | **live** |
+| `a-lapsed-customer-keeps-their-history` | holding somebody's own records hostage over a payment — a customer flag that gated reads would take away every meal, set and measurement they logged themselves | **live** |
+| `a-withheld-lens-is-absent-not-empty` | a quietly thinner payload, which makes 'not in your package' and 'nothing recorded' the same answer — so no screen can tell them apart either | **live** |
+| `an-exception-is-a-diff` | a replacement set, which freezes somebody at whatever the package said the day the exception was written — so editing the package reaches everybody except the people somebody took the trouble to think about | **live** |
+| `a-repair-is-not-a-purchase` | a correction written into the grant ledger, after which 'what have they bought from us' has no answer — and a once-per-customer package can never be sold again | **live** |
+| `the-soonest-scope-is-what-warns` | warning on the headline runway, which is a maximum — so somebody with ninety days of training and three of nutrition reads as fully covered | **live** |
+| `no-expiry-is-not-an-expiry` | every client who never bought anything at the top of the attention list, which is the fastest way to teach a coach to stop opening it | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

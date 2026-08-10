@@ -123,9 +123,25 @@ describe("the customer rail is mounted only where an app declares one", () => {
     expect(customerOperations(app({}))).toEqual([]);
   });
 
-  it("mounts the offer, the grant and the explanation when it does", () => {
+  it("mounts the offer, the grant, the explanation and the corrections when it does", () => {
     const ids = customerOperations(app({ access: withRail })).map((op) => op.id).sort();
-    expect(ids).toEqual(["commerce.capabilities", "commerce.grant", "commerce.package.save", "commerce.packages"]);
+    expect(ids).toEqual([
+      "commerce.capabilities", "commerce.days", "commerce.grant", "commerce.history",
+      "commerce.override", "commerce.package.save", "commerce.packages",
+    ]);
+  });
+
+  /*
+    ⚠️ THE THREE WRITES A WORKSPACE MAKES ABOUT ONE PERSON ARE ALL OUT OF REACH
+    OF AN ASSISTANT. Granting access, excepting somebody from what they bought
+    and correcting their remaining days are decisions about a customer's money;
+    a model that can take them can be talked into taking them.
+  */
+  it("keeps every per-customer write away from the assistant", () => {
+    const ops = customerOperations(app({ access: withRail }));
+    for (const id of ["commerce.grant", "commerce.override", "commerce.days"]) {
+      expect(ops.find((op) => op.id === id)?.tool, id).toBe(false);
+    }
   });
 
   /*

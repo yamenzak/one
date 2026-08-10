@@ -73,7 +73,7 @@ without one.
 | `[x]` | `plan-choose` | owner | Choose a plan and pay for it |
 | `[x]` | `standing` | owner | Know where they stand when a payment fails, and how to fix it |
 | | **body** | | |
-| `[ ]` | `body-report` | client | See how their body has changed over months, not days |
+| `[x]` | `body-report` | client | See how their body has changed over months, not days |
 | `[ ]` | `body-scan` | client | Estimate body composition from photographs, guided through the poses |
 | `[ ]` | `body-scan-voice` | client | Be talked through a scan hands-free |
 | `[x]` | `measurements` | client | Record their weight and measurements and see them move |
@@ -91,19 +91,19 @@ without one.
 | `[x]` | `goal-set` | trainer | Set a goal with a number and a date |
 | `[x]` | `goal-track` | client | See how far along a goal is without doing the arithmetic |
 | | **commerce** | | |
-| `[ ]` | `access-capabilities` | client | See what their package actually lets them do |
-| `[ ]` | `access-override` | owner | Make an exception for one client without changing the package |
-| `[ ]` | `access-repair` | owner | Correct somebody's remaining days by hand, with a reason, audited |
-| `[ ]` | `access-runway` | client | See how many days they have left, per thing they hold |
+| `[x]` | `access-capabilities` | client | See what their package actually lets them do |
+| `[x]` | `access-override` | owner | Make an exception for one client without changing the package |
+| `[x]` | `access-repair` | owner | Correct somebody's remaining days by hand, with a reason, audited |
+| `[x]` | `access-runway` | client | See how many days they have left, per thing they hold |
 | `[ ]` | `lapse-ladder` | owner | Decide what happens to a client whose access ran out, and when |
-| `[ ]` | `package-build` | owner | Design what they sell: a block of days and what it lets a client do |
+| `[x]` | `package-build` | owner | Design what they sell: a block of days and what it lets a client do |
 | `[ ]` | `package-buy` | client | Buy access from their studio and start using it immediately |
-| `[ ]` | `package-contradictions` | owner | Be told when a package sells something it also switches off |
-| `[ ]` | `package-grant` | owner | Give somebody access directly, with a reason, recorded |
+| `[x]` | `package-contradictions` | owner | Be told when a package sells something it also switches off |
+| `[x]` | `package-grant` | owner | Give somebody access directly, with a reason, recorded |
 | `[ ]` | `package-manual` | owner | Confirm a payment taken outside the product, without a provider at all |
 | `[ ]` | `package-sell` | owner | Take payment on their own provider, in their own country |
 | `[ ]` | `promo-code` | owner | Discount their own prices with a code they control |
-| `[ ]` | `purchase-history` | client | See what they have bought from this studio |
+| `[x]` | `purchase-history` | client | See what they have bought from this studio |
 | `[ ]` | `redeem` | client | Redeem a code and see the days arrive |
 | `[ ]` | `redemption-code` | owner | Issue a code that tops somebody's access up |
 | | **content** | | |

@@ -20,6 +20,7 @@ import {
   type SqlHandle,
   type FlagDef,
   type PackageSpec,
+  type Runway,
   type StandingState,
   extendBudget,
   heldEntitlements,
@@ -302,6 +303,26 @@ export async function readAccess(db: SqlHandle, tenantId: string, subjectId: str
 }
 
 /**
+ * Every customer's runway in one read.
+ *
+ * ⚠️ ONE QUERY FOR THE WHOLE ROSTER, NOT ONE PER PERSON. "Whose access is about
+ * to run out" is a question asked of everybody at once, and a read that fans out
+ * per customer gets slower exactly as a workspace succeeds. `readAccess` is the
+ * per-person answer and is the wrong shape for this.
+ *
+ * Customers with no access at all are ABSENT rather than present with zero:
+ * nothing of theirs is running out, because they hold nothing.
+ */
+export async function runwayAcross(
+  db: SqlHandle, tenantId: string, at: Instant,
+): Promise<ReadonlyMap<string, Runway>> {
+  const rows = await db.all<{ subject_id: string; budgets_json: string }>(
+    `SELECT subject_id, budgets_json FROM subject_access WHERE tenant_id = ?`, tenantId,
+  );
+  return new Map(rows.map((r) => [r.subject_id, runwayFor(json(r.budgets_json) as never, at)]));
+}
+
+/**
  * Apply a package to a customer.
  *
  * ⚠️ A REPEAT PURCHASE FOLDS INTO THE ROW THAT IS ALREADY OPEN, so the row's own
@@ -341,6 +362,89 @@ export async function applyPackage(
   );
   await recordGrant(db, tenantId, subjectId, pkg.id, at, ref);
   return { daysAdded, budgets };
+}
+
+/**
+ * The sparse per-customer exception a workspace sets by hand.
+ *
+ * ⚠️ A DIFF, AND `null` ON A KEY MEANS "BACK TO THE PACKAGE". That only works
+ * because it is a diff: a replacement set would freeze somebody at whatever the
+ * package said the day the exception was written, so editing the package would
+ * reach everybody except the people somebody had taken the trouble to think
+ * about.
+ *
+ * ⚠️ AND IT CANNOT WIDEN A LAPSED BUDGET OR THE WORKSPACE'S OWN PLAN. Both gates
+ * run AFTER the merge — see `explainCustomerFlags` — so this is an exception
+ * within what was sold, never a way around what was paid for.
+ */
+export async function setOverrides(
+  db: SqlHandle,
+  tenantId: string,
+  subjectId: string,
+  changes: Readonly<Record<string, boolean | null>>,
+  at: Instant,
+): Promise<void> {
+  const current = await readAccess(db, tenantId, subjectId);
+  const next: Record<string, boolean | null> = { ...current.overrides };
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === null) delete next[key];
+    else next[key] = value;
+  }
+  await db.run(
+    `INSERT INTO subject_access (tenant_id, subject_id, package_id, flags_json, overrides_json, budgets_json, updated_at)
+     VALUES (?, ?, NULL, '{}', ?, '{}', ?)
+     ON CONFLICT(tenant_id, subject_id) DO UPDATE SET overrides_json = excluded.overrides_json, updated_at = excluded.updated_at`,
+    tenantId, subjectId, JSON.stringify(next), at,
+  );
+}
+
+/**
+ * Set what is left of one scope, in days, by hand.
+ *
+ * ⚠️ THE ONE WRITE IN THIS ECONOMY WITH NO PRICE BEHIND IT, which is exactly why
+ * it is separate from a grant: a repair is not a purchase, it must not appear in
+ * the grant ledger as one, and somebody has to be able to correct a mistake
+ * without inventing a package to do it with.
+ *
+ * Zero ENDS the scope rather than removing it — "they have none left" and "they
+ * never had this" are different facts, and a screen that cannot tell them apart
+ * shows a lapsed customer as one who never bought.
+ */
+export async function setRemainingDays(
+  db: SqlHandle,
+  tenantId: string,
+  subjectId: string,
+  scope: string,
+  days: number,
+  at: Instant,
+): Promise<Readonly<Record<string, Instant>>> {
+  const current = await readAccess(db, tenantId, subjectId);
+  const budgets: Record<string, Instant> = { ...current.budgets };
+  budgets[scope] = new Date(Date.parse(at) + Math.max(0, days) * 86_400_000).toISOString() as Instant;
+  await db.run(
+    `INSERT INTO subject_access (tenant_id, subject_id, package_id, flags_json, overrides_json, budgets_json, updated_at)
+     VALUES (?, ?, NULL, '{}', '{}', ?, ?)
+     ON CONFLICT(tenant_id, subject_id) DO UPDATE SET budgets_json = excluded.budgets_json, updated_at = excluded.updated_at`,
+    tenantId, subjectId, JSON.stringify(budgets), at,
+  );
+  return budgets;
+}
+
+/**
+ * What a customer has actually been given, in order.
+ *
+ * ⚠️ THE LEDGER, NOT THE LIVE ROW. A repeat purchase folds into the row already
+ * open, so the row remembers only the package that opened it — the ledger is the
+ * only place "what have they bought from us" has an answer.
+ */
+export async function grantsFor(
+  db: SqlHandle, tenantId: string, subjectId: string,
+): Promise<readonly { readonly packageId: string; readonly at: Instant; readonly ref: string | null }[]> {
+  const rows = await db.all<{ package_id: string; at: string; ref: string | null }>(
+    `SELECT package_id, at, ref FROM package_grant WHERE tenant_id = ? AND subject_id = ? ORDER BY at DESC LIMIT 200`,
+    tenantId, subjectId,
+  );
+  return rows.map((r) => ({ packageId: r.package_id, at: r.at as Instant, ref: r.ref }));
 }
 
 /**

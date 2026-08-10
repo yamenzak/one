@@ -434,6 +434,14 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     ...op,
     ...(spec.entitlement ? { entitlement: spec.entitlement } : {}),
     ...(spec.quota && ADDS.has(op.id) ? { quota: spec.quota } : {}),
+    /*
+      ⚠️ WRITES ONLY, for the reason stated on the declaration: a lapsed
+      customer's history is something they recorded themselves, and taking it
+      away is holding their own records hostage rather than withholding a
+      product. Reads stay open at every rung of the customer ladder, exactly as
+      they do at every rung of the payment one.
+    */
+    ...(spec.customerFlag && op.kind === "write" ? { customerFlag: spec.customerFlag } : {}),
   }));
   return gated as unknown as readonly AnyOperation[];
 }

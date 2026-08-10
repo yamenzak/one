@@ -39,6 +39,8 @@
     "portion:write",
     "programme:read",
     "programme:write",
+    "report:read",
+    "report:read",
     "set:read",
     "set:write",
     "workout:read",

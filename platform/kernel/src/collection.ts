@@ -203,6 +203,22 @@ export interface CollectionSpec {
    */
   readonly entitlement?: string;
   readonly quota?: string;
+  /**
+   * ⚠️ WHAT THE WORKSPACE'S OWN CUSTOMER MUST HAVE BOUGHT, and it gates WRITES
+   * ONLY.
+   *
+   * The difference from `entitlement` is not an oversight. An entitlement is
+   * "this workspace never bought that", so there is usually nothing to read; a
+   * customer flag is "this person's access has run out", and their history is
+   * something they recorded themselves. Withholding it is holding somebody's own
+   * records hostage over a payment, which is a different thing from withholding
+   * a product — and it is the same argument that already spares reads from a
+   * quota.
+   *
+   * So a lapsed customer keeps every meal, set and measurement they ever logged,
+   * and cannot add another until they renew.
+   */
+  readonly customerFlag?: string;
   readonly activity?: boolean;
   readonly search?: readonly string[];
   readonly offline?: OfflinePolicy;

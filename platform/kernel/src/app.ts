@@ -449,6 +449,7 @@ export function coverage(spec: {
   for (const c of spec.collections) {
     if (c.entitlement) gated.add(c.entitlement);
     if (c.quota) quotaed.add(c.quota);
+    if (c.customerFlag) flagged.add(c.customerFlag);
   }
   /*
     ⚠️ THE PLATFORM'S OWN DERIVED OPERATIONS COUNT TOO. An app that declares a

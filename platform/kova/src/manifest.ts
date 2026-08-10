@@ -15,7 +15,8 @@
 
 import { daysBetween, daysLeft, progressOf } from "./goals.js";
 import { energyOf, overDays, portionOf, totalOf, type Macros } from "./nutrition.js";
-import { bestOf, consistency, expectedOver, needing, prescribedPerWeek } from "./reading.js";
+import { bestOf, consistency, expectedOver, needing, prescribedPerWeek, soonest } from "./reading.js";
+import { runwayAcross } from "@one/runtime";
 import {
   UNLIMITED,
   cache, collection, defineApp, defineBindings, field,
@@ -174,6 +175,8 @@ export const workouts = collection({
   id: "workout",
   label: { one: "Workout", many: "Workouts" },
   scope: { of: "subject", subject: "client" },
+  /* ⚠️ Their own history stays readable when the days run out. See `customerFlag`. */
+  customerFlag: "training",
   version: true,
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
@@ -201,6 +204,7 @@ export const sets = collection({
   id: "set",
   label: { one: "Set", many: "Sets" },
   scope: { of: "subject", subject: "client" },
+  customerFlag: "training",
   version: true,
   retention: { days: null, onTenantClose: "export-then-purge" },
   /* ⚠️ Purged rather than archived: a set mistyped mid-workout is noise, and an
@@ -267,6 +271,7 @@ export const portions = collection({
   id: "portion",
   label: { one: "Portion", many: "Portions" },
   scope: { of: "subject", subject: "client" },
+  customerFlag: "nutrition",
   version: true,
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "purge" },
@@ -337,6 +342,7 @@ export const entries = collection({
  */
 export const checkins = collection({
   id: "checkin",
+  customerFlag: "checkins",
   label: { one: "Check-in", many: "Check-ins" },
   scope: { of: "subject", subject: "client" },
   version: true,
@@ -599,6 +605,13 @@ export const attention = operation<Bindings, Record<string, never>, { rows: unkn
       ctx.tenantId, ctx.tenantId,
     );
 
+    /*
+      ⚠️ ACCESS RUNNING OUT IS THE ONE REASON A COACH CAN ACT ON BEFORE IT
+      HAPPENS, which is why it is on this list at all — every other reason here
+      is already true of somebody.
+    */
+    const runway = await runwayAcross(ctx.bind.db, ctx.tenantId, ctx.now());
+
     const lastSeen = new Map(quiet.map((r) => [r.client_id, r.last]));
     const unanswered = new Map(waiting.map((r) => [r.client_id, r.oldest]));
     const now = new Map(latest.map((r) => [`${r.client_id}:${r.kind}`, r.value]));
@@ -626,8 +639,7 @@ export const attention = operation<Bindings, Record<string, never>, { rows: unkn
           quietFor: since(lastSeen.get(p.id) ?? joined(p)) ?? 0,
           unansweredFor: since(unanswered.get(p.id) ?? null),
           overdueBy: since(behind.get(p.id) ?? null),
-          /* DEFER(one-171) stage:7 — `endingIn` needs the access economy, which is Kova 0.5. */
-          endingIn: null,
+          endingIn: soonest(runway.get(p.id)?.byScope ?? {}),
           joinedAgo: since(joined(p)) ?? 0,
         },
       }))),
@@ -652,15 +664,37 @@ export const attention = operation<Bindings, Record<string, never>, { rows: unkn
 export const report = operation<
   Bindings,
   { clientId: string; days?: number },
-  { window: unknown; body: unknown; training: unknown; nutrition: unknown },
+  { window: unknown; body: unknown; training: unknown; nutrition: unknown; included?: unknown },
   "platform.not_found"
 >({
   id: "client.report",
   kind: "read",
   summary: "One client's whole picture over a window: body, training and nutrition.",
   input: s.object({ clientId: s.text({ max: 40 }), days: s.optional(s.number({ integer: true, min: 1, max: 365 })) }),
-  output: s.object({ window: s.json(), body: s.json(), training: s.json(), nutrition: s.json() }),
-  permission: "client:read",
+  /* ⚠️ `included` is merged in by the platform — see `Ctx.included`. */
+  output: s.object({ window: s.json(), body: s.json(), training: s.json(), nutrition: s.json(), included: s.json() }),
+  /*
+    ⚠️ ITS OWN PERMISSION, BECAUSE TWO PEOPLE READ THIS AND ONE OF THEM IS THE
+    SUBJECT. `client:read` is a staff key — it also opens the roster, so giving
+    it to a client to let them see their own report would show them everybody
+    else's name. One report, both personas, and the ROW SCOPE below is what makes
+    that safe rather than a second endpoint that drifts.
+  */
+  permission: "report:read",
+  /*
+    ⚠️ A CLIENT MAY ASK ABOUT THEMSELVES AND NOBODY ELSE. Staff have no subject,
+    so their reach is decided by their permissions; a caller who IS a subject is
+    narrowed to their own by the platform, before the handler runs.
+  */
+  scope: (i: { clientId: string }) => ({ subject: i.clientId }),
+  /*
+    ⚠️ SHAPED RATHER THAN GATED, and the three lenses are why. Refusing the whole
+    report would take the goals and the check-in history down with the sold
+    lenses; returning everything gives away what nobody paid for. `included`
+    travels with the answer so a screen can say "not in your package" rather than
+    drawing an empty chart.
+  */
+  shape: { body: "progress", training: "progress", nutrition: "progress" },
   idempotency: { mode: "none" },
   fails: ["platform.not_found"],
   help: "reports" as never,
@@ -755,9 +789,17 @@ export const report = operation<
     const days = [...perDay.values()].map((portions) => totalOf(portions));
     const average = overDays(days);
 
+    /*
+      ⚠️ WITHHELD MEANS ABSENT, NOT EMPTY, and `included` beside it is what makes
+      the two distinguishable. A lens returned as `{}` reads as "nothing
+      recorded", which is a lie about somebody's month rather than a statement
+      about their package.
+    */
+    const withheld = (lens: "body" | "training" | "nutrition") => ctx.included[lens] === false;
+
     return {
       window: { since, until, days: span, client: { id: who!.id, name: who!.name } },
-      body: {
+      body: withheld("body") ? null : {
         latest: Object.fromEntries([...latest].map(([kind, r]) => [kind, { day: r.day, value: r.value }])),
         goals: goalRows.map((g) => {
           const current = latest.get(g.kind)?.value;
@@ -770,7 +812,7 @@ export const report = operation<
           };
         }),
       },
-      training: {
+      training: withheld("training") ? null : {
         workouts: done.length,
         /*
           ⚠️ REPORTED, NOT ONLY DIVIDED BY. "Nine of fourteen" answers a
@@ -783,7 +825,7 @@ export const report = operation<
         consistency: consistency(done.length, expectedOver(asks, span)),
         bests,
       },
-      nutrition: {
+      nutrition: withheld("nutrition") ? null : {
         /* ⚠️ The mean carries the day count, because an average over two days is
            a different claim from an average over twenty-eight. */
         days: average.days,
@@ -801,14 +843,14 @@ const STAFF = [
   "workout:read", "workout:write", "set:read", "set:write", "entry:read", "entry:write",
   "food:read", "food:write", "portion:read", "portion:write",
   "checkin:read", "checkin:write", "goal:read", "goal:write",
-  "inbox:read", "file:read", "file:write", "guide:read", "milestone:read", "commerce:read",
+  "inbox:read", "file:read", "file:write", "guide:read", "milestone:read", "commerce:read", "report:read",
 ];
 
 export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.5.0",
+  manifestVersion: "0.6.0",
   bindings,
 
   identity: {
@@ -841,7 +883,7 @@ export const kova = defineApp({
   access: {
     permissions: [
       ...STAFF, "workspace:create", "workspace:close", "billing:manage", "billing:operate", "commerce:manage",
-      "member:read", "member:manage",
+      "member:read", "member:manage", "report:read",
     ],
     roles: {
       /*
@@ -866,6 +908,9 @@ export const kova = defineApp({
         /* ⚠️ A client WRITES a check-in and READS the answer; replying is staff's. */
         "checkin:read", "checkin:write", "goal:read",
         "inbox:read", "guide:read", "milestone:read", "file:read", "commerce:read",
+        /* ⚠️ Their OWN report. The row scope on `client.report` is what stops it
+           being anybody else's. */
+        "report:read",
       ],
       /*
         ⚠️ WHAT SOMEBODY MAY DO ON THE OPERATOR DOOR, where there is no studio to
@@ -922,18 +967,65 @@ export const kova = defineApp({
       },
     ],
 
-    /*
-      ⚠️ THE RAIL IS OPEN AND NOTHING IS SOLD THROUGH IT YET. A studio sells
-      access to its own clients, and that is version 0.3 — declaring the rail now
-      is honest (the surface exists, empty) and declaring flags for it would not
-      be, because nothing gates them.
-    */
     /* ⚠️ A CLIENT RECORD IS THE CUSTOMER, not the account that signs in. A coach
        acts on somebody's behalf all day; resolving the caller's own account as
        the subject would give the coach the client's package and the client
        nothing. The membership names the record, on the invitation. */
     customerRail: "record",
-    customerFlags: {},
+
+    /*
+      ⚠️ WHAT A STUDIO SELLS THE PEOPLE IT COACHES, and it is NOT the first rail
+      again. `training` here is the capability a CLIENT bought from their studio;
+      `training` in `entitlements` above is what the STUDIO bought from us. They
+      share a word because they are the same feature seen from two sides, and a
+      person's real capability is the INTERSECTION — which is why each one names
+      the entitlement it requires rather than the platform assuming a match.
+    */
+    customerFlags: {
+      training: {
+        label: "Training programmes",
+        enforcement: "gate",
+        /* ⚠️ The bucket of DAYS that gates it. Runs out, and the flag goes off. */
+        scope: "coaching",
+        requires: "training",
+        parked: false,
+      },
+      nutrition: {
+        label: "Meal plans and food logging",
+        enforcement: "gate",
+        scope: "nutrition",
+        parked: false,
+      },
+      checkins: {
+        label: "Weekly check-ins",
+        enforcement: "gate",
+        scope: "coaching",
+        parked: false,
+      },
+      /*
+        ⚠️ SHAPED, NOT GATED, and this is the case the rule exists for. One report
+        carries the body, the training and the nutrition lenses; refusing it
+        outright takes the ungated halves down with the sold one, and returning a
+        quietly thinner payload makes "withheld" and "empty" the same answer. It
+        reports what it withheld instead.
+      */
+      progress: {
+        label: "Progress reports",
+        enforcement: "shape",
+        scope: "coaching",
+        parked: false,
+      },
+      /*
+        ⚠️ THE ONE HONEST EXEMPTION. A day's macros are computed from the food
+        the person logged themselves — there is nothing a route could withhold
+        without breaking the logging that produced it.
+      */
+      macros: {
+        label: "Daily macro totals",
+        enforcement: { derived: "computed from the client's own entries; withholding it would break logging" },
+        parked: true,
+      },
+    },
     seats: { counts: ["owner", "trainer", "assistant"] },
     /* ⚠️ What somebody holds before they belong to a studio: opening one. A coach
        invited to somebody else's studio arrives with a membership and needs
@@ -1136,6 +1228,18 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.6.0",
+      at: "2026-08-10",
+      notes: [
+        "Design what you sell: a block of days and what it lets a client do. The builder tells you when a package sells something it also switches off.",
+        "Give somebody access, see how many days they have left per thing they hold, and read what they have been given.",
+        "Make an exception for one client without changing the package — and clear it to put them back on it.",
+        "Correct somebody's remaining days by hand, with a reason, recorded as a correction rather than as a purchase.",
+        "A client whose access has run out keeps everything they ever logged and cannot add more until they renew.",
+        "Somebody whose access is nearly up now appears on your list before it happens.",
+      ],
+    },
     {
       version: "0.5.0",
       at: "2026-08-10",

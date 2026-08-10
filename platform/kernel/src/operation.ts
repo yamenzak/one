@@ -116,6 +116,19 @@ export interface Ctx<B extends BindingSpec> {
    * An app that filled it in for staff would hide the roster from the coach.
    */
   readonly subjectId?: string;
+  /**
+   * WHICH OF THIS OPERATION'S DECLARED `shape` KEYS THIS CALLER MAY SEE.
+   *
+   * ⚠️ THE HANDLER WITHHOLDS; THE PLATFORM REPORTS. Only the handler knows what
+   * to leave out of its own payload, and only the platform knows what the caller
+   * bought — so the decision is resolved once, here, and the same map is merged
+   * into the response as `included`. That is what makes "withheld" and "empty"
+   * different answers on the wire, which is the whole reason shaping exists
+   * instead of refusing.
+   *
+   * Empty for an operation that declares no shape.
+   */
+  readonly included: Readonly<Record<string, boolean>>;
   readonly region: RegionId;
   /** ⚠️ Injected, so a test is deterministic and a handler cannot read a wall clock. */
   now(): Instant;

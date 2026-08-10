@@ -121,6 +121,23 @@ export function expectedOver(perWeek: number | null, days: number): number {
   return Math.round((perWeek * days) / 7);
 }
 
+/**
+ * How long until the first thing somebody holds runs out.
+ *
+ * ⚠️ THE SOONEST, NOT THE HEADLINE. The headline runway is a MAXIMUM across
+ * scopes, which is the right number to show the person themselves — and exactly
+ * the wrong one for a coach, because somebody with sixty days of training and
+ * two of nutrition reads as sixty days covered. What needs acting on is the one
+ * that ends first.
+ *
+ * Null when they hold nothing: there is no expiry to warn about, and a zero
+ * would put every client who never bought anything at the top of the list.
+ */
+export function soonest(byScope: Readonly<Record<string, number>>): number | null {
+  const days = Object.values(byScope);
+  return days.length ? Math.min(...days) : null;
+}
+
 /* ------------------------------------------------------------ attention --- */
 
 /**

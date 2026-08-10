@@ -1642,6 +1642,87 @@
       "impl": "kova/test/membership.test.ts",
       "proves": "takes one thing away and leaves the rest of the role",
       "fails": "a stored permission set instead of an exception — so a role gaining a key next month reaches nobody who was ever narrowed, and one losing a key keeps working for them"
+    },
+    {
+      "id": "row-scope-is-discharged",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/access.test.ts",
+      "proves": "cannot read another client's report, capabilities or history",
+      "fails": "the obligation `check` returns and nothing performs — any customer holding an ordinary read permission names somebody else's id and is answered, which for a studio's roster is every client reading every other client's packages, days and purchases"
+    },
+    {
+      "id": "row-scope-does-not-narrow-staff",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/access.test.ts",
+      "proves": "does not narrow the coach to anybody",
+      "fails": "a coach locked out of their own clients because the rule was applied to callers it says nothing about"
+    },
+    {
+      "id": "a-customer-flag-withholds-from-customers",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/access.test.ts",
+      "proves": "does not withhold anything from the studio's own staff",
+      "fails": "the customer gate exactly backwards — an absent set defaulting to refused, so the product is withheld from the workspace paying for it while its customers sail through"
+    },
+    {
+      "id": "a-lapsed-customer-keeps-their-history",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/access.test.ts",
+      "proves": "may read, and may not write what is sold",
+      "fails": "holding somebody's own records hostage over a payment — a customer flag that gated reads would take away every meal, set and measurement they logged themselves"
+    },
+    {
+      "id": "a-withheld-lens-is-absent-not-empty",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/access.test.ts",
+      "proves": "withholds the lenses a client did not buy, and says so",
+      "fails": "a quietly thinner payload, which makes 'not in your package' and 'nothing recorded' the same answer — so no screen can tell them apart either"
+    },
+    {
+      "id": "an-exception-is-a-diff",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/access.test.ts",
+      "proves": "puts them back on the package when the exception is cleared",
+      "fails": "a replacement set, which freezes somebody at whatever the package said the day the exception was written — so editing the package reaches everybody except the people somebody took the trouble to think about"
+    },
+    {
+      "id": "a-repair-is-not-a-purchase",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/access.test.ts",
+      "proves": "sets what is left, with a reason, without inventing a purchase",
+      "fails": "a correction written into the grant ledger, after which 'what have they bought from us' has no answer — and a once-per-customer package can never be sold again"
+    },
+    {
+      "id": "the-soonest-scope-is-what-warns",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/access.test.ts",
+      "proves": "names somebody whose soonest scope is nearly done",
+      "fails": "warning on the headline runway, which is a maximum — so somebody with ninety days of training and three of nutrition reads as fully covered"
+    },
+    {
+      "id": "no-expiry-is-not-an-expiry",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/access.test.ts",
+      "proves": "does not warn about an expiry somebody does not have",
+      "fails": "every client who never bought anything at the top of the attention list, which is the fastest way to teach a coach to stop opening it"
     }
   ]
 }
