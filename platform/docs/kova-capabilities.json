@@ -294,7 +294,7 @@
       "persona": "client",
       "area": "training",
       "outcome": "See their own bests, and know when they set a new one",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "exercise-swap-request",
@@ -420,7 +420,7 @@
       "persona": "trainer",
       "area": "nutrition",
       "outcome": "See how a client has been eating, over time, without reading every entry",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "fasting-timer",
@@ -574,14 +574,14 @@
       "persona": "trainer",
       "area": "reports",
       "outcome": "See one client's whole picture: body, training, nutrition, consistency",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "roster-activity",
       "persona": "owner",
       "area": "reports",
       "outcome": "See who on the roster is active and who has gone quiet",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "roster-analytics",
@@ -595,14 +595,14 @@
       "persona": "owner",
       "area": "reports",
       "outcome": "See who is at risk of leaving before they leave",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "attention",
       "persona": "trainer",
       "area": "reports",
       "outcome": "Be told who needs them today rather than deciding by scrolling",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "content-write",

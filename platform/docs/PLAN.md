@@ -982,6 +982,17 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `submitted-words-stop-moving` | a report that can be quietly rewritten after somebody replied to it, which makes the reply meaningless | **live** |
 | `goal-measures-from-the-baseline` | progress computed as current over target — it says somebody at 90 kg aiming for 75 is 120% done before they have lost a gram, and that somebody who gained is doing better | **live** |
 | `overdue-is-not-clamped` | a deadline clamped at zero, so a product says '0 days left' forever instead of '11 days late' | **live** |
+| `deployment-that-cannot-charge-serves-its-floor` | a self-host, or a deployment before its payment step, held at the parking allowances forever — one of everything, with no plan to buy and therefore no way out, punished for OUR missing configuration | **live** |
+| `floor-plan-never-displaces-a-real-one` | a deployment that starts charging quietly re-pricing every workspace that had already bought something | **live** |
+| `new-arrival-is-not-a-quiet-one` | somebody who joined on Tuesday listed as having gone silent, because their coach entered the training they already did — a list that cries wolf is worse than none | **live** |
+| `silence-counts-from-arrival` | the quietest person on a roster reading as fine forever, because 'days since they last did anything' has no answer and an absent fact reads as nothing to report | **live** |
+| `reached-early-is-not-overdue` | a goal past its date raised as missed for somebody who reached it early — a product telling a coach off for a success | **live** |
+| `waiting-on-a-reply-comes-first` | the one person waiting on us buried under people who never wrote, which is what a sort by days-since-anything produces | **live** |
+| `no-hand-written-table-name` | a table name typed into a handler — every collection route keeps working and only the one query that spells it out 503s, which is how `entrys` shipped as `entries` | **live** |
+| `report-average-over-days-logged` | two carefully logged days divided by a twenty-eight-day window — a product telling somebody they ate sixty calories a day, which is wrong, alarming, and produced by mistaking silence for abstinence | **live** |
+| `best-set-is-worth-not-weight` | a personal best sorted by what was on the bar, which tells somebody their hardest session was their easiest — and a report showing the estimate rather than the set they actually did | **live** |
+| `no-programme-is-not-nought-per-cent` | a consistency bar at 0% for somebody nobody prescribed anything to — an accusation about sessions that a parsing failure or an empty block invented | **live** |
+| `report-is-computed-never-kept` | a report written to a table, which is wrong the moment anybody corrects an entry and is wrong silently — nothing about a stale number looks stale | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

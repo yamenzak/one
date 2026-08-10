@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import {
   NO_OVERRIDES, UNLIMITED,
   balanceOf, charsPerUnit, daysRemaining, explainCustomerFlags, explainEntitlements,
-  extendBudget, gateFor, heldEntitlements, mayPurchase, packageContradictions,
+  extendBudget, floorPlan, gateFor, heldEntitlements, mayPurchase, packageContradictions,
   parkingAboveFloor, planRun, resolveCustomerFlags, resolveEntitlements, reversal,
   runwayFor, settle, withinQuota,
   type Allowance, type EntitlementDef, type FlagDef, type Instant, type PackageSpec, type PlanSpec,
@@ -125,6 +125,44 @@ describe("what the workspace bought", () => {
   it("compares against the CHEAPEST plan, not the first declared", () => {
     const pro: PlanSpec = { ...starter, id: "pro", price: { minor: 2900, currency: "USD" }, entitlements: { ...starter.entitlements, seats: 20 } };
     expect(parkingAboveFloor({ ...declared, seats: { label: "Some capability", parked: 10, enforcement: "quota" } }, [pro, starter])).toEqual(["seats"]);
+  });
+
+  /*
+    ⚠️ AND THE OTHER HALF OF THE SAME RULE, which is the one that had no test.
+    The parking state sits below the entry plan on purpose — fair only where
+    paying is possible. With no payment provider there is no plan to buy, so
+    holding a workspace at the parking floor punishes it for OUR missing
+    configuration and there is no way out at all. `standingFor` already stands
+    down in exactly that case; without this the gate opens onto a product that
+    permits one of everything.
+  */
+  it("serves the cheapest plan where nothing can be bought", () => {
+    const pro: PlanSpec = { ...starter, id: "pro", price: { minor: 2900, currency: "USD" }, entitlements: { ...starter.entitlements, seats: 20 } };
+    expect(floorPlan([pro, starter])!.id).toBe("starter");
+    expect(floorPlan([])).toBeNull();
+
+    const r = explainEntitlements({
+      declared, plan: null, overrides: NO_OVERRIDES, gate: OPEN, floorPlan: floorPlan([pro, starter]),
+    });
+    /* ⚠️ Its own source. "plan" would claim they are on one they never bought. */
+    expect(r.seats).toEqual({ value: 3, from: "floor", planValue: 3 });
+    expect(r.reports!.value).toBe(true);
+  });
+
+  /*
+    ⚠️ A REAL PLAN ALWAYS WINS, so a deployment that starts charging does not
+    quietly re-price everybody who had already bought something.
+  */
+  it("never displaces a plan the workspace actually has", () => {
+    const pro: PlanSpec = { ...starter, id: "pro", price: { minor: 2900, currency: "USD" }, entitlements: { ...starter.entitlements, seats: 20 } };
+    const r = explainEntitlements({ declared, plan: pro, overrides: NO_OVERRIDES, gate: OPEN, floorPlan: starter });
+    expect(r.seats).toEqual({ value: 20, from: "plan", planValue: 20 });
+  });
+
+  /* The clamp is still last: being unable to charge is not a way past the ladder. */
+  it("is still withheld when the workspace is blocked", () => {
+    const r = explainEntitlements({ declared, plan: null, overrides: NO_OVERRIDES, gate: SHUT, floorPlan: starter });
+    expect(r.seats).toEqual({ value: 0, from: "withheld", planValue: 3 });
   });
 });
 

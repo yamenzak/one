@@ -13,10 +13,13 @@
  * its own release note.
  */
 
+import { daysBetween, daysLeft, progressOf } from "./goals.js";
+import { energyOf, overDays, portionOf, totalOf, type Macros } from "./nutrition.js";
+import { bestOf, consistency, expectedOver, needing, prescribedPerWeek } from "./reading.js";
 import {
   UNLIMITED,
   cache, collection, defineApp, defineBindings, field,
-  objects, operation, s, sql,
+  objects, operation, s, sql, tableNameFor,
   type Currency, type Locale, type RegionId, type TimeZone,
 } from "@one/kernel";
 
@@ -395,6 +398,27 @@ export const goals = collection({
 /* ------------------------------------------------------------ operations --- */
 
 /**
+ * ⚠️ NEVER A HAND-WRITTEN TABLE NAME. The platform derives one from a
+ * collection's id, so a name typed into a handler is a 503 that no other test
+ * can see — every collection route keeps working, and only the one query that
+ * spells it out fails. `entry` derives `entrys`, which is not what anybody
+ * guesses, and it shipped as `entries` until a read that joined two collections
+ * drove it.
+ */
+const T = {
+  clients: tableNameFor(clients),
+  movements: tableNameFor(movements),
+  programmes: tableNameFor(programmes),
+  workouts: tableNameFor(workouts),
+  sets: tableNameFor(sets),
+  foods: tableNameFor(foods),
+  portions: tableNameFor(portions),
+  entries: tableNameFor(entries),
+  checkins: tableNameFor(checkins),
+  goals: tableNameFor(goals),
+} as const;
+
+/**
  * ⚠️ THE ONE THING A COLLECTION COULD NOT IMPLY: publishing is a decision, not a
  * field. It makes exactly one plan current for one person, tells them, and is
  * the event a milestone is a rule over. Writing `current: true` through the
@@ -421,7 +445,7 @@ export const publish = operation<
   help: "programmes" as never,
   async handler(ctx, input: { programmeId: string }) {
     const row = await ctx.bind.db.first<{ id: string; client: string | null; kind: string }>(
-      `SELECT id, client, kind FROM programmes WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
+      `SELECT id, client, kind FROM ${T.programmes} WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
       input.programmeId, ctx.tenantId,
     );
     if (!row) ctx.fail("platform.not_found", { field: "programmeId" });
@@ -439,10 +463,10 @@ export const publish = operation<
       supermarket.
     */
     await ctx.bind.db.run(
-      `UPDATE programmes SET active = 0 WHERE tenant_id = ? AND client = ? AND kind = ?`,
+      `UPDATE ${T.programmes} SET active = 0 WHERE tenant_id = ? AND client = ? AND kind = ?`,
       ctx.tenantId, row!.client, row!.kind,
     );
-    await ctx.bind.db.run(`UPDATE programmes SET active = 1, updated_at = ? WHERE id = ?`, ctx.now(), row!.id);
+    await ctx.bind.db.run(`UPDATE ${T.programmes} SET active = 1, updated_at = ? WHERE id = ?`, ctx.now(), row!.id);
     return { published: row!.id };
   },
 });
@@ -466,11 +490,11 @@ export const complete = operation<Bindings, { workoutId: string }, { completed: 
   fails: ["platform.not_found"],
   async handler(ctx, input: { workoutId: string }) {
     const row = await ctx.bind.db.first<{ id: string }>(
-      `SELECT id FROM workouts WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
+      `SELECT id FROM ${T.workouts} WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
       input.workoutId, ctx.tenantId,
     );
     if (!row) ctx.fail("platform.not_found", { field: "workoutId" });
-    await ctx.bind.db.run(`UPDATE workouts SET docstatus = 1, updated_at = ? WHERE id = ?`, ctx.now(), row!.id);
+    await ctx.bind.db.run(`UPDATE ${T.workouts} SET docstatus = 1, updated_at = ? WHERE id = ?`, ctx.now(), row!.id);
     return { completed: row!.id };
   },
 });
@@ -497,12 +521,276 @@ export const answer = operation<Bindings, { checkinId: string; answer: string },
   help: "checkins" as never,
   async handler(ctx, input: { checkinId: string; answer: string }) {
     const row = await ctx.bind.db.first<{ id: string }>(
-      `SELECT id FROM checkins WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
+      `SELECT id FROM ${T.checkins} WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
       input.checkinId, ctx.tenantId,
     );
     if (!row) ctx.fail("platform.not_found", { field: "checkinId" });
-    await ctx.bind.db.run(`UPDATE checkins SET answer = ?, updated_at = ? WHERE id = ?`, input.answer, ctx.now(), row!.id);
+    await ctx.bind.db.run(`UPDATE ${T.checkins} SET answer = ?, updated_at = ? WHERE id = ?`, input.answer, ctx.now(), row!.id);
     return { answered: row!.id };
+  },
+});
+
+/**
+ * ⚠️ WHO NEEDS YOU TODAY — the one read a coach opens the product for.
+ *
+ * It is an operation because it is a question no collection can answer: it
+ * crosses the roster, the check-ins, the goals and everything anybody recorded,
+ * and it ANSWERS RATHER THAN LISTS. A coach deciding by scrolling is a coach who
+ * misses the person who stopped.
+ *
+ * ⚠️ AND NOTHING IT REPORTS IS STORED. Every reason is derived at read time from
+ * records that already exist, so it cannot go stale and there is no sweep to
+ * forget to run. The ordering — somebody waiting on a reply above somebody who
+ * merely went quiet — is `reading.ts`, tested without a database.
+ */
+export const attention = operation<Bindings, Record<string, never>, { rows: unknown }, never>({
+  id: "coach.attention",
+  kind: "read",
+  summary: "Who needs you today, and why, most urgent first.",
+  input: s.object({}),
+  output: s.object({ rows: s.json() }),
+  permission: "client:read",
+  idempotency: { mode: "none" },
+  help: "attention" as never,
+  async handler(ctx) {
+    const today = ctx.now().slice(0, 10);
+    const since = (day: string | null) => (day ? daysBetween(day, today) : null);
+    /* When they arrived: the date a coach set, or failing that the day the record was made. */
+    const joined = (p: { started_on: string | null; created_at: string }) => p.started_on ?? p.created_at.slice(0, 10);
+
+    const people = await ctx.bind.db.all<{ id: string; name: string; started_on: string | null; created_at: string }>(
+      `SELECT id, name, started_on, created_at FROM ${T.clients} WHERE tenant_id = ? AND deleted_at IS NULL LIMIT 500`,
+      ctx.tenantId,
+    );
+
+    /*
+      ⚠️ ONE QUERY PER FACT ACROSS THE WHOLE ROSTER, not one per person. A read
+      a coach opens every morning that fans out per client is one that gets
+      slower exactly as a studio succeeds.
+    */
+    const quiet = await ctx.bind.db.all<{ client_id: string; last: string }>(
+      `SELECT client_id, MAX(day) AS last FROM ${T.workouts} WHERE tenant_id = ? AND deleted_at IS NULL GROUP BY client_id`,
+      ctx.tenantId,
+    );
+    const waiting = await ctx.bind.db.all<{ client_id: string; oldest: string }>(
+      `SELECT client_id, MIN(until) AS oldest FROM ${T.checkins}
+       WHERE tenant_id = ? AND deleted_at IS NULL AND docstatus = 1 AND (answer IS NULL OR answer = '')
+       GROUP BY client_id`,
+      ctx.tenantId,
+    );
+
+    /*
+      ⚠️ A GOAL PAST ITS DATE IS NOT AUTOMATICALLY OVERDUE — somebody who reached
+      it early is not behind, and telling a coach they are is the quiet lie this
+      whole read exists to avoid. Reaching it is a question about the entries, so
+      the latest of each kind comes back too and `progressOf` decides.
+    */
+    const due = await ctx.bind.db.all<{ client_id: string; kind: string; start: number; target: number; due_on: string }>(
+      `SELECT client_id, kind, start, target, due_on FROM ${T.goals}
+       WHERE tenant_id = ? AND deleted_at IS NULL AND due_on IS NOT NULL AND due_on < ?`,
+      ctx.tenantId, today,
+    );
+    const latest = due.length === 0 ? [] : await ctx.bind.db.all<{ client_id: string; kind: string; value: number }>(
+      `SELECT e.client_id AS client_id, e.kind AS kind, e.value AS value FROM ${T.entries} e
+       JOIN (SELECT client_id, kind, MAX(day) AS day FROM ${T.entries}
+             WHERE tenant_id = ? AND deleted_at IS NULL GROUP BY client_id, kind) newest
+         ON newest.client_id = e.client_id AND newest.kind = e.kind AND newest.day = e.day
+       WHERE e.tenant_id = ? AND e.deleted_at IS NULL`,
+      ctx.tenantId, ctx.tenantId,
+    );
+
+    const lastSeen = new Map(quiet.map((r) => [r.client_id, r.last]));
+    const unanswered = new Map(waiting.map((r) => [r.client_id, r.oldest]));
+    const now = new Map(latest.map((r) => [`${r.client_id}:${r.kind}`, r.value]));
+
+    /* The worst still-unreached goal per person: one number, the oldest miss. */
+    const behind = new Map<string, string>();
+    for (const g of due) {
+      const current = now.get(`${g.client_id}:${g.kind}`);
+      /* No entry of that kind at all means no evidence they got there. */
+      if (current !== undefined && progressOf({ start: g.start, current, target: g.target }).reached) continue;
+      const worst = behind.get(g.client_id);
+      if (!worst || g.due_on < worst) behind.set(g.client_id, g.due_on);
+    }
+
+    return {
+      rows: needing(people.map((p) => ({
+        who: { id: p.id, name: p.name },
+        facts: {
+          /*
+            ⚠️ SILENCE COUNTS FROM THE DAY THEY JOINED WHEN THERE IS NOTHING
+            ELSE. Somebody who has never recorded a thing is the quietest person
+            on a roster, and a fact reading "no data" is a fact that reads as
+            "nothing to report" — so they would stay invisible forever.
+          */
+          quietFor: since(lastSeen.get(p.id) ?? joined(p)) ?? 0,
+          unansweredFor: since(unanswered.get(p.id) ?? null),
+          overdueBy: since(behind.get(p.id) ?? null),
+          /* DEFER(one-171) stage:7 — `endingIn` needs the access economy, which is Kova 0.5. */
+          endingIn: null,
+          joinedAgo: since(joined(p)) ?? 0,
+        },
+      }))),
+    };
+  },
+});
+
+/**
+ * ⚠️ ONE PERSON'S WHOLE PICTURE — body, training, nutrition — computed rather
+ * than kept.
+ *
+ * A coach asking "how is Ro doing" is asking one question, and answering it by
+ * making somebody open four screens and hold the answers in their head is how
+ * the old product's four separate reports came to disagree with each other.
+ *
+ * ⚠️ NOTHING HERE IS STORED, AND THAT IS THE DESIGN RATHER THAN AN OPTIMISATION.
+ * A report written to a table is wrong the moment anybody corrects an entry, and
+ * it is wrong silently — nothing about a stale number looks stale. Correcting a
+ * weigh-in from six weeks ago corrects this, including the goal it was measured
+ * against.
+ */
+export const report = operation<
+  Bindings,
+  { clientId: string; days?: number },
+  { window: unknown; body: unknown; training: unknown; nutrition: unknown },
+  "platform.not_found"
+>({
+  id: "client.report",
+  kind: "read",
+  summary: "One client's whole picture over a window: body, training and nutrition.",
+  input: s.object({ clientId: s.text({ max: 40 }), days: s.optional(s.number({ integer: true, min: 1, max: 365 })) }),
+  output: s.object({ window: s.json(), body: s.json(), training: s.json(), nutrition: s.json() }),
+  permission: "client:read",
+  idempotency: { mode: "none" },
+  fails: ["platform.not_found"],
+  help: "reports" as never,
+  async handler(ctx, input: { clientId: string; days?: number }) {
+    const span = input.days ?? 28;
+    const until = ctx.now().slice(0, 10);
+    const since = new Date(Date.parse(`${until}T00:00:00.000Z`) - span * 86_400_000).toISOString().slice(0, 10);
+
+    const who = await ctx.bind.db.first<{ id: string; name: string }>(
+      `SELECT id, name FROM ${T.clients} WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
+      input.clientId, ctx.tenantId,
+    );
+    if (!who) ctx.fail("platform.not_found", { field: "clientId" });
+
+    /* ------------------------------------------------------------- body --- */
+
+    /*
+      ⚠️ THE LATEST OF EACH KIND, OVER ALL TIME RATHER THAN THE WINDOW. Somebody
+      who did not weigh in this month still has a weight, and a report that
+      showed a blank would read as "they have never recorded one".
+    */
+    const readings = await ctx.bind.db.all<{ kind: string; day: string; value: number }>(
+      `SELECT e.kind AS kind, e.day AS day, e.value AS value FROM ${T.entries} e
+       JOIN (SELECT kind, MAX(day) AS day FROM ${T.entries}
+             WHERE tenant_id = ? AND client_id = ? AND deleted_at IS NULL GROUP BY kind) newest
+         ON newest.kind = e.kind AND newest.day = e.day
+       WHERE e.tenant_id = ? AND e.client_id = ? AND e.deleted_at IS NULL`,
+      ctx.tenantId, input.clientId, ctx.tenantId, input.clientId,
+    );
+    const latest = new Map(readings.map((r) => [r.kind, r]));
+
+    const goalRows = await ctx.bind.db.all<{ id: string; kind: string; start: number; target: number; due_on: string | null; why: string | null }>(
+      `SELECT id, kind, start, target, due_on, why FROM ${T.goals}
+       WHERE tenant_id = ? AND client_id = ? AND deleted_at IS NULL`,
+      ctx.tenantId, input.clientId,
+    );
+
+    /* ---------------------------------------------------------- training --- */
+
+    const done = await ctx.bind.db.all<{ id: string; day: string }>(
+      `SELECT id, day FROM ${T.workouts}
+       WHERE tenant_id = ? AND client_id = ? AND deleted_at IS NULL AND docstatus = 1 AND day >= ? AND day <= ?`,
+      ctx.tenantId, input.clientId, since, until,
+    );
+
+    const following = await ctx.bind.db.first<{ weeks: string }>(
+      `SELECT weeks FROM ${T.programmes}
+       WHERE tenant_id = ? AND client = ? AND kind = 'training' AND active = 1 AND deleted_at IS NULL`,
+      ctx.tenantId, input.clientId,
+    );
+    let asks: number | null = null;
+    if (following) {
+      /* ⚠️ A body that will not parse asks for NOTHING, never for nought. */
+      try { asks = prescribedPerWeek(JSON.parse(following.weeks) as unknown); } catch { asks = null; }
+    }
+
+    /*
+      ⚠️ THE BEST SET PER MOVEMENT, ACROSS ALL TIME. A personal best that reset
+      every four weeks is not a personal best. The window is what the consistency
+      figure is about, not what a record is about.
+    */
+    const lifted = await ctx.bind.db.all<{ movement: string; name: string | null; load: number | null; reps: number | null }>(
+      `SELECT s.movement AS movement, m.name AS name, s.load AS load, s.reps AS reps
+       FROM ${T.sets} s LEFT JOIN ${T.movements} m ON m.id = s.movement
+       WHERE s.tenant_id = ? AND s.client_id = ?`,
+      ctx.tenantId, input.clientId,
+    );
+    const byMovement = new Map<string, { name: string | null; sets: { load: number; reps: number }[] }>();
+    for (const row of lifted) {
+      const seen = byMovement.get(row.movement) ?? { name: row.name, sets: [] };
+      seen.sets.push({ load: row.load ?? 0, reps: row.reps ?? 0 });
+      byMovement.set(row.movement, seen);
+    }
+    const bests = [...byMovement.entries()].flatMap(([id, m]) => {
+      const best = bestOf(m.sets);
+      return best ? [{ movement: id, name: m.name, of: best.of, estimate: best.estimate }] : [];
+    });
+
+    /* --------------------------------------------------------- nutrition --- */
+
+    const eaten = await ctx.bind.db.all<{ day: string; amount: number; per: number; protein: number; carbs: number; fat: number; fibre: number | null }>(
+      `SELECT p.day AS day, p.amount AS amount, f.per AS per, f.protein AS protein, f.carbs AS carbs, f.fat AS fat, f.fibre AS fibre
+       FROM ${T.portions} p JOIN ${T.foods} f ON f.id = p.food
+       WHERE p.tenant_id = ? AND p.client_id = ? AND p.day >= ? AND p.day <= ?`,
+      ctx.tenantId, input.clientId, since, until,
+    );
+    const perDay = new Map<string, Macros[]>();
+    for (const row of eaten) {
+      const of = portionOf({ per: row.per, protein: row.protein, carbs: row.carbs, fat: row.fat, fibre: row.fibre ?? 0 }, row.amount);
+      perDay.set(row.day, [...(perDay.get(row.day) ?? []), of]);
+    }
+    const days = [...perDay.values()].map((portions) => totalOf(portions));
+    const average = overDays(days);
+
+    return {
+      window: { since, until, days: span, client: { id: who!.id, name: who!.name } },
+      body: {
+        latest: Object.fromEntries([...latest].map(([kind, r]) => [kind, { day: r.day, value: r.value }])),
+        goals: goalRows.map((g) => {
+          const current = latest.get(g.kind)?.value;
+          return {
+            id: g.id, kind: g.kind, start: g.start, target: g.target, dueOn: g.due_on, why: g.why,
+            /* ⚠️ Null rather than zero when nothing has been recorded: no progress
+               is not the same as no movement, and a bar at 0% is an accusation. */
+            progress: current === undefined ? null : progressOf({ start: g.start, current, target: g.target }),
+            daysLeft: g.due_on ? daysLeft(until, g.due_on) : null,
+          };
+        }),
+      },
+      training: {
+        workouts: done.length,
+        /*
+          ⚠️ REPORTED, NOT ONLY DIVIDED BY. "Nine of fourteen" answers a
+          different question from "the block asks for three and a half a week",
+          and without this the difference between a programme that asks for
+          nothing and one this cannot read is invisible — which makes `null` a
+          distinction nothing observes and therefore one nothing protects.
+        */
+        prescribedPerWeek: asks,
+        consistency: consistency(done.length, expectedOver(asks, span)),
+        bests,
+      },
+      nutrition: {
+        /* ⚠️ The mean carries the day count, because an average over two days is
+           a different claim from an average over twenty-eight. */
+        days: average.days,
+        mean: average.mean,
+        energy: average.days === 0 ? null : energyOf(average.mean),
+      },
+    };
   },
 });
 
@@ -520,7 +808,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.3.0",
+  manifestVersion: "0.4.0",
   bindings,
 
   identity: {
@@ -680,7 +968,7 @@ export const kova = defineApp({
     },
   },
 
-  operations: [publish, complete, answer],
+  operations: [publish, complete, answer, attention, report],
 
   help: {
     clients: {
@@ -715,6 +1003,16 @@ export const kova = defineApp({
       title: "Logging what you ate",
       body: "Pick the food, say how much, and say which meal it was. The amount is in the food's own unit — two eggs is two, not a hundred and twenty grams. The day's totals come from the portions themselves, so correcting one corrects the day.",
       surfaces: ["portion"],
+    },
+    reports: {
+      title: "Reading how somebody is doing",
+      body: "One picture rather than four screens: where their body is against the goals they set, how much of their programme they actually did, their best sets, and how they have been eating. Nothing here is stored — it is worked out from what has been recorded, so correcting a weigh-in from six weeks ago corrects the report too. An average is over the days that were logged, never over the whole window.",
+      surfaces: ["client", "goal", "entry", "workout", "set", "portion"],
+    },
+    attention: {
+      title: "Who needs you today",
+      body: "Rather than a list of everybody, this is the short list of people something is true about: somebody waiting on a reply, a goal that has passed its date, somebody who has gone quiet. Waiting on a reply comes first, because that is the one person who is waiting on you. Somebody who joined this week is never called quiet.",
+      surfaces: ["client"],
     },
     checkins: {
       title: "Reporting in, and hearing back",
@@ -808,6 +1106,16 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.4.0",
+      at: "2026-08-10",
+      notes: [
+        "See who needs you today — somebody waiting on a reply first, then a goal that has passed its date, then anybody who has gone quiet.",
+        "Read one client's whole picture on one screen: where their body is, how much of their programme happened, their best sets and how they have been eating.",
+        "A best set is chosen by what it was worth rather than what was on the bar, so a heavy single no longer outranks a hard five.",
+        "Nothing in a report is stored, so correcting a weigh-in from six weeks ago corrects the report as well.",
+      ],
+    },
     {
       version: "0.3.0",
       at: "2026-08-10",

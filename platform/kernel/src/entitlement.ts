@@ -95,7 +95,7 @@ export interface PlanSpec {
 
 /* -------------------------------------------------------------- the walk --- */
 
-export type Source = "parked" | "plan" | "grandfathered" | "adjusted" | "withheld";
+export type Source = "parked" | "floor" | "plan" | "grandfathered" | "adjusted" | "withheld";
 
 export interface EntitlementResolution {
   readonly value: Allowance;
@@ -149,12 +149,19 @@ export function explainEntitlements(input: {
   readonly plan: PlanSpec | null;
   readonly overrides: Overrides;
   readonly gate: StandingGate;
+  /**
+   * ⚠️ THE DEPLOYMENT'S OWN FLOOR, when there is no way to buy a plan. See
+   * `floorPlan` — the parking state is only a fair answer where paying is
+   * possible.
+   */
+  readonly floorPlan?: PlanSpec | null;
 }): Readonly<Record<string, EntitlementResolution>> {
   const out: Record<string, EntitlementResolution> = {};
+  const applied = input.plan ?? input.floorPlan ?? null;
   for (const [key, def] of Object.entries(input.declared)) {
-    const planValue = input.plan?.entitlements[key] ?? def.parked;
+    const planValue = applied?.entitlements[key] ?? def.parked;
     let value = planValue;
-    let from: Source = input.plan ? "plan" : "parked";
+    let from: Source = input.plan ? "plan" : applied ? "floor" : "parked";
 
     const held = input.overrides.grandfathered[key];
     if (held !== undefined) {
@@ -215,12 +222,32 @@ export function withinQuota(allowance: Allowance, used: number): boolean {
  * Returns the keys where the parking state is more generous, so the caller can
  * name them. An empty list is the whole of the pass condition.
  */
+/**
+ * The cheapest plan on the shelf — what a deployment that cannot charge serves.
+ *
+ * ⚠️ FAIL CLOSED ON THEIR NON-PAYMENT, OPEN ON OURS. The parking state sits
+ * BELOW the entry plan on purpose, so that not choosing one is never a better
+ * deal than the cheapest. That is only fair where paying is possible: with no
+ * payment provider configured — a self-host, a deployment before its Stripe
+ * step, every test in this repo — there is no plan to buy, so holding a
+ * workspace at the parking floor punishes them for our own missing
+ * configuration and there is no way out. The standing gate already stands down
+ * in exactly this case; the allowances have to as well, or the gate stands down
+ * onto a product that permits one of everything.
+ *
+ * Null when an app sells nothing at all, which leaves the parking values as the
+ * only thing there is.
+ */
+export function floorPlan(plans: readonly PlanSpec[]): PlanSpec | null {
+  return [...plans].sort((a, b) => a.price.minor - b.price.minor)[0] ?? null;
+}
+
 export function parkingAboveFloor(
   declared: Readonly<Record<string, EntitlementDef>>,
   plans: readonly PlanSpec[],
 ): readonly string[] {
-  if (plans.length === 0) return [];
-  const cheapest = [...plans].sort((a, b) => a.price.minor - b.price.minor)[0]!;
+  const cheapest = floorPlan(plans);
+  if (!cheapest) return [];
   return Object.entries(declared)
     .filter(([key, def]) => {
       const paid = cheapest.entitlements[key] ?? def.parked;

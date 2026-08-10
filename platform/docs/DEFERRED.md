@@ -8,4 +8,7 @@ kind: index
 > Every entry is a `DEFER` marker somewhere in the repository. Nothing here
 > was remembered — it was found, which is the point (docs/DOCS-STANDARD.md §2).
 
-Nothing is deferred. Every stage owes nothing to a later one.
+## Stage 7 — Kova migration
+
+- `one-171` — `endingIn` needs the access economy, which is Kova 0.5.  
+  <sub>kova/src/manifest.ts:629</sub>

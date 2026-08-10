@@ -145,7 +145,7 @@ without one.
 | `[ ]` | `meal-plan-arrangements` | trainer | Offer alternatives within a meal so a plan survives real life |
 | `[x]` | `meal-plan-build` | trainer | Write a meal plan: days, meals, options, portions |
 | `[x]` | `meal-plan-follow` | client | See what they are meant to eat today and tick it off |
-| `[ ]` | `nutrition-report` | trainer | See how a client has been eating, over time, without reading every entry |
+| `[x]` | `nutrition-report` | trainer | See how a client has been eating, over time, without reading every entry |
 | `[x]` | `nutrition-week` | client | See a week of eating rather than one day at a time |
 | | **operator** | | |
 | `[ ]` | `op-adjust` | operator | Adjust one studio's ceilings without editing the plan everybody is on |
@@ -160,10 +160,10 @@ without one.
 | `[ ]` | `op-tenants` | operator | See every studio on the deployment and what it is on |
 | `[ ]` | `op-topup` | operator | Give a studio credits |
 | | **reports** | | |
-| `[ ]` | `attention` | trainer | Be told who needs them today rather than deciding by scrolling |
-| `[ ]` | `client-report` | trainer | See one client's whole picture: body, training, nutrition, consistency |
-| `[ ]` | `retention-report` | owner | See who is at risk of leaving before they leave |
-| `[ ]` | `roster-activity` | owner | See who on the roster is active and who has gone quiet |
+| `[x]` | `attention` | trainer | Be told who needs them today rather than deciding by scrolling |
+| `[x]` | `client-report` | trainer | See one client's whole picture: body, training, nutrition, consistency |
+| `[x]` | `retention-report` | owner | See who is at risk of leaving before they leave |
+| `[x]` | `roster-activity` | owner | See who on the roster is active and who has gone quiet |
 | `[ ]` | `roster-analytics` | owner | See how the studio is doing as a business, not as a list of people |
 | | **roster** | | |
 | `[x]` | `client-add` | trainer | Add somebody they coach, by inviting them or by entering them directly |
@@ -219,7 +219,7 @@ without one.
 | `[x]` | `workout-history` | client | Look back at what they lifted last time, at the moment they need it |
 | `[x]` | `workout-log` | client | Record what they actually lifted, including when it differed from the plan |
 | `[ ]` | `workout-player` | client | Work through a session set by set, on a phone, in a gym |
-| `[ ]` | `workout-prs` | client | See their own bests, and know when they set a new one |
+| `[x]` | `workout-prs` | client | See their own bests, and know when they set a new one |
 | `[x]` | `workout-review` | trainer | See what a client actually did against what was prescribed |
 <!-- /generated -->
 

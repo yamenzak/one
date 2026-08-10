@@ -73,6 +73,26 @@ export function progressOf(goal: Goal): Progress {
 }
 
 /**
+ * Whole days from one plain date to another. Negative when `to` is earlier.
+ *
+ * ⚠️ ONE HOME FOR DATE ARITHMETIC, and the reason is that the second
+ * implementation is always the one with the off-by-one. Both directions are the
+ * same subtraction: "days since they last trained" and "days until this is due"
+ * are one question asked from opposite ends.
+ *
+ * ⚠️ AND IT IS MIDNIGHT UTC ON BOTH SIDES, WHICH IS SAFE ONLY BECAUSE BOTH SIDES
+ * ARE PLAIN DATES. A local date is already the person's own day (`dayIn` decided
+ * that upstream); parsing both at the same instant makes the difference exact
+ * rather than drifting by an hour twice a year.
+ */
+export function daysBetween(from: string, to: string): number {
+  const a = Date.parse(`${from}T00:00:00.000Z`);
+  const b = Date.parse(`${to}T00:00:00.000Z`);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return 0;
+  return Math.round((b - a) / 86_400_000);
+}
+
+/**
  * Whether a goal is running out of time, in whole days.
  *
  * ⚠️ NEGATIVE IS OVERDUE AND IS NOT CLAMPED. "0 days left" and "11 days late"
@@ -80,8 +100,5 @@ export function progressOf(goal: Goal): Progress {
  * gentler one forever.
  */
 export function daysLeft(today: string, by: string): number {
-  const from = Date.parse(`${today}T00:00:00.000Z`);
-  const until = Date.parse(`${by}T00:00:00.000Z`);
-  if (!Number.isFinite(from) || !Number.isFinite(until)) return 0;
-  return Math.round((until - from) / 86_400_000);
+  return daysBetween(today, by);
 }

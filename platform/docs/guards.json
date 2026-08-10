@@ -1,23 +1,23 @@
 {
   "$comment": [
-    "THE GUARD REGISTRY \u2014 every enforcement promise this platform makes.",
+    "THE GUARD REGISTRY — every enforcement promise this platform makes.",
     "",
     "`scripts/guards.test.mjs` reads this file. Three rules make it more than a",
     "list:",
     "",
     "  1. A `live` guard must name an implementation AND a literal string that",
     "     implementation contains. Rename or delete the check and the registry",
-    "     fails \u2014 so a guard cannot quietly stop existing.",
+    "     fails — so a guard cannot quietly stop existing.",
     "  2. A `live` guard must actually RUN: an .mjs guard is named by the root",
     "     `gate` or `one:gate` script, a .ts guard sits where the test runner",
     "     finds it. A check nobody invokes is the same as no check.",
-    "  3. An `owed` guard names a stage, and \u26a0\ufe0f a SHIPPED stage may owe",
+    "  3. An `owed` guard names a stage, and ⚠️ a SHIPPED stage may owe",
     "     nothing. This is the DEFER mechanism applied to enforcement: flipping a",
     "     stage to shipped is what forces every guard it promised to be built,",
     "     re-targeted with a reason, or dropped on purpose.",
     "",
-    "And the tables in PLAN.md \u00a76 and UI.md \u00a710 are GENERATED from this file, so",
-    "prose cannot promise a guard that has no entry here \u2014 which is the failure",
+    "And the tables in PLAN.md §6 and UI.md §10 are GENERATED from this file, so",
+    "prose cannot promise a guard that has no entry here — which is the failure",
     "this registry exists for. Documentation claiming enforcement nobody built is",
     "worse than no documentation, because it is expensive to disprove.",
     "",
@@ -37,7 +37,7 @@
     {
       "id": "docs-defer",
       "group": "docs",
-      "fails": "a deferral with no id, a duplicate id, no description, an unknown stage \u2014 or a stage that is SHIPPED",
+      "fails": "a deferral with no id, a duplicate id, no description, an unknown stage — or a stage that is SHIPPED",
       "stage": "0",
       "status": "live",
       "impl": "scripts/docs.test.mjs",
@@ -46,7 +46,7 @@
     {
       "id": "docs-generated",
       "group": "docs",
-      "fails": "a generated block whose command now produces different output \u2014 a hand-edited inventory",
+      "fails": "a generated block whose command now produces different output — a hand-edited inventory",
       "stage": "0",
       "status": "live",
       "impl": "scripts/docs.test.mjs",
@@ -82,7 +82,7 @@
     {
       "id": "kernel-day-zero",
       "group": "kernel",
-      "fails": "a day-zero declaration from MANIFEST.md \u00a79 with no type expressing it, or one expressed as optional",
+      "fails": "a day-zero declaration from MANIFEST.md §9 with no type expressing it, or one expressed as optional",
       "stage": "0",
       "status": "live",
       "impl": "scripts/kernel.test.mjs",
@@ -91,7 +91,7 @@
     {
       "id": "kernel-vocabulary",
       "group": "kernel",
-      "fails": "a product noun in kernel code \u2014 an identifier, a type or a string literal",
+      "fails": "a product noun in kernel code — an identifier, a type or a string literal",
       "stage": "0",
       "status": "live",
       "impl": "scripts/kernel.test.mjs",
@@ -100,7 +100,7 @@
     {
       "id": "kernel-no-escape",
       "group": "kernel",
-      "fails": "an escape hatch on a manifest type \u2014 a passthrough, a raw blob, an unchecked extension point",
+      "fails": "an escape hatch on a manifest type — a passthrough, a raw blob, an unchecked extension point",
       "stage": "0",
       "status": "live",
       "impl": "scripts/kernel.test.mjs",
@@ -136,7 +136,7 @@
     {
       "id": "binding-chokepoint",
       "group": "platform",
-      "fails": "any runtime binding touched outside its owner \u2014 a query that will hit the wrong continent the day a second region exists",
+      "fails": "any runtime binding touched outside its owner — a query that will hit the wrong continent the day a second region exists",
       "status": "live",
       "impl": "scripts/bindings.test.mjs",
       "proves": "outside ${BINDING_OWNER}",
@@ -145,7 +145,7 @@
     {
       "id": "kv-key-space",
       "group": "platform",
-      "fails": "a KV write outside the allow-listed key space \u2014 the one store that cannot be regionalised may never hold anything personal",
+      "fails": "a KV write outside the allow-listed key space — the one store that cannot be regionalised may never hold anything personal",
       "status": "live",
       "impl": "scripts/bindings.test.mjs",
       "proves": "take no namespace",
@@ -226,7 +226,7 @@
     {
       "id": "entitlement-enforced",
       "group": "platform",
-      "fails": "a sold entitlement no gate, quota or shaped response names \u2014 a capability on a price list that every workspace has anyway",
+      "fails": "a sold entitlement no gate, quota or shaped response names — a capability on a price list that every workspace has anyway",
       "stage": "5",
       "status": "live",
       "impl": "kernel/test/app.test.ts",
@@ -253,7 +253,7 @@
     {
       "id": "app-test-budget",
       "group": "platform",
-      "fails": "an app's own suite crossing its duration cap \u2014 measured, not asked, because a budget nobody times is a comment",
+      "fails": "an app's own suite crossing its duration cap — measured, not asked, because a budget nobody times is a comment",
       "stage": "6",
       "status": "live",
       "impl": "scripts/budget.test.mjs",
@@ -271,7 +271,7 @@
     {
       "id": "release-note-shape",
       "group": "platform",
-      "fails": "a release note reading like a commit message \u2014 a file path, a type name, a pull-request number, an internal id",
+      "fails": "a release note reading like a commit message — a file path, a type name, a pull-request number, an internal id",
       "stage": "6",
       "status": "live",
       "impl": "kernel/test/app.test.ts",
@@ -314,7 +314,7 @@
     {
       "id": "state-completeness",
       "group": "interface",
-      "fails": "a registered component with a state it does not declare and photograph \u2014 the photograph half arrives with the component suite",
+      "fails": "a registered component with a state it does not declare and photograph — the photograph half arrives with the component suite",
       "stage": "4",
       "status": "live",
       "impl": "ui/test/components.test.tsx",
@@ -368,7 +368,7 @@
     {
       "id": "pane-container-queries",
       "group": "interface",
-      "fails": "a pane-capable surface sized by viewport breakpoints rather than by its container \u2014 every breakpoint answers yes about the wrong box",
+      "fails": "a pane-capable surface sized by viewport breakpoints rather than by its container — every breakpoint answers yes about the wrong box",
       "stage": "4",
       "status": "live",
       "impl": "ui/test/shell.test.tsx",
@@ -422,7 +422,7 @@
     {
       "id": "boot-per-region",
       "group": "platform",
-      "fails": "a deployment that composes one region's schema and serves another \u2014 the tenant resolves, reaches the right database, and finds nothing in it",
+      "fails": "a deployment that composes one region's schema and serves another — the tenant resolves, reaches the right database, and finds nothing in it",
       "stage": "1",
       "status": "live",
       "impl": "hello/test/boot.test.ts",
@@ -440,7 +440,7 @@
     {
       "id": "session-per-origin",
       "group": "platform",
-      "fails": "a session accepted at an origin it was not issued for \u2014 an account is shared across products and a bearer token is not",
+      "fails": "a session accepted at an origin it was not issued for — an account is shared across products and a bearer token is not",
       "stage": "1",
       "status": "live",
       "impl": "hello/test/identity.test.ts",
@@ -467,7 +467,7 @@
     {
       "id": "no-membership-oracle",
       "group": "platform",
-      "fails": "a sign-in endpoint that answers differently for an address with an account \u2014 type an address, learn whether that person uses the product",
+      "fails": "a sign-in endpoint that answers differently for an address with an account — type an address, learn whether that person uses the product",
       "stage": "1",
       "status": "live",
       "impl": "hello/test/identity.test.ts",
@@ -476,7 +476,7 @@
     {
       "id": "one-dispatcher",
       "group": "platform",
-      "fails": "a second path that invokes a handler \u2014 two dispatchers is how an agent ends up able to do something a route cannot",
+      "fails": "a second path that invokes a handler — two dispatchers is how an agent ends up able to do something a route cannot",
       "stage": "2",
       "status": "live",
       "impl": "scripts/surface.test.mjs",
@@ -503,7 +503,7 @@
     {
       "id": "input-parsed",
       "group": "kernel",
-      "fails": "an operation whose input is asserted rather than parsed \u2014 a type assertion compiles, reads like validation, and lets a number reach a text column",
+      "fails": "an operation whose input is asserted rather than parsed — a type assertion compiles, reads like validation, and lets a number reach a text column",
       "stage": "2",
       "status": "live",
       "impl": "scripts/surface.test.mjs",
@@ -512,7 +512,7 @@
     {
       "id": "tenant-predicate-derived",
       "group": "platform",
-      "fails": "a list that filters by tenant in its own code \u2014 one that forgets returns every tenant's rows and looks completely ordinary",
+      "fails": "a list that filters by tenant in its own code — one that forgets returns every tenant's rows and looks completely ordinary",
       "stage": "3",
       "status": "live",
       "impl": "scripts/surface.test.mjs",
@@ -530,7 +530,7 @@
     {
       "id": "collection-reachable",
       "group": "platform",
-      "fails": "a collection declared and left without a surface \u2014 a table applied, rows written by some other path, and no route to reach any of it",
+      "fails": "a collection declared and left without a surface — a table applied, rows written by some other path, and no route to reach any of it",
       "stage": "3",
       "status": "live",
       "impl": "hello/test/data.test.ts",
@@ -548,7 +548,7 @@
     {
       "id": "accent-relit",
       "group": "interface",
-      "fails": "a screen recomputing the accent instead of re-lighting it \u2014 a brand that is a different colour on every surface",
+      "fails": "a screen recomputing the accent instead of re-lighting it — a brand that is a different colour on every surface",
       "stage": "4",
       "status": "live",
       "impl": "ui/test/contrast.test.ts",
@@ -593,7 +593,7 @@
     {
       "id": "shape-from-kind",
       "group": "interface",
-      "fails": "a screen choosing its own layout instead of taking it from the destination's kind \u2014 which is how a collection replaces its list on open",
+      "fails": "a screen choosing its own layout instead of taking it from the destination's kind — which is how a collection replaces its list on open",
       "stage": "4",
       "status": "live",
       "impl": "ui/test/components.test.tsx",
@@ -611,7 +611,7 @@
     {
       "id": "refusal-has-reason",
       "group": "interface",
-      "fails": "a control rendering a refusal with no explanation \u2014 a dead end nobody can get past and nobody can describe",
+      "fails": "a control rendering a refusal with no explanation — a dead end nobody can get past and nobody can describe",
       "stage": "4",
       "status": "live",
       "impl": "ui/test/components.test.tsx",
@@ -629,7 +629,7 @@
     {
       "id": "contained-form",
       "group": "interface",
-      "fails": "a semantic tone rendered on a ground it would be confused with \u2014 decided by the renderer, never by an author's conditional",
+      "fails": "a semantic tone rendered on a ground it would be confused with — decided by the renderer, never by an author's conditional",
       "stage": "4",
       "status": "live",
       "impl": "ui/test/components.test.tsx",
@@ -651,7 +651,7 @@
       "status": "live",
       "impl": "kernel/test/app.test.ts",
       "proves": "refuses a parking state more generous than the cheapest plan",
-      "fails": "a parking state more generous than the cheapest paid plan \u2014 not paying buys more than paying does"
+      "fails": "a parking state more generous than the cheapest paid plan — not paying buys more than paying does"
     },
     {
       "id": "quota-countable",
@@ -696,7 +696,7 @@
       "status": "live",
       "impl": "scripts/surface.test.mjs",
       "proves": "constant time: the signature compare cannot be timed",
-      "fails": "a computed digest compared with ===, whose timing measures how much of the secret was right \u2014 a forgery no functional test can observe"
+      "fails": "a computed digest compared with ===, whose timing measures how much of the secret was right — a forgery no functional test can observe"
     },
     {
       "id": "event-applied-or-parked",
@@ -705,7 +705,7 @@
       "status": "live",
       "impl": "scripts/surface.test.mjs",
       "proves": "dead letter: an unplaceable event is parked, and the parking is readable",
-      "fails": "an unattributable payment event answered 200 with its id claimed, so the provider never retries \u2014 or parked where nobody can read it"
+      "fails": "an unattributable payment event answered 200 with its id claimed, so the provider never retries — or parked where nobody can read it"
     },
     {
       "id": "webhook-region",
@@ -714,7 +714,7 @@
       "status": "live",
       "impl": "hello/test/provider.test.ts",
       "proves": "settles a workspace that lives in another region",
-      "fails": "a webhook settling against the region the request arrived in rather than the one the workspace lives in \u2014 the row lands in the wrong database and nothing throws"
+      "fails": "a webhook settling against the region the request arrived in rather than the one the workspace lives in — the row lands in the wrong database and nothing throws"
     },
     {
       "id": "ladder-anchor",
@@ -741,7 +741,7 @@
       "status": "live",
       "impl": "hello/test/provider.test.ts",
       "proves": "so the renewal after it is claimed",
-      "fails": "a webhook that never records the customer it just placed, so every renewal \u2014 which carries no metadata of ours \u2014 parks and the workspace's plan quietly lapses"
+      "fails": "a webhook that never records the customer it just placed, so every renewal — which carries no metadata of ours — parks and the workspace's plan quietly lapses"
     },
     {
       "id": "emits-declared",
@@ -750,7 +750,7 @@
       "status": "live",
       "impl": "kernel/test/app.test.ts",
       "proves": "refuses an operation raising an event no notification declares",
-      "fails": "an operation raising an event no notification declares \u2014 a subscription nobody can make, and a notification with no copy, icon or destination"
+      "fails": "an operation raising an event no notification declares — a subscription nobody can make, and a notification with no copy, icon or destination"
     },
     {
       "id": "notification-link",
@@ -786,7 +786,7 @@
       "status": "live",
       "impl": "runtime/test/inbox.test.ts",
       "proves": "tells only the roles the type is for",
-      "fails": "a dispatch that names its own recipients rather than reading the registry \u2014 'everybody' and 'nobody' have both shipped"
+      "fails": "a dispatch that names its own recipients rather than reading the registry — 'everybody' and 'nobody' have both shipped"
     },
     {
       "id": "help-link-resolves",
@@ -795,7 +795,7 @@
       "status": "live",
       "impl": "kernel/test/app.test.ts",
       "proves": "refuses a link to an article nobody wrote, from an operation or from a failure",
-      "fails": "a help cross-link naming an article that does not exist \u2014 rendered beside an error, so it is the second failure in a row"
+      "fails": "a help cross-link naming an article that does not exist — rendered beside an error, so it is the second failure in a row"
     },
     {
       "id": "lock-exists",
@@ -813,7 +813,7 @@
       "status": "live",
       "impl": "hello/test/exit.test.ts",
       "proves": "still works when the workspace has been blocked over an unpaid charge",
-      "fails": "an exit route that is itself gated by standing \u2014 a workspace that cannot be closed while suspended is a trap"
+      "fails": "an exit route that is itself gated by standing — a workspace that cannot be closed while suspended is a trap"
     },
     {
       "id": "export-erasure-one-plan",
@@ -822,7 +822,7 @@
       "status": "live",
       "impl": "hello/test/exit.test.ts",
       "proves": "covers every table a module declares as a tenant's, with nothing hand-listed",
-      "fails": "an export or an erasure that reads a hand-written table list \u2014 one named seven tables against a declaration of twenty-five and reported success"
+      "fails": "an export or an erasure that reads a hand-written table list — one named seven tables against a declaration of twenty-five and reported success"
     },
     {
       "id": "maintenance-above-public",
@@ -849,7 +849,7 @@
       "status": "live",
       "impl": "cli/test/scaffold.node.test.ts",
       "proves": "sets every required field",
-      "fails": "a scaffold missing a field `AppSpec` requires \u2014 read from the type itself, so a day-zero field added to the platform is a red run until the template sets it"
+      "fails": "a scaffold missing a field `AppSpec` requires — read from the type itself, so a day-zero field added to the platform is a red run until the template sets it"
     },
     {
       "id": "template-mounts-modules",
@@ -858,7 +858,7 @@
       "status": "live",
       "impl": "cli/test/scaffold.node.test.ts",
       "proves": "mounts every schema module the runtime ships",
-      "fails": "a scaffold that imports a schema module and never composes it \u2014 the name is present, the reader sees it, and the table is never created"
+      "fails": "a scaffold that imports a schema module and never composes it — the name is present, the reader sees it, and the table is never created"
     },
     {
       "id": "app-id-is-a-label",
@@ -867,7 +867,7 @@
       "status": "live",
       "impl": "cli/test/scaffold.node.test.ts",
       "proves": "refuses a door and a platform package",
-      "fails": "an app id that is not a DNS label, or one that is a door \u2014 it is the relying party's subdomain, the value stamped into every payment object, and not renameable"
+      "fails": "an app id that is not a DNS label, or one that is a door — it is the relying party's subdomain, the value stamped into every payment object, and not renameable"
     },
     {
       "id": "object-door",
@@ -876,7 +876,7 @@
       "status": "live",
       "impl": "scripts/bindings.test.mjs",
       "proves": "HOLDS_HANDLE.test(src) && WRITES.test(src)",
-      "fails": "a write to the object store outside the media ledger \u2014 an object with no ledger row is invisible to the quota and to erasure forever, costs money every month, and nothing else would ever notice"
+      "fails": "a write to the object store outside the media ledger — an object with no ledger row is invisible to the quota and to erasure forever, costs money every month, and nothing else would ever notice"
     },
     {
       "id": "metadata-stripped",
@@ -885,7 +885,7 @@
       "status": "live",
       "impl": "runtime/test/files.test.ts",
       "proves": "says so rather than claiming a format it does not parse",
-      "fails": "a stored file recorded as stripped when its format was never parsed \u2014 a written claim that somebody's location was removed when it was not, and stripping later never fixes what is already stored"
+      "fails": "a stored file recorded as stripped when its format was never parsed — a written claim that somebody's location was removed when it was not, and stripping later never fixes what is already stored"
     },
     {
       "id": "storage-counts-stored",
@@ -894,7 +894,7 @@
       "status": "live",
       "impl": "runtime/test/files.test.ts",
       "proves": "refuses the file that would CROSS the workspace ceiling, not merely the one after it",
-      "fails": "a storage ceiling checked as 'are we full', which admits one more file of any size \u2014 the difference between a limit and a suggestion"
+      "fails": "a storage ceiling checked as 'are we full', which admits one more file of any size — the difference between a limit and a suggestion"
     },
     {
       "id": "file-read-is-bytes",
@@ -903,7 +903,7 @@
       "status": "live",
       "impl": "hello/test/files.test.ts",
       "proves": "never lets a shared cache keep it",
-      "fails": "a file served through a JSON envelope, or one a shared cache may keep \u2014 a shared cache holding one workspace's photograph is the one place a caching header is a disclosure"
+      "fails": "a file served through a JSON envelope, or one a shared cache may keep — a shared cache holding one workspace's photograph is the one place a caching header is a disclosure"
     },
     {
       "id": "job-bounded",
@@ -912,7 +912,7 @@
       "status": "live",
       "impl": "kernel/test/job.test.ts",
       "proves": "refuses one with no bound on a single run",
-      "fails": "a sweep with no ceiling on one run \u2014 it works until the largest tenant crosses the runtime's time limit, then fails, is retried, fails at the same size, and the work never happens again"
+      "fails": "a sweep with no ceiling on one run — it works until the largest tenant crosses the runtime's time limit, then fails, is retried, fails at the same size, and the work never happens again"
     },
     {
       "id": "job-emits-declared",
@@ -921,7 +921,7 @@
       "status": "live",
       "impl": "kernel/test/job.test.ts",
       "proves": "refuses one raising an event no notification declares",
-      "fails": "a job raising an event no notification declares \u2014 found on the night it finally has something to say, rather than the first time somebody uses a feature"
+      "fails": "a job raising an event no notification declares — found on the night it finally has something to say, rather than the first time somebody uses a feature"
     },
     {
       "id": "job-clock-on-success",
@@ -930,7 +930,7 @@
       "status": "live",
       "impl": "hello/test/jobs.solo.test.ts",
       "proves": "a failure must not advance the clock, or a broken job never retries",
-      "fails": "a scheduler clock advanced by a failed run, or by one where every tenant was skipped \u2014 the run table fills with healthy-looking rows and the work stops"
+      "fails": "a scheduler clock advanced by a failed run, or by one where every tenant was skipped — the run table fills with healthy-looking rows and the work stops"
     },
     {
       "id": "job-isolation",
@@ -948,7 +948,7 @@
       "status": "live",
       "impl": "kernel/test/guide.test.ts",
       "proves": "refuses one counting something that does not exist",
-      "fails": "a checklist step counting a collection the app does not have \u2014 answered 'no' forever, so a new workspace is told to do something impossible, and a required one is a wizard nobody can finish"
+      "fails": "a checklist step counting a collection the app does not have — answered 'no' forever, so a new workspace is told to do something impossible, and a required one is a wizard nobody can finish"
     },
     {
       "id": "hint-cap",
@@ -957,7 +957,7 @@
       "status": "live",
       "impl": "kernel/test/guide.test.ts",
       "proves": "refuses a sixth, because past that it is a tour",
-      "fails": "more hints than the cap \u2014 a hint is the one tracked thing in the guide, and tracked is what makes a tour bad, so the number is bounded to stop one being rebuilt gradually"
+      "fails": "more hints than the cap — a hint is the one tracked thing in the guide, and tracked is what makes a tour bad, so the number is bounded to stop one being rebuilt gradually"
     },
     {
       "id": "checklist-derived",
@@ -966,7 +966,7 @@
       "status": "live",
       "impl": "hello/test/guide.test.ts",
       "proves": "opens again when the thing is deleted",
-      "fails": "a checklist step that stays ticked after the thing it counts is gone \u2014 the property no tour has, and the whole reason an item is derived rather than tracked"
+      "fails": "a checklist step that stays ticked after the thing it counts is gone — the property no tour has, and the whole reason an item is derived rather than tracked"
     },
     {
       "id": "no-marking-done",
@@ -984,7 +984,7 @@
       "status": "live",
       "impl": "kernel/test/milestone.test.ts",
       "proves": "refuses a rule over an event nothing raises",
-      "fails": "a milestone waiting on an event nothing in the app raises \u2014 unearnable, and indistinguishable from one that is merely hard, so somebody works towards it forever"
+      "fails": "a milestone waiting on an event nothing in the app raises — unearnable, and indistinguishable from one that is merely hard, so somebody works towards it forever"
     },
     {
       "id": "milestone-announced",
@@ -993,7 +993,7 @@
       "status": "live",
       "impl": "kernel/test/milestone.test.ts",
       "proves": "refuses a milestone whose earners the announcement is not addressed to",
-      "fails": "a milestone earned in silence \u2014 notifications are delivered by role, so one a customer can earn with an announcement addressed to owners is a row in a table and nothing else"
+      "fails": "a milestone earned in silence — notifications are delivered by role, so one a customer can earn with an announcement addressed to owners is a row in a table and nothing else"
     },
     {
       "id": "milestone-once",
@@ -1002,7 +1002,7 @@
       "status": "live",
       "impl": "hello/test/milestone.test.ts",
       "proves": "does not announce it a second time when the rule is satisfied again",
-      "fails": "an award made on satisfaction rather than on the first write \u2014 a rule stays satisfied forever, so it congratulates somebody on every call for the rest of the account's life"
+      "fails": "an award made on satisfaction rather than on the first write — a rule stays satisfied forever, so it congratulates somebody on every call for the rest of the account's life"
     },
     {
       "id": "milestone-counts-nothing-else",
@@ -1011,7 +1011,7 @@
       "status": "live",
       "impl": "hello/test/milestone.test.ts",
       "proves": "writes no tally at all for an event no rule is about",
-      "fails": "a tally row per person per event \u2014 a permanent record of everything anybody ever did, written on the hot path of every write in the product"
+      "fails": "a tally row per person per event — a permanent record of everything anybody ever did, written on the hot path of every write in the product"
     },
     {
       "id": "milestone-earner-is-a-person",
@@ -1020,7 +1020,7 @@
       "status": "live",
       "impl": "runtime/test/milestone.test.ts",
       "proves": "names nobody for a system actor",
-      "fails": "recognition credited to a sweep or a webhook \u2014 a badge handed to whichever account happened to be on the request, for work nobody did"
+      "fails": "recognition credited to a sweep or a webhook — a badge handed to whichever account happened to be on the request, for work nobody did"
     },
     {
       "id": "streak-is-their-day",
@@ -1029,7 +1029,7 @@
       "status": "live",
       "impl": "runtime/test/milestone.test.ts",
       "proves": "resolves one instant to two days in two zones",
-      "fails": "a streak bucketed in UTC \u2014 midnight UTC is four in the afternoon in California, so it breaks halfway through somebody's day and they lose it having done nothing wrong"
+      "fails": "a streak bucketed in UTC — midnight UTC is four in the afternoon in California, so it breaks halfway through somebody's day and they lose it having done nothing wrong"
     },
     {
       "id": "permission-reachable",
@@ -1038,7 +1038,7 @@
       "status": "live",
       "impl": "runtime/test/commerce.test.ts",
       "proves": "refuses a collection whose implied permissions the app does not declare",
-      "fails": "an operation naming a permission no role can hold \u2014 it refuses everybody, forever, including the workspace owner, and reads exactly like a feature nobody uses"
+      "fails": "an operation naming a permission no role can hold — it refuses everybody, forever, including the workspace owner, and reads exactly like a feature nobody uses"
     },
     {
       "id": "platform-events-have-copy",
@@ -1047,7 +1047,7 @@
       "status": "live",
       "impl": "kernel/test/app.test.ts",
       "proves": "refuses a manifest that declares no copy for one of them",
-      "fails": "an app with no notification for an event the platform raises \u2014 dispatch answers an unknown type by returning nothing, so a workspace creation, a plan choice and a grant announce nothing at all"
+      "fails": "an app with no notification for an event the platform raises — dispatch answers an unknown type by returning nothing, so a workspace creation, a plan choice and a grant announce nothing at all"
     },
     {
       "id": "no-app-celebrations",
@@ -1056,7 +1056,7 @@
       "status": "live",
       "impl": "kernel/test/moment.test.ts",
       "proves": "refuses an operation that celebrates",
-      "fails": "an operation that can celebrate on every call \u2014 a celebration belongs to a milestone, earned once per person, and the first one an app declares would be on whatever the product most wants people to do"
+      "fails": "an operation that can celebrate on every call — a celebration belongs to a milestone, earned once per person, and the first one an app declares would be on whatever the product most wants people to do"
     },
     {
       "id": "no-chime-over-loss",
@@ -1065,7 +1065,7 @@
       "status": "live",
       "impl": "kernel/test/moment.test.ts",
       "proves": "refuses punctuation on a danger outcome",
-      "fails": "a moment on a danger outcome \u2014 the tone already says this is the destructive one, so punctuating it is the product being pleased about somebody's lost work"
+      "fails": "a moment on a danger outcome — the tone already says this is the destructive one, so punctuating it is the product being pleased about somebody's lost work"
     },
     {
       "id": "sound-is-derived",
@@ -1083,7 +1083,7 @@
       "status": "live",
       "impl": "hello/test/boot.test.ts",
       "proves": "expect(readOutcome(made.headers)).toMatchObject",
-      "fails": "an outcome declared on every write and delivered to nobody \u2014 the mechanism-with-no-surface failure, inside the platform, invisible because nothing consuming it exists yet"
+      "fails": "an outcome declared on every write and delivered to nobody — the mechanism-with-no-surface failure, inside the platform, invisible because nothing consuming it exists yet"
     },
     {
       "id": "outcome-fits-a-header",
@@ -1092,7 +1092,7 @@
       "status": "live",
       "impl": "runtime/test/outcome.test.ts",
       "proves": "carries a message no header could hold, by escaping it to ASCII",
-      "fails": "an outcome message a header cannot carry \u2014 a character above U+00FF throws when the header is set, in the success path after the write already happened, so German, Arabic and every emoji turn a completed operation into a 503"
+      "fails": "an outcome message a header cannot carry — a character above U+00FF throws when the header is set, in the success path after the write already happened, so German, Arabic and every emoji turn a completed operation into a 503"
     },
     {
       "id": "moment-hold-survives-reduced-motion",
@@ -1101,7 +1101,7 @@
       "status": "live",
       "impl": "ui/test/motion.test.ts",
       "proves": "drops the transform under reduced motion and keeps the hold",
-      "fails": "reduced motion shortening how long somebody has to read \u2014 the one adaptation that makes the setting worse for the people who turn it on"
+      "fails": "reduced motion shortening how long somebody has to read — the one adaptation that makes the setting worse for the people who turn it on"
     },
     {
       "id": "sound-needs-a-gesture",
@@ -1110,7 +1110,7 @@
       "status": "live",
       "impl": "ui/test/motion.test.ts",
       "proves": "plays only when the surface is audible and somebody just acted",
-      "fails": "a sound with no gesture behind it \u2014 every browser refuses it, so the design produces silence in production and a chime in every demo"
+      "fails": "a sound with no gesture behind it — every browser refuses it, so the design produces silence in production and a chime in every demo"
     },
     {
       "id": "one-moment-at-a-time",
@@ -1119,7 +1119,7 @@
       "status": "live",
       "impl": "ui/test/motion.test.ts",
       "proves": "replaces what was showing",
-      "fails": "a queue of moments \u2014 a batch of writes producing four celebrations in a row, each meaning less than the last, long after the thing that caused them"
+      "fails": "a queue of moments — a batch of writes producing four celebrations in a row, each meaning less than the last, long after the thing that caused them"
     },
     {
       "id": "wizard-is-the-checklist",
@@ -1127,8 +1127,8 @@
       "stage": "6.5",
       "status": "live",
       "impl": "kernel/test/guide.test.ts",
-      "proves": "carries only the required ones \u2014 the rest is the checklist",
-      "fails": "a wizard kept as a second list \u2014 how a setup flow and the guidance come to disagree about what a new workspace still needs, always discovered by somebody stuck in the flow"
+      "proves": "carries only the required ones — the rest is the checklist",
+      "fails": "a wizard kept as a second list — how a setup flow and the guidance come to disagree about what a new workspace still needs, always discovered by somebody stuck in the flow"
     },
     {
       "id": "wizard-stands-where-they-are",
@@ -1137,7 +1137,7 @@
       "status": "live",
       "impl": "kernel/test/guide.test.ts",
       "proves": "stands at the first unfinished step, even when a later one is already done",
-      "fails": "a wizard position derived from how many steps are finished \u2014 somebody who satisfied a later step out of order is walked past work they have not done"
+      "fails": "a wizard position derived from how many steps are finished — somebody who satisfied a later step out of order is walked past work they have not done"
     },
     {
       "id": "outer-setup-leads",
@@ -1155,7 +1155,7 @@
       "status": "live",
       "impl": "kernel/test/guide.test.ts",
       "proves": "refuses a person step counting a collection the whole workspace shares",
-      "fails": "a person's setup step counting the workspace's rows \u2014 done the moment a colleague does it, so a new arrival is told their setup is complete having done nothing"
+      "fails": "a person's setup step counting the workspace's rows — done the moment a colleague does it, so a new arrival is told their setup is complete having done nothing"
     },
     {
       "id": "deployment-step-has-no-tenant",
@@ -1173,7 +1173,7 @@
       "status": "live",
       "impl": "kernel/test/app.test.ts",
       "proves": "refuses a step asking for a plan in an app that sells none",
-      "fails": "a checklist step the rest of the manifest makes unanswerable \u2014 no plans to choose or no upload surface mounted \u2014 which looks exactly like a step nobody has got to yet"
+      "fails": "a checklist step the rest of the manifest makes unanswerable — no plans to choose or no upload surface mounted — which looks exactly like a step nobody has got to yet"
     },
     {
       "id": "subject-rows-are-theirs",
@@ -1182,7 +1182,7 @@
       "status": "live",
       "impl": "hello/test/guide.test.ts",
       "proves": "keeps one person's rows out of another's list",
-      "fails": "one customer's subject-scoped rows visible to another \u2014 a whole Scope variant that had DDL, an index and an erasure cascade while no derived operation ever wrote or filtered its column"
+      "fails": "one customer's subject-scoped rows visible to another — a whole Scope variant that had DDL, an index and an erasure cascade while no derived operation ever wrote or filtered its column"
     },
     {
       "id": "subject-row-needs-a-subject",
@@ -1191,7 +1191,7 @@
       "status": "live",
       "impl": "runtime/test/collection.test.ts",
       "proves": "refuses to create one for a caller who is not a customer",
-      "fails": "a subject-scoped row written with no subject \u2014 the column is NOT NULL, so the failure is a constraint violation surfacing as an unavailable on a request that was simply not this caller's to make"
+      "fails": "a subject-scoped row written with no subject — the column is NOT NULL, so the failure is a constraint violation surfacing as an unavailable on a request that was simply not this caller's to make"
     },
     {
       "id": "setup-follows-the-door",
@@ -1200,7 +1200,7 @@
       "status": "live",
       "impl": "hello/test/guide.test.ts",
       "proves": "asks about the deployment there and about a workspace everywhere else",
-      "fails": "an operator shown a workspace's checklist, or a workspace shown the deployment's \u2014 a task nobody there can do and would not understand"
+      "fails": "an operator shown a workspace's checklist, or a workspace shown the deployment's — a task nobody there can do and would not understand"
     },
     {
       "id": "degrade-lane-finishes",
@@ -1209,7 +1209,7 @@
       "status": "live",
       "impl": "hello/test/guide.test.ts",
       "proves": "finishes a workspace's wizard on a deployment that cannot take money",
-      "fails": "a mandatory paid step that strands every workspace on a self-host or before the payment provider is configured \u2014 failing closed on our own misconfiguration rather than on theirs"
+      "fails": "a mandatory paid step that strands every workspace on a self-host or before the payment provider is configured — failing closed on our own misconfiguration rather than on theirs"
     },
     {
       "id": "shelf-is-the-declaration",
@@ -1218,7 +1218,7 @@
       "status": "live",
       "impl": "kernel/test/market.test.ts",
       "proves": "carries a row for everything declared, whether the plan mentions it or not",
-      "fails": "a price list written beside the declarations rather than from them \u2014 it drifts from what the gate enforces, and the drift is found by somebody who bought a thing the product then refuses"
+      "fails": "a price list written beside the declarations rather than from them — it drifts from what the gate enforces, and the drift is found by somebody who bought a thing the product then refuses"
     },
     {
       "id": "unlimited-is-the-top",
@@ -1227,7 +1227,7 @@
       "status": "live",
       "impl": "kernel/test/market.test.ts",
       "proves": "reads unlimited as more, not as less than five",
-      "fails": "-1 compared as a number \u2014 every upgrade to an unlimited plan reported as a loss of everything, and every price list printing 'minus one'"
+      "fails": "-1 compared as a number — every upgrade to an unlimited plan reported as a loss of everything, and every price list printing 'minus one'"
     },
     {
       "id": "no-plan-is-the-parking-state",
@@ -1236,7 +1236,7 @@
       "status": "live",
       "impl": "kernel/test/market.test.ts",
       "proves": "compares against the parking values when there is no plan yet",
-      "fails": "a comparison treating 'no plan' as zero \u2014 advertising every plan as pure gain, including the ones that take something away from what a workspace already had"
+      "fails": "a comparison treating 'no plan' as zero — advertising every plan as pure gain, including the ones that take something away from what a workspace already had"
     },
     {
       "id": "strain-is-over-not-at",
@@ -1245,7 +1245,7 @@
       "status": "live",
       "impl": "kernel/test/market.test.ts",
       "proves": "says nothing when the usage fits",
-      "fails": "a ceiling reported as strained when the usage exactly meets it \u2014 a warning on every workspace that is precisely where it is supposed to be"
+      "fails": "a ceiling reported as strained when the usage exactly meets it — a warning on every workspace that is precisely where it is supposed to be"
     },
     {
       "id": "plans-sell-what-exists",
@@ -1254,7 +1254,7 @@
       "status": "live",
       "impl": "kernel/test/app.test.ts",
       "proves": "refuses a plan selling a key this app does not declare",
-      "fails": "a plan naming an entitlement nobody declared \u2014 sold, paid for, resolved by nothing at the gate, and indistinguishable from a capability that happens to be generous"
+      "fails": "a plan naming an entitlement nobody declared — sold, paid for, resolved by nothing at the gate, and indistinguishable from a capability that happens to be generous"
     },
     {
       "id": "shelf-counts-what-the-gate-counts",
@@ -1263,7 +1263,7 @@
       "status": "live",
       "impl": "runtime/test/market.test.ts",
       "proves": "asks the caller's counter for each key it can count",
-      "fails": "a storefront counting usage its own way \u2014 it promises a downgrade the very next write then refuses, which is a surface that is not the mechanism"
+      "fails": "a storefront counting usage its own way — it promises a downgrade the very next write then refuses, which is a surface that is not the mechanism"
     },
     {
       "id": "price-list-survives-a-failed-count",
@@ -1272,7 +1272,7 @@
       "status": "live",
       "impl": "runtime/test/market.test.ts",
       "proves": "survives a counter that fails",
-      "fails": "a failed usage count taking the price list down \u2014 somebody looking at plans is doing the one thing the business wants, and a broken count is not a reason to show them an error"
+      "fails": "a failed usage count taking the price list down — somebody looking at plans is doing the one thing the business wants, and a broken count is not a reason to show them an error"
     },
     {
       "id": "packages-card-every-flag",
@@ -1290,7 +1290,7 @@
       "status": "live",
       "impl": "scripts/capabilities.test.mjs",
       "proves": "an outcome describes what a person accomplishes, not where",
-      "fails": "the capability inventory becoming a screen list \u2014 risk #1 of the whole migration, because the moment a capability is written as an interface the rewrite is a port and every inconsistency the platform exists to end comes back with it"
+      "fails": "the capability inventory becoming a screen list — risk #1 of the whole migration, because the moment a capability is written as an interface the rewrite is a port and every inconsistency the platform exists to end comes back with it"
     },
     {
       "id": "dropped-carries-a-reason",
@@ -1299,7 +1299,7 @@
       "status": "live",
       "impl": "scripts/capabilities.test.mjs",
       "proves": "is dropped with no reason",
-      "fails": "a capability quietly not rebuilt \u2014 a removal and an oversight look identical in a diff, and the inventory is the only place the difference can be recorded"
+      "fails": "a capability quietly not rebuilt — a removal and an oversight look identical in a diff, and the inventory is the only place the difference can be recorded"
     },
     {
       "id": "inventory-covers-the-client",
@@ -1317,7 +1317,7 @@
       "status": "live",
       "impl": "kernel/test/ddl.test.ts",
       "proves": "refuses a field whose column is a SQL keyword, naming it",
-      "fails": "a field or collection whose derived name is a SQL keyword \u2014 the DDL is generated, so nobody reads it, and the syntax error throws out of the boot-time schema apply, answering 503 on every route with no mention of a column"
+      "fails": "a field or collection whose derived name is a SQL keyword — the DDL is generated, so nobody reads it, and the syntax error throws out of the boot-time schema apply, answering 503 on every route with no mention of a column"
     },
     {
       "id": "subject-write-on-behalf",
@@ -1326,7 +1326,7 @@
       "status": "live",
       "impl": "runtime/test/collection.test.ts",
       "proves": "takes the subject from the body when the caller has none",
-      "fails": "staff unable to write a record on somebody's behalf \u2014 a coach recording a workout for a client is the core loop of a coaching product, and a subject taken only from the caller refuses it outright"
+      "fails": "staff unable to write a record on somebody's behalf — a coach recording a workout for a client is the core loop of a coaching product, and a subject taken only from the caller refuses it outright"
     },
     {
       "id": "subject-cannot-be-argued",
@@ -1335,7 +1335,7 @@
       "status": "live",
       "impl": "runtime/test/collection.test.ts",
       "proves": "ignores a subject in the body when the caller has one of their own",
-      "fails": "one customer writing a row into another's history by naming them in the body \u2014 the row scope narrowed on read and not on write"
+      "fails": "one customer writing a row into another's history by naming them in the body — the row scope narrowed on read and not on write"
     },
     {
       "id": "energy-is-derived",
@@ -1344,7 +1344,7 @@
       "status": "live",
       "impl": "kova/test/nutrition.test.ts",
       "proves": "uses Atwater's factors",
-      "fails": "a food row carrying both an energy figure and the macros it comes from \u2014 two numbers that disagree the moment anybody edits one, producing a diary whose totals do not match the sum of its rows"
+      "fails": "a food row carrying both an energy figure and the macros it comes from — two numbers that disagree the moment anybody edits one, producing a diary whose totals do not match the sum of its rows"
     },
     {
       "id": "portion-uses-its-own-basis",
@@ -1353,7 +1353,7 @@
       "status": "live",
       "impl": "kova/test/nutrition.test.ts",
       "proves": "scales from a per-item basis",
-      "fails": "a portion scaled as though every food were declared per 100 \u2014 which is how a product tells somebody one egg was 620 calories"
+      "fails": "a portion scaled as though every food were declared per 100 — which is how a product tells somebody one egg was 620 calories"
     },
     {
       "id": "over-is-visible",
@@ -1371,7 +1371,7 @@
       "status": "live",
       "impl": "kova/test/nutrition.test.ts",
       "proves": "ignores the days with nothing in them",
-      "fails": "a weekly average divided by seven rather than by the days with entries \u2014 turning three carefully logged days into an alarming number produced by mistaking silence for abstinence"
+      "fails": "a weekly average divided by seven rather than by the days with entries — turning three carefully logged days into an alarming number produced by mistaking silence for abstinence"
     },
     {
       "id": "publish-per-kind",
@@ -1380,7 +1380,7 @@
       "status": "live",
       "impl": "kova/test/nutrition.e2e.test.ts",
       "proves": "keeps both current, and stands down only the same kind",
-      "fails": "publishing a way of training removing somebody's way of eating \u2014 a data loss they discover in a supermarket"
+      "fails": "publishing a way of training removing somebody's way of eating — a data loss they discover in a supermarket"
     },
     {
       "id": "document-transition-emits",
@@ -1389,7 +1389,7 @@
       "status": "live",
       "impl": "kernel/test/app.test.ts",
       "proves": "refuses a submit that raises an event no notification declares",
-      "fails": "a document's own transition raising an event no notification declares \u2014 invisible in `operations` because nobody wrote those, and arriving at the single most notification-worthy moment the product has"
+      "fails": "a document's own transition raising an event no notification declares — invisible in `operations` because nobody wrote those, and arriving at the single most notification-worthy moment the product has"
     },
     {
       "id": "checkin-freezes-words-not-numbers",
@@ -1398,7 +1398,7 @@
       "status": "live",
       "impl": "kova/test/checkin.test.ts",
       "proves": "has nowhere to store a weight at all",
-      "fails": "a report copying the numbers it was written beside \u2014 the shape that produced three documented bug classes, where correcting a weigh-in left the old value in every check-in that copied it"
+      "fails": "a report copying the numbers it was written beside — the shape that produced three documented bug classes, where correcting a weigh-in left the old value in every check-in that copied it"
     },
     {
       "id": "submitted-words-stop-moving",
@@ -1416,7 +1416,7 @@
       "status": "live",
       "impl": "kova/test/goals.test.ts",
       "proves": "is measured the same way, and is not 120% done on day one",
-      "fails": "progress computed as current over target \u2014 it says somebody at 90 kg aiming for 75 is 120% done before they have lost a gram, and that somebody who gained is doing better"
+      "fails": "progress computed as current over target — it says somebody at 90 kg aiming for 75 is 120% done before they have lost a gram, and that somebody who gained is doing better"
     },
     {
       "id": "overdue-is-not-clamped",
@@ -1426,6 +1426,105 @@
       "impl": "kova/test/goals.test.ts",
       "proves": "goes negative rather than resting at zero",
       "fails": "a deadline clamped at zero, so a product says '0 days left' forever instead of '11 days late'"
+    },
+    {
+      "id": "deployment-that-cannot-charge-serves-its-floor",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/commerce.test.ts",
+      "proves": "serves the cheapest plan where nothing can be bought",
+      "fails": "a self-host, or a deployment before its payment step, held at the parking allowances forever — one of everything, with no plan to buy and therefore no way out, punished for OUR missing configuration"
+    },
+    {
+      "id": "floor-plan-never-displaces-a-real-one",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/commerce.test.ts",
+      "proves": "never displaces a plan the workspace actually has",
+      "fails": "a deployment that starts charging quietly re-pricing every workspace that had already bought something"
+    },
+    {
+      "id": "new-arrival-is-not-a-quiet-one",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/attention.test.ts",
+      "proves": "does not call somebody quiet for training they did before they arrived",
+      "fails": "somebody who joined on Tuesday listed as having gone silent, because their coach entered the training they already did — a list that cries wolf is worse than none"
+    },
+    {
+      "id": "silence-counts-from-arrival",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/attention.test.ts",
+      "proves": "counts silence from the day somebody joined when they never started",
+      "fails": "the quietest person on a roster reading as fine forever, because 'days since they last did anything' has no answer and an absent fact reads as nothing to report"
+    },
+    {
+      "id": "reached-early-is-not-overdue",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/attention.test.ts",
+      "proves": "is not raised when they got there",
+      "fails": "a goal past its date raised as missed for somebody who reached it early — a product telling a coach off for a success"
+    },
+    {
+      "id": "waiting-on-a-reply-comes-first",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/attention.test.ts",
+      "proves": "puts the person waiting on a reply at the top",
+      "fails": "the one person waiting on us buried under people who never wrote, which is what a sort by days-since-anything produces"
+    },
+    {
+      "id": "no-hand-written-table-name",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/attention.test.ts",
+      "proves": "is raised when they did not, counted from the date they set",
+      "fails": "a table name typed into a handler — every collection route keeps working and only the one query that spells it out 503s, which is how `entrys` shipped as `entries`"
+    },
+    {
+      "id": "report-average-over-days-logged",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/report.test.ts",
+      "proves": "averages over the days that were logged, and says how many",
+      "fails": "two carefully logged days divided by a twenty-eight-day window — a product telling somebody they ate sixty calories a day, which is wrong, alarming, and produced by mistaking silence for abstinence"
+    },
+    {
+      "id": "best-set-is-worth-not-weight",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/report.test.ts",
+      "proves": "picks the best set by what it was worth, and shows the real one",
+      "fails": "a personal best sorted by what was on the bar, which tells somebody their hardest session was their easiest — and a report showing the estimate rather than the set they actually did"
+    },
+    {
+      "id": "no-programme-is-not-nought-per-cent",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/report.test.ts",
+      "proves": "says nothing for a published programme with nothing in it",
+      "fails": "a consistency bar at 0% for somebody nobody prescribed anything to — an accusation about sessions that a parsing failure or an empty block invented"
+    },
+    {
+      "id": "report-is-computed-never-kept",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/report.test.ts",
+      "proves": "measures a goal from its baseline, and follows a correction",
+      "fails": "a report written to a table, which is wrong the moment anybody corrects an entry and is wrong silently — nothing about a stale number looks stale"
     }
   ]
 }

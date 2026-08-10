@@ -1963,3 +1963,75 @@ reading is available and would have been implemented by accident.
 The consequence to know: a client's milestones are earned by a client's own
 sessions. Whether a coach's entry on their behalf should count towards them is a
 product question, and the honest answer today is that it does not.
+
+## 163. A deployment that cannot charge was punished for its own configuration
+
+The parking state deliberately sits BELOW the entry plan — not paying must never
+buy more than the cheapest plan does — and finding 116 is the guard that keeps it
+there. The other half of the rule had no guard at all: where there is no payment
+provider, there is no plan to buy, so the parking allowances become permanent.
+Kova parks at one client; a self-host, or any deployment before its payment step,
+could coach exactly one person forever with no way out.
+
+The standing gate already knew this. `standingFor` takes `chargeable` and stands
+down precisely so an unpaid workspace is not held to setup over OUR missing
+configuration — and it then opened onto a product that permitted one of
+everything. Fail closed on their non-payment, open on ours, is a rule that has to
+be applied to the allowances and to the gate, not to one of them.
+
+Found by an ordinary test fixture: a suite needing five clients on a roster got
+back an empty attention list rather than a refusal, because the quota check
+answered `402` inside a fixture nobody asserted on. That is the second time a
+quota has been tested by accident here.
+
+## 164. The floor gets its own source, because "plan" would be a lie
+
+Resolving the cheapest plan for such a deployment could have reported
+`from: "plan"`, and every screen would then tell an operator the workspace is on
+Starter. It is on nothing; Starter is what we serve when we cannot sell. The walk
+gained a fifth source rather than borrowing the fourth — one extra word in a
+union against a console that quietly misreports what somebody is paying for.
+
+## 165. A hand-written table name is a 503 that no other test can see
+
+`entry` derives `entrys`, and a handler that spelled it `entries` typechecked,
+passed every collection test, and answered every route correctly — because the
+collection surface never names its own table. Only the one hand-written query
+failed, and it failed as `platform.unavailable` two steps from its cause.
+
+It survived one round of testing too: the query sat behind an early return that
+was taken whenever no goal was overdue, so the first fixture that exercised the
+feature did not exercise the query. The fix is not a rule about care —
+`tableNameFor` is exported and the app derives all ten names from the
+collections, so a renamed collection is a compile error rather than a runtime one.
+
+## 166. Somebody who never started is the quietest person on the roster
+
+"Days since they last did anything" has no answer for a person who has never done
+anything, and the honest-looking `null` reads downstream as nothing to report —
+so the one client who never began was the one client who never appeared on the
+list of people needing attention. Silence is counted from their last activity or
+from the day they joined, whichever exists, and the fact stopped being nullable
+so the wrong answer is no longer expressible.
+
+The settling rule survived that change and is NOT redundant beneath it, which was
+the tempting conclusion: a coach onboarding somebody enters the training they
+already did, so a person who joined on Tuesday can carry a six-week-old last
+session. Silence measured from the training alone flags them, and nothing about
+the row looks wrong.
+
+## 167. A distinction nothing observes is a distinction nothing protects
+
+`prescribedPerWeek` returns null for a programme that asks for nothing, which is
+not zero — zero flows into a consistency figure as nought per cent and accuses
+somebody of missing sessions an empty block invented. Every mutation that
+replaced the null with a zero survived, because `expectedOver(0, days)` and
+`expectedOver(null, days)` are both zero and `consistency(_, 0)` is null either
+way. The distinction was real, correct, and unobservable.
+
+Deleting it would have been wrong; the number is what a coach wants. Reporting
+`prescribedPerWeek` beside the ratio — "the block asks for three and a half a
+week" answers a different question from "nine of fourteen" — made it observable,
+and the mutation died. The general shape: when a mutation of a correct
+distinction survives, the fix is usually to surface it rather than to remove it
+or to assert it artificially.

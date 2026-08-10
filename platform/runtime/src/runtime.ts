@@ -19,7 +19,7 @@ import type {
 } from "@one/kernel";
 import {
   ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, PLATFORM_PROBLEMS, STORAGE_ENTITLEMENT,
-  fromQuery, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
+  floorPlan, fromQuery, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
 import { COMMERCE, commerceOperations, customerOperations, providerOperations, type CommerceCarrier } from "./commerce-ops.js";
@@ -501,6 +501,15 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         plan: app.access.plans.find((p) => p.id === sub.planId) ?? null,
         overrides: sub.overrides,
         gate,
+        /*
+          ⚠️ THE SAME "OPEN ON OURS" THE STANDING GATE APPLIES ONE LINE ABOVE.
+          With no payment provider there is no plan to buy, so the parking
+          allowances would hold a workspace at one of everything with no way
+          out — a punishment for OUR missing configuration. `standingFor`
+          already stands down here; the allowances have to as well, or the gate
+          opens onto a product that permits nothing.
+        */
+        floorPlan: opts.chargeable === true ? null : floorPlan(app.access.plans),
       });
       /*
         ⚠️ THE SECOND RAIL RESOLVES THROUGH THE SAME WALK THE CAPABILITIES SCREEN
