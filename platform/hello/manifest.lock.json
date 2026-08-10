@@ -23,7 +23,8 @@
     "receipt:read",
     "receipt:write",
     "workspace:close",
-    "workspace:create"
+    "workspace:create",
+    "workspace:settings"
   ],
   "plans": [
     "free",

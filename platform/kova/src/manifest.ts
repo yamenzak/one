@@ -2100,7 +2100,7 @@ export const kova = defineApp({
 
   access: {
     permissions: [
-      ...STAFF, "workspace:create", "workspace:close", "billing:manage", "commerce:manage",
+      ...STAFF, "workspace:create", "workspace:close", "workspace:settings", "billing:manage", "commerce:manage",
       "member:read", "member:manage", "report:read", "ai:read", "platform:operate",
     ],
     roles: {
@@ -2112,9 +2112,15 @@ export const kova = defineApp({
       */
       /* ⚠️ `ai:read` is the OWNER's alone — what the studio's credits went on is
          a question about the bill, and the bill is theirs. */
-      owner: [...STAFF, "workspace:create", "workspace:close", "billing:manage", "commerce:manage", "member:read", "member:manage", "ai:read"],
+      owner: [...STAFF, "workspace:create", "workspace:close", "workspace:settings", "billing:manage", "commerce:manage", "member:read", "member:manage", "ai:read"],
       /* ⚠️ A coach SEES the team and cannot change it — hiring is the owner's. */
-      trainer: [...STAFF, "workspace:create", "member:read"],
+      /*
+        ⚠️ A COACH MAY SET HOW THE STUDIO COACHES. The check-in cadence and what
+        a week starts on are coaching decisions, not commercial ones — and a
+        settings screen only the owner can open is one the owner is asked to open
+        on somebody else's behalf every week.
+      */
+      trainer: [...STAFF, "workspace:create", "member:read", "workspace:settings"],
       /* ⚠️ The front desk sees people and bookings, and prescribes nothing. */
       /* ⚠️ The front desk sees people and BOOKINGS, and prescribes nothing —
          which is why `session:write` is here and nothing else new is. */
@@ -2285,6 +2291,58 @@ export const kova = defineApp({
     comment and the column takes any shape — see `WEEKS_SHAPE`.
   */
   schemas: { "programme.weeks": WEEKS_SHAPE },
+
+  /*
+    ⚠️ WHAT A STUDIO CHOOSES ABOUT ITSELF, and every one of these is a decision
+    a coach makes differently from the studio next door. The three branding keys
+    arrive whether they are declared here or not, because the sign-in screen
+    wears them before there is a session to resolve these with.
+  */
+  settings: {
+    "studio.weekStart": {
+      label: "Weeks start on",
+      kind: "enum",
+      values: ["monday", "sunday", "saturday"],
+      fallback: "monday",
+      help: "Which day a training week and a consistency count begin on.",
+    },
+    /*
+      ⚠️ A NUMBER WITH A CEILING, because this is what a client is shown as
+      overdue — and a studio that typed 400 has turned the whole feature off
+      without meaning to.
+    */
+    "studio.checkInDays": {
+      label: "Check in every",
+      kind: "number",
+      min: 1,
+      max: 90,
+      fallback: 7,
+      help: "How often you expect somebody to check in. What the coach's attention list counts against.",
+    },
+    "studio.replyDays": {
+      label: "Answer a check-in within",
+      kind: "number",
+      min: 1,
+      max: 30,
+      fallback: 3,
+      help: "How long an unanswered check-in may sit before it is flagged to you.",
+    },
+    /*
+      ⚠️ NARROWER THAN THE SCREEN IT IS ON. Turning the client feed off takes
+      something away from everybody the studio coaches, so it is the owner's
+      rather than any coach who can open settings.
+    */
+    "studio.publishFeed": {
+      label: "Publish articles to clients",
+      kind: "bool",
+      fallback: true,
+      /* ⚠️ The OWNER's: withdrawing the feed takes something away from everybody
+         the studio coaches, which is a decision about what is offered rather
+         than about how anybody is coached. */
+      write: "commerce:manage",
+      help: "When off, published articles stay in the studio and no client sees the feed.",
+    },
+  },
   collections: [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles, supplements, doses, labs, assignments, alternatives, swaps],
 
   notifications: {

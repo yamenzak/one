@@ -523,3 +523,147 @@ describe("what a model costs", () => {
     expect((await coach("/api/admin.models.rate", { id: "gemini-2.5-flash", input: 1, output: 1 })).status).toBe(403);
   });
 });
+
+/* ------------------------------------------------------------ the catalogue --- */
+
+/**
+ * ⚠️ THE CATALOGUE IS EDITABLE BECAUSE A MANIFEST IS A DEPLOY AND A PRICE IS NOT.
+ * The same argument as a model's rate, one rail over: an operator who has to ship
+ * a build to change a price ships fewer price changes than the business actually
+ * makes, and the gap is filled by discounts nobody records.
+ */
+describe("what this deployment sells", () => {
+  it("shows the declaration and the edit side by side", async () => {
+    const out = await operator("/api/admin.catalog");
+    expect(out.status).toBe(200);
+    const declared = out.body.declared as unknown as { id: string; price: { minor: number } }[];
+    expect(declared.find((p) => p.id === "solo")).toBeTruthy();
+    /* ⚠️ Nothing edited yet, so what is sold is what was declared. */
+    expect(out.body.selling).toEqual(out.body.declared);
+  });
+
+  it("changes a price without touching the ceilings", async () => {
+    const out = await operator("/api/admin.catalog.set", { planId: "solo", price: { minor: 900, currency: "USD" } });
+    expect(out.status).toBe(200);
+    const selling = out.body.selling as unknown as { id: string; price: { minor: number }; entitlements: Record<string, unknown> }[];
+    const solo = selling.find((p) => p.id === "solo")!;
+    expect(solo.price.minor).toBe(900);
+    expect(solo.entitlements.clients).toBe(3);
+  });
+
+  it("refuses an entitlement key this app never declared", async () => {
+    const out = await operator("/api/admin.catalog.set", { planId: "solo", entitlements: { invented: 5 } });
+    expect(out.status).toBe(400);
+  });
+
+  /* ⚠️ A quota given `true` is a ceiling every count compares against a boolean;
+     a gate given `3` is a feature on because three is truthy. Both "work". */
+  it("refuses a ceiling of the wrong kind", async () => {
+    expect((await operator("/api/admin.catalog.set", { planId: "solo", entitlements: { clients: true } })).status).toBe(400);
+    expect((await operator("/api/admin.catalog.set", { planId: "solo", entitlements: { training: 3 } })).status).toBe(400);
+  });
+
+  it("refuses a plan that does not exist", async () => {
+    expect((await operator("/api/admin.catalog.set", { planId: "imaginary", trialDays: 0 })).status).toBe(400);
+  });
+
+  it("is not a studio owner's to edit", async () => {
+    expect((await coach("/api/admin.catalog")).status).toBe(403);
+    expect((await coach("/api/admin.catalog.set", { planId: "solo", trialDays: 0 })).status).toBe(403);
+  });
+
+  /*
+    ⚠️ AND THE EDIT REACHES THE GATE, which is the half that makes it worth
+    having. A catalogue screen the resolver never reads is a price list with no
+    effect on anything: raising a limit for a customer who paid for it would
+    change nothing, and the only symptom is a refusal they were told would not
+    happen.
+  */
+  /*
+    ⚠️ ITS OWN WORKSPACE, because this test fills a roster to a ceiling and the
+    file's other tests share one. A quota assertion against a shared fixture
+    fails as an off-by-however-many-somebody-added-since.
+  */
+  it("changes what the workspace on that plan may actually do", async () => {
+    const founding = await signIn("priced@example.test", SETUP);
+    const made = await post(SETUP, "/api/identity.workspace.create", { slug: "priced" }, founding);
+    const theirs = made.body.tenantId as string;
+    const them = at("https://priced.kova.4dl.app")(await signIn("priced@example.test", "https://priced.kova.4dl.app"));
+    await operator("/api/admin.comp", { tenantId: theirs, planId: "solo", reason: "test" });
+
+    /* Three is the declared ceiling. */
+    for (const name of ["One", "Two", "Three"]) {
+      expect((await them("/api/client.create", { name })).status, `${name} is inside the declared ceiling`).toBe(200);
+    }
+    expect((await them("/api/client.create", { name: "Four" })).status).toBe(402);
+
+    await operator("/api/admin.catalog.set", { planId: "solo", entitlements: { clients: 10 } });
+    expect((await them("/api/client.create", { name: "Four" })).status).toBe(200);
+  });
+
+  /*
+    ⚠️ AND EDITING IT DOWN HOLDS EVERYBODY ALREADY ON IT AT WHAT THEY WERE SOLD.
+    This is the whole reason a catalogue is safe to edit, and `grandfathered_json`
+    was read by the resolver and written by nothing until an operator could edit
+    a plan. Without it, a workspace that bought ten loses seven mid-period, with
+    no notice — and the plan says three and appears always to have.
+  */
+  it("holds an existing subscriber at what they were sold", async () => {
+    const them = at("https://priced.kova.4dl.app")(await signIn("priced@example.test", "https://priced.kova.4dl.app"));
+    const out = await operator("/api/admin.catalog.set", { planId: "solo", entitlements: { clients: 3 } });
+    expect(out.status).toBe(200);
+    expect(out.body.grandfathered as unknown as number).toBeGreaterThanOrEqual(1);
+
+    /* They keep the ten they were sold, and the fifth client still lands. */
+    expect((await them("/api/client.create", { name: "Five" })).status).toBe(200);
+  });
+
+  /* ⚠️ It ratchets up only, so a second reduction cannot lower somebody already
+     held at the first. */
+  it("does not lower them again on a second reduction", async () => {
+    const them = at("https://priced.kova.4dl.app")(await signIn("priced@example.test", "https://priced.kova.4dl.app"));
+    await operator("/api/admin.catalog.set", { planId: "solo", entitlements: { clients: 1 } });
+    expect((await them("/api/client.create", { name: "Six" })).status).toBe(200);
+  });
+
+  /* ⚠️ And raising a plan records nothing — a snapshot there would freeze a
+     workspace out of every future improvement. */
+  it("records nothing when a plan gets better", async () => {
+    const out = await operator("/api/admin.catalog.set", { planId: "solo", entitlements: { clients: 50 } });
+    expect(out.body.grandfathered as unknown as number).toBe(0);
+  });
+});
+
+/* --------------------------------------------------------------- domains --- */
+
+describe("every custom domain on the deployment", () => {
+  /*
+    ⚠️ "WHY IS MY DOMAIN NOT WORKING" IS ASKED OF AN OPERATOR, about a workspace
+    whose settings screen they cannot open. Without this the only answer is to
+    ask the customer to read their own screen back.
+  */
+  it("lists what each is waiting for", async () => {
+    await coach("/api/domain.claim", { hostname: "gym.bowland.example" });
+    const out = await operator("/api/admin.domains");
+    expect(out.status).toBe(200);
+    const rows = out.body.domains as unknown as { hostname: string; state: string; tenantId: string }[];
+    const found = rows.find((r) => r.hostname === "gym.bowland.example")!;
+    expect(found.state).toBe("claimed");
+    expect(found.tenantId).toBe(tenantId);
+  });
+
+  /*
+    ⚠️ THE TOKEN IS NOT HERE. An operator does not need it to answer the
+    question, and a console displaying every workspace's verification secret is
+    one screenshot away from somebody claiming a domain they have no DNS access
+    to.
+  */
+  it("does not show the verification secret", async () => {
+    const rows = (await operator("/api/admin.domains")).body.domains as unknown as Record<string, unknown>[];
+    for (const row of rows) expect(Object.keys(row)).not.toContain("token");
+  });
+
+  it("is not a studio owner's to read", async () => {
+    expect((await coach("/api/admin.domains")).status).toBe(403);
+  });
+});

@@ -141,3 +141,23 @@ export const PLATFORM_PROBLEMS = declareProblems({
     retryable: false,
   },
 });
+
+/**
+ * A problem's sentence, or nothing.
+ *
+ * ⚠️ A SENTENCE WITH A HOLE IN IT IS WORSE THAN NO SENTENCE. `detail` is a
+ * template over the meta a raise site supplies, and a site that supplies less
+ * than the template names renders "Your plan includes undefined, and undefined
+ * are in use" — which shipped, and which somebody hitting a seat limit actually
+ * read.
+ *
+ * Nothing throws when that happens, and nothing can: the template is a function
+ * and the missing value is a legal `undefined`. So the check is here, once, on
+ * the way out — a detail that cannot be completed is withheld, leaving the title
+ * and the code, both of which are still true.
+ */
+export function detailFor(def: ProblemDef, meta: Readonly<Record<string, string | number | boolean>> | undefined): string | null {
+  if (!def.detail || !meta) return null;
+  const text = def.detail(meta);
+  return text.includes("undefined") || text.includes("[object Object]") ? null : text;
+}

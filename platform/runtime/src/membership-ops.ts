@@ -126,7 +126,16 @@ export function membershipOperations<B extends BindingSpec>(app: AppSpec<B>): re
       }
       if (counted.includes(input.role)) {
         const used = await seatsUsed(d.db, d.tenantId, counted);
-        if (!withinQuota(d.seatsAllowed, used)) ctx.fail("platform.quota_reached", { field: "seats" });
+        /*
+          ⚠️ THE TWO NUMBERS ARE THE MESSAGE. `platform.quota_reached` renders
+          "Your plan includes {limit}, and {used} are in use" — so raising it
+          with neither produces "Your plan includes undefined, and undefined are
+          in use", which is what somebody hitting a seat limit actually read.
+          A problem's meta is not decoration; it IS the sentence.
+        */
+        if (!withinQuota(d.seatsAllowed, used)) {
+          ctx.fail("platform.quota_reached", { field: "seats", limit: String(d.seatsAllowed), used: String(used) });
+        }
       }
       const made = await invite(
         d.db, d.tenantId,

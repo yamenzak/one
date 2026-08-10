@@ -11,8 +11,13 @@ export default defineWorkersConfig({
     /* ⚠️ The lock check needs a filesystem, so it lives in the node project. */
     exclude: ["**/*.node.test.ts", "**/*.solo.test.ts", "**/node_modules/**"],
     /*
-      A serial root run absorbs Miniflare storage contention; one retry absorbs
-      the rest. A genuine assertion failure still fails twice.
+      ⚠️ ONE RETRY, AND IT ONLY WORKS IF THE FIXTURES ARE RETRY-SAFE. Storage is
+      shared across this package's files (see `isolatedStorage` below), so a
+      retried file runs its `beforeAll` against a database its first attempt
+      already wrote to — and a fixture creating a FIXED slug then conflicts with
+      itself. That reads as "the studio must have been created", which describes
+      neither the retry nor the original failure. `freshSlug` in `session.ts` is
+      the answer; this comment is here so the next fixture inherits it.
     */
     retry: 1,
     poolOptions: {

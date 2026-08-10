@@ -1086,6 +1086,18 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-generated-picture-lands-in-the-library` | bytes handed to a browser that nothing counts against the workspace's storage, nothing erases when it closes, and nothing can serve again — so keeping it means generating it a second time and paying again | **live** |
 | `a-picture-read-is-a-picture-the-workspace-holds` | one workspace's photograph read by another's request — and a lookup that forgot its tenant binding refuses an invented id while serving a real one, so only a real foreign id finds it | **live** |
 | `a-refusal-keeps-its-own-words` | the generic code written over the specific reason, so "that picture is not in this workspace", "this asks for a picture and none was given" and a missing model binding all read as one word nobody can act on | **live** |
+| `a-setting-is-declared-not-scattered` | three readers each deciding what an absent row means — a lapse policy read as "never" by a sweep and "fourteen days" by the screen that shows it, neither throwing | **live** |
+| `a-tenant-colour-is-a-colour` | anything a CSS parser would take being stored as a workspace's accent — a `url(...)` or a variable reference injected into a stylesheet this product renders for other people, which is a stored injection wearing a colour picker's clothes | **live** |
+| `a-setting-may-be-narrower-than-its-screen` | one control on a settings screen that withdraws something from every customer of the workspace, reachable by anybody who may open the screen at all | **live** |
+| `branding-reaches-the-screen-that-cannot-ask` | a sign-in screen wearing the product's name and correcting itself, because the branding lives only in a regional store the pre-session screen cannot reach | **live** |
+| `a-claimed-domain-routes-nothing` | a hostname served on the strength of somebody typing it — and the thing typed may belong to a competitor, a bank, or another workspace on the same deployment | **live** |
+| `the-dns-verdict-is-ours` | a caller reporting its own verification result — a custom domain anybody takes by sending {verified: true} | **live** |
+| `a-verification-token-survives-a-second-claim` | somebody who has already published the DNS record pressing the button again and never being able to verify, because what they published no longer matches what we look for | **live** |
+| `a-domain-is-released-by-its-own-workspace` | a claim table keyed on the hostname alone, where a delete without the tenant binding takes somebody else's address down | **live** |
+| `a-price-is-not-a-deploy` | a catalogue screen the resolver never reads — raising a limit for a customer who paid for it changes nothing, and the only symptom is a refusal they were told would not happen | **live** |
+| `editing-a-plan-down-holds-existing-subscribers` | a workspace losing seats it paid for mid-period with no notice, because `grandfathered_json` was read by the resolver and written by nothing | **live** |
+| `unlimited-is-the-top-not-a-small-number` | -1 compared arithmetically, so "you had unlimited and now have five" records no snapshot at all — silently, for exactly the workspaces with the most to lose | **live** |
+| `a-problem-sentence-has-no-holes` | "Your plan includes undefined, and undefined are in use" — a detail template rendered against meta a raise site never supplied, which nothing throws on because the missing value is a legal undefined | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

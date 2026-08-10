@@ -25,6 +25,7 @@ export * from "./session.js";
 export * from "./membership.js";
 export * from "./schema.js";
 export * from "./collection.js";
+export * from "./settings.js";
 export * from "./entitlement.js";
 export * from "./customer.js";
 export * from "./meter.js";

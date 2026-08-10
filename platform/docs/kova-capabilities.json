@@ -48,7 +48,7 @@
       "persona": "everyone",
       "area": "identity",
       "outcome": "Choose whether they read weights and measures in metric or imperial",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "account-delete",
@@ -70,21 +70,21 @@
       "persona": "owner",
       "area": "studio",
       "outcome": "Make the product look like their business — name, logo, colours",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "studio-domain",
       "persona": "owner",
       "area": "studio",
       "outcome": "Serve the product from a domain they own, with a certificate that works",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "studio-settings",
       "persona": "owner",
       "area": "studio",
       "outcome": "Set how the studio behaves: what a lapsed client loses, and when",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "studio-close",
@@ -1072,14 +1072,14 @@
       "persona": "operator",
       "area": "operator",
       "outcome": "Edit what the platform sells: prices, ceilings, features, trials",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "op-domains",
       "persona": "operator",
       "area": "operator",
       "outcome": "See and troubleshoot studios' custom domains",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "op-parked",

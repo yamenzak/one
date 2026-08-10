@@ -13,6 +13,8 @@
 import type { BindingSpec } from "./bindings.js";
 import type { CollectionSpec } from "./collection.js";
 import type { Shape } from "./validate.js";
+import type { SettingsSpec } from "./settings.js";
+import { settingsProblems } from "./settings.js";
 import type { FlagDef } from "./customer.js";
 import type { AiSpec } from "./generation.js";
 import { aiProblems } from "./generation.js";
@@ -310,6 +312,19 @@ export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = Probl
    */
   readonly schemas?: Readonly<Record<string, Shape<unknown>>>;
   /**
+   * ⚠️ WHAT A WORKSPACE MAY CHOOSE ABOUT ITSELF, and it is not config.
+   *
+   * Config is the DEPLOYMENT's — one Stripe key, one mail provider, set by an
+   * operator, the same for everybody. A setting is one WORKSPACE's, set by its
+   * owner and different for every tenant on the same deployment. Merging them
+   * would put a studio's accent colour and a live secret key behind one read.
+   *
+   * Every app gets the three branding keys whether it declares any or not,
+   * because the sign-in screen wears them and that screen renders before there
+   * is a session to resolve an app's own settings with.
+   */
+  readonly settings?: SettingsSpec;
+  /**
    * ⚠️ SCHEDULED WORK IS DECLARED, NOT CRON'D. A cron entry in a deployment
    * config is a capability with no surface, no test, no audit and no record that
    * it ran — and the characteristic failure is silence rather than an error.
@@ -572,6 +587,19 @@ export function assertComposable(spec: {
   readonly guide?: GuideSpec;
   readonly milestones?: MilestoneRegistry;
   readonly schemas?: Readonly<Record<string, Shape<unknown>>>;
+  /**
+   * ⚠️ WHAT A WORKSPACE MAY CHOOSE ABOUT ITSELF, and it is not config.
+   *
+   * Config is the DEPLOYMENT's — one Stripe key, one mail provider, set by an
+   * operator, the same for everybody. A setting is one WORKSPACE's, set by its
+   * owner and different for every tenant on the same deployment. Merging them
+   * would put a studio's accent colour and a live secret key behind one read.
+   *
+   * Every app gets the three branding keys whether it declares any or not,
+   * because the sign-in screen wears them and that screen renders before there
+   * is a session to resolve an app's own settings with.
+   */
+  readonly settings?: SettingsSpec;
   readonly problems: Readonly<Record<string, unknown>>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly jobs?: readonly JobSpec<any>[];
@@ -702,6 +730,19 @@ export function assertComposable(spec: {
     Refusing at composition costs one registration; the alternative costs a
     column of malformed records nobody can find.
   */
+  /*
+    ⚠️ A SETTING THAT CANNOT BE USED IS WORSE THAN ONE THAT IS ABSENT, because
+    it renders. A choice with nothing to choose from, a fallback that is not one
+    of the choices, and a fallback of the wrong type are all controls somebody
+    will keep trying — and the last travels furthest, because a number declared
+    with a string fallback is `NaN` for every workspace that has not set it,
+    which on the day it ships is all of them.
+  */
+  const settings = settingsProblems({ ...spec.settings ?? {} });
+  if (settings.length) {
+    throw new Error(`${spec.id}: setting(s) ${settings.map((p) => `"${p.key}" ${p.why}`).join("; ")}.`);
+  }
+
   const unregistered = spec.collections.flatMap((c) =>
     Object.entries(c.fields)
       .filter(([, f]) => f.kind === "json" && !(spec.schemas ?? {})[(f as { schema: string }).schema])

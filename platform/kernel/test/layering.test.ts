@@ -38,6 +38,9 @@ const LAYER: Record<string, number> = {
   "customer.ts": 2,
   "job.ts": 2,
   "generation.ts": 2,
+  /* ⚠️ Declared, validated and defaulted with no I/O and nothing below it but
+     primitives — the same shape as every other registry here. */
+  "settings.ts": 2,
   "notify.ts": 3,
   "help.ts": 3,
   "guide.ts": 3,

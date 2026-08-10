@@ -149,6 +149,8 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
         */
         standing: { standing: "active", reason: "ok" },
         domains: [],
+        /* ⚠️ Nothing chosen yet. The three keys are published as they are set. */
+        branding: {},
       });
 
       /*

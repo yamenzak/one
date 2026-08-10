@@ -121,7 +121,7 @@ without one.
 | `[x]` | `passkey-remove` | everyone | See which devices they have registered and remove one they no longer have |
 | `[x]` | `session-list` | everyone | See where they are signed in and end a session on a device they no longer hold |
 | `[x]` | `sign-in` | everyone | Sign in with a code sent to their email address, with no password anywhere |
-| `[ ]` | `units` | everyone | Choose whether they read weights and measures in metric or imperial |
+| `[x]` | `units` | everyone | Choose whether they read weights and measures in metric or imperial |
 | | **media** | | |
 | `[x]` | `avatar` | trainer | Give a client a face, so a roster is people rather than rows |
 | `[x]` | `media-library` | trainer | Reuse something they already uploaded rather than uploading it again |
@@ -150,9 +150,9 @@ without one.
 | | **operator** | | |
 | `[x]` | `op-adjust` | operator | Adjust one studio's ceilings without editing the plan everybody is on |
 | `[x]` | `op-ai` | operator | Choose which models are on, and what they cost |
-| `[ ]` | `op-catalog` | operator | Edit what the platform sells: prices, ceilings, features, trials |
+| `[x]` | `op-catalog` | operator | Edit what the platform sells: prices, ceilings, features, trials |
 | `[x]` | `op-comp` | operator | Put a studio on a plan without a payment, for a reason |
-| `[ ]` | `op-domains` | operator | See and troubleshoot studios' custom domains |
+| `[x]` | `op-domains` | operator | See and troubleshoot studios' custom domains |
 | `[x]` | `op-email` | operator | Configure how the deployment sends mail, and prove it works |
 | `[x]` | `op-maintenance` | operator | Close the deployment for work, read-only or fully, and say so |
 | `[x]` | `op-parked` | operator | Read the payment events nothing could place, and replay them |
@@ -190,11 +190,11 @@ without one.
 | `[x]` | `staff-roster` | owner | See who is on the team, including who has not accepted yet |
 | `[x]` | `staff-seats` | owner | Know how many seats they have and how many are used |
 | | **studio** | | |
-| `[ ]` | `studio-brand` | owner | Make the product look like their business — name, logo, colours |
+| `[x]` | `studio-brand` | owner | Make the product look like their business — name, logo, colours |
 | `[x]` | `studio-close` | owner | Close the studio, change their mind for a week, and export what was theirs |
 | `[x]` | `studio-create` | owner | Open a studio at an address of their choosing and be its owner |
-| `[ ]` | `studio-domain` | owner | Serve the product from a domain they own, with a certificate that works |
-| `[ ]` | `studio-settings` | owner | Set how the studio behaves: what a lapsed client loses, and when |
+| `[x]` | `studio-domain` | owner | Serve the product from a domain they own, with a certificate that works |
+| `[x]` | `studio-settings` | owner | Set how the studio behaves: what a lapsed client loses, and when |
 | | **supplements** | | |
 | `[x]` | `lab-request` | trainer | Ask a client for a lab test and record the result |
 | `[x]` | `lab-upload` | client | Send in a lab report as a photograph or a file |

@@ -30,6 +30,7 @@ const entry = (over: Partial<DirectoryEntry> = {}): DirectoryEntry => ({
   region: "auto" as RegionId,
   standing: { standing: "active", reason: "ok" },
   domains: [],
+  branding: {},
   ...over,
 });
 

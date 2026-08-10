@@ -14,12 +14,20 @@
 import type { Directory, DirectoryEntry, Instant, RegionId, SchemaModule, SqlHandle, Standing, TenantId } from "@one/kernel";
 
 /** Every column, and the list is the point. Nothing about a PERSON is here. */
-export const DIRECTORY_COLUMNS = ["tenant_id", "slug", "region", "standing", "standing_reason", "standing_next_at", "domains"] as const;
+export const DIRECTORY_COLUMNS = ["tenant_id", "slug", "region", "standing", "standing_reason", "standing_next_at", "domains", "branding"] as const;
 
 export const DIRECTORY_SCHEMA: SchemaModule = {
   id: "directory",
   ddl: [
-    `CREATE TABLE IF NOT EXISTS tenant_directory (tenant_id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, region TEXT NOT NULL, standing TEXT NOT NULL, standing_reason TEXT NOT NULL, standing_next_at TEXT, domains TEXT NOT NULL DEFAULT '[]');`,
+    /*
+      ⚠️ `branding` IS A COPY OF THREE REGIONAL SETTINGS, and it is here for one
+      reason: the sign-in screen wears a workspace's name and colour, and it
+      renders BEFORE there is a session — so before there is a tenancy whose own
+      database could be read. Resolving the host already reads this row, so the
+      branding rides along and a cold sign-in shows the right name rather than
+      flashing the product's own and correcting itself.
+    */
+    `CREATE TABLE IF NOT EXISTS tenant_directory (tenant_id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, region TEXT NOT NULL, standing TEXT NOT NULL, standing_reason TEXT NOT NULL, standing_next_at TEXT, domains TEXT NOT NULL DEFAULT '[]', branding TEXT NOT NULL DEFAULT '{}');`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_tenant_directory_slug ON tenant_directory(slug);`,
   ],
 };
@@ -39,6 +47,7 @@ interface Row {
   tenant_id: string; slug: string; region: string;
   standing: string; standing_reason: string; standing_next_at: string | null;
   domains: string;
+  branding: string | null;
 }
 
 const toEntry = (r: Row): DirectoryEntry => ({
@@ -51,7 +60,16 @@ const toEntry = (r: Row): DirectoryEntry => ({
     ...(r.standing_next_at ? { nextAt: r.standing_next_at as Instant } : {}),
   },
   domains: JSON.parse(r.domains) as string[],
+  /* ⚠️ An older row predates the column, and a workspace with no branding is the
+     ordinary case — so an unreadable value is the empty one rather than a throw
+     on every request to that host. */
+  branding: parseOr(r.branding),
 });
+
+const parseOr = (text: string | null): Readonly<Record<string, string>> => {
+  if (!text) return {};
+  try { return JSON.parse(text) as Record<string, string>; } catch { return {}; }
+};
 
 const COLUMNS = DIRECTORY_COLUMNS.join(", ");
 

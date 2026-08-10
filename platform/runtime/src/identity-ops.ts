@@ -26,6 +26,12 @@ import { sessionCookie, clearedCookie } from "./identity.js";
 export const PLATFORM = Symbol.for("one.runtime.platform");
 
 export interface PlatformDeps {
+  /**
+   * ⚠️ THE DIRECTORY IS WHERE AN ACCOUNT LIVES, so a personal preference is
+   * written there rather than in a region. Somebody in two workspaces in two
+   * regions is one person with one answer to "how do you read a weight", and a
+   * per-region copy is two answers that disagree the first time one is edited.
+   */
   readonly directory: SqlHandle;
   readonly identity: IdentityStore;
   readonly sessions: SessionStore;
@@ -379,5 +385,67 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
-  return [requestCode, verifyCode, registerBegin, registerFinish, signInBegin, signInFinish, whoami, signOut] as unknown as readonly AnyOperation[];
+
+  /**
+   * How this person reads weights and measures.
+   *
+   * ⚠️ THE PERSON'S, NOT THE WORKSPACE'S. A coach who thinks in kilograms and a
+   * client who thinks in pounds are both right, in the same studio, about the
+   * same barbell — so a workspace-level choice is one that is wrong for somebody
+   * by construction. It hangs off the ACCOUNT rather than the membership:
+   * somebody in two studios does not change how they read a weight when they
+   * switch between them.
+   *
+   * ⚠️ AND IT IS A DISPLAY CHOICE ONLY. Everything is stored in one unit and
+   * converted at the edge — a store that held whatever somebody last typed is a
+   * database where a number means nothing without a second column beside it, and
+   * the sum of a column like that is meaningless.
+   */
+  const preferences = operation({
+    id: "me.preferences",
+    kind: "read",
+    summary: "How you read weights and measures.",
+    input: nothing(),
+    output: s.object({ units: s.text() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const d = deps(ctx);
+      if (!d.session) return { units: "" };
+      const row = await d.directory.first<{ units: string | null }>(
+        `SELECT units FROM accounts WHERE id = ?`, d.session.accountId,
+      ).catch(() => null);
+      /* ⚠️ Empty means "whatever this deployment's format says", which is the
+         honest answer for somebody who has never chosen. Substituting one here
+         would make a default indistinguishable from a decision. */
+      return { units: row?.units ?? "" };
+    },
+  });
+
+  const setPreferences = operation({
+    id: "me.preferences.set",
+    kind: "write",
+    summary: "Change how you read weights and measures.",
+    input: s.object({ units: s.enum(["", "metric", "imperial"]) }),
+    output: s.object({ ok: s.bool() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    outcome: { message: "Saved", tone: "success", invalidates: ["me.preferences"] },
+    fails: ["platform.forbidden"],
+    tool: false,
+    async handler(ctx, input: { units: string }) {
+      const d = deps(ctx);
+      /*
+        ⚠️ PUBLIC IS THE LANE, NOT THE AUDIENCE. Every operation here answers on
+        a door with no tenancy, so the permission cannot be a role — but writing
+        a preference still needs somebody to write it FOR, and without this the
+        route is an unauthenticated write against whatever account id arrived.
+      */
+      if (!d.session) ctx.fail("platform.forbidden", { reason: "sign in first" });
+      await d.directory.run(`UPDATE accounts SET units = ? WHERE id = ?`, input.units, d.session!.accountId);
+      return { ok: true };
+    },
+  });
+
+  return [requestCode, verifyCode, registerBegin, registerFinish, signInBegin, signInFinish, whoami, signOut, preferences, setPreferences] as unknown as readonly AnyOperation[];
 }

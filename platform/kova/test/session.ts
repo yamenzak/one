@@ -22,12 +22,25 @@ import worker, { recorded } from "../src/worker.js";
  * back to `recorded` when nothing was configured is a production deployment
  * quietly recording its sign-in codes and answering as though the mail went out.
  */
-let seeded = false;
+/*
+  ⚠️ NO MODULE-LEVEL "ALREADY DONE" FLAG, AND THAT IS NOT AN OVERSIGHT.
+
+  Storage is isolated PER TEST FILE and the module registry is not, so a flag set
+  by whichever file ran first survives into every later one while the database it
+  wrote to does not. The result is a suite where one file seeds, passes, and every
+  other file signs in against a deployment with no mail provider — so no code is
+  ever recorded, the verify fails, and the fixture reports "the studio must have
+  been created" against an undefined id. It reproduces only under a full run,
+  which is exactly when nobody is looking at one file.
+
+  The insert is `ON CONFLICT DO NOTHING`, so doing it every time costs one
+  statement and cannot be wrong.
+*/
 const seedMail = async () => {
-  if (seeded) return;
-  seeded = true;
   const db = bindingsFor({ db: sql() }, { DB: (env as Record<string, unknown>).DIRECTORY }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
   await db.batch([`CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, at TEXT NOT NULL);`]);
+
+
   for (const [key, value] of [["email.provider", "recorded"], ["email.from", "Kova <noreply@4dl.app>"]]) {
     await db.run(
       `INSERT INTO app_config (key, value, at) VALUES (?, ?, ?) ON CONFLICT(key) DO NOTHING`,
@@ -37,6 +50,21 @@ const seedMail = async () => {
 };
 
 export const SETUP = "https://setup.kova.4dl.app";
+
+/**
+ * A slug this attempt has not used before.
+ *
+ * ⚠️ STORAGE IS SHARED ACROSS THIS PACKAGE'S FILES AND A FILE IS RETRIED ONCE,
+ * so a fixture that creates a fixed slug conflicts with ITSELF: the first
+ * attempt takes the address, something later fails, and the retry's `beforeAll`
+ * is told the address is taken — which reports as "the studio must have been
+ * created" and hides whatever actually went wrong.
+ *
+ * A fresh address per attempt makes the fixture idempotent under retry without
+ * weakening anything: a workspace is a workspace whatever it is called.
+ */
+let minted = 0;
+export const freshSlug = (base: string): string => `${base}-${(minted += 1)}${Math.random().toString(36).slice(2, 7)}`;
 
 export const post = async (origin: string, path: string, body: unknown, cookie = "") => {
   const res = await worker.fetch(
@@ -62,7 +90,38 @@ export const accountIds = new Map<string, string>();
 /** Returns the cookie for that origin. Sessions are per origin, so it matters. */
 export async function signIn(email: string, origin: string): Promise<string> {
   await seedMail();
-  await post(origin, "/api/identity.code.request", { email });
+  /*
+    ⚠️ ONE RETRY OF THE WHOLE CEREMONY, AND THE REASON IS THE STORE RATHER THAN
+    THE CODE.
+
+    Storage is SHARED across this package's files (`isolatedStorage: false`), and
+    under a full run the `sign_in_codes` row occasionally is not the one that was
+    just written by the time the exchange reads it — so a freshly delivered code
+    is answered "that doesn't look right" about a field the caller never chose.
+    Asking again writes a new row and exchanges it in the same breath.
+
+    ⚠️ IT IS BOUNDED AT TWO, so a genuine failure still fails. And nothing here
+    clears `recorded`: several files are mid-sign-in against one map, and a
+    tidy-up that emptied it took another file's undelivered code with it.
+  */
+  const once = await attemptSignIn(email, origin);
+  if (once) return once;
+  const again = await attemptSignIn(email, origin);
+  if (again) return again;
+  throw new Error(`signing ${email} in did not work twice — is a mail provider configured?`);
+}
+
+async function attemptSignIn(email: string, origin: string): Promise<string | null> {
+  const held = recorded.get(email.toLowerCase());
+  const asked = await post(origin, "/api/identity.code.request", { email });
+  /*
+    ⚠️ A REFUSED RESEND MEANS THE LAST CODE IS STILL THE LIVE ONE. There is a
+    sixty-second cooldown per address — the one gate in front of an
+    unauthenticated send — and a suite signing the same person in at two doors in
+    the same second is refused the second time by design.
+  */
+  if (asked.res.status !== 200 && !held) return null;
+
   /*
     ⚠️ READ OUT OF THE MESSAGE THAT WAS SENT, not out of a map the worker kept.
     The `recorded` provider is one a deployment CHOOSES, so this drives the same
@@ -70,9 +129,11 @@ export async function signIn(email: string, origin: string): Promise<string> {
   */
   const sent = recorded.get(email.toLowerCase());
   const code = /\b(\d{4,8})\b/.exec(sent?.body ?? "")?.[1];
+  if (!code) return null;
+
   const { res, body } = await post(origin, "/api/identity.code.verify", { email, code });
   if (typeof body.accountId === "string") accountIds.set(email, body.accountId);
-  return (res.headers.get("set-cookie") ?? "").split(";")[0]!;
+  return (res.headers.get("set-cookie") ?? "").split(";")[0] || null;
 }
 
 /**

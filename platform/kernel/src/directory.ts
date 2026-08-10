@@ -34,10 +34,30 @@ export interface DirectoryEntry {
   readonly standing: StandingState;
   /** Custom domains pointing here. Hostnames, not people. */
   readonly domains: readonly string[];
+  /**
+   * ⚠️ THE THREE BRANDING SETTINGS, COPIED, so the sign-in screen can wear them.
+   * That screen renders before there is a session, and therefore before there is
+   * a tenancy whose own database could be read — so without this a cold sign-in
+   * shows the product's name and then corrects itself.
+   */
+  readonly branding: Readonly<Record<string, string>>;
 }
 
 /** Asserted by `test/directory.test.ts` against the interface. */
-export const DIRECTORY_FIELDS = ["tenantId", "slug", "region", "standing", "domains"] as const;
+/*
+  ⚠️ `branding` IS HERE DELIBERATELY, AND THE CONFORMANCE TEST IS WHAT MADE IT
+  deliberate. It is a workspace's public face — the name, mark and colour its own
+  sign-in screen wears — which is the same class of thing as its slug and no more
+  personal than the address people type to reach it.
+
+  The alternative was worse in the way that matters: the sign-in screen renders
+  before there is a session, therefore before there is a tenancy whose regional
+  store could be read, so without this a workspace's own customers arrive at a
+  page wearing the product's name and watch it change. And it stays a COPY — the
+  regional row is authoritative and this is refreshed from it on write, so there
+  is no second answer to migrate.
+*/
+export const DIRECTORY_FIELDS = ["tenantId", "slug", "region", "standing", "domains", "branding"] as const;
 
 /**
  * How the directory is read. Injected, so the resolution logic is pure and the

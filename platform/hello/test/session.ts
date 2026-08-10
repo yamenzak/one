@@ -22,10 +22,21 @@ import worker, { recorded } from "../src/worker.js";
  * back to `recorded` when nothing was configured is a production deployment
  * quietly recording its sign-in codes and answering as though the mail went out.
  */
-let seeded = false;
+/*
+  ⚠️ NO MODULE-LEVEL "ALREADY DONE" FLAG, AND THAT IS NOT AN OVERSIGHT.
+
+  Storage is isolated PER TEST FILE and the module registry is not, so a flag set
+  by whichever file ran first survives into every later one while the database it
+  wrote to does not. The result is a suite where one file seeds, passes, and every
+  other file signs in against a deployment with no mail provider — so no code is
+  ever recorded, the verify fails, and the fixture reports "the studio must have
+  been created" against an undefined id. It reproduces only under a full run,
+  which is exactly when nobody is looking at one file.
+
+  The insert is `ON CONFLICT DO NOTHING`, so doing it every time costs one
+  statement and cannot be wrong.
+*/
 const seedMail = async () => {
-  if (seeded) return;
-  seeded = true;
   const db = bindingsFor({ db: sql() }, { DB: (env as Record<string, unknown>).DIRECTORY }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
   await db.batch([`CREATE TABLE IF NOT EXISTS app_config (key TEXT PRIMARY KEY, value TEXT NOT NULL, at TEXT NOT NULL);`]);
   for (const [key, value] of [["email.provider", "recorded"], ["email.from", "Hello <noreply@4dl.app>"]]) {

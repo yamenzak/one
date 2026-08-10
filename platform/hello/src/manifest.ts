@@ -185,13 +185,13 @@ export const hello = defineApp({
     weekStart: 1,
   },
   access: {
-    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage", "platform:operate"],
+    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "inbox:read", "workspace:close", "workspace:settings", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage", "platform:operate"],
     /*
       Anybody signed in may open a workspace — this is a self-serve product, and
       `workspace:create` is checked on a door that has no tenant to be a member
       of, so a role is the only place it could come from.
     */
-    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage"], reader: ["note:read", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read"],
+    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "inbox:read", "workspace:close", "workspace:settings", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage"], reader: ["note:read", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read"],
       /* ⚠️ WHAT SOMEBODY MAY DO ON THE OPERATOR DOOR, where there is no
          workspace to be a member of. The door is the control; this says what it
          opens onto. Deliberately narrow: the deployment's own checklist and the

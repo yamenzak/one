@@ -255,3 +255,129 @@ export function parkingAboveFloor(
     })
     .map(([key]) => key);
 }
+
+/* --------------------------------------------------------- editing a plan --- */
+
+/**
+ * What an operator has changed about a declared plan.
+ *
+ * ⚠️ AN OVERRIDE, NOT A REPLACEMENT, and for the same reason a model's rate is
+ * one: a manifest is a deploy and a price change is not. The declaration is what
+ * the app ships knowing; this is what the deployment currently sells. Every field
+ * is optional because most edits move one number, and an edit that had to restate
+ * the whole plan is one that silently resets the parts nobody meant to touch.
+ */
+export interface PlanOverride {
+  readonly price?: Money;
+  readonly trialDays?: number;
+  /** Sparse. A key absent here keeps the declared value. */
+  readonly entitlements?: Readonly<Record<string, Allowance>>;
+}
+
+export type PlanOverrides = Readonly<Record<string, PlanOverride>>;
+
+/** The catalogue as it is actually sold today. */
+export function catalogueOf(declared: readonly PlanSpec[], overrides: PlanOverrides): readonly PlanSpec[] {
+  return declared.map((plan) => {
+    const over = overrides[plan.id];
+    if (!over) return plan;
+    return {
+      ...plan,
+      ...(over.price ? { price: over.price } : {}),
+      ...(over.trialDays === undefined ? {} : { trialDays: over.trialDays }),
+      entitlements: { ...plan.entitlements, ...(over.entitlements ?? {}) },
+    };
+  });
+}
+
+/**
+ * What editing a plan DOWN takes away from somebody already on it.
+ *
+ * ⚠️ THIS IS THE HALF THAT MAKES A CATALOGUE SAFE TO EDIT, and until an operator
+ * could edit one it was a column the resolver read and nothing wrote.
+ *
+ * A workspace bought three seats. The plan is edited to two — for good reasons,
+ * about what is sold from now on — and without a snapshot that workspace loses a
+ * seat it paid for, in the middle of a period, with no notice and no refund. The
+ * symptom is a member who cannot sign in and a support conversation nobody can
+ * explain, because the plan says two and always did.
+ *
+ * ⚠️ IT RATCHETS UP ONLY. A snapshot merged downward would be the edit it exists
+ * to protect against, applied by the protection itself — so a second reduction
+ * cannot lower a workspace that was already held at the first.
+ *
+ * ⚠️ AND IT ONLY EVER RECORDS A REDUCTION. Raising a plan needs no snapshot: the
+ * new value is better and resolution already prefers the higher of the two, so
+ * writing one would freeze a workspace out of every future improvement.
+ */
+export function snapshotDowngrade(
+  before: Readonly<Record<string, Allowance>>,
+  after: Readonly<Record<string, Allowance>>,
+  held: Readonly<Record<string, Allowance>>,
+): Readonly<Record<string, Allowance>> {
+  const out: Record<string, Allowance> = { ...held };
+  for (const [key, was] of Object.entries(before)) {
+    const now = after[key];
+    if (now === undefined) continue;
+    if (!isLower(now, was)) continue;
+    const already = out[key];
+    out[key] = already === undefined ? was : higher(already, was);
+  }
+  return out;
+}
+
+/**
+ * ⚠️ `UNLIMITED` IS THE TOP, NOT A SMALL NUMBER. It is stored as -1, so an
+ * arithmetic comparison reads unlimited as lower than one — which turns "you had
+ * unlimited and now have five" into no snapshot at all, silently, for exactly the
+ * workspaces with the most to lose.
+ */
+const isLower = (now: Allowance, was: Allowance): boolean => {
+  if (typeof was === "boolean" || typeof now === "boolean") return was === true && now === false;
+  if (was === UNLIMITED) return now !== UNLIMITED;
+  if (now === UNLIMITED) return false;
+  return now < was;
+};
+
+const higher = (a: Allowance, b: Allowance): Allowance => {
+  if (typeof a === "boolean" || typeof b === "boolean") return Boolean(a) || Boolean(b);
+  if (a === UNLIMITED || b === UNLIMITED) return UNLIMITED;
+  return Math.max(a, b);
+};
+
+/** Why a proposed edit may not be applied. */
+export type CatalogueRefusal = "unknown_plan" | "unknown_key" | "negative_price" | "negative_trial" | "kind";
+
+/**
+ * ⚠️ AN EDIT IS CHECKED AGAINST THE DECLARATION, so a catalogue cannot grow keys
+ * the app never declared. An entitlement nothing resolves is a price list
+ * promising something that does not exist — sold, paid for, and answered by no
+ * gate anywhere, which is indistinguishable from a capability that happens to be
+ * generous.
+ */
+export function refuseCatalogueEdit(
+  declared: readonly PlanSpec[],
+  keys: Readonly<Record<string, EntitlementDef>>,
+  planId: string,
+  edit: PlanOverride,
+): CatalogueRefusal | null {
+  const plan = declared.find((p) => p.id === planId);
+  if (!plan) return "unknown_plan";
+  if (edit.price && edit.price.minor < 0) return "negative_price";
+  if (edit.trialDays !== undefined && (!Number.isInteger(edit.trialDays) || edit.trialDays < 0)) return "negative_trial";
+  for (const [key, value] of Object.entries(edit.entitlements ?? {})) {
+    const def = keys[key];
+    if (!def) return "unknown_key";
+    /*
+      ⚠️ THE KIND HAS TO MATCH WHAT THE GATE READS. A quota given `true` is a
+      ceiling every count compares against a boolean, and a gate given `3` is a
+      feature that is on because three is truthy — both of which "work" until
+      somebody looks at a number.
+    */
+    const wantsNumber = def.enforcement === "quota";
+    if (wantsNumber && typeof value !== "number") return "kind";
+    if (!wantsNumber && typeof value !== "boolean") return "kind";
+    if (wantsNumber && typeof value === "number" && value < UNLIMITED) return "kind";
+  }
+  return null;
+}

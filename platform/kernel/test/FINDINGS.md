@@ -2881,3 +2881,79 @@ and refused the feature for everybody.
 ⚠️ It fails CLOSED, which is why it is a finding and not an incident: the
 symptom is a feature nobody can use rather than one nobody is charged for. The
 same mistake on `customerFlag` would fail the other way.
+
+## 232. A workspace's own choices had nowhere to live
+
+Config is the DEPLOYMENT's — one Stripe key, one mail provider, set by an
+operator, the same for everybody. There was no counterpart for the WORKSPACE's:
+its name, its colour, how often it expects somebody to check in. Every app would
+have grown its own table, its own write endpoint and its own defaults — and the
+default is the part that goes wrong, because three readers each deciding what an
+absent row means is three decisions and the one that differs is a policy that
+says fourteen days on the screen and never in the sweep.
+
+⚠️ AND ONE OF THEM IS A COLOUR, WHICH IS AN INJECTION SITE. Anything a CSS parser
+would accept is also a way to put a `url(...)` or a variable reference into a
+stylesheet this product renders for other people. A hex triple or nothing.
+
+⚠️ THE THREE BRANDING KEYS ARE COPIED TO THE DIRECTORY, and that is the one place
+a setting is written twice on purpose: the sign-in screen wears them and renders
+BEFORE there is a session, therefore before there is a tenancy whose regional
+store could be read. `DIRECTORY_FIELDS` and its conformance test made adding the
+column a deliberate act, which is exactly what that test is for.
+
+## 233. `grandfathered_json` was read by the resolver and written by nothing
+
+The column has existed since the beginning, the resolution walk has always
+honoured it, and the comment above it explains at length why it may only ratchet
+up. Nothing ever wrote a value into it — because until an operator could edit a
+plan there was nothing to protect anybody from.
+
+Making the catalogue editable is what turns that from an unused column into a
+live promise. A workspace bought three seats; the plan becomes two, for good
+reasons about what is sold from now on; and without the snapshot that workspace
+loses a seat it paid for, mid-period, with no notice. The symptom is a colleague
+who cannot sign in and a support conversation nobody can explain, because the
+plan says two and appears always to have.
+
+⚠️ AND `UNLIMITED` IS THE TOP, NOT A SMALL NUMBER. Stored as -1, an arithmetic
+comparison reads unlimited as lower than one — so "you had unlimited and now have
+five" records no snapshot at all, silently, for exactly the workspaces with the
+most to lose.
+
+## 234. "Your plan includes undefined, and undefined are in use"
+
+A problem's `detail` is a template over the meta a raise site supplies, and the
+seat ceiling raised `platform.quota_reached` with neither number in it. Nothing
+throws when that happens and nothing can: the template is a function and the
+missing value is a legal `undefined`. It is customer-facing copy, on a refusal,
+at the moment somebody is trying to add a colleague.
+
+Two fixes, because one is not enough. The raise site now carries both numbers;
+and a detail that cannot be completed is WITHHELD on the way out, leaving the
+title and the code — both of which are still true. A sentence with a hole in it
+is worse than no sentence.
+
+It was found by a fixture that hit the seat limit by accident.
+
+## 235. A retried test file conflicted with its own first attempt
+
+Kova's suite shares storage across files on purpose and retries a file once. Put
+together, a fixture that creates a FIXED slug takes the address on its first
+attempt and is told the address is taken on its second — so whatever actually
+failed is replaced by "the studio must have been created", about a workspace the
+same file made ninety seconds earlier.
+
+It cost most of an afternoon and three wrong hypotheses: a module-level seeding
+flag, a stale recorded message, and file parallelism. All three were plausible,
+two produced real improvements worth keeping, and none was the cause.
+
+⚠️ THE FIXTURES NOW SAY WHAT WENT WRONG WHERE IT WENT WRONG. `signIn` returning
+`""` on a refusal is what made this expensive: the failure surfaced three calls
+later in a different assertion with nothing naming the sign-in. Every fixture
+assertion in this repo exists because of one of these.
+
+⚠️ AND NOTHING MAY CLEAR `recorded`. It is a module-level map several files are
+mid-sign-in against; a tidy-up that emptied it took another file's undelivered
+code with it — which was one of the three wrong hypotheses, added as a fix and
+removed as a cause.

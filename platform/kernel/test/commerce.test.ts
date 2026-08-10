@@ -11,9 +11,10 @@
 import { describe, expect, it } from "vitest";
 import {
   NO_OVERRIDES, UNLIMITED,
-  balanceOf, charsPerUnit, daysRemaining, explainCustomerFlags, explainEntitlements,
+  balanceOf, catalogueOf, charsPerUnit, daysRemaining, explainCustomerFlags, explainEntitlements,
   extendBudget, floorPlan, gateFor, heldEntitlements, mayPurchase, packageContradictions,
-  parkingAboveFloor, planRun, resolveCustomerFlags, resolveEntitlements, reversal,
+  parkingAboveFloor, planRun, refuseCatalogueEdit, resolveCustomerFlags, resolveEntitlements, reversal,
+  snapshotDowngrade,
   DESTRUCTIVE_FLOOR_DAYS, ladderProblems, lapsedFor, runwayFor, rungFor, settle, withinQuota,
   type Allowance, type EntitlementDef, type FlagDef, type Instant, type PackageSpec, type PlanSpec,
 } from "../src/index.js";
@@ -423,5 +424,140 @@ describe("metering", () => {
     expect(reversal({ granted: 1000, paidMinor: 1000, refundedMinorTotal: 1000, alreadyReversed: 1000 })).toBe(0);
     expect(reversal({ granted: 1000, paidMinor: 1000, refundedMinorTotal: 2000, alreadyReversed: 0 })).toBe(1000);
     expect(reversal({ granted: 1000, paidMinor: 0, refundedMinorTotal: 500, alreadyReversed: 0 })).toBe(0);
+  });
+});
+
+
+/* ------------------------------------------------------- editing a plan --- */
+
+/**
+ * ⚠️ A CATALOGUE IS EDITABLE BECAUSE A MANIFEST IS A DEPLOY AND A PRICE IS NOT —
+ * the same argument as a model's rate, one rail over.
+ *
+ * ⚠️ AND THE SNAPSHOT IS WHAT MAKES IT SAFE. `grandfathered_json` has been read
+ * by the resolver since the beginning and written by nothing, because until an
+ * operator could edit a plan there was nothing to protect anybody from. A
+ * workspace bought three seats; the plan becomes two — for good reasons, about
+ * what is sold from now on — and without a snapshot that workspace loses a seat
+ * it paid for, mid-period, with no notice. The symptom is a colleague who cannot
+ * sign in and a support conversation nobody can explain, because the plan says
+ * two and appears always to have.
+ */
+describe("editing what a deployment sells", () => {
+  const plans: PlanSpec[] = [
+    { id: "solo", name: "Solo", price: { minor: 499, currency: "usd" }, period: "month", trialDays: 14,
+      entitlements: { clients: 3, seats: 1, training: true } },
+  ];
+  const keys: Record<string, EntitlementDef> = {
+    clients: { label: "Clients", parked: 1, enforcement: "quota" },
+    seats: { label: "Staff", parked: 1, enforcement: "quota" },
+    training: { label: "Training", parked: false, enforcement: "gate" },
+  };
+
+  it("leaves a plan nobody edited exactly as declared", () => {
+    expect(catalogueOf(plans, {})).toEqual(plans);
+  });
+
+  it("applies a price without touching the ceilings", () => {
+    const out = catalogueOf(plans, { solo: { price: { minor: 900, currency: "usd" } } })[0]!;
+    expect(out.price.minor).toBe(900);
+    expect(out.entitlements).toEqual({ clients: 3, seats: 1, training: true });
+  });
+
+  /* ⚠️ Sparse. An edit that had to restate the whole plan silently resets the
+     parts nobody meant to touch. */
+  it("merges one ceiling and keeps the rest", () => {
+    const out = catalogueOf(plans, { solo: { entitlements: { clients: 10 } } })[0]!;
+    expect(out.entitlements).toEqual({ clients: 10, seats: 1, training: true });
+  });
+
+  it("refuses an entitlement key the app never declared", () => {
+    expect(refuseCatalogueEdit(plans, keys, "solo", { entitlements: { invented: 5 } })).toBe("unknown_key");
+  });
+
+  /*
+    ⚠️ THE KIND HAS TO MATCH WHAT THE GATE READS. A quota given `true` is a
+    ceiling every count compares against a boolean; a gate given `3` is a feature
+    that is on because three is truthy. Both "work" until somebody looks at a
+    number.
+  */
+  it("refuses a quota set to a switch, and a switch set to a number", () => {
+    expect(refuseCatalogueEdit(plans, keys, "solo", { entitlements: { clients: true } })).toBe("kind");
+    expect(refuseCatalogueEdit(plans, keys, "solo", { entitlements: { training: 3 } })).toBe("kind");
+  });
+
+  it("refuses a negative price and a negative trial", () => {
+    expect(refuseCatalogueEdit(plans, keys, "solo", { price: { minor: -1, currency: "usd" } })).toBe("negative_price");
+    expect(refuseCatalogueEdit(plans, keys, "solo", { trialDays: -1 })).toBe("negative_trial");
+  });
+
+  it("refuses a plan that does not exist", () => {
+    expect(refuseCatalogueEdit(plans, keys, "nope", { trialDays: 0 })).toBe("unknown_plan");
+  });
+
+  it("accepts an ordinary edit", () => {
+    expect(refuseCatalogueEdit(plans, keys, "solo", { price: { minor: 900, currency: "usd" }, entitlements: { clients: 10 } })).toBeNull();
+  });
+});
+
+describe("holding an existing subscriber at what they were sold", () => {
+  const before = { clients: 3, seats: 2, training: true };
+
+  it("records what a reduction takes away", () => {
+    expect(snapshotDowngrade(before, { ...before, seats: 1 }, {})).toEqual({ seats: 2 });
+  });
+
+  /* ⚠️ Raising needs no snapshot: the new value is better and resolution already
+     prefers the higher of the two, so writing one freezes a workspace out of
+     every future improvement. */
+  it("records nothing when a plan gets better", () => {
+    expect(snapshotDowngrade(before, { ...before, clients: 10 }, {})).toEqual({});
+  });
+
+  it("records a capability withdrawn", () => {
+    expect(snapshotDowngrade(before, { ...before, training: false }, {})).toEqual({ training: true });
+  });
+
+  it("says nothing about a capability that was already off", () => {
+    expect(snapshotDowngrade({ training: false }, { training: false }, {})).toEqual({});
+  });
+
+  /*
+    ⚠️ IT RATCHETS UP ONLY. A snapshot merged downward would be the edit it
+    exists to protect against, applied by the protection itself — so a second
+    reduction cannot lower a workspace already held at the first.
+  */
+  it("keeps the higher of what is already held", () => {
+    const held = { seats: 5 };
+    expect(snapshotDowngrade(before, { ...before, seats: 1 }, held)).toEqual({ seats: 5 });
+  });
+
+  /*
+    ⚠️ `UNLIMITED` IS THE TOP, NOT A SMALL NUMBER. Stored as -1, an arithmetic
+    comparison reads it as lower than one — so "you had unlimited and now have
+    five" records nothing at all, silently, for exactly the workspaces with the
+    most to lose.
+  */
+  it("treats unlimited as the highest value there is", () => {
+    expect(snapshotDowngrade({ clients: UNLIMITED }, { clients: 5 }, {})).toEqual({ clients: UNLIMITED });
+    expect(snapshotDowngrade({ clients: 5 }, { clients: UNLIMITED }, {})).toEqual({});
+    expect(snapshotDowngrade({ clients: UNLIMITED }, { clients: 5 }, { clients: 9 })).toEqual({ clients: UNLIMITED });
+  });
+
+  it("ignores a key the new plan does not mention at all", () => {
+    expect(snapshotDowngrade(before, { clients: 3 }, {})).toEqual({});
+  });
+
+  /* ⚠️ And the snapshot is what the resolver then honours — the two halves have
+     to meet, or the write is a column nobody reads. */
+  it("is honoured by the resolution walk", () => {
+    const held = snapshotDowngrade(before, { ...before, seats: 1 }, {});
+    const out = explainEntitlements({
+      declared: { seats: { label: "Staff", parked: 1, enforcement: "quota" } },
+      plan: { id: "solo", name: "Solo", price: { minor: 499, currency: "usd" }, period: "month", trialDays: 0, entitlements: { seats: 1 } },
+      overrides: { grandfathered: held, adjusted: {} },
+      gate: { reads: true, writes: true, app: true },
+    });
+    expect(out.seats).toMatchObject({ value: 2, from: "grandfathered", planValue: 1 });
   });
 });

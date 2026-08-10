@@ -23,6 +23,9 @@ import { MEDIA_SCHEMA } from "./files.js";
 import { GUIDE_SCHEMA } from "./guide.js";
 import { MILESTONE_SCHEMA } from "./milestone.js";
 import { GENERATION_SCHEMA } from "./generate.js";
+import { SETTINGS_SCHEMA } from "./settings.js";
+import { DOMAIN_CLAIM_SCHEMA } from "./settings-ops.js";
+import { CATALOGUE_SCHEMA } from "./operator-ops.js";
 import { CONFIG_SCHEMA, MODEL_SCHEMA } from "./config.js";
 import { DIRECTORY_SCHEMA, DOMAIN_SCHEMA } from "./directory.js";
 import { IDENTITY_SCHEMA } from "./identity.js";
@@ -43,6 +46,7 @@ export const PLATFORM_REGIONAL: readonly SchemaModule[] = [
   GUIDE_SCHEMA,
   MILESTONE_SCHEMA,
   GENERATION_SCHEMA,
+  SETTINGS_SCHEMA,
 ];
 
 /**
@@ -64,6 +68,11 @@ export const PLATFORM_GLOBAL: readonly SchemaModule[] = [
   PLATFORM_STATE_SCHEMA,
   JOB_SCHEMA,
   CONFIG_SCHEMA,
+  /* ⚠️ Beside the directory, because a claim is looked up by hostname before any
+     region is known — the same reason the domain table itself is here. */
+  DOMAIN_CLAIM_SCHEMA as SchemaModule,
+  /* ⚠️ Global, because a price is the deployment's and a region is a workspace's. */
+  CATALOGUE_SCHEMA,
 ];
 
 /**

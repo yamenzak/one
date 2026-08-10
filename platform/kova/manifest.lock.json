@@ -73,7 +73,8 @@
     "workout:read",
     "workout:write",
     "workspace:close",
-    "workspace:create"
+    "workspace:create",
+    "workspace:settings"
   ],
   "plans": [
     "max",

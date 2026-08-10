@@ -2362,6 +2362,114 @@
       "impl": "kova/test/seeing.test.ts",
       "proves": "refuses a picture this workspace does not hold, and says so",
       "fails": "the generic code written over the specific reason, so \"that picture is not in this workspace\", \"this asks for a picture and none was given\" and a missing model binding all read as one word nobody can act on"
+    },
+    {
+      "id": "a-setting-is-declared-not-scattered",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/settings.test.ts",
+      "proves": "falls back to the declaration where nothing is stored",
+      "fails": "three readers each deciding what an absent row means — a lapse policy read as \"never\" by a sweep and \"fourteen days\" by the screen that shows it, neither throwing"
+    },
+    {
+      "id": "a-tenant-colour-is-a-colour",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/settings.test.ts",
+      "proves": "refuses anything a CSS parser would take",
+      "fails": "anything a CSS parser would take being stored as a workspace's accent — a `url(...)` or a variable reference injected into a stylesheet this product renders for other people, which is a stored injection wearing a colour picker's clothes"
+    },
+    {
+      "id": "a-setting-may-be-narrower-than-its-screen",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/settings.test.ts",
+      "proves": "refuses somebody who may open the screen and not hold the narrower key",
+      "fails": "one control on a settings screen that withdraws something from every customer of the workspace, reachable by anybody who may open the screen at all"
+    },
+    {
+      "id": "branding-reaches-the-screen-that-cannot-ask",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/settling.test.ts",
+      "proves": "reaches the row a screen with no session reads",
+      "fails": "a sign-in screen wearing the product's name and correcting itself, because the branding lives only in a regional store the pre-session screen cannot reach"
+    },
+    {
+      "id": "a-claimed-domain-routes-nothing",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/settling.test.ts",
+      "proves": "serves nothing from it yet",
+      "fails": "a hostname served on the strength of somebody typing it — and the thing typed may belong to a competitor, a bank, or another workspace on the same deployment"
+    },
+    {
+      "id": "the-dns-verdict-is-ours",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/settling.test.ts",
+      "proves": "refuses to serve on a record that is not there",
+      "fails": "a caller reporting its own verification result — a custom domain anybody takes by sending {verified: true}"
+    },
+    {
+      "id": "a-verification-token-survives-a-second-claim",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/settling.test.ts",
+      "proves": "does not change the record when the same studio claims again",
+      "fails": "somebody who has already published the DNS record pressing the button again and never being able to verify, because what they published no longer matches what we look for"
+    },
+    {
+      "id": "a-domain-is-released-by-its-own-workspace",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/settling.test.ts",
+      "proves": "cannot be released by a second studio",
+      "fails": "a claim table keyed on the hostname alone, where a delete without the tenant binding takes somebody else's address down"
+    },
+    {
+      "id": "a-price-is-not-a-deploy",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "changes what the workspace on that plan may actually do",
+      "fails": "a catalogue screen the resolver never reads — raising a limit for a customer who paid for it changes nothing, and the only symptom is a refusal they were told would not happen"
+    },
+    {
+      "id": "editing-a-plan-down-holds-existing-subscribers",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "holds an existing subscriber at what they were sold",
+      "fails": "a workspace losing seats it paid for mid-period with no notice, because `grandfathered_json` was read by the resolver and written by nothing"
+    },
+    {
+      "id": "unlimited-is-the-top-not-a-small-number",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/commerce.test.ts",
+      "proves": "treats unlimited as the highest value there is",
+      "fails": "-1 compared arithmetically, so \"you had unlimited and now have five\" records no snapshot at all — silently, for exactly the workspaces with the most to lose"
+    },
+    {
+      "id": "a-problem-sentence-has-no-holes",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/settling.test.ts",
+      "proves": "says what the seat ceiling is when it refuses one",
+      "fails": "\"Your plan includes undefined, and undefined are in use\" — a detail template rendered against meta a raise site never supplied, which nothing throws on because the missing value is a legal undefined"
     }
   ]
 }

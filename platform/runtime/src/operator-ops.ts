@@ -17,8 +17,8 @@
  * without also handing them every studio on the deployment.
  */
 
-import type { AnyOperation, AppSpec, BindingSpec, Instant, RegionId, SqlHandle } from "@one/kernel";
-import { operation, s } from "@one/kernel";
+import type { Allowance, AnyOperation, AppSpec, BindingSpec, Instant, Money, PlanOverride, PlanOverrides, RegionId, SchemaModule, SqlHandle } from "@one/kernel";
+import { catalogueOf, operation, refuseCatalogueEdit, s, snapshotDowngrade } from "@one/kernel";
 import { balance, record } from "./ledger.js";
 import { CREDITS } from "./generate.js";
 import { OPEN, readMaintenance, setMaintenance, type Maintenance } from "./maintenance.js";
@@ -40,6 +40,14 @@ export interface OperatorDeps {
    * has no tables until something opens it.
    */
   regionalIn(region: RegionId): Promise<SqlHandle>;
+  /**
+   * ⚠️ EVERY REGION THIS DEPLOYMENT HAS, because some operator acts reach ALL
+   * workspaces rather than one named workspace. Holding an existing subscriber
+   * at what they were sold is the sharpest: a snapshot written only where the
+   * operator happens to be is a promise kept for some customers, and the ones it
+   * is broken for are the ones furthest from whoever would notice.
+   */
+  readonly regions: readonly RegionId[];
   readonly actorId: string;
 }
 
@@ -310,5 +318,182 @@ export function operatorOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
-  return [tenants, comp, adjust, topup, readSwitch, setSwitch] as unknown as readonly AnyOperation[];
+  return [tenants, comp, adjust, topup, readSwitch, setSwitch, ...catalogueOperations(app)] as unknown as readonly AnyOperation[];
+}
+
+/* -------------------------------------------------------------- the catalogue --- */
+
+/**
+ * ⚠️ THE CATALOGUE IS EDITABLE BECAUSE A MANIFEST IS A DEPLOY AND A PRICE IS NOT.
+ *
+ * The same argument as a model's rate, one rail over. What an app SHIPS knowing
+ * is the declaration; what a deployment currently sells is this. An operator who
+ * has to ship a build to change a price ships fewer price changes than the
+ * business actually makes, and the gap is filled by discounts nobody records.
+ */
+export const CATALOGUE_SCHEMA: SchemaModule = {
+  id: "plan_overrides",
+  ddl: [
+    `CREATE TABLE IF NOT EXISTS plan_override (plan_id TEXT PRIMARY KEY, price_minor INTEGER, price_currency TEXT, trial_days INTEGER, entitlements_json TEXT NOT NULL DEFAULT '{}', at TEXT NOT NULL, by TEXT NOT NULL);`,
+  ],
+};
+
+interface OverrideRow {
+  plan_id: string; price_minor: number | null; price_currency: string | null;
+  trial_days: number | null; entitlements_json: string;
+}
+
+export async function planOverrides(db: SqlHandle): Promise<PlanOverrides> {
+  const rows = await db.all<OverrideRow>(`SELECT * FROM plan_override`).catch(() => []);
+  const out: Record<string, PlanOverride> = {};
+  for (const r of rows) {
+    out[r.plan_id] = {
+      ...(r.price_minor === null ? {} : { price: { minor: r.price_minor, currency: (r.price_currency ?? "usd") as Money["currency"] } }),
+      ...(r.trial_days === null ? {} : { trialDays: r.trial_days }),
+      entitlements: parseAllowances(r.entitlements_json),
+    };
+  }
+  return out;
+}
+
+/* ⚠️ An unreadable column is the empty edit, not a throw. It is read on the
+   billing path of every request that resolves entitlements, and a JSON parse
+   error there would take the whole deployment's billing down over one row. */
+const parseAllowances = (text: string): Readonly<Record<string, Allowance>> => {
+  try {
+    const v = JSON.parse(text) as unknown;
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, Allowance>) : {};
+  } catch { return {}; }
+};
+
+function catalogueOperations<B extends BindingSpec>(app: AppSpec<B>): readonly AnyOperation[] {
+  const read = operation({
+    id: "admin.catalog",
+    kind: "read",
+    summary: "What this deployment sells, declared and as edited.",
+    input: s.object({}),
+    /*
+      ⚠️ ALL THREE, because an operator editing a price needs to know whether the
+      number in front of them is the one the app shipped or one somebody already
+      changed. A screen showing only the effective value makes every edit look
+      like the first.
+    */
+    output: s.object({ declared: s.json(), overrides: s.json(), selling: s.json(), keys: s.json() }),
+    permission: OPERATE,
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const d = deps(ctx);
+      const overrides = await planOverrides(d.global);
+      return {
+        declared: app.access.plans,
+        overrides,
+        selling: catalogueOf(app.access.plans, overrides),
+        keys: app.access.entitlements,
+      };
+    },
+  });
+
+  const set = operation({
+    id: "admin.catalog.set",
+    kind: "write",
+    summary: "Change a plan's price, trial or ceilings.",
+    input: s.object({
+      planId: s.text({ max: 60 }),
+      price: s.optional(s.money()),
+      trialDays: s.optional(s.number({ integer: true, min: 0, max: 365 })),
+      entitlements: s.optional(s.json()),
+    }),
+    output: s.object({ selling: s.json(), grandfathered: s.number({ integer: true }) }),
+    permission: OPERATE,
+    idempotency: { mode: "none" },
+    audit: (i: { planId: string }) => ({ subject: i.planId, verb: "reprice" }),
+    outcome: { message: "Catalogue updated", tone: "success", invalidates: ["admin.catalog"] },
+    fails: ["platform.invalid"],
+    /*
+      ⚠️ NOT A TOOL. This is the price list. A model that can edit it is one
+      sentence in something it was asked to read away from selling the product
+      for nothing.
+    */
+    tool: false,
+    async handler(ctx, input: { planId: string; price?: Money; trialDays?: number; entitlements?: Record<string, Allowance> }) {
+      const d = deps(ctx);
+      const edit: PlanOverride = {
+        ...(input.price ? { price: input.price } : {}),
+        ...(input.trialDays === undefined ? {} : { trialDays: input.trialDays }),
+        ...(input.entitlements ? { entitlements: input.entitlements } : {}),
+      };
+      const refused = refuseCatalogueEdit(app.access.plans, app.access.entitlements, input.planId, edit);
+      if (refused) ctx.fail("platform.invalid", { field: "planId", reason: refused });
+
+      const before = catalogueOf(app.access.plans, await planOverrides(d.global));
+
+      const current = await d.global.first<OverrideRow>(`SELECT * FROM plan_override WHERE plan_id = ?`, input.planId).catch(() => null);
+      await d.global.run(
+        `INSERT INTO plan_override (plan_id, price_minor, price_currency, trial_days, entitlements_json, at, by)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(plan_id) DO UPDATE SET price_minor = excluded.price_minor, price_currency = excluded.price_currency,
+           trial_days = excluded.trial_days, entitlements_json = excluded.entitlements_json, at = excluded.at, by = excluded.by`,
+        input.planId,
+        input.price ? input.price.minor : current?.price_minor ?? null,
+        input.price ? input.price.currency : current?.price_currency ?? null,
+        input.trialDays === undefined ? current?.trial_days ?? null : input.trialDays,
+        JSON.stringify({ ...parseAllowances(current?.entitlements_json ?? "{}"), ...(input.entitlements ?? {}) }),
+        ctx.now(), d.actorId,
+      );
+
+      const after = catalogueOf(app.access.plans, await planOverrides(d.global));
+      const wasPlan = before.find((p) => p.id === input.planId);
+      const nowPlan = after.find((p) => p.id === input.planId);
+
+      /*
+        ⚠️ EDITING A PLAN DOWN HOLDS EVERYBODY ALREADY ON IT AT WHAT THEY WERE
+        SOLD, and this write is the whole reason the catalogue is safe to edit.
+
+        A workspace bought three seats. The plan becomes two — for good reasons,
+        about what is sold FROM NOW ON — and without the snapshot that workspace
+        loses a seat it paid for, mid-period, with no notice and no refund. The
+        symptom is a colleague who cannot sign in and a support conversation
+        nobody can explain, because the plan says two and appears always to have.
+      */
+      const grandfathered = wasPlan && nowPlan
+        ? await holdExisting(d, input.planId, wasPlan.entitlements, nowPlan.entitlements, ctx.now())
+        : 0;
+
+      return { selling: after, grandfathered };
+    },
+  });
+
+  return [read, set] as unknown as readonly AnyOperation[];
+}
+
+/**
+ * ⚠️ EVERY WORKSPACE ON THE PLAN, ACROSS EVERY REGION. A snapshot written only
+ * where the operator happens to be is a promise kept for some customers.
+ */
+async function holdExisting(
+  d: OperatorDeps,
+  planId: string,
+  before: Readonly<Record<string, Allowance>>,
+  after: Readonly<Record<string, Allowance>>,
+  at: Instant,
+): Promise<number> {
+  let held = 0;
+  for (const region of d.regions) {
+    const db = await d.regionalIn(region);
+    const rows = await db.all<{ tenant_id: string; grandfathered_json: string }>(
+      `SELECT tenant_id, grandfathered_json FROM subscription WHERE plan_id = ?`, planId,
+    ).catch(() => []);
+    for (const row of rows) {
+      const kept = snapshotDowngrade(before, after, parseAllowances(row.grandfathered_json));
+      /* ⚠️ Only where something actually moved. A write per workspace per edit
+         would rewrite the whole subscriber table to change a trial length. */
+      if (JSON.stringify(kept) === JSON.stringify(parseAllowances(row.grandfathered_json))) continue;
+      await db.run(
+        `UPDATE subscription SET grandfathered_json = ?, updated_at = ? WHERE tenant_id = ?`,
+        JSON.stringify(kept), at, row.tenant_id,
+      ).catch(() => undefined);
+      held++;
+    }
+  }
+  return held;
 }

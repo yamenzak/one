@@ -39,6 +39,21 @@ export const IDENTITY_SCHEMA: SchemaModule = {
     */
     `CREATE TABLE IF NOT EXISTS challenges (id TEXT PRIMARY KEY, purpose TEXT NOT NULL, account_id TEXT, origin TEXT NOT NULL, expires_at TEXT NOT NULL);`,
   ],
+  /*
+    ⚠️ AN ALTER, BECAUSE THE TABLE PREDATES THE COLUMN ON EVERY LIVE DEPLOYMENT.
+    A `CREATE TABLE IF NOT EXISTS` carrying it is a statement that does nothing
+    at all where the table is already there — which is a column that exists on
+    fresh databases and nowhere else, and a read that returns undefined for
+    everybody who was already here.
+
+    ⚠️ HOW ONE PERSON READS THINGS, AND IT IS THEIRS RATHER THAN A WORKSPACE'S. A
+    coach who thinks in kilograms and a client who thinks in pounds are both
+    right, in the same studio, about the same barbell — so a workspace-level
+    choice is one that is wrong for somebody by construction. It travels with the
+    ACCOUNT rather than the membership: somebody in two studios does not change
+    how they read a weight when they switch.
+  */
+  alters: [`ALTER TABLE accounts ADD COLUMN units TEXT NOT NULL DEFAULT '';`],
 };
 
 /**

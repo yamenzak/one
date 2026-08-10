@@ -19,7 +19,7 @@ import type {
 } from "@one/kernel";
 import {
   ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT,
-  floorPlan, fromQuery, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
+  catalogueOf, detailFor, floorPlan, fromQuery, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
 import { applySchema } from "./schema.js";
@@ -28,8 +28,9 @@ import { INBOX, inboxOperations, type InboxCarrier } from "./inbox-ops.js";
 import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
 import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files-ops.js";
 import { GENERATION, generationOperations, type GenerationCarrier } from "./generate-ops.js";
-import { OPERATOR, operatorOperations, type OperatorCarrier } from "./operator-ops.js";
+import { OPERATE, OPERATOR, operatorOperations, planOverrides, type OperatorCarrier } from "./operator-ops.js";
 import { CONFIG, configOperations, type ConfigCarrier } from "./config-ops.js";
+import { SETTINGS, settingsOperations, domainAdminOperations, type SettingsCarrier } from "./settings-ops.js";
 import { chargeableFrom, readAll, readRates } from "./config.js";
 import { send, type Post } from "./mail.js";
 import { SHARED_MODULES } from "./modules.js";
@@ -287,7 +288,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...operatorOperations(app), ...configOperations(app), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...operatorOperations(app), ...configOperations(app), ...settingsOperations(app), ...domainAdminOperations(OPERATE), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -683,6 +684,15 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         setup over OUR misconfiguration.
       */
       const chargeable = chargeableFrom(await readAll(directoryDb));
+      /*
+        ⚠️ THE CATALOGUE AS IT IS ACTUALLY SOLD, NOT AS IT WAS DECLARED. An
+        operator's edit that the gate never reads is a price list screen with no
+        effect on anything — the plan a workspace is on would keep resolving to
+        the ceilings the app shipped with, so raising a limit for a customer who
+        paid for it would change nothing and the only symptom is a refusal they
+        were told would not happen.
+      */
+      const selling = catalogueOf(app.access.plans, await planOverrides(directoryDb));
       const sub = at.tenant ? await readSubscription(regionalDb, at.tenant.tenantId) : PARKED;
       const standingState = at.tenant
         ? standingFor(sub, new Date().toISOString() as Instant, chargeable)
@@ -690,7 +700,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       const gate = gateFor(standingState);
       const entitlements = resolveEntitlements({
         declared: app.access.entitlements,
-        plan: app.access.plans.find((p) => p.id === sub.planId) ?? null,
+        plan: selling.find((p) => p.id === sub.planId) ?? null,
         overrides: sub.overrides,
         gate,
         /*
@@ -701,7 +711,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           already stands down here; the allowances have to as well, or the gate
           opens onto a product that permits nothing.
         */
-        floorPlan: chargeable ? null : floorPlan(app.access.plans),
+        floorPlan: chargeable ? null : floorPlan(selling),
       });
       /*
         ⚠️ THE SECOND RAIL RESOLVES THROUGH THE SAME WALK THE CAPABILITIES SCREEN
@@ -937,7 +947,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier = {
         [CONFIG]: {
           own: directoryDb,
           /*
@@ -966,6 +976,10 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             if (opts.onBoot) await once(region, () => opts.onBoot!.region(there, region));
             return there.db as SqlHandle;
           },
+          /* ⚠️ Every region, because holding an existing subscriber at what they
+             were sold must reach all of them — a snapshot written only where the
+             operator happens to be is a promise kept for some customers. */
+          regions: app.tenancy.regions,
           actorId: actor.userId ?? "system",
         },
         [GENERATION]: {
@@ -985,6 +999,14 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           actorId: actor.userId ?? "system",
         },
         [INBOX]: { db: regionalDb, tenantId: at.tenant?.tenantId ?? "", userId: session?.accountId ?? null },
+        [SETTINGS]: {
+          db: regionalDb,
+          /* ⚠️ The branding copy and the domain claims are looked up before a
+             region is known, so they live beside the directory. */
+          directory: directoryDb,
+          tenantId: at.tenant?.tenantId ?? "",
+          isOperator: actor.kind === "operator",
+        },
         [FILES]: {
           db: regionalDb,
           objects: bind[opts.objectsBinding ?? "media"] as ObjectHandle,
@@ -1199,7 +1221,8 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           return problemResponse(
             {
               code: e.code, status: def.status, title: def.title, retryable: def.retryable,
-              ...(def.detail && e.meta ? { detail: def.detail(e.meta) } : {}),
+              /* ⚠️ Withheld rather than rendered with a hole in it. See `detailFor`. */
+              ...((() => { const d = detailFor(def, e.meta); return d ? { detail: d } : {}; })()),
               ...(e.meta ? { meta: e.meta } : {}),
               ...(def.help ? { help: def.help } : {}),
             },
