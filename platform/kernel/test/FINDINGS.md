@@ -3309,3 +3309,100 @@ case: a result the user cannot see happen is a toast, and silence is reserved fo
 every reading and every draft built from it acknowledges the same way — which is
 the argument for the factories being the platform's rather than one app's, since
 the next app writes the same two.
+
+## 253. The audit was built, collected, and thrown away
+
+`auditFor` produced an entry for every operation declaring one. The entry was
+pushed into an array in the request handler. The array was never read, and there
+was no audit table.
+
+Fifteen of Kova's operations declare an `audit:`. So does every operator action —
+comping a workspace, adjusting its ceilings, topping up its credits, replaying a
+payment event. None of it left a trace, and every line of code involved was
+correct.
+
+⚠️ A TEST OF THE ENTRY'S SHAPE WOULD HAVE PASSED THROUGHOUT. `auditFor` is pure
+and does exactly what it says; what was missing was a caller. Which is why the
+first assertion in `watching.test.ts` is that a row exists at all, before any
+assertion about what is in it.
+
+MANIFEST.md §9 lists audit as day-zero for the reason this demonstrates: it is "a
+table, and evidence you cannot reconstruct". Everything before this commit is
+gone.
+
+## 254. A restriction written down and not applied
+
+`TenancySpec.doors` has been declared by every app since the first one, and
+`classifyHost` never took it. So an app declaring `["root", "setup", "slug"]`
+still had an `admin.` console door, and one declaring no `custom` still resolved
+any hostname through the custom-domain lookup.
+
+⚠️ WORSE THAN NO DECLARATION, because somebody has read it and believes it. A
+missing restriction is a question somebody asks; a stated one is a question
+nobody asks again.
+
+The fix makes `doors` required on `DoorConfig` rather than optional — an absent
+list would have meant "all of them", which is the behaviour being removed. An
+undeclared door under our root is `unclaimed`; a foreign hostname with no
+`custom` door is `invalid`, because it is not under our root and never could have
+been ours.
+
+## 255. Reading an obligation as a prohibition
+
+`retention.onTenantClose` is `"purge" | "export-then-purge"`, and the first
+implementation of it here filtered every `purge` collection OUT of the export.
+
+That is backwards. `export-then-purge` does not say "never export this" — it says
+an export happens BEFORE this is destroyed, which is a promise about the ORDER of
+two operations. `purge` is the absence of that promise, not a ban.
+
+⚠️ AND THE CORRECT READING CANNOT BE HONOURED BY A FILTER. It also cannot be
+honoured by telling somebody to take an export first: an instruction attached to
+the one operation in this platform with no undo is a thing that gets skipped at
+three in the morning. So `exit.erase` RETURNS the data from every collection that
+asked for it, before deleting anything — the promise cannot be broken by
+forgetting.
+
+The near-miss is worth recording on its own. The wrong version passed
+typechecking, read plausibly, and was caught by an existing test asserting that
+the export covers every table — a test written for a different reason two stages
+earlier.
+
+## 256. Three declarations removed rather than implemented
+
+`OperationSpec.meter`, `Channel = "push"` (finding 250) and a single-member
+`sessionScope` were all fields an app could fill in that changed nothing.
+
+`meter` was the clearest case. Every billable unit already meters through a typed
+path that knows what it is counting — generation reserves against the credit
+ledger before reaching a provider, storage checks stored bytes against the
+ceiling, seats are counted from the roster — and each of those is guarded. A
+fourth declaration naming a unit and doing nothing was not an unfinished feature;
+it was a way to write `meter: { unit: "credits" }` and believe it was charging.
+
+`sessionScope` went the other way and became real: `"origin" | "host"`, where
+`host` is a cookie with no Domain at all. Both are postures a product might want,
+and the one-value version meant every session widened to the app root whatever
+the manifest said.
+
+⚠️ THE TEST FOR WHICH: is there a second implementation somebody would plausibly
+want? For `sessionScope` yes, and it took four lines. For `meter` no — writing
+one would mean a fourth metering path competing with three that work.
+
+## 257. A rate limit is per operation or it is a defence against nothing
+
+`rateLimit` was day-zero in MANIFEST.md §9 and counted by nothing.
+
+⚠️ AND IMPLEMENTING IT AS A GENERAL DEFENCE WOULD HAVE BEEN WRONG. A worker in
+front of a global network already has a layer that absorbs volume; what a
+declaration can do that the network cannot is know that THIS operation is
+expensive when one caller repeats it — a code that can be guessed, a message sent
+to somebody else, a generation that costs money. So it is counted only where
+declared, and an operation naming none pays nothing.
+
+Two decisions inside it are worth the words they cost. The window is part of the
+KEY rather than a timestamp to compare, so a spent window stops being matched
+when it rolls over and nothing has to expire anything — the sweep is a tidy-up
+rather than the thing correctness depends on. And a store that cannot answer
+ALLOWS the request: a limiter that fails closed turns one broken table into a
+product nobody can use, which is a larger outage than the one it was preventing.

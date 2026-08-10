@@ -1161,6 +1161,15 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `consent-comes-from-a-person` | a model agreeing to terms on somebody's behalf, which makes the ledger worthless as evidence — the only thing it is for | **live** |
 | `a-channel-is-a-promise-about-delivery` | a switch in a settings screen that silently does nothing — somebody turns it on and stops watching their inbox | **live** |
 | `a-declaration-is-consumed` | a manifest field an app can write that changes nothing — declared, validated in the file that declares it, and read by no other code, which is the shape that shipped help, legal, releases, an unenforced rate limit, an unread retention policy and an impersonation contract with no surface | **live** |
+| `a-door-not-declared-is-closed` | a manifest declaring which doors an app has while host resolution ignores it — an app that says it has no setup door creating workspaces there, and one that says it has no custom door resolving anybody's domain | **live** |
+| `a-session-reaches-what-was-declared` | every session widening to the app root whatever the manifest asked for, so a product that wanted one jar per workspace silently got one for all of them | **live** |
+| `export-then-purge-is-an-obligation` | reading a promise about the ORDER of two operations as a ban on one of them — which withholds from an export exactly what the declaration asked to be exported first | **live** |
+| `a-retention-limit-deletes` | a per-collection retention limit that nothing enforces — a number in a manifest against rows that are still on disk, which is the difference between what a privacy notice says and what a subpoena finds | **live** |
+| `a-sweep-reports-what-it-removed` | a sweep reporting its ceiling rather than its count, which makes one that removed nothing indistinguishable from one that removed five hundred | **live** |
+| `the-audit-is-written-down` | every operation's audit entry built, collected into an array and thrown away at the end of the request — every operator action, every money movement, recorded nowhere, with the code producing the entries perfectly correct | **live** |
+| `acting-as-somebody-is-bounded` | a support session with no ceiling, or one whose ceiling the request decides — a time box a caller sets is not one | **live** |
+| `acting-as-somebody-is-announced` | a support session nobody inside the workspace is told about, which is indistinguishable from somebody having got in | **live** |
+| `ending-keeps-the-evidence` | an operator who can delete their own support session, and with it the only record of what they did in it | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

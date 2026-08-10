@@ -207,6 +207,12 @@ export const kova = defineApp({
       link: { to: "collection", collection: "package" },
       roles: ["customer", "owner"],
     },
+    "support.session": {
+      category: "service", tone: "warning", icon: "shield",
+      title: "Somebody from support was in your workspace",
+      body: "Why: {reason}",
+      link: { to: "inbox" }, roles: ["owner"],
+    },
     "staff.invited": {
       category: "action", tone: "info", icon: "person",
       title: "{email} was invited",

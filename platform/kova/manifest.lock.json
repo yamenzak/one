@@ -282,6 +282,7 @@
     "package.granted",
     "plan.chosen",
     "programme.published",
+    "support.session",
     "workout.completed",
     "workspace.created"
   ]

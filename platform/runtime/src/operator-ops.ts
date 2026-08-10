@@ -20,6 +20,7 @@
 import type { Allowance, AnyOperation, AppSpec, BindingSpec, Instant, Money, PlanOverride, PlanOverrides, RegionId, SchemaModule, SqlHandle } from "@one/kernel";
 import { catalogueOf, operation, refuseCatalogueEdit, s, snapshotDowngrade } from "@one/kernel";
 import { balance, record } from "./ledger.js";
+import { begin, end, historyFor } from "./impersonation.js";
 import { CREDITS } from "./generate.js";
 import { OPEN, readMaintenance, setMaintenance, type Maintenance } from "./maintenance.js";
 import { readSubscription } from "./commerce.js";
@@ -40,6 +41,13 @@ export interface OperatorDeps {
    * has no tables until something opens it.
    */
   regionalIn(region: RegionId): Promise<SqlHandle>;
+  /** Who is operating. Null where nobody is signed in — nothing may be acted as. */
+  readonly operatorId: string | null;
+  /** ⚠️ The manifest's ceiling on a support session. A request may ask for less. */
+  readonly maxMinutes: number;
+  /** ⚠️ Whether the workspace is told. The manifest decides; this carries it out. */
+  readonly announce: boolean;
+  announceTo(tenantId: string, reason: string): Promise<void>;
   /**
    * ⚠️ EVERY REGION THIS DEPLOYMENT HAS, because some operator acts reach ALL
    * workspaces rather than one named workspace. Holding an existing subscriber
@@ -112,6 +120,120 @@ export function operatorOperations<B extends BindingSpec>(app: AppSpec<B>): read
         });
       }
       return { tenants: out };
+    },
+  });
+
+  /* ------------------------------------------------------ acting as them --- */
+
+  /**
+   * ⚠️ TIME-BOXED, ANNOUNCED AND WRITTEN DOWN — the three properties a manifest
+   * has declared since the first app while nothing read the declaration.
+   *
+   * There is no token. What exists is a ROW naming an operator and a workspace,
+   * and every request the operator makes on that workspace's origin is resolved
+   * against it — so ending a session is a write, expiry is a comparison, and
+   * there is nothing that can be copied out of a log and used afterwards.
+   */
+  const impersonate = operation({
+    id: "admin.impersonate",
+    kind: "write",
+    summary: "Act inside a workspace to help them, for a bounded time, on the record.",
+    input: s.object({
+      tenantId: s.text({ max: 60 }),
+      /*
+        ⚠️ REQUIRED, AND LONG ENOUGH TO BE A SENTENCE. "Investigating a report of
+        missing records, ticket 4471" is what makes the row answerable six months
+        later; "support" is what makes it a row nobody can act on.
+      */
+      reason: s.text({ min: 8, max: 500 }),
+      minutes: s.optional(s.number({ integer: true, min: 1, max: 240 })),
+    }),
+    output: s.object({ id: s.text(), expiresAt: s.instant() }),
+    permission: OPERATE,
+    idempotency: { mode: "none" },
+    audit: (i: { tenantId: string }) => ({ subject: i.tenantId, verb: "impersonate" }),
+    /*
+      ⚠️ DECLARED, THOUGH THE DERIVED DISPATCH CANNOT CARRY IT. `emits` announces
+      to the audience of the CALLER's workspace, and an operator is on a door
+      with no workspace at all — so the announcement is made explicitly, to the
+      workspace being entered, in its own region.
+
+      It is still declared, because the declaration is what puts the event in the
+      webhook catalogue and forces every app to write copy for it. An
+      announcement made by code and known to no registry is one no app can
+      translate, no tenant can subscribe to, and nothing checks the copy of.
+    */
+    emits: ["support.session"],
+    outcome: { message: "Acting as this workspace", tone: "warning", invalidates: ["admin.tenants"] },
+    fails: ["platform.not_found", "platform.invalid", "platform.conflict"],
+    /*
+      ⚠️ NEVER A TOOL. A model that can act as a workspace's owner is one sentence
+      in a document away from doing it, and everything it then does is recorded
+      against a person who was not there.
+    */
+    tool: false,
+    async handler(ctx, input: { tenantId: string; reason: string; minutes?: number }) {
+      const d = deps(ctx);
+      const where = await placeOf(d.global, input.tenantId);
+      if (!where) ctx.fail("platform.not_found", { field: "tenantId" });
+      if (!d.operatorId) ctx.fail("platform.invalid", { reason: "sign in first" });
+
+      const out = await begin(d.global, {
+        operatorId: d.operatorId!,
+        tenantId: input.tenantId,
+        reason: input.reason,
+        /* ⚠️ The manifest's ceiling, and a request may only ask for less. */
+        maxMinutes: Math.min(input.minutes ?? d.maxMinutes, d.maxMinutes),
+      }, ctx.now());
+      if (!out.ok) {
+        if (out.why === "already_live") ctx.fail("platform.conflict", { reason: out.why });
+        ctx.fail("platform.invalid", { reason: out.why });
+      }
+      const live = (out as Extract<typeof out, { ok: true }>).live;
+
+      /*
+        ⚠️ ANNOUNCED, WHERE THE MANIFEST SAYS SO. A support session somebody is
+        not told about is indistinguishable, from inside the workspace, from
+        somebody having got in — and the difference is exactly what the person
+        looking at their own audit needs to be able to tell.
+      */
+      if (d.announce) await d.announceTo(input.tenantId, input.reason);
+
+      return { id: live.id, expiresAt: live.expiresAt as Instant };
+    },
+  });
+
+  const stopActing = operation({
+    id: "admin.impersonate.end",
+    kind: "write",
+    summary: "Stop acting inside a workspace.",
+    input: s.object({ id: s.text({ max: 40 }) }),
+    output: s.object({ ok: s.bool() }),
+    permission: OPERATE,
+    idempotency: { mode: "natural", key: "id" },
+    audit: (i: { id: string }) => ({ subject: i.id, verb: "impersonate-end" }),
+    outcome: { message: "Stopped", tone: "success", invalidates: ["admin.tenants"] },
+    tool: false,
+    async handler(ctx, input: { id: string }) {
+      const d = deps(ctx);
+      /* ⚠️ Ended rather than deleted: an operator who can remove their own
+         support session can remove the only record of what they did in it. */
+      if (d.operatorId) await end(d.global, input.id, d.operatorId, ctx.now());
+      return { ok: true };
+    },
+  });
+
+  const sessions = operation({
+    id: "admin.impersonations",
+    kind: "read",
+    summary: "Every time somebody acted inside this workspace, and why.",
+    input: s.object({ tenantId: s.text({ max: 60 }), limit: s.optional(s.number({ integer: true, min: 1, max: 200 })) }),
+    output: s.object({ sessions: s.json() }),
+    permission: OPERATE,
+    idempotency: { mode: "none" },
+    async handler(ctx, input: { tenantId: string; limit?: number }) {
+      const d = deps(ctx);
+      return { sessions: await historyFor(d.global, input.tenantId, Math.min(input.limit ?? 50, 200)) };
     },
   });
 
@@ -318,7 +440,7 @@ export function operatorOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
-  return [tenants, comp, adjust, topup, readSwitch, setSwitch, ...catalogueOperations(app)] as unknown as readonly AnyOperation[];
+  return [tenants, comp, adjust, topup, readSwitch, setSwitch, impersonate, stopActing, sessions, ...catalogueOperations(app)] as unknown as readonly AnyOperation[];
 }
 
 /* -------------------------------------------------------------- the catalogue --- */

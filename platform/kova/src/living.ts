@@ -9,6 +9,8 @@
  * who has eaten. Both say what they were computed FROM.
  */
 
+import { scoreOf, type Part, type Score } from "@one/kernel";
+
 /* --------------------------------------------------------------- fasting --- */
 
 /**
@@ -87,59 +89,37 @@ export interface Week {
   readonly loggedDays?: number;
 }
 
-export interface Wellness {
-  /** 0–100, or null where there is not enough to say anything. */
-  readonly score: number | null;
-  /**
-   * ⚠️ WHAT IT WAS COMPUTED FROM, AND IT TRAVELS WITH THE NUMBER. A score of 82
-   * from one input looks exactly like a score of 82 from five, and the first is
-   * a person being told they are doing well because they slept once.
-   */
-  readonly from: readonly string[];
-  /** How much of the picture is present, 0–1. Renders as "based on 2 of 5". */
-  readonly coverage: number;
-}
+export type Wellness = Score;
 
-const PARTS = 5;
 
 /**
- * One honest number for how a week has gone.
- *
- * ⚠️ IT IS AN AVERAGE OF WHAT IS PRESENT, NOT A SUM WITH ZEROS FOR THE REST.
- * Treating an absent input as zero punishes somebody for not logging, which is
- * precisely backwards: the weeks people log least are the hard ones, so the
- * score would fall hardest exactly when it is read most.
- *
- * ⚠️ AND BELOW TWO INPUTS THERE IS NO SCORE AT ALL. One input is not a picture
- * of a week, and a number computed from one is one somebody will act on.
+ * ⚠️ FIVE PARTS, AND WHICH FIVE IS THIS PRODUCT'S ONLY CONTRIBUTION. The rule —
+ * an average of what is present, no score below two inputs, and the coverage
+ * travelling with the number — is `scoreOf`'s, in the kernel, because every
+ * product that summarises a period into one number gets it wrong the same way.
  */
+const PARTS = 5;
+
 export function wellnessOf(week: Week): Wellness {
-  const parts: { name: string; value: number }[] = [];
+  const parts: Part[] = [];
 
   const rating = (name: string, values: readonly number[] | undefined) => {
     if (!values || values.length === 0) return;
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
     /* 1–5 becomes 0–1: a 3 is the middle, not 60%. */
-    parts.push({ name, value: clamp((mean - 1) / 4) });
+    parts.push({ name, value: (mean - 1) / 4 });
   };
   rating("sleep", week.sleep);
   rating("mood", week.mood);
   rating("energy", week.energy);
 
   if (week.sessions && week.sessions.expected > 0) {
-    parts.push({ name: "training", value: clamp(week.sessions.done / week.sessions.expected) });
+    parts.push({ name: "training", value: week.sessions.done / week.sessions.expected });
   }
   if (week.loggedDays !== undefined) {
-    parts.push({ name: "eating", value: clamp(week.loggedDays / 7) });
+    parts.push({ name: "eating", value: week.loggedDays / 7 });
   }
 
-  if (parts.length < 2) return { score: null, from: parts.map((p) => p.name), coverage: parts.length / PARTS };
-  const mean = parts.reduce((a, p) => a + p.value, 0) / parts.length;
-  return {
-    score: Math.round(mean * 100),
-    from: parts.map((p) => p.name),
-    coverage: parts.length / PARTS,
-  };
+  return scoreOf(parts, PARTS);
 }
 
-const clamp = (n: number): number => (Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 0);

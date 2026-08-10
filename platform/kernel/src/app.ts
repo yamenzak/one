@@ -110,7 +110,20 @@ export interface FilePurpose {
  */
 export interface IdentitySpec {
   readonly rootRelyingParty: string;
-  readonly sessionScope: "origin";
+  /**
+   * How far a session reaches.
+   *
+   * ⚠️ `origin` IS THE APP'S OWN ROOT, NOT THE PLATFORM'S, and `host` is one
+   * hostname. The difference is real and a product may want either: with
+   * `origin` a person signed into one workspace is signed into the next one
+   * they open, which is what a multi-workspace product wants; with `host` every
+   * workspace has its own jar, which is what a product serving mutually
+   * hostile tenants wants.
+   *
+   * It was a single-member union read by nothing, so `cookieDomainFor` widened
+   * every session to the app root whatever the manifest said.
+   */
+  readonly sessionScope: "origin" | "host";
   /** Identity is read at SIGN-IN; sessions are read per request. Hence one store. */
   readonly directoryRegion: RegionId;
 }

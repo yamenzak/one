@@ -1414,7 +1414,7 @@
       "group": "platform",
       "stage": "7",
       "status": "live",
-      "impl": "kova/test/goals.test.ts",
+      "impl": "kernel/test/measure.test.ts",
       "proves": "is measured the same way, and is not 120% done on day one",
       "fails": "progress computed as current over target \u2014 it says somebody at 90 kg aiming for 75 is 120% done before they have lost a gram, and that somebody who gained is doing better"
     },
@@ -1423,7 +1423,7 @@
       "group": "platform",
       "stage": "7",
       "status": "live",
-      "impl": "kova/test/goals.test.ts",
+      "impl": "kernel/test/measure.test.ts",
       "proves": "goes negative rather than resting at zero",
       "fails": "a deadline clamped at zero, so a product says '0 days left' forever instead of '11 days late'"
     },
@@ -2848,6 +2848,87 @@
       "impl": "scripts/kernel.test.mjs",
       "proves": "consumed:",
       "fails": "a manifest field an app can write that changes nothing \u2014 declared, validated in the file that declares it, and read by no other code, which is the shape that shipped help, legal, releases, an unenforced rate limit, an unread retention policy and an impersonation contract with no surface"
+    },
+    {
+      "id": "a-door-not-declared-is-closed",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/resolve.test.ts",
+      "proves": "closes a door the app did not declare",
+      "fails": "a manifest declaring which doors an app has while host resolution ignores it \u2014 an app that says it has no setup door creating workspaces there, and one that says it has no custom door resolving anybody's domain"
+    },
+    {
+      "id": "a-session-reaches-what-was-declared",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/resolve.test.ts",
+      "proves": "gives every host its own jar where the app asked for that",
+      "fails": "every session widening to the app root whatever the manifest asked for, so a product that wanted one jar per workspace silently got one for all of them"
+    },
+    {
+      "id": "export-then-purge-is-an-obligation",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/data.test.ts",
+      "proves": "names what may not be destroyed without being handed over",
+      "fails": "reading a promise about the ORDER of two operations as a ban on one of them \u2014 which withholds from an export exactly what the declaration asked to be exported first"
+    },
+    {
+      "id": "a-retention-limit-deletes",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/data.test.ts",
+      "proves": "sweeps only what declared a real limit",
+      "fails": "a per-collection retention limit that nothing enforces \u2014 a number in a manifest against rows that are still on disk, which is the difference between what a privacy notice says and what a subpoena finds"
+    },
+    {
+      "id": "a-sweep-reports-what-it-removed",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/data.test.ts",
+      "proves": "reports what it actually removed",
+      "fails": "a sweep reporting its ceiling rather than its count, which makes one that removed nothing indistinguishable from one that removed five hundred"
+    },
+    {
+      "id": "the-audit-is-written-down",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/watching.test.ts",
+      "proves": "is written down at all",
+      "fails": "every operation's audit entry built, collected into an array and thrown away at the end of the request \u2014 every operator action, every money movement, recorded nowhere, with the code producing the entries perfectly correct"
+    },
+    {
+      "id": "acting-as-somebody-is-bounded",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/data.test.ts",
+      "proves": "refuses one that is not bounded",
+      "fails": "a support session with no ceiling, or one whose ceiling the request decides \u2014 a time box a caller sets is not one"
+    },
+    {
+      "id": "acting-as-somebody-is-announced",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/watching.test.ts",
+      "proves": "tells the workspace it happened, and why",
+      "fails": "a support session nobody inside the workspace is told about, which is indistinguishable from somebody having got in"
+    },
+    {
+      "id": "ending-keeps-the-evidence",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/watching.test.ts",
+      "proves": "ends without removing the evidence",
+      "fails": "an operator who can delete their own support session, and with it the only record of what they did in it"
     }
   ]
 }

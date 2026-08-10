@@ -410,19 +410,10 @@ const UNCONSUMED = {
   "AppSpec.sounds": "the surface audio map; nothing plays yet",
   "SoundSpec.pack": "which audio set; nothing plays yet",
 
-  /* Real gaps, and each is a behaviour an app has already been told it has. */
-  "TenancySpec.doors": "an app declares its doors and host resolution ignores the declaration, so an app that says it has no setup door has one anyway",
-  "CollectionSpec.retention": "how long rows live and what happens on workspace close — declared per collection, and the erasure cascade treats every collection alike",
-  "OperationSpec.meter": "what an operation consumes; generation meters through its own path and this field meters nothing",
-  "OperationSpec.rateLimit": "per actor, tenant or IP — nothing counts requests, so every declaration is a ceiling with no counter",
-  "GovernanceSpec.impersonation": "the time box and the announcement for operator access; there is no impersonation surface at all",
-  "GovernanceSpec.auditRetentionDays": "how long the audit is kept; nothing prunes it",
-  "FormatSpec.weekStart": "which day a week begins on; every weekly read picks its own",
-  "IdentitySpec.sessionScope": "how far a session reaches; the cookie logic does not read it",
-
   /* Consumed outside these two directories, which this check cannot see. */
   "AppSpec.retired": "read by each app's own lock comparison — see the `lock-exists` guard",
 };
+
 
 const specFiles = walk(join(ROOT, "kernel", "src")).filter((f) => f.endsWith(".ts"));
 const declaredIn = new Map();

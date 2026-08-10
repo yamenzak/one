@@ -65,28 +65,6 @@ export function bestOf<T extends Effort>(sets: readonly T[]): Best<T> | null {
   return best;
 }
 
-/* ---------------------------------------------------------- consistency --- */
-
-export interface Consistency {
-  readonly done: number;
-  readonly expected: number;
-  /** 0–1, clamped. Null when nothing was asked for — see below. */
-  readonly ratio: number | null;
-}
-
-/**
- * How much of what was asked for actually happened.
- *
- * ⚠️ NOTHING EXPECTED IS NOT ZERO PER CENT. A person with no programme has not
- * failed to follow one, and a dashboard that shows them at 0% is accusing
- * somebody of missing sessions nobody ever prescribed. `null` is the honest
- * answer and it forces the reader to say something else.
- */
-export function consistency(done: number, expected: number): Consistency {
-  if (!(expected > 0)) return { done, expected: 0, ratio: null };
-  return { done, expected, ratio: Math.min(1, Math.max(0, done / expected)) };
-}
-
 /**
  * How many sessions a week a programme asks for.
  *
@@ -122,28 +100,6 @@ export function prescribedPerWeek(body: unknown): number | null {
   return days === 0 ? null : days / body.length;
 }
 
-/** What that comes to over a window. Zero expected is "nothing asked for". */
-export function expectedOver(perWeek: number | null, days: number): number {
-  if (perWeek === null || days <= 0) return 0;
-  return Math.round((perWeek * days) / 7);
-}
-
-/**
- * How long until the first thing somebody holds runs out.
- *
- * ⚠️ THE SOONEST, NOT THE HEADLINE. The headline runway is a MAXIMUM across
- * scopes, which is the right number to show the person themselves — and exactly
- * the wrong one for a coach, because somebody with sixty days of training and
- * two of nutrition reads as sixty days covered. What needs acting on is the one
- * that ends first.
- *
- * Null when they hold nothing: there is no expiry to warn about, and a zero
- * would put every client who never bought anything at the top of the list.
- */
-export function soonest(byScope: Readonly<Record<string, number>>): number | null {
-  const days = Object.values(byScope);
-  return days.length ? Math.min(...days) : null;
-}
 
 /* ------------------------------------------------------------ attention --- */
 

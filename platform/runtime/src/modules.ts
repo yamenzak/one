@@ -26,6 +26,9 @@ import { GENERATION_SCHEMA } from "./generate.js";
 import { SETTINGS_SCHEMA } from "./settings.js";
 import { REPLAY_SCHEMA } from "./replay.js";
 import { CONSENT_SCHEMA } from "./reference-ops.js";
+import { AUDIT_SCHEMA } from "./audit.js";
+import { LIMIT_SCHEMA } from "./limit.js";
+import { IMPERSONATION_SCHEMA } from "./impersonation.js";
 import { DOMAIN_CLAIM_SCHEMA } from "./settings-ops.js";
 import { CATALOGUE_SCHEMA } from "./operator-ops.js";
 import { CONFIG_SCHEMA, MODEL_SCHEMA } from "./config.js";
@@ -50,6 +53,8 @@ export const PLATFORM_REGIONAL: readonly SchemaModule[] = [
   GENERATION_SCHEMA,
   SETTINGS_SCHEMA,
   REPLAY_SCHEMA,
+  AUDIT_SCHEMA,
+  LIMIT_SCHEMA,
 ];
 
 /**
@@ -69,6 +74,9 @@ export const PLATFORM_GLOBAL: readonly SchemaModule[] = [
   /* ⚠️ After identity: a consent belongs to an account, and the ledger is only
      meaningful beside the record of who that is. */
   CONSENT_SCHEMA,
+  /* ⚠️ Global, and NOT tenant-scoped: a workspace closing must not delete the
+     record of the support sessions that happened inside it. */
+  IMPERSONATION_SCHEMA,
   OTP_SCHEMA as SchemaModule,
   PROVIDER_SCHEMA,
   PLATFORM_STATE_SCHEMA,

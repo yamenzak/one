@@ -168,7 +168,6 @@ export const applyPackageGrant = operation({
   scope: (i) => ({ subject: i.subjectId }),
 
   idempotency: { mode: "client-supplied" },
-  meter: { unit: "credits", reserve: false },
   audit: (i) => ({ subject: i.subjectId, verb: "grant" }),
   emits: ["package.granted"],
   tool: false,

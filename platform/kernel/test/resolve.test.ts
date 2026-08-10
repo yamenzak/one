@@ -21,6 +21,7 @@ const cfg: ResolveConfig = {
   appRoot: "kova.4dl.app",
   platformRoot: "4dl.app",
   reserved: ["kova", "coach"],
+  doors: ["root", "setup", "admin", "tenant", "custom"],
   directoryRegion: "eu",
 };
 
@@ -75,9 +76,48 @@ describe("the doors", () => {
     }
   });
 
-  it("opens the device door only when an app asks for one", () => {
+  /*
+    ⚠️ TWO THINGS ARE NEEDED AND EITHER ALONE IS NOT ENOUGH. The label says WHICH
+    subdomain a paired device answers on; the declaration says the app has that
+    door at all. `play` is a label an ordinary workspace could otherwise hold, so
+    naming it without declaring the door must not quietly take it away from them.
+  */
+  it("opens the device door only when an app names the label and declares the door", () => {
     expect(classifyHost("play.kova.4dl.app", cfg).door).toBe("tenant");
-    expect(classifyHost("play.kova.4dl.app", { ...cfg, deviceDoor: "play" }).door).toBe("device");
+    expect(classifyHost("play.kova.4dl.app", { ...cfg, deviceDoor: "play" }).door).toBe("unclaimed");
+    expect(classifyHost("play.kova.4dl.app", { ...cfg, deviceDoor: "play", doors: [...cfg.doors, "device"] }).door).toBe("device");
+  });
+
+  /*
+    ⚠️ A DOOR AN APP DID NOT DECLARE IS NOT ITS OWN KIND, and for the whole of
+    stage 7 the declaration was read by nothing: every app had every door. An app
+    declaring no `setup` still created workspaces there, and one declaring no
+    `custom` still resolved anybody's own domain through the custom-domain
+    lookup. A restriction that is written down and not applied is worse than none
+    — somebody has read it and believes it.
+  */
+  it("closes a door the app did not declare", () => {
+    const only = { ...cfg, doors: ["root", "tenant"] as const };
+    expect(classifyHost("setup.kova.4dl.app", only).door).toBe("unclaimed");
+    expect(classifyHost("admin.kova.4dl.app", only).door).toBe("unclaimed");
+    /* ⚠️ `invalid` rather than `unclaimed`: a foreign hostname is not under our
+       root and never could have been ours, so there is nothing here to claim. */
+    expect(classifyHost("coaching.byshujaa.com", only).door).toBe("invalid");
+  });
+
+  /* ⚠️ And an app with no tenant door serves no workspace at a subdomain —
+     otherwise "we do not have tenants" is a sentence with a tenant behind it. */
+  it("closes the tenant door too", () => {
+    const none = { ...cfg, doors: ["root", "setup"] as const };
+    expect(classifyHost("gym.kova.4dl.app", none)).toMatchObject({ door: "unclaimed", slug: null });
+  });
+
+  /* The negative half: with everything declared, every door still opens. */
+  it("leaves a fully declared app with all of them", () => {
+    expect(classifyHost("setup.kova.4dl.app", cfg).door).toBe("setup");
+    expect(classifyHost("admin.kova.4dl.app", cfg).door).toBe("admin");
+    expect(classifyHost("gym.kova.4dl.app", cfg).door).toBe("tenant");
+    expect(classifyHost("coaching.byshujaa.com", cfg).door).toBe("custom");
   });
 });
 
@@ -116,8 +156,22 @@ describe("one credential, separate sessions", () => {
     expect(cookieDomainFor(shape)).toBeNull();
   });
 
+  /*
+    ⚠️ `sessionScope` WAS A SINGLE-MEMBER UNION READ BY NOTHING, so every session
+    widened to the app root whatever the manifest said. The two values are a real
+    choice: `origin` means somebody signed into one workspace is signed into the
+    next one they open, which is what a multi-workspace product wants; `host`
+    gives every workspace its own jar, which is what a product serving mutually
+    hostile tenants wants.
+  */
+  it("gives every host its own jar where the app asked for that", () => {
+    const shape = classifyHost("gym.kova.4dl.app", cfg);
+    expect(cookieDomainFor(shape, "origin")).toBe(".kova.4dl.app");
+    expect(cookieDomainFor(shape, "host")).toBeNull();
+  });
+
   it("leaves localhost host-only, because browsers refuse a Domain for it", () => {
-    const local: DoorConfig = { appRoot: "localhost", platformRoot: "localhost", reserved: [] };
+    const local: DoorConfig = { appRoot: "localhost", platformRoot: "localhost", reserved: [], doors: ["root", "tenant"] };
     expect(cookieDomainFor(classifyHost("gym.localhost", local))).toBeNull();
   });
 });

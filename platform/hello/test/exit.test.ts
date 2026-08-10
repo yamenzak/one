@@ -133,3 +133,43 @@ describe("being forgotten", () => {
   });
 });
 
+
+/* ------------------------------------------------------------ retention --- */
+
+/**
+ * ⚠️ `export-then-purge` IS AN OBLIGATION ABOUT THE ORDER OF TWO OPERATIONS, and
+ * it is easy to read backwards — the first implementation here read it as "never
+ * export this" and withheld the table from the document, which is the opposite
+ * of what the words say.
+ *
+ * It cannot be honoured by a filter, and it cannot be honoured by telling
+ * somebody to take an export first: an instruction attached to the one operation
+ * in this platform with no undo is a thing that gets skipped. So the destruction
+ * hands the data over, and the promise cannot be broken by forgetting.
+ */
+describe("what may not be destroyed without being handed over", () => {
+  it("comes back with the erasure", async () => {
+    const fresh = `keeping${Math.random().toString(36).slice(2, 7)}`;
+    const founding = await signIn(`${fresh}@example.test`, SETUP);
+    const made = await post(SETUP, "/api/identity.workspace.create", { slug: fresh }, founding);
+    const origin = `https://${fresh}.hello.4dl.app`;
+    const cookie = await signIn(`${fresh}@example.test`, origin);
+    const at = (path: string, body?: unknown) => post(origin, path, body ?? {}, cookie);
+
+    await at("/api/receipt.create", { total: { minor: 1_000, currency: "EUR" }, issuedOn: "2026-01-01" });
+    await at("/api/note.create", { title: "not owed to anybody" });
+
+    const erased = await at("/api/exit.erase", { confirm: made.body.tenantId as string });
+    expect(erased.res.status, JSON.stringify(erased.body)).toBe(200);
+    const taken = erased.body.taken as { tables: Record<string, unknown[]> } | undefined;
+
+    expect(taken, "a collection declaring export-then-purge must leave with the workspace").toBeTruthy();
+    /* ⚠️ The one that asked for it, carrying its rows. */
+    expect(Object.keys(taken!.tables)).toContain("receipts");
+    expect(taken!.tables.receipts!.length).toBe(1);
+    /* ⚠️ And only the ones that asked. A collection with no such declaration is
+       owed nothing, and handing it over anyway makes the declaration mean
+       nothing in the other direction. */
+    expect(Object.keys(taken!.tables)).not.toContain("notes");
+  });
+});

@@ -14,7 +14,7 @@
  * wrong.
  */
 
-import type { AiSpec, AnyOperation, AppSpec, BindingSpec, InferenceHandle, Instant, Rates, SqlHandle } from "@one/kernel";
+import type { AiSpec, AnyOperation, AppSpec, BindingSpec, InferenceHandle, Instant, OperationSpec, Rates, SqlHandle } from "@one/kernel";
 import { operation, s } from "@one/kernel";
 import { FILES, type FilesCarrier } from "./files-ops.js";
 import { fetchMedia, storeMedia } from "./files.js";
@@ -186,6 +186,112 @@ export function refusalProblem(g: Extract<Generated, { ok: false }>): {
     case "unknown_feature": return { code: "platform.invalid", meta };
     default: return { code: "platform.unavailable", meta };
   }
+}
+
+/* --------------------------------------------------------- two factories --- */
+
+/**
+ * TWO OPERATIONS EVERY APP WITH A MODEL WRITES, WRITTEN ONCE.
+ *
+ * ⚠️ NEITHER KNOWS WHAT IT IS READING OR DRAFTING. What varies is the id, the
+ * feature, the permission and the words; what does not vary is the shape — a
+ * metered write, refused as a declared problem rather than a throw, never a
+ * tool, and acknowledging that it happened.
+ *
+ * ⚠️ AND THE LAST OF THOSE IS WHY THEY ARE HERE. Both shipped in an app without
+ * an `outcome`, so five writes that spend a workspace's credits answered with
+ * nothing a screen was told to say. One omission became five, and the next app
+ * writing its own pair would make it six.
+ */
+
+const GENERATION_FAILS = [
+  "platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable",
+] as const;
+
+export interface GenerationOp {
+  readonly id: string;
+  /** The manifest's feature — the model, the system text and the ceiling. */
+  readonly feature: string;
+  readonly summary: string;
+  readonly permission: string;
+  readonly customerFlag?: string;
+  readonly entitlement?: string;
+  /** What the audit records this as. */
+  readonly verb: string;
+  readonly subject: string;
+}
+
+/**
+ * An operation that sends a picture the workspace already holds to a model, and
+ * answers with what it read.
+ *
+ * ⚠️ NOT A TOOL, AND THAT IS NOT NEGOTIABLE PER APP. A model that can hand
+ * another model a photograph out of this workspace's library, on a request
+ * nobody made, spends somebody's credits on pictures nobody chose to have read.
+ */
+export function readsAPicture<B extends BindingSpec>(
+  ai: AiSpec, o: GenerationOp,
+): OperationSpec<B, { photo: string; note?: string }, { generation: string; read: unknown; charged: number }, typeof GENERATION_FAILS[number]> {
+  return operation<B, { photo: string; note?: string }, { generation: string; read: unknown; charged: number }, typeof GENERATION_FAILS[number]>({
+    id: o.id,
+    kind: "write",
+    summary: o.summary,
+    input: s.object({ photo: s.text({ max: 40 }), note: s.optional(s.text({ max: 300 })) }),
+    output: s.object({ generation: s.text(), read: s.json(), charged: s.number({ integer: true }) }),
+    permission: o.permission,
+    ...(o.customerFlag ? { customerFlag: o.customerFlag } : {}),
+    ...(o.entitlement ? { entitlement: o.entitlement } : {}),
+    idempotency: { mode: "none" },
+    audit: () => ({ subject: o.subject, verb: o.verb }),
+    fails: [...GENERATION_FAILS],
+    outcome: { message: "Read", tone: "success", invalidates: ["ai.spending"] },
+    tool: false,
+    async handler(ctx, input: { photo: string; note?: string }) {
+      const out = await generateAbout(ctx, ai, o.feature, input.note ?? "", input.photo);
+      if (!out.ok) {
+        const problem = refusalProblem(out);
+        ctx.fail(problem.code as typeof GENERATION_FAILS[number], problem.meta);
+      }
+      const done = out as Extract<typeof out, { ok: true }>;
+      return { generation: done.id, read: done.output, charged: done.charged };
+    },
+  });
+}
+
+/**
+ * An operation that drafts something from a sentence somebody typed.
+ *
+ * ⚠️ THE CEILING ON THE SENTENCE IS THE APP'S, because the length of a useful
+ * brief differs by what is being drafted — and it is an input bound rather than
+ * a suggestion, since every character reaches a model that charges by the token.
+ */
+export function draftsFrom<B extends BindingSpec>(
+  ai: AiSpec, o: GenerationOp & { readonly max: number },
+): OperationSpec<B, { about: string }, { generation: string; draft: unknown; charged: number }, typeof GENERATION_FAILS[number]> {
+  return operation<B, { about: string }, { generation: string; draft: unknown; charged: number }, typeof GENERATION_FAILS[number]>({
+    id: o.id,
+    kind: "write",
+    summary: o.summary,
+    input: s.object({ about: s.text({ min: 3, max: o.max }) }),
+    output: s.object({ generation: s.text(), draft: s.json(), charged: s.number({ integer: true }) }),
+    permission: o.permission,
+    ...(o.customerFlag ? { customerFlag: o.customerFlag } : {}),
+    ...(o.entitlement ? { entitlement: o.entitlement } : {}),
+    idempotency: { mode: "none" },
+    audit: () => ({ subject: o.subject, verb: o.verb }),
+    fails: [...GENERATION_FAILS],
+    outcome: { message: "Drafted", tone: "success", invalidates: ["ai.spending"] },
+    tool: false,
+    async handler(ctx, input: { about: string }) {
+      const out = await generateWith(ctx, ai, o.feature, input.about);
+      if (!out.ok) {
+        const problem = refusalProblem(out);
+        ctx.fail(problem.code as typeof GENERATION_FAILS[number], problem.meta);
+      }
+      const done = out as Extract<typeof out, { ok: true }>;
+      return { generation: done.id, draft: done.output, charged: done.charged };
+    },
+  });
 }
 
 /* ------------------------------------------------------------ operations --- */

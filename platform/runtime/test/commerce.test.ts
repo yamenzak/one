@@ -14,6 +14,7 @@ import { createRuntime } from "../src/runtime.js";
 import { collectionOperations } from "../src/collection-ops.js";
 import { commerceOperations, customerOperations, providerOperations } from "../src/commerce-ops.js";
 import { platformOperations } from "../src/platform-ops.js";
+import { operatorOperations } from "../src/operator-ops.js";
 import { identityOperations } from "../src/identity-ops.js";
 import { guideOperations } from "../src/guide-ops.js";
 import { attribute, verifySignature } from "../src/provider.js";
@@ -81,12 +82,14 @@ const app = (over: Partial<AppSpec<typeof bindings>>): AppSpec<typeof bindings> 
   },
   governance: { legal: [], impersonation: { maxMinutes: 30, announce: true }, auditRetentionDays: 365 },
   collections: [],
-  /* ⚠️ The three the PLATFORM raises. An app that declares none of them boots
-     with a workspace creation, a plan choice and a grant that announce nothing. */
+  /* ⚠️ The four the PLATFORM raises. An app that declares none of them boots
+     with a workspace creation, a plan choice, a grant and a support session
+     that all announce nothing. */
   notifications: {
     "workspace.created": { category: "service", tone: "success", icon: "sparkle", title: "{slug} is ready", link: { to: "inbox" }, roles: ["owner"] },
     "plan.chosen": { category: "billing", tone: "info", icon: "card", title: "You chose {planId}", link: { to: "inbox" }, roles: ["owner"] },
     "package.granted": { category: "billing", tone: "success", icon: "gift", title: "{days} days added", link: { to: "inbox" }, roles: ["owner"] },
+    "support.session": { category: "service", tone: "warning", icon: "shield", title: "Somebody from support was in your workspace", body: "Why: {reason}", link: { to: "inbox" }, roles: ["owner"] },
   },
   help: {},
   filePurposes: {},
@@ -575,7 +578,15 @@ describe("what the platform raises is what the kernel says it raises", () => {
     const raised = new Set<string>();
     /* ⚠️ With the customer rail ON, or `package.granted` is not mounted to be found. */
     const railed = app({ access: { ...app({}).access, customerRail: "member" } });
-    for (const op of [...platformOperations(railed), ...commerceOperations(railed), ...customerOperations(railed), ...identityOperations(railed)]) {
+    /*
+      ⚠️ THE OPERATOR OPERATIONS ARE IN THE WALK, and one of them raises an event
+      the derived dispatch cannot carry: `emits` announces to the audience of the
+      CALLER's workspace, and an operator is on a door with no workspace. The
+      announcement is made explicitly, to the workspace being entered, in its own
+      region — and the event is still DECLARED, because the declaration is what
+      puts it in the webhook catalogue and forces every app to write copy for it.
+    */
+    for (const op of [...platformOperations(railed), ...commerceOperations(railed), ...customerOperations(railed), ...identityOperations(railed), ...operatorOperations(railed)]) {
       for (const e of op.emits ?? []) raised.add(e);
     }
     expect([...raised].sort()).toEqual([...PLATFORM_EVENTS].sort());

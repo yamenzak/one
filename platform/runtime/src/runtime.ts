@@ -18,7 +18,7 @@ import type {
   ConfigRegistry, InferenceHandle, ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
 } from "@one/kernel";
 import {
-  ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT,
+  ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, weekStarting, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT, SUPPORT_SESSION,
   catalogueOf, detailFor, floorPlan, fromQuery, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
@@ -50,10 +50,14 @@ import { claim, memberOf, membersOf, permissionsOf, seatsUsed, subjectFor } from
 import { MEMBERS, membershipOperations, type MemberCarrier } from "./membership-ops.js";
 import { sqlDirectory } from "./directory.js";
 import { collectionOperations } from "./collection-ops.js";
-import { DIRECTORY, FOUNDER, TOOLS, platformOperations, toolOperations, type DirectoryCarrier, type FounderCarrier, type ToolCarrier } from "./platform-ops.js";
+import { DIRECTORY, FOUNDER, TOOLS, foundingRole, platformOperations, toolOperations, type DirectoryCarrier, type FounderCarrier, type ToolCarrier } from "./platform-ops.js";
 import { identityOperations, PLATFORM, type PlatformCarrier, type PlatformDeps } from "./identity-ops.js";
 import { identityStore, readCookie, SESSION_COOKIE, sessionStore } from "./identity.js";
 import { REFERENCE, referenceOperations, type ReferenceCarrier } from "./reference-ops.js";
+import { keptBy, retentionJob } from "./data.js";
+import { auditJob, recordAudit } from "./audit.js";
+import { countRequest, limitJob } from "./limit.js";
+import { liveFor } from "./impersonation.js";
 
 /* -------------------------------------------------------------------- ref --- */
 
@@ -358,6 +362,13 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     appRoot: app.tenancy.appRoot,
     platformRoot: app.identity.rootRelyingParty,
     reserved: [...app.tenancy.reservedSlugs],
+    /*
+      ⚠️ THE APP'S OWN DECLARATION, WHICH NOTHING READ FOR THE WHOLE OF STAGE 7.
+      `slug` is the manifest's word for the tenant door — the label a workspace
+      takes — and `classifyHost` calls that door `tenant`, so the one rename
+      happens here rather than in either vocabulary.
+    */
+    doors: app.tenancy.doors.map((d) => (d === "slug" ? "tenant" : d)),
     directoryRegion: app.identity.directoryRegion,
   };
   const regional = (env: RawEnv) => bindingsFor(app.bindings, env, { defaultRegion: app.tenancy.defaultRegion });
@@ -484,7 +495,12 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       */
       if (!directoryDb) return [];
       if (opts.onBoot) await once("global", () => opts.onBoot!.global(directoryDb));
-      return runDue(app.jobs ?? [], {
+      /*
+        ⚠️ THE PLATFORM'S OWN SWEEPS RUN BESIDE THE APP'S, and retention is one
+        of them: `CollectionSpec.retention` is a declaration every app makes and
+        nothing read, so a limit written in a manifest deleted nothing.
+      */
+      return runDue([...(app.jobs ?? []), retentionJob(app.collections), auditJob(app.governance.auditRetentionDays), limitJob()], {
         global: directoryDb,
         regions: app.tenancy.regions,
         now: () => new Date().toISOString() as Instant,
@@ -614,7 +630,9 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           invariant rather than a policy, and also exactly what whitelabel wants.
         */
         relyingParty: relyingPartyFor(at.host),
-        cookieDomain: cookieDomainFor(at.host),
+        /* ⚠️ The manifest's own scope. It declared one and nothing read it, so
+           every session widened to the app root whatever the app asked for. */
+        cookieDomain: cookieDomainFor(at.host, app.identity.sessionScope),
         secureCookies: url.protocol === "https:",
         sessionDays: opts.sessionDays ?? 30,
         session,
@@ -719,6 +737,23 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         }
       }
 
+      /*
+        ⚠️ AN OPERATOR ACTING INSIDE A WORKSPACE, RESOLVED BEFORE THE CALLER IS.
+        There is no token — what exists is a row naming an operator and a
+        workspace, with an expiry the read enforces rather than a sweep. So this
+        is a lookup on the request, and a grant that ran out five minutes ago is
+        simply not found.
+
+        ⚠️ AND IT IS ONLY EVER A LOOKUP FOR SOMEBODY WHO IS SIGNED IN AND IN A
+        WORKSPACE. Doing it for every request would be a global-store read on the
+        hot path for the overwhelming majority of them, which are neither.
+      */
+      const acting = session && at.tenant
+        ? await liveFor(directoryDb, session.accountId, at.tenant.tenantId, new Date().toISOString() as Instant)
+        : null;
+      /* ⚠️ Whose behalf it is on, for the audit. Null is the ordinary case. */
+      const actingFor = acting ? acting.id : null;
+
       const { actor, permissions, subjectId } = opts.resolveCaller
         ? await opts.resolveCaller(session, at)
         : {
@@ -726,6 +761,9 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
               userId: session?.accountId ?? null,
               tenantId: at.tenant?.tenantId ?? null,
               kind: (session ? "user" : "system") as Actor["kind"],
+              /* ⚠️ Set at last. The field existed in the primitives from stage 1
+                 and nothing ever wrote it, so every trail read as ordinary. */
+              ...(acting ? { impersonatedBy: session!.accountId } : {}),
             },
             /*
               ⚠️ A SIGNED-IN PERSON WHO IS NOT A MEMBER HOLDS THE PERSONAL SET
@@ -747,7 +785,17 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
               door has had since it was added.
             */
             permissions: at.tenant
-              ? permissionsOf(app.access.roles, membership)
+              /*
+                ⚠️ A LIVE SUPPORT SESSION CONFERS THE FOUNDING ROLE AND NOTHING
+                WIDER. An operator helping somebody needs to see what they see;
+                what they must not get is a set assembled from the operator's own
+                powers, which would let a support session do things no member of
+                that workspace can do — and every one of them recorded against
+                the workspace rather than against us.
+              */
+              ? acting
+                ? new Set(app.access.roles[foundingRole(app) ?? ""] ?? [])
+                : permissionsOf(app.access.roles, membership)
               : !session
                 ? new Set<string>()
                 : at.door === "admin" && app.access.roles.operator
@@ -833,6 +881,29 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         : caller;
       const verdict = check(op, forGate);
       if (!verdict.allowed) return problemResponse(refusalProblem(verdict.refusal), ref);
+
+      /*
+        ⚠️ HOW OFTEN, WHERE THE OPERATION SAID SO. Declared since stage 0 and
+        counted by nothing, so every `rateLimit` in every manifest was a ceiling
+        with no counter — a field an app fills in and believes.
+
+        ⚠️ COUNTED BEFORE THE HANDLER AND NEVER GIVEN BACK. A limit that only
+        counts successes is one somebody exhausts for free by sending requests
+        that fail, which for the operations worth limiting is the whole of it.
+      */
+      if (op.rateLimit) {
+        const verdict = await countRequest(regionalDb, op.id, op.rateLimit, {
+          actorId: session?.accountId ?? null,
+          tenantId: at.tenant?.tenantId ?? null,
+          ip: request.headers.get("cf-connecting-ip"),
+        }, new Date().toISOString() as Instant);
+        if (!verdict.allowed) {
+          return problemResponse(
+            { ...problems["platform.too_many"]!, code: "platform.too_many", meta: { limit: String(verdict.max), used: String(verdict.used) } } as never,
+            ref,
+          );
+        }
+      }
 
       /*
         ⚠️ AND THE CEILING, the same way. Counting needs a query, so the gate
@@ -1123,6 +1194,32 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
              were sold must reach all of them — a snapshot written only where the
              operator happens to be is a promise kept for some customers. */
           regions: app.tenancy.regions,
+          operatorId: session?.accountId ?? null,
+          /* ⚠️ The manifest's ceiling, read here rather than guessed at the
+             call site — a support session bounded by a number nobody declared
+             is one bounded by whatever somebody typed. */
+          maxMinutes: app.governance.impersonation.maxMinutes,
+          announce: app.governance.impersonation.announce,
+          announceTo: async (tenantId, reason) => {
+            /* ⚠️ The workspace's OWN region, resolved from the directory. An
+               operator acts from one door on workspaces in every region, so the
+               caller's own store is the wrong one for all but one of them. */
+            const place = await directoryDb.first<{ region: string }>(
+              `SELECT region FROM tenant_directory WHERE tenant_id = ?`, tenantId,
+            ).catch(() => null);
+            if (!place) return;
+            const bound = regional(env)(place.region as ResolvedRegion);
+            if (opts.onBoot) await once(place.region, () => opts.onBoot!.region(bound, place.region as RegionId));
+            const there = bound.db as SqlHandle;
+            await dispatch({
+              db: there, registry: app.notifications, tenantId,
+              type: SUPPORT_SESSION,
+              audience: await audienceOf(tenantId as TenantId, there).catch(() => []),
+              values: { reason },
+              at: new Date().toISOString() as Instant,
+              send: deliver,
+            }).catch(() => undefined);
+          },
           actorId: actor.userId ?? "system",
         },
         [GENERATION]: {
@@ -1240,6 +1337,8 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           global: directoryDb,
           tenantId: at.tenant?.tenantId ?? "",
           modules: opts.regionalModules ?? [],
+          keeping: keptBy(app.collections),
+          auditRetentionDays: app.governance.auditRetentionDays,
           isOperator: at.door === "admin",
           /* ⚠️ The same store the uploads went to, so erasure reaches the bytes. */
           objects: (bind[opts.objectsBinding ?? "media"] as ObjectHandle | undefined) ?? null,
@@ -1328,11 +1427,31 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         */
         holds: (permission: string) => caller.permissions.has(permission),
         now: () => new Date().toISOString() as Instant,
+        /* ⚠️ The manifest's own boundary, so two weekly reads in one product
+           cannot disagree about which day a week starts on. */
+        weekOf: (day: string) => weekStarting(day, app.format.weekStart),
         fail: (code, meta) => { throw new DeclaredFailure(code, meta); },
       };
 
       try {
         const out = await run(op, input, "http");
+
+        /*
+          ⚠️ WRITTEN AFTER THE OPERATION SUCCEEDED, and this is where the entries
+          finally go. They were built, pushed into an array and never read —
+          every operator action, every money movement and every declared
+          `audit:` in every app, recorded nowhere at all.
+
+          A failure to record is not a failure of the operation: the change has
+          already happened and been answered, so throwing here would report a
+          completed action as an error and invite a retry that does it twice.
+        */
+        if (audit.length && at.tenant) {
+          await recordAudit(
+            regionalDb, at.tenant.tenantId, session?.accountId ?? null, actingFor,
+            audit, new Date().toISOString() as Instant,
+          );
+        }
 
         /*
           ⚠️ A FILE READ ANSWERS WITH THE BYTES, NOT WITH JSON ABOUT THEM. An

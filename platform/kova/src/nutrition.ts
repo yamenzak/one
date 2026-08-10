@@ -13,6 +13,8 @@
  * ⚠️ AND ENERGY IS NOT A FIELD. See `energyOf`.
  */
 
+import { meanOverRecorded } from "@one/kernel";
+
 /** Grams of each. The whole vocabulary. */
 export interface Macros {
   readonly protein: number;
@@ -105,12 +107,15 @@ export function against(eaten: number, target: number): Against {
  * it is worth.
  */
 export function overDays(days: readonly Macros[]): { readonly mean: Macros; readonly days: number } {
-  const kept = days.filter((d) => d.protein > 0 || d.carbs > 0 || d.fat > 0);
-  if (!kept.length) return { mean: NOTHING, days: 0 };
-  const sum = totalOf(kept);
-  const n = kept.length;
-  return {
-    mean: { protein: sum.protein / n, carbs: sum.carbs / n, fat: sum.fat / n, fibre: sum.fibre / n },
-    days: n,
-  };
+  /*
+    ⚠️ THE RULE IS THE KERNEL'S AND THE SHAPE IS OURS. "Divide by the days with
+    entries, not by the window" is not about eating — every product that
+    summarises recorded days gets it wrong the same way — so it lives once, and
+    this decides what counts as a recorded day and what an empty answer reads as.
+  */
+  const out = meanOverRecorded(
+    days as readonly Readonly<Record<keyof Macros, number>>[],
+    (d) => d.protein > 0 || d.carbs > 0 || d.fat > 0,
+  );
+  return { mean: (out.mean as Macros | null) ?? NOTHING, days: out.days };
 }

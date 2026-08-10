@@ -8,10 +8,12 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { erasurePlan, eraseTenant, exportTenant } from "../src/data.js";
+import { erasurePlan, eraseTenant, exportTenant, keptBy, mustLeaveWith, sweepRetention } from "../src/data.js";
 import { OPEN, PLATFORM_STATE_SCHEMA, readMaintenance, refuses, setMaintenance, SURVIVES_MAINTENANCE } from "../src/maintenance.js";
 import { dataOperations } from "../src/data-ops.js";
 
+import { collection, field } from "@one/kernel";
+import { begin } from "../src/impersonation.js";
 import type { Instant, SchemaModule, SqlHandle } from "@one/kernel";
 
 const AT = "2026-01-10T00:00:00.000Z" as Instant;
@@ -310,5 +312,144 @@ describe("the way out", () => {
     const byId = new Map(ops.map((op) => [op.id, op]));
     for (const id of ["exit.export", "exit.close", "exit.erase"]) expect(byId.get(id)!.tool, id).toBe(false);
     expect(byId.get("exit.cancel")!.tool).toBeUndefined();
+  });
+});
+
+
+/* ------------------------------------------------------------ retention --- */
+
+/**
+ * WHAT A COLLECTION SAID ABOUT KEEPING ITS OWN ROWS — and both halves of it were
+ * read by nothing for the whole of stage 7.
+ *
+ * ⚠️ THE TWO DECLARATIONS ARE ABOUT DIFFERENT MOMENTS. `days` applies while the
+ * workspace is perfectly healthy and is a limit on how long a record may be
+ * held at all; `onTenantClose` is a promise about the ORDER of two operations
+ * when it leaves. Reading either as the other is the mistake this was written
+ * after making.
+ */
+describe("what a collection says about keeping its rows", () => {
+  const keeping = [
+    { table: "transient", days: 30, onTenantClose: "purge" as const },
+    { table: "permanent", days: null, onTenantClose: "export-then-purge" as const },
+    { table: "zeroed", days: 0, onTenantClose: "purge" as const },
+  ];
+
+  /*
+    ⚠️ `export-then-purge` IS AN OBLIGATION, NOT A PROHIBITION. It does not say
+    "never export this"; it says an export happens BEFORE this is destroyed. The
+    first implementation read it backwards and filtered the table out of the
+    export, which is the opposite of what the words ask for.
+  */
+  it("names what may not be destroyed without being handed over", () => {
+    expect([...mustLeaveWith(keeping)]).toEqual(["permanent"]);
+  });
+
+  /* ⚠️ A limit of null or zero is not a limit — sweeping on either would delete
+     everything a workspace has ever recorded, immediately. */
+  it("sweeps only what declared a real limit", async () => {
+    const deleted: string[] = [];
+    const db = {
+      first: async () => ({ n: 3 }),
+      all: async () => [],
+      run: async (sql: string) => { deleted.push(/FROM (\w+)/.exec(sql)?.[1] ?? ""); },
+      batch: async () => undefined,
+    } as unknown as SqlHandle;
+
+    const out = await sweepRetention(db, keeping, "tenant_id", "t_1", "2026-08-10T00:00:00.000Z" as Instant);
+    expect(out.map((e) => e.table)).toEqual(["transient"]);
+    expect(deleted).toEqual(["transient"]);
+  });
+
+  /*
+    ⚠️ AND THE NUMBER REPORTED IS WHAT WAS THERE, NOT THE CEILING. Reporting the
+    cap — which the first draft did — makes a sweep that removed nothing
+    indistinguishable from one that removed five hundred, on the one job whose
+    whole output is a number nobody can check afterwards.
+  */
+  it("reports what it actually removed", async () => {
+    const db = {
+      first: async () => ({ n: 7 }),
+      all: async () => [],
+      run: async () => undefined,
+      batch: async () => undefined,
+    } as unknown as SqlHandle;
+    const out = await sweepRetention(db, keeping, "tenant_id", "t_1", "2026-08-10T00:00:00.000Z" as Instant, 500);
+    expect(out).toEqual([{ table: "transient", deleted: 7 }]);
+  });
+
+  /* ⚠️ Nothing due is no row at all, so a workspace with nothing to sweep does
+     not appear as one that was swept. */
+  it("says nothing where nothing is due", async () => {
+    const db = {
+      first: async () => ({ n: 0 }),
+      all: async () => [],
+      run: async () => { throw new Error("must not delete"); },
+      batch: async () => undefined,
+    } as unknown as SqlHandle;
+    expect(await sweepRetention(db, keeping, "tenant_id", "t_1", "2026-08-10T00:00:00.000Z" as Instant)).toEqual([]);
+  });
+
+  /* ⚠️ Derived from the collection, so a renamed one carries its rule with it
+     rather than leaving the rule pointed at a table that no longer exists. */
+  it("reads the declaration off the collection rather than a list", () => {
+    const thing = collection({
+      id: "thing",
+      label: { one: "Thing", many: "Things" },
+      scope: { of: "tenant" },
+      version: true,
+      retention: { days: 90, onTenantClose: "purge" },
+      onDelete: { on: "archive" },
+      fields: { title: field.text({ required: true }) },
+    });
+    expect(keptBy([thing])).toEqual([{ table: "things", days: 90, onTenantClose: "purge" }]);
+  });
+});
+
+/* --------------------------------------------------- acting as somebody --- */
+
+/**
+ * ⚠️ THE STORE'S OWN REFUSALS, ASSERTED SEPARATELY FROM THE OPERATION'S INPUT
+ * SHAPE. The operation declares `reason: s.text({ min: 8 })`, so a short one is
+ * refused at the boundary and the check inside `begin` never runs — which means
+ * an end-to-end test proves the SHAPE and says nothing about the store.
+ *
+ * That matters because the shape is the thing somebody widens in six months to
+ * accept a different format, and the store is the last thing standing when they
+ * do. Two checks for one rule is correct here; one test for two checks is not.
+ */
+describe("beginning a support session", () => {
+  const store = (live: unknown = null) => ({
+    async first() { return live; },
+    async all() { return []; },
+    async run() { return undefined; },
+  } as unknown as SqlHandle);
+
+  const ok = { operatorId: "u_1", tenantId: "t_1", reason: "Investigating ticket 4471", maxMinutes: 30 };
+  const NOW = "2026-08-10T00:00:00.000Z" as Instant;
+
+  it("takes one with a reason somebody could act on", async () => {
+    const out = await begin(store(), ok, NOW);
+    expect(out.ok).toBe(true);
+  });
+
+  /* ⚠️ "support" is a row nobody can act on six months later. */
+  it("refuses one with no reason worth reading", async () => {
+    expect(await begin(store(), { ...ok, reason: "support" }, NOW)).toEqual({ ok: false, why: "no_reason" });
+    expect(await begin(store(), { ...ok, reason: "        " }, NOW)).toEqual({ ok: false, why: "no_reason" });
+  });
+
+  /* ⚠️ A time box with no ceiling, or one measured in days, is not a time box. */
+  it("refuses one that is not bounded", async () => {
+    for (const maxMinutes of [0, -5, 241, 30.5]) {
+      expect(await begin(store(), { ...ok, maxMinutes }, NOW), String(maxMinutes)).toEqual({ ok: false, why: "too_long" });
+    }
+  });
+
+  /* ⚠️ Two live grants are two expiry times, and the longer one silently
+     extends the shorter — which is how a time box stops being one. */
+  it("refuses a second while one is live", async () => {
+    const running = { id: "imp_1", reason: "x", started_at: NOW, expires_at: "2099-01-01T00:00:00.000Z" };
+    expect(await begin(store(running), ok, NOW)).toEqual({ ok: false, why: "already_live" });
   });
 });

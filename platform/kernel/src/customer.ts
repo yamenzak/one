@@ -414,3 +414,21 @@ export function discountUsable(d: Discount | null, now: string): boolean {
   if (d.usesLeft <= 0) return false;
   return !d.expiresAt || d.expiresAt > now;
 }
+
+/**
+ * How long until the first thing somebody holds runs out.
+ *
+ * ⚠️ THE SOONEST, NOT THE HEADLINE. `runwayFor`'s overall figure is a MAXIMUM
+ * across scopes, which is the right number to show the person themselves — and
+ * exactly the wrong one for whoever is looking after them, because sixty days of
+ * one thing and two of another reads as sixty days covered. What needs acting on
+ * is the one that ends first.
+ *
+ * ⚠️ NULL WHERE THEY HOLD NOTHING. There is no expiry to warn about, and a zero
+ * would put everybody who never bought anything at the top of the list — which
+ * is the fastest way to teach somebody to stop opening it.
+ */
+export function soonestScope(byScope: Readonly<Record<string, number>>): number | null {
+  const days = Object.values(byScope);
+  return days.length ? Math.min(...days) : null;
+}

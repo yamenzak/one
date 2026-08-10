@@ -7,8 +7,9 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { consistency, expectedOver } from "@one/kernel";
 import {
-  QUIET_DAYS, RELIABLE_REPS, bestOf, consistency, estimatedMax, expectedOver, needing, prescribedPerWeek, watchesFor,
+  QUIET_DAYS, RELIABLE_REPS, bestOf, estimatedMax, needing, prescribedPerWeek, watchesFor,
 } from "../src/reading.js";
 
 const facts = (over: Partial<Parameters<typeof watchesFor>[0]> = {}) => ({

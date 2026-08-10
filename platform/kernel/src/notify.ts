@@ -110,7 +110,15 @@ export type NotificationRegistry = Readonly<Record<string, NotificationDef>>;
  * platform's operations actually declare, in a package that cannot import them —
  * so the copy is asserted equal rather than trusted.
  */
-export const PLATFORM_EVENTS = ["workspace.created", "plan.chosen", "package.granted"] as const;
+export const PLATFORM_EVENTS = ["workspace.created", "plan.chosen", "package.granted", "support.session"] as const;
+
+/**
+ * ⚠️ SOMEBODY FROM OUTSIDE THE WORKSPACE ACTED INSIDE IT, and the workspace is
+ * told. A support session nobody is announced is indistinguishable, from in
+ * there, from somebody having got in — and telling those two apart is exactly
+ * what a person reading their own record needs to be able to do.
+ */
+export const SUPPORT_SESSION = "support.session";
 
 /* ---------------------------------------------------------- the channels --- */
 

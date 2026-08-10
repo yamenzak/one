@@ -152,7 +152,7 @@ describe("the door taxonomy", () => {
     expect(TENANT_DOORS.filter((d) => TENANTLESS_DOORS.includes(d))).toEqual([]);
   });
 
-  const cfg: DoorConfig = { appRoot: "kova.4dl.app", platformRoot: "4dl.app", reserved: ["kova"], deviceDoor: "play" };
+  const cfg: DoorConfig = { appRoot: "kova.4dl.app", platformRoot: "4dl.app", reserved: ["kova"], deviceDoor: "play", doors: EVERY_DOOR };
 
   it("resolves no tenant from a tenantless host", () => {
     for (const host of ["kova.4dl.app", "setup.kova.4dl.app", "admin.kova.4dl.app", "play.kova.4dl.app"]) {
@@ -255,6 +255,7 @@ const base = {
     "workspace.created": { category: "service", tone: "success", icon: "sparkle", title: "ready", link: { to: "inbox" }, roles: ["owner"] },
     "plan.chosen": { category: "billing", tone: "info", icon: "card", title: "chosen", link: { to: "inbox" }, roles: ["owner"] },
     "package.granted": { category: "billing", tone: "success", icon: "gift", title: "granted", link: { to: "inbox" }, roles: ["owner"] },
+    "support.session": { category: "service", tone: "warning", icon: "shield", title: "Somebody from support was in your workspace", body: "Why: {reason}", link: { to: "inbox" }, roles: ["owner"] },
   } as Record<string, NotificationDef>,
   help: {} as HelpRegistry,
   filePurposes: {},

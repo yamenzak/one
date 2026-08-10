@@ -12,6 +12,7 @@
  * mechanical — and so stage 0 spends its time on the types rather than on four
  * package.json files.
  */
+export * from "./measure.js";
 export * from "./primitives.js";
 export * from "./validate.js";
 export * from "./bindings.js";

@@ -13,17 +13,16 @@
  * its own release note.
  */
 
-import { daysBetween, daysLeft, progressOf } from "./goals.js";
 import { energyOf, overDays, portionOf, totalOf, type Macros } from "./nutrition.js";
-import { bestOf, consistency, expectedOver, needing, prescribedPerWeek, soonest } from "./reading.js";
-import { drawWith, forgetSubject, generateAbout, generateWith, lapsedAcross, lookUp, lookupProblem, readSettings, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
+import { bestOf, needing, prescribedPerWeek } from "./reading.js";
+import { drawWith, forgetSubject, generateAbout, generateWith, draftsFrom, readsAPicture, lapsedAcross, lookUp, lookupProblem, readSettings, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
 import { progressWeek, weekAt, WEEKS_SHAPE, type Week } from "./plans.js";
 import { FASTING_ZONES, wellnessOf, zoneAt } from "./living.js";
 import { roundsOf } from "./plans.js";
 import {
   UNLIMITED,
   cache, collection, defineApp, defineBindings, field,
-  inference, objects, operation, rungFor, s, sql, tableNameFor, type SettingsSpec,
+  consistency, daysBetween, daysLeft, expectedOver, inference, objects, operation, progressOf, rungFor, s, soonestScope, sql, tableNameFor, type SettingsSpec,
   type AiSpec, type Currency, type Locale, type RegionId, type SqlHandle, type TimeZone,
 } from "@one/kernel";
 
@@ -1146,7 +1145,7 @@ export const attention = operation<Bindings, Record<string, never>, { rows: unkn
           quietFor: since(lastSeen.get(p.id) ?? joined(p)) ?? 0,
           unansweredFor: since(unanswered.get(p.id) ?? null),
           overdueBy: since(behind.get(p.id) ?? null),
-          endingIn: soonest(runway.get(p.id)?.byScope ?? {}),
+          endingIn: soonestScope(runway.get(p.id)?.byScope ?? {}),
           joinedAgo: since(joined(p)) ?? 0,
         },
       }))),
@@ -2790,63 +2789,14 @@ export const parseFood = operation<
  * the storage ceiling, and erased when the workspace is. A lane that took bytes
  * on this request would be a second way into a model's input with none of that.
  */
-const readsAPicture = (o: {
-  id: string;
-  feature: string;
-  summary: string;
-  permission: string;
-  customerFlag?: string;
-  entitlement?: string;
-  verb: string;
-  subject: string;
-}) => operation<
-  Bindings,
-  { photo: string; note?: string },
-  { generation: string; read: unknown; charged: number },
-  "platform.invalid" | "platform.quota_reached" | "platform.too_many" | "platform.unavailable"
->({
-  id: o.id,
-  kind: "write",
-  summary: o.summary,
-  input: s.object({ photo: s.text({ max: 40 }), note: s.optional(s.text({ max: 300 })) }),
-  output: s.object({ generation: s.text(), read: s.json(), charged: s.number({ integer: true }) }),
-  permission: o.permission,
-  ...(o.customerFlag ? { customerFlag: o.customerFlag } : {}),
-  ...(o.entitlement ? { entitlement: o.entitlement } : {}),
-  idempotency: { mode: "none" },
-  audit: () => ({ subject: o.subject, verb: o.verb }),
-  fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
-  /*
-    ⚠️ DECLARED ON THE FACTORY, so every reading built from it gets the same
-    acknowledgement. Five generations shipped with none at all — a write that
-    spends somebody's credits and answers with nothing a screen is told to say,
-    which is the one place silence reads as "did that work?".
-  */
-  outcome: { message: "Read", tone: "success", invalidates: ["ai.spending"] },
-  /*
-    ⚠️ NOT A TOOL. A model that can hand another model a photograph out of this
-    workspace's library, on a request nobody made, spends a studio's credits on
-    pictures nobody chose to have read.
-  */
-  tool: false,
-  async handler(ctx, input: { photo: string; note?: string }) {
-    const out = await generateAbout(ctx, KOVA_AI, o.feature, input.note ?? "", input.photo);
-    if (!out.ok) {
-      const problem = refusalProblem(out);
-      ctx.fail(problem.code, problem.meta);
-    }
-    const done = out as Extract<typeof out, { ok: true }>;
-    /*
-      ⚠️ IT ANSWERS; IT DOES NOT WRITE. A reading saved straight into somebody's
-      diary or their lab record is a number nobody checked, filed under a
-      coach's name — and for a lab report that is a clinical figure the studio
-      would then act on.
-    */
-    return { generation: done.id, read: done.output, charged: done.charged };
-  },
-});
-
-export const snapMeal = readsAPicture({
+/*
+  ⚠️ THE TWO FACTORIES ARE `@one/runtime`'S NOW. Neither knew what it was reading
+  or drafting — what varies is the id, the feature, the permission and the words
+  — and both shipped here without an `outcome`, so five writes that spend a
+  workspace's credits answered with nothing a screen was told to say. One
+  omission became five; the next app writing its own pair would make it six.
+*/
+export const snapMeal = readsAPicture<Bindings>(KOVA_AI, {
   id: "ai.snap-meal",
   feature: "snap-meal",
   summary: "Photograph a meal and get it back as foods and portions, to check.",
@@ -2856,7 +2806,7 @@ export const snapMeal = readsAPicture({
   subject: "portion",
 });
 
-export const labelReader = readsAPicture({
+export const labelReader = readsAPicture<Bindings>(KOVA_AI, {
   id: "ai.label-reader",
   feature: "label-reader",
   summary: "Photograph a nutrition label and get the food, to check and save.",
@@ -2872,7 +2822,7 @@ export const labelReader = readsAPicture({
   handed to whoever ordered the test, and the model is told in its own system
   text not to say whether anything is concerning.
 */
-export const labExtract = readsAPicture({
+export const labExtract = readsAPicture<Bindings>(KOVA_AI, {
   id: "ai.lab-extract",
   feature: "lab-extract",
   summary: "Read a lab report photograph into values, for a coach to check.",
@@ -2889,46 +2839,7 @@ export const labExtract = readsAPicture({
  * generated paragraph written straight into a movement, a supplement or the
  * studio's feed is text nobody approved, published under the studio's name.
  */
-const drafts = (o: {
-  id: string;
-  feature: string;
-  summary: string;
-  permission: string;
-  entitlement?: string;
-  verb: string;
-  subject: string;
-  max: number;
-}) => operation<
-  Bindings,
-  { about: string },
-  { generation: string; draft: unknown; charged: number },
-  "platform.invalid" | "platform.quota_reached" | "platform.too_many" | "platform.unavailable"
->({
-  id: o.id,
-  kind: "write",
-  summary: o.summary,
-  input: s.object({ about: s.text({ min: 3, max: o.max }) }),
-  output: s.object({ generation: s.text(), draft: s.json(), charged: s.number({ integer: true }) }),
-  permission: o.permission,
-  ...(o.entitlement ? { entitlement: o.entitlement } : {}),
-  idempotency: { mode: "none" },
-  audit: () => ({ subject: o.subject, verb: o.verb }),
-  fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
-  /* ⚠️ The same, once, for every draft this factory makes. */
-  outcome: { message: "Drafted", tone: "success", invalidates: ["ai.spending"] },
-  tool: false,
-  async handler(ctx, input: { about: string }) {
-    const out = await generateWith(ctx, KOVA_AI, o.feature, input.about);
-    if (!out.ok) {
-      const problem = refusalProblem(out);
-      ctx.fail(problem.code, problem.meta);
-    }
-    const done = out as Extract<typeof out, { ok: true }>;
-    return { generation: done.id, draft: done.output, charged: done.charged };
-  },
-});
-
-export const draftMeals = drafts({
+export const draftMeals = draftsFrom<Bindings>(KOVA_AI, {
   id: "ai.draft-meals",
   feature: "draft-meals",
   summary: "Draft an eating plan from a sentence, to edit rather than to keep.",
@@ -2946,7 +2857,7 @@ export const draftMeals = drafts({
   max: 600,
 });
 
-export const exerciseGuide = drafts({
+export const exerciseGuide = draftsFrom<Bindings>(KOVA_AI, {
   id: "ai.exercise-guide",
   feature: "exercise-guide",
   summary: "Draft how-to text for a movement, in the studio's voice.",
@@ -2956,7 +2867,7 @@ export const exerciseGuide = drafts({
   max: 200,
 });
 
-export const supplementGuide = drafts({
+export const supplementGuide = draftsFrom<Bindings>(KOVA_AI, {
   id: "ai.supplement-guide",
   feature: "supplement-guide",
   summary: "Draft guidance on a supplement, with what the evidence supports.",
@@ -2966,7 +2877,7 @@ export const supplementGuide = drafts({
   max: 200,
 });
 
-export const draftArticle = drafts({
+export const draftArticle = draftsFrom<Bindings>(KOVA_AI, {
   id: "ai.article",
   feature: "article",
   summary: "Draft an article for the studio's feed, to edit before it goes out.",
@@ -3176,7 +3087,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.23.0",
+  manifestVersion: "0.24.0",
   bindings,
 
   identity: {
@@ -3475,6 +3386,12 @@ export const kova = defineApp({
       category: "billing", tone: "success", icon: "gift", theirs: true,
       title: "{days} days added", link: { to: "inbox" }, roles: ["owner", "client"],
     },
+    "support.session": {
+      category: "service", tone: "warning", icon: "shield",
+      title: "Somebody from support was in your workspace",
+      body: "Why: {reason}",
+      link: { to: "inbox" }, roles: ["owner"],
+    },
     /* ⚠️ The one that matters: a person is told what they are meant to do. */
     "programme.published": {
       category: "activity", tone: "success", icon: "check", theirs: true,
@@ -3755,6 +3672,14 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.24.0",
+      at: "2026-08-10",
+      notes: [
+        "See what was done in your studio, by whom, and how long that record is kept.",
+        "If somebody from support needs to work inside your studio, it is bounded, you are told why, and it is on the record either way.",
+      ],
+    },
     {
       version: "0.23.0",
       at: "2026-08-10",

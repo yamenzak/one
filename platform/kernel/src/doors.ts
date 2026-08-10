@@ -45,6 +45,19 @@ export interface DoorConfig {
   /** Opt-in per app: `play` is a slug an ordinary tenant could otherwise hold. */
   readonly deviceDoor?: string;
   readonly reserved: readonly string[];
+  /**
+   * ⚠️ WHICH DOORS THIS APP ACTUALLY HAS, AND IT IS REQUIRED.
+   *
+   * A manifest has always declared this and nothing read it, so every app had
+   * every door: one that declared no `setup` still created workspaces there, and
+   * one that declared no `custom` still resolved anybody's own domain through
+   * the custom-domain lookup. A declared restriction that is not applied is
+   * worse than no declaration, because somebody has read it and believes it.
+   *
+   * Optional would have been the compatible choice and the wrong one — an
+   * absent list would mean "all of them", which is the behaviour being fixed.
+   */
+  readonly doors: readonly Door[];
 }
 
 /**
@@ -94,21 +107,41 @@ export function classifyHost(hostnameRaw: string, cfg: DoorConfig): HostShape {
 
   const l = label(hostname, cfg.appRoot);
   if (l === null) {
-    // Not under our root at all: somebody's own domain, resolved by lookup.
-    return { ...base, door: "custom", underRoot: false, slug: null };
+    /*
+      Not under our root at all: somebody's own domain, resolved by lookup.
+
+      ⚠️ AND AN APP THAT DECLARED NO CUSTOM DOOR DOES NOT DO THE LOOKUP. `invalid`
+      rather than `unclaimed`, because this hostname is not under our root and
+      never could have been ours — there is nothing here to claim.
+    */
+    return cfg.doors.includes("custom")
+      ? { ...base, door: "custom", underRoot: false, slug: null }
+      : { ...base, door: "invalid", underRoot: false, slug: null };
   }
   // A dotted label is a sub-subdomain. We serve one level; anything deeper is
   // not a tenant that could have been created, so it is malformed rather than
   // merely unknown.
   if (l.includes(".") || l === "") return { ...base, door: "invalid", underRoot: true, slug: null };
 
-  if (l === "setup") return { ...base, door: "setup", underRoot: true, slug: null };
-  if (l === "admin") return { ...base, door: "admin", underRoot: true, slug: null };
-  if (cfg.deviceDoor && l === cfg.deviceDoor) return { ...base, door: "device", underRoot: true, slug: null };
+  /*
+    ⚠️ A DOOR THIS APP DID NOT DECLARE IS `unclaimed`, NOT ITS OWN KIND. It is a
+    well-formed label under our root that belongs to nobody — which is exactly
+    what it is — and answering that way tells an outsider probing for names
+    nothing they could not have guessed.
+  */
+  const has = (door: Door) => cfg.doors.includes(door);
+  if (l === "setup") return { ...base, door: has("setup") ? "setup" : "unclaimed", underRoot: true, slug: null };
+  if (l === "admin") return { ...base, door: has("admin") ? "admin" : "unclaimed", underRoot: true, slug: null };
+  if (cfg.deviceDoor && l === cfg.deviceDoor) {
+    return { ...base, door: has("device") ? "device" : "unclaimed", underRoot: true, slug: null };
+  }
   if (cfg.reserved.includes(l) || UNIVERSAL_RESERVED.includes(l)) {
     return { ...base, door: "unclaimed", underRoot: true, slug: null };
   }
-  return { ...base, door: "tenant", underRoot: true, slug: l };
+  /* ⚠️ And an app with no tenant door has no tenants to serve at a subdomain. */
+  return has("tenant")
+    ? { ...base, door: "tenant", underRoot: true, slug: l }
+    : { ...base, door: "unclaimed", underRoot: true, slug: null };
 }
 
 /* --------------------------------------------------------------- identity --- */
@@ -146,7 +179,14 @@ export function relyingPartyFor(shape: HostShape): string {
  * for it — which is why a local `*.localhost` signs in per host and production
  * does not.
  */
-export function cookieDomainFor(shape: HostShape): string | null {
+export function cookieDomainFor(shape: HostShape, scope: "origin" | "host" = "origin"): string | null {
+  /*
+    ⚠️ `host` IS NO DOMAIN AT ALL, which is a host-only cookie: this hostname and
+    nothing under it. An app declaring it wants every workspace to have its own
+    jar, and a widened cookie would quietly give a person signed into one a
+    session in the next.
+  */
+  if (scope === "host") return null;
   if (!shape.underRoot) return null;
   if (!shape.appRoot.includes(".")) return null;
   /*

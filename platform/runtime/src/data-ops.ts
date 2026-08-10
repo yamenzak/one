@@ -16,8 +16,9 @@
 import type { AnyOperation, AppSpec, BindingSpec, Instant, ObjectHandle, SchemaModule, SqlHandle } from "@one/kernel";
 import { operation, s } from "@one/kernel";
 import { OPERATE } from "./operator-ops.js";
-import { erasurePlan, eraseSubject, exportTenant, subjectPlan, eraseTenant, type Forgotten } from "./data.js";
+import { erasurePlan, eraseSubject, exportTenant, subjectPlan, eraseTenant, mustLeaveWith, type Forgotten, type Keeping } from "./data.js";
 import { jobHistory } from "./jobs.js";
+import { auditTrail } from "./audit.js";
 
 /** ⚠️ A symbol, so an app cannot reach the plan by writing a property name. */
 export const DATA = Symbol.for("one.runtime.data");
@@ -36,6 +37,14 @@ export interface DataDeps {
   readonly objects: ObjectHandle | null;
   readonly tenantId: string;
   readonly modules: readonly SchemaModule[];
+  /**
+   * ⚠️ WHAT EACH COLLECTION SAID ABOUT KEEPING ITS OWN ROWS. Derived from the
+   * manifest rather than from the schema, because `retention` is a product
+   * decision about a collection and a schema module knows only about tables.
+   */
+  readonly keeping: readonly Keeping[];
+  /** ⚠️ How long the audit is kept. Declared by every app, read by nothing. */
+  readonly auditRetentionDays: number;
   /** Whether this caller may act for the whole deployment rather than one workspace. */
   readonly isOperator: boolean;
 }
@@ -63,7 +72,46 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
     tool: false,
     async handler(ctx) {
       const d = deps(ctx);
+      /*
+        ⚠️ WITHOUT WHAT THE MANIFEST SAID MUST NOT BE KEPT. A collection
+        declaring `onTenantClose: "purge"` is one whose retention refuses to keep
+        it — and writing it into a document somebody downloads is exactly the
+        thing that declaration forbids, done by the feature meant to honour it.
+      */
       return exportTenant(d.db, erasurePlan(d.modules), d.tenantId, ctx.now());
+    },
+  });
+
+  /**
+   * WHAT WAS DONE HERE, AND BY WHOM.
+   *
+   * ⚠️ THE AUDIT IS THE WORKSPACE'S OWN, not only the operator's. A trail only we
+   * can read is one that answers our questions about them and none of theirs
+   * about us — and the single most important row in it is a support session,
+   * which is us.
+   */
+  const trail = operation({
+    id: "audit.list",
+    kind: "read",
+    summary: "What was done in this workspace, most recent first.",
+    input: s.object({
+      limit: s.optional(s.number({ integer: true, min: 1, max: 200 })),
+      actorId: s.optional(s.text({ max: 60 })),
+    }),
+    output: s.object({ entries: s.json(), keptForDays: s.number({ integer: true }) }),
+    /* ⚠️ The same permission that closes the workspace. An audit names who did
+       what, so reading it is reading about colleagues, not about records. */
+    permission: "workspace:close",
+    idempotency: { mode: "none" },
+    tool: false,
+    async handler(ctx, input: { limit?: number; actorId?: string }) {
+      const d = deps(ctx);
+      return {
+        entries: await auditTrail(d.db, d.tenantId, Math.min(input.limit ?? 50, 200), input.actorId),
+        /* ⚠️ Said out loud. "Everything we have" and "everything since March"
+           are different answers, and only one of them is true. */
+        keptForDays: d.auditRetentionDays,
+      };
     },
   });
 
@@ -123,7 +171,7 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
     kind: "write",
     summary: "Forget this workspace now, without waiting out the seven days.",
     input: s.object({ confirm: s.text({ max: 120 }) }),
-    output: s.object({ tables: s.json(), absent: s.json(), objects: s.number({ integer: true }), stranded: s.number({ integer: true }) }),
+    output: s.object({ tables: s.json(), absent: s.json(), objects: s.number({ integer: true }), stranded: s.number({ integer: true }), taken: s.optional(s.json()) }),
     permission: "workspace:close",
     idempotency: { mode: "none" },
     audit: () => ({ subject: "workspace", verb: "erase" }),
@@ -142,7 +190,14 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
         The caller is told rather than reassured: erasure is re-runnable, and the
         second attempt starts from whatever is still there.
       */
-      return eraseTenant(d.db, erasurePlan(d.modules), d.tenantId, d.objects);
+      /*
+        ⚠️ AND WHAT THE MANIFEST SAID MAY NOT BE DESTROYED WITHOUT BEING HANDED
+        OVER COMES BACK WITH THE ANSWER. `export-then-purge` is an obligation
+        about the ORDER of two operations, so it cannot be honoured by a filter
+        on the export or by telling somebody to take one first — an instruction
+        attached to the one operation with no undo is a thing that gets skipped.
+      */
+      return eraseTenant(d.db, erasurePlan(d.modules), d.tenantId, d.objects, mustLeaveWith(d.keeping), ctx.now());
     },
   });
 
@@ -168,7 +223,7 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
     },
   });
 
-  return [takeIt, close, cancel, erase, runs] as unknown as readonly AnyOperation[];
+  return [takeIt, trail, close, cancel, erase, runs] as unknown as readonly AnyOperation[];
 }
 
 /**

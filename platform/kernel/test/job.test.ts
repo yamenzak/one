@@ -65,6 +65,7 @@ const base = {
     "workspace.created": { category: "service", tone: "success", icon: "sparkle", title: "ready", link: { to: "inbox" }, roles: ["owner"] },
     "plan.chosen": { category: "billing", tone: "info", icon: "card", title: "chosen", link: { to: "inbox" }, roles: ["owner"] },
     "package.granted": { category: "billing", tone: "success", icon: "gift", title: "granted", link: { to: "inbox" }, roles: ["owner"] },
+    "support.session": { category: "service", tone: "warning", icon: "shield", title: "Somebody from support was in your workspace", body: "Why: {reason}", link: { to: "inbox" }, roles: ["owner"] },
   } as NotificationRegistry,
   help: {}, filePurposes: {},
   releases: [], problems: {}, operations: [], jobs: [] as JobSpec[],

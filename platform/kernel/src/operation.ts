@@ -77,19 +77,19 @@ export type Idempotency =
 
 /* -------------------------------------------------------------- metering --- */
 
-export interface Meter {
-  /** What is consumed — the ledger's unit, not a price. */
-  readonly unit: "credits" | "bytes" | "seats" | "messages";
-  /**
-   * ⚠️ A RESERVE IS A CEILING ON REVENUE, NOT AN ESTIMATE.
-   *
-   * Settlement charges the lesser of what was held and what was used, so
-   * anything a reserve fails to count is paid for by the platform and not by the
-   * tenant — silently, on every call. Estimating high is a rounding error;
-   * estimating low is a transfer.
-   */
-  readonly reserve?: boolean;
-}
+/*
+  ⚠️ THERE IS NO `Meter` DECLARATION, AND ITS REMOVAL IS THE HONEST END OF IT.
+
+  An operation could declare `meter: { unit, reserve }` and nothing read it. Every
+  billable unit in this platform already meters through a typed path that knows
+  what it is counting — generation reserves against the credit ledger before it
+  reaches a provider, storage checks the stored bytes against the ceiling, seats
+  are counted from the membership roster — and each of those is guarded.
+
+  A fourth declaration that named a unit and did nothing was not an unfinished
+  feature. It was a way to write `meter: { unit: "credits" }` on an operation and
+  believe it was being charged for.
+*/
 
 export interface RateLimit {
   readonly per: "actor" | "tenant" | "ip";
@@ -143,6 +143,16 @@ export interface Ctx<B extends BindingSpec> {
   holds(permission: string): boolean;
   /** ⚠️ Injected, so a test is deterministic and a handler cannot read a wall clock. */
   now(): Instant;
+  /**
+   * The plain date the week containing this one began on.
+   *
+   * ⚠️ ON THE CONTEXT RATHER THAN IMPORTED, because the answer depends on the
+   * manifest and a handler that imported the function would still have to be
+   * handed the declaration. `format.weekStart` existed from the first app and
+   * every weekly read chose its own boundary — which is worse than one wrong
+   * default, because it is several, disagreeing.
+   */
+  weekOf(day: string): string;
   /** Raise a declared failure. The only way out other than returning. */
   fail(code: string, meta?: Record<string, string | number | boolean>): never;
 }
@@ -204,7 +214,6 @@ export interface OperationSpec<B extends BindingSpec, I, O, F extends string = s
   readonly scope?: (input: I) => Readonly<Record<string, string>>;
 
   readonly idempotency: Idempotency;
-  readonly meter?: Meter;
   readonly rateLimit?: RateLimit;
 
   /**

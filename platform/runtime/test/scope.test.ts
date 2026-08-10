@@ -32,6 +32,13 @@ import { PLATFORM_REGIONAL, PLATFORM_GLOBAL } from "../src/modules.js";
  */
 const EXEMPT_REGIONAL: Readonly<Record<string, string>> = {
   sessions: "belongs to an account, not a workspace — it has no tenant column to cascade on",
+  /*
+    ⚠️ A COUNTER, NOT A RECORD. Its key is a composite of operation, window and
+    whoever was asking — which may be an address rather than anybody — so there
+    is no tenant column to cascade on, and the rows stop being matched the moment
+    their window rolls over whether anything deletes them or not.
+  */
+  request_counts: "a fixed-window counter keyed by a composite, with no tenant column and no lifetime past its window",
 };
 
 describe("the platform's own regional tables", () => {

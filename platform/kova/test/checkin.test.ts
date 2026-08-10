@@ -13,7 +13,7 @@ import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "../src/worker.js";
 import { post, SETUP, signIn } from "./session.js";
-import { progressOf } from "../src/goals.js";
+import { progressOf } from "@one/kernel";
 
 const STUDIO = "https://westgate.kova.4dl.app";
 let coach = "";

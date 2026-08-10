@@ -64,6 +64,7 @@
     "milestone.earned",
     "package.granted",
     "plan.chosen",
+    "support.session",
     "workspace.created"
   ]
 }

@@ -287,6 +287,12 @@ export const hello = defineApp({
       link: { to: "inbox" },
       roles: ["owner"],
     },
+    "support.session": {
+      category: "service", tone: "warning", icon: "shield",
+      title: "Somebody from support was in your workspace",
+      body: "Why: {reason}",
+      link: { to: "inbox" }, roles: ["owner"],
+    },
     /*
       ⚠️ THE ONE TYPE EVERY MILESTONE IS ANNOUNCED WITH, and the platform names
       it. An app with milestones and no announcement does not compose: earning
