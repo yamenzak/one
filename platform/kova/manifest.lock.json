@@ -45,6 +45,8 @@
     "client:write",
     "commerce:manage",
     "commerce:read",
+    "consent:manage",
+    "consent:read",
     "dose:read",
     "dose:write",
     "entry:read",

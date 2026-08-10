@@ -48,6 +48,7 @@ async function studio(slug: string) {
 
   const client = async (name: string, startedOn: string) => {
     const made = await call("/api/client.create", { name, startedOn });
+    await call("/api/consent.record", { subject: made.body.id });
     if (made.status !== 200) throw new Error(`${name}: ${JSON.stringify(made.body)}`);
     return made.body.id as unknown as string;
   };

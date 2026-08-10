@@ -56,6 +56,8 @@ beforeAll(async () => {
   owner = at(STUDIO)(ownerCookie);
 
   const person = await owner.call("/api/client.create", { name: "Ro Adeyemi", email: CLIENT_EMAIL });
+
+  await owner.call("/api/consent.record", { subject: person.body.id });
   expect(person.status, "the roster fixture must not have hit the client quota").toBe(200);
   ro = person.body.id as unknown as string;
   /* ⚠️ The membership NAMES the record, which is what makes them a customer

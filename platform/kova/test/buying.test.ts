@@ -69,6 +69,8 @@ beforeAll(async () => {
   coach = as(await signIn(`${SLUG}@example.test`, STUDIO));
 
   ro = (await coach("/api/client.create", { name: "Ro" })).body.id as unknown as string;
+
+  await coach("/api/consent.record", { subject: ro });
   await coach("/api/member.invite", { email: "ro@thwaite.example.test", role: "client", subjectId: ro });
   client = as(await signIn("ro@thwaite.example.test", STUDIO));
 
@@ -252,6 +254,7 @@ describe("what a customer may open", () => {
   /* ⚠️ Their own, and nobody else's — the same row scope as everything here. */
   it("cannot open a purchase for another client", async () => {
     const somebody = (await coach("/api/client.create", { name: "Somebody" })).body.id as unknown as string;
+    await coach("/api/consent.record", { subject: somebody });
     expect((await client("/api/commerce.checkout", { subjectId: somebody, packageId: "month" })).status).toBe(403);
   });
 

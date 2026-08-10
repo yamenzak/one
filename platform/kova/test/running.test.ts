@@ -159,6 +159,7 @@ describe("asking to be released from somebody", () => {
 
   beforeAll(async () => {
     const made = await owner.call("/api/client.create", { name: "Ro Adeyemi" });
+    await owner.call("/api/consent.record", { subject: made.body.id });
     expect(made.status, "the roster fixture must not have hit the client quota").toBe(200);
     person = made.body.id as unknown as string;
   });

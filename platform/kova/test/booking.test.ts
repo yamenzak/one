@@ -54,6 +54,8 @@ beforeAll(async () => {
   coach = as(coachCookie);
 
   const first = await coach("/api/client.create", { name: "Ro Adeyemi" });
+
+  await coach("/api/consent.record", { subject: first.body.id });
   expect(first.status, "the roster fixture must not have hit the client quota").toBe(200);
   ro = first.body.id as unknown as string;
   tam = ((await coach("/api/client.create", { name: "Tam Okonjo" })).body.id) as unknown as string;

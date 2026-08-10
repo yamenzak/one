@@ -50,6 +50,8 @@ beforeAll(async () => {
   coach = as(await signIn(`${SLUG}@example.test`, STUDIO));
 
   ro = (await coach("/api/client.create", { name: "Ro" })).body.id as unknown as string;
+
+  await coach("/api/consent.record", { subject: ro });
   /* ⚠️ The membership NAMES the record, which is what makes them a customer. */
   await coach("/api/member.invite", { email: "ro@harlow.example.test", role: "client", subjectId: ro });
   client = as(await signIn("ro@harlow.example.test", STUDIO));
@@ -253,6 +255,7 @@ describe("access running out reaches the coach's list", () => {
   */
   it("names somebody whose soonest scope is nearly done", async () => {
     const ending = (await coach("/api/client.create", { name: "Ending" })).body.id as unknown as string;
+    await coach("/api/consent.record", { subject: ending });
     /*
       ⚠️ TWO SCOPES OF DIFFERENT LENGTHS, because that is the only arrangement
       that tells the two runway numbers apart. The headline is a MAXIMUM — the
@@ -280,6 +283,7 @@ describe("access running out reaches the coach's list", () => {
   */
   it("does not warn about an expiry somebody does not have", async () => {
     const never = (await coach("/api/client.create", { name: "Nothing bought" })).body.id as unknown as string;
+    await coach("/api/consent.record", { subject: never });
     const made = await coach("/api/workout.create", { client: never, day: new Date().toISOString().slice(0, 10) });
     await coach("/api/workout.submit", { id: made.body.id as unknown as string });
 
@@ -322,7 +326,10 @@ describe("a client may ask about themselves and nobody else", () => {
     boss = at(await signIn("kilnsey@example.test", ROW));
 
     me = (await boss("/api/client.create", { name: "Me" })).body.id as unknown as string;
+
+    await boss("/api/consent.record", { subject: me });
     them = (await boss("/api/client.create", { name: "Them" })).body.id as unknown as string;
+    await boss("/api/consent.record", { subject: them });
     expect(me, "the roster fixture must not have hit the client quota").toBeTruthy();
     expect(them).toBeTruthy();
 

@@ -70,6 +70,7 @@ describe("a studio starts with nothing, and is told what to do about it", () => 
 describe("a coach writes a programme and somebody follows it", () => {
   it("adds a person and a movement", async () => {
     const person = await call("/api/client.create", { name: "Marion", email: "marion@example.test" });
+    await call("/api/consent.record", { subject: person.body.id });
     expect(person.status).toBe(200);
     clientId = person.body.id as unknown as string;
 

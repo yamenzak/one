@@ -67,6 +67,8 @@ beforeAll(async () => {
   coach = as(coachCookie);
 
   const person = await coach.call("/api/client.create", { name: "Ro Adeyemi" });
+
+  await coach.call("/api/consent.record", { subject: person.body.id });
   expect(person.status, "the roster fixture must not have hit the client quota").toBe(200);
   ro = person.body.id as unknown as string;
 
@@ -468,6 +470,7 @@ describe("forgetting somebody, permanently", () => {
 
   beforeAll(async () => {
     const made = await coach.call("/api/client.create", { name: "Sam Okonkwo" });
+    await coach.call("/api/consent.record", { subject: made.body.id });
     expect(made.status, "the roster fixture must not have hit the client quota").toBe(200);
     doomed = made.body.id as unknown as string;
     const w = (await coach.call("/api/workout.create", { client: doomed, day: "2026-03-09" })).body.id as unknown as string;

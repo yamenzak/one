@@ -3683,3 +3683,56 @@ lane check inside `consentGate` changed no behaviour, because the runtime
 short-circuits on the same list to keep the directory query off every sign-in.
 The duplication is a deliberate fast path; what it means is that `consentGate`
 needs unit coverage of its own, which it now has — four mutations, all killed.
+
+## 272. A legal basis the product did not have
+
+Fifteen of Kova's collections declared `condition: "explicit_consent"` and
+nothing anywhere collected any. That is worse than declaring the wrong condition:
+a manifest asserting a basis it does not hold reads as diligence, and
+special-category processing without a valid condition is PROHIBITED rather than
+merely undocumented.
+
+`subject_consent` is the ledger and the derived write path is the enforcement.
+⚠️ IT IS DERIVED FROM THE DECLARATION RATHER THAN LISTED — a collection holding a
+special category about a subject is one whose rows may not be written without
+consent, and adding such a collection is the whole of what it takes to bring it
+under the rule. There is no list to forget.
+
+Three properties are the design:
+
+⚠️ IT IS PER SUBJECT, NOT PER ACCOUNT. The person whose health data it is may
+have no login at all — a studio records a client's weight, and the client is a
+row long before they are ever a sign-in. Keying it on an account would collect
+consent from whoever was typing.
+
+⚠️ WITHDRAWAL IS WHAT MAKES IT CONSENT. Article 7(3) requires withdrawing to be
+as easy as giving; a basis that cannot be withdrawn is a different basis wearing
+the word. Same permission, one call, and new records stop immediately.
+
+⚠️ AND WITHDRAWING IS A COLUMN, NEVER A DELETE. Removing the row would destroy
+exactly the evidence needed to show the processing that already happened was
+lawful. Withdrawal is not retroactive; the record of both moments is the value.
+
+## 273. It found a path that created people nothing could be written about
+
+Enforcing it turned 70 tests red and one of them was not a fixture problem:
+`client.register` — somebody adding themselves to a studio — created a client
+with no consent, so every log, measurement and check-in about them would have
+been refused forever, with no screen anywhere explaining why.
+
+⚠️ THE MOMENT SOMEBODY ADDS THEMSELVES IS THE MOMENT THEY CONSENT. They are
+filling in a form about their own body, on a page carrying the studio's privacy
+notice, which is what makes it explicit and specific. A coach adding somebody
+records it separately, because in that case the person is in the room rather than
+at the keyboard.
+
+## 274. The fixture shim that would have hidden the gate
+
+The first fix for the other 69 was a shim in the shared `post` helper: see a
+successful `client.create`, record consent. One edit, every test green.
+
+⚠️ IT WAS DELETED. A fixture that silently satisfies the thing under test is how
+a gate comes to be covered by nothing — the shim would have made a REMOVED gate
+indistinguishable from a working one for every test but the three that ask
+directly. The consent is recorded at each of the 39 call sites instead, one line
+after the client is created, which is what a coach does anyway.

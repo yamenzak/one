@@ -282,6 +282,7 @@ describe("who may spend a studio's credits", () => {
   */
   it("refuses a client whose package does not include eating", async () => {
     const record = await coach("/api/client.create", { name: "Tam Okonjo" });
+    await coach("/api/consent.record", { subject: record.body.id });
     expect(record.status, "the roster fixture must not have hit the client quota").toBe(200);
     await coach("/api/member.invite", { email: "tam@airedale.example.test", role: "client", subjectId: record.body.id });
     const them = as(await signIn("tam@airedale.example.test", STUDIO));

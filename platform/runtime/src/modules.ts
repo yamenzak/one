@@ -25,7 +25,7 @@ import { MILESTONE_SCHEMA } from "./milestone.js";
 import { GENERATION_SCHEMA } from "./generate.js";
 import { SETTINGS_SCHEMA } from "./settings.js";
 import { REPLAY_SCHEMA } from "./replay.js";
-import { CONSENT_SCHEMA } from "./reference-ops.js";
+import { CONSENT_SCHEMA, SUBJECT_CONSENT_SCHEMA } from "./reference-ops.js";
 import { AUDIT_SCHEMA } from "./audit.js";
 import { LIMIT_SCHEMA } from "./limit.js";
 import { IMPERSONATION_SCHEMA } from "./impersonation.js";
@@ -55,6 +55,10 @@ export const PLATFORM_REGIONAL: readonly SchemaModule[] = [
   REPLAY_SCHEMA,
   AUDIT_SCHEMA,
   LIMIT_SCHEMA,
+  /* ⚠️ REGIONAL, because it is about a SUBJECT rather than an account — the
+     person whose health data it is may have no login at all, and their record
+     lives where their workspace's records live. */
+  SUBJECT_CONSENT_SCHEMA,
 ];
 
 /**

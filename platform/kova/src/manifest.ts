@@ -15,7 +15,7 @@
 
 import { energyOf, overDays, portionOf, totalOf, type Macros } from "./nutrition.js";
 import { bestOf, needing, prescribedPerWeek } from "./reading.js";
-import { drawWith, forgetSubject, generateAbout, generateWith, draftsFrom, readsAPicture, lapsedAcross, lookUp, lookupProblem, readSettings, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
+import { drawWith, forgetSubject, generateAbout, generateWith, draftsFrom, readsAPicture, lapsedAcross, lookUp, lookupProblem, readSettings, recordSubjectConsent, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
 import { progressWeek, weekAt, WEEKS_SHAPE, type Week } from "./plans.js";
 import { FASTING_ZONES, wellnessOf, zoneAt } from "./living.js";
 import { roundsOf } from "./plans.js";
@@ -2145,6 +2145,18 @@ export const selfRegister = operation<
       `INSERT INTO ${T.clients} (id, tenant_id, version, created_at, updated_at, name, email) VALUES (?, ?, 1, ?, ?, ?, ?)`,
       id, ctx.tenantId, at, at, input.name, email,
     );
+    /*
+      ⚠️ SOMEBODY ADDING THEMSELVES IS THE MOMENT THEY CONSENT, and this line is
+      here because the Article 9 gate found its absence: a self-registered client
+      was a person on the roster whose every log, measurement and check-in was
+      refused, with no screen anywhere explaining why.
+
+      They are filling in a form about their own body, on a page that carries the
+      studio's privacy notice — which is what makes it explicit and specific.
+      A coach adding somebody records it through `consent.record` instead, because
+      in that case the person is in the room rather than at the keyboard.
+    */
+    await recordSubjectConsent(ctx.bind.db, ctx.tenantId, id, at);
     return { ok: true };
   },
 });
@@ -3170,7 +3182,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.29.0",
+  manifestVersion: "0.30.0",
   bindings,
 
   identity: {
@@ -3216,6 +3228,14 @@ export const kova = defineApp({
     permissions: [
       ...STAFF, "workspace:create", "workspace:close", "workspace:settings", "billing:manage", "commerce:manage",
       "member:read", "member:manage", "report:read", "ai:read", "platform:operate",
+      /*
+        ⚠️ CONSENT IS ITS OWN PAIR, and it is not `client:write`. Recording that
+        somebody agreed to have their medical information processed, and
+        withdrawing it, is a different act from editing their profile — and the
+        person most likely to need the second is the front desk, who has no
+        business doing the first.
+      */
+      "consent:read", "consent:manage",
     ],
     roles: {
       /*
@@ -3226,7 +3246,7 @@ export const kova = defineApp({
       */
       /* ⚠️ `ai:read` is the OWNER's alone — what the studio's credits went on is
          a question about the bill, and the bill is theirs. */
-      owner: [...STAFF, "workspace:create", "workspace:close", "workspace:settings", "billing:manage", "commerce:manage", "member:read", "member:manage", "ai:read"],
+      owner: [...STAFF, "workspace:create", "workspace:close", "workspace:settings", "billing:manage", "commerce:manage", "member:read", "member:manage", "ai:read", "consent:read", "consent:manage"],
       /* ⚠️ A coach SEES the team and cannot change it — hiring is the owner's. */
       /*
         ⚠️ A COACH MAY SET HOW THE STUDIO COACHES. The check-in cadence and what
@@ -3234,12 +3254,17 @@ export const kova = defineApp({
         settings screen only the owner can open is one the owner is asked to open
         on somebody else's behalf every week.
       */
-      trainer: [...STAFF, "workspace:create", "member:read", "workspace:settings"],
+      /* ⚠️ A COACH RECORDS AND WITHDRAWS IT, because they are the one in the room
+         when it is given — an owner-only control means consent is asked for by
+         somebody who is not there and recorded later from memory. */
+      trainer: [...STAFF, "workspace:create", "member:read", "workspace:settings", "consent:read", "consent:manage"],
       /* ⚠️ The front desk sees people and bookings, and prescribes nothing. */
       /* ⚠️ The front desk sees people and BOOKINGS, and prescribes nothing —
          which is why `session:write` is here and nothing else new is. */
+      /* ⚠️ The front desk SEES whether consent is held — they book people in and
+         need to know — and does not record or withdraw it. */
       assistant: ["client:read", "workout:read", "inbox:read", "guide:read", "milestone:read", "commerce:read", "file:read", "member:read",
-        "booking:read", "booking:write", "article:feed", "assignment:read"],
+        "booking:read", "booking:write", "article:feed", "assignment:read", "consent:read"],
       /*
         ⚠️ A CLIENT WRITES THEIR OWN RECORD AND READS WHAT WAS PRESCRIBED. The
         row scope does the narrowing — `session`, `set` and `entry` are subject
@@ -3986,6 +4011,14 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.30.0",
+      at: "2026-08-10",
+      notes: [
+        "Record that a client agreed to have their body, their food and their health recorded — and see at a glance whether it is held. Nothing new is stored about somebody who has not.",
+        "They can take it back at any time, as easily as they gave it, and their existing records stay theirs to read.",
+      ],
+    },
     {
       version: "0.29.0",
       at: "2026-08-10",

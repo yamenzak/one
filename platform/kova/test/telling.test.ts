@@ -27,6 +27,7 @@ const STUDIO = `https://${SLUG}.kova.4dl.app`;
    address, and driving it from this one is what would make a residency
    assertion pass while proving nothing. */
 const at = (cookie: string, origin: string = STUDIO) => ({
+  cookie,
   async call(path: string, body?: unknown) {
     const res = await worker.fetch(
       new Request(`${origin}${path}`, {
@@ -528,6 +529,7 @@ describe("what somebody may do before they have agreed to anything", () => {
 
   it("refuses a write, and names the documents standing in the way", async () => {
     const out = await fresh.call("/api/client.create", { name: "Someone" });
+    await fresh.call("/api/consent.record", { subject: out.body.id });
     /* ⚠️ 451, not 403. A legal precondition is a different thing from lacking
        permission, and this one the person can actually do something about. */
     expect(out.status).toBe(451);
@@ -543,5 +545,87 @@ describe("what somebody may do before they have agreed to anything", () => {
     }
     /* ⚠️ And the write goes through afterwards, or the gate is a wall. */
     expect((await fresh.call("/api/client.create", { name: "Someone" })).status).toBe(200);
+  });
+});
+
+/* ------------------------------------------------------------ article 9 --- */
+
+/**
+ * ⚠️ FIFTEEN COLLECTIONS DECLARED `condition: "explicit_consent"` AND NOTHING
+ * COLLECTED ANY.
+ *
+ * The manifest asserted a legal basis the product did not have, which is worse
+ * than declaring the wrong one because it reads as diligence. Special-category
+ * processing is PROHIBITED without a condition — not merely undocumented — so
+ * this refuses rather than shapes.
+ */
+describe("recording somebody's body needs their say-so", () => {
+  let subject = "";
+  beforeAll(async () => {
+    /* ⚠️ A client nobody recorded consent for — which is what every fixture in
+       this repository now does explicitly, one line after creating one, because
+       a coach does it in the room. This test is the one that must not. */
+    subject = (await owner.call("/api/client.create", { name: "Unasked" })).body.id as unknown as string;
+  });
+
+  it("refuses a health write for somebody who has not consented", async () => {
+    const out = await owner.call("/api/goal.create", { client: subject, kind: "weight", start: 82, target: 76 });
+    expect(out.status).toBe(451);
+  });
+
+  /* ⚠️ Reading is not refused: the row that already exists is theirs, and
+     withholding it helps nobody. What is refused is recording something NEW. */
+  it("still lets their record be read", async () => {
+    expect((await owner.get("/api/goal.list")).status).toBe(200);
+  });
+
+  it("takes the consent, and then the write goes through", async () => {
+    expect((await owner.call("/api/consent.record", { subject })).status).toBe(200);
+    const status = await owner.get("/api/consent.status", { subject });
+    expect(status.body.given).toBe(true);
+    /* ⚠️ And it says WHAT it covers — consent to "everything" is not specific,
+       which is one of the three things Article 9 requires it to be. */
+    expect((status.body.covers as unknown as string[]).length).toBeGreaterThan(5);
+
+    expect((await owner.call("/api/goal.create", { client: subject, kind: "weight", start: 82, target: 76 })).status).toBe(200);
+  });
+
+  /*
+    ⚠️ WITHDRAWAL IS THE PROPERTY THAT MAKES IT CONSENT. Article 7(3) requires it
+    to be as easy to withdraw as to give — a basis that cannot be withdrawn is
+    not consent, it is a different basis wearing the word.
+  */
+  it("stops accepting new records the moment it is withdrawn", async () => {
+    expect((await owner.call("/api/consent.withdraw", { subject })).status).toBe(200);
+    expect((await owner.get("/api/consent.status", { subject })).body.given).toBe(false);
+    expect((await owner.call("/api/goal.create", { client: subject, kind: "waist", start: 92, target: 86 })).status).toBe(451);
+  });
+
+  /*
+    ⚠️ AND WITHDRAWING DOES NOT ERASE THAT IT WAS EVER HELD. Deleting the row
+    would destroy exactly the evidence needed to show the processing that already
+    happened was lawful — withdrawal is not retroactive, and the record of both
+    moments is the whole value.
+  */
+  it("keeps the record of when it was given as well as when it went", async () => {
+    const status = await owner.get("/api/consent.status", { subject });
+    expect(status.body.at).toBeTruthy();
+    expect(status.body.withdrawnAt).toBeTruthy();
+  });
+
+  it("takes it again when they change their mind", async () => {
+    expect((await owner.call("/api/consent.record", { subject })).status).toBe(200);
+    expect((await owner.get("/api/consent.status", { subject })).body.given).toBe(true);
+  });
+
+  /* ⚠️ Somebody who adds themselves consents by doing so — otherwise they are a
+     person on the roster whose every log is refused, with nothing explaining it. */
+  it("is already held for somebody who added themselves", async () => {
+    await owner.call("/api/settings.write", { key: "studio.selfRegister", value: true });
+    const email = `self-${freshSlug("x")}@example.test`;
+    expect((await post(STUDIO, "/api/client.register", { name: "Self", email })).res.status).toBe(200);
+    const found = (await owner.get("/api/client.list")).body.rows as unknown as { id: string; email?: string }[];
+    const them = found.find((r) => r.email === email)!;
+    expect((await owner.get("/api/consent.status", { subject: them.id })).body.given).toBe(true);
   });
 });

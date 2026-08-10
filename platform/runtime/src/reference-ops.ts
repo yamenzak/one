@@ -29,6 +29,13 @@ export const REFERENCE = Symbol.for("one.runtime.reference");
 
 export interface ReferenceDeps {
   /**
+   * ⚠️ THE REGIONAL STORE, because a SUBJECT's consent lives where that
+   * workspace's records live. The document ledger beside it is global for the
+   * opposite reason: a person in three workspaces accepted the terms once.
+   */
+  readonly regional: SqlHandle;
+  readonly tenantId: string;
+  /**
    * ⚠️ THE GLOBAL STORE, because an acceptance belongs to a PERSON. Somebody in
    * two workspaces accepted the terms once, not twice — and a regional copy is
    * two answers that disagree the first time one of them is written.
@@ -299,5 +306,196 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
     },
   });
 
-  return [help, changes, legal, accept, disclosure, record] as unknown as readonly AnyOperation[];
+  /*
+    ⚠️ THE ONLY COLLECTIONS THIS APP HAS THAT NEED IT, computed once. An app with
+    none gets no surface at all rather than one that refuses — a screen offering
+    to record consent for processing that does not happen is a screen that
+    teaches people the word means nothing.
+  */
+  const guarded = app.collections.filter((c) => needsExplicitConsent(c as never)).map((c) => c.id);
+
+  const consentRead = operation({
+    id: "consent.status",
+    kind: "read",
+    summary: "Whether explicit consent is held for this person, and what it covers.",
+    input: s.object({ subject: s.text({ max: 60 }) }),
+    output: s.object({ given: s.bool(), at: s.optional(s.text()), withdrawnAt: s.optional(s.text()), covers: s.json() }),
+    permission: "consent:read",
+    idempotency: { mode: "none" },
+    async handler(ctx, input: { subject: string }) {
+      const d = deps(ctx);
+      const held = await consentOf(d.regional, d.tenantId, input.subject);
+      return {
+        given: held.given,
+        ...(held.at ? { at: held.at } : {}),
+        ...(held.withdrawnAt ? { withdrawnAt: held.withdrawnAt } : {}),
+        /* ⚠️ WHAT IT COVERS, DERIVED. Consent to "everything" is not specific,
+           which is one of the three things Article 9 requires it to be. */
+        covers: guarded,
+      };
+    },
+  });
+
+  const give = operation({
+    id: "consent.record",
+    kind: "write",
+    summary: "Record that this person gave explicit consent to what is held about them.",
+    input: s.object({ subject: s.text({ max: 60 }) }),
+    output: s.object({ given: s.bool() }),
+    permission: "consent:manage",
+    idempotency: { mode: "natural", key: "subject" },
+    audit: (i: { subject: string }) => ({ subject: i.subject, verb: "consent:give" }),
+    outcome: { message: "Recorded", tone: "success", invalidates: ["consent.status"] },
+    /*
+      ⚠️ NOT A TOOL, AND FOR THE SAME REASON ACCEPTING TERMS IS NOT. A model that
+      can record somebody's consent to processing their medical information makes
+      the ledger worthless as evidence, which is the only thing it is for.
+    */
+    tool: false,
+    async handler(ctx, input: { subject: string }) {
+      const d = deps(ctx);
+      /*
+        ⚠️ RE-GIVING CLEARS A WITHDRAWAL rather than being refused as a
+        duplicate. Somebody who withdrew and changed their mind is an ordinary
+        thing that happens, and a ledger that could not express it would leave
+        them permanently unable to use the product they came back to.
+      */
+      await d.regional.run(
+        `INSERT INTO subject_consent (tenant_id, subject_id, given_at, withdrawn_at, by_account)
+         VALUES (?, ?, ?, NULL, ?)
+         ON CONFLICT(tenant_id, subject_id) DO UPDATE SET given_at = excluded.given_at, withdrawn_at = NULL, by_account = excluded.by_account`,
+        d.tenantId, input.subject, ctx.now() as Instant, d.session?.accountId ?? null,
+      );
+      return { given: true };
+    },
+  });
+
+  const withdraw = operation({
+    id: "consent.withdraw",
+    kind: "write",
+    summary: "Withdraw that consent. Nothing new is recorded afterwards.",
+    input: s.object({ subject: s.text({ max: 60 }) }),
+    output: s.object({ withdrawn: s.bool() }),
+    /*
+      ⚠️ WITHDRAWING IS EASIER THAN GIVING, WHICH IS THE LAW AND ALSO THE POINT.
+      Article 7(3) requires it to be as easy to withdraw as to give; making it
+      the same permission is the least that satisfies that, and a narrower one
+      would be a product where consent is a one-way door.
+    */
+    permission: "consent:manage",
+    idempotency: { mode: "natural", key: "subject" },
+    audit: (i: { subject: string }) => ({ subject: i.subject, verb: "consent:withdraw" }),
+    outcome: { message: "Withdrawn", tone: "success", invalidates: ["consent.status"] },
+    fails: ["platform.not_found"],
+    tool: false,
+    async handler(ctx, input: { subject: string }) {
+      const d = deps(ctx);
+      /*
+        ⚠️ A COLUMN, NEVER A DELETE. Removing the row destroys the evidence that
+        consent was ever held — which is exactly what is needed to show the
+        processing that already happened was lawful. Withdrawal is not
+        retroactive; the record of both moments is the whole value.
+      */
+      const changed = await d.regional.run(
+        `UPDATE subject_consent SET withdrawn_at = ? WHERE tenant_id = ? AND subject_id = ? AND withdrawn_at IS NULL`,
+        ctx.now() as Instant, d.tenantId, input.subject,
+      ).then(() => true).catch(() => false);
+      if (!changed) ctx.fail("platform.not_found", { field: "subject" });
+      return { withdrawn: true };
+    },
+  });
+
+  /*
+    ⚠️ AN APP WITH NOTHING TO CONSENT TO GETS NO SURFACE, rather than one that
+    refuses. `hello` holds nothing personal, so offering it a consent screen
+    would be a control over processing that does not happen.
+  */
+  const consentOps = guarded.length ? [consentRead, give, withdraw] : [];
+
+  return [help, changes, legal, accept, disclosure, record, ...consentOps] as unknown as readonly AnyOperation[];
 }
+
+/* ------------------------------------------------- article 9 consent --- */
+
+/**
+ * EXPLICIT CONSENT TO SPECIAL-CATEGORY PROCESSING, FROM THE PERSON IT IS ABOUT.
+ *
+ * ⚠️ THIS IS NOT THE DOCUMENT LEDGER ONE FILE UP, AND CONFLATING THEM IS THE
+ * MISTAKE THIS EXISTS TO PREVENT. Accepting a privacy notice is being TOLD what
+ * happens. Article 9 explicit consent is agreeing to a specific thing, and it
+ * carries a property no document acceptance has: it can be WITHDRAWN, at any
+ * time, as easily as it was given.
+ *
+ * Fifteen of Kova's collections declared `condition: "explicit_consent"` and
+ * nothing anywhere collected any. The declaration asserted a legal basis the
+ * product did not have — which is worse than declaring the wrong one, because it
+ * reads as diligence.
+ *
+ * ⚠️ AND IT IS PER SUBJECT, NOT PER ACCOUNT. The person whose health data it is
+ * may have no account at all: a studio records a client's weight, and the client
+ * is a row before they are ever a login. Keying this on an account would collect
+ * consent from whoever was typing.
+ */
+export const SUBJECT_CONSENT_SCHEMA: SchemaModule = {
+  id: "subject_consent",
+  ddl: [
+    /*
+      ⚠️ ONE ROW PER SUBJECT, WITH A WITHDRAWAL COLUMN RATHER THAN A DELETE.
+      Deleting the row on withdrawal would destroy the evidence that consent was
+      ever held — which is exactly what is needed to show the processing that
+      already happened was lawful. Withdrawal is not retroactive; the record of
+      both moments is the point.
+    */
+    `CREATE TABLE IF NOT EXISTS subject_consent (tenant_id TEXT NOT NULL, subject_id TEXT NOT NULL, given_at TEXT NOT NULL, withdrawn_at TEXT, by_account TEXT, PRIMARY KEY (tenant_id, subject_id));`,
+    `CREATE INDEX IF NOT EXISTS idx_subject_consent_tenant ON subject_consent(tenant_id);`,
+  ],
+  scoped: { tenantColumn: "tenant_id", tenantTables: ["subject_consent"] },
+};
+
+export interface SubjectConsent {
+  readonly given: boolean;
+  readonly at: string | null;
+  readonly withdrawnAt: string | null;
+}
+
+/** ⚠️ Withdrawn is NOT given. A row is not the question; a live row is. */
+export async function consentOf(db: SqlHandle, tenantId: string, subjectId: string): Promise<SubjectConsent> {
+  const row = await db.first<{ given_at: string; withdrawn_at: string | null }>(
+    `SELECT given_at, withdrawn_at FROM subject_consent WHERE tenant_id = ? AND subject_id = ?`,
+    tenantId, subjectId,
+  ).catch(() => null);
+  if (!row) return { given: false, at: null, withdrawnAt: null };
+  return { given: !row.withdrawn_at, at: row.given_at, withdrawnAt: row.withdrawn_at };
+}
+
+/**
+ * ⚠️ WHICH COLLECTIONS NEED IT, DERIVED FROM WHAT THEY SAID THEY HOLD.
+ *
+ * Nobody maintains a list. A collection declaring a special category with
+ * `explicit_consent` is one whose rows may not be written without it, and adding
+ * such a collection is the whole of what it takes to bring it under this rule.
+ */
+/**
+ * Record it from inside an app's own handler.
+ *
+ * ⚠️ THE MOMENT SOMEBODY ADDS THEMSELVES IS THE MOMENT THEY CONSENT, and an app
+ * whose self-registration did not record it created people nothing could ever be
+ * written about — a person on the roster whose every log is refused, with no
+ * screen anywhere explaining why. The gate found exactly that.
+ */
+export async function recordSubjectConsent(
+  db: SqlHandle, tenantId: string, subjectId: string, at: Instant, byAccount: string | null = null,
+): Promise<void> {
+  await db.run(
+    `INSERT INTO subject_consent (tenant_id, subject_id, given_at, withdrawn_at, by_account)
+     VALUES (?, ?, ?, NULL, ?)
+     ON CONFLICT(tenant_id, subject_id) DO UPDATE SET given_at = excluded.given_at, withdrawn_at = NULL`,
+    tenantId, subjectId, at, byAccount,
+  );
+}
+
+export const needsExplicitConsent = (spec: {
+  readonly holding: { readonly kind: string; readonly condition?: string };
+  readonly scope: { readonly of: string };
+}): boolean =>
+  spec.holding.kind === "personal" && spec.holding.condition === "explicit_consent" && spec.scope.of === "subject";

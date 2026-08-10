@@ -21,6 +21,7 @@ import {
   liveClause, s, tableNameFor, transition, type DocState,
 } from "@one/kernel";
 import { mediaRefused } from "./files.js";
+import { consentOf, needsExplicitConsent } from "./reference-ops.js";
 
 /* ---------------------------------------------------------------- shapes --- */
 
@@ -328,6 +329,29 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
       const named = spec.scope.of === "subject" ? (input[spec.scope.subject] as string | undefined) : undefined;
       const owner = subjectId ?? named;
       if (spec.scope.of === "subject" && !owner) ctx.fail("platform.invalid", { field: spec.scope.subject });
+
+      /*
+        ⚠️ ARTICLE 9 CONSENT, CHECKED WHERE THE ROW IS ACTUALLY WRITTEN.
+
+        Fifteen of Kova's collections declared `condition: "explicit_consent"`
+        and nothing anywhere collected any — the manifest asserted a legal basis
+        the product did not have, which is worse than declaring the wrong one
+        because it reads as diligence.
+
+        ⚠️ AND IT IS DERIVED FROM THE DECLARATION RATHER THAN LISTED. Adding a
+        collection that holds a special category about a subject is the whole of
+        what it takes to bring it under this rule; there is no list to forget.
+        Special-category processing is PROHIBITED without a condition, so this
+        refuses rather than shapes.
+      */
+      if (owner && needsExplicitConsent(spec)) {
+        const held = await consentOf(db, tenantId, owner);
+        if (!held.given) {
+          ctx.fail("platform.consent_required", {
+            documents: `explicit consent from this ${spec.scope.of === "subject" ? spec.scope.subject : "person"}`,
+          });
+        }
+      }
       const owned = spec.scope.of === "subject" ? [subjectColumn(spec)] : [];
       const system = ["id", "version", "created_at", "updated_at", ...(spec.scope.of === "platform" ? [] : ["tenant_id"]), ...owned];
       const systemValues = [id, 1, at, at, ...(spec.scope.of === "platform" ? [] : [tenantId]), ...(owned.length ? [owner!] : [])];

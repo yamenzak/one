@@ -1313,7 +1313,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           ⚠️ THE ROLE TRAVELS, because which documents somebody must accept
           depends on what they are acting as here rather than on who they are.
         */
-        [REFERENCE]: { directory: directoryDb, session, role: personRole },
+        [REFERENCE]: { directory: directoryDb, regional: regionalDb, tenantId: at.tenant?.tenantId ?? "", session, role: personRole },
         [SETTINGS]: {
           db: regionalDb,
           /* ⚠️ The branding copy and the domain claims are looked up before a

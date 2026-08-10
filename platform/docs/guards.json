@@ -3199,6 +3199,42 @@
       "impl": "kernel/test/app.test.ts",
       "proves": "does not exempt the product's own lanes",
       "fails": "an exemption list that grew until it covered the writes that actually collect data, leaving a gate that refuses nothing anybody does"
+    },
+    {
+      "id": "special-category-needs-explicit-consent",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/telling.test.ts",
+      "proves": "refuses a health write for somebody who has not consented",
+      "fails": "fifteen collections declaring condition: explicit_consent while nothing anywhere collected any — a manifest asserting a legal basis the product did not have, which is worse than declaring the wrong one because it reads as diligence"
+    },
+    {
+      "id": "consent-can-be-withdrawn",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/telling.test.ts",
+      "proves": "stops accepting new records the moment it is withdrawn",
+      "fails": "a basis that cannot be withdrawn, which is not consent but a different basis wearing the word — Article 7(3) requires withdrawing to be as easy as giving"
+    },
+    {
+      "id": "a-withdrawal-keeps-the-evidence",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/telling.test.ts",
+      "proves": "keeps the record of when it was given as well as when it went",
+      "fails": "deleting the row on withdrawal, which destroys exactly the evidence needed to show the processing that already happened was lawful"
+    },
+    {
+      "id": "self-registration-records-its-own-consent",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/telling.test.ts",
+      "proves": "is already held for somebody who added themselves",
+      "fails": "a self-registered person on the roster whose every log, measurement and check-in is refused, with no screen anywhere explaining why"
     }
   ]
 }

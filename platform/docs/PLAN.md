@@ -1200,6 +1200,10 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-consent-gate-never-withholds-reads` | somebody's own records withheld because they have not clicked anything — punitive, helps nobody, and not what Articles 13 and 14 ask for, which is about the moment of collection | **live** |
 | `agreeing-does-not-require-having-agreed` | a gate that refuses the acceptance itself, or the sign-in that reaches the document, or the exit a person who declines needs — each of which makes the product unusable rather than compliant | **live** |
 | `the-product-s-own-lanes-are-not-exempt` | an exemption list that grew until it covered the writes that actually collect data, leaving a gate that refuses nothing anybody does | **live** |
+| `special-category-needs-explicit-consent` | fifteen collections declaring condition: explicit_consent while nothing anywhere collected any — a manifest asserting a legal basis the product did not have, which is worse than declaring the wrong one because it reads as diligence | **live** |
+| `consent-can-be-withdrawn` | a basis that cannot be withdrawn, which is not consent but a different basis wearing the word — Article 7(3) requires withdrawing to be as easy as giving | **live** |
+| `a-withdrawal-keeps-the-evidence` | deleting the row on withdrawal, which destroys exactly the evidence needed to show the processing that already happened was lawful | **live** |
+| `self-registration-records-its-own-consent` | a self-registered person on the roster whose every log, measurement and check-in is refused, with no screen anywhere explaining why | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

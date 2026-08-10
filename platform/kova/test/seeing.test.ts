@@ -398,6 +398,7 @@ describe("somebody's month, read back", () => {
   it("summarises from figures this workspace actually holds", async () => {
     provider.answer = { output: "Nine sessions in four weeks, steady." };
     const person = await coach.call("/api/client.create", { name: "Wren Adeyemi" });
+    await coach.call("/api/consent.record", { subject: person.body.id });
     expect(person.status, "the roster fixture must not have hit the client quota").toBe(200);
 
     const out = await coach.call("/api/ai.client-summary", { clientId: person.body.id as unknown as string });
@@ -413,6 +414,7 @@ describe("somebody's month, read back", () => {
   it("gives the model counts and not the person", async () => {
     provider.answer = { output: "steady" };
     const person = await coach.call("/api/client.create", { name: "Idris Mbeki" });
+    await coach.call("/api/consent.record", { subject: person.body.id });
     expect(person.status, "the roster fixture must not have hit the client quota").toBe(200);
     await coach.call("/api/ai.client-summary", { clientId: person.body.id as unknown as string });
 

@@ -38,6 +38,7 @@ beforeAll(async () => {
   await post(SETUP, "/api/identity.workspace.create", { slug: "westgate" }, staff);
   coach = await signIn("westgate@example.test", STUDIO);
   clientId = (await call("/api/client.create", { name: "Ro" })).body.id as unknown as string;
+  await call("/api/consent.record", { subject: clientId });
 });
 
 /* ------------------------------------------------------------- the words --- */

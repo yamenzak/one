@@ -129,6 +129,7 @@ describe("putting a workspace on a plan without a payment", () => {
   it("gives them what that plan includes", async () => {
     for (let i = 0; i < 5; i++) {
       const made = await coach("/api/client.create", { name: `Person ${i}` });
+      await coach("/api/consent.record", { subject: made.body.id });
       expect(made.status, `client ${i} must fit under the comped plan`).toBe(200);
     }
   });
@@ -287,6 +288,7 @@ describe("closing the deployment", () => {
 
     expect((await coach("/api/client.list")).status).toBe(200);
     const refused = await coach("/api/client.create", { name: "Not now" });
+    await coach("/api/consent.record", { subject: refused.body.id });
     expect(refused.status).toBe(503);
     expect(refused.body).toMatchObject({ code: "platform.maintenance" });
   });

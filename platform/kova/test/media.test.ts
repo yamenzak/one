@@ -177,6 +177,7 @@ describe("giving a client a face", () => {
 
   it("keeps the photograph on the record, and hands it back on the read", async () => {
     const made = await coach.call("/api/client.create", { name: "Ro Adeyemi", avatar: face });
+    await coach.call("/api/consent.record", { subject: made.body.id });
     expect(made.status, "the roster fixture must not have hit the client quota").toBe(200);
     ro = made.body.id as unknown as string;
     const back = await coach.call(`/api/client.read?id=${ro}`);
@@ -195,12 +196,15 @@ describe("giving a client a face", () => {
     film = uploaded.body.id as unknown as string;
 
     const refused = await coach.call("/api/client.create", { name: "Not a film", avatar: film });
+
+    await coach.call("/api/consent.record", { subject: refused.body.id });
     expect(refused.status).toBe(400);
     expect(refused.body.fields ?? refused.body.meta).toMatchObject({ field: "avatar" });
   });
 
   it("refuses a file that is not there at all", async () => {
     const refused = await coach.call("/api/client.create", { name: "Ghost", avatar: "med_nothing" });
+    await coach.call("/api/consent.record", { subject: refused.body.id });
     expect(refused.status).toBe(400);
   });
 
@@ -225,6 +229,7 @@ describe("giving a client a face", () => {
   */
   it("lets a photograph be taken back off", async () => {
     const made = await coach.call("/api/client.create", { name: "Bea Halloran", avatar: face });
+    await coach.call("/api/consent.record", { subject: made.body.id });
     expect(made.status).toBe(200);
     bea = made.body.id as unknown as string;
     const cleared = await coach.call("/api/client.update", { id: bea, version: 1, changes: { avatar: "" } });

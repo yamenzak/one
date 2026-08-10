@@ -69,6 +69,8 @@ beforeAll(async () => {
   coach = as(coachCookie);
 
   const person = await coach.call("/api/client.create", { name: "Ro Adeyemi" });
+
+  await coach.call("/api/consent.record", { subject: person.body.id });
   expect(person.status, "the roster fixture must not have hit the client quota").toBe(200);
   ro = person.body.id as unknown as string;
 
@@ -131,6 +133,7 @@ describe("a fast, while it is running", () => {
 
   it("is the client's own, and not another client's", async () => {
     const other = await coach.call("/api/client.create", { name: "Sam Okonkwo" });
+    await coach.call("/api/consent.record", { subject: other.body.id });
     expect(other.status, "the roster fixture must not have hit the client quota").toBe(200);
     await coach.call("/api/fast.create", {
       client: other.body.id as unknown as string, startedAt: new Date().toISOString(),

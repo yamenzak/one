@@ -69,6 +69,8 @@ beforeAll(async () => {
   coach = as(coachCookie);
 
   const made = await coach.call("/api/client.create", { name: "Ro Adeyemi" });
+
+  await coach.call("/api/consent.record", { subject: made.body.id });
   expect(made.status, "the roster fixture must not have hit the client quota").toBe(200);
   ro = made.body.id as unknown as string;
 
@@ -145,6 +147,7 @@ describe("prescribing something", () => {
   */
   it("is withheld from a client whose package does not include eating", async () => {
     const other = await coach.call("/api/client.create", { name: "Tam Okonjo" });
+    await coach.call("/api/consent.record", { subject: other.body.id });
     expect(other.status).toBe(200);
     await coach.call("/api/member.invite", { email: "tam@wensleydale.example.test", role: "client", subjectId: other.body.id });
     const them = as(await signIn("tam@wensleydale.example.test", STUDIO));

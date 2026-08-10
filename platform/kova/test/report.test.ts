@@ -59,14 +59,18 @@ beforeAll(async () => {
   cookie = await signIn("calder@example.test", STUDIO);
 
   ro = (await call("/api/client.create", { name: "Ro" })).body.id as unknown as string;
+
+  await call("/api/consent.record", { subject: ro });
   /* Somebody with nothing at all: no programme, no entries, no food. */
   bare = (await call("/api/client.create", { name: "Bare" })).body.id as unknown as string;
+  await call("/api/consent.record", { subject: bare });
   /*
     ⚠️ AND SOMEBODY WITH THE FORMS BUT NOT THE CONTENT — a published programme
     with no days in it and a goal with nothing weighed against it. Both are the
     cases where a report is tempted to answer zero, and zero is an accusation.
   */
   plain = (await call("/api/client.create", { name: "Plain" })).body.id as unknown as string;
+  await call("/api/consent.record", { subject: plain });
   const hollow = await call("/api/programme.create", {
     title: "Nothing in it", kind: "training", client: plain, weeks: [],
   });

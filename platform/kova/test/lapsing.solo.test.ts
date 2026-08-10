@@ -80,6 +80,8 @@ beforeAll(async () => {
   coach = as(await signIn(`${SLUG}@example.test`, STUDIO));
 
   ro = (await coach("/api/client.create", { name: "Ro" })).body.id as unknown as string;
+
+  await coach("/api/consent.record", { subject: ro });
   await coach("/api/member.invite", { email: `ro@${SLUG}.example.test`, role: "client", subjectId: ro });
   client = as(await signIn(`ro@${SLUG}.example.test`, STUDIO));
 
@@ -174,6 +176,7 @@ describe("the sweep", () => {
   */
   it("leaves alone somebody who never held anything", async () => {
     const never = (await coach("/api/client.create", { name: "Never bought" })).body.id as unknown as string;
+    await coach("/api/consent.record", { subject: never });
     expect((await coach("/api/commerce.override", { subjectId: never, changes: { training: true } })).status).toBe(200);
 
     await sweep();
@@ -216,6 +219,7 @@ describe("the sweep", () => {
   */
   it("lands somebody at the furthest rung rather than the next one", async () => {
     const long = (await coach("/api/client.create", { name: "Long gone" })).body.id as unknown as string;
+    await coach("/api/consent.record", { subject: long });
     await coach("/api/commerce.grant", { subjectId: long, packageId: "month" });
     await lapsedSince(long, daysAgo(400));
 
@@ -231,6 +235,7 @@ describe("the sweep", () => {
   */
   it("does nothing at all while the studio is itself past due", async () => {
     const making = await coach("/api/client.create", { name: "Held" });
+    await coach("/api/consent.record", { subject: making.body.id });
     expect(making.status, "the roster fixture must not have hit the client quota").toBe(200);
     const held = making.body.id as unknown as string;
     await coach("/api/commerce.grant", { subjectId: held, packageId: "month" });
@@ -260,6 +265,7 @@ describe("a code tops access up", () => {
 
   beforeAll(async () => {
     topped = (await coach("/api/client.create", { name: "Topped" })).body.id as unknown as string;
+    await coach("/api/consent.record", { subject: topped });
   });
 
   it("refuses a scope nothing is gated on", async () => {
