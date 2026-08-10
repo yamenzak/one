@@ -329,7 +329,7 @@
       "persona": "trainer",
       "area": "nutrition",
       "outcome": "Build a library of foods with the numbers this studio trusts",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "food-barcode",
@@ -350,21 +350,21 @@
       "persona": "client",
       "area": "nutrition",
       "outcome": "Enter a food nobody has entered yet, once, and reuse it",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "food-recent",
       "persona": "client",
       "area": "nutrition",
       "outcome": "Reach the things they eat often without searching each time",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "meal-plan-build",
       "persona": "trainer",
       "area": "nutrition",
       "outcome": "Write a meal plan: days, meals, options, portions",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "meal-plan-arrangements",
@@ -378,7 +378,7 @@
       "persona": "client",
       "area": "nutrition",
       "outcome": "See what they are meant to eat today and tick it off",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "meal-option-swap",
@@ -392,28 +392,28 @@
       "persona": "client",
       "area": "nutrition",
       "outcome": "Record what they actually ate, by meal, with portions",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "food-log-edit",
       "persona": "client",
       "area": "nutrition",
       "outcome": "Correct something they logged wrongly",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "macro-breakdown",
       "persona": "client",
       "area": "nutrition",
       "outcome": "See how a day adds up against their targets",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "nutrition-week",
       "persona": "client",
       "area": "nutrition",
       "outcome": "See a week of eating rather than one day at a time",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "nutrition-report",

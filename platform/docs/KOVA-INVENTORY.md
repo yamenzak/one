@@ -134,19 +134,19 @@ without one.
 | | **nutrition** | | |
 | `[ ]` | `fasting-timer` | client | Run a fast and see which phase they are in |
 | `[ ]` | `food-barcode` | client | Scan a barcode and get the food rather than typing it |
-| `[ ]` | `food-create` | client | Enter a food nobody has entered yet, once, and reuse it |
-| `[ ]` | `food-library` | trainer | Build a library of foods with the numbers this studio trusts |
-| `[ ]` | `food-log` | client | Record what they actually ate, by meal, with portions |
-| `[ ]` | `food-log-edit` | client | Correct something they logged wrongly |
-| `[ ]` | `food-recent` | client | Reach the things they eat often without searching each time |
+| `[x]` | `food-create` | client | Enter a food nobody has entered yet, once, and reuse it |
+| `[x]` | `food-library` | trainer | Build a library of foods with the numbers this studio trusts |
+| `[x]` | `food-log` | client | Record what they actually ate, by meal, with portions |
+| `[x]` | `food-log-edit` | client | Correct something they logged wrongly |
+| `[x]` | `food-recent` | client | Reach the things they eat often without searching each time |
 | `[ ]` | `food-search-external` | client | Find a food in a public database when the studio has not entered it |
-| `[ ]` | `macro-breakdown` | client | See how a day adds up against their targets |
+| `[x]` | `macro-breakdown` | client | See how a day adds up against their targets |
 | `[ ]` | `meal-option-swap` | client | Choose a different option within a meal their coach allowed |
 | `[ ]` | `meal-plan-arrangements` | trainer | Offer alternatives within a meal so a plan survives real life |
-| `[ ]` | `meal-plan-build` | trainer | Write a meal plan: days, meals, options, portions |
-| `[ ]` | `meal-plan-follow` | client | See what they are meant to eat today and tick it off |
+| `[x]` | `meal-plan-build` | trainer | Write a meal plan: days, meals, options, portions |
+| `[x]` | `meal-plan-follow` | client | See what they are meant to eat today and tick it off |
 | `[ ]` | `nutrition-report` | trainer | See how a client has been eating, over time, without reading every entry |
-| `[ ]` | `nutrition-week` | client | See a week of eating rather than one day at a time |
+| `[x]` | `nutrition-week` | client | See a week of eating rather than one day at a time |
 | | **operator** | | |
 | `[ ]` | `op-adjust` | operator | Adjust one studio's ceilings without editing the plan everybody is on |
 | `[ ]` | `op-ai` | operator | Choose which models are on, and what they cost |

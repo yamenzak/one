@@ -1336,6 +1336,51 @@
       "impl": "runtime/test/collection.test.ts",
       "proves": "ignores a subject in the body when the caller has one of their own",
       "fails": "one customer writing a row into another's history by naming them in the body \u2014 the row scope narrowed on read and not on write"
+    },
+    {
+      "id": "energy-is-derived",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/nutrition.test.ts",
+      "proves": "uses Atwater's factors",
+      "fails": "a food row carrying both an energy figure and the macros it comes from \u2014 two numbers that disagree the moment anybody edits one, producing a diary whose totals do not match the sum of its rows"
+    },
+    {
+      "id": "portion-uses-its-own-basis",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/nutrition.test.ts",
+      "proves": "scales from a per-item basis",
+      "fails": "a portion scaled as though every food were declared per 100 \u2014 which is how a product tells somebody one egg was 620 calories"
+    },
+    {
+      "id": "over-is-visible",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/nutrition.test.ts",
+      "proves": "says how far over, while the bar stays full",
+      "fails": "an overage clamped away by the same number that draws the bar, so somebody 300 calories over is told they are exactly on target"
+    },
+    {
+      "id": "week-counts-recorded-days",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/nutrition.test.ts",
+      "proves": "ignores the days with nothing in them",
+      "fails": "a weekly average divided by seven rather than by the days with entries \u2014 turning three carefully logged days into an alarming number produced by mistaking silence for abstinence"
+    },
+    {
+      "id": "publish-per-kind",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/nutrition.e2e.test.ts",
+      "proves": "keeps both current, and stands down only the same kind",
+      "fails": "publishing a way of training removing somebody's way of eating \u2014 a data loss they discover in a supermarket"
     }
   ]
 }

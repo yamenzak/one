@@ -84,7 +84,7 @@ describe("a coach writes a programme and somebody follows it", () => {
   */
   it("writes it as a template first, and refuses to publish that", async () => {
     const template = await call("/api/programme.create", {
-      title: "Base — 4 weeks", weeks: [{ days: [{ items: [{ movement: movementId, sets: 5, reps: 5 }] }] }],
+      title: "Base — 4 weeks", kind: "training", weeks: [{ days: [{ items: [{ movement: movementId, sets: 5, reps: 5 }] }] }],
     });
     expect(template.status).toBe(200);
 
@@ -96,6 +96,7 @@ describe("a coach writes a programme and somebody follows it", () => {
   it("addresses one to somebody and publishes it", async () => {
     const made = await call("/api/programme.create", {
       title: "Marion — block 1",
+      kind: "training",
       client: clientId,
       weeks: [{ days: [{ items: [{ movement: movementId, sets: 5, reps: 5 }] }] }],
     });
@@ -115,7 +116,7 @@ describe("a coach writes a programme and somebody follows it", () => {
   */
   it("stands the previous one down when a second is published", async () => {
     const second = await call("/api/programme.create", {
-      title: "Marion — block 2", client: clientId, weeks: [{ days: [] }],
+      title: "Marion — block 2", kind: "training", client: clientId, weeks: [{ days: [] }],
     });
     expect((await call("/api/programme.publish", { programmeId: second.body.id as unknown as string })).status).toBe(200);
 

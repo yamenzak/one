@@ -1860,3 +1860,44 @@ the person being coached is not a product.
 The discriminator is declared rather than a list of directory names: **an app is
 a package with a `src/manifest.ts`**, which is precisely what makes one on this
 platform. Every other check still applies to it.
+
+## 153. Energy is derived, because a food that stores both disagrees with itself
+
+A food row carrying `calories` AND its macros holds two numbers that part company
+the moment anybody edits one — and every product that stores both ends up with a
+diary whose totals do not match the sum of its rows. There is nothing to
+reconcile if there is nothing to disagree with, so there is no `calories` field
+and `energyOf` is arithmetic over the only numbers anybody actually measured.
+
+Fibre counts at two rather than four, taken out of the carbohydrate it is part
+of: it is a carbohydrate by measurement and mostly not absorbed, and counting it
+at four overstates every high-fibre day for somebody who is acting on the number.
+
+## 154. The basis is a field, or one egg is 620 calories
+
+A tin declares its numbers per 100 g and an egg declares them per egg. Assuming
+100 everywhere is a single constant that produces a wrong answer for a whole
+class of food, and the wrongness scales with how small the item is.
+
+## 155. Two fields, because one number cannot say both things
+
+"You are 300 over" and "draw the bar full" are different questions. A single
+value clamped for the bar tells somebody they are exactly on target while they
+are not; unclamped, it draws a bar 140% long. `left` is signed and `filled` is
+clamped, and they are separate because they answer separately.
+
+## 156. A weekly average divides by the days somebody recorded, not by seven
+
+Dividing by seven turns "I logged three days carefully" into "you ate 800
+calories a day" — wrong, alarming, and produced by a product that mistook silence
+for abstinence. The count travels with the average so a reader can see what it is
+worth.
+
+## 157. One current thing per KIND, not per person
+
+A person follows a way of training and a way of eating at the same time, so "the
+current programme" is a question with two answers. Standing down every programme
+on publish would take somebody's eating away for publishing their training — a
+data loss they would discover in a supermarket. The mutation that removed the
+`kind` predicate was caught, which is the only reason to write it that way rather
+than to remember it.

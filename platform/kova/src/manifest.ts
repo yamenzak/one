@@ -137,6 +137,14 @@ export const programmes = collection({
   search: ["title"],
   fields: {
     title: field.text({ required: true, min: 1, max: 160 }),
+    /*
+      ⚠️ TWO KINDS, ONE COLLECTION, AND ONE OF EACH IS CURRENT AT A TIME. A
+      person follows a way of training AND a way of eating simultaneously, so
+      "the current one" is a question with two answers — which is why `publish`
+      stands down only the same kind, and why this is a field rather than a
+      second collection with the same four columns.
+    */
+    kind: field.enum(["training", "eating"], { required: true }),
     /** Absent = a template. Present = somebody is following this. */
     client: field.ref("client", { onDelete: "cascade" }),
     /*
@@ -203,6 +211,68 @@ export const sets = collection({
     reps: field.number({ integer: true, min: 0, max: 1_000 }),
     /** How hard it felt. The one number that makes a log worth reading later. */
     effort: field.number({ integer: true, min: 1, max: 10, label: "Effort" }),
+  },
+});
+
+/* ------------------------------------------------------------- nutrition --- */
+
+/**
+ * A food, and the one number it does NOT carry.
+ *
+ * ⚠️ THERE IS NO `calories` FIELD. A row holding both an energy figure and the
+ * macros it is computed from holds two numbers that disagree the moment anybody
+ * edits one — and every product that stores both ends up with a diary whose
+ * totals do not match the sum of its rows. Energy is derived, in
+ * `nutrition.ts`, from the only numbers anybody actually measured.
+ *
+ * ⚠️ AND THE BASIS IS A FIELD. A tin declares its numbers per 100 g and an egg
+ * declares them per egg; assuming 100 everywhere is how a product tells somebody
+ * one egg was 620 calories.
+ */
+export const foods = collection({
+  id: "food",
+  label: { one: "Food", many: "Foods" },
+  scope: { of: "tenant" },
+  version: true,
+  retention: { days: null, onTenantClose: "purge" },
+  onDelete: { on: "archive" },
+  activity: true,
+  search: ["name", "brand"],
+  fields: {
+    name: field.text({ required: true, min: 1, max: 160 }),
+    brand: field.text({ max: 120 }),
+    /** What the numbers below are per: 100 grams, or one of something. */
+    per: field.number({ required: true, min: 0.001, label: "Numbers are per" }),
+    unit: field.enum(["g", "ml", "item"], { required: true }),
+    protein: field.number({ required: true, min: 0 }),
+    carbs: field.number({ required: true, min: 0 }),
+    fat: field.number({ required: true, min: 0 }),
+    fibre: field.number({ min: 0 }),
+    barcode: field.text({ max: 32 }),
+  },
+});
+
+/**
+ * A portion of a food, at a meal, on a day.
+ *
+ * ⚠️ ROWS, FOR THE SAME REASON A SET IS. "What do I eat most often" and "what
+ * did I have this week" are both queried ACROSS records — so a day's eating is
+ * not a JSON blob on a diary row, however tempting the symmetry with a
+ * programme's body looks.
+ */
+export const portions = collection({
+  id: "portion",
+  label: { one: "Portion", many: "Portions" },
+  scope: { of: "subject", subject: "client" },
+  version: true,
+  retention: { days: null, onTenantClose: "export-then-purge" },
+  onDelete: { on: "purge" },
+  fields: {
+    day: field.plainDate({ required: true, label: "Day" }),
+    meal: field.enum(["breakfast", "lunch", "dinner", "snack"], { required: true }),
+    food: field.ref("food", { onDelete: "restrict", required: true }),
+    /** In the food's own unit. A portion of an egg is 2, not 120. */
+    amount: field.number({ required: true, min: 0 }),
   },
 });
 
@@ -274,8 +344,8 @@ export const publish = operation<
   fails: ["platform.not_found", "coaching.programme_has_no_client"],
   help: "programmes" as never,
   async handler(ctx, input: { programmeId: string }) {
-    const row = await ctx.bind.db.first<{ id: string; client: string | null }>(
-      `SELECT id, client FROM programmes WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
+    const row = await ctx.bind.db.first<{ id: string; client: string | null; kind: string }>(
+      `SELECT id, client, kind FROM programmes WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
       input.programmeId, ctx.tenantId,
     );
     if (!row) ctx.fail("platform.not_found", { field: "programmeId" });
@@ -286,10 +356,15 @@ export const publish = operation<
     */
     if (!row!.client) ctx.fail("coaching.programme_has_no_client");
 
-    /* One current plan per person: the previous one steps down in the same breath. */
+    /*
+      ⚠️ THE PREVIOUS ONE OF THE SAME KIND STEPS DOWN, AND ONLY THAT ONE.
+      Standing down every programme would take somebody's eating off them for
+      publishing their training, which is a data loss they would discover in a
+      supermarket.
+    */
     await ctx.bind.db.run(
-      `UPDATE programmes SET active = 0 WHERE tenant_id = ? AND client = ?`,
-      ctx.tenantId, row!.client,
+      `UPDATE programmes SET active = 0 WHERE tenant_id = ? AND client = ? AND kind = ?`,
+      ctx.tenantId, row!.client, row!.kind,
     );
     await ctx.bind.db.run(`UPDATE programmes SET active = 1, updated_at = ? WHERE id = ?`, ctx.now(), row!.id);
     return { published: row!.id };
@@ -329,6 +404,7 @@ export const complete = operation<Bindings, { workoutId: string }, { completed: 
 const STAFF = [
   "client:read", "client:write", "movement:read", "movement:write", "programme:read", "programme:write",
   "workout:read", "workout:write", "set:read", "set:write", "entry:read", "entry:write",
+  "food:read", "food:write", "portion:read", "portion:write",
   "inbox:read", "file:read", "file:write", "guide:read", "milestone:read", "commerce:read",
 ];
 
@@ -336,7 +412,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.1.0",
+  manifestVersion: "0.2.0",
   bindings,
 
   identity: {
@@ -382,7 +458,7 @@ export const kova = defineApp({
       */
       client: [
         "programme:read", "movement:read", "workout:read", "workout:write", "set:read", "set:write",
-        "entry:read", "entry:write",
+        "entry:read", "entry:write", "food:read", "portion:read", "portion:write",
         "inbox:read", "guide:read", "milestone:read", "file:read", "commerce:read",
       ],
     },
@@ -446,7 +522,7 @@ export const kova = defineApp({
     auditRetentionDays: 730,
   },
 
-  collections: [clients, movements, programmes, workouts, sets, entries],
+  collections: [clients, movements, programmes, workouts, sets, foods, portions, entries],
 
   notifications: {
     "workspace.created": {
@@ -506,6 +582,17 @@ export const kova = defineApp({
       body: "A workout is one visit. Add the sets as you go, then finish it. Once a workout is finished it stops being editable — that is the point of it, because a training history you can quietly change is not a history. If something was wrong, amend it and both versions stay.",
       surfaces: ["workout", "set"],
     },
+    foods: {
+      title: "Building a food library",
+      body: "A food carries what somebody measured: protein, carbohydrate, fat and fibre, and what those numbers are per. Energy is worked out from them rather than stored, so a food can never say one thing and add up to another. A tin is per 100 grams; an egg is per egg.",
+      steps: ["Open Foods", "Add", "Copy the numbers off the label", "Say what they are per"],
+      surfaces: ["food"],
+    },
+    portions: {
+      title: "Logging what you ate",
+      body: "Pick the food, say how much, and say which meal it was. The amount is in the food's own unit — two eggs is two, not a hundred and twenty grams. The day's totals come from the portions themselves, so correcting one corrects the day.",
+      surfaces: ["portion"],
+    },
     entries: {
       title: "Keeping track of yourself",
       body: "Weight, sleep, mood, water, steps and your measurements all live in one place, recorded against the day they happened. The day is yours, from your own device, so an evening entry is not tomorrow.",
@@ -529,6 +616,7 @@ export const kova = defineApp({
     steps: [
       { id: "take-payments", title: "Connect a payment provider", roles: ["owner"], setup: "deployment", required: true, answer: { kind: "platform", fact: "payments_configured" } },
       { id: "choose-plan", title: "Choose a plan", roles: ["owner"], setup: "workspace", required: true, answer: { kind: "platform", fact: "plan_chosen" } },
+      { id: "first-food", title: "Add the foods you prescribe", roles: ["owner", "trainer"], setup: "workspace", required: false, answer: { kind: "collection", collection: "food", atLeast: 1 }, does: "food.create", help: "foods" as never },
       { id: "first-movement", title: "Add the movements you use", roles: ["owner", "trainer"], setup: "workspace", required: true, answer: { kind: "collection", collection: "movement", atLeast: 1 }, does: "movement.create", help: "movements" },
       { id: "first-client", title: "Add somebody you coach", roles: ["owner", "trainer"], setup: "workspace", required: false, answer: { kind: "collection", collection: "client", atLeast: 1 }, does: "client.create", help: "clients" },
       { id: "a-passkey", title: "Add a passkey so you can sign in with a tap", roles: ["owner", "trainer", "assistant", "client"], setup: "person", required: false, answer: { kind: "platform", fact: "passkey_registered" } },
@@ -573,6 +661,15 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.2.0",
+      at: "2026-08-10",
+      notes: [
+        "Build a library of foods, and log what you actually ate.",
+        "A food's energy is worked out from what was measured, so it can never disagree with itself.",
+        "Write a way of eating alongside a way of training — publishing one no longer takes the other away.",
+      ],
+    },
     {
       version: "0.1.0",
       at: "2026-08-10",
