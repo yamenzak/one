@@ -781,7 +781,7 @@ export const assignments = collection({
         screen that lists who is coaching whom.
       */
       const held = await db.all<{ id: string }>(
-        `SELECT id FROM ${table} WHERE tenant_id = ? AND client_id = ? AND coach = ?`,
+        `SELECT id FROM ${table} WHERE tenant_id = ? AND client_id = ? AND coach = ? LIMIT 50`,
         tenantId, client, coach,
       );
       return !held.some((h) => h.id !== id);
@@ -852,7 +852,7 @@ export const bookings = collection({
       */
       const clashes = await db.all<{ id: string; starts_at: string; minutes: number }>(
         `SELECT id, starts_at, minutes FROM ${table}
-         WHERE tenant_id = ? AND coach = ? AND state IN ('booked', 'attended') AND deleted_at IS NULL`,
+         WHERE tenant_id = ? AND coach = ? AND state IN ('booked', 'attended') AND deleted_at IS NULL LIMIT 200`,
         tenantId, coach,
       );
       return !clashes.some((c) => {
@@ -1081,13 +1081,13 @@ export const attention = operation<Bindings, Record<string, never>, { rows: unkn
       slower exactly as a studio succeeds.
     */
     const quiet = await ctx.bind.db.all<{ client_id: string; last: string }>(
-      `SELECT client_id, MAX(day) AS last FROM ${T.workouts} WHERE tenant_id = ? AND deleted_at IS NULL GROUP BY client_id`,
+      `SELECT client_id, MAX(day) AS last FROM ${T.workouts} WHERE tenant_id = ? AND deleted_at IS NULL GROUP BY client_id LIMIT 2000`,
       ctx.tenantId,
     );
     const waiting = await ctx.bind.db.all<{ client_id: string; oldest: string }>(
       `SELECT client_id, MIN(until) AS oldest FROM ${T.checkins}
        WHERE tenant_id = ? AND deleted_at IS NULL AND docstatus = 1 AND (answer IS NULL OR answer = '')
-       GROUP BY client_id`,
+       GROUP BY client_id LIMIT 2000`,
       ctx.tenantId,
     );
 
@@ -1099,7 +1099,7 @@ export const attention = operation<Bindings, Record<string, never>, { rows: unkn
     */
     const due = await ctx.bind.db.all<{ client_id: string; kind: string; start: number; target: number; due_on: string }>(
       `SELECT client_id, kind, start, target, due_on FROM ${T.goals}
-       WHERE tenant_id = ? AND deleted_at IS NULL AND due_on IS NOT NULL AND due_on < ?`,
+       WHERE tenant_id = ? AND deleted_at IS NULL AND due_on IS NOT NULL AND due_on < ? LIMIT 2000`,
       ctx.tenantId, today,
     );
     const latest = due.length === 0 ? [] : await ctx.bind.db.all<{ client_id: string; kind: string; value: number }>(
@@ -1107,7 +1107,7 @@ export const attention = operation<Bindings, Record<string, never>, { rows: unkn
        JOIN (SELECT client_id, kind, MAX(day) AS day FROM ${T.entries}
              WHERE tenant_id = ? AND deleted_at IS NULL GROUP BY client_id, kind) newest
          ON newest.client_id = e.client_id AND newest.kind = e.kind AND newest.day = e.day
-       WHERE e.tenant_id = ? AND e.deleted_at IS NULL`,
+       WHERE e.tenant_id = ? AND e.deleted_at IS NULL LIMIT 2000`,
       ctx.tenantId, ctx.tenantId,
     );
 
@@ -1227,14 +1227,14 @@ export const report = operation<
        JOIN (SELECT kind, MAX(day) AS day FROM ${T.entries}
              WHERE tenant_id = ? AND client_id = ? AND deleted_at IS NULL GROUP BY kind) newest
          ON newest.kind = e.kind AND newest.day = e.day
-       WHERE e.tenant_id = ? AND e.client_id = ? AND e.deleted_at IS NULL`,
+       WHERE e.tenant_id = ? AND e.client_id = ? AND e.deleted_at IS NULL LIMIT 100`,
       ctx.tenantId, input.clientId, ctx.tenantId, input.clientId,
     );
     const latest = new Map(readings.map((r) => [r.kind, r]));
 
     const goalRows = await ctx.bind.db.all<{ id: string; kind: string; start: number; target: number; due_on: string | null; why: string | null }>(
       `SELECT id, kind, start, target, due_on, why FROM ${T.goals}
-       WHERE tenant_id = ? AND client_id = ? AND deleted_at IS NULL`,
+       WHERE tenant_id = ? AND client_id = ? AND deleted_at IS NULL LIMIT 100`,
       ctx.tenantId, input.clientId,
     );
 
@@ -1242,7 +1242,7 @@ export const report = operation<
 
     const done = await ctx.bind.db.all<{ id: string; day: string }>(
       `SELECT id, day FROM ${T.workouts}
-       WHERE tenant_id = ? AND client_id = ? AND deleted_at IS NULL AND docstatus = 1 AND day >= ? AND day <= ?`,
+       WHERE tenant_id = ? AND client_id = ? AND deleted_at IS NULL AND docstatus = 1 AND day >= ? AND day <= ? LIMIT 400`,
       ctx.tenantId, input.clientId, since, until,
     );
 
@@ -1265,7 +1265,7 @@ export const report = operation<
     const lifted = await ctx.bind.db.all<{ movement: string; name: string | null; load: number | null; reps: number | null }>(
       `SELECT s.movement AS movement, m.name AS name, s.load AS load, s.reps AS reps
        FROM ${T.sets} s LEFT JOIN ${T.movements} m ON m.id = s.movement
-       WHERE s.tenant_id = ? AND s.client_id = ?`,
+       WHERE s.tenant_id = ? AND s.client_id = ? LIMIT 5000`,
       ctx.tenantId, input.clientId,
     );
     const byMovement = new Map<string, { name: string | null; sets: { load: number; reps: number }[] }>();
@@ -1284,7 +1284,7 @@ export const report = operation<
     const eaten = await ctx.bind.db.all<{ day: string; amount: number; per: number; protein: number; carbs: number; fat: number; fibre: number | null }>(
       `SELECT p.day AS day, p.amount AS amount, f.per AS per, f.protein AS protein, f.carbs AS carbs, f.fat AS fat, f.fibre AS fibre
        FROM ${T.portions} p JOIN ${T.foods} f ON f.id = p.food
-       WHERE p.tenant_id = ? AND p.client_id = ? AND p.day >= ? AND p.day <= ?`,
+       WHERE p.tenant_id = ? AND p.client_id = ? AND p.day >= ? AND p.day <= ? LIMIT 2000`,
       ctx.tenantId, input.clientId, since, until,
     );
     const perDay = new Map<string, Macros[]>();
@@ -1759,7 +1759,7 @@ export const wellness = operation<
     */
     const logged = await ctx.bind.db.all<{ kind: string; value: number }>(
       `SELECT kind, value FROM ${T.entries} WHERE tenant_id = ? AND client_id = ? AND day >= ? AND deleted_at IS NULL
-       AND kind IN ('sleep', 'mood', 'energy')`,
+       AND kind IN ('sleep', 'mood', 'energy') LIMIT 500`,
       ctx.tenantId, who, since,
     );
     const column = (kind: string) => logged.filter((r) => r.kind === kind).map((r) => r.value);
@@ -1948,7 +1948,7 @@ export const compare = operation<
   async handler(ctx, input: { pose: string; clientId?: string }) {
     const who = ctx.subjectId ?? input.clientId ?? "";
     const rows = await ctx.bind.db.all<{ id: string; day: string; image: string }>(
-      `SELECT id, day, image FROM ${T.photos} WHERE tenant_id = ? AND client_id = ? AND pose = ? ORDER BY day ASC`,
+      `SELECT id, day, image FROM ${T.photos} WHERE tenant_id = ? AND client_id = ? AND pose = ? ORDER BY day ASC LIMIT 200`,
       ctx.tenantId, who, input.pose,
     );
     if (rows.length === 0) return { pose: input.pose, first: null, latest: null, days: null };
@@ -1992,6 +1992,8 @@ export const bodyScan = operation<
   output: s.object({ generation: s.text(), read: s.json(), charged: s.number({ integer: true }) }),
   permission: "scan:write",
   customerFlag: "body",
+  /* ⚠️ A reading of a photograph costs credits and produces numbers on a screen the person is already looking at — but the charge is not visible, and a scan that answered in silence is one somebody runs again. */
+  outcome: { message: "Read", tone: "success", invalidates: ["ai.spending", "scan"] },
   idempotency: { mode: "none" },
   audit: () => ({ subject: "scan", verb: "estimate" }),
   fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
@@ -2727,6 +2729,8 @@ export const draftPlan = operation<
     is used — collapsing the second call onto the first would return the answer
     they were trying to replace.
   */
+  /* ⚠️ A draft lands in an editor the coach then works in; what is not visible is that it cost something. */
+  outcome: { message: "Drafted", tone: "success", invalidates: ["ai.spending"] },
   idempotency: { mode: "none" },
   audit: () => ({ subject: "programme", verb: "draft" }),
   fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
@@ -2765,6 +2769,8 @@ export const parseFood = operation<
   output: s.object({ generation: s.text(), foods: s.json(), charged: s.number({ integer: true }) }),
   permission: "portion:write",
   customerFlag: "nutrition",
+  /* ⚠️ The same: what came back is on the screen, what it cost is not. */
+  outcome: { message: "Read", tone: "success", invalidates: ["ai.spending"] },
   idempotency: { mode: "none" },
   audit: () => ({ subject: "portion", verb: "parse" }),
   fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
@@ -2910,6 +2916,8 @@ export const clientSummary = operation<
   input: s.object({ clientId: s.text({ max: 40 }), days: s.optional(s.number({ integer: true, min: 7, max: 90 })) }),
   output: s.object({ generation: s.text(), summary: s.json(), charged: s.number({ integer: true }) }),
   permission: "client:read",
+  /* ⚠️ A month of somebody's records read into a paragraph, charged for. */
+  outcome: { message: "Summarised", tone: "success", invalidates: ["ai.spending"] },
   idempotency: { mode: "none" },
   audit: (i: { clientId: string }) => ({ subject: i.clientId, verb: "summarise" }),
   fails: ["platform.not_found", "platform.forbidden", "platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
@@ -2974,6 +2982,8 @@ export const drawImage = operation<
   input: s.object({ about: s.text({ min: 3, max: 400 }) }),
   output: s.object({ generation: s.text(), media: s.text(), charged: s.number({ integer: true }) }),
   permission: "article:write",
+  /* ⚠️ A generated picture lands in the library, which is a second surface to refresh. */
+  outcome: { message: "Generated", tone: "success", invalidates: ["ai.spending", "file.list"] },
   idempotency: { mode: "none" },
   audit: () => ({ subject: "media", verb: "draw" }),
   fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
@@ -3087,7 +3097,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.24.0",
+  manifestVersion: "0.25.0",
   bindings,
 
   identity: {
@@ -3331,9 +3341,45 @@ export const kova = defineApp({
   },
 
   governance: {
+    /*
+      ⚠️ EACH CARRIES ITS TEXT. A version is part of the consent ledger's key, so
+      a document nobody can produce makes every row in that ledger evidence of
+      nothing — which is the one thing anybody would ever ask for it about.
+
+      ⚠️ THESE ARE ACCURATE NOTICES, NOT OPERATIVE AGREEMENTS. Every sentence
+      below describes what this code actually does and can be checked against it.
+      What they are not is drafted by a lawyer, and this product stores health
+      information — which is special-category data, needing explicit consent and
+      an impact assessment rather than the ordinary basis. The operative
+      long-form documents belong at `url` beside these, and they need review
+      before the first paying customer rather than before the first commit.
+    */
     legal: [
-      { id: "terms", version: "2026-01-01", mustAccept: ["owner"] },
-      { id: "privacy", version: "2026-01-01", mustAccept: ["owner", "trainer", "assistant", "client"] },
+      {
+        id: "terms",
+        version: "2026-01-01",
+        title: "Terms of service",
+        body: [
+          "Kova is software a coaching business runs its own practice on. The studio decides who it coaches, what it sells them and what it records about them; we provide the software and store what the studio puts in it.",
+          "A studio pays us for a plan. Its own customers pay the studio, on the studio's own payment provider — we never see a card number and are not part of that transaction.",
+          "You can leave at any time, from any state, including one where a payment has failed. Closing a workspace is reversible for seven days; after that its records are erased and cannot be recovered.",
+          "We may act inside a workspace to help with a problem. That is time-boxed, needs a stated reason, is announced to the workspace, and is on the record either way.",
+        ].join("\n\n"),
+        mustAccept: ["owner"],
+      },
+      {
+        id: "privacy",
+        version: "2026-01-01",
+        title: "Privacy notice",
+        body: [
+          "What is stored: who you are (an email address, a name, and a photograph if you add one), and what you record — sessions, meals, measurements, photographs, and what you write in a check-in. A studio's staff can see the records of the people they coach. Other studios cannot see any of it.",
+          "Where it is stored: in one place, chosen by the studio when it was created. Sign-in credentials are held separately from a studio's records, and a passkey never leaves your device.",
+          "Who else sees it: nobody, except the services that make specific features work. A photograph you send to be read by a model goes to that model's provider. A message we send you goes through a mail provider. A payment for a plan goes through a payment provider. Nothing is sold, and nothing is used to train anybody's model.",
+          "How long: for as long as the workspace exists, unless a record has a shorter limit of its own. A closed workspace is erased after seven days. Asking to be forgotten removes your records and the trail of who touched them.",
+          "What you can ask for: a copy of everything held about you, a correction, or an erasure. Ask the studio that coaches you; they can do all three from inside the product.",
+        ].join("\n\n"),
+        mustAccept: ["owner", "trainer", "assistant", "client"],
+      },
     ],
     impersonation: { maxMinutes: 30, announce: true },
     auditRetentionDays: 730,
@@ -3672,6 +3718,14 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.25.0",
+      at: "2026-08-10",
+      notes: [
+        "Read the terms and the privacy notice in full before agreeing to them. They were asked about by name and their text was nowhere.",
+        "Reading a photograph, drafting a plan, parsing a meal, summarising a month and generating an image all say that they worked. They spent credits and answered in silence.",
+      ],
+    },
     {
       version: "0.24.0",
       at: "2026-08-10",

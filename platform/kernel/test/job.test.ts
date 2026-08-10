@@ -68,6 +68,11 @@ const base = {
     "support.session": { category: "service", tone: "warning", icon: "shield", title: "Somebody from support was in your workspace", body: "Why: {reason}", link: { to: "inbox" }, roles: ["owner"] },
   } as NotificationRegistry,
   help: {}, filePurposes: {},
+  governance: {
+    legal: [{ id: "terms", version: "1", title: "Terms", body: "The terms.", mustAccept: ["owner"] }],
+    impersonation: { maxMinutes: 30, announce: true },
+    auditRetentionDays: 365,
+  },
   releases: [], problems: {}, operations: [], jobs: [] as JobSpec[],
   guide: { steps: [], hints: [] },
 };

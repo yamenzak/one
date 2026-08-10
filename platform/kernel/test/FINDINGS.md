@@ -3406,3 +3406,57 @@ when it rolls over and nothing has to expire anything — the sweep is a tidy-up
 rather than the thing correctness depends on. And a store that cannot answer
 ALLOWS the request: a limiter that fails closed turns one broken table into a
 product nobody can use, which is a larger outage than the one it was preventing.
+
+## 258. A consent ledger pointing at nothing
+
+`LegalDoc` was `{ id, version, mustAccept }`. The ledger built two sessions ago
+recorded, correctly and per version, that somebody agreed to `terms@2026-01-01`.
+
+The text of `terms@2026-01-01` existed nowhere — not in the manifest, not on a
+page, not in the repository.
+
+⚠️ WHICH MAKES IT WORSE THAN NO LEDGER. It manufactures evidence that somebody
+agreed to something that cannot be produced, and the document is exactly what
+anybody asking about the row would want. The ledger was built carefully — per
+person, per document, per VERSION, refusing a version nobody published — and
+every one of those properties was about a document that did not exist.
+
+`legalProblems` now refuses a declaration carrying neither its text nor an
+address for it, and refuses a blank one, a versionless one, a duplicate and one
+nobody has to accept. Kova declares both notices in full: they are accurate
+descriptions of what this code does and can be checked against it, which is a
+different thing from being drafted by a lawyer, and the manifest says so.
+
+## 259. Four properties that held by discipline
+
+Two of the four checks added here found defects. Two found nothing, and were
+written anyway — which is the point of writing them at that moment.
+
+- **Bounded reads**: eleven `db.all` calls in Kova's handlers had no `LIMIT`.
+  Every one named its tenant, so it was not a leak; it was a query whose result
+  size IS the workspace's row count. That works on every deployment until the
+  largest workspace crosses a limit, then fails, is retried, fails at the same
+  size, and the feature stops for exactly the customer who uses it most.
+- **A write speaks**: five AI operations spent a workspace's credits and declared
+  no outcome. The two FACTORIES were fixed a session earlier; these five are
+  separate operations and were not, which is the ordinary way a fix reaches most
+  of a class.
+- **A query names its tenant**: 61 of 61 already did.
+- **No wall clock**: neither app read one.
+
+⚠️ A GUARD OVER A PROPERTY THAT ALREADY HOLDS IS THE CHEAP ONE TO WRITE AND THE
+VALUABLE ONE TO HAVE. Sixty-one correct queries are sixty-one acts of discipline,
+and the commit that breaks the sixty-second will look completely ordinary — a new
+handler, a reasonable query, no predicate. Writing the check while it is green
+costs an afternoon; writing it after costs an incident.
+
+## 260. And the check refused a reason somebody had written
+
+The exemption lookback read three lines above the offending line. This
+repository's comments are `/* … */` with plain indented prose inside, so an
+interior line carries no marker of its own — and the walk stopped at the first
+one, reporting a correctly-written `tenant-exempt:` three lines up as missing.
+
+⚠️ A CHECK THAT REFUSES A REASON SOMEBODY WROTE IS WORSE THAN ONE THAT DOES NOT
+ASK FOR REASONS. It teaches people that the exemption does not work, and what
+they do next is delete the check.

@@ -1170,8 +1170,36 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `acting-as-somebody-is-bounded` | a support session with no ceiling, or one whose ceiling the request decides — a time box a caller sets is not one | **live** |
 | `acting-as-somebody-is-announced` | a support session nobody inside the workspace is told about, which is indistinguishable from somebody having got in | **live** |
 | `ending-keeps-the-evidence` | an operator who can delete their own support session, and with it the only record of what they did in it | **live** |
+| `a-query-names-its-tenant` | a hand-written query that forgets its tenant predicate — it returns every workspace's rows, answers 200, renders perfectly and looks entirely ordinary in review | **live** |
+| `a-read-is-bounded` | a list whose size is the workspace's own row count — it works until the largest one crosses a limit, then fails, is retried, fails at the same size, and the feature stops for the customer who uses it most | **live** |
+| `no-wall-clock-in-a-handler` | a handler reading the wall clock, whose behaviour cannot be pinned by a test and whose replay does not reproduce the run it is replaying | **live** |
+| `a-write-speaks` | a write somebody cannot see happen that says nothing — five of them spent a workspace's credits and answered with nothing a screen was told to say, so the person does it again | **live** |
+| `a-consent-refers-to-something` | a legal document declared with no text and no address for it, so every row in the consent ledger is evidence that somebody agreed to something nobody can produce — which is the one thing it would ever be asked for | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
+
+⚠️ **AND A LEGAL DOCUMENT CARRIES ITS TEXT.** `LegalDoc` was
+`{ id, version, mustAccept }`, so the consent ledger recorded that somebody
+agreed to `terms@2026-01-01` and the text of `terms@2026-01-01` existed nowhere —
+not in the manifest, not on a page, not in the repository. **A ledger pointing at
+nothing is worse than no ledger**: it manufactures evidence that somebody agreed
+to something that cannot be produced, which is exactly the document anybody would
+ask for it about. `legalProblems` refuses a document carrying neither text nor an
+address for it, and Kova now declares both notices in full.
+
+⚠️ **RESIDENCY STAYS AT THE TENANT, and per-user residency inside a tenancy is
+refused rather than deferred.** Four reasons, none of which changes: the
+CONTROLLER is the tenant, so residency is a controller-level commitment and
+modelling it per person would be us promising on behalf of somebody who did not;
+a workspace's data is relational and does not split, so one workspace across two
+databases makes every list a cross-region join and runs the erasure cascade twice
+with no transaction spanning them; routing per person needs the region BEFORE the
+identity, which is a global map of email → region — precisely the personal data
+`directory-columns` exists to keep out; and GDPR requires a lawful basis for
+transfer plus the rights already built, not that each subject's rows live in
+their own region. What earns instead is §4.2's own conclusion — residency as a
+PLAN attribute, with a per-region sub-processor allow-list, which is a manifest
+declaration and a gate exactly like an entitlement.
 
 ⚠️ **AND A DECLARATION NOTHING ACTS ON IS DECORATION.** `kernel-declaration-consumed`
 is the general form of the failure this document keeps recording one instance of

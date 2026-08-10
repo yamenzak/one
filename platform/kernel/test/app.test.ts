@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import { kova } from "./proof.app.js";
 import { PLATFORM_PROBLEMS, type Problem, type ProblemCode, type ProviderAdapter } from "../src/problem.js";
 import { TENANT_DOORS, TENANTLESS_DOORS, DIRECTORY_REGION, classifyHost, cookieDomainFor, type Door, type DoorConfig } from "../src/doors.js";
-import { assertComposable, coverage, undeclaredEmits, type AccessSpec } from "../src/app.js";
+import { legalProblems, assertComposable, coverage, undeclaredEmits, type AccessSpec } from "../src/app.js";
 import type { EntitlementDef, PlanSpec } from "../src/entitlement.js";
 import type { FlagDef } from "../src/customer.js";
 import { collection, field, type CollectionSpec } from "../src/collection.js";
@@ -246,6 +246,13 @@ const base = {
       personal: [],
     },
   collections: [] as CollectionSpec[],
+  /* ⚠️ A document carrying its text, because one carrying neither its text nor
+     an address for it is a consent recorded against nothing. */
+  governance: {
+    legal: [{ id: "terms", version: "1", title: "Terms", body: "The terms.", mustAccept: ["owner"] }],
+    impersonation: { maxMinutes: 30, announce: true },
+    auditRetentionDays: 365,
+  },
   /*
     ⚠️ THE THREE THE PLATFORM RAISES, in the shared base, because every manifest
     must declare them — an app that does not has a workspace creation, a plan
@@ -819,5 +826,69 @@ describe("a file purpose says who may upload under it", () => {
   it("refuses one naming a permission nobody can hold", () => {
     expect(() => assertComposable(withPurpose("imaginary:write")))
       .toThrow(/"photo" needs "imaginary:write"/);
+  });
+});
+
+/* ----------------------------------------------------------------- legal --- */
+
+/**
+ * ⚠️ A CONSENT LEDGER POINTING AT NOTHING IS WORSE THAN NO LEDGER.
+ *
+ * `LegalDoc` was `{ id, version, mustAccept }`. The ledger recorded that
+ * somebody agreed to `terms@2026-01-01`, and the text of `terms@2026-01-01`
+ * existed nowhere — not in the manifest, not on a page, not in the repository.
+ * So the rows were evidence that somebody agreed to something that could not be
+ * produced, which is exactly the document anybody would ever ask for it about.
+ */
+describe("a document somebody is asked to agree to", () => {
+  const doc = { id: "terms", version: "1", title: "Terms", body: "The terms.", mustAccept: ["owner"] };
+
+  it("is accepted when it carries its own text", () => {
+    expect(legalProblems([doc])).toEqual([]);
+  });
+
+  /* ⚠️ Or an address for it, which is the practical answer for anything long
+     enough that nobody reads it where it is asked about. */
+  it("is accepted when it carries an address for it", () => {
+    expect(legalProblems([{ ...doc, body: undefined, url: "https://example.test/terms" }])).toEqual([]);
+  });
+
+  it("is refused when it carries neither", () => {
+    const out = legalProblems([{ ...doc, body: undefined }]);
+    expect(out.map((p) => p.id)).toEqual(["terms"]);
+    expect(out[0]!.why).toContain("refers to nothing");
+  });
+
+  /* ⚠️ Blank is not text. An empty body is the same document nobody can produce,
+     declared in a way that looks like it was thought about. */
+  it("is refused when what it carries is blank", () => {
+    expect(legalProblems([{ ...doc, body: "   " }])).not.toEqual([]);
+    expect(legalProblems([{ ...doc, body: undefined, url: "  " }])).not.toEqual([]);
+  });
+
+  /*
+    ⚠️ THE VERSION IS PART OF THE LEDGER'S KEY. Without one, a consent to this
+    document cannot be told from a consent to the next one — which is the single
+    property the ledger exists to have.
+  */
+  it("is refused with no version", () => {
+    expect(legalProblems([{ ...doc, version: "" }])).not.toEqual([]);
+  });
+
+  /* ⚠️ And a document required of nobody is one that is never shown and never
+     agreed to, which reads in a manifest exactly like one that is. */
+  it("is refused when nobody has to accept it", () => {
+    expect(legalProblems([{ ...doc, mustAccept: [] }])).not.toEqual([]);
+  });
+
+  /* ⚠️ Declared twice, and which version is asked about is whichever came last. */
+  it("is refused when the same one is declared twice", () => {
+    expect(legalProblems([doc, { ...doc, version: "2" }])).not.toEqual([]);
+  });
+
+  /* ⚠️ Reported all at once: a check that stops at the first turns fixing a
+     manifest into a conversation of one sentence at a time. */
+  it("reports every problem rather than the first", () => {
+    expect(legalProblems([{ id: "x", version: "", title: "", mustAccept: [] }]).length).toBeGreaterThan(2);
   });
 });

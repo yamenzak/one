@@ -2929,6 +2929,51 @@
       "impl": "kova/test/watching.test.ts",
       "proves": "ends without removing the evidence",
       "fails": "an operator who can delete their own support session, and with it the only record of what they did in it"
+    },
+    {
+      "id": "a-query-names-its-tenant",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/handlers.test.mjs",
+      "proves": "scoped:",
+      "fails": "a hand-written query that forgets its tenant predicate \u2014 it returns every workspace's rows, answers 200, renders perfectly and looks entirely ordinary in review"
+    },
+    {
+      "id": "a-read-is-bounded",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/handlers.test.mjs",
+      "proves": "bounded:",
+      "fails": "a list whose size is the workspace's own row count \u2014 it works until the largest one crosses a limit, then fails, is retried, fails at the same size, and the feature stops for the customer who uses it most"
+    },
+    {
+      "id": "no-wall-clock-in-a-handler",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/handlers.test.mjs",
+      "proves": "clock:",
+      "fails": "a handler reading the wall clock, whose behaviour cannot be pinned by a test and whose replay does not reproduce the run it is replaying"
+    },
+    {
+      "id": "a-write-speaks",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/handlers.test.mjs",
+      "proves": "acknowledged:",
+      "fails": "a write somebody cannot see happen that says nothing \u2014 five of them spent a workspace's credits and answered with nothing a screen was told to say, so the person does it again"
+    },
+    {
+      "id": "a-consent-refers-to-something",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "is refused when it carries neither",
+      "fails": "a legal document declared with no text and no address for it, so every row in the consent ledger is evidence that somebody agreed to something nobody can produce \u2014 which is the one thing it would ever be asked for"
     }
   ]
 }

@@ -93,7 +93,13 @@ const runtime = createRuntime(hello, {
     the ONE thing a framework cannot supply.
   */
   audienceFor: async (_tenantId, db) => {
-    const rows = await db.all<{ account_id: string }>(`SELECT DISTINCT account_id FROM sessions`);
+    /*
+      tenant-exempt: a session belongs to an ACCOUNT rather than to a workspace
+      and carries no tenant column — see `runtime/test/scope.test.ts`, which
+      exempts the same table from the erasure cascade for the same reason.
+      unbounded-read: bounded below rather than by the predicate.
+    */
+    const rows = await db.all<{ account_id: string }>(`SELECT DISTINCT account_id FROM sessions LIMIT 500`);
     return rows.map((r) => ({ userId: r.account_id, role: "owner" }));
   },
   /*

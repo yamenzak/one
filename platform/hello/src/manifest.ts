@@ -254,7 +254,7 @@ export const hello = defineApp({
     personal: ["workspace:create"],
   },
   governance: {
-    legal: [{ id: "terms", version: "2026-01-01", mustAccept: ["owner"] }],
+    legal: [{ id: "terms", version: "2026-01-01", title: "Terms", body: "What this example does with what you put in it: nothing at all.", mustAccept: ["owner"] }],
     impersonation: { maxMinutes: 30, announce: true },
     auditRetentionDays: 365,
   },

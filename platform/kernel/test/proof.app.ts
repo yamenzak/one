@@ -154,10 +154,12 @@ export const kova = defineApp({
   },
 
   governance: {
+    /* ⚠️ Each carries its text or an address for it. A version in a ledger key
+       against a document nobody can produce is evidence of nothing. */
     legal: [
-      { id: "terms", version: "2026-01-01", mustAccept: ["owner"] },
-      { id: "privacy", version: "2026-01-01", mustAccept: ["owner", "trainer", "customer"] },
-      { id: "dpa", version: "2026-03-01", mustAccept: ["owner"] },
+      { id: "terms", version: "2026-01-01", title: "Terms of service", url: "https://example.test/terms", mustAccept: ["owner"] },
+      { id: "privacy", version: "2026-01-01", title: "Privacy notice", url: "https://example.test/privacy", mustAccept: ["owner", "trainer", "customer"] },
+      { id: "dpa", version: "2026-03-01", title: "Data processing agreement", url: "https://example.test/dpa", mustAccept: ["owner"] },
     ],
     impersonation: { maxMinutes: 60, announce: true },
     auditRetentionDays: 730,

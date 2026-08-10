@@ -165,7 +165,7 @@ describe("the documents this product asks you to agree to", () => {
     const accepted = [{ document: "terms", version: "2026-01-01", at: "x" }];
     const { outstandingFor } = await import("@one/runtime");
     expect(outstandingFor(
-      [{ id: "terms", version: "2027-01-01", mustAccept: ["owner"] }], "owner", accepted,
+      [{ id: "terms", version: "2027-01-01", title: "Terms", body: "New terms.", mustAccept: ["owner"] }], "owner", accepted,
     ).map((d) => d.id)).toEqual(["terms"]);
   });
 

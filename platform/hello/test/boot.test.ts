@@ -161,7 +161,15 @@ describe("a workspace is created, and only the platform may create it", () => {
   it("serves workspace creation from the platform, not from the manifest", async () => {
     const { hello } = await import("../src/manifest.js");
     expect(hello.operations.map((o) => o.id)).not.toContain("identity.workspace.create");
-    expect((await call(setup, { method: "POST", as: "member", body: JSON.stringify({ slug: "second" }) })).status).toBe(200);
+    /*
+      ⚠️ A SLUG THIS ATTEMPT HAS NOT USED. Storage is shared across this
+      package's files and a file is retried once, so a fixed slug conflicts with
+      ITSELF: the first attempt takes the address and the retry is refused 409 —
+      which reads as "the platform does not serve workspace creation" and is the
+      one thing this assertion is not about.
+    */
+    const slug = `second${Math.random().toString(36).slice(2, 7)}`;
+    expect((await call(setup, { method: "POST", as: "member", body: JSON.stringify({ slug }) })).status).toBe(200);
   });
 });
 

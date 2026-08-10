@@ -228,11 +228,61 @@ export interface AccessSpec {
 
 /* --------------------------------------------------------------- consent --- */
 
+/**
+ * A DOCUMENT SOMEBODY IS ASKED TO AGREE TO.
+ *
+ * ⚠️ IT CARRIES ITS TEXT, OR AN ADDRESS FOR IT, AND A DECLARATION WITH NEITHER
+ * IS REFUSED AT COMPOSITION.
+ *
+ * This was `{ id, version, mustAccept }`. The consent ledger recorded that
+ * somebody agreed to `terms@2026-01-01`, and the text of `terms@2026-01-01`
+ * existed nowhere — not in the manifest, not on a page, not in the repository. A
+ * ledger pointing at nothing is worse than no ledger: it manufactures evidence
+ * that somebody agreed to something that cannot be produced, which is precisely
+ * the document anybody would ask for it about.
+ */
 export interface LegalDoc {
   readonly id: string;
   readonly version: string;
+  /** What it is called, in the words somebody sees before they agree. */
+  readonly title: string;
+  /**
+   * The text, for a document short enough to read where it is asked about.
+   *
+   * ⚠️ ONE OF `body` OR `url` IS REQUIRED. Both together is the useful case: a
+   * plain-language notice somebody actually reads, beside the operative document
+   * they can open.
+   */
+  readonly body?: string;
+  readonly url?: string;
   /** ⚠️ Who must accept it, recorded per person per version. Not backfillable. */
   readonly mustAccept: readonly string[];
+}
+
+/**
+ * ⚠️ EVERY ONE OF THESE IS A CONSENT THAT WOULD BE RECORDED AGAINST NOTHING.
+ *
+ * A version is part of the ledger's key, so a document whose version changes
+ * without its text changing asks everybody again for no reason — and one whose
+ * text changes without its version changing inherits every consent ever given,
+ * which is the single property the ledger exists to deny.
+ */
+export function legalProblems(docs: readonly LegalDoc[]): readonly { readonly id: string; readonly why: string }[] {
+  const out: { id: string; why: string }[] = [];
+  const seen = new Set<string>();
+  for (const d of docs) {
+    if (seen.has(d.id)) out.push({ id: d.id, why: "is declared twice, so which version is asked about is whichever came last" });
+    seen.add(d.id);
+    if (!d.title.trim()) out.push({ id: d.id, why: "has no title, so it is asked about by its identifier" });
+    if (!d.version.trim()) out.push({ id: d.id, why: "has no version, so a consent to it cannot be told from a consent to the next one" });
+    if (!d.body?.trim() && !d.url?.trim()) {
+      out.push({ id: d.id, why: "carries neither its text nor an address for it — a consent recorded against it refers to nothing" });
+    }
+    if (!d.mustAccept.length) {
+      out.push({ id: d.id, why: "is required of nobody, so it is a document that is never shown and never agreed to" });
+    }
+  }
+  return out;
 }
 
 /* ------------------------------------------------------------ governance --- */
@@ -636,6 +686,8 @@ export function assertComposable(spec: {
   readonly notifications: NotificationRegistry;
   readonly help: HelpRegistry;
   readonly releases: readonly Release[];
+  /** ⚠️ For the documents. A consent ledger keyed on one that does not exist. */
+  readonly governance: GovernanceSpec;
   readonly guide?: GuideSpec;
   readonly milestones?: MilestoneRegistry;
   readonly schemas?: Readonly<Record<string, Shape<unknown>>>;
@@ -750,6 +802,16 @@ export function assertComposable(spec: {
     ⚠️ REPORTED ALL AT ONCE. A check that stops at the first failure turns fixing
     a manifest into a conversation of one sentence at a time.
   */
+  /*
+    ⚠️ BEFORE THE HELP, because a consent recorded against a document that does
+    not exist is the more expensive of the two to discover late — the rows are
+    already written and there is nothing to point them at.
+  */
+  const legal = legalProblems(spec.governance.legal);
+  if (legal.length) {
+    throw new Error(`${spec.id}: legal — ${legal.map((l) => `"${l.id}" ${l.why}`).join("; ")}.`);
+  }
+
   const help = helpProblems(spec.help, spec.collections);
   if (help.length) {
     throw new Error(`${spec.id}: help — ${help.map((h) => `"${h.id}" ${h.why}`).join("; ")}.`);
