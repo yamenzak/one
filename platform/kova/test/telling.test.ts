@@ -133,7 +133,7 @@ describe("the documents this product asks you to agree to", () => {
   it("are readable by somebody who is not signed in", async () => {
     const out = await stranger.get("/api/legal.list");
     expect(out.status).toBe(200);
-    expect((out.body.documents as unknown as { id: string }[]).map((d) => d.id)).toEqual(["terms", "privacy"]);
+    expect((out.body.documents as unknown as { id: string }[]).map((d) => d.id)).toEqual(["terms", "privacy", "dpa"]);
   });
 
   /* ⚠️ And what one person has agreed to is theirs — an unsigned reader is told
@@ -145,14 +145,17 @@ describe("the documents this product asks you to agree to", () => {
   it("says what this person still has to accept", async () => {
     const out = await owner.get("/api/legal.list");
     const outstanding = out.body.outstanding as unknown as { id: string; version: string }[];
-    /* An owner must accept both, and has accepted neither. */
-    expect(outstanding.map((d) => d.id).sort()).toEqual(["privacy", "terms"]);
+    /* ⚠️ An owner must accept all three and has accepted none. The third is the
+       PROCESSING AGREEMENT, which only the owner is asked for — it is the one
+       document here that is an agreement between two businesses rather than a
+       notice to a person. */
+    expect(outstanding.map((d) => d.id).sort()).toEqual(["dpa", "privacy", "terms"]);
   });
 
   it("stops asking once they have", async () => {
     expect((await owner.call("/api/legal.accept", { document: "terms", version: "2026-01-01" })).status).toBe(200);
     const outstanding = (await owner.get("/api/legal.list")).body.outstanding as unknown as { id: string }[];
-    expect(outstanding.map((d) => d.id)).toEqual(["privacy"]);
+    expect(outstanding.map((d) => d.id)).toEqual(["privacy", "dpa"]);
   });
 
   /*
@@ -203,5 +206,97 @@ describe("the documents this product asks you to agree to", () => {
     */
     expect(offered).toContain("client.create");
     expect(offered).not.toContain("legal.accept");
+  });
+});
+
+/* ------------------------------------------------------------ protection --- */
+
+/**
+ * ⚠️ THE RECORD HAS TO BE PRODUCIBLE, OR IT IS NOT A RECORD.
+ *
+ * Article 30 obliges keeping one and producing it on request. Every version of
+ * that document in the world is a spreadsheet describing the product as it was
+ * when somebody last had time — and the drift is invisible, because a processing
+ * activity missing from a record looks exactly like one that does not happen.
+ * These two routes are what make it a computed answer instead.
+ */
+describe("what this product discloses about where data goes", () => {
+  /*
+    ⚠️ PUBLIC, FOR THE SAME REASON THE TERMS ARE. Articles 13 and 14 oblige
+    telling somebody who else receives their data BEFORE it is collected, so a
+    list behind a session is published after the moment it is owed. It is also
+    what a customer's compliance team asks for, and answering that by email is
+    how a sub-processor list comes to differ from the product.
+  */
+  it("names every recipient to somebody who is not signed in", async () => {
+    const out = await stranger.get("/api/protection.list");
+    expect(out.status).toBe(200);
+    const ids = (out.body.subprocessors as unknown as { id: string }[]).map((p) => p.id);
+    expect(ids).toContain("cloudflare");
+    expect(ids).toContain("gemini");
+    expect(ids).toContain("openfoodfacts");
+    /* ⚠️ And NOT the lane this product does not use. It was on the list until
+       the disclosure check ran; Kova's catalogue is Gemini only. */
+    expect(ids).not.toContain("workers-ai");
+  });
+
+  it("says where the data is and who to ask about it", async () => {
+    const out = await stranger.get("/api/protection.list");
+    expect(out.body.contact).toBe("privacy@4dl.app");
+    /* ⚠️ THE REGIONS THE MANIFEST DECLARES, NOT A SENTENCE SOMEBODY WROTE. Kova
+       declares one today, and a disclosure naming a region this deployment has
+       no store for is wrong in the one field a residency question asks about. */
+    expect(out.body.regions as unknown as string[]).toEqual(kova.tenancy.regions);
+    /* ⚠️ Two controllers, never merged: a client's rights run against their
+       studio, and we act on the studio's instruction. */
+    expect(String(out.body.controller)).toMatch(/processor/);
+  });
+
+  /*
+    ⚠️ EVERY ENTRY CARRIES ITS SAFEGUARD, because "where is it processed" and
+    "what covers the transfer" are two questions and the second is the one a
+    questionnaire actually asks.
+  */
+  it("carries a safeguard and processing terms for every one of them", async () => {
+    const list = (await stranger.get("/api/protection.list")).body.subprocessors as unknown as
+      { id: string; safeguard: string; terms: string; receives: string[] }[];
+    expect(list.length).toBeGreaterThan(3);
+    for (const p of list) {
+      expect(["eea", "adequacy", "sccs", "dpf"]).toContain(p.safeguard);
+      expect(p.terms).toMatch(/^https:/);
+      expect(p.receives.length).toBeGreaterThan(0);
+    }
+  });
+
+  /* ⚠️ The RECORD is not public — it names every activity, its basis and its
+     retention, which is a description of the business rather than a notice to a
+     person. Same permission as the audit trail. */
+  it("keeps the record of processing off the public lane", async () => {
+    expect((await stranger.get("/api/protection.record")).status).toBe(403);
+  });
+
+  it("produces the whole record for somebody who runs the workspace", async () => {
+    const out = await owner.get("/api/protection.record");
+    expect(out.status).toBe(200);
+    const record = out.body.record as unknown as {
+      special: boolean;
+      activities: { collection: string; basis: string; special: boolean; condition?: string }[];
+    };
+    /*
+      ⚠️ ONE ACTIVITY PER COLLECTION THAT HOLDS SOMETHING, AND NONE FOR THE ONES
+      THAT DO NOT. A record listing a shared catalogue as processing describes
+      something that does not happen, which is the same kind of wrong as omitting
+      something that does.
+    */
+    const named = record.activities.map((a) => a.collection);
+    expect(named).toContain("client");
+    expect(named).toContain("scan");
+    expect(named).not.toContain("movement");
+
+    /* ⚠️ Article 35's trigger, computed from the collections rather than ticked. */
+    expect(record.special).toBe(true);
+    const scan = record.activities.find((a) => a.collection === "scan");
+    expect(scan?.special).toBe(true);
+    expect(scan?.condition).toBe("explicit_consent");
   });
 });

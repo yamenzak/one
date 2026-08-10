@@ -77,6 +77,7 @@ export const unversioned = collection({
   id: "note",
   label: { one: "Note", many: "Notes" },
   scope: { of: "tenant" },
+  holding: { kind: "none" as const, why: "A fixture. It exists to be a shape, not to hold anybody's data." },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "archive" },
   fields: { body: field.text() },
@@ -90,6 +91,7 @@ export const unexplainedPlatformScope = collection({
   // @ts-expect-error — `why` is required on a platform scope
   scope: { of: "platform" },
   version: true,
+  holding: { kind: "none" as const, why: "A fixture. It exists to be a shape, not to hold anybody's data." },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "archive" },
   fields: { title: field.text() },

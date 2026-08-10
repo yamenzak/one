@@ -14,6 +14,7 @@
 
 import type { SqlHandle } from "./bindings.js";
 import type { Dimension, Id, Instant } from "./primitives.js";
+import type { Holding } from "./protection.js";
 
 /* ---------------------------------------------------------------- fields --- */
 
@@ -239,6 +240,20 @@ export interface CollectionSpec {
   readonly version: true;
 
   readonly retention: Retention;
+  /**
+   * What this holds about a person, and on what basis.
+   *
+   * ⚠️ REQUIRED, WITH AN EXPLICIT "NOTHING". No schema implies "this is health
+   * information", so a person has to say — once, here — and an optional field is
+   * one that is absent on the collection somebody added in a hurry. Absent is
+   * indistinguishable from "nothing personal", which is exactly the claim that
+   * needs somebody behind it.
+   *
+   * The record of processing is derived from this and nothing else is written by
+   * hand, which is what stops it describing the product as it was when somebody
+   * last had time.
+   */
+  readonly holding: Holding;
   readonly onDelete: DeletePolicy;
 
   readonly naming?: NamingSeries;

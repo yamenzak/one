@@ -260,7 +260,9 @@ Grouped by what it governs. **Bold** entries have day-zero consequences (§9).
 
 | declaration | what it decides |
 |---|---|
-| **`legal`** | documents, versions, and ⚠️ **who must accept which version, recorded** |
+| **`legal`** | documents, versions, and ⚠️ **who must accept which version, recorded**. `terms` is owed always; `privacy` and `dpa` become owed the moment a collection holds somebody's data — §7a |
+| **`holding`** | per collection: what it holds, whose it is, why, and on what lawful basis. ⚠️ Required with an explicit `{ kind: "none", why }` — §7a |
+| **`protection`** | the controller, the contact, the sub-processor list, and whether an impact assessment is owed. ⚠️ Checked against what the manifest REACHES — §7a |
 | **`audit`** | what is recorded, retention, who may read it |
 | `jobs` | scheduled work: per-tenant, idempotent, with a visible failure surface |
 | `onboarding` | the wizard's steps; the tenant is created between them so Back is lossless |
@@ -280,6 +282,57 @@ double-application, which is the same review as looking for the bug.
 same record must not silently overwrite each other, and a tool call racing a
 human is the same problem with worse timing. It is one integer per table, and
 adding it later is a migration across every table in the platform.
+
+---
+
+## 7a. Data protection is declared once and derived after that
+
+⚠️ **The goal is that nobody visits this per feature.** A compliance posture that
+needs somebody to remember something on every commit is correct on the day it is
+written and wrong by the end of the quarter — and the gap is invisible, because a
+processing activity missing from a record looks exactly like one that does not
+happen.
+
+So exactly one thing is declared and everything else is read off it.
+
+**Declared.** `holding` on every collection: `{ kind: "none", why }` or what it
+holds, whose it is, what for, and on what Article 6 basis. No schema implies
+"this is health information"; a person has to say so, once.
+
+⚠️ **And it is required WITH an explicit nothing.** An optional field is one that
+is absent on the collection somebody added in a hurry, and absent is
+indistinguishable from "nothing personal here" — the exact claim that needs a
+person behind it.
+
+**Derived, and refused at composition when it disagrees:**
+
+| what | from | what a wrong answer would be |
+|---|---|---|
+| the Article 30 record | every `holding`, the retention, the regions | a spreadsheet describing the product as it was when somebody last had time |
+| the sub-processor list | the model catalogue, `services`, the mail lane, whether anything has a price | the list every product has: right when written, silently wrong after the next feature |
+| the privacy notice and the DPA | whether anything is personal at all | two documents owed at a moment nothing anywhere marks |
+| whether an impact assessment is owed | whether any category is special | `required: false`, typed without thinking about it, on a product storing health data |
+
+**The anti-trick half is the reason any of it is worth anything.**
+`{ kind: "none" }` is one line, and one line is exactly what somebody writes to
+make a check go away — so a collection carrying `email` may not claim to hold
+nothing, and one whose own field names are `weight` and `sleep` may not declare
+only `usage`. The word list is deliberately short: `name`, `photo` and `note` are
+NOT on it, because a food has a name and a movement has a demonstration image,
+and a check that refuses an honest declaration teaches people to weaken it.
+
+**Both directions, on the sub-processor list.** A company reached and not
+disclosed is somebody's data going somewhere no notice names. A company disclosed
+and not reached is a false disclosure in the direction that looks careful — and it
+is the entry nobody ever removes, because removing it feels like claiming less.
+The check found one the first time it ran.
+
+**And the record is a route, not a file.** `protection.list` is public because
+Articles 13 and 14 oblige telling somebody before their data is collected;
+`protection.record` sits behind the permission that reads the audit. There is
+deliberately no generated markdown copy of either: a second copy of a compliance
+claim is one that can differ from the product, which is the whole failure this
+section exists to prevent.
 
 ---
 

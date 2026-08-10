@@ -24,6 +24,7 @@ const packages = collection({
   label: { one: "Package", many: "Packages" },
   scope: { of: "tenant" },
   version: true,
+  holding: { kind: "none" as const, why: "A fixture. It exists to be a shape, not to hold anybody's data." },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
   activity: true,
@@ -161,6 +162,21 @@ export const kova = defineApp({
       { id: "privacy", version: "2026-01-01", title: "Privacy notice", url: "https://example.test/privacy", mustAccept: ["owner", "trainer", "customer"] },
       { id: "dpa", version: "2026-03-01", title: "Data processing agreement", url: "https://example.test/dpa", mustAccept: ["owner"] },
     ],
+    protection: {
+      controller: "The example controls it.",
+      contact: "privacy@example.test",
+      assessment: { required: false, note: "A fixture processes nobody's data." },
+      subprocessors: [
+        /* ⚠️ TWO ON A FIXTURE, because there is no such thing as a product with
+           none: it runs on somebody's computers and its sign-in code leaves
+           through somebody's mail lane. `disclosureProblems` refuses a manifest
+           that reaches one of these and does not name it. */
+        { id: "cloudflare", name: "Cloudflare, Inc.", role: "Runs it.", receives: ["identity", "usage"] as const, where: "Its network.", safeguard: "dpf" as const, terms: "https://example.test/dpa" },
+        { id: "cloudflare-email", name: "Cloudflare Email", role: "Sends the sign-in code.", receives: ["contact"] as const, where: "Its network.", safeguard: "dpf" as const, terms: "https://example.test/dpa" },
+        /* ⚠️ And a third the moment a plan has a price on it. */
+        { id: "stripe", name: "Stripe, Inc.", role: "Settles the plan.", receives: ["contact", "financial"] as const, where: "US and IE.", safeguard: "dpf" as const, terms: "https://example.test/dpa" },
+      ],
+    },
     impersonation: { maxMinutes: 60, announce: true },
     auditRetentionDays: 730,
   },

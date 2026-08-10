@@ -29,6 +29,7 @@ import { momentProblems } from "./moment.js";
 import { marketProblems } from "./market.js";
 import { MILESTONE_EARNED, milestoneProblems } from "./milestone.js";
 import { danglingHelp, helpProblems } from "./help.js";
+import { agreementProblems, disclosureProblems, holdingProblems, protectionProblems, ropaOf, type ProtectionSpec, type Record30 } from "./protection.js";
 import type { NotificationRegistry } from "./notify.js";
 import type { Release, Retired } from "./release.js";
 import { releaseProblems } from "./release.js";
@@ -289,6 +290,12 @@ export function legalProblems(docs: readonly LegalDoc[]): readonly { readonly id
 
 export interface GovernanceSpec {
   readonly legal: readonly LegalDoc[];
+  /**
+   * ⚠️ REQUIRED, because the record of processing is derived from it and a
+   * derivation with a missing input is a document with a hole in it that reads
+   * as a processing activity that does not happen.
+   */
+  readonly protection: ProtectionSpec;
   /** ⚠️ Operator access to a tenant: time-boxed, audited, announced. From day one. */
   readonly impersonation: { readonly maxMinutes: number; readonly announce: boolean };
   readonly auditRetentionDays: number;
@@ -810,6 +817,51 @@ export function assertComposable(spec: {
   const legal = legalProblems(spec.governance.legal);
   if (legal.length) {
     throw new Error(`${spec.id}: legal — ${legal.map((l) => `"${l.id}" ${l.why}`).join("; ")}.`);
+  }
+
+  /*
+    ⚠️ WHAT EVERY COLLECTION SAYS IT HOLDS, AND WHETHER IT IS BELIEVABLE. The
+    declaration is one line and one line is exactly what somebody writes to make
+    a check go away — so a collection claiming to hold nothing personal while
+    carrying a field called `email`, or one whose own vocabulary is health while
+    it declares only usage, is refused here rather than discovered in a
+    questionnaire.
+  */
+  const held = holdingProblems(spec.collections);
+  const declared = protectionProblems(spec.governance.protection);
+  /*
+    ⚠️ AND WHETHER THE LIST IS STILL TRUE, which is the half that rots. A
+    sub-processor list is correct on the day it is written and wrong by the end
+    of the quarter, because nothing anywhere connects adding a feature to
+    disclosing where its data goes. Here it does: the only ways to reach a new
+    recipient are a model, a service host and a price, all three are declarations
+    in this manifest, and the composition that adds one refuses to boot until the
+    disclosure names it.
+  */
+  const disclosure = disclosureProblems(
+    {
+      models: (spec.ai?.models ?? []).map((m) => m.provider),
+      services: Object.keys(spec.services ?? {}),
+      charges:
+        spec.access.plans.some((p) => p.price.minor > 0) ||
+        (spec.access.creditPacks ?? []).some((p) => p.price.minor > 0),
+    },
+    spec.governance.protection.subprocessors,
+  );
+  /*
+    ⚠️ AND WHAT THOSE DECLARATIONS OBLIGE. A processing agreement and an impact
+    assessment are the two things every product owes and no product is ever
+    asked for — they are owed at a moment nobody notices, and there is no error
+    anywhere when they are absent. Here the collections themselves are what asks.
+  */
+  const agreements = agreementProblems({
+    docs: spec.governance.legal,
+    collections: spec.collections,
+    assessment: spec.governance.protection.assessment,
+  });
+  if (held.length || declared.length || disclosure.length || agreements.length) {
+    const all = [...held, ...declared, ...disclosure, ...agreements];
+    throw new Error(`${spec.id}: data protection — ${all.map((p) => `"${p.at}" ${p.why}`).join("; ")}.`);
   }
 
   const help = helpProblems(spec.help, spec.collections);

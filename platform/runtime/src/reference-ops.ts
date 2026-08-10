@@ -22,7 +22,7 @@
  */
 
 import type { AnyOperation, AppSpec, BindingSpec, Instant, LegalDoc, SchemaModule, Session, SqlHandle } from "@one/kernel";
-import { PUBLIC, operation, s } from "@one/kernel";
+import { PUBLIC, operation, ropaOf, s } from "@one/kernel";
 
 /** ⚠️ A symbol, so an app cannot reach the ledger by writing a property name. */
 export const REFERENCE = Symbol.for("one.runtime.reference");
@@ -217,5 +217,68 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
     },
   });
 
-  return [help, changes, legal, accept] as unknown as readonly AnyOperation[];
+  /*
+    ⚠️ THE DISCLOSURE HALF, AND IT IS PUBLIC FOR THE SAME REASON THE TERMS ARE.
+    Articles 13 and 14 oblige telling somebody who else receives their data
+    BEFORE it is collected, so a list that needs a session is a list published
+    after the moment it is owed. It is also the page a customer's own compliance
+    team asks for, and answering that with a PDF sent by email is how a
+    sub-processor list comes to differ from the product.
+  */
+  const disclosure = operation({
+    id: "protection.list",
+    kind: "read",
+    summary: "Who else receives data held here, what they receive, and where they process it.",
+    input: s.object({}),
+    output: s.object({ controller: s.text(), contact: s.text(), subprocessors: s.json(), regions: s.json() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    async handler() {
+      const p = app.governance.protection;
+      return {
+        controller: p.controller,
+        contact: p.contact,
+        subprocessors: p.subprocessors,
+        /*
+          ⚠️ THE REGIONS ARE THE ANSWER TO "WHERE IS IT", and they come from the
+          tenancy declaration rather than from a sentence. A page that names a
+          region the deployment does not have, or omits one it does, is wrong in
+          the one field a residency question is asked about.
+        */
+        regions: app.tenancy.regions,
+      };
+    },
+  });
+
+  /*
+    ⚠️ THE ARTICLE 30 RECORD, PRODUCED RATHER THAN MAINTAINED.
+    A record of processing is a document every controller must keep and produce
+    on request, and every one in the world is a spreadsheet describing the
+    product as it was when somebody last had time. This one is computed from the
+    declarations the product cannot boot without, so it cannot describe a version
+    of the product that is not running.
+  */
+  const record = operation({
+    id: "protection.record",
+    kind: "read",
+    summary: "The record of processing activities for this deployment.",
+    input: s.object({}),
+    output: s.object({ record: s.json() }),
+    /* ⚠️ The same permission that reads the audit and closes the workspace: it
+       is about the business rather than about anybody's own records. */
+    permission: "workspace:close",
+    idempotency: { mode: "none" },
+    tool: false,
+    async handler() {
+      return {
+        record: ropaOf({
+          collections: app.collections,
+          protection: app.governance.protection,
+          regions: app.tenancy.regions,
+        }),
+      };
+    },
+  });
+
+  return [help, changes, legal, accept, disclosure, record] as unknown as readonly AnyOperation[];
 }

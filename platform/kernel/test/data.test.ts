@@ -21,6 +21,7 @@ const invoices = collection({
   label: { one: "Invoice", many: "Invoices" },
   scope: { of: "subject", subject: "client" },
   version: true,
+  holding: { kind: "none" as const, why: "A fixture. It exists to be a shape, not to hold anybody's data." },
   retention: { days: 2555, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
   naming: { series: "INV-.YYYY.-.####" },
@@ -136,6 +137,7 @@ describe("a column collision is caught, not left to SQLite", () => {
   const clashing: CollectionSpec = {
     id: "thing", label: { one: "Thing", many: "Things" }, scope: { of: "tenant" },
     version: true, retention: { days: null, onTenantClose: "purge" }, onDelete: { on: "purge" },
+    holding: { kind: "none", why: "A fixture. It exists to be a shape, not to hold anybody's data." },
     fields: { lastSeen: field.instant(), last_seen: field.text() },
   };
 

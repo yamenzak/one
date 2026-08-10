@@ -77,6 +77,7 @@ export const clients = collection({
     coaching history is the client's own record of their body; a retention
     window measured in months would delete the thing they are here for.
   */
+  holding: { kind: "personal", categories: ["identity", "contact", "health"], subjects: ["customer"], purpose: "The person a studio coaches, and the situation it is coaching them in.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
   activity: true,
@@ -111,6 +112,7 @@ export const movements = collection({
   label: { one: "Movement", many: "Movements" },
   scope: { of: "tenant" },
   version: true,
+  holding: { kind: "none", why: "A studio\u2019s own library of exercises. It describes a movement, never a person." },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "archive" },
   activity: true,
@@ -156,6 +158,7 @@ export const programmes = collection({
   label: { one: "Programme", many: "Programmes" },
   scope: { of: "tenant" },
   version: true,
+  holding: { kind: "personal", categories: ["health", "usage"], subjects: ["customer"], purpose: "What a studio has prescribed somebody to do or eat.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
   activity: true,
@@ -199,6 +202,7 @@ export const workouts = collection({
   /* ⚠️ Their own history stays readable when the days run out. See `customerFlag`. */
   customerFlag: "training",
   version: true,
+  holding: { kind: "personal", categories: ["health", "usage"], subjects: ["customer"], purpose: "A session somebody did, and how it went.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
   docStatus: { amendable: true, immutableAfterSubmit: ["day", "programme"] },
@@ -227,6 +231,7 @@ export const sets = collection({
   scope: { of: "subject", subject: "client" },
   customerFlag: "training",
   version: true,
+  holding: { kind: "personal", categories: ["health", "usage"], subjects: ["customer"], purpose: "What somebody actually lifted, so a coach can prescribe the next one.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   /* ⚠️ Purged rather than archived: a set mistyped mid-workout is noise, and an
      archived one still counts towards the history it was never part of. */
@@ -270,6 +275,7 @@ export const foods = collection({
   label: { one: "Food", many: "Foods" },
   scope: { of: "tenant" },
   version: true,
+  holding: { kind: "none", why: "A studio\u2019s own library of foods and their numbers. It describes a food, never who ate it." },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "archive" },
   activity: true,
@@ -302,6 +308,7 @@ export const portions = collection({
   scope: { of: "subject", subject: "client" },
   customerFlag: "nutrition",
   version: true,
+  holding: { kind: "personal", categories: ["health", "usage"], subjects: ["customer"], purpose: "What somebody ate, and when.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "purge" },
   fields: {
@@ -338,6 +345,7 @@ export const entries = collection({
   label: { one: "Entry", many: "Entries" },
   scope: { of: "subject", subject: "client" },
   version: true,
+  holding: { kind: "personal", categories: ["health"], subjects: ["customer"], purpose: "A number somebody recorded about themselves \u2014 a weight, a measurement, how they slept.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
   fields: {
@@ -381,6 +389,7 @@ export const checkins = collection({
   label: { one: "Check-in", many: "Check-ins" },
   scope: { of: "subject", subject: "client" },
   version: true,
+  holding: { kind: "personal", categories: ["health", "content"], subjects: ["customer"], purpose: "A report somebody wrote about their own week, and their coach\u2019s reply.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
   /*
@@ -422,6 +431,7 @@ export const goals = collection({
   label: { one: "Goal", many: "Goals" },
   scope: { of: "subject", subject: "client" },
   version: true,
+  holding: { kind: "personal", categories: ["health"], subjects: ["customer"], purpose: "What somebody is working towards, and from where.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
   activity: true,
@@ -460,6 +470,7 @@ export const alternatives = collection({
   label: { one: "Alternative", many: "Alternatives" },
   scope: { of: "tenant" },
   version: true,
+  holding: { kind: "none", why: "Which movement stands in for which, and when. A fact about two exercises." },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "purge" },
   fields: {
@@ -487,6 +498,7 @@ export const swaps = collection({
   scope: { of: "subject", subject: "client" },
   customerFlag: "training",
   version: true,
+  holding: { kind: "personal", categories: ["health", "content"], subjects: ["customer"], purpose: "Somebody asking to change a movement they cannot do, and the answer.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "purge" },
   activity: true,
@@ -524,6 +536,7 @@ export const releases = collection({
   label: { one: "Release request", many: "Release requests" },
   scope: { of: "tenant" },
   version: true,
+  holding: { kind: "personal", categories: ["content"], subjects: ["member", "customer"], purpose: "A coach asking to be released from somebody, and the owner\u2019s answer.", basis: "contract" },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "purge" },
   activity: true,
@@ -556,6 +569,7 @@ export const fasts = collection({
   scope: { of: "subject", subject: "client" },
   customerFlag: "nutrition",
   version: true,
+  holding: { kind: "personal", categories: ["health"], subjects: ["customer"], purpose: "A fast somebody is running.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "purge" },
   fields: {
@@ -585,6 +599,7 @@ export const photos = collection({
   scope: { of: "subject", subject: "client" },
   customerFlag: "body",
   version: true,
+  holding: { kind: "personal", categories: ["health", "biometric", "content"], subjects: ["customer"], purpose: "Progress photographs, so somebody can see a change over months.", basis: "consent", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   /* ⚠️ Purged, never archived. Somebody deleting a photograph of their own body
      means it is gone, not hidden. */
@@ -614,6 +629,7 @@ export const mealChoices = collection({
   scope: { of: "subject", subject: "client" },
   customerFlag: "nutrition",
   version: true,
+  holding: { kind: "personal", categories: ["health", "usage"], subjects: ["customer"], purpose: "Which option somebody picked within a meal their coach allowed.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "purge" },
   fields: {
@@ -640,6 +656,7 @@ export const scans = collection({
   scope: { of: "subject", subject: "client" },
   customerFlag: "body",
   version: true,
+  holding: { kind: "personal", categories: ["health", "biometric"], subjects: ["customer"], purpose: "An estimate of body composition from photographs.", basis: "consent", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "purge" },
   fields: {
@@ -670,6 +687,7 @@ export const supplements = collection({
   scope: { of: "subject", subject: "client" },
   customerFlag: "nutrition",
   version: true,
+  holding: { kind: "personal", categories: ["health"], subjects: ["customer"], purpose: "What a studio has prescribed somebody to take, and why.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
   activity: true,
@@ -697,6 +715,7 @@ export const doses = collection({
   scope: { of: "subject", subject: "client" },
   customerFlag: "nutrition",
   version: true,
+  holding: { kind: "personal", categories: ["health"], subjects: ["customer"], purpose: "That somebody took what was prescribed.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "purge" },
   fields: {
@@ -730,6 +749,7 @@ export const labs = collection({
     the most sensitive thing in the product; a retention window measured in
     months would delete somebody's own record of their health.
   */
+  holding: { kind: "personal", categories: ["health"], subjects: ["customer"], purpose: "A test a studio asked for, and its result.", basis: "contract", condition: "explicit_consent" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
   activity: true,
@@ -760,6 +780,7 @@ export const assignments = collection({
   label: { one: "Assignment", many: "Assignments" },
   scope: { of: "subject", subject: "client" },
   version: true,
+  holding: { kind: "personal", categories: ["usage"], subjects: ["customer", "member"], purpose: "Which member of staff works with which of the people a studio coaches.", basis: "contract" },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "purge" },
   activity: true,
@@ -815,6 +836,7 @@ export const bookings = collection({
     ⚠️ KEPT, because an appointment history is what a studio bills against and
     what a client remembers. Purged with the studio, like everything else.
   */
+  holding: { kind: "personal", categories: ["usage"], subjects: ["customer", "member"], purpose: "When somebody is booked in, and with whom.", basis: "contract" },
   retention: { days: null, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
   activity: true,
@@ -882,6 +904,7 @@ export const articles = collection({
   label: { one: "Article", many: "Articles" },
   scope: { of: "tenant" },
   version: true,
+  holding: { kind: "personal", categories: ["content"], subjects: ["member"], purpose: "Something a studio wrote for the people it coaches.", basis: "contract" },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "archive" },
   activity: true,
@@ -2508,15 +2531,15 @@ export const KOVA_AI: AiSpec = {
       almost nothing, settles at almost nothing, and every photograph is one the
       platform pays for in full — on the feature people use most.
     */
-    { id: "gemini-2.5-flash", provider: "google", rate: { input: 1, output: 4 }, imageUnits: 1_100 },
+    { id: "gemini-2.5-flash", provider: "gemini", rate: { input: 1, output: 4 }, imageUnits: 1_100 },
     /*
       ⚠️ A REASONING MODEL FOR THE ONE READING THAT MATTERS CLINICALLY. A lab
       report misread is a number a coach acts on, and `thinking` widens the
       reserve because such a model spends units the request does not show.
     */
-    { id: "gemini-2.5-pro", provider: "google", rate: { input: 4, output: 16 }, thinking: true, imageUnits: 1_100 },
+    { id: "gemini-2.5-pro", provider: "gemini", rate: { input: 4, output: 16 }, thinking: true, imageUnits: 1_100 },
     /* ⚠️ Priced per PICTURE. There is no output ceiling here that means anything. */
-    { id: "gemini-2.5-flash-image", provider: "google", rate: { input: 1, output: 4 }, perImage: 600 },
+    { id: "gemini-2.5-flash-image", provider: "gemini", rate: { input: 1, output: 4 }, perImage: 600 },
   ],
   features: {
     "draft-plan": {
@@ -3097,7 +3120,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.25.0",
+  manifestVersion: "0.26.0",
   bindings,
 
   identity: {
@@ -3380,7 +3403,165 @@ export const kova = defineApp({
         ].join("\n\n"),
         mustAccept: ["owner", "trainer", "assistant", "client"],
       },
+      /*
+        ⚠️ THE OWNER ACCEPTS THIS AND NOBODY ELSE, because it is the one document
+        here that is an agreement between two BUSINESSES. The terms bind the
+        studio to us; the privacy notice tells a person what is held about them;
+        this is the studio instructing us, in writing, on how we may handle
+        records about people who never signed anything with us at all.
+        Article 28 requires it to be a contract rather than a description, which
+        is the difference between this and the paragraph in the privacy notice
+        that says the same thing.
+
+        ⚠️ AND IT IS FORCED BY THE COLLECTIONS RATHER THAN BY MEMORY. The moment
+        one of them declares `holding.kind === "personal"`, this manifest does not
+        compose without a document with this id — see `agreementProblems`.
+      */
+      {
+        id: "dpa",
+        version: "2026-01-01",
+        title: "Data processing agreement",
+        body: [
+          "This is the studio's instruction to us about the records it keeps on the people it coaches. For those records the studio decides what is collected and why; we hold them, and we act only on what the studio asks for. For a studio's own account and its bill with us, we decide, and the privacy notice covers that.",
+          "What we do with them: store them, show them to the staff the studio gives access to, and run the specific features the studio uses. Nothing else. They are not sold, not shared with another studio, and not used to train anybody's model.",
+          "Who else touches them: the companies listed as sub-processors, each for one named job, each under its own processing terms. That list is generated from the product itself rather than maintained by hand, so a feature that sends data somewhere new cannot ship before the list says so. We will not add a sub-processor without the list changing, which is visible here.",
+          "Where they are: in the region the studio chose when its workspace was created, apart from sign-in records, which are held separately. Transfers out of the EEA are covered per sub-processor and named in the list.",
+          "Security: access to a workspace is by passkey or a one-time code, never a password. Staff access is per person and per role. Anybody from our side entering a workspace to help is time-boxed, has to give a reason, is announced to the workspace, and is on the record.",
+          "If something goes wrong: we tell the studio without undue delay and give it what it needs to make its own notification, because the notification is the studio's to make.",
+          "Getting them back or ending this: the studio can export everything at any time, and closing a workspace exports before erasing. Erasure is derived from the same declarations the product is built from, so it covers everything rather than a list somebody remembered to update.",
+          "Somebody exercising a right — a copy, a correction, an erasure — asks the studio, and the studio can do all three from inside the product. Where they ask us, we pass it to the studio rather than acting on it ourselves.",
+        ].join("\n\n"),
+        mustAccept: ["owner"],
+      },
     ],
+    /*
+      ⚠️ THE WHOLE LIST, AND A GUARD CHECKS IT AGAINST WHAT THE CODE ACTUALLY
+      REACHES. An entry nothing calls fails; a call to somebody with no entry
+      fails. That is what stops this going stale the first time a feature is
+      added, which is the failure every hand-maintained sub-processor list has.
+
+      ⚠️ AND THEIR CERTIFICATIONS ARE LINKED, NEVER COPIED. Cloudflare's and
+      Google's lists change on their schedule; a copy here is wrong the first
+      time one lapses or is added, and it is wrong in the worst possible place —
+      a compliance claim we made about somebody else. We hold no certification of
+      our own and this file does not imply one.
+    */
+    protection: {
+      /*
+        ⚠️ TWO CONTROLLERS, AND CONFLATING THEM IS THE MOST CONSEQUENTIAL MISTAKE
+        AVAILABLE HERE. We control the account and the billing relationship with
+        a studio. The STUDIO controls what it records about the people it
+        coaches, and for that we are its processor — so a client's rights run
+        against their studio, and we act on the studio's instruction.
+      */
+      controller: "4DL controls accounts and its own billing. Each studio controls what it records about the people it coaches; for that data 4DL is the studio's processor.",
+      contact: "privacy@4dl.app",
+      assessment: {
+        /*
+          ⚠️ YES, AND THE REASON IS THE PRODUCT RATHER THAN ITS SIZE. Article 35
+          asks about likelihood of high risk, and special-category data about
+          identifiable people on a large scale is its own trigger — this stores
+          weight, sleep, injuries, medication and photographs of bodies.
+        */
+        required: true,
+        note: "Health data about identifiable people, including photographs, is special category under Article 9. An assessment is owed before the first paying studio and is not complete.",
+      },
+      subprocessors: [
+        {
+          id: "cloudflare",
+          name: "Cloudflare, Inc.",
+          role: "Runs the product and stores everything in it — compute, the databases, the object store, the key-value cache and the durable objects.",
+          receives: ["identity", "contact", "credential", "financial", "usage", "content", "health", "biometric"],
+          where: "Workers run at the point of presence nearest the request. Databases and object stores are placed in the region a studio chose.",
+          safeguard: "dpf",
+          terms: "https://www.cloudflare.com/cloudflare-customer-dpa/",
+          trust: "https://www.cloudflare.com/trust-hub/compliance-resources/",
+        },
+        {
+          id: "cloudflare-email",
+          name: "Cloudflare Email Routing and Email Sending",
+          /*
+            ⚠️ THE ONLY MAILER, DELIBERATELY. A second provider is a second
+            processor, a second set of terms and a second place a sign-in code
+            can be read — for a lane that sends one sentence and one link.
+          */
+          role: "Sends the messages this product sends: a sign-in code, an invitation, a notification somebody asked to be emailed.",
+          receives: ["identity", "contact"],
+          where: "Cloudflare's network.",
+          safeguard: "dpf",
+          terms: "https://www.cloudflare.com/cloudflare-customer-dpa/",
+          trust: "https://www.cloudflare.com/trust-hub/compliance-resources/",
+        },
+        /*
+          ⚠️ WORKERS AI IS NOT ON THIS LIST, and it was — which is what the
+          disclosure check found the first time it ran. The platform offers that
+          lane; Kova's catalogue names three models and all three are Gemini, so
+          nothing here reaches it. A company on a sub-processor list that
+          receives nothing is a disclosure that is false in the direction that
+          looks careful, and it is the entry nobody ever removes. Adding a
+          Workers AI model to the catalogue is what puts it back, at the moment
+          it becomes true.
+        */
+        {
+          id: "gemini",
+          name: "Google (Gemini API)",
+          /*
+            ⚠️ THIS ONE RECEIVES HEALTH DATA, and that is why it is worth its own
+            sentence rather than a line in a list. A photograph of a meal, a
+            label, a lab report or a body goes to it. Nothing is stored there by
+            us and nothing is used for training under the paid terms — which is a
+            claim about THEIR terms, linked below rather than restated here.
+          */
+          role: "Reads photographs and drafts text for the features that need a vision model: a meal, a label, a lab report, a body scan.",
+          receives: ["content", "health", "biometric"],
+          where: "Google's infrastructure.",
+          safeguard: "sccs",
+          terms: "https://ai.google.dev/gemini-api/terms",
+          trust: "https://cloud.google.com/security/compliance",
+        },
+        {
+          id: "stripe",
+          name: "Stripe, Inc.",
+          /*
+            ⚠️ BETWEEN US AND A STUDIO ONLY. A studio's own customers pay the
+            studio, on a page the studio owns, with a link the studio configured
+            — we open an intent and learn the outcome. There is no Stripe Connect
+            here and no card number ever reaches this infrastructure, which is the
+            strongest single sentence in this whole declaration.
+          */
+          role: "Takes a studio's payment for its own plan and its credits. Never involved in what a studio charges the people it coaches.",
+          receives: ["identity", "contact", "financial"],
+          where: "United States and Ireland.",
+          safeguard: "dpf",
+          terms: "https://stripe.com/legal/dpa",
+          trust: "https://stripe.com/docs/security",
+        },
+        {
+          id: "openfoodfacts",
+          name: "Open Food Facts",
+          /*
+            ⚠️ IT RECEIVES A BARCODE OR A SEARCH TERM AND NOTHING ELSE. No account,
+            no workspace, nobody's name — which is why `receives` says `usage`
+            rather than anything about a person, and the lookup lane is built so
+            that no other value could reach it.
+          */
+          role: "Answers a barcode or a food search when a studio has not entered the food itself.",
+          receives: ["usage"],
+          where: "France.",
+          safeguard: "eea",
+          terms: "https://world.openfoodfacts.org/terms-of-use",
+        },
+        {
+          id: "wger",
+          name: "wger",
+          role: "Answers a movement search when a studio would rather not type one out.",
+          receives: ["usage"],
+          where: "Germany.",
+          safeguard: "eea",
+          terms: "https://wger.de/en/software/terms-of-service",
+        },
+      ],
+    },
     impersonation: { maxMinutes: 30, announce: true },
     auditRetentionDays: 730,
   },
@@ -3718,6 +3899,15 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.26.0",
+      at: "2026-08-10",
+      notes: [
+        "See exactly which companies receive anything held here, what each one receives, where they process it and under what terms — without signing in.",
+        "The processing agreement your studio enters with us is now a document you can read and accept, rather than a paragraph describing one.",
+        "If you run the studio, you can produce the full record of what is processed here and why, on demand, computed from the product rather than written down beside it.",
+      ],
+    },
     {
       version: "0.25.0",
       at: "2026-08-10",

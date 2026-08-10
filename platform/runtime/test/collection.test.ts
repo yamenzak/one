@@ -17,6 +17,7 @@ const owned = collection({
   label: { one: "Entry", many: "Entries" },
   scope: { of: "subject", subject: "customer" },
   version: true,
+  holding: { kind: "none" as const, why: "A fixture. It exists to be a shape, not to hold anybody's data." },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "archive" },
   fields: { note: field.text({ required: true }) },
@@ -107,6 +108,7 @@ const answerable = collection({
   label: { one: "Question", many: "Questions" },
   scope: { of: "tenant" },
   version: true,
+  holding: { kind: "none" as const, why: "A fixture. It exists to be a shape, not to hold anybody's data." },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "purge" },
   fields: {
@@ -229,6 +231,7 @@ const spoken = collection({
   label: { one: "Reading", many: "Readings" },
   scope: { of: "tenant" },
   version: true,
+  holding: { kind: "none" as const, why: "A fixture. It exists to be a shape, not to hold anybody's data." },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "purge" },
   fields: {

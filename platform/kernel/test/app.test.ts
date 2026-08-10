@@ -23,7 +23,11 @@ import { isArchived } from "../src/document.js";
 
 /** The smallest thing the coverage walk will read — it inspects four fields. */
 const stub = { id: "x.do", kind: "write", permission: "x" };
-const stubCollection = { id: "x", label: { one: "X", many: "Xs" }, scope: { of: "tenant" }, fields: {} };
+const stubCollection = {
+  id: "x", label: { one: "X", many: "Xs" }, scope: { of: "tenant" }, fields: {},
+  retention: { days: null, onTenantClose: "purge" },
+  holding: { kind: "none", why: "A fixture. It exists to be a shape, not to hold anybody's data." },
+};
 
 import type { RowBase } from "../src/collection.js";
 import type { Result } from "../src/operation.js";
@@ -250,6 +254,19 @@ const base = {
      an address for it is a consent recorded against nothing. */
   governance: {
     legal: [{ id: "terms", version: "1", title: "Terms", body: "The terms.", mustAccept: ["owner"] }],
+    protection: {
+      controller: "The example controls it.",
+      contact: "privacy@example.test",
+      assessment: { required: false, note: "A fixture processes nobody's data." },
+      subprocessors: [
+        /* ⚠️ TWO ON A FIXTURE, because there is no such thing as a product with
+           none: it runs on somebody's computers and its sign-in code leaves
+           through somebody's mail lane. `disclosureProblems` refuses a manifest
+           that reaches one of these and does not name it. */
+        { id: "cloudflare", name: "Cloudflare, Inc.", role: "Runs it.", receives: ["identity", "usage"] as const, where: "Its network.", safeguard: "dpf" as const, terms: "https://example.test/dpa" },
+        { id: "cloudflare-email", name: "Cloudflare Email", role: "Sends the sign-in code.", receives: ["contact"] as const, where: "Its network.", safeguard: "dpf" as const, terms: "https://example.test/dpa" },
+      ],
+    },
     impersonation: { maxMinutes: 30, announce: true },
     auditRetentionDays: 365,
   },
@@ -421,6 +438,7 @@ describe("a document's own transitions raise events, and they are checked too", 
     collections: [{
       id: "report", label: { one: "Report", many: "Reports" }, scope: { of: "tenant" },
       version: true, retention: { days: null, onTenantClose: "purge" }, onDelete: { on: "archive" },
+      holding: { kind: "none", why: "A fixture. It exists to be a shape, not to hold anybody's data." },
       docStatus: { amendable: false, immutableAfterSubmit: [], emits: { submit: event } },
       fields: { title: {} },
     }],
@@ -765,6 +783,7 @@ describe("a json column says what it holds, or the manifest is refused", () => {
     label: { one: "Note", many: "Notes" },
     scope: { of: "tenant" },
     version: true,
+    holding: { kind: "none" as const, why: "A fixture. It exists to be a shape, not to hold anybody's data." },
     retention: { days: null, onTenantClose: "purge" },
     onDelete: { on: "purge" },
     fields: { body: field.json(schema, { required: true }) },

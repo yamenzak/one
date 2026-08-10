@@ -398,6 +398,7 @@ describe("what a collection says about keeping its rows", () => {
       label: { one: "Thing", many: "Things" },
       scope: { of: "tenant" },
       version: true,
+      holding: { kind: "none" as const, why: "A fixture. It exists to be a shape, not to hold anybody's data." },
       retention: { days: 90, onTenantClose: "purge" },
       onDelete: { on: "archive" },
       fields: { title: field.text({ required: true }) },

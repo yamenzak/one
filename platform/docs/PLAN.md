@@ -1175,6 +1175,15 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `no-wall-clock-in-a-handler` | a handler reading the wall clock, whose behaviour cannot be pinned by a test and whose replay does not reproduce the run it is replaying | **live** |
 | `a-write-speaks` | a write somebody cannot see happen that says nothing — five of them spent a workspace's credits and answered with nothing a screen was told to say, so the person does it again | **live** |
 | `a-consent-refers-to-something` | a legal document declared with no text and no address for it, so every row in the consent ledger is evidence that somebody agreed to something nobody can produce — which is the one thing it would ever be asked for | **live** |
+| `a-collection-says-what-it-holds` | a collection declaring it holds nothing personal while carrying an email address — the declaration is one line, and one line is exactly what somebody writes to make a check go away, so without this it measures diligence rather than truth | **live** |
+| `a-special-category-names-its-condition` | health, biometric or genetic data held with a lawful basis and no Article 9 condition — which is not undocumented processing, it is prohibited processing | **live** |
+| `a-health-vocabulary-cannot-declare-itself-usage` | a collection whose own field names are weight, sleep or bodyfat declaring only ordinary categories, which understates the whole regime that applies to it | **live** |
+| `every-recipient-is-disclosed` | a model, an outbound service or a payment rail the manifest reaches and the sub-processor list does not name — the failure every hand-maintained list has, because nothing anywhere connects adding a feature to disclosing where its data goes | **live** |
+| `no-disclosure-nothing-reaches` | a company disclosed as receiving data that receives none — a false disclosure in the direction that looks careful, and the entry nobody ever removes. It found one on its first run | **live** |
+| `personal-data-obliges-a-dpa` | a product holding personal data with no privacy notice and no Article 28 processing agreement, both owed at a moment nothing anywhere marks | **live** |
+| `a-special-category-obliges-an-assessment` | an app storing health data answering that no impact assessment is required — not a judgement, but the one claim the collections in front of it contradict | **live** |
+| `the-record-of-processing-is-produced` | an Article 30 record that exists as a spreadsheet rather than as a computed answer, describing the product as it was when somebody last had time | **live** |
+| `the-recipients-are-public` | a sub-processor list published behind a session, which is publishing it after the moment Articles 13 and 14 oblige it | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

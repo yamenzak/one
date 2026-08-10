@@ -35,6 +35,7 @@ export const notes = collection({
   scope: { of: "tenant" },
   entitlement: "notes",
   version: true,
+  holding: { kind: "none" as const, why: "A fixture. It exists to be a shape, not to hold anybody's data." },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "archive" },
   activity: true,
@@ -65,6 +66,7 @@ export const receipts = collection({
   // hostage; refusing the next one does not.
   quota: "receiptsStored",
   version: true,
+  holding: { kind: "none" as const, why: "A fixture. It exists to be a shape, not to hold anybody's data." },
   retention: { days: 2555, onTenantClose: "export-then-purge" },
   onDelete: { on: "archive" },
   naming: { series: "RC-.YYYY.-.####" },
@@ -97,6 +99,7 @@ export const entries = collection({
   label: { one: "Entry", many: "Entries" },
   scope: { of: "subject", subject: "customer" },
   version: true,
+  holding: { kind: "none" as const, why: "A fixture. It exists to be a shape, not to hold anybody's data." },
   retention: { days: null, onTenantClose: "purge" },
   onDelete: { on: "archive" },
   activity: true,
@@ -255,6 +258,53 @@ export const hello = defineApp({
   },
   governance: {
     legal: [{ id: "terms", version: "2026-01-01", title: "Terms", body: "What this example does with what you put in it: nothing at all.", mustAccept: ["owner"] }],
+    protection: {
+      controller: "The example controls it.",
+      contact: "privacy@example.test",
+      assessment: { required: false, note: "A fixture processes nobody's data." },
+      /*
+        ⚠️ THREE ENTRIES ON AN APP THAT DOES ALMOST NOTHING, and that is the
+        reference point worth having. There is no such thing as a product with
+        no sub-processors: it runs on somebody's computers, it sends its sign-in
+        code through somebody's mail lane, and the moment it puts a price on a
+        plan somebody settles it. This list was EMPTY, honestly written by
+        somebody who had not added a feature yet, and all three were true then
+        too. The disclosure check is what turned that from an oversight into a
+        composition that does not boot.
+      */
+      subprocessors: [
+        {
+          id: "cloudflare",
+          name: "Cloudflare, Inc.",
+          role: "Runs the product and stores everything in it — compute, the databases, the object store, the cache and the durable objects.",
+          receives: ["identity", "contact", "credential", "financial", "usage", "content"],
+          where: "Workers run at the point of presence nearest the request. Databases and object stores are placed in the region a workspace chose.",
+          safeguard: "dpf",
+          terms: "https://www.cloudflare.com/cloudflare-customer-dpa/",
+          trust: "https://www.cloudflare.com/trust-hub/compliance-resources/",
+        },
+        {
+          id: "cloudflare-email",
+          name: "Cloudflare Email Routing and Email Sending",
+          role: "Sends the messages this product sends: a sign-in code, an invitation, a notification somebody asked to be emailed.",
+          receives: ["identity", "contact"],
+          where: "Cloudflare's network.",
+          safeguard: "dpf",
+          terms: "https://www.cloudflare.com/cloudflare-customer-dpa/",
+          trust: "https://www.cloudflare.com/trust-hub/compliance-resources/",
+        },
+        {
+          id: "stripe",
+          name: "Stripe, Inc.",
+          role: "Takes a workspace's payment for its own plan. Never involved in what a workspace charges anybody else.",
+          receives: ["identity", "contact", "financial"],
+          where: "United States and Ireland.",
+          safeguard: "dpf",
+          terms: "https://stripe.com/legal/dpa",
+          trust: "https://stripe.com/docs/security",
+        },
+      ],
+    },
     impersonation: { maxMinutes: 30, announce: true },
     auditRetentionDays: 365,
   },

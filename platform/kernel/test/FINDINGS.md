@@ -3460,3 +3460,59 @@ one, reporting a correctly-written `tenant-exempt:` three lines up as missing.
 ⚠️ A CHECK THAT REFUSES A REASON SOMEBODY WROTE IS WORSE THAN ONE THAT DOES NOT
 ASK FOR REASONS. It teaches people that the exemption does not work, and what
 they do next is delete the check.
+
+## 261. A sub-processor list nothing connects to the product
+
+The list was written by hand, honestly, and was already wrong in both directions
+on the day it was checked.
+
+**Reached and not disclosed.** `hello` declared an EMPTY list. It runs on
+Cloudflare, sends its sign-in code through a mail lane, and prices a plan — three
+recipients, all true on the day the empty list was written by somebody who had
+not added a feature yet. There is no such thing as a product with no
+sub-processors, and the honest-looking answer is the one that says so.
+
+**Disclosed and not reached.** Kova declared Workers AI. Its catalogue names
+three models and all three are Gemini, so nothing in the product ever sent a
+token there. That is a disclosure that is false in the direction that looks
+careful, which is why it survives: removing an entry feels like claiming less,
+so nobody does.
+
+⚠️ THE FIX IS NOT A BETTER LIST, IT IS A DERIVATION. The only ways an app can
+reach a new recipient are to add a model, declare a service host, or put a price
+on something — and all three are declarations in the manifest. `disclosureProblems`
+makes the composition that adds one refuse to boot until the list says so, in both
+directions. Seventeen mutations of it and of the rest of `protection.ts` were
+killed by `kernel/test/protection.test.ts`.
+
+## 262. Two documents owed at a moment nothing marks
+
+Kova stored weight, sleep, injuries, medication and photographs of bodies, and
+declared a terms and a privacy notice. It had no Article 28 processing agreement
+at all — which is the document that makes us a studio's processor rather than
+somebody describing what we happen to do with its clients' records.
+
+Nothing anywhere was in a position to ask for it. There is no error when a DPA is
+absent, no test that fails, no screen that renders wrong; it is owed at the moment
+a collection first holds somebody's data, and that moment is a normal-looking
+commit.
+
+`agreementProblems` reads it off `holding`: personal data anywhere obliges a
+privacy notice and a `dpa` document, and a SPECIAL category obliges
+`assessment.required: true`. The second one matters more than it looks —
+`required: false` is what somebody types without thinking, and it was what Kova's
+manifest would have carried if the assessment had not been argued out by hand a
+session earlier. It is now the one claim the collections in front of it can
+contradict.
+
+## 263. The anti-trick list had to be made SHORTER to work
+
+`PERSONAL_WORDS` began with `name`, `photo`, `image`, `note` and `comment` on it,
+and failed two collections that were declared honestly: a food has a name, a
+movement has a demonstration image, a note can be about an exercise.
+
+⚠️ A CHECK THAT REFUSES AN HONEST DECLARATION TEACHES PEOPLE TO WEAKEN IT, which
+costs more than the cases it would catch. What is left is the set that is never
+anything but a person — `email`, `passport`, `ssn` — plus a health vocabulary
+caught separately, where the same reasoning runs the other way: `weight` on a
+collection is not the weight of a barbell.

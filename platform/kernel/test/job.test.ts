@@ -70,6 +70,19 @@ const base = {
   help: {}, filePurposes: {},
   governance: {
     legal: [{ id: "terms", version: "1", title: "Terms", body: "The terms.", mustAccept: ["owner"] }],
+    protection: {
+      controller: "The example controls it.",
+      contact: "privacy@example.test",
+      assessment: { required: false, note: "A fixture processes nobody's data." },
+      subprocessors: [
+        /* ⚠️ TWO ON A FIXTURE, because there is no such thing as a product with
+           none: it runs on somebody's computers and its sign-in code leaves
+           through somebody's mail lane. `disclosureProblems` refuses a manifest
+           that reaches one of these and does not name it. */
+        { id: "cloudflare", name: "Cloudflare, Inc.", role: "Runs it.", receives: ["identity", "usage"] as const, where: "Its network.", safeguard: "dpf" as const, terms: "https://example.test/dpa" },
+        { id: "cloudflare-email", name: "Cloudflare Email", role: "Sends the sign-in code.", receives: ["contact"] as const, where: "Its network.", safeguard: "dpf" as const, terms: "https://example.test/dpa" },
+      ],
+    },
     impersonation: { maxMinutes: 30, announce: true },
     auditRetentionDays: 365,
   },
