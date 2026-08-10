@@ -86,10 +86,10 @@ export interface AiSpec {
  * what is held, is a shape in which a caller may hand a different document to
  * each — and unit tests over the halves separately stay green through it.
  */
-export function planFeature(spec: AiSpec, featureId: string, prompt: string): Run | null {
+export function planFeature(spec: AiSpec, featureId: string, prompt: string, rates: Rates = {}): Run | null {
   const feature = spec.features[featureId];
   if (!feature) return null;
-  const model = spec.models.find((m) => m.id === feature.model);
+  const model = modelFor(spec, feature.model, rates);
   if (!model) return null;
   return planRun({
     system: feature.system,
@@ -99,6 +99,45 @@ export function planFeature(spec: AiSpec, featureId: string, prompt: string): Ru
     rate: model.rate,
   });
 }
+
+/**
+ * What one model costs, with the deployment's own answer preferred.
+ *
+ * ⚠️ A RATE IS A FACT ABOUT A PROVIDER'S PRICE LIST, IDENTICAL IN EVERY PRODUCT,
+ * and getting one wrong is a transfer rather than a bug: the reserve is the cap
+ * on what may be charged, so every unit an out-of-date rate fails to count is a
+ * unit the platform pays for and nobody is billed. A manifest is a deploy; a
+ * price change is not. So the declared catalogue is a FLOOR — what an app ships
+ * knowing — and a shared, correctable rate wins over it.
+ *
+ * ⚠️ IT NEVER INVENTS A MODEL. A rate for something the app does not declare is
+ * ignored, because the system text, the output ceiling and the daily bound are
+ * the app's and there is nothing here to supply them. A catalogue entry cannot
+ * turn into a feature.
+ */
+export function modelFor(spec: AiSpec, modelId: string, rates: Rates = {}): ModelSpec | null {
+  const declared = spec.models.find((m) => m.id === modelId);
+  if (!declared) return null;
+  const shared = rates[modelId];
+  if (!shared) return declared;
+  return {
+    ...declared,
+    rate: shared.rate,
+    /* ⚠️ Whether a model reasons is a fact about the model, so it travels too. */
+    ...(shared.thinking === undefined ? {} : { thinking: shared.thinking }),
+  };
+}
+
+/**
+ * Rates a deployment holds centrally, by model id.
+ *
+ * ⚠️ THE KEY IS THE PROVIDER PATH, which is why the id IS the path. A short slug
+ * beside a `path` column is one indirection, and it is the one that kept a
+ * shipping product's catalogue from ever being shared: two apps chose different
+ * slugs for the same model, so a rate published by one was invisible to the
+ * other.
+ */
+export type Rates = Readonly<Record<string, { readonly rate: { readonly input: number; readonly output: number }; readonly thinking?: boolean }>>;
 
 /* -------------------------------------------------------------- refusals --- */
 

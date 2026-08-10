@@ -10,8 +10,8 @@
  */
 
 import type { AnyOperation, AppSpec, BindingSpec, ConfigRegistry, Instant, SqlHandle } from "@one/kernel";
-import { operation, s } from "@one/kernel";
-import { lines, readAll, refuseWrite, writeOne } from "./config.js";
+import { modelFor, operation, s } from "@one/kernel";
+import { lines, readAll, readRates, refuseRate, refuseWrite, writeOne, writeRate } from "./config.js";
 import { OPERATE } from "./operator-ops.js";
 
 /** ⚠️ A symbol, so an app cannot reach the secret store by writing a property name. */
@@ -29,7 +29,7 @@ export interface ConfigCarrier { readonly [CONFIG]: ConfigDeps }
 
 const deps = (ctx: unknown): ConfigDeps => (ctx as ConfigCarrier)[CONFIG];
 
-export function configOperations<B extends BindingSpec>(_app: AppSpec<B>): readonly AnyOperation[] {
+export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readonly AnyOperation[] {
   const read = operation({
     id: "admin.config",
     kind: "read",
@@ -98,5 +98,96 @@ export function configOperations<B extends BindingSpec>(_app: AppSpec<B>): reado
     },
   });
 
-  return [read, write] as unknown as readonly AnyOperation[];
+  /* ------------------------------------------------------------- models --- */
+
+  /*
+    ⚠️ ONLY WHERE AN APP GENERATES. A catalogue screen in a product that asks no
+    model anything is a surface that can only ever be wrong — and mounting it
+    would make "which models are on" a question about a deployment rather than
+    about a product.
+  */
+  const catalogue = app.ai
+    ? [
+        operation({
+          id: "admin.models",
+          kind: "read",
+          summary: "What each model this app uses costs, and where that number came from.",
+          input: s.object({}),
+          output: s.object({ models: s.json() }),
+          permission: OPERATE,
+          idempotency: { mode: "none" },
+          async handler(ctx) {
+            const d = deps(ctx);
+            const rates = await readRates(d.shared);
+            /*
+              ⚠️ THE APP'S OWN LIST IS WHAT IS SHOWN, priced by the shared
+              catalogue where it has an answer. Listing every row in the shared
+              store instead would show an operator models this product cannot
+              ask anything — which reads as a feature that is switched off.
+            */
+            return {
+              models: app.ai!.models.map((declared) => {
+                const live = modelFor(app.ai!, declared.id, rates)!;
+                return {
+                  id: live.id, provider: live.provider,
+                  rate: live.rate, thinking: live.thinking ?? false,
+                  /* ⚠️ Which number is in force, so a stale shared rate is visible. */
+                  source: rates[declared.id] ? "shared" : "app",
+                  declared: declared.rate,
+                };
+              }),
+            };
+          },
+        }),
+        operation({
+          id: "admin.models.rate",
+          kind: "write",
+          summary: "Publish what a model costs, for every app behind this deployment.",
+          input: s.object({
+            id: s.text({ min: 1, max: 200 }),
+            input: s.number({ min: 0 }),
+            output: s.number({ min: 0 }),
+            thinking: s.optional(s.bool()),
+          }),
+          output: s.object({ id: s.text() }),
+          permission: OPERATE,
+          idempotency: { mode: "natural", key: "id" },
+          audit: (i: { id: string }) => ({ subject: i.id, verb: "price" }),
+          outcome: { message: "Published", tone: "success", invalidates: ["admin.models"] },
+          fails: ["platform.invalid", "platform.unavailable"],
+          tool: false,
+          async handler(ctx, input: { id: string; input: number; output: number; thinking?: boolean }) {
+            const d = deps(ctx);
+            /*
+              ⚠️ A RATE FOR A MODEL THIS APP DOES NOT DECLARE IS REFUSED. Nothing
+              here can supply the system text, the output ceiling or the daily
+              bound, so a catalogue row cannot become a feature — and one saved
+              for a model nobody asks is a number an operator can see and no
+              reserve will ever read.
+            */
+            const declared = app.ai!.models.find((m) => m.id === input.id);
+            if (!declared) ctx.fail("platform.invalid", { field: "id", reason: "not a model this app declares" });
+            /*
+              ⚠️ ZERO IS REFUSED ON THE WAY IN. Saved, it makes the model
+              unmetered for EVERY app behind this store: the reserve is zero, the
+              settle is zero, the balance never moves, and the provider invoices
+              as usual.
+            */
+            if (refuseRate({ input: input.input, output: input.output })) {
+              ctx.fail("platform.invalid", { field: "rate", reason: "a rate of zero is not free, it is unmetered" });
+            }
+            if (!d.shared) ctx.fail("platform.unavailable", { reason: "this deployment binds no shared configuration store" });
+
+            await writeRate(d.shared!, {
+              id: input.id, provider: declared!.provider,
+              rate: { input: input.input, output: input.output },
+              ...(input.thinking === undefined ? {} : { thinking: input.thinking }),
+            }, ctx.now() as Instant);
+            return { id: input.id };
+          },
+        }),
+      ]
+    : [];
+
+  return [read, write, ...catalogue] as unknown as readonly AnyOperation[];
 }

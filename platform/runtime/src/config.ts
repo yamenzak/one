@@ -17,7 +17,7 @@
  * values and nothing else, which is what a self-host and every test run are.
  */
 
-import type { Instant, ConfigRegistry, SchemaModule, SqlHandle } from "@one/kernel";
+import type { Instant, ConfigRegistry, Rates, SchemaModule, SqlHandle } from "@one/kernel";
 import { redactConfig, resolveConfig, writableToShared } from "@one/kernel";
 
 /**
@@ -116,4 +116,72 @@ export function refuseWrite(key: string, scope: "app" | "shared", registry: Conf
 export function chargeableFrom(values: Values): boolean {
   const mode = values["stripe.mode"] === "live" ? "live" : "test";
   return (values[`stripe.${mode}.secret_key`] ?? "") !== "";
+}
+
+/* ------------------------------------------------------------- the models --- */
+
+/**
+ * The model catalogue, shared.
+ *
+ * ⚠️ IT LIVES IN THE SHARED STORE BECAUSE A RATE IS THE SAME EVERYWHERE. One
+ * Google account, one price list; holding a copy per app means a price change is
+ * a deploy per app, or one app quietly keeps the old number — and the old number
+ * is not a cosmetic error. The reserve is the cap on what may be charged, so
+ * every unit an out-of-date rate fails to count is a unit the platform pays for
+ * and nobody is billed, silently, on every call.
+ *
+ * ⚠️ WHAT IS NOT HERE: which models a product turns ON, what it asks them for,
+ * and how often one person may ask. Those are the app's, and a platform holding
+ * them would be a platform every product had to be edited into.
+ */
+export const MODEL_SCHEMA: SchemaModule = {
+  id: "ai_model",
+  ddl: [
+    `CREATE TABLE IF NOT EXISTS ai_model (id TEXT PRIMARY KEY, provider TEXT NOT NULL, rate_input REAL NOT NULL, rate_output REAL NOT NULL, thinking INTEGER, at TEXT NOT NULL);`,
+  ],
+};
+
+export async function readRates(db: SqlHandle | null): Promise<Rates> {
+  if (!db) return {};
+  const rows = await db.all<{ id: string; rate_input: number; rate_output: number; thinking: number | null }>(
+    `SELECT id, rate_input, rate_output, thinking FROM ai_model`,
+  ).catch(() => []);
+  const out: Record<string, { rate: { input: number; output: number }; thinking?: boolean }> = {};
+  for (const row of rows) {
+    out[row.id] = {
+      rate: { input: row.rate_input, output: row.rate_output },
+      /* ⚠️ Null is "the app's declaration stands", not "false". */
+      ...(row.thinking === null ? {} : { thinking: row.thinking === 1 }),
+    };
+  }
+  return out;
+}
+
+export type RateRefusal = "unmetered";
+
+/**
+ * Publish one rate.
+ *
+ * ⚠️ ZERO IS REFUSED HERE TOO, and not as a copy of the composition check. That
+ * one reads a manifest at boot; this one is a live write from a console, and
+ * a rate of zero saved into the shared store makes a model unmetered for EVERY
+ * app behind it — the reserve is zero, the settle is zero, the balance never
+ * moves, and the provider invoices as usual.
+ */
+export function refuseRate(rate: { readonly input: number; readonly output: number }): RateRefusal | null {
+  return rate.input > 0 && rate.output > 0 ? null : "unmetered";
+}
+
+export async function writeRate(
+  db: SqlHandle,
+  model: { readonly id: string; readonly provider: string; readonly rate: { readonly input: number; readonly output: number }; readonly thinking?: boolean },
+  at: Instant,
+): Promise<void> {
+  await db.run(
+    `INSERT INTO ai_model (id, provider, rate_input, rate_output, thinking, at) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET provider = excluded.provider, rate_input = excluded.rate_input,
+       rate_output = excluded.rate_output, thinking = excluded.thinking, at = excluded.at`,
+    model.id, model.provider, model.rate.input, model.rate.output,
+    model.thinking === undefined ? null : model.thinking ? 1 : 0, at,
+  );
 }

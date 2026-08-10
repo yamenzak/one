@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { aiProblems, planFeature, type AiSpec } from "../src/generation.js";
+import { aiProblems, modelFor, planFeature, type AiSpec } from "../src/generation.js";
 
 const spec = (over: Partial<AiSpec> = {}): AiSpec => ({
   models: [{ id: "gemini-2.5-flash", provider: "google", rate: { input: 1, output: 4 } }],
@@ -123,5 +123,53 @@ describe("a catalogue that cannot be trusted with money", () => {
       const out = aiProblems(spec({ features: { draft: { summary: "D", model: "gemini-2.5-flash", system: "s", maxOutput: 10, dailyPerPerson } } }));
       expect(out.some((p) => p.why.includes("daily ceiling")), String(dailyPerPerson)).toBe(true);
     }
+  });
+});
+
+/* --------------------------------------------------------------- rates --- */
+
+/**
+ * ⚠️ THE DECLARED CATALOGUE IS A FLOOR. A manifest is a deploy and a price change
+ * is not, so a shared, correctable rate wins — and an out-of-date rate is not a
+ * cosmetic error: the reserve caps what may be charged, so every unit it fails to
+ * count is a unit the platform pays for and nobody is billed.
+ */
+describe("what a model costs, corrected centrally", () => {
+  it("uses what the app shipped with until somebody says otherwise", () => {
+    expect(modelFor(spec(), "gemini-2.5-flash")!.rate).toEqual({ input: 1, output: 4 });
+  });
+
+  it("prefers the published rate", () => {
+    const live = modelFor(spec(), "gemini-2.5-flash", { "gemini-2.5-flash": { rate: { input: 3, output: 9 } } })!;
+    expect(live.rate).toEqual({ input: 3, output: 9 });
+    /* ⚠️ And nothing else about the model moves with it. */
+    expect(live.provider).toBe("google");
+  });
+
+  it("holds more once the published rate is higher", () => {
+    const before = planFeature(spec(), "draft", "x")!.reserve;
+    const after = planFeature(spec(), "draft", "x", { "gemini-2.5-flash": { rate: { input: 3, output: 12 } } })!.reserve;
+    expect(after).toBeGreaterThan(before);
+  });
+
+  /*
+    ⚠️ WHETHER A MODEL REASONS IS A FACT ABOUT THE MODEL, so it travels with the
+    rate — a model that starts thinking and is still budgeted as one that does
+    not is an under-count on every call to it.
+  */
+  it("carries whether it reasons, and leaves the app's answer alone when silent", () => {
+    expect(modelFor(spec(), "gemini-2.5-flash", { "gemini-2.5-flash": { rate: { input: 1, output: 4 }, thinking: true } })!.thinking).toBe(true);
+    const quiet = spec({ models: [{ id: "gemini-2.5-flash", provider: "google", rate: { input: 1, output: 4 }, thinking: true }] });
+    expect(modelFor(quiet, "gemini-2.5-flash", { "gemini-2.5-flash": { rate: { input: 2, output: 8 } } })!.thinking).toBe(true);
+  });
+
+  /*
+    ⚠️ AND A RATE NEVER INVENTS A MODEL. The system text, the output ceiling and
+    the daily bound are the app's, and nothing in a catalogue can supply them —
+    so a row for something this app does not declare is ignored rather than
+    turned into something it can be asked for.
+  */
+  it("ignores a rate for a model this app does not declare", () => {
+    expect(modelFor(spec(), "gpt-9-ultra", { "gpt-9-ultra": { rate: { input: 1, output: 1 } } })).toBeNull();
   });
 });

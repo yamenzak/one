@@ -149,7 +149,7 @@ without one.
 | `[x]` | `nutrition-week` | client | See a week of eating rather than one day at a time |
 | | **operator** | | |
 | `[x]` | `op-adjust` | operator | Adjust one studio's ceilings without editing the plan everybody is on |
-| `[ ]` | `op-ai` | operator | Choose which models are on, and what they cost |
+| `[x]` | `op-ai` | operator | Choose which models are on, and what they cost |
 | `[ ]` | `op-catalog` | operator | Edit what the platform sells: prices, ceilings, features, trials |
 | `[x]` | `op-comp` | operator | Put a studio on a plan without a payment, for a reason |
 | `[ ]` | `op-domains` | operator | See and troubleshoot studios' custom domains |

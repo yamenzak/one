@@ -32,6 +32,8 @@ export default defineWorkersConfig({
             DIRECTORY: "one-kova-directory",
             /* The default region keeps the bare name; a second is ADDITIVE beside it. */
             DB: "one-kova-auto",
+            /* ⚠️ The store every app binds by the same id — see `sharedConfigBinding`. */
+            SHARED: "one-shared-config",
           },
           r2Buckets: { MEDIA: "one-kova-media" },
           kvNamespaces: ["CACHE"],

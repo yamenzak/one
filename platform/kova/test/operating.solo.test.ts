@@ -349,8 +349,8 @@ describe("configuring the deployment", () => {
     const keys = out.body.keys as unknown as { key: string; secret: boolean; source: string }[];
     expect(keys.map((k) => k.key)).toContain("stripe.mode");
     expect(keys.find((k) => k.key === "stripe.test.secret_key")!.secret).toBe(true);
-    /* ⚠️ No shared store bound here, and it says so rather than implying one. */
-    expect(out.body.shared).toBe(false);
+    /* ⚠️ Kova binds the shared store, and the answer says so rather than implying it. */
+    expect(out.body.shared).toBe(true);
   });
 
   it("is not reachable from inside a studio", async () => {
@@ -406,19 +406,120 @@ describe("configuring the deployment", () => {
     SOMEWHERE. Silently writing the shared value into this app's own store would
     be a key that works here and nowhere else, discovered by the second app.
   */
-  it("refuses a shared write where there is nothing shared to write to", async () => {
-    const out = await operator("/api/admin.config.set", { key: "stripe.mode", value: "live", scope: "shared" });
-    expect(out.status).toBe(503);
-    /*
-      ⚠️ A STATED REFUSAL, NOT A CRASH. Reaching for a store that is not there
-      throws, and the runtime turns any throw into the same 503 — so asserting
-      the status alone cannot tell "we told you" from "it fell over", and the
-      version that falls over writes nothing while saying nothing either.
-    */
-    expect(out.body.meta).toMatchObject({ reason: "this deployment binds no shared configuration store" });
+  /*
+    ⚠️ A SHARED WRITE LANDS IN THE SHARED STORE AND IS READ BACK FROM IT. That is
+    the whole point: one Stripe account behind every product, so a rotated key is
+    pasted once rather than once per app — and the answer says WHERE the live
+    value came from, because typing a local value over a shared one pins this app
+    to a copy that will not follow the next rotation.
+  */
+  it("puts a shared key where every app behind this deployment reads it", async () => {
+    expect((await operator("/api/admin.config.set", { key: "stripe.mode", value: "live", scope: "shared" })).status).toBe(200);
+    const keys = (await operator("/api/admin.config")).body.keys as unknown as { key: string; value: unknown; source: string }[];
+    const mode = keys.find((k) => k.key === "stripe.mode")!;
+    expect(mode.value).toBe("live");
+    expect(mode.source).toBe("shared");
+  });
 
-    /* ⚠️ And it did not quietly land in this app's own store instead. */
-    const keys = (await operator("/api/admin.config")).body.keys as unknown as { key: string; source: string }[];
-    expect(keys.find((k) => k.key === "stripe.mode")!.source).toBe("unset");
+  /*
+    ⚠️ AND A KEY DECLARED PER-APP MAY NOT GO THERE, however tempting. Each app
+    registers its own payment webhook and gets its own signing secret; sharing
+    one makes every app fail verification but the one that saved it last.
+  */
+  it("refuses a per-app key aimed at the shared store", async () => {
+    const out = await operator("/api/admin.config.set", { key: "stripe.webhook_secret", value: "whsec_x", scope: "shared" });
+    expect(out.status).toBe(400);
+    expect(out.body.meta).toMatchObject({ field: "scope" });
+  });
+});
+
+/* ------------------------------------------------------- the catalogue --- */
+
+/**
+ * ⚠️ A RATE IS A FACT ABOUT A PROVIDER'S PRICE LIST, IDENTICAL IN EVERY PRODUCT,
+ * and getting one wrong is a transfer rather than a bug: the reserve caps what
+ * may be charged, so every unit an out-of-date rate fails to count is a unit the
+ * platform pays for and nobody is billed. A manifest is a deploy and a price
+ * change is not, so the declared catalogue is a FLOOR and the shared store wins.
+ *
+ * ⚠️ SOLO, because publishing one changes what every app behind this deployment
+ * charges — which is the whole point, and exactly why it cannot run beside a
+ * suite that is generating.
+ */
+describe("what a model costs", () => {
+  const attach = () => {
+    (env as Record<string, unknown>).AI = {
+      async run() { return { output: { weeks: [] }, usage: { input: 10, output: 10 } }; },
+    };
+  };
+
+  const balance = async () =>
+    Number((await coach("/api/ai.spending")).body.balance);
+
+  it("shows the app's own models, priced by the manifest until somebody says otherwise", async () => {
+    const out = await operator("/api/admin.models");
+    expect(out.status).toBe(200);
+    const models = out.body.models as unknown as { id: string; rate: { input: number; output: number }; source: string }[];
+    const flash = models.find((m) => m.id === "gemini-2.5-flash")!;
+    expect(flash.rate).toEqual({ input: 1, output: 4 });
+    expect(flash.source).toBe("app");
+  });
+
+  it("charges at the manifest's rate before anything is published", async () => {
+    attach();
+    await operator("/api/admin.topup", { tenantId, amount: 200_000, reason: "for the rate test", ref: "rates-1" });
+    const before = await balance();
+    /* 10 × 1 + 10 × 4 = 50 */
+    expect((await coach("/api/ai.draft-plan", { brief: "four weeks for a beginner, twice a week" })).status).toBe(200);
+    expect(before - (await balance())).toBe(50);
+  });
+
+  /*
+    ⚠️ AND PUBLISHING ONE CHANGES WHAT IS CHARGED, WITHOUT A DEPLOY. That is the
+    difference between a price list a person can correct in a minute and one that
+    waits for a release — and while it waits, the platform is paying.
+  */
+  it("charges at the published rate once one exists", async () => {
+    attach();
+    expect((await operator("/api/admin.models.rate", { id: "gemini-2.5-flash", input: 2, output: 8 })).status).toBe(200);
+
+    const models = (await operator("/api/admin.models")).body.models as unknown as { id: string; rate: { input: number; output: number }; source: string; declared: { input: number } }[];
+    const flash = models.find((m) => m.id === "gemini-2.5-flash")!;
+    expect(flash.rate).toEqual({ input: 2, output: 8 });
+    expect(flash.source).toBe("shared");
+    /* ⚠️ What the app shipped with is still shown, so a stale rate is visible. */
+    expect(flash.declared.input).toBe(1);
+
+    const before = await balance();
+    /* 10 × 2 + 10 × 8 = 100 */
+    expect((await coach("/api/ai.draft-plan", { brief: "four weeks for a beginner, twice a week" })).status).toBe(200);
+    expect(before - (await balance())).toBe(100);
+  });
+
+  /*
+    ⚠️ A RATE OF ZERO IS NOT FREE, IT IS UNMETERED — for every app behind this
+    store. The reserve is zero, the settle is zero, the balance never moves, and
+    the provider invoices as usual.
+  */
+  it("refuses a rate of zero", async () => {
+    const out = await operator("/api/admin.models.rate", { id: "gemini-2.5-flash", input: 0, output: 8 });
+    expect(out.status).toBe(400);
+    expect(out.body.meta).toMatchObject({ field: "rate" });
+  });
+
+  /*
+    ⚠️ AND A RATE CANNOT INVENT A MODEL. Nothing here supplies a system text, an
+    output ceiling or a daily bound, so a catalogue row saved for a model this
+    app does not declare is a number an operator can see and no reserve reads.
+  */
+  it("refuses a model this app does not declare", async () => {
+    const out = await operator("/api/admin.models.rate", { id: "gpt-9-ultra", input: 1, output: 1 });
+    expect(out.status).toBe(400);
+    expect(out.body.meta).toMatchObject({ field: "id" });
+  });
+
+  it("is not reachable from inside a studio", async () => {
+    expect((await coach("/api/admin.models")).status).toBe(403);
+    expect((await coach("/api/admin.models.rate", { id: "gemini-2.5-flash", input: 1, output: 1 })).status).toBe(403);
   });
 });

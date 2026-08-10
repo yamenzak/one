@@ -2648,3 +2648,44 @@ produces. The mutation survived a test asserting the status.
 carries no `meta` and writes nothing while saying nothing either — so the test
 now checks the reason AND that the value did not quietly land in the app's own
 store instead.
+
+## 216. A price list in a manifest is a price list that waits for a release
+
+The model catalogue — ids, providers, rates — was in each app's manifest, in
+code. So correcting a rate meant editing every app and shipping every app, and
+while that waited the reserve under-counted: it caps what may be charged, so
+every unit an out-of-date rate fails to anticipate is a unit the platform pays
+for and nobody is billed, silently, on every call.
+
+A manifest is a deploy and a price change is not. So the declared catalogue is a
+FLOOR — what an app ships knowing — and a shared, correctable rate wins over it.
+The console shows both, so a stale number is visible rather than merely wrong.
+
+⚠️ AND A RATE NEVER INVENTS A MODEL. The system text, the output ceiling and the
+daily bound are the app's, and nothing in a catalogue can supply them — so a row
+for something an app does not declare is ignored on read and refused on write.
+The read-side half survived a mutation until the kernel had its own test: the
+console refuses the write, so no such row was ever there to expose it.
+
+## 217. The line between shared and per-app is not "is it a secret"
+
+Three keys that look shareable are not, and each fails differently when shared:
+a payment webhook secret is per ENDPOINT, so sharing one makes every app fail
+verification but the last to save; a sender's display name is per PRODUCT, so
+sharing it renames the sender for everybody; a maintenance switch is per
+PRODUCT, so sharing it takes the others down. Requiring a `why` on every
+unshared key is what forces that distinction to be written where the next
+person adding a key will read it.
+
+The reverse line is just as sharp: what a model costs, and the credentials
+behind it, are the same everywhere — so they belong in one store, and holding a
+copy per app is how one product quietly keeps yesterday's key.
+
+## 218. `hello` binds no shared store, on purpose
+
+Both apps binding it would leave the unbound path — a self-host, a
+single-product deployment — untested, and that path has a real failure in it: a
+console offering a shared scope that quietly writes somewhere else is a key that
+works here and nowhere, discovered by the second app. So the reference app is
+the unshared one and Kova is the shared one, and each proves what the other
+cannot.

@@ -1051,7 +1051,7 @@
       "persona": "operator",
       "area": "operator",
       "outcome": "Choose which models are on, and what they cost",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "op-maintenance",

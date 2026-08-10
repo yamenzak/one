@@ -40,6 +40,13 @@ const runtime = createRuntime(kova, {
   */
   config: PLATFORM_CONFIG,
   directoryBinding: "DIRECTORY",
+  /*
+    ⚠️ THE SAME STORE, BY THE SAME ID, IN EVERY APP. One Stripe account, one
+    Google account, one price list: a rotated key is pasted once and a model's
+    rate is one row rather than a deploy per product. Unbound it resolves to this
+    app's own values and nothing else, which is what a self-host is.
+  */
+  sharedConfigBinding: "SHARED",
   identityBinding: "DIRECTORY",
   sessionsBinding: "db",
   objectsBinding: "media",

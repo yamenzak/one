@@ -15,8 +15,8 @@
  * production by getting a config wrong and the other is not reachable at all.
  */
 
-import type { AiSpec, InferenceHandle, Instant, SchemaModule, SqlHandle } from "@one/kernel";
-import { planFeature, settle } from "@one/kernel";
+import type { AiSpec, InferenceHandle, Instant, Rates, SchemaModule, SqlHandle } from "@one/kernel";
+import { modelFor, planFeature, settle } from "@one/kernel";
 import { balance, hold as holdCredits, record } from "./ledger.js";
 
 /** The unit every generation is priced in. One word, so two apps cannot disagree. */
@@ -78,6 +78,14 @@ export type Refusal = "unknown_feature" | "unconfigured" | "no_credits" | "daily
 export interface GenerateInput {
   readonly db: SqlHandle;
   readonly ai: AiSpec | undefined;
+  /**
+   * ⚠️ THE DEPLOYMENT'S OWN RATES, WHICH WIN OVER THE MANIFEST'S. A manifest is
+   * a deploy and a price change is not, so the declared catalogue is a floor and
+   * a shared, correctable rate is preferred — because an out-of-date rate is not
+   * a cosmetic error: the reserve caps what may be charged, so every unit it
+   * fails to count is one the platform pays for and nobody is billed.
+   */
+  readonly rates?: Rates;
   /** ⚠️ Null where the deployment binds no model runner. Refused, never mocked. */
   readonly inference: InferenceHandle | null;
   readonly tenantId: string;
@@ -102,7 +110,7 @@ export interface GenerateInput {
  */
 export async function generate(input: GenerateInput): Promise<Generated> {
   const feature = input.ai?.features[input.feature];
-  const run = input.ai ? planFeature(input.ai, input.feature, input.prompt) : null;
+  const run = input.ai ? planFeature(input.ai, input.feature, input.prompt, input.rates ?? {}) : null;
   if (!feature || !run) return { ok: false, why: "unknown_feature" };
 
   /*
@@ -112,7 +120,7 @@ export async function generate(input: GenerateInput): Promise<Generated> {
   */
   if (!input.inference) return { ok: false, why: "unconfigured" };
 
-  const model = input.ai!.models.find((m) => m.id === feature.model)!;
+  const model = modelFor(input.ai!, feature.model, input.rates ?? {})!;
   /*
     ⚠️ RESIDENCY IS NOT ONLY STORAGE. A region carries a sub-processor
     allow-list, and a model outside it is refused rather than quietly run

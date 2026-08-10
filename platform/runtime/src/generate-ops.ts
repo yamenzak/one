@@ -14,7 +14,7 @@
  * wrong.
  */
 
-import type { AiSpec, AnyOperation, AppSpec, BindingSpec, InferenceHandle, Instant, SqlHandle } from "@one/kernel";
+import type { AiSpec, AnyOperation, AppSpec, BindingSpec, InferenceHandle, Instant, Rates, SqlHandle } from "@one/kernel";
 import { operation, s } from "@one/kernel";
 import { generate, judge, spending, type Generated } from "./generate.js";
 import { balance } from "./ledger.js";
@@ -26,6 +26,8 @@ export const GENERATION = Symbol.for("one.runtime.generation");
 export interface GenerationDeps {
   readonly db: SqlHandle;
   readonly inference: InferenceHandle | null;
+  /** ⚠️ Read lazily: only a request that actually generates pays for the query. */
+  rates(): Promise<Rates>;
   readonly tenantId: string;
   readonly actorId: string;
 }
@@ -55,7 +57,7 @@ export async function generateWith(
 ): Promise<Generated> {
   const d = deps(ctx);
   return generate({
-    db: d.db, ai, inference: d.inference,
+    db: d.db, ai, inference: d.inference, rates: await d.rates(),
     tenantId: d.tenantId, actorId: d.actorId,
     feature, prompt, at: ctx.now(),
   });

@@ -23,7 +23,7 @@ import { MEDIA_SCHEMA } from "./files.js";
 import { GUIDE_SCHEMA } from "./guide.js";
 import { MILESTONE_SCHEMA } from "./milestone.js";
 import { GENERATION_SCHEMA } from "./generate.js";
-import { CONFIG_SCHEMA } from "./config.js";
+import { CONFIG_SCHEMA, MODEL_SCHEMA } from "./config.js";
 import { DIRECTORY_SCHEMA, DOMAIN_SCHEMA } from "./directory.js";
 import { IDENTITY_SCHEMA } from "./identity.js";
 import { OTP_SCHEMA } from "./identity-ops.js";
@@ -65,3 +65,13 @@ export const PLATFORM_GLOBAL: readonly SchemaModule[] = [
   JOB_SCHEMA,
   CONFIG_SCHEMA,
 ];
+
+/**
+ * Everything the platform owns in the store EVERY APP BINDS BY THE SAME ID.
+ *
+ * ⚠️ THIS IS THE ONE LIST THAT IS NOT THIS APP'S. Its tables hold the facts that
+ * are the same behind every product — the credentials, and what a model costs —
+ * so a rotated key is pasted once and a price change is one row rather than a
+ * deploy per app. Nothing here is per workspace and nothing here is per product.
+ */
+export const SHARED_MODULES: readonly SchemaModule[] = [CONFIG_SCHEMA, MODEL_SCHEMA];

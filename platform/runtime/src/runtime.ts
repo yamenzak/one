@@ -22,6 +22,7 @@ import {
   floorPlan, fromQuery, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
+import { applySchema } from "./schema.js";
 import { COMMERCE, commerceOperations, customerOperations, providerOperations, type CommerceCarrier } from "./commerce-ops.js";
 import { INBOX, inboxOperations, type InboxCarrier } from "./inbox-ops.js";
 import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
@@ -29,7 +30,8 @@ import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files
 import { GENERATION, generationOperations, type GenerationCarrier } from "./generate-ops.js";
 import { OPERATOR, operatorOperations, type OperatorCarrier } from "./operator-ops.js";
 import { CONFIG, configOperations, type ConfigCarrier } from "./config-ops.js";
-import { chargeableFrom, readAll } from "./config.js";
+import { chargeableFrom, readAll, readRates } from "./config.js";
+import { SHARED_MODULES } from "./modules.js";
 import { GUIDE, guideOperations, type GuideCarrier } from "./guide-ops.js";
 import { MILESTONES, milestoneOperations, type MilestoneCarrier } from "./milestone-ops.js";
 import { MILESTONE_EARNED, dayIn, earnerOf, recognise } from "./milestone.js";
@@ -632,6 +634,16 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         failure is not a 500, it is every workspace on a self-host stranded in
         setup over OUR misconfiguration.
       */
+      /*
+        ⚠️ THE SHARED STORE IS BOOTED THE FIRST TIME ANY APP TOUCHES IT, and by
+        the platform rather than by an app's own boot hook. Every app binds it by
+        the same id, so leaving the composition to each of them means N chances
+        to forget — and the failure is a table that is not there, read through a
+        `catch` that answers "nothing configured".
+      */
+      const sharedConfigDb = opts.sharedConfigBinding ? globalSql(env, opts.sharedConfigBinding) : null;
+      if (sharedConfigDb) await once("shared-config", () => applySchema(sharedConfigDb, SHARED_MODULES).then(() => undefined));
+
       const chargeable = chargeableFrom(await readAll(directoryDb));
       const sub = at.tenant ? await readSubscription(regionalDb, at.tenant.tenantId) : PARKED;
       const standingState = at.tenant
@@ -895,7 +907,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             app. Null where a deployment binds none, which resolves to this app's
             own values and nothing else.
           */
-          shared: opts.sharedConfigBinding ? globalSql(env, opts.sharedConfigBinding) : null,
+          shared: sharedConfigDb,
           registry: opts.config ?? {},
         },
         [OPERATOR]: {
@@ -914,6 +926,12 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         },
         [GENERATION]: {
           db: regionalDb,
+          /*
+            ⚠️ THE DEPLOYMENT'S OWN RATES, READ LAZILY. Only a request that
+            actually generates pays for the query — and the shared store is where
+            they live, because a price change is not a deploy.
+          */
+          rates: () => readRates(sharedConfigDb),
           /*
             ⚠️ NULL WHERE NOTHING IS BOUND. `generate` refuses on it; nothing
             anywhere substitutes an answer.

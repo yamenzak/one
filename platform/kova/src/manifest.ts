@@ -1182,7 +1182,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.13.0",
+  manifestVersion: "0.14.0",
   bindings,
 
   identity: {
@@ -1659,6 +1659,17 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.14.0",
+      at: "2026-08-10",
+      notes: [
+        "One place for what is the same behind every product: the payment keys, the sign-in widget, the model prices. Set once, not once per app.",
+        "See what each model costs, where that number came from, and what this app shipped expecting — so a price that has moved is visible rather than quietly wrong.",
+        "Correct a price without a release. Until somebody does, the number the app shipped with is what is charged.",
+        "A price of zero is refused: it is not free, it is unmetered, and the provider still invoices.",
+        "A price cannot be set for a model this product does not use — there would be nothing to ask it.",
+      ],
+    },
     {
       version: "0.13.0",
       at: "2026-08-10",

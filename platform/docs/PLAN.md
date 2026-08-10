@@ -1060,6 +1060,10 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `the-mode-picks-the-lane` | a checkout that fails at the till, because both lanes are stored at once and a deployment answered yes on the strength of the wrong one | **live** |
 | `an-undeclared-key-is-refused-not-stored` | a row an operator can see on a screen and no consumer will ever read, which is indistinguishable from a setting that does not work | **live** |
 | `a-refusal-is-not-a-crash` | reaching for a store that is not there, which throws into the same 503 a stated refusal produces — so the status alone cannot tell 'we told you' from 'it fell over' | **live** |
+| `a-rate-is-corrected-in-one-place` | a price change that waits for a deploy per app — and while it waits, the reserve under-counts and the platform pays the difference on every call | **live** |
+| `a-published-rate-cannot-be-unmetered` | one row making a model free for every app behind the store, while the provider invoices as usual | **live** |
+| `a-catalogue-row-cannot-become-a-feature` | a rate saved for something no reserve reads, because the system text, the output ceiling and the daily bound are the app's and nothing here supplies them | **live** |
+| `unbound-changes-nothing` | a single-app deployment broken by a sharing mechanism it does not use | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

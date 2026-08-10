@@ -61,6 +61,12 @@ const runtime = createRuntime(hello, {
   */
   config: PLATFORM_CONFIG,
   directoryBinding: "DIRECTORY",
+  /*
+    ⚠️ DELIBERATELY UNBOUND. `sharedConfigBinding` is what makes one Stripe key
+    serve every product; a deployment with a single app has nothing to share
+    with, and this is the reference app for exactly that shape. Kova binds it.
+    Unbound resolves this app's own values and falls through to nothing.
+  */
   identityBinding: "DIRECTORY",
   sessionsBinding: "db",
   objectsBinding: "media",

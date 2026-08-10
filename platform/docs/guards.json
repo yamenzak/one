@@ -2125,9 +2125,45 @@
       "group": "platform",
       "stage": "7",
       "status": "live",
-      "impl": "kova/test/operating.solo.test.ts",
-      "proves": "refuses a shared write where there is nothing shared to write to",
+      "impl": "hello/test/config.test.ts",
+      "proves": "refuses a shared write, and says why",
       "fails": "reaching for a store that is not there, which throws into the same 503 a stated refusal produces \u2014 so the status alone cannot tell 'we told you' from 'it fell over'"
+    },
+    {
+      "id": "a-rate-is-corrected-in-one-place",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "charges at the published rate once one exists",
+      "fails": "a price change that waits for a deploy per app \u2014 and while it waits, the reserve under-counts and the platform pays the difference on every call"
+    },
+    {
+      "id": "a-published-rate-cannot-be-unmetered",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "refuses a rate of zero",
+      "fails": "one row making a model free for every app behind the store, while the provider invoices as usual"
+    },
+    {
+      "id": "a-catalogue-row-cannot-become-a-feature",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "refuses a model this app does not declare",
+      "fails": "a rate saved for something no reserve reads, because the system text, the output ceiling and the daily bound are the app's and nothing here supplies them"
+    },
+    {
+      "id": "unbound-changes-nothing",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/config.test.ts",
+      "proves": "still resolves this app's own values",
+      "fails": "a single-app deployment broken by a sharing mechanism it does not use"
     }
   ]
 }
