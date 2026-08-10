@@ -1745,3 +1745,37 @@ is always allowed.
 Usage travels on the card as well as inside a strain. "5 of 5" is what somebody
 needs to see BEFORE they are over, and a storefront that only speaks up once a
 ceiling is breached mentions the problem at the moment it is already theirs.
+
+## 144. The inventory caught its own author on the first run
+
+`KOVA.md` §1.1 argues at length that a capability inventory must list outcomes
+and never screens, because the moment it lists screens the rewrite is a port. The
+paragraph existed for a day before the inventory was written — and three of the
+first hundred and fifty-three entries said "page", "screen" and "screen",
+written by the same hand that wrote the paragraph.
+
+That is the whole argument for §3a in one incident. A rule that lives in prose is
+one the author of the prose breaks within a sitting; the same rule as nine
+forbidden words in a script is one nobody breaks twice. It cost four lines.
+
+## 145. An acceptance contract belongs in a registry, not in a document
+
+The inventory is what stage 8 is measured against, so "what is left" and "what
+was dropped, and why" have to be answerable by a command rather than by reading.
+It is `kova-capabilities.json` with a status per entry, the markdown table is
+generated from it, and a `dropped` entry carries a reason — because a capability
+quietly not rebuilt and one deliberately removed look identical in a diff.
+
+Same shape as `guards.json`, for the same reason, and the third inventory in this
+repository to arrive at it independently.
+
+## 146. A survey asks whether a person can SEE a table, not what shape it is
+
+The new schema is free, so "what columns does it have" is not a migration
+question. The question is whether a row is something somebody can look at — those
+travel — or the residue of how the old product worked, which does not. Thirty-five
+tables split cleanly on that question, and the split took minutes because it is
+the only question being asked.
+
+Row counts are deliberately absent: they are a property of a deployment rather
+than of a repository, and a number written into a document is wrong the day after.

@@ -11,7 +11,7 @@ kind: index
 
 | | |
 |---|---|
-| active | none |
+| active | **7** — Kova migration |
 | shipped | 0, 1, 2, 3, 4, 5, 6, 6.5 |
 | open deferrals | 0 — see [DEFERRED.md](DEFERRED.md) |
 
@@ -41,20 +41,21 @@ Generated. Never hand-written.
 
 - [docs/DEFERRED.md](../docs/DEFERRED.md)
 
+## contract
+
+Invariants and rationale. Do not rot; carry a `verified:` date.
+
+- [docs/KOVA-INVENTORY.md](../docs/KOVA-INVENTORY.md) — verified 2026-08-10
+- [docs/MANIFEST.md](../docs/MANIFEST.md) — verified 2026-08-09
+- [docs/STANDARDS.md](../docs/STANDARDS.md) — verified 2026-08-09
+- [docs/UI.md](../docs/UI.md) — verified 2026-08-09
+
 ## plan
 
 Open intentions. Every open item is a `DEFER` marker — see docs/DEFERRED.md.
 
 - [docs/KOVA.md](../docs/KOVA.md)
 - [docs/PLAN.md](../docs/PLAN.md)
-
-## contract
-
-Invariants and rationale. Do not rot; carry a `verified:` date.
-
-- [docs/MANIFEST.md](../docs/MANIFEST.md) — verified 2026-08-09
-- [docs/STANDARDS.md](../docs/STANDARDS.md) — verified 2026-08-09
-- [docs/UI.md](../docs/UI.md) — verified 2026-08-09
 
 ## record
 

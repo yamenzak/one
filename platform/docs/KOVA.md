@@ -48,6 +48,11 @@ complete today, per persona, as a flat checked list. It becomes the acceptance
 contract for the new product, and it is the only artefact that crosses from the
 old codebase to the new one.
 
+**It is written: [KOVA-INVENTORY.md](KOVA-INVENTORY.md)** — 153 capabilities
+across six personas, as a registry rather than prose, with the data survey beside
+it. The rule below is enforced by a script rather than trusted, and it caught
+three violations on its first run.
+
 ⚠️ **IT LISTS OUTCOMES, NOT SCREENS.** "A coach can see how a client's strength
 is trending" is a capability. "The Progress tab has four lenses" is an
 implementation, and writing it down that way is how a rewrite becomes a port

@@ -1282,6 +1282,33 @@
       "impl": "hello/test/commerce.test.ts",
       "proves": "cards a package against every sellable flag, not only the ones it turns on",
       "fails": "a package shown as the features it enables rather than as its position among all of them, so a customer cannot see what a more expensive one would add"
+    },
+    {
+      "id": "inventory-is-outcomes",
+      "group": "docs",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/capabilities.test.mjs",
+      "proves": "an outcome describes what a person accomplishes, not where",
+      "fails": "the capability inventory becoming a screen list \u2014 risk #1 of the whole migration, because the moment a capability is written as an interface the rewrite is a port and every inconsistency the platform exists to end comes back with it"
+    },
+    {
+      "id": "dropped-carries-a-reason",
+      "group": "docs",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/capabilities.test.mjs",
+      "proves": "is dropped with no reason",
+      "fails": "a capability quietly not rebuilt \u2014 a removal and an oversight look identical in a diff, and the inventory is the only place the difference can be recorded"
+    },
+    {
+      "id": "inventory-covers-the-client",
+      "group": "docs",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/capabilities.test.mjs",
+      "proves": "the client half is most of the daily use",
+      "fails": "an inventory written from the studio's side only, so the half of the product that is used every day is not part of the acceptance contract"
     }
   ]
 }
