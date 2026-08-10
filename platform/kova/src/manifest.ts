@@ -16,9 +16,10 @@
 import { daysBetween, daysLeft, progressOf } from "./goals.js";
 import { energyOf, overDays, portionOf, totalOf, type Macros } from "./nutrition.js";
 import { bestOf, consistency, expectedOver, needing, prescribedPerWeek, soonest } from "./reading.js";
-import { drawWith, forgetSubject, generateAbout, generateWith, lapsedAcross, readSettings, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
+import { drawWith, forgetSubject, generateAbout, generateWith, lapsedAcross, lookUp, lookupProblem, readSettings, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
 import { progressWeek, weekAt, WEEKS_SHAPE, type Week } from "./plans.js";
 import { FASTING_ZONES, wellnessOf, zoneAt } from "./living.js";
+import { roundsOf } from "./plans.js";
 import {
   UNLIMITED,
   cache, collection, defineApp, defineBindings, field,
@@ -2157,6 +2158,332 @@ export const rosterAnalytics = operation<
   },
 });
 
+
+
+/* --------------------------------------------------------------- the gym --- */
+
+/**
+ * A session, set by set, on a phone.
+ *
+ * ⚠️ ONE CALL, BECAUSE THE PLACE THIS IS READ IS A GYM. Somebody between sets
+ * has thirty seconds and one hand; five round trips is a screen they stop using.
+ *
+ * ⚠️ AND WHAT THEY NEED IS WHAT THEY LIFTED LAST TIME. It is the most-asked
+ * question in a gym and it is asked per MOVEMENT across every session they have
+ * ever done — which is why a set is rows rather than part of a workout's JSON.
+ */
+export const player = operation<
+  Bindings,
+  { workoutId: string },
+  { day: string; rounds: unknown; done: unknown },
+  "platform.not_found"
+>({
+  id: "workout.player",
+  kind: "read",
+  summary: "Work through today's session set by set, with what you lifted last time.",
+  input: s.object({ workoutId: s.text({ max: 40 }) }),
+  output: s.object({ day: s.text(), rounds: s.json(), done: s.json() }),
+  permission: "set:write",
+  customerFlag: "training",
+  idempotency: { mode: "none" },
+  fails: ["platform.not_found"],
+  async handler(ctx, input: { workoutId: string }) {
+    const db = ctx.bind.db;
+    const workout = await db.first<{ id: string; day: string; programme: string | null; client_id: string }>(
+      `SELECT id, day, programme, client_id FROM ${T.workouts} WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
+      input.workoutId, ctx.tenantId,
+    );
+    if (!workout) ctx.fail("platform.not_found", { field: "workoutId" });
+    /*
+      ⚠️ AND IT IS THEIRS. A subject-scoped read narrows for a customer, but this
+      one takes an id — so the row's own subject is checked rather than assumed,
+      or a client with any workout id reads somebody else's session.
+    */
+    if (ctx.subjectId && workout!.client_id !== ctx.subjectId) ctx.fail("platform.not_found", { field: "workoutId" });
+
+    /* What was prescribed, grouped the way it will be logged. */
+    let rounds: readonly (readonly unknown[])[] = [];
+    if (workout!.programme) {
+      const plan = await db.first<{ weeks: string }>(
+        `SELECT weeks FROM ${T.programmes} WHERE id = ? AND tenant_id = ?`, workout!.programme, ctx.tenantId,
+      );
+      const weeks = (safeJson(plan?.weeks ?? "") ?? []) as Week[];
+      const day = weeks[0]?.days?.[0];
+      if (day) rounds = roundsOf(day);
+    }
+
+    /*
+      ⚠️ LAST TIME IS THE MOST RECENT SET ON ANOTHER DAY, not the most recent set.
+      Without excluding today, the first set somebody logs becomes what they are
+      told they did last time — so the number they are working against is the one
+      they just did, and it climbs with them all session.
+    */
+    const movements = rounds.flat().map((i) => (i as { movement: string }).movement).filter(Boolean);
+    const last: Record<string, { reps: number | null; load: number | null; day: string }> = {};
+    for (const movement of new Set(movements)) {
+      const row = await db.first<{ reps: number | null; load: number | null; day: string }>(
+        `SELECT s.reps, s.load, w.day FROM ${T.sets} s JOIN ${T.workouts} w ON w.id = s.workout
+         WHERE s.tenant_id = ? AND s.client_id = ? AND s.movement = ? AND w.day < ?
+         ORDER BY w.day DESC, s.created_at DESC LIMIT 1`,
+        ctx.tenantId, workout!.client_id, movement, workout!.day,
+      );
+      if (row) last[movement] = row;
+    }
+
+    return {
+      day: workout!.day,
+      rounds: rounds.map((round) => round.map((item) => ({
+        ...(item as object),
+        lastTime: last[(item as { movement: string }).movement] ?? null,
+      }))),
+      /* ⚠️ What is already logged for THIS workout, so a reload does not lose
+         where somebody was. */
+      done: await db.all(
+        `SELECT id, movement, reps, load, round FROM ${T.sets} WHERE tenant_id = ? AND workout = ? ORDER BY created_at ASC`,
+        ctx.tenantId, workout!.id,
+      ),
+    };
+  },
+});
+
+/* ----------------------------------------------------------- the shopfront --- */
+
+/**
+ * What a studio offers, to somebody who is not signed in.
+ *
+ * ⚠️ PUBLIC BY NECESSITY AND NARROW BY DESIGN. A person deciding whether to
+ * enquire has no account, so this answers before there is a session — which
+ * means every field on it is a field the whole internet can read. What travels
+ * is what a studio would put on a poster: its name, what it sells and for how
+ * much. Not who it coaches, not how many, not anybody's name.
+ *
+ * ⚠️ AND IT IS OFF UNTIL THE STUDIO SAYS OTHERWISE, for the same reason
+ * self-registration is: publishing a business's price list is the business's
+ * decision, not a default it discovers.
+ */
+export const shopfront = operation<
+  Bindings,
+  Record<string, never>,
+  { open: boolean; name: string; packages: unknown },
+  never
+>({
+  id: "studio.shopfront",
+  kind: "read",
+  summary: "What this studio offers, before you sign in.",
+  input: s.object({}),
+  output: s.object({ open: s.bool(), name: s.text(), packages: s.json() }),
+  permission: "public",
+  idempotency: { mode: "none" },
+  async handler(ctx) {
+    const settings = await readSettings(ctx.bind.db, KOVA_SETTINGS, ctx.tenantId);
+    if (settings["studio.shopfront"] !== true) return { open: false, name: "", packages: [] };
+
+    /*
+      ⚠️ NOT WRAPPED IN A `catch(() => [])`, and it was. A failing query answered
+      that way is a public page confidently telling a stranger this studio sells
+      nothing — which is indistinguishable from a studio that sells nothing, and
+      is what hid a `WHERE active = 1` against a column that does not exist.
+    */
+    const rows = await ctx.bind.db.all<{ id: string; name: string; price_minor: number; price_currency: string; flags_json: string }>(
+      `SELECT id, name, price_minor, price_currency, flags_json FROM customer_package
+       WHERE tenant_id = ? ORDER BY price_minor ASC LIMIT 20`,
+      ctx.tenantId,
+    );
+
+    return {
+      open: true,
+      name: String(settings["brand.name"] ?? ""),
+      /* ⚠️ Name, price and what it includes. Nothing about who holds one. */
+      packages: rows.map((r) => ({
+        id: r.id, name: r.name,
+        price: { minor: r.price_minor, currency: r.price_currency },
+        includes: Object.entries(safeFlags(r.flags_json)).filter(([, on]) => on).map(([key]) => key),
+      })),
+    };
+  },
+});
+
+const safeFlags = (text: string): Record<string, boolean> => {
+  try {
+    const v = JSON.parse(text) as unknown;
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, boolean>) : {};
+  } catch { return {}; }
+};
+
+/* ------------------------------------------------------- through a scan --- */
+
+/**
+ * The poses, in order, as something a person can be talked through.
+ *
+ * ⚠️ HANDS-FREE MEANS THE SEQUENCE IS THE SERVER'S AND THE SPEAKING IS THE
+ * DEVICE'S. A phone propped against a wall two metres away can read text aloud
+ * and count down without asking us anything — what it cannot do is invent the
+ * order, the framing or the wording, and a product where each client's app made
+ * those up is one where two scans are not comparable.
+ *
+ * ⚠️ AND THE WORDING IS PART OF IT. This is read to somebody standing in their
+ * underwear in front of a camera; "turn to your left, arms relaxed" is the whole
+ * difference between a measurement and an ordeal.
+ */
+export const scanGuide = operation<
+  Bindings,
+  Record<string, never>,
+  { steps: unknown },
+  never
+>({
+  id: "scan.guide",
+  kind: "read",
+  summary: "How to take a body scan, step by step, hands free.",
+  input: s.object({}),
+  output: s.object({ steps: s.json() }),
+  permission: "scan:read",
+  customerFlag: "body",
+  idempotency: { mode: "none" },
+  async handler() {
+    return {
+      steps: [
+        { pose: "front", holdSeconds: 3, say: "Stand facing the camera, feet about hip width apart, arms relaxed by your sides." },
+        { pose: "side", holdSeconds: 3, say: "Turn to your left so the camera sees your side. Arms relaxed, look straight ahead." },
+        { pose: "back", holdSeconds: 3, say: "Turn again so your back is to the camera. Stand as you were for the first one." },
+      ],
+    };
+  },
+});
+
+/* ------------------------------------------------------- looking outward --- */
+
+/**
+ * ⚠️ THREE LOOKUPS, ONE SHAPE, AND NONE OF THEM SAVES ANYTHING. Each answers
+ * with something a person then chooses to keep — a food they will log for
+ * months, a movement that goes in a plan. Writing it for them means a library
+ * filling up with rows nobody chose from a service nobody checked.
+ *
+ * ⚠️ AND EACH IS ITS OWN OPERATION RATHER THAN ONE `lookup(service, …)`. A
+ * general one would take the service from the caller, which is the argument this
+ * whole lane exists to remove.
+ */
+export const barcode = operation<
+  Bindings,
+  { code: string },
+  { found: unknown },
+  "platform.not_found" | "platform.unavailable"
+>({
+  id: "food.barcode",
+  kind: "read",
+  summary: "Scan a barcode and get the food rather than typing it.",
+  input: s.object({ code: s.text({ min: 6, max: 20, pattern: /^[0-9]+$/ }) }),
+  output: s.object({ found: s.json() }),
+  permission: "food:read",
+  customerFlag: "nutrition",
+  idempotency: { mode: "none" },
+  fails: ["platform.not_found", "platform.unavailable"],
+  async handler(ctx, input: { code: string }) {
+    /*
+      ⚠️ THE CODE IS A SEGMENT, AND DIGITS ONLY BESIDES. Two defences rather than
+      one: the shape refuses anything that is not a barcode, and the lane escapes
+      whatever gets through — because the shape is the thing somebody widens in
+      six months to accept a different format.
+    */
+    const out = await lookUp<{ product?: Record<string, unknown>; status?: number }>(
+      ctx, "openfoodfacts", ["api", "v2", "product", input.code],
+    );
+    if (!out.ok) {
+      const problem = lookupProblem(out.why);
+      ctx.fail(problem.code, problem.meta);
+    }
+    const body = (out as Extract<typeof out, { ok: true }>).value;
+    if (!body.product) ctx.fail("platform.not_found", { field: "code" });
+    return { found: readFood(body.product!) };
+  },
+});
+
+/**
+ * ⚠️ WHAT COMES BACK IS NARROWED TO WHAT THIS PRODUCT USES, and that is not
+ * tidiness. A third party's whole record carries hundreds of fields, several of
+ * them free text somebody else wrote — handing it to a screen means rendering
+ * whatever they put there, and storing it means keeping it.
+ */
+const readFood = (p: Record<string, unknown>) => {
+  const n = (p.nutriments ?? {}) as Record<string, unknown>;
+  const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  return {
+    name: typeof p.product_name === "string" ? p.product_name.slice(0, 120) : "",
+    brand: typeof p.brands === "string" ? p.brands.slice(0, 120) : "",
+    per100g: {
+      kcal: num(n["energy-kcal_100g"]),
+      protein: num(n.proteins_100g),
+      carbs: num(n.carbohydrates_100g),
+      fat: num(n.fat_100g),
+    },
+  };
+};
+
+export const foodSearch = operation<
+  Bindings,
+  { text: string },
+  { found: unknown },
+  "platform.not_found" | "platform.unavailable"
+>({
+  id: "food.search",
+  kind: "read",
+  summary: "Find a food in a public database when the studio has not entered it.",
+  input: s.object({ text: s.text({ min: 2, max: 60 }) }),
+  output: s.object({ found: s.json() }),
+  permission: "food:read",
+  customerFlag: "nutrition",
+  idempotency: { mode: "none" },
+  fails: ["platform.not_found", "platform.unavailable"],
+  async handler(ctx, input: { text: string }) {
+    const out = await lookUp<{ products?: Record<string, unknown>[] }>(
+      ctx, "openfoodfacts", ["cgi", "search.pl"],
+      { search_terms: input.text, search_simple: "1", action: "process", json: "1", page_size: "10" },
+    );
+    if (!out.ok) {
+      const problem = lookupProblem(out.why);
+      ctx.fail(problem.code, problem.meta);
+    }
+    const body = (out as Extract<typeof out, { ok: true }>).value;
+    /* ⚠️ Bounded here as well as asked for. A service that ignores `page_size`
+       is not a reason for a screen to render a thousand rows. */
+    return { found: (body.products ?? []).slice(0, 10).map(readFood) };
+  },
+});
+
+export const movementSearch = operation<
+  Bindings,
+  { text: string },
+  { found: unknown },
+  "platform.not_found" | "platform.unavailable"
+>({
+  id: "movement.search",
+  kind: "read",
+  summary: "Find a movement in a public catalogue rather than typing it out.",
+  input: s.object({ text: s.text({ min: 2, max: 60 }) }),
+  output: s.object({ found: s.json() }),
+  permission: "movement:write",
+  idempotency: { mode: "none" },
+  fails: ["platform.not_found", "platform.unavailable"],
+  async handler(ctx, input: { text: string }) {
+    const out = await lookUp<{ results?: Record<string, unknown>[] }>(
+      ctx, "wger", ["api", "v2", "exercise", "search"], { term: input.text, language: "2" },
+    );
+    if (!out.ok) {
+      const problem = lookupProblem(out.why);
+      ctx.fail(problem.code, problem.meta);
+    }
+    const body = (out as Extract<typeof out, { ok: true }>).value;
+    return {
+      found: (body.results ?? []).slice(0, 10).map((r) => {
+        const data = (r.data ?? {}) as Record<string, unknown>;
+        return {
+          name: typeof data.name === "string" ? data.name.slice(0, 120) : "",
+          category: typeof data.category === "string" ? data.category.slice(0, 60) : "",
+        };
+      }),
+    };
+  },
+});
+
 /* ------------------------------------------------------------------- ai --- */
 
 /**
@@ -2811,6 +3138,19 @@ export const KOVA_SETTINGS: SettingsSpec = {
       write: "member:manage",
       help: "How many people may be on the roster before self-registration closes. Zero means no limit of its own.",
     },
+    /*
+      ⚠️ OFF UNTIL THE STUDIO SAYS OTHERWISE. Publishing a business's price list
+      is the business's decision rather than a default it discovers — and what is
+      published is readable by the whole internet, which is why it carries what a
+      poster carries and nothing about who is coached here.
+    */
+    "studio.shopfront": {
+      label: "Show what you offer publicly",
+      kind: "bool",
+      fallback: false,
+      write: "commerce:manage",
+      help: "When on, your packages and prices can be read by somebody who has not signed in. Nothing about your clients is included.",
+    },
     "studio.publishFeed": {
       label: "Publish articles to clients",
       kind: "bool",
@@ -2827,7 +3167,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.20.0",
+  manifestVersion: "0.21.0",
   bindings,
 
   identity: {
@@ -3086,6 +3426,17 @@ export const kova = defineApp({
   schemas: { "programme.weeks": WEEKS_SHAPE },
 
   /*
+    ⚠️ THE TWO SERVERS THIS PRODUCT TALKS TO, BY HOST. Neither takes a
+    credential; both are public catalogues. Declaring the host rather than a base
+    URL is what stops a barcode somebody scanned from becoming part of an
+    address — see `@one/kernel`'s `lookup.ts`.
+  */
+  services: {
+    openfoodfacts: { host: "world.openfoodfacts.org", label: "Open Food Facts" },
+    wger: { host: "wger.de", label: "wger exercise database" },
+  },
+
+  /*
     ⚠️ WHAT A STUDIO CHOOSES ABOUT ITSELF, and every one of these is a decision
     a coach makes differently from the studio next door. The three branding keys
     arrive whether they are declared here or not, because the sign-in screen
@@ -3104,14 +3455,22 @@ export const kova = defineApp({
       category: "billing", tone: "info", icon: "card",
       title: "You chose {planId}", link: { to: "inbox" }, roles: ["owner"],
     },
+    /*
+      ⚠️ THE THREE `theirs` ENTRIES BELOW ARE THE STUDIO WRITING TO ITS OWN
+      CUSTOMER, which is why they may be rephrased and the two above them may
+      not. "You chose {planId}" is us writing to the studio about the studio's
+      own bill; a business that could reword its own arrears notice could make
+      one read as though nothing were wrong, for staff who would then not act.
+    */
     "package.granted": {
-      category: "billing", tone: "success", icon: "gift",
+      category: "billing", tone: "success", icon: "gift", theirs: true,
       title: "{days} days added", link: { to: "inbox" }, roles: ["owner", "client"],
     },
     /* ⚠️ The one that matters: a person is told what they are meant to do. */
     "programme.published": {
-      category: "activity", tone: "success", icon: "check",
+      category: "activity", tone: "success", icon: "check", theirs: true,
       title: "You have a new programme",
+      body: "Your coach has published what you are doing next. Open it when you are ready.",
       link: { to: "collection", collection: "programme" },
       roles: ["client"],
     },
@@ -3129,8 +3488,9 @@ export const kova = defineApp({
       roles: ["owner", "trainer"],
     },
     "checkin.answered": {
-      category: "activity", tone: "success", icon: "check",
+      category: "activity", tone: "success", icon: "check", theirs: true,
       title: "Your coach replied",
+      body: "There is an answer waiting on your last check-in.",
       link: { to: "collection", collection: "checkin" },
       roles: ["client"],
     },
@@ -3147,6 +3507,7 @@ export const kova = defineApp({
     draftPlan, parseFood, draftMeals, snapMeal, labelReader, labExtract,
     exerciseGuide, supplementGuide, clientSummary, draftArticle, drawImage, bodyScan,
     fastNow, wellness, today, prefill, compare, selfRegister, rosterAnalytics,
+    barcode, foodSearch, movementSearch, player, shopfront, scanGuide,
   ],
 
   help: {
@@ -3385,6 +3746,22 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.21.0",
+      at: "2026-08-10",
+      notes: [
+        "Scan a barcode, or search a public food database, when the studio has not entered something. Nothing is saved until somebody chooses it.",
+        "Find a movement in a public catalogue rather than typing it out.",
+        "Work through a session set by set on a phone, with what you lifted last time beside each movement — read from a previous day, never from the set you just did.",
+        "Log a set with no signal and have it arrive once when you surface. A queued write that is replayed no longer makes two sets.",
+        "Be talked through a body scan hands-free: the poses in order, with the words to say and how long to hold each.",
+        "Show what your studio offers to somebody who has not signed in — your name, what you sell and for how much, and nothing about who you coach.",
+        "Discount your own prices with a code you control. The use is spent when a payment is confirmed, not when somebody looks at a price.",
+        "Change the words your studio sends and sign them. Ours stay behind anything you leave blank, and the messages we send you about your own bill are not yours to reword.",
+        "Move between the studios you belong to without signing in again.",
+        "Arrange what you see first, so the thing you check hourly is at the top.",
+      ],
+    },
     {
       version: "0.20.0",
       at: "2026-08-10",

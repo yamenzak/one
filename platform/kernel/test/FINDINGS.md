@@ -3034,3 +3034,112 @@ record with an open answer. `asking.test.ts` insists that every collection with 
 `asked` state has a narrower write on its state AND on every field carrying the
 answer — because a decision with an open "what we agreed" field is one the asker
 writes for themselves.
+
+## 240. A hook the platform documented and nobody implemented
+
+`send` on the runtime options carried this comment: *"The decision is the
+platform's; the sending is not — but 'not sending at all' is not a third option.
+Absent, the deployment's own mail lane carries it."*
+
+Absent meant nobody carried it. `dispatch` was handed `opts.send`, which no app
+passed, so every notification whose channel resolved to `email` was rendered,
+counted, returned as a `Delivery` — and dropped. The inbox row was written, so
+nothing looked broken, and the only observable symptom is a person saying they
+were not told.
+
+⚠️ THE COMMENT IS WHAT MADE IT INVISIBLE. It describes the behaviour precisely
+and reads as a statement about the code beneath it. This is the same class as a
+mechanism with no surface, one level down: a mechanism with a documented default
+and no default.
+
+It surfaced only because a test asked for something else entirely — that a
+studio's sign-off appears at the bottom of what its client is sent. There was no
+message to put a sign-off on.
+
+## 241. And the audience said everybody was an owner
+
+Under the missing delivery was a second one. Kova supplied its own `audienceFor`,
+which read every distinct `account_id` out of `sessions` and returned each with
+the role `"owner"`.
+
+Every client-facing notification this product declares — a published programme,
+an answered check-in — has `roles: ["client"]`, and matched nobody. Every
+staff-facing one reached anybody who had ever signed in, including customers.
+Both halves are silent: an inbox empty where it should have a row, and full where
+it should not.
+
+⚠️ THE FIX WAS TO DELETE THE OVERRIDE. The platform's default is the membership
+roster with each person's real role, which is the answer this app was standing in
+front of with something worse. An `audienceFor` is for a product whose audience
+genuinely is not its members; supplying one because the option exists is how a
+default that was right gets replaced by a guess.
+
+## 242. Idempotency was declared on every write and enforced on none
+
+Every operation in this platform declares an `Idempotency`. Nothing read it.
+
+The declaration is not decoration — a payment webhook, a credit grant and an
+offline queue all depend on it — so the honest reading is that a hundred writes
+carried a promise about retry behaviour that nothing kept.
+
+⚠️ AND THE OBVIOUS IMPLEMENTATION WOULD HAVE BEEN WORSE THAN NOTHING. `natural`
+names an input field, and caching a response against it would break `update`:
+two genuine edits to one row carry the same key, and the second would be answered
+with the first one's result and never applied. `natural` is a claim that the
+operation is idempotent BY CONSTRUCTION — publishing a plan that is published,
+deleting a row that is deleted — and needs no table at all.
+
+`client-supplied` is the one with something to enforce, and `create` is the one
+write that needs it: an update names the row it changes, a delete names the row it
+removes, a create names nothing. The key comes from the caller because only the
+caller knows two attempts were one intent — three sets of ten really is three
+identical rows, and a gym is where somebody does the same thing twice on purpose.
+
+## 243. Five tables the platform created and never scoped
+
+Erasure here is derived from what each module declares. The commerce module
+declared four tables and creates nine.
+
+`customer_purchase`, `customer_lapse`, `access_code`, `discount_code` and
+`tenant_payments` were in no scope, so erasing a workspace left its purchase
+history, its lapse policy, its unspent codes — and the secret its own payment
+provider signs webhooks with — in the regional store. Every statement the sweep
+was given succeeded, and it reported that the workspace was erased.
+
+⚠️ `unscopedTables` ALREADY EXISTED AND WAS TESTED AS A FUNCTION. Nothing ever
+ran it over the platform's own modules. A helper written for apps to use, that the
+platform did not use on itself, which is worth noticing as a shape.
+
+`runtime/test/scope.test.ts` walks `PLATFORM_REGIONAL` and allows exactly one
+exemption, with a reason: `sessions` belongs to an account rather than to a
+workspace and has no tenant column to cascade on. The list may only shrink — an
+entry for a table that has since been scoped fails the test, so an excuse written
+once cannot come to cover an oversight added under it.
+
+## 244. A catch that answered a broken query with a confident fact
+
+The public shopfront read a studio's packages with `WHERE active = 1`. There is
+no `active` column. The read was wrapped in `.catch(() => [])`, so the query
+failed on every request and the page told every stranger that this studio sells
+nothing — which is indistinguishable from a studio that sells nothing.
+
+⚠️ THE CATCH WAS THE BUG, NOT THE WRAPPER AROUND IT. It was written to keep a
+public page from 500ing, which is a real concern; what it actually bought was a
+plausible lie in place of an error nobody could see. The read is unwrapped now: a
+shopfront that cannot answer says so.
+
+## 245. An SSRF defence that is a shape rather than a validation
+
+The three public-catalogue lookups added here take a barcode and a search term
+from a customer. The classic failure is not exotic — build
+`https://api.example/v1/${code}`, be handed a code containing `../` or a whole
+other host, and make that request from inside the network the worker sits in.
+
+⚠️ SO THERE IS NO ARGUMENT ANYWHERE THAT COULD CARRY A URL. An app declares the
+services it may reach BY HOST; a caller supplies path SEGMENTS, each escaped; the
+URL is assembled in one function. Validation would be a promise to have thought
+of every character that means something in a URL, and the first version of the
+host check made exactly that promise and lost: it blocked `/`, `:` and `*`, and
+accepted `example.test?a=1`, which puts the whole escaped path inside a query
+string. It is an allow-list now — labels and dots — because a hostname has a
+shape and everything else is a mistake whatever it would have done.

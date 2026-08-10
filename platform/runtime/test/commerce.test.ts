@@ -127,7 +127,8 @@ describe("the customer rail is mounted only where an app declares one", () => {
     const ids = customerOperations(app({ access: withRail })).map((op) => op.id).sort();
     expect(ids).toEqual([
       "commerce.capabilities", "commerce.checkout", "commerce.code.issue", "commerce.codes",
-      "commerce.confirm", "commerce.days", "commerce.grant", "commerce.history",
+      "commerce.confirm", "commerce.days", "commerce.discount.save", "commerce.discounts",
+      "commerce.grant", "commerce.history",
       "commerce.lapse", "commerce.lapse.set", "commerce.override", "commerce.package.save",
       "commerce.packages", "commerce.payments", "commerce.payments.set", "commerce.purchases",
       "commerce.redeem", "webhook.customer",

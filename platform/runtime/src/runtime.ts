@@ -30,7 +30,10 @@ import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files
 import { GENERATION, generationOperations, type GenerationCarrier } from "./generate-ops.js";
 import { OPERATE, OPERATOR, operatorOperations, planOverrides, type OperatorCarrier } from "./operator-ops.js";
 import { CONFIG, configOperations, type ConfigCarrier } from "./config-ops.js";
-import { SETTINGS, settingsOperations, domainAdminOperations, type SettingsCarrier } from "./settings-ops.js";
+import { SETTINGS, settingsFor, settingsOperations, domainAdminOperations, type SettingsCarrier } from "./settings-ops.js";
+import { readSettings, wordingFor } from "./settings.js";
+import { remember, replayed, replayKeyOf, REPLAY_HEADER } from "./replay.js";
+import { LOOKUP, type Fetcher, type LookupCarrier } from "./lookup.js";
 import { chargeableFrom, readAll, readRates } from "./config.js";
 import { send, type Post } from "./mail.js";
 import { SHARED_MODULES } from "./modules.js";
@@ -176,6 +179,12 @@ export interface RuntimeOptions<B extends BindingSpec> {
    * — the one place a wrong sender or a wrong field lives — asserted by nothing.
    */
   readonly post?: Post;
+  /**
+   * ⚠️ THE OUTBOUND LANE FOR DECLARED SERVICES, injected for the same reason the
+   * mailer is: a suite must not be able to reach a real third party by accident,
+   * and the path itself is worth exercising rather than stubbing out.
+   */
+  readonly lookup?: Fetcher;
   /**
    * How to count what a key's ceiling applies to, where a collection cannot.
    *
@@ -586,6 +595,25 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         session,
         setCookie: (value) => cookies.push(value),
         /*
+          ⚠️ ASKED OF EACH REGION, because memberships are regional and the
+          directory is global — so "which of these do I belong to" is a question
+          neither store can answer alone. A list built from the directory alone
+          would be every workspace on the deployment.
+        */
+        mineIn: async (tenantIds) => {
+          const out = new Set<string>();
+          if (!session || tenantIds.length === 0) return out;
+          for (const region of app.tenancy.regions) {
+            const there = regional(env)(region as ResolvedRegion);
+            if (opts.onBoot) await once(region, () => opts.onBoot!.region(there, region));
+            const rows = await (there.db as SqlHandle).all<{ tenant_id: string }>(
+              `SELECT DISTINCT tenant_id FROM membership WHERE account_id = ?`, session.accountId,
+            ).catch(() => []);
+            for (const row of rows) if (tenantIds.includes(row.tenant_id)) out.add(row.tenant_id);
+          }
+          return out;
+        },
+        /*
           ⚠️ THE DEPLOYMENT'S OWN LANE UNLESS THE APP INSISTS. A refusal here is
           reported by `identity.code.request` rather than swallowed: a code that
           could not be sent and a code that was are not the same answer, and
@@ -601,6 +629,39 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           if (!out.ok) throw new Error(`mail:${out.why}`);
         }),
       };
+
+      /**
+       * How an interruption actually leaves the process.
+       *
+       * ⚠️ THE FALLBACK IS THE DEPLOYMENT'S OWN MAIL LANE, and it had to be
+       * written rather than described. `send` was optional with a comment saying
+       * an absent one meant the deployment carried it — and absent meant NOBODY
+       * carried it, so every notification whose channel said `email` was
+       * resolved, rendered, counted and dropped. Which is the failure this whole
+       * platform is a reaction to, sitting inside the platform.
+       *
+       * ⚠️ THE ADDRESS COMES FROM THE ACCOUNT, NOT FROM THE DISPATCH. A delivery
+       * carries who it is for; letting it carry where to send would make every
+       * raise site a place somebody can be mailed from.
+       */
+      const deliver = opts.send ?? (async (delivery: Delivery) => {
+        if (delivery.channel !== "email") return;
+        const who = await directoryDb.first<{ email: string }>(
+          `SELECT email FROM accounts WHERE id = ?`, delivery.userId,
+        ).catch(() => null);
+        /* ⚠️ No address is silence, not a throw. The inbox row is already
+           written and it is the record; mail is the interruption. */
+        if (!who?.email) return;
+        const values = { ...(await readAll(sharedConfigDb)), ...await readAll(directoryDb) };
+        await send(values, {
+          to: who.email,
+          subject: delivery.title,
+          /* ⚠️ A message with no body is its own title. An email whose whole
+             content is a subject line reads as a truncated one. */
+          body: delivery.body ?? delivery.title,
+        }, opts.post ?? ((url, init) => fetch(url, init as RequestInit).then((r) => ({ ok: r.ok }))),
+          new Date().toISOString() as Instant).catch(() => undefined);
+      });
 
       /*
         ⚠️ ONE READ, ONE WALK, AND THE GATE IS DOWNSTREAM OF BOTH. The
@@ -862,7 +923,43 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
        */
       let celebrated: Raised | undefined;
 
+      /**
+       * How this workspace talks — its rephrasings and its sign-off.
+       *
+       * ⚠️ A WORKSPACE THAT HAS CHANGED NOTHING COSTS ONE EMPTY QUERY AND GETS
+       * THE PLATFORM'S WORDS, which is the case for almost every dispatch. The
+       * alternative — resolving it up front on every request — would read a
+       * table on requests that raise nothing at all.
+       */
+      const theirVoice = async (tenantId: string) => {
+        const [wording, values] = await Promise.all([
+          wordingFor(regionalDb, tenantId).catch(() => ({})),
+          readSettings(regionalDb, settingsFor(app), tenantId)
+            .catch(() => ({} as Readonly<Record<string, string | number | boolean>>)),
+        ]);
+        return { wording, signature: String(values["mail.signature"] ?? "") };
+      };
+
       const run = async (target: AnyOperation, payload: unknown, via: AuditEntry["via"]) => {
+        /*
+          ⚠️ A REPLAY IS ANSWERED BEFORE ANYTHING ELSE HAPPENS — before the audit
+          entry, before the handler, before the dispatch. A phone that queued a
+          write in a basement cannot know whether the first attempt landed (the
+          ANSWER is what went missing, not the request), so it asks again; and a
+          second audit row, a second notification and a second set are three
+          things that look like the person did more than they did.
+        */
+        // vocabulary-exempt: the HTTP caller, not somebody's customer — the
+        // mode's own name, declared in the kernel with the same exemption.
+        const replayKey = target.idempotency.mode === "client-supplied"
+          ? replayKeyOf(request.headers.get(REPLAY_HEADER))
+          : "";
+        const replayActor = session?.accountId ?? "anonymous";
+        if (replayKey && at.tenant) {
+          const before = await replayed(regionalDb, at.tenant.tenantId, replayActor, target.id, replayKey);
+          if (before) return before.answer;
+        }
+
         const entry = auditFor(target, payload, via);
         if (entry) audit.push(entry);
         const raw = await target.handler(ctx as never, payload as never);
@@ -891,13 +988,20 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         */
         if (target.emits?.length && at.tenant) {
           const audience = await audienceOf(at.tenant.tenantId as TenantId, regionalDb).catch(() => []);
+          /*
+            ⚠️ READ ONCE FOR THE WHOLE DISPATCH, not once per person. A workspace
+            writing to eleven people is one sentence eleven times, and a lookup
+            inside the loop would be its whole copy read eleven times to send it.
+          */
+          const voice = await theirVoice(at.tenant.tenantId);
           for (const type of target.emits) {
             await dispatch({
               db: regionalDb, registry: app.notifications, tenantId: at.tenant.tenantId,
               type, audience,
               values: interpolatable(payload, result),
               at: new Date().toISOString() as Instant,
-              send: opts.send,
+              ...voice,
+              send: deliver,
             }).catch(() => undefined);
           }
         }
@@ -931,6 +1035,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             */
             const first = earned[0];
             if (first) celebrated = { moment: "celebrate", message: (app.milestones ?? {})[first]!.title };
+            const voice = await theirVoice(at.tenant.tenantId);
             for (const id of earned) {
               await dispatch({
                 db: regionalDb, registry: app.notifications, tenantId: at.tenant.tenantId,
@@ -938,16 +1043,29 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
                 audience: [{ userId: earner, role: personRole }],
                 values: { milestone: id, title: (app.milestones ?? {})[id]!.title },
                 at: new Date().toISOString() as Instant,
-                send: opts.send,
+                ...voice,
+                send: deliver,
               }).catch(() => undefined);
             }
           }
+        }
+        /*
+          ⚠️ REMEMBERED ONLY AFTER THE HANDLER SUCCEEDED. Recording the key first
+          would turn a write that failed halfway into one nobody can retry: the
+          client asks again with the same key and is told, truthfully, that we
+          have seen it, and falsely, that it worked.
+        */
+        if (replayKey && at.tenant) {
+          await remember(
+            regionalDb, at.tenant.tenantId, replayActor, target.id, replayKey,
+            result, new Date().toISOString() as Instant,
+          );
         }
         return result;
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & LookupCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier = {
         [CONFIG]: {
           own: directoryDb,
           /*
@@ -999,6 +1117,18 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           actorId: actor.userId ?? "system",
         },
         [INBOX]: { db: regionalDb, tenantId: at.tenant?.tenantId ?? "", userId: session?.accountId ?? null },
+        [LOOKUP]: {
+          services: app.services ?? {},
+          /* ⚠️ Read lazily: only a request that actually looks something up pays
+             for the query. */
+          values: () => readAll(sharedConfigDb ?? directoryDb),
+          /*
+            ⚠️ THE NETWORK, INJECTED — the same shape as the mail lane. Nothing
+            in a suite can reach a real service by accident, and the path is
+            exercised rather than stubbed out.
+          */
+          fetcher: opts.lookup ?? ((url, init) => fetch(url, init as RequestInit)),
+        },
         [SETTINGS]: {
           db: regionalDb,
           /* ⚠️ The branding copy and the domain claims are looked up before a

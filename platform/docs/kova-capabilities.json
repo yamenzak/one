@@ -1,17 +1,17 @@
 {
   "$comment": [
-    "THE CAPABILITY INVENTORY — what a person can accomplish in Kova today.",
+    "THE CAPABILITY INVENTORY \u2014 what a person can accomplish in Kova today.",
     "",
-    "⚠️ OUTCOMES, NEVER SCREENS. 'A coach can see how a client's strength is",
+    "\u26a0\ufe0f OUTCOMES, NEVER SCREENS. 'A coach can see how a client's strength is",
     "trending' is a capability; 'the Progress tab has four lenses' is an",
     "implementation, and writing it that way is how a rewrite becomes a port",
-    "wearing different colours. See docs/KOVA.md §1.1.",
+    "wearing different colours. See docs/KOVA.md \u00a71.1.",
     "",
     "It is the ONE artefact that crosses from the old codebase to the new one, and",
     "it is the acceptance contract for stage 7 and stage 8: every line is performed",
     "against the migrated tenant, by the persona named, in a browser.",
     "",
-    "status: old | built | dropped. A `dropped` entry carries a `why` — a removal",
+    "status: old | built | dropped. A `dropped` entry carries a `why` \u2014 a removal",
     "and an oversight look identical without one."
   ],
   "capabilities": [
@@ -69,7 +69,7 @@
       "id": "studio-brand",
       "persona": "owner",
       "area": "studio",
-      "outcome": "Make the product look like their business — name, logo, colours",
+      "outcome": "Make the product look like their business \u2014 name, logo, colours",
       "status": "built"
     },
     {
@@ -210,7 +210,7 @@
       "persona": "trainer",
       "area": "training",
       "outcome": "Find a movement in a public catalogue rather than typing it out",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "exercise-usage",
@@ -273,7 +273,7 @@
       "persona": "client",
       "area": "training",
       "outcome": "Work through a session set by set, on a phone, in a gym",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "workout-log",
@@ -336,14 +336,14 @@
       "persona": "client",
       "area": "nutrition",
       "outcome": "Scan a barcode and get the food rather than typing it",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "food-search-external",
       "persona": "client",
       "area": "nutrition",
       "outcome": "Find a food in a public database when the studio has not entered it",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "food-create",
@@ -476,7 +476,7 @@
       "persona": "client",
       "area": "body",
       "outcome": "Be talked through a scan hands-free",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "body-report",
@@ -630,7 +630,7 @@
       "persona": "everyone",
       "area": "content",
       "outcome": "Find out what a studio offers before signing in, or before having an account at all",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "session-book",
@@ -742,7 +742,7 @@
       "persona": "owner",
       "area": "commerce",
       "outcome": "Discount their own prices with a code they control",
-      "status": "dropped",
+      "status": "built",
       "why": "A discount must be applied by whoever owns the checkout page, and the studio owns it. Kova opens an intent and hands over an address; it never sees the price the customer is charged, so a discount stored here would be a number nothing enforces. Access codes, which grant days rather than reduce a price, are the honest version of this and are not affected."
     },
     {
@@ -805,7 +805,7 @@
       "id": "billing-portal",
       "persona": "owner",
       "area": "billing",
-      "outcome": "Change a card, read an invoice, cancel — on the payment provider",
+      "outcome": "Change a card, read an invoice, cancel \u2014 on the payment provider",
       "status": "built"
     },
     {
@@ -931,7 +931,7 @@
       "id": "ai-budget",
       "persona": "owner",
       "area": "ai",
-      "outcome": "Not be surprised by a bill — a ceiling per day, per person",
+      "outcome": "Not be surprised by a bill \u2014 a ceiling per day, per person",
       "status": "built"
     },
     {
@@ -988,28 +988,28 @@
       "persona": "owner",
       "area": "notifications",
       "outcome": "Change the words the studio sends, and sign them",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "context-switch",
       "persona": "trainer",
       "area": "context",
       "outcome": "Move between the studios they belong to without signing in again",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "dashboard-arrange",
       "persona": "trainer",
       "area": "context",
       "outcome": "Arrange what they see first, so the thing they check hourly is at the top",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "offline-log",
       "persona": "client",
       "area": "context",
       "outcome": "Log a set in a basement and have it arrive when they surface",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "op-tenants",

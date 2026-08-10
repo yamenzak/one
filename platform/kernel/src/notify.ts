@@ -76,6 +76,18 @@ export interface NotificationDef {
    * everybody or nobody, and both have shipped.
    */
   readonly roles: readonly string[];
+  /**
+   * ⚠️ WHETHER A WORKSPACE MAY PUT THIS IN ITS OWN WORDS — off unless declared.
+   *
+   * The default is the strict one on purpose. A tenant is a business writing to
+   * its own customers, and the sentence "your session is confirmed" is theirs to
+   * phrase; the sentence "your card was declined" is the PLATFORM writing to the
+   * tenant about the tenant, and a workspace that could rewrite it could reword
+   * its own arrears notice into something reassuring, for staff who would then
+   * not act on it. Opting in per type keeps that distinction visible in the
+   * manifest instead of resting on whoever adds the next notification.
+   */
+  readonly theirs?: boolean;
 }
 
 export type NotificationRegistry = Readonly<Record<string, NotificationDef>>;
@@ -182,4 +194,107 @@ export function danglingLinks(registry: NotificationRegistry, collections: reado
   return Object.entries(registry)
     .filter(([, def]) => def.link.to !== "inbox" && !known.has((def.link as { collection: string }).collection))
     .map(([id]) => id);
+}
+
+/* --------------------------------------------------------- their own words --- */
+
+/**
+ * ONE WORKSPACE'S REPHRASING OF ONE NOTIFICATION.
+ *
+ * ⚠️ A REPLACEMENT FOR THE COPY, NEVER FOR THE MECHANISM. The category, the
+ * tone, the icon, the audience and the destination stay the platform's — those
+ * are what make an inbox triageable and a link real. What a tenant may change is
+ * the sentence, because the sentence is their voice talking to their customers.
+ */
+export interface Wording {
+  readonly title?: string;
+  readonly body?: string;
+}
+
+/** Per notification type, what this workspace says instead. */
+export type WordingBook = Readonly<Record<string, Wording>>;
+
+/**
+ * ⚠️ LONG ENOUGH FOR A PARAGRAPH, SHORT ENOUGH THAT IT IS STILL A NOTIFICATION.
+ * The ceiling is not about storage: a title is rendered into an email subject
+ * and into a row on a phone, and neither has anywhere to put a thousand words.
+ */
+export const MAX_WORDING = 500;
+
+export type WordingRefusal = "unknown_type" | "not_theirs" | "empty" | "unknown_token" | "too_long";
+
+/** Every `{token}` a template interpolates, in the order it uses them. */
+export function tokensIn(template: string): readonly string[] {
+  return [...template.matchAll(/\{(\w+)\}/g)].map((m) => m[1]!);
+}
+
+/**
+ * Whether this workspace may store these words for this type.
+ *
+ * ⚠️ THE TOKEN CHECK IS THE ONE THAT MATTERS, and it is not about tidiness. A
+ * dispatch carries the values the platform's own copy needs and nothing else, so
+ * a rephrasing reaching for `{amount}` on a type that never carries one renders
+ * the literal text `{amount}` — to a customer, in an email, from a business that
+ * thought it was writing a sentence. `render` deliberately leaves an unknown
+ * token in place rather than printing `undefined`, which makes this the moment
+ * to refuse it: at the keyboard of the person who can fix it.
+ *
+ * ⚠️ THE ALLOWED SET IS THE TITLE AND THE BODY TOGETHER, so a workspace may move
+ * a value from one to the other. What it may not do is invent one.
+ */
+export function refuseWording(
+  registry: NotificationRegistry,
+  type: string,
+  wording: Wording,
+): WordingRefusal | null {
+  const def = registry[type];
+  if (!def) return "unknown_type";
+  if (!def.theirs) return "not_theirs";
+
+  const title = (wording.title ?? "").trim();
+  const body = (wording.body ?? "").trim();
+  if (title === "" && body === "") return "empty";
+  if (title.length > MAX_WORDING || body.length > MAX_WORDING) return "too_long";
+
+  const allowed = new Set([...tokensIn(def.title), ...tokensIn(def.body ?? "")]);
+  for (const token of [...tokensIn(title), ...tokensIn(body)]) {
+    if (!allowed.has(token)) return "unknown_token";
+  }
+  return null;
+}
+
+/**
+ * What this notification actually says here.
+ *
+ * ⚠️ BLANK FALLS THROUGH RATHER THAN CLEARING. It is the same rule the config
+ * store uses — non-empty wins, not present wins — and here it is what stops a
+ * half-filled form from sending an email with no subject. A workspace that wants
+ * the platform's words back clears the entry; it does not save an empty box.
+ *
+ * ⚠️ AND AN ENTRY FOR A TYPE THAT IS NOT THEIRS IS IGNORED HERE TOO. The write
+ * refuses one, but a registry can change after a row was stored — a type that
+ * stops being a tenant's to phrase must stop being phrased by them on the same
+ * deploy, not whenever somebody remembers to delete the row.
+ */
+export function saying(def: NotificationDef, override?: Wording): { readonly title: string; readonly body?: string } {
+  const mine = def.theirs ? override : undefined;
+  const title = (mine?.title ?? "").trim() || def.title;
+  const body = (mine?.body ?? "").trim() || def.body;
+  return { title, ...(body ? { body } : {}) };
+}
+
+/**
+ * A workspace's sign-off, on the messages that leave the product.
+ *
+ * ⚠️ THE EMAIL ONLY, AND NOT THE INBOX. An inbox row is already inside the
+ * workspace's own branding, being read by somebody who is signed into it —
+ * repeating "— Anna, Northside Strength" under every line there is noise. An
+ * email arrives among a hundred others and has to say who it is from in its own
+ * body, because the sender address belongs to the deployment rather than to the
+ * business.
+ */
+export function signOff(body: string | undefined, signature: string): string | undefined {
+  const signed = signature.trim();
+  if (signed === "") return body;
+  return body ? `${body}\n\n${signed}` : signed;
 }

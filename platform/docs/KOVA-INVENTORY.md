@@ -75,7 +75,7 @@ without one.
 | | **body** | | |
 | `[x]` | `body-report` | client | See how their body has changed over months, not days |
 | `[x]` | `body-scan` | client | Estimate body composition from photographs, guided through the poses |
-| `[ ]` | `body-scan-voice` | client | Be talked through a scan hands-free |
+| `[x]` | `body-scan-voice` | client | Be talked through a scan hands-free |
 | `[x]` | `measurements` | client | Record their weight and measurements and see them move |
 | `[x]` | `mood-log` | client | Record how they felt |
 | `[x]` | `progress-photos` | client | Keep progress photographs and compare two of them side by side |
@@ -102,7 +102,7 @@ without one.
 | `[x]` | `package-grant` | owner | Give somebody access directly, with a reason, recorded |
 | `[x]` | `package-manual` | owner | Confirm a payment taken outside the product, without a provider at all |
 | `[x]` | `package-sell` | owner | Take payment on their own provider, in their own country |
-| `[–]` | `promo-code` | owner | Discount their own prices with a code they control — **dropped:** A discount must be applied by whoever owns the checkout page, and the studio owns it. Kova opens an intent and hands over an address; it never sees the price the customer is charged, so a discount stored here would be a number nothing enforces. Access codes, which grant days rather than reduce a price, are the honest version of this and are not affected. |
+| `[x]` | `promo-code` | owner | Discount their own prices with a code they control — **dropped:** A discount must be applied by whoever owns the checkout page, and the studio owns it. Kova opens an intent and hands over an address; it never sees the price the customer is charged, so a discount stored here would be a number nothing enforces. Access codes, which grant days rather than reduce a price, are the honest version of this and are not affected. |
 | `[x]` | `purchase-history` | client | See what they have bought from this studio |
 | `[x]` | `redeem` | client | Redeem a code and see the days arrive |
 | `[x]` | `redemption-code` | owner | Issue a code that tops somebody's access up |
@@ -110,11 +110,11 @@ without one.
 | `[x]` | `content-cover` | trainer | Give an article a cover image without leaving the product |
 | `[x]` | `content-read` | client | Read what their studio published, in a feed that is theirs |
 | `[x]` | `content-write` | trainer | Write an article for clients and publish it |
-| `[ ]` | `marketplace-public` | everyone | Find out what a studio offers before signing in, or before having an account at all |
+| `[x]` | `marketplace-public` | everyone | Find out what a studio offers before signing in, or before having an account at all |
 | | **context** | | |
-| `[ ]` | `context-switch` | trainer | Move between the studios they belong to without signing in again |
-| `[ ]` | `dashboard-arrange` | trainer | Arrange what they see first, so the thing they check hourly is at the top |
-| `[ ]` | `offline-log` | client | Log a set in a basement and have it arrive when they surface |
+| `[x]` | `context-switch` | trainer | Move between the studios they belong to without signing in again |
+| `[x]` | `dashboard-arrange` | trainer | Arrange what they see first, so the thing they check hourly is at the top |
+| `[x]` | `offline-log` | client | Log a set in a basement and have it arrive when they surface |
 | | **identity** | | |
 | `[x]` | `account-delete` | everyone | Delete their own account and understand what that removes |
 | `[x]` | `passkey-add` | everyone | Register a passkey and afterwards sign in with a fingerprint or face |
@@ -128,18 +128,18 @@ without one.
 | `[x]` | `media-quota` | owner | See how much storage they are using against what they bought |
 | `[x]` | `media-upload` | trainer | Upload an image or a video and watch it arrive |
 | | **notifications** | | |
-| `[ ]` | `email-templates` | owner | Change the words the studio sends, and sign them |
+| `[x]` | `email-templates` | owner | Change the words the studio sends, and sign them |
 | `[x]` | `inbox` | everyone | See what happened while they were away, in one list |
 | `[x]` | `notification-prefs` | everyone | Decide what interrupts them, by category, without losing the record |
 | | **nutrition** | | |
 | `[x]` | `fasting-timer` | client | Run a fast and see which phase they are in |
-| `[ ]` | `food-barcode` | client | Scan a barcode and get the food rather than typing it |
+| `[x]` | `food-barcode` | client | Scan a barcode and get the food rather than typing it |
 | `[x]` | `food-create` | client | Enter a food nobody has entered yet, once, and reuse it |
 | `[x]` | `food-library` | trainer | Build a library of foods with the numbers this studio trusts |
 | `[x]` | `food-log` | client | Record what they actually ate, by meal, with portions |
 | `[x]` | `food-log-edit` | client | Correct something they logged wrongly |
 | `[x]` | `food-recent` | client | Reach the things they eat often without searching each time |
-| `[ ]` | `food-search-external` | client | Find a food in a public database when the studio has not entered it |
+| `[x]` | `food-search-external` | client | Find a food in a public database when the studio has not entered it |
 | `[x]` | `macro-breakdown` | client | See how a day adds up against their targets |
 | `[x]` | `meal-option-swap` | client | Choose a different option within a meal their coach allowed |
 | `[x]` | `meal-plan-arrangements` | trainer | Offer alternatives within a meal so a plan survives real life |
@@ -204,7 +204,7 @@ without one.
 | `[x]` | `exercise-alternatives` | trainer | Say which movements stand in for which, so a swap is not a guess |
 | `[x]` | `exercise-detail` | trainer | Describe a movement well enough that somebody could do it unsupervised |
 | `[x]` | `exercise-library` | trainer | Build a library of the movements this studio uses |
-| `[ ]` | `exercise-search-external` | trainer | Find a movement in a public catalogue rather than typing it out |
+| `[x]` | `exercise-search-external` | trainer | Find a movement in a public catalogue rather than typing it out |
 | `[x]` | `exercise-swap-decide` | trainer | Decide a swap request, with the alternatives already in front of them |
 | `[x]` | `exercise-swap-request` | client | Ask to swap a movement they cannot do, and get an answer |
 | `[x]` | `exercise-usage` | trainer | See where a movement is used before changing or removing it |
@@ -218,7 +218,7 @@ without one.
 | `[x]` | `plan-variants` | trainer | Give one client more than one plan and switch which is current |
 | `[x]` | `workout-history` | client | Look back at what they lifted last time, at the moment they need it |
 | `[x]` | `workout-log` | client | Record what they actually lifted, including when it differed from the plan |
-| `[ ]` | `workout-player` | client | Work through a session set by set, on a phone, in a gym |
+| `[x]` | `workout-player` | client | Work through a session set by set, on a phone, in a gym |
 | `[x]` | `workout-prs` | client | See their own bests, and know when they set a new one |
 | `[x]` | `workout-review` | trainer | See what a client actually did against what was prescribed |
 <!-- /generated -->

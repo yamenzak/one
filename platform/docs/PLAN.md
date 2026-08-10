@@ -1118,6 +1118,21 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-roster-count-is-not-an-active-count` | the number that flatters — it only ever goes up, and it goes up fastest when nobody is being coached | **live** |
 | `a-request-is-not-its-own-answer` | a client marking their own swap allowed and a coach agreeing to their own release — both open because the asker must hold the collection's write permission in order to ask at all | **live** |
 | `a-credit-pack-grants-something-and-costs-something` | a purchase that succeeds and moves no balance, or a tap anybody refills from for free | **live** |
+| `an-outbound-request-is-a-declared-host` | server-side request forgery through a caller's own value — a barcode carrying `../`, a query, or a whole other host, pasted into a URL template and requested from inside our network | **live** |
+| `a-service-is-declared-by-host-not-by-url` | a declaration carrying a path, a scheme, a wildcard or a query — every one of them somewhere a caller's escaped value ends up meaning something | **live** |
+| `somebody-elses-answer-is-bounded` | a third party having a bad day becoming a worker that runs out of memory, on a request nobody could have predicted | **live** |
+| `a-queued-write-lands-once` | a phone that lost the ANSWER to a write replaying it and logging the set twice — in the record, forever, with nothing throwing | **live** |
+| `a-replay-key-belongs-to-one-person` | two clients whose apps mint keys the same way swallowing each other's writes | **live** |
+| `a-notification-actually-leaves-the-process` | every notification whose channel says email being resolved, rendered, counted and dropped — the mechanism-with-no-surface failure, inside the platform | **live** |
+| `a-workspace-rewords-only-what-it-sends` | a business rewriting its own arrears notice into something reassuring, for staff who then do not act on it | **live** |
+| `a-rephrasing-cannot-invent-a-value` | an email reading `You paid {amount}` to a paying customer, because render leaves an unknown token in place | **live** |
+| `every-platform-table-is-in-a-scope` | an erased workspace keeping its purchase history, its lapse policy, its unspent codes and its payment provider's verify secret, while the sweep reports success | **live** |
+| `a-public-page-does-not-name-a-roster` | a shopfront answering before there is a session and carrying a customer's name, address or id to the whole internet | **live** |
+| `a-workspace-list-is-intersected-with-membership` | the directory being global, so a list built from it alone hands everybody the name of every business on the deployment | **live** |
+| `last-time-is-not-this-time` | the first set somebody logs becoming what they are told they did last time — so the number they work against climbs with them all session | **live** |
+| `a-discount-is-spent-when-money-moves` | a code for twenty exhausted by twenty people who looked at a price and closed the tab | **live** |
+| `a-code-that-does-not-work-is-refused` | quietly charging full price to somebody who typed a code, discovered from a receipt on a page we do not own | **live** |
+| `a-discount-rounds-towards-the-customer` | a business quietly charging one minor unit more than its own poster said, on every sale, forever | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

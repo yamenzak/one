@@ -15,15 +15,16 @@
 
 import type { Allowance, AnyOperation, AppSpec, BindingSpec, EntitlementDef, Instant, Ladder, Money, PlanSpec, SqlHandle } from "@one/kernel";
 import {
-  DESTRUCTIVE_FLOOR_DAYS, explainCustomerFlags, explainEntitlements, extendBudget, gateFor,
-  heldEntitlements, ladderProblems, mayPurchase, packageLines, operation, packageContradictions,
-  PUBLIC, runwayFor, s,
+  DESTRUCTIVE_FLOOR_DAYS, discountUsable, explainCustomerFlags, explainEntitlements, extendBudget, gateFor,
+  heldEntitlements, ladderProblems, MAX_DISCOUNT_PERCENT, mayPurchase, MIN_DISCOUNT_PERCENT,
+  packageLines, operation, packageContradictions, PUBLIC, refuseDiscount, runwayFor, s,
 } from "@one/kernel";
 import {
   applyPackage, applyPayment, choosePlan, claimCode, codesFor, grantsFor, issueCode, listPackages,
   openPurchase, priorGrants, purchasesFor, readAccess, readLadder, readPackage, readPayments,
   readPurchase, savePayments, saveLadder, setOverrides, setRemainingDays, settlePurchase,
   credentialProblem, verifySecretOf,
+  discountsFor, readDiscount, saveDiscount, spendDiscount,
   readSubscription, savePackage, standingFor,
 } from "./commerce.js";
 import { attribute, claimByCustomer, claimEvent, listParked, park, rememberCustomer, resolveParked, verifySignature } from "./provider.js";
@@ -353,6 +354,18 @@ async function settle(
     purchase list rather than swallowed.
   */
   if (!pkg) return { purchaseId: purchase!.id, daysAdded: 0, alreadySettled: false };
+
+  /*
+    ⚠️ THE CODE IS SPENT HERE, WHERE THE MONEY MOVED, and never at checkout. An
+    intent is somebody saying they mean to pay, on a page this platform does not
+    own; most are abandoned. Spending a use there exhausts a code for twenty on
+    twenty people who looked at a price and closed the tab.
+
+    ⚠️ AND A CODE THAT CANNOT BE SPENT DOES NOT UNDO THE SETTLEMENT. The payment
+    already happened at the reduced price the customer was quoted; refusing here
+    would be this platform arguing with a receipt.
+  */
+  if (purchase!.discountCode) await spendDiscount(d.db, d.tenantId, purchase!.discountCode, at);
 
   const applied = await applyPackage(d.db, d.tenantId, purchase!.subjectId, pkg, at, purchase!.id);
   return { purchaseId: purchase!.id, daysAdded: applied.daysAdded, alreadySettled: false };
@@ -684,8 +697,8 @@ export function customerOperations<B extends BindingSpec>(app: AppSpec<B>): read
     id: "commerce.checkout",
     kind: "write",
     summary: "Say you want to buy a package, and be told where to pay for it.",
-    input: s.object({ subjectId: s.text({ max: 120 }), packageId: s.text({ max: 60 }) }),
-    output: s.object({ purchaseId: s.text(), payAt: s.text(), amount: s.json(), settlement: s.text() }),
+    input: s.object({ subjectId: s.text({ max: 120 }), packageId: s.text({ max: 60 }), code: s.optional(s.text({ max: 40 })) }),
+    output: s.object({ purchaseId: s.text(), payAt: s.text(), amount: s.json(), settlement: s.text(), discount: s.json() }),
     permission: "commerce:read",
     /* ⚠️ A customer may open one for themselves and nobody else. */
     scope: (i: { subjectId: string }) => ({ subject: i.subjectId }),
@@ -693,10 +706,24 @@ export function customerOperations<B extends BindingSpec>(app: AppSpec<B>): read
     audit: (i: { packageId: string }) => ({ subject: i.packageId, verb: "checkout" }),
     fails: ["platform.not_found", "platform.conflict"],
     tool: false,
-    async handler(ctx, input: { subjectId: string; packageId: string }) {
+    async handler(ctx, input: { subjectId: string; packageId: string; code?: string }) {
       const d = deps(ctx);
       const pkg = await readPackage(d.db, d.tenantId, input.packageId);
       if (!pkg) ctx.fail("platform.not_found", { field: "packageId" });
+
+      /*
+        ⚠️ A CODE THAT DOES NOT WORK IS REFUSED RATHER THAN IGNORED. Quietly
+        charging the full price to somebody who typed a code is the worst of the
+        three outcomes: they pay more than they expected and find out from a
+        receipt, on a page we do not own, with nothing to point at.
+      */
+      let discount: { code: string; percent: number } | undefined;
+      if (input.code?.trim()) {
+        const code = input.code.trim().toUpperCase();
+        const found = await readDiscount(d.db, d.tenantId, code);
+        if (!discountUsable(found, ctx.now())) ctx.fail("platform.not_found", { field: "code" });
+        discount = { code, percent: found!.percent };
+      }
 
       /*
         ⚠️ REFUSED HERE RATHER THAN AT SETTLEMENT. A once-only package somebody
@@ -708,9 +735,15 @@ export function customerOperations<B extends BindingSpec>(app: AppSpec<B>): read
       if (!verdict.allowed) ctx.fail("platform.conflict", { reason: verdict.refusal });
 
       const setup = await readPayments(d.db, d.tenantId);
-      const purchase = await openPurchase(d.db, d.tenantId, input.subjectId, pkg!, ctx.now());
+      const purchase = await openPurchase(d.db, d.tenantId, input.subjectId, pkg!, ctx.now(), discount);
       return {
         purchaseId: purchase.id,
+        /*
+          ⚠️ SAID BACK, WITH THE FULL PRICE BESIDE IT. A number that is simply
+          lower than the poster is one nobody can check, and the workspace has to
+          be able to confirm a payment against what it actually asked for.
+        */
+        discount: discount ? { code: discount.code, percent: discount.percent, was: pkg!.price } : null,
         /*
           ⚠️ THE WORKSPACE OWNS THAT PAGE, NOT US. We open an intent and hand
           over an address; tokenization, 3DS, retries and the money itself stay
@@ -900,6 +933,65 @@ export function customerOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
+  /* ---------------------------------------------------------- discounts --- */
+
+  /**
+   * ⚠️ A WORKSPACE'S OWN CODE AGAINST ITS OWN PRICES, and what it can honestly
+   * do is bounded by who owns the checkout page. The workspace is paid on ITS
+   * OWN provider — this platform opens an intent and hands over an address — so
+   * a code changes the amount we QUOTE, record on the purchase, and ask the
+   * workspace to confirm. It cannot change what a page we do not control asks
+   * for, and pretending otherwise would be a discount that exists only on our
+   * screen.
+   */
+  const saveCode = operation({
+    id: "commerce.discount.save",
+    kind: "write",
+    summary: "Issue a code that takes a percentage off your own prices.",
+    input: s.object({
+      code: s.text({ min: 3, max: 40 }),
+      percent: s.number({ integer: true, min: MIN_DISCOUNT_PERCENT, max: MAX_DISCOUNT_PERCENT }),
+      uses: s.number({ integer: true, min: 1, max: 100_000 }),
+      expiresAt: s.optional(s.text({ max: 40 })),
+    }),
+    output: s.object({ code: s.text(), percent: s.number({ integer: true }), usesLeft: s.number({ integer: true }) }),
+    permission: "commerce:manage",
+    idempotency: { mode: "natural", key: "code" },
+    audit: (i: { code: string }) => ({ subject: i.code, verb: "discount" }),
+    outcome: { message: "Code saved", tone: "success", invalidates: ["commerce.discounts"] },
+    fails: ["platform.invalid"],
+    /* ⚠️ Not a tool. A model that can mint a discount can be handed a document
+       asking it to, and the loss is real money on somebody else's account. */
+    tool: false,
+    async handler(ctx, input: { code: string; percent: number; uses: number; expiresAt?: string }) {
+      const d = deps(ctx);
+      const code = input.code.trim().toUpperCase();
+      const refused = refuseDiscount({ code, percent: input.percent, uses: input.uses });
+      if (refused) ctx.fail("platform.invalid", { field: refused });
+
+      const made = await saveDiscount(
+        d.db, d.tenantId,
+        { code, percent: input.percent, uses: input.uses, expiresAt: (input.expiresAt ?? null) as Instant | null },
+        ctx.now(),
+      );
+      return { code: made.code, percent: made.percent, usesLeft: made.usesLeft };
+    },
+  });
+
+  const discounts = operation({
+    id: "commerce.discounts",
+    kind: "read",
+    summary: "The discount codes this workspace has issued, and what is left of them.",
+    input: s.object({}),
+    output: s.object({ discounts: s.json() }),
+    permission: "commerce:manage",
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const d = deps(ctx);
+      return { discounts: await discountsFor(d.db, d.tenantId) };
+    },
+  });
+
   const codes = operation({
     id: "commerce.codes",
     kind: "read",
@@ -961,7 +1053,7 @@ export function customerOperations<B extends BindingSpec>(app: AppSpec<B>): read
   return [
     offer, save, grant, capabilities, override, repair, history,
     payments, setPayments, checkout, confirm, notified, purchases,
-    lapse, setLapse, issue, codes, redeem,
+    lapse, setLapse, issue, codes, redeem, saveCode, discounts,
   ] as unknown as readonly AnyOperation[];
 }
 

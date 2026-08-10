@@ -41,6 +41,8 @@ const LAYER: Record<string, number> = {
   /* ⚠️ Declared, validated and defaulted with no I/O and nothing below it but
      primitives — the same shape as every other registry here. */
   "settings.ts": 2,
+  /* Declared and validated with no I/O — the asking is the runtime's. */
+  "lookup.ts": 2,
   "notify.ts": 3,
   "help.ts": 3,
   "guide.ts": 3,

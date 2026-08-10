@@ -20,9 +20,12 @@ import {
   type SqlHandle,
   type FlagDef,
   type Ladder,
+  type Discount,
   type PackageSpec,
   type Runway,
   type StandingState,
+  discountUsable,
+  discounted,
   extendBudget,
   heldEntitlements,
   lapsedFor,
@@ -101,10 +104,45 @@ export const COMMERCE_SCHEMA: SchemaModule = {
       string — it adds days to something somebody already has.
     */
     `CREATE TABLE IF NOT EXISTS access_code (code TEXT NOT NULL, tenant_id TEXT NOT NULL, scope TEXT NOT NULL, days INTEGER NOT NULL, uses_left INTEGER NOT NULL, expires_at TEXT, created_at TEXT NOT NULL, PRIMARY KEY (tenant_id, code));`,
+    /*
+      ⚠️ A SECOND TABLE RATHER THAN A COLUMN ON THE FIRST. An access code GRANTS
+      days and a discount code REDUCES a price — one is applied to somebody who
+      already holds a package, the other before anybody has bought anything, and
+      the two are refused for different reasons at different moments. Merging
+      them would put a nullable `days` and a nullable `percent` on one row and
+      leave every reader asking which kind it has.
+    */
+    `CREATE TABLE IF NOT EXISTS discount_code (code TEXT NOT NULL, tenant_id TEXT NOT NULL, percent INTEGER NOT NULL, uses_left INTEGER NOT NULL, expires_at TEXT, created_at TEXT NOT NULL, PRIMARY KEY (tenant_id, code));`,
     `CREATE INDEX IF NOT EXISTS idx_grant_subject ON package_grant(tenant_id, subject_id);`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_grant_ref ON package_grant(tenant_id, ref) WHERE ref IS NOT NULL;`,
   ],
-  scoped: { tenantColumn: "tenant_id", tenantTables: ["subscription", "customer_package", "subject_access", "package_grant"] },
+  /*
+    ⚠️ AN EXISTING DATABASE GAINS THE COLUMN HERE. `CREATE TABLE IF NOT EXISTS`
+    cannot add one, so a deployment that has booted once would keep the old
+    `customer_purchase` and every read naming `discount_code` would fail with
+    "no such column" — which is not a degraded feature, it is every commerce
+    route answering 500.
+  */
+  alters: [
+    `ALTER TABLE customer_purchase ADD COLUMN discount_code TEXT;`,
+  ],
+  /*
+    ⚠️ EVERY TABLE IN THIS MODULE, AND FIVE OF THEM WERE MISSING. `customer_purchase`,
+    `tenant_payments`, `customer_lapse`, `access_code` and `discount_code` were
+    created here and named in no scope, so erasing a workspace left its purchase
+    history, its lapse policy, its unspent codes — and its payment provider's
+    VERIFY SECRET — in the regional store, while the erasure reported success.
+    A forgotten table is not an error anywhere: the delete simply never runs.
+    `runtime/test/scope.test.ts` is the check that makes the next omission a
+    failure instead of a silence.
+  */
+  scoped: {
+    tenantColumn: "tenant_id",
+    tenantTables: [
+      "subscription", "customer_package", "subject_access", "package_grant",
+      "customer_purchase", "tenant_payments", "customer_lapse", "access_code", "discount_code",
+    ],
+  },
 };
 
 /** What the provider last told us, as a fact rather than as a verdict. */
@@ -560,32 +598,41 @@ export interface Purchase {
   readonly ref: string | null;
   readonly openedAt: Instant;
   readonly settledAt: Instant | null;
+  /** The workspace's own code, where one was applied. */
+  readonly discountCode?: string;
 }
 
 const toPurchase = (r: {
   id: string; subject_id: string; package_id: string; amount_minor: number; currency: string;
   status: string; ref: string | null; opened_at: string; settled_at: string | null;
+  discount_code?: string | null;
 }): Purchase => ({
   id: r.id, subjectId: r.subject_id, packageId: r.package_id,
   amount: { minor: r.amount_minor, currency: r.currency },
   status: r.status === "settled" ? "settled" : r.status === "cancelled" ? "cancelled" : "open",
   ref: r.ref, openedAt: r.opened_at as Instant, settledAt: (r.settled_at as Instant | null) ?? null,
+  ...(r.discount_code ? { discountCode: r.discount_code } : {}),
 });
 
-const PURCHASE_COLUMNS = `id, subject_id, package_id, amount_minor, currency, status, ref, opened_at, settled_at`;
+const PURCHASE_COLUMNS = `id, subject_id, package_id, amount_minor, currency, status, ref, opened_at, settled_at, discount_code`;
 
 export async function openPurchase(
   db: SqlHandle, tenantId: string, subjectId: string, pkg: PackageSpec, at: Instant,
+  /* ⚠️ The code, not the reduced amount. Storing the number alone would leave a
+     purchase for less than its package costs with nothing saying why. */
+  discount?: { readonly code: string; readonly percent: number },
 ): Promise<Purchase> {
   const id = `pur_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
+  const minor = discount ? discounted(pkg.price.minor, discount.percent) : pkg.price.minor;
   await db.run(
-    `INSERT INTO customer_purchase (id, tenant_id, subject_id, package_id, amount_minor, currency, status, opened_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
-    id, tenantId, subjectId, pkg.id, pkg.price.minor, pkg.price.currency, at,
+    `INSERT INTO customer_purchase (id, tenant_id, subject_id, package_id, amount_minor, currency, status, opened_at, discount_code)
+     VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?)`,
+    id, tenantId, subjectId, pkg.id, minor, pkg.price.currency, at, discount?.code ?? null,
   );
   return {
-    id, subjectId, packageId: pkg.id, amount: { minor: pkg.price.minor, currency: pkg.price.currency },
+    id, subjectId, packageId: pkg.id, amount: { minor, currency: pkg.price.currency },
     status: "open", ref: null, openedAt: at, settledAt: null,
+    ...(discount ? { discountCode: discount.code } : {}),
   };
 }
 
@@ -822,4 +869,62 @@ export async function applyPayment(
     case "other":
       return;
   }
+}
+
+/* ---------------------------------------------------------- discounts --- */
+
+export async function saveDiscount(
+  db: SqlHandle,
+  tenantId: string,
+  input: { readonly code: string; readonly percent: number; readonly uses: number; readonly expiresAt: Instant | null },
+  at: Instant,
+): Promise<Discount> {
+  /* ⚠️ Upsert, because a workspace re-issuing a code means to REPLACE what it
+     said — a refusal would leave a spent code nobody can revive. */
+  await db.run(
+    `INSERT INTO discount_code (code, tenant_id, percent, uses_left, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(tenant_id, code) DO UPDATE SET percent = excluded.percent, uses_left = excluded.uses_left, expires_at = excluded.expires_at`,
+    input.code, tenantId, input.percent, input.uses, input.expiresAt, at,
+  );
+  return { code: input.code, percent: input.percent, usesLeft: input.uses, expiresAt: input.expiresAt };
+}
+
+export async function discountsFor(db: SqlHandle, tenantId: string): Promise<readonly Discount[]> {
+  const rows = await db.all<{ code: string; percent: number; uses_left: number; expires_at: string | null }>(
+    `SELECT code, percent, uses_left, expires_at FROM discount_code WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 200`,
+    tenantId,
+  );
+  return rows.map((r) => ({ code: r.code, percent: r.percent, usesLeft: r.uses_left, expiresAt: r.expires_at }));
+}
+
+export async function readDiscount(db: SqlHandle, tenantId: string, code: string): Promise<Discount | null> {
+  const row = await db.first<{ code: string; percent: number; uses_left: number; expires_at: string | null }>(
+    `SELECT code, percent, uses_left, expires_at FROM discount_code WHERE tenant_id = ? AND code = ?`, tenantId, code,
+  );
+  return row ? { code: row.code, percent: row.percent, usesLeft: row.uses_left, expiresAt: row.expires_at } : null;
+}
+
+/**
+ * Spend one use, or nothing.
+ *
+ * ⚠️ SPENT AT SETTLEMENT, NOT AT CHECKOUT. An intent is opened by somebody
+ * saying they intend to pay, on a page this platform does not own — most of them
+ * are abandoned. Spending the use there means a code for twenty is exhausted by
+ * twenty people who looked at a price and closed the tab, and the workspace
+ * cannot tell why.
+ *
+ * ⚠️ THE CONDITIONAL WRITE IS THE LOCK, exactly as it is for an access code and
+ * for a settlement: a read-then-write leaves a window one round trip wide.
+ */
+export async function spendDiscount(db: SqlHandle, tenantId: string, code: string, at: Instant): Promise<boolean> {
+  const found = await readDiscount(db, tenantId, code);
+  if (!discountUsable(found, at)) return false;
+  await db.run(
+    `UPDATE discount_code SET uses_left = uses_left - 1 WHERE tenant_id = ? AND code = ? AND uses_left = ?`,
+    tenantId, code, found!.usesLeft,
+  );
+  const after = await db.first<{ uses_left: number }>(
+    `SELECT uses_left FROM discount_code WHERE tenant_id = ? AND code = ?`, tenantId, code,
+  );
+  return (after?.uses_left ?? -1) === found!.usesLeft - 1;
 }

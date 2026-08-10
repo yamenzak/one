@@ -94,6 +94,28 @@ export const BRANDING: SettingsSpec = {
   },
 };
 
+/* --------------------------------------------------------------- sending --- */
+
+/**
+ * ⚠️ THE SIGN-OFF IS THE PLATFORM'S KEY BECAUSE THE PLATFORM IS THE SENDER.
+ *
+ * Every message leaves from the deployment's own address — one verified sender
+ * for the whole platform, which is what makes a new product inherit mail that
+ * works instead of a plausible-looking address that bounces. The cost of that is
+ * that a customer's inbox shows the deployment, not the business they know, so
+ * the business has to be able to say who it is inside the message. An app
+ * declaring its own key for that would be an app guessing at a name the runtime
+ * then has to look up.
+ */
+export const SENDING: SettingsSpec = {
+  "mail.signature": {
+    label: "How your messages sign off",
+    kind: "text",
+    fallback: "",
+    help: "Added to the end of emails this workspace sends. Empty means no sign-off.",
+  },
+};
+
 /* ------------------------------------------------------------- validation --- */
 
 /** Why a value may not be stored under this key. */

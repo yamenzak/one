@@ -53,7 +53,16 @@ export const IDENTITY_SCHEMA: SchemaModule = {
     ACCOUNT rather than the membership: somebody in two studios does not change
     how they read a weight when they switch.
   */
-  alters: [`ALTER TABLE accounts ADD COLUMN units TEXT NOT NULL DEFAULT '';`],
+  alters: [
+    `ALTER TABLE accounts ADD COLUMN units TEXT NOT NULL DEFAULT '';`,
+    /*
+      ⚠️ WHAT THIS PERSON WANTS TO SEE FIRST, and it is theirs rather than the
+      workspace's for the same reason units are: two coaches in one studio check
+      different things hourly, and a shared order is one that is wrong for
+      whoever did not set it.
+    */
+    `ALTER TABLE accounts ADD COLUMN layout TEXT NOT NULL DEFAULT '';`,
+  ],
 };
 
 /**

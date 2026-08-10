@@ -284,7 +284,17 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     input: bodyShape(spec, false, true, schemas),
     output: s.object({ id: s.id(spec.id), version: s.number({ integer: true }) }),
     permission: write,
-    idempotency: { mode: "none" },
+    /*
+      ⚠️ THE ONE WRITE THAT IS NOT IDEMPOTENT BY CONSTRUCTION, on every
+      collection at once. An update names the row it changes and a delete names
+      the row it removes; a create names nothing, so a request that arrives twice
+      makes two rows. That is what a queued offline write does when the answer to
+      the first attempt is what went missing — and only the caller can say the
+      two attempts were one intent, which is what this mode asks it to do.
+    */
+    // vocabulary-exempt: the HTTP caller, not somebody's customer — the mode's
+    // own name, declared in the kernel with the same exemption.
+    idempotency: { mode: "client-supplied" },
     fails: ["platform.invalid", "platform.forbidden"],
     audit: () => ({ subject: spec.id, verb: "create" }),
     outcome: { message: `${spec.label.one} saved`, tone: "success", invalidates: [spec.id] },

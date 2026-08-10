@@ -206,14 +206,20 @@ describe("a setting the screen's own opener may not change", () => {
 
 /* --------------------------------------------------------------- branding --- */
 
-describe("the three keys every app gets", () => {
+describe("the keys every app gets", () => {
   /*
-    ⚠️ THE SIGN-IN SCREEN WEARS THEM AND IT RENDERS BEFORE THERE IS A SESSION —
-    so an app declaring its own would be declaring three keys the platform then
-    has to guess the names of.
+    ⚠️ THE SIGN-IN SCREEN WEARS THE BRANDING AND IT RENDERS BEFORE THERE IS A
+    SESSION — so an app declaring its own would be declaring keys the platform
+    then has to guess the names of.
+
+    ⚠️ THE SIGN-OFF IS HERE FOR THE MIRROR-IMAGE REASON: every message leaves
+    from the DEPLOYMENT's verified address, so a customer's inbox shows the
+    platform rather than the business they know, and the business has to be able
+    to say who it is inside the message. The runtime reads this key on every
+    dispatch, so it cannot be an app's to name.
   */
   it("are present whether an app declares any settings or not", () => {
-    expect(Object.keys(settingsFor({}))).toEqual(["brand.name", "brand.mark", "brand.accent"]);
+    expect(Object.keys(settingsFor({}))).toEqual(["brand.name", "brand.mark", "brand.accent", "mail.signature"]);
   });
 
   it("come before the app's own, so they render first", () => {

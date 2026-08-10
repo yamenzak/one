@@ -65,12 +65,20 @@ const runtime = createRuntime(kova, {
   /* ⚠️ No secret, so the payment endpoint refuses and `chargeable` stays false —
      which is the honest state of a deployment with no provider. */
   webhookSecretVar: "PROVIDER_WEBHOOK_SECRET",
-  /* ⚠️ Who is in this workspace is the app's answer, and the ONE thing a
-     framework cannot supply. */
-  audienceFor: async (_tenantId, db) => {
-    const rows = await db.all<{ account_id: string }>(`SELECT DISTINCT account_id FROM sessions`);
-    return rows.map((r) => ({ userId: r.account_id, role: "owner" }));
-  },
+  /*
+    ⚠️ NO `audienceFor`, AND REMOVING ONE IS THE FIX.
+
+    This app supplied its own, reading every signed-in account out of `sessions`
+    and labelling all of them `owner`. Every notification declared for a client —
+    a published programme, an answered check-in — has `roles: ["client"]`, so it
+    matched nobody and was never raised, while every staff-facing one reached
+    anybody who had ever signed in. Both halves are silent: the inbox is empty
+    where it should have a row, and full where it should not.
+
+    The platform's default is the membership roster with each person's real
+    role, which is the answer this override was standing in front of. An app
+    supplies its own only where its audience genuinely is not its members.
+  */
   onBoot: {
     global: (directory) => applySchema(directory, GLOBAL_MODULES).then(() => undefined),
     region: (bind) => applySchema(bind.db, REGIONAL_MODULES).then(() => undefined),

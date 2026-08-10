@@ -349,3 +349,68 @@ export function lapsedFor(budgets: Readonly<Record<string, Instant>>, now: Insta
   const days = Math.floor((Date.parse(now) - last) / DAY_MS);
   return days > 0 ? days : null;
 }
+
+/* ------------------------------------------------------------- discounts --- */
+
+/**
+ * A WORKSPACE'S OWN CODE, AGAINST ITS OWN PRICES.
+ *
+ * ⚠️ AND WHAT IT CAN HONESTLY DO IS BOUNDED BY WHO OWNS THE CHECKOUT PAGE. The
+ * workspace is paid on ITS OWN provider — this platform opens an intent and
+ * hands over an address — so a discount here changes the amount we RECORD and
+ * tell both sides, and it cannot change what a payment page we do not control
+ * asks for. That is a real limitation and it is worth being exact about: the
+ * number this produces is what the customer is quoted, what the purchase row
+ * carries, and what the workspace is asked to confirm.
+ *
+ * ⚠️ A PERCENTAGE RATHER THAN AN AMOUNT OFF. An amount is in one currency, and a
+ * workspace selling in two would need a code per currency or would give away the
+ * difference between them without noticing.
+ */
+export interface Discount {
+  readonly code: string;
+  readonly percent: number;
+  readonly usesLeft: number;
+  readonly expiresAt: string | null;
+}
+
+/** ⚠️ Nothing free and nothing token: a code is a discount, not a giveaway. */
+export const MAX_DISCOUNT_PERCENT = 90;
+export const MIN_DISCOUNT_PERCENT = 1;
+
+export type DiscountRefusal = "percent" | "uses" | "code";
+
+export function refuseDiscount(input: { code: string; percent: number; uses: number }): DiscountRefusal | null {
+  /* ⚠️ Letters and digits only. A code is typed by a person off a poster, and
+     anything else is a character somebody has to be told how to enter. */
+  if (!/^[A-Z0-9][A-Z0-9-]{2,39}$/.test(input.code.trim().toUpperCase())) return "code";
+  if (!Number.isInteger(input.percent) || input.percent < MIN_DISCOUNT_PERCENT || input.percent > MAX_DISCOUNT_PERCENT) return "percent";
+  if (!Number.isInteger(input.uses) || input.uses < 1 || input.uses > 100_000) return "uses";
+  return null;
+}
+
+/**
+ * What a customer is asked for once a code is applied.
+ *
+ * ⚠️ ROUNDED TO THE MINOR UNIT, DOWNWARD, IN THE CUSTOMER'S FAVOUR. Half a penny
+ * is not a number any payment page can take, and rounding a discount up is a
+ * business quietly charging more than its own poster said.
+ */
+export function discounted(minor: number, percent: number): number {
+  const off = Math.ceil((minor * percent) / 100);
+  return Math.max(0, minor - off);
+}
+
+/**
+ * Whether this code may be used right now.
+ *
+ * ⚠️ EXPIRY IS A DATE COMPARISON ON TEXT, which works only because both sides
+ * are ISO. It is the same trap a shipping product fell into by storing epoch
+ * milliseconds in a TEXT column: nothing throws, and the comparison is
+ * lexicographic against a number.
+ */
+export function discountUsable(d: Discount | null, now: string): boolean {
+  if (!d) return false;
+  if (d.usesLeft <= 0) return false;
+  return !d.expiresAt || d.expiresAt > now;
+}

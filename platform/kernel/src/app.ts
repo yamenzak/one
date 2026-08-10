@@ -14,6 +14,8 @@ import type { BindingSpec } from "./bindings.js";
 import type { CollectionSpec } from "./collection.js";
 import type { Shape } from "./validate.js";
 import type { SettingsSpec } from "./settings.js";
+import type { Services } from "./lookup.js";
+import { serviceProblems } from "./lookup.js";
 import { settingsProblems } from "./settings.js";
 import type { FlagDef } from "./customer.js";
 import type { AiSpec } from "./generation.js";
@@ -352,6 +354,16 @@ export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = Probl
    */
   readonly settings?: SettingsSpec;
   /**
+   * ⚠️ WHOSE SERVERS THIS APP MAY TALK TO, BY HOST.
+   *
+   * An outbound request is a capability rather than a convenience, because of
+   * where a worker sits: a URL a caller can influence is a request made FROM
+   * inside our network, to an address they chose. Declaring the HOST — never a
+   * base URL, because a base URL carries a path somebody will interpolate into —
+   * is what makes that unavailable rather than discouraged.
+   */
+  readonly services?: Services;
+  /**
    * ⚠️ SCHEDULED WORK IS DECLARED, NOT CRON'D. A cron entry in a deployment
    * config is a capability with no surface, no test, no audit and no record that
    * it ran — and the characteristic failure is silence rather than an error.
@@ -627,6 +639,7 @@ export function assertComposable(spec: {
    * is a session to resolve an app's own settings with.
    */
   readonly settings?: SettingsSpec;
+  readonly services?: Services;
   readonly problems: Readonly<Record<string, unknown>>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly jobs?: readonly JobSpec<any>[];
@@ -773,6 +786,17 @@ export function assertComposable(spec: {
   const packs = packProblems(spec.access.creditPacks ?? []);
   if (packs.length) {
     throw new Error(`${spec.id}: credit pack(s) ${packs.map((p) => `"${p.id}" ${p.why}`).join("; ")}.`);
+  }
+
+  /*
+    ⚠️ EVERY ONE OF THESE IS A REQUEST THAT WOULD LEAVE THIS WORKER FOR SOMEWHERE
+    NOBODY MEANT — a wildcard host, an address inside our own network, or a URL
+    where a host belongs, which is a path a caller's value could be interpolated
+    into. None is visible in a green suite.
+  */
+  const services = serviceProblems(spec.services ?? {});
+  if (services.length) {
+    throw new Error(`${spec.id}: service(s) ${services.map((p) => `"${p.id}" ${p.why}`).join("; ")}.`);
   }
 
   const settings = settingsProblems({ ...spec.settings ?? {} });

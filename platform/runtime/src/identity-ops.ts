@@ -45,6 +45,12 @@ export interface PlatformDeps {
   setCookie(value: string): void;
   /** Injected: the platform owns the code, an app owns how it travels. */
   deliverCode(email: string, code: string): Promise<void>;
+  /**
+   * ⚠️ WHICH OF THESE WORKSPACES THIS PERSON IS IN, asked of the regions rather
+   * than guessed. Memberships are regional and the directory is global, so
+   * "where do I belong" is a question one store cannot answer alone.
+   */
+  mineIn(tenantIds: readonly string[]): Promise<ReadonlySet<string>>;
 }
 
 export interface PlatformCarrier { readonly [PLATFORM]: PlatformDeps }
@@ -406,34 +412,45 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
     kind: "read",
     summary: "How you read weights and measures.",
     input: nothing(),
-    output: s.object({ units: s.text() }),
+    output: s.object({ units: s.text(), layout: s.json() }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
     async handler(ctx) {
       const d = deps(ctx);
-      if (!d.session) return { units: "" };
-      const row = await d.directory.first<{ units: string | null }>(
-        `SELECT units FROM accounts WHERE id = ?`, d.session.accountId,
+      if (!d.session) return { units: "", layout: [] };
+      const row = await d.directory.first<{ units: string | null; layout: string | null }>(
+        `SELECT units, layout FROM accounts WHERE id = ?`, d.session.accountId,
       ).catch(() => null);
       /* ⚠️ Empty means "whatever this deployment's format says", which is the
          honest answer for somebody who has never chosen. Substituting one here
          would make a default indistinguishable from a decision. */
-      return { units: row?.units ?? "" };
+      /*
+        ⚠️ AN EMPTY LAYOUT IS "WHATEVER THE PRODUCT PUTS FIRST", not an empty
+        screen. A stored order is a list of names the app knows; anything else in
+        it is ignored by whoever renders it, which is what keeps a rename from
+        blanking somebody's dashboard.
+      */
+      return { units: row?.units ?? "", layout: parseLayout(row?.layout ?? "") };
     },
   });
 
   const setPreferences = operation({
     id: "me.preferences.set",
     kind: "write",
-    summary: "Change how you read weights and measures.",
-    input: s.object({ units: s.enum(["", "metric", "imperial"]) }),
+    summary: "Change how you read weights and measures, and what you see first.",
+    input: s.object({
+      units: s.optional(s.enum(["", "metric", "imperial"])),
+      /* ⚠️ Bounded, because it is a list of what to show first rather than a
+         place to keep things. */
+      layout: s.optional(s.array(s.text({ max: 40 }), { max: 20 })),
+    }),
     output: s.object({ ok: s.bool() }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
     outcome: { message: "Saved", tone: "success", invalidates: ["me.preferences"] },
     fails: ["platform.forbidden"],
     tool: false,
-    async handler(ctx, input: { units: string }) {
+    async handler(ctx, input: { units?: string; layout?: readonly string[] }) {
       const d = deps(ctx);
       /*
         ⚠️ PUBLIC IS THE LANE, NOT THE AUDIENCE. Every operation here answers on
@@ -442,10 +459,78 @@ export function identityOperations<B extends BindingSpec>(app: AppSpec<B>): read
         route is an unauthenticated write against whatever account id arrived.
       */
       if (!d.session) ctx.fail("platform.forbidden", { reason: "sign in first" });
-      await d.directory.run(`UPDATE accounts SET units = ? WHERE id = ?`, input.units, d.session!.accountId);
+      /* ⚠️ Each is set only when it was SENT. A screen saving one preference
+         must not clear the other, which is what a whole-object write does. */
+      if (input.units !== undefined) {
+        await d.directory.run(`UPDATE accounts SET units = ? WHERE id = ?`, input.units, d.session!.accountId);
+      }
+      if (input.layout !== undefined) {
+        await d.directory.run(`UPDATE accounts SET layout = ? WHERE id = ?`, JSON.stringify(input.layout), d.session!.accountId);
+      }
       return { ok: true };
     },
   });
 
-  return [requestCode, verifyCode, registerBegin, registerFinish, signInBegin, signInFinish, whoami, signOut, preferences, setPreferences] as unknown as readonly AnyOperation[];
+
+  /**
+   * Every workspace this person belongs to.
+   *
+   * ⚠️ SESSIONS ARE PER ORIGIN, SO THIS IS A LIST OF ADDRESSES RATHER THAN A
+   * SWITCH. Moving between workspaces is navigating to another door, and there is
+   * one credential behind all of them — so it costs a tap, not a sign-in. A
+   * platform that "switched" by rewriting a session would be one session valid on
+   * several origins, which is the thing `sessionScope: "origin"` refuses.
+   *
+   * ⚠️ AND IT IS ANSWERED ON EVERY DOOR, including the one they are on. A list
+   * that excluded the current workspace makes the control disappear for somebody
+   * who belongs to exactly one, which is most people — and reappear later, which
+   * reads as a bug.
+   */
+  const workspaces = operation({
+    id: "me.workspaces",
+    kind: "read",
+    summary: "The workspaces you belong to, and where each one is.",
+    input: nothing(),
+    output: s.object({ workspaces: s.json() }),
+    permission: PUBLIC,
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const d = deps(ctx);
+      if (!d.session) return { workspaces: [] };
+      /*
+        ⚠️ READ FROM MEMBERSHIP AND THE DIRECTORY, WHICH ARE IN DIFFERENT
+        STORES. Memberships are regional and the directory is global, so this
+        cannot be one join — and the honest order is directory-first, because the
+        directory is the thing that knows which region to ask.
+      */
+      const rows = await d.directory.all<{ slug: string; tenant_id: string; branding: string | null }>(
+        `SELECT slug, tenant_id, branding FROM tenant_directory ORDER BY slug LIMIT 200`,
+      ).catch(() => []);
+      const mine = await d.mineIn(rows.map((r) => r.tenant_id));
+      return {
+        workspaces: rows
+          .filter((r) => mine.has(r.tenant_id))
+          .map((r) => ({ slug: r.slug, tenantId: r.tenant_id, branding: parseBranding(r.branding) })),
+      };
+    },
+  });
+
+  return [requestCode, verifyCode, registerBegin, registerFinish, signInBegin, signInFinish, whoami, signOut, preferences, setPreferences, workspaces] as unknown as readonly AnyOperation[];
 }
+
+/* ⚠️ An unreadable copy is no branding rather than a throw on a list somebody
+   opened. It is a convenience field on a routing row. */
+const parseBranding = (text: string | null): Readonly<Record<string, string>> => {
+  if (!text) return {};
+  try { return JSON.parse(text) as Record<string, string>; } catch { return {}; }
+};
+
+/* ⚠️ An unreadable layout is no layout. It decides an ORDER, so falling back to
+   the product's own is always a working screen. */
+const parseLayout = (text: string): readonly string[] => {
+  if (!text) return [];
+  try {
+    const v = JSON.parse(text) as unknown;
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 20) : [];
+  } catch { return []; }
+};

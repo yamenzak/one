@@ -9,7 +9,7 @@
  */
 
 import type { AnyOperation, AppSpec, BindingSpec, SettingsSpec, SqlHandle } from "@one/kernel";
-import { BRANDING, operation, s } from "@one/kernel";
+import { BRANDING, SENDING, operation, s } from "@one/kernel";
 import { BRANDING_KEYS, publishBranding, readSettings, storedSettings, writeSetting } from "./settings.js";
 
 /** ⚠️ A symbol, so an app cannot reach the directory by writing a property name. */
@@ -35,9 +35,9 @@ const deps = (ctx: unknown): SettingsDeps => (ctx as SettingsCarrier)[SETTINGS];
  */
 export const SETTINGS_PERMISSION = "workspace:settings";
 
-/** Branding plus whatever the app declared. Branding first, because it renders first. */
+/** Branding, the sign-off, then whatever the app declared. Branding first, because it renders first. */
 export const settingsFor = (app: { readonly settings?: SettingsSpec }): SettingsSpec =>
-  ({ ...BRANDING, ...(app.settings ?? {}) });
+  ({ ...BRANDING, ...SENDING, ...(app.settings ?? {}) });
 
 export function settingsOperations<B extends BindingSpec>(app: AppSpec<B>): readonly AnyOperation[] {
   const spec = settingsFor(app);

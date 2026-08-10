@@ -16,9 +16,9 @@
  */
 
 import {
-  DEFAULT_PREFERENCES, channelsFor, destinationFor, render,
+  DEFAULT_PREFERENCES, channelsFor, destinationFor, render, saying, signOff,
   type Category, type Channel, type Instant, type NotificationRegistry,
-  type Preferences, type SchemaModule, type SqlHandle,
+  type Preferences, type SchemaModule, type SqlHandle, type WordingBook,
 } from "@one/kernel";
 
 export const INBOX_SCHEMA: SchemaModule = {
@@ -92,6 +92,7 @@ export async function listInbox(
   tenantId: string,
   userId: string,
   limit: number,
+  wording: WordingBook = {},
 ): Promise<{ readonly rows: readonly InboxRow[]; readonly unread: number }> {
   const raw = await db.all<{ id: string; type: string; values_json: string; row_id: string | null; read_at: string | null; at: string }>(
     `SELECT id, type, values_json, row_id, read_at, at FROM inbox WHERE tenant_id = ? AND user_id = ? ORDER BY at DESC LIMIT ?`,
@@ -112,11 +113,18 @@ export async function listInbox(
     */
     if (!def) continue;
     const values = parse<Record<string, string | number>>(r.values_json, {});
+    /*
+      ⚠️ RESOLVED AT READ TIME, NOT STORED WITH THE ROW. A workspace that fixes a
+      typo in its own copy fixes it in the inbox too — and a row keeping the
+      words it was written with would make an inbox a museum of every phrasing
+      the studio has ever tried.
+    */
+    const said = saying(def, wording[r.type]);
     rows.push({
       id: r.id,
       type: r.type,
-      title: render(def.title, values),
-      ...(def.body ? { body: render(def.body, values) } : {}),
+      title: render(said.title, values),
+      ...(said.body ? { body: render(said.body, values) } : {}),
       tone: def.tone,
       icon: def.icon,
       category: def.category,
@@ -164,6 +172,10 @@ export async function dispatch(input: {
   readonly values: Readonly<Record<string, string | number>>;
   readonly rowId?: string;
   readonly at: Instant;
+  /** What this workspace says instead, per type. Absent means the platform's words. */
+  readonly wording?: WordingBook;
+  /** How this workspace signs off. Email only — see `signOff`. */
+  readonly signature?: string;
   send?(delivery: Delivery): Promise<void>;
 }): Promise<readonly Delivery[]> {
   const def = input.registry[input.type];
@@ -173,7 +185,8 @@ export async function dispatch(input: {
   for (const person of input.audience) {
     if (!def.roles.includes(person.role)) continue;
     const prefs = await preferencesFor(input.db, input.tenantId, person.userId);
-    const title = render(def.title, input.values);
+    const said = saying(def, input.wording?.[input.type]);
+    const title = render(said.title, input.values);
 
     for (const channel of channelsFor(def, prefs)) {
       if (channel === "inbox") {
@@ -184,7 +197,14 @@ export async function dispatch(input: {
         out.push({ channel, userId: person.userId, type: input.type, title });
         continue;
       }
-      const delivery: Delivery = { channel, userId: person.userId, type: input.type, title, ...(def.body ? { body: render(def.body, input.values) } : {}) };
+      /*
+        ⚠️ THE SIGN-OFF GOES ON EVERY CHANNEL THAT LEAVES THE PRODUCT, and the
+        inbox above is not one of them — a row being read inside the workspace's
+        own branding does not need to be told whose workspace it is.
+      */
+      const written = said.body ? render(said.body, input.values) : undefined;
+      const body = channel === "email" ? signOff(written, input.signature ?? "") : written;
+      const delivery: Delivery = { channel, userId: person.userId, type: input.type, title, ...(body ? { body } : {}) };
       /*
         ⚠️ A FAILED INTERRUPTION IS NOT A FAILED NOTIFICATION. The inbox row is
         already written; a mail provider being down must not roll back the

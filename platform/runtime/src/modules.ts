@@ -24,6 +24,7 @@ import { GUIDE_SCHEMA } from "./guide.js";
 import { MILESTONE_SCHEMA } from "./milestone.js";
 import { GENERATION_SCHEMA } from "./generate.js";
 import { SETTINGS_SCHEMA } from "./settings.js";
+import { REPLAY_SCHEMA } from "./replay.js";
 import { DOMAIN_CLAIM_SCHEMA } from "./settings-ops.js";
 import { CATALOGUE_SCHEMA } from "./operator-ops.js";
 import { CONFIG_SCHEMA, MODEL_SCHEMA } from "./config.js";
@@ -47,6 +48,7 @@ export const PLATFORM_REGIONAL: readonly SchemaModule[] = [
   MILESTONE_SCHEMA,
   GENERATION_SCHEMA,
   SETTINGS_SCHEMA,
+  REPLAY_SCHEMA,
 ];
 
 /**
