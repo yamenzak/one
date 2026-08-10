@@ -528,3 +528,65 @@ export function ropaOf(input: {
     special: activities.some((a) => a.special),
   };
 }
+
+/* ----------------------------------------------------------- transfers --- */
+
+/**
+ * WHICH CATEGORIES CROSS WHICH BORDER, UNDER WHAT.
+ *
+ * ⚠️ THIS IS THE ONE ARTEFACT EVERY QUESTIONNAIRE ASKS FOR AND ALMOST NOBODY CAN
+ * PRODUCE. "Do you transfer personal data outside the EEA, and on what basis" is
+ * answerable only by joining what is HELD to who RECEIVES it, and the two live in
+ * different documents in every company that has both — so the answer is written
+ * from memory, once, and is wrong by the next feature.
+ *
+ * Here it is a join over two declarations the product cannot boot without.
+ */
+export interface Transfer {
+  readonly to: string;
+  readonly name: string;
+  readonly where: string;
+  readonly safeguard: Subprocessor["safeguard"];
+  /**
+   * ⚠️ WHAT THEY RECEIVE THAT THIS PRODUCT ACTUALLY HOLDS — the INTERSECTION,
+   * not what the sub-processor's own entry claims. A recipient declaring it
+   * receives `financial` in an app that holds none is over-disclosure, and it
+   * makes the transfer look larger than it is in the direction nobody checks.
+   */
+  readonly categories: readonly DataCategory[];
+  /** ⚠️ True where any of it is Article 9. It is the row a reviewer reads first. */
+  readonly special: boolean;
+  /** Whose data it is — a member's, a customer's, a visitor's. */
+  readonly subjects: readonly SubjectKind[];
+}
+
+export function transfersOf(input: {
+  readonly collections: readonly Held[];
+  readonly subprocessors: readonly Subprocessor[];
+}): readonly Transfer[] {
+  const held = new Set<DataCategory>();
+  const whose = new Map<DataCategory, Set<SubjectKind>>();
+  for (const c of input.collections) {
+    if (c.holding?.kind !== "personal") continue;
+    for (const k of c.holding.categories) {
+      held.add(k);
+      const set = whose.get(k) ?? new Set<SubjectKind>();
+      for (const s of c.holding.subjects) set.add(s);
+      whose.set(k, set);
+    }
+  }
+
+  return input.subprocessors.map((p) => {
+    const categories = p.receives.filter((k) => held.has(k));
+    const subjects = [...new Set(categories.flatMap((k) => [...(whose.get(k) ?? [])]))];
+    return {
+      to: p.id,
+      name: p.name,
+      where: p.where,
+      safeguard: p.safeguard,
+      categories,
+      special: categories.some((k) => SPECIAL_CATEGORIES.includes(k)),
+      subjects,
+    };
+  });
+}

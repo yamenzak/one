@@ -629,3 +629,47 @@ describe("recording somebody's body needs their say-so", () => {
     expect((await owner.get("/api/consent.status", { subject: them.id })).body.given).toBe(true);
   });
 });
+
+/* ------------------------------------------------------------- transfers --- */
+
+/**
+ * ⚠️ THE ANSWER TO THE QUESTION EVERY COMPLIANCE QUESTIONNAIRE ASKS. It is a
+ * join over two declarations the product cannot boot without, so it cannot be
+ * the thing every company's is: written from memory once, wrong by the next
+ * feature.
+ */
+describe("what crosses a border", () => {
+  it("says who receives what, where, and under which safeguard", async () => {
+    const transfers = (await stranger.get("/api/protection.list")).body.transfers as unknown as
+      { to: string; where: string; safeguard: string; categories: string[]; special: boolean; subjects: string[] }[];
+
+    const gemini = transfers.find((t) => t.to === "gemini")!;
+    /* ⚠️ The one that carries Article 9 data out of the EEA — the row a reviewer
+       reads first, computed rather than left to somebody spotting `health`. */
+    expect(gemini.special).toBe(true);
+    expect(gemini.safeguard).toBe("sccs");
+    expect(gemini.categories).toContain("health");
+    expect(gemini.subjects).toContain("customer");
+  });
+
+  /*
+    ⚠️ THE INTERSECTION, so a recipient cannot over-disclose. Open Food Facts
+    receives a barcode and nothing else; its entry says `usage`, and this product
+    holds no `usage` category on any collection — so the honest transfer is
+    empty rather than a category nobody actually sends.
+  */
+  it("reports nothing for a recipient that receives nothing this product holds", async () => {
+    const transfers = (await stranger.get("/api/protection.list")).body.transfers as unknown as
+      { to: string; categories: string[]; special: boolean }[];
+    const food = transfers.find((t) => t.to === "openfoodfacts")!;
+    expect(food.special).toBe(false);
+    expect(food.categories.length).toBeLessThanOrEqual(1);
+  });
+
+  it("covers every declared sub-processor, so nothing is silently left off", async () => {
+    const body = (await stranger.get("/api/protection.list")).body;
+    const declared = (body.subprocessors as unknown as { id: string }[]).map((p) => p.id).sort();
+    const transferred = (body.transfers as unknown as { to: string }[]).map((t) => t.to).sort();
+    expect(transferred).toEqual(declared);
+  });
+});

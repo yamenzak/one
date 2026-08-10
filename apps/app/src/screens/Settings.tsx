@@ -1147,7 +1147,7 @@ function NotificationPolicySection() {
   );
 }
 
-/** Owner: how the studio sends email — the metered platform sender or your Brevo. */
+/** Owner: how the studio sends email — the metered platform sender, or off. */
 /**
  * Email — three settings stacked on one page, now three pages.
  *
@@ -1174,7 +1174,7 @@ function MessagingSettings() {
 
   const deliveryValue = !cfg ? "…"
     : !cfg.email.ready ? "Not set up — nothing can be sent"
-    : `${cfg.email.provider === "platform" ? "Sent by Kova" : "Your own sender"}${cfg.email.senderEmail ? ` · ${cfg.email.senderEmail}` : ""}`;
+    : `${cfg.email.provider === "platform" ? "Sent by Kova" : "Off"}${cfg.email.senderEmail ? ` · ${cfg.email.senderEmail}` : ""}`;
 
   const policyValue = (() => {
     if (!cfg) return "…";
@@ -1207,9 +1207,7 @@ function MessagingSettings() {
 }
 
 function EmailSection() {
-  const [cfg, setCfg] = useState<{ email: { provider: string; senderEmail: string; senderName: string; brevoKeySet: boolean; ready: boolean }; emailPlatformFrom: string; emailCreditsEach: number } | null>(null);
-  const [brevoKey, setBrevoKey] = useState("");
-  const [senderEmail, setSenderEmail] = useState("");
+  const [cfg, setCfg] = useState<{ email: { provider: string; senderEmail: string; senderName: string; ready: boolean }; emailPlatformFrom: string; emailCreditsEach: number } | null>(null);
   const [senderName, setSenderName] = useState("");
   const act = useAction();
   const busy = act.busy !== null;
@@ -1217,8 +1215,8 @@ function EmailSection() {
   const load = useCallback(async () => {
     setError(false);
     try {
-      const r = await api.get<{ email: { provider: string; senderEmail: string; senderName: string; brevoKeySet: boolean; ready: boolean }; emailPlatformFrom: string; emailCreditsEach: number }>("/api/settings");
-      setCfg(r); setSenderEmail(r.email.senderEmail); setSenderName(r.email.senderName);
+      const r = await api.get<{ email: { provider: string; senderEmail: string; senderName: string; ready: boolean }; emailPlatformFrom: string; emailCreditsEach: number }>("/api/settings");
+      setCfg(r); setSenderName(r.email.senderName);
     } catch { setError(true); }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -1248,18 +1246,17 @@ function EmailSection() {
       await load();
       return "Sender name saved.";
     }, "Couldn't save the sender name.");
-  const saveBrevo = () =>
-    act.run("brevo", async () => {
-      await api.patch("/api/settings", { email: { senderEmail, senderName, ...(brevoKey ? { brevoApiKey: brevoKey } : {}) } });
-      setBrevoKey("");
-      await load();
-      return "Brevo settings saved.";
-    }, "Couldn't save your Brevo settings — nothing was changed.");
   return (
     <section>
       <Card className="space-y-3">
         <SegmentedControl
-          options={[{ value: "platform", label: "Kova" }, { value: "brevo", label: "Brevo" }, { value: "off", label: "Off" }]}
+          /* ⚠️ TWO LANES. A studio bringing its own mail provider was a second
+             processor, a second set of terms and a second place a sign-in code
+             could be read — and it was undisclosed: the sub-processor list named
+             the platform's mailer, and every studio on the other lane sent
+             through a company nothing anywhere declared. The sender NAME, which
+             is the half of that request anybody actually made, is still theirs. */
+          options={[{ value: "platform", label: "Kova" }, { value: "off", label: "Off" }]}
           value={provider}
           onChange={(v) => void setProvider(v)}
         />
@@ -1277,12 +1274,10 @@ function EmailSection() {
               okLabel={cfg.emailCreditsEach === 0 ? "Free" : `${cfg.emailCreditsEach} cr`}
               detail={cfg.emailCreditsEach === 0
                 ? "Metering is switched off for this deployment."
-                : `Charged when the email actually goes out, and refunded if it fails. Brevo sends on your own account instead, at no credit cost.`}
+                : `Charged when the email actually goes out, and refunded if it fails.`}
             />
-            {/* Sender name applies HERE too. It used to be a Brevo-only field, so
-                a studio on the default provider set it and nothing happened. The
-                address must stay ours — it is the authenticated domain — but the
-                name is theirs. */}
+            {/* The address must stay ours — it is the authenticated domain —
+                but the name is the studio's to choose. */}
             <Field
               label="Sender name"
               value={senderName}
@@ -1296,20 +1291,8 @@ function EmailSection() {
           </div>
         )}
         {provider === "off" && <p className="text-body text-muted-foreground">Email is off — members still get in-app notifications. Login codes always send.</p>}
-        {provider === "brevo" && (
-          <div className="space-y-3">
-            <p className="text-body text-muted-foreground">Send through your own Brevo account — your sender, your bill, no credits.</p>
-            <Field label="Sender email" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} placeholder="coach@yourstudio.com" />
-            <Field label="Sender name" value={senderName} onChange={(e) => setSenderName(e.target.value)} placeholder="Your Studio" />
-            <Field label={cfg.email.brevoKeySet ? "Brevo API key (set — leave blank to keep)" : "Brevo API key"} value={brevoKey} onChange={(e) => setBrevoKey(e.target.value)} type="password" placeholder="xkeysib-…" />
-            <div className="flex items-center justify-between">
-              <Badge tone={cfg.email.ready ? "success" : "warning"}>{cfg.email.ready ? "Ready" : "Needs key + sender"}</Badge>
-              <Button size="sm" disabled={busy} onClick={() => void saveBrevo()}>{busy ? "Saving…" : "Save"}</Button>
-            </div>
-          </div>
-        )}
-        {/* One outcome line for all three controls — the lane switch, the sender
-            name and the Brevo credentials share a card, so they share a result. */}
+        {/* One outcome line for both controls — the lane switch and the sender
+            name share a card, so they share a result. */}
         <ActionResult msg={act.msg} err={act.err} />
       </Card>
     </section>

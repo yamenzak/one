@@ -22,7 +22,7 @@
  */
 
 import type { AnyOperation, AppSpec, BindingSpec, Instant, LegalDoc, SchemaModule, Session, SqlHandle } from "@one/kernel";
-import { PUBLIC, operation, ropaOf, s } from "@one/kernel";
+import { PUBLIC, operation, ropaOf, s, transfersOf } from "@one/kernel";
 
 /** ⚠️ A symbol, so an app cannot reach the ledger by writing a property name. */
 export const REFERENCE = Symbol.for("one.runtime.reference");
@@ -237,7 +237,7 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
     kind: "read",
     summary: "Who else receives data held here, what they receive, and where they process it.",
     input: s.object({}),
-    output: s.object({ controller: s.text(), contact: s.text(), subprocessors: s.json(), regions: s.json(), inference: s.json() }),
+    output: s.object({ controller: s.text(), contact: s.text(), subprocessors: s.json(), regions: s.json(), inference: s.json(), transfers: s.json() }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
     async handler() {
@@ -264,6 +264,19 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
           permits everything says so plainly instead of implying otherwise by
           being absent.
         */
+        /*
+          ⚠️ THE ANSWER TO THE QUESTION EVERY QUESTIONNAIRE ASKS, joined rather
+          than written. "Do you transfer personal data outside the EEA and on
+          what basis" needs what is HELD crossed with who RECEIVES it, and in
+          every company that has both documents the answer is written from
+          memory once and is wrong by the next feature.
+
+          ⚠️ IT IS THE INTERSECTION, so a recipient's own entry cannot
+          over-disclose: a company claiming to receive `financial` in an app that
+          holds none would make the transfer look larger than it is, in the
+          direction nobody checks.
+        */
+        transfers: transfersOf({ collections: app.collections, subprocessors: p.subprocessors }),
         inference: Object.fromEntries(
           Object.entries(app.bindings as Record<string, { kind?: string; byRegion?: Record<string, readonly string[]>; subprocessors?: readonly string[] }>)
             .filter(([, store]) => store?.kind === "inference")

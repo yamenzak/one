@@ -593,7 +593,7 @@ export function emailListRow(label: string, value: string, opts: { brand?: Brand
  * A send failure, in words the person who caused it can act on.
  *
  * The failure strings this module produces are provider mechanics — `"email
- * disabled"`, a `"brevo 401"`, a raw exception out of the Cloudflare binding —
+ * disabled"`, a raw exception out of the Cloudflare binding —
  * and every caller that shows one to a human had the same problem: a lookup
  * table keyed on codes the send path never actually returns. Kova's invite
  * screen listed four reasons, three of which were `skipped` codes and the
@@ -624,11 +624,5 @@ export function explainSendError(error: string | undefined): string {
   }
   if (/email disabled/i.test(e)) return "Email is switched off for this deployment.";
   if (/mock email provider/i.test(e)) return "This deployment is still on the mock email provider, which never sends outside development.";
-  const brevo = /^brevo (\d+)/i.exec(e);
-  if (brevo) {
-    return brevo[1] === "401"
-      ? "Brevo rejected the API key."
-      : `Brevo refused the send (HTTP ${brevo[1]}).`;
-  }
   return `The email couldn't be delivered: ${e}`;
 }

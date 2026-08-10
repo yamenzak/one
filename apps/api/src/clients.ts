@@ -441,8 +441,8 @@ export interface InviteDelivery { sent: boolean; reason: string | null }
  *
  * This used to be `.catch(() => undefined)`: the email result was thrown away and
  * the route reported success either way. A studio with email switched off, out of
- * credits, or on an unconfigured Brevo account — and a FRESH DEPLOY cannot send
- * at all until the platform sender is configured — added a client, saw "invited",
+ * credits — and a FRESH DEPLOY cannot send at all until the platform sender is
+ * configured — added a client, saw "invited",
  * and the client never heard anything. Nobody could tell, because the failure had
  * no representation anywhere.
  *
@@ -452,12 +452,11 @@ export interface InviteDelivery { sent: boolean; reason: string | null }
  */
 function describeDelivery(r: { ok: boolean; skipped?: string; error?: string }): InviteDelivery {
   if (r.ok) return { sent: true, reason: null };
-  // The three reasons the send path DECLINED before trying. Each is a studio
+  // The two reasons the send path DECLINES before trying. Each is a studio
   // setting, so each is phrased as something the coach can go and change.
   const skipped: Record<string, string> = {
     provider_off: "Email is switched off in your studio settings.",
     no_credits: "Your studio is out of credits, so the email wasn't sent.",
-    brevo_unconfigured: "Brevo needs an API key and a verified sender before it can send.",
   };
   if (r.skipped && skipped[r.skipped]) return { sent: false, reason: skipped[r.skipped]! };
   // Everything else is the provider's own failure, explained by the package

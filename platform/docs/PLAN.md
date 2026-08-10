@@ -1204,6 +1204,8 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `consent-can-be-withdrawn` | a basis that cannot be withdrawn, which is not consent but a different basis wearing the word — Article 7(3) requires withdrawing to be as easy as giving | **live** |
 | `a-withdrawal-keeps-the-evidence` | deleting the row on withdrawal, which destroys exactly the evidence needed to show the processing that already happened was lawful | **live** |
 | `self-registration-records-its-own-consent` | a self-registered person on the roster whose every log, measurement and check-in is refused, with no screen anywhere explaining why | **live** |
+| `the-transfer-register-is-a-join` | a transfer register written from what recipients CLAIM to receive rather than from what the product holds — over-disclosure in the direction nobody checks, making a transfer look larger than it is | **live** |
+| `every-recipient-appears-in-the-transfers` | a sub-processor disclosed in one place and absent from the transfer register — the artefact every questionnaire asks for, answerable only by joining what is held to who receives it, and wrong by the next feature in every company that writes it by hand | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

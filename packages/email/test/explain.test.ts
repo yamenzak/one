@@ -35,9 +35,11 @@ describe("explainSendError", () => {
       .toMatch(/mock email provider/i);
   });
 
-  it("separates a rejected Brevo key from any other Brevo refusal", () => {
-    expect(explainSendError("brevo 401")).toMatch(/API key/i);
-    expect(explainSendError("brevo 503")).toMatch(/HTTP 503/);
+  /* ⚠️ THE BRING-YOUR-OWN-PROVIDER LANE IS GONE, so its two error shapes are
+     too — and an unrecognised string returns the RAW error rather than a
+     friendly nothing, which is what a removed provider's status line now gets. */
+  it("hands back an unrecognised provider message rather than swallowing it", () => {
+    expect(explainSendError("brevo 401")).toContain("brevo 401");
   });
 
   /**

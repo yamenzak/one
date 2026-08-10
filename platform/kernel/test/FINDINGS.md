@@ -3736,3 +3736,37 @@ a gate comes to be covered by nothing — the shim would have made a REMOVED gat
 indistinguishable from a working one for every test but the three that ask
 directly. The consent is recorded at each of the 39 call sites instead, one line
 after the client is created, which is what a coach does anyway.
+
+## 275. The one artefact every questionnaire asks for
+
+"Do you transfer personal data outside the EEA, and on what basis" is answerable
+only by joining what is HELD to who RECEIVES it — and in every company that has
+both documents they are different documents, so the answer is written from memory
+once and is wrong by the next feature.
+
+`transfersOf` is that join over two declarations the product cannot boot without,
+published on the public disclosure beside the sub-processor list.
+
+⚠️ IT IS THE INTERSECTION, NOT THE RECIPIENT'S OWN CLAIM. A sub-processor entry
+saying it receives `financial` in an app holding none would make the transfer look
+larger than it is — over-disclosure, in the direction nobody checks, and the
+direction that reads as caution.
+
+⚠️ AND IT CARRIES WHOSE DATA IT IS. A member's and a customer's crossing the same
+border are different questions with different answers about who has to be told.
+
+## 276. The bring-your-own mailer nobody disclosed
+
+The legacy tree let a tenant plug in its own Brevo account. The platform's
+sub-processor list named the platform's own mailer — so every studio on that lane
+was sending its clients' addresses through a company no disclosure anywhere
+mentioned, and no check could have caught it: the recipient was chosen per tenant,
+at runtime, from a settings screen.
+
+⚠️ A CAPABILITY WHOSE RECIPIENT IS CONFIGURED PER TENANT CANNOT BE DISCLOSED
+STATICALLY, which is the argument for removing it rather than declaring it. It is
+gone; `senderName` — the half of that request anybody actually made — stays.
+
+⚠️ AND A STORED `brevo` FALLS BACK TO THE PLATFORM RATHER THAN TO `off`. Mapping
+it to `off` would silently stop every invitation and notification a studio sends,
+which is a worse outcome than the thing being fixed.

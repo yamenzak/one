@@ -1,8 +1,8 @@
 /**
  * THE PER-TENANT EMAIL LANE, metered.
  *
- * `@4dl/email` owns the provider decision (platform sender | the tenant's own
- * Brevo key | off). What it takes as a PARAMETER is the meter: on the platform
+ * `@4dl/email` owns the provider decision (platform sender | off). What it
+ * takes as a PARAMETER is the meter: on the platform
  * lane a send costs the tenant credits, and the credit authority is this app's
  * `TenantBillingDO`.
  *

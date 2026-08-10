@@ -3182,7 +3182,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.30.0",
+  manifestVersion: "0.31.0",
   bindings,
 
   identity: {
@@ -4011,6 +4011,13 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.31.0",
+      at: "2026-08-10",
+      notes: [
+        "See exactly which of your clients' information leaves the country, who receives it, and what covers the transfer — computed from the product rather than written down beside it.",
+      ],
+    },
     {
       version: "0.30.0",
       at: "2026-08-10",

@@ -42,9 +42,8 @@ export const settingsRoutes = new Hono<AppEnv>()
       lapse: { ...DEFAULT_LAPSE_POLICY, ...parseJson<Partial<LapsePolicy>>(row?.lapse_json ?? null, {}) },
       email: maskEmailConfig(resolveEmailConfig(parseJson(row?.email_config_json ?? null, {}))),
       emailPlatformFrom: platformFrom,
-      // What ONE email costs on the Kova lane. Brevo is the studio's own
-      // account and costs them nothing here, so the number is only meaningful
-      // for the platform provider — the UI shows it only there.
+      // What ONE email costs on the Kova lane, which is now the only sending
+      // lane there is.
       emailCreditsEach: Number((await getConfig(c.env))["email.credits_per_email"] ?? "1"),
       // Owner-governed studio-wide email allow-list, by category AND audience
       // (email clients vs staff about a category, separately).
@@ -132,10 +131,10 @@ export const settingsRoutes = new Hono<AppEnv>()
         marketplace: z.object({ enabled: z.boolean().optional(), selfRegister: z.boolean().optional(), requireActiveAccess: z.boolean().optional() }).optional(),
         // Per-provider: { enabled?, <keyField>?: string }. Empty string clears a key.
         integrations: z.record(z.string(), z.record(z.string(), z.union([z.boolean(), z.string().max(200)]))).optional(),
-        // Email provider: platform (metered) | brevo (own key) | off.
+        // Email provider: platform (metered) | off. The bring-your-own lane is
+        // gone — a second processor nothing disclosed.
         email: z.object({
-          provider: z.enum(["platform", "brevo", "off"]).optional(),
-          brevoApiKey: z.string().max(200).optional(),
+          provider: z.enum(["platform", "off"]).optional(),
           senderEmail: z.string().max(200).optional(),
           senderName: z.string().max(120).optional(),
         }).optional(),
@@ -209,9 +208,12 @@ export const settingsRoutes = new Hono<AppEnv>()
     // explicitly cleared (empty string clears; undefined keeps).
     if (d.email) {
       const cur = resolveEmailConfig(parseJson((await c.env.DB.prepare("SELECT email_config_json FROM tenant_settings WHERE tenant_id = ?").bind(who.tenantId).first<{ email_config_json: string | null }>())?.email_config_json ?? null, {}));
+      /* ⚠️ THE BRING-YOUR-OWN KEY IS GONE WITH ITS LANE. A stored one is left
+         where it is rather than migrated out: nothing reads it, and rewriting
+         every studio's settings row to drop a field is a risk taken for
+         tidiness. What must not happen is this route accepting a NEW one. */
       const next = {
         provider: d.email.provider ?? cur.provider,
-        brevoApiKey: d.email.brevoApiKey !== undefined ? d.email.brevoApiKey : cur.brevoApiKey,
         senderEmail: d.email.senderEmail !== undefined ? d.email.senderEmail : cur.senderEmail,
         senderName: d.email.senderName !== undefined ? d.email.senderName : cur.senderName,
       };

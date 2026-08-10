@@ -12,36 +12,47 @@ import type { HasDb, HasEmail, HasEnvironment, HasPlatformConfig } from "@4dl/co
 import { getConfig, isDevLane, parseJson } from "@4dl/core";
 import { sendEmail, bareAddress, PLATFORM_FROM_DEFAULT, type SendResult } from "./mailer.js";
 
-export type EmailProvider = "platform" | "brevo" | "off";
+/*
+ * ⚠️ TWO LANES, AND `brevo` IS GONE ON PURPOSE.
+ *
+ * A tenant bringing its own mail provider is a second processor, a second set
+ * of terms and a second place a sign-in code can be read — for a lane that sends
+ * one sentence and one link. It was also undisclosed: the platform's
+ * sub-processor list named the platform's own mailer, and every studio on the
+ * bring-your-own lane was sending through a company nothing anywhere declared.
+ *
+ * A tenant that wants its own sender keeps `senderName`, which is the half of
+ * that request anybody actually made.
+ */
+export type EmailProvider = "platform" | "off";
 
 export interface TenantEmailConfig {
   provider: EmailProvider;
-  brevoApiKey: string;
   senderEmail: string;
   senderName: string;
 }
 
 export function resolveEmailConfig(raw: unknown): TenantEmailConfig {
   const r = (raw ?? {}) as Record<string, unknown>;
-  const provider = r.provider === "brevo" || r.provider === "off" ? r.provider : "platform";
+  /* ⚠️ A STORED `brevo` FALLS BACK TO THE PLATFORM RATHER THAN TO `off`. A
+     studio whose provider was removed under it must keep receiving mail; making
+     it `off` would silently stop every invitation and notification it sends. */
+  const provider: EmailProvider = r.provider === "off" ? "off" : "platform";
   return {
     provider,
-    brevoApiKey: typeof r.brevoApiKey === "string" ? r.brevoApiKey : "",
     senderEmail: typeof r.senderEmail === "string" ? r.senderEmail : "",
     senderName: typeof r.senderName === "string" ? r.senderName : "",
   };
 }
 
-/** A Brevo config is usable only with a key + a verified sender address. */
+/** Off sends nothing; the platform lane is always ready and credit-gated. */
 export function emailReady(cfg: TenantEmailConfig): boolean {
-  if (cfg.provider === "off") return false;
-  if (cfg.provider === "brevo") return cfg.brevoApiKey.trim().length > 0 && cfg.senderEmail.trim().length > 0;
-  return true; // platform is always ready (credit-gated at send time)
+  return cfg.provider !== "off";
 }
 
 /** Redact the key for the client — expose config minus the secret. */
-export function maskEmailConfig(cfg: TenantEmailConfig): { provider: EmailProvider; senderEmail: string; senderName: string; brevoKeySet: boolean; ready: boolean } {
-  return { provider: cfg.provider, senderEmail: cfg.senderEmail, senderName: cfg.senderName, brevoKeySet: cfg.brevoApiKey.trim().length > 0, ready: emailReady(cfg) };
+export function maskEmailConfig(cfg: TenantEmailConfig): { provider: EmailProvider; senderEmail: string; senderName: string; ready: boolean } {
+  return { provider: cfg.provider, senderEmail: cfg.senderEmail, senderName: cfg.senderName, ready: emailReady(cfg) };
 }
 
 export async function tenantEmailConfig(db: D1Database, tenantId: string): Promise<TenantEmailConfig> {
@@ -77,8 +88,8 @@ export interface EmailMeter {
 }
 
 /**
- * Send one email through the tenant's configured provider. Platform sends meter
- * credits (skips gracefully when the tenant is out); Brevo sends hit their API.
+ * Send one email. Platform sends meter credits and skip gracefully when the
+ * tenant is out; `off` sends nothing and says so.
  *
  * The meter is a PARAMETER, not module state, because unlike the brand it needs
  * per-request bindings to reach the credit authority — a `configure…` call at
@@ -93,26 +104,6 @@ export async function sendTenantEmail(
 ): Promise<EmailSendResult> {
   const cfg = await tenantEmailConfig(env.DB, tenantId);
   if (cfg.provider === "off") return { ok: false, skipped: "provider_off" };
-
-  if (cfg.provider === "brevo") {
-    if (!emailReady(cfg)) return { ok: false, skipped: "brevo_unconfigured" };
-    try {
-      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
-        headers: { "api-key": cfg.brevoApiKey, "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({
-          sender: { email: cfg.senderEmail, name: cfg.senderName || undefined },
-          to: [{ email: msg.to }],
-          subject: msg.subject,
-          htmlContent: msg.html ?? undefined,
-          textContent: msg.text ?? undefined,
-        }),
-      });
-      return res.ok ? { ok: true } : { ok: false, error: `brevo ${res.status}` };
-    } catch (err) {
-      return { ok: false, error: String(err) };
-    }
-  }
 
   // Platform: meter credits first (no-op charge skips the send when short).
   const conf = await getConfig(env);

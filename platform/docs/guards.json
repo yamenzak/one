@@ -3235,6 +3235,24 @@
       "impl": "kova/test/telling.test.ts",
       "proves": "is already held for somebody who added themselves",
       "fails": "a self-registered person on the roster whose every log, measurement and check-in is refused, with no screen anywhere explaining why"
+    },
+    {
+      "id": "the-transfer-register-is-a-join",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/protection.test.ts",
+      "proves": "reports only what this product actually holds",
+      "fails": "a transfer register written from what recipients CLAIM to receive rather than from what the product holds — over-disclosure in the direction nobody checks, making a transfer look larger than it is"
+    },
+    {
+      "id": "every-recipient-appears-in-the-transfers",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/telling.test.ts",
+      "proves": "covers every declared sub-processor, so nothing is silently left off",
+      "fails": "a sub-processor disclosed in one place and absent from the transfer register — the artefact every questionnaire asks for, answerable only by joining what is held to who receives it, and wrong by the next feature in every company that writes it by hand"
     }
   ]
 }

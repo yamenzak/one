@@ -16,7 +16,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MAIL_LANES, PLATFORM_INFRASTRUCTURE, PLATFORM_PAYMENTS,
-  agreementProblems, disclosureProblems, holdingProblems, protectionProblems, ropaOf,
+  agreementProblems, disclosureProblems, holdingProblems, protectionProblems, ropaOf, transfersOf,
   type Held, type ProtectionSpec, type Subprocessor,
 } from "../src/protection.js";
 
@@ -321,5 +321,65 @@ describe("the Article 30 record is produced, never maintained", () => {
     expect(record.subprocessors.map((p) => p.id)).toEqual(["cloudflare"]);
     expect(record.contact).toBe("privacy@example.test");
     expect(record.controller).toMatch(/each workspace controls/);
+  });
+});
+
+/* ------------------------------------------------------------- transfers --- */
+
+/**
+ * ⚠️ THE ARTEFACT EVERY QUESTIONNAIRE ASKS FOR AND ALMOST NOBODY CAN PRODUCE.
+ * "Do you transfer personal data outside the EEA, and on what basis" is
+ * answerable only by joining what is HELD to who RECEIVES it — two documents in
+ * every company that has both, so the answer is written from memory once and is
+ * wrong by the next feature.
+ */
+describe("which categories cross which border", () => {
+  const collections = [
+    held("member", ["role"], PERSONAL),
+    held("scan", ["bodyfat"], { ...PERSONAL, categories: ["health"], subjects: ["customer"], condition: "explicit_consent" }),
+    held("catalogue", ["title"], NOTHING),
+  ];
+  const subprocessors = [
+    sub({ id: "infra", name: "Infra", receives: ["identity", "contact", "health"], where: "Its network.", safeguard: "dpf" }),
+    sub({ id: "vision", name: "Vision", receives: ["health"], where: "United States.", safeguard: "sccs" }),
+    sub({ id: "search", name: "Search", receives: ["usage"], where: "France.", safeguard: "eea" }),
+  ];
+  const out = transfersOf({ collections, subprocessors });
+
+  /*
+    ⚠️ THE INTERSECTION, NOT THE RECIPIENT'S OWN CLAIM. A company declaring it
+    receives `usage` in an app that holds none would make the transfer look
+    larger than it is — over-disclosure, in the direction nobody checks.
+  */
+  it("reports only what this product actually holds", () => {
+    expect(out.find((t) => t.to === "search")!.categories).toEqual([]);
+    expect(out.find((t) => t.to === "infra")!.categories).toEqual(["identity", "contact", "health"]);
+  });
+
+  /* ⚠️ Article 9 is the row a reviewer reads first, so it is computed rather
+     than left to somebody noticing `health` in a list. */
+  it("flags the ones carrying a special category", () => {
+    expect(out.find((t) => t.to === "vision")!.special).toBe(true);
+    expect(out.find((t) => t.to === "search")!.special).toBe(false);
+  });
+
+  /* ⚠️ WHOSE data crosses, not only what — a member's and a customer's are
+     different questions with different answers about who to notify. */
+  it("says whose data it is", () => {
+    expect(new Set(out.find((t) => t.to === "infra")!.subjects)).toEqual(new Set(["member", "customer"]));
+    expect(out.find((t) => t.to === "vision")!.subjects).toEqual(["customer"]);
+  });
+
+  it("carries the destination and the safeguard from the declaration", () => {
+    const vision = out.find((t) => t.to === "vision")!;
+    expect(vision.where).toBe("United States.");
+    expect(vision.safeguard).toBe("sccs");
+  });
+
+  /* ⚠️ A collection that holds nothing contributes nothing — a transfer row for
+     a shared catalogue describes a movement of personal data that never happens. */
+  it("ignores collections that hold nothing", () => {
+    expect(transfersOf({ collections: [held("catalogue", ["title"], NOTHING)], subprocessors }).every((t) => t.categories.length === 0))
+      .toBe(true);
   });
 });

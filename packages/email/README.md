@@ -5,7 +5,7 @@ Transactional mail, and the HTML kit that makes it look like the product.
 | Module | What it is |
 |---|---|
 | `mailer.ts` | The provider decision, the MIME builder, and the component kit (shell, button, bars, rings, sparklines, stat rows). |
-| `provider.ts` | The PER-TENANT lane: platform sender vs the tenant's own Brevo key vs `off`. |
+| `provider.ts` | The PER-TENANT lane: the platform sender, or `off`. A bring-your-own-provider lane was removed — a second processor, a second set of terms, and one no sub-processor list disclosed. |
 | `schema.ts` | `email_templates` — a tenant's white-label overrides. |
 
 ## `email.provider` is on the shared allow-list, so the send path must MERGE
