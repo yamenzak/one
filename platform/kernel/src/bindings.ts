@@ -108,6 +108,25 @@ export interface InferenceStore extends StoreCommon {
    * so an EU tenant may resolve a different — or empty — model set.
    */
   readonly subprocessors: readonly string[];
+  /**
+   * ⚠️ WHAT EACH REGION PERMITS, AND IT IS REQUIRED THE MOMENT THERE IS MORE
+   * THAN ONE REGION.
+   *
+   * The line above was true and did nothing: the mechanism existed, `generate`
+   * enforced it, and no app ever supplied a map — so a workspace that chose EU
+   * storage had its photographs sent to exactly the same models as everybody
+   * else. Storage residency was real and inference residency was a sentence.
+   *
+   * An absent entry is refused rather than defaulted, because the default is the
+   * bug: falling back to the app-wide set means every region permits everything
+   * unless somebody remembered, and nothing anywhere reports that they did not.
+   *
+   * ⚠️ AND DECLARING THE SAME SET FOR A REGION IS A REAL ANSWER. Where no
+   * provider offers inference inside a jurisdiction, the honest declaration is
+   * that the transfer happens and is covered by a safeguard — which is a
+   * decision somebody made and can be read, rather than one nobody noticed.
+   */
+  readonly byRegion?: Readonly<Record<string, readonly string[]>>;
 }
 
 export interface QueueStore extends StoreCommon {

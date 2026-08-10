@@ -129,10 +129,24 @@ export interface AiSpec {
  * what is held, is a shape in which a caller may hand a different document to
  * each — and unit tests over the halves separately stay green through it.
  */
-export function planFeature(spec: AiSpec, featureId: string, prompt: string, rates: Rates = {}): Run | null {
+export function planFeature(
+  spec: AiSpec, featureId: string, prompt: string, rates: Rates = {},
+  /**
+   * ⚠️ WHICH MODEL IS ACTUALLY GOING TO RUN, because a reserve is a ceiling on
+   * revenue and the manifest's default is not always what runs. A workspace may
+   * choose a dearer model from the catalogue; budgeting the default would hold
+   * the cheap one's price, cap the settle there, and the platform would pay the
+   * difference on every call — silently, because nothing fails.
+   *
+   * It is a parameter rather than a second lookup for the reason `planRun`
+   * exists: one call decides the model, and the same decision is used for the
+   * reserve and for the run.
+   */
+  modelId?: string,
+): Run | null {
   const feature = spec.features[featureId];
   if (!feature) return null;
-  const model = modelFor(spec, feature.model, rates);
+  const model = modelFor(spec, modelId ?? feature.model, rates);
   if (!model) return null;
   /*
     ⚠️ A PICTURE IS PRICED PER PICTURE. Running it through the unit arithmetic
@@ -267,4 +281,120 @@ export function aiProblems(spec: AiSpec | undefined): readonly AiProblem[] {
   }
 
   return out;
+}
+
+/* ----------------------------------------------------------- which model --- */
+
+/**
+ * WHO DECIDED WHICH MODEL RUNS THIS.
+ *
+ * ⚠️ FOUR LAYERS, AND EACH IS A DIFFERENT PERSON'S DECISION. The manifest names
+ * a default because a product has an opinion; the operator turns models on and
+ * off because a deployment has a contract and a bill; a workspace picks from
+ * what is left because "which company reads my clients' photographs" is its
+ * decision and nobody else's; and the region refuses what it does not permit,
+ * because residency outranks all three.
+ *
+ * They were one line — `feature.model` — so a product could offer a catalogue of
+ * two providers and every workspace on every deployment got whichever one the
+ * manifest happened to name.
+ */
+export type ModelSource = "manifest" | "workspace";
+
+export type ModelChoice =
+  | { readonly ok: true; readonly model: ModelSpec; readonly source: ModelSource }
+  /**
+   * ⚠️ A REFUSAL SAYS WHICH LAYER REFUSED, because the four are different things
+   * to go and do: ask an operator to enable one, pick a different one, or accept
+   * that this region does not permit any. "Unavailable" makes all three the same
+   * shrug.
+   */
+  | { readonly ok: false; readonly why: "unknown_feature" | "unknown_model" | "none_permitted" };
+
+/**
+ * ⚠️ WHETHER A MODEL CAN DO WHAT A FEATURE ASKS, DERIVED RATHER THAN DECLARED.
+ *
+ * A model that prices no image cannot be given one, and a model with no
+ * per-picture price cannot produce one — both are already in the catalogue
+ * because the METER needs them, so a second `capabilities` field would be a
+ * declaration that can disagree with the arithmetic. It would disagree in the
+ * expensive direction: a vision feature on a text model holds a reserve computed
+ * from the prompt alone, settles at almost nothing, and the platform pays for
+ * every picture.
+ */
+export function modelSuits(model: ModelSpec, feature: FeatureSpec): boolean {
+  if (feature.takes === "image" && (model.imageUnits ?? 0) <= 0) return false;
+  if (feature.produces === "image" && (model.perImage ?? 0) <= 0) return false;
+  /* ⚠️ And a model that prices pictures is not therefore a text model. */
+  if (feature.produces !== "image" && (model.perImage ?? 0) > 0) return false;
+  return true;
+}
+
+/** Every model a workspace may legitimately choose for one feature. */
+export function modelsFor(input: {
+  readonly ai: AiSpec;
+  readonly feature: string;
+  /** Turned off by the operator, deployment-wide. Absent means all are offered. */
+  readonly disabled?: readonly string[];
+  /** The region's allow-list. Empty means the region narrows nothing. */
+  readonly permitted?: readonly string[];
+  readonly rates?: Rates;
+}): readonly ModelSpec[] {
+  const feature = input.ai.features[input.feature];
+  if (!feature) return [];
+  const off = new Set(input.disabled ?? []);
+  const permitted = input.permitted ?? [];
+  return input.ai.models
+    .map((m) => modelFor(input.ai, m.id, input.rates ?? {})!)
+    .filter((m) => !off.has(m.id))
+    .filter((m) => permitted.length === 0 || permitted.includes(m.id))
+    .filter((m) => modelSuits(m, feature));
+}
+
+/**
+ * The one model this call will run, and who decided.
+ *
+ * ⚠️ A WORKSPACE'S CHOICE IS HONOURED ONLY IF IT IS STILL ELIGIBLE. An operator
+ * turning a model off, a region that does not permit it, or a catalogue that
+ * dropped it must not leave a workspace pinned to something unreachable — the
+ * failure would be one workspace whose generation stopped working, reported as a
+ * provider error, months after the change that caused it.
+ *
+ * ⚠️ AND FALLING BACK IS NOT SILENT ELSEWHERE: `source` says `manifest` whenever
+ * the workspace's pick did not decide, so a screen can say the choice is no
+ * longer available rather than showing it as though it were in effect.
+ */
+export function chooseModel(input: {
+  readonly ai: AiSpec;
+  readonly feature: string;
+  readonly chosen?: string | null;
+  readonly disabled?: readonly string[];
+  readonly permitted?: readonly string[];
+  readonly rates?: Rates;
+}): ModelChoice {
+  const feature = input.ai.features[input.feature];
+  if (!feature) return { ok: false, why: "unknown_feature" };
+
+  const eligible = modelsFor(input);
+  if (input.chosen) {
+    const picked = eligible.find((m) => m.id === input.chosen);
+    if (picked) return { ok: true, model: picked, source: "workspace" };
+  }
+
+  /*
+    ⚠️ THE MANIFEST'S DEFAULT STILL HAS TO BE ELIGIBLE. A product's opinion does
+    not outrank a region: an app naming a model the EU does not permit would
+    otherwise run it there for every workspace that never chose one, which is the
+    exact promise residency is.
+  */
+  const declared = eligible.find((m) => m.id === feature.model);
+  if (declared) return { ok: true, model: declared, source: "manifest" };
+
+  /*
+    ⚠️ AND NOTHING IS PICKED FOR THEM. Quietly substituting another model would
+    send a workspace's data to a company it did not choose, at a price nobody
+    quoted, and the only signal would be the bill.
+  */
+  if (!input.ai.models.some((m) => m.id === feature.model)) return { ok: false, why: "unknown_model" };
+  return { ok: false, why: "none_permitted" };
 }

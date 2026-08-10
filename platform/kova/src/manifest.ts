@@ -50,7 +50,43 @@ export const bindings = defineBindings({
     catalogue and forgetting this line is a feature that answers "not permitted
     in this region" and nothing else.
   */
-  ai: inference({ subprocessors: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-image"], optional: true }),
+  ai: inference({
+    subprocessors: [
+      "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-image",
+      "@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/qwen/qwen2.5-coder-32b-instruct",
+    ],
+    /*
+      ⚠️ THE SAME SET IN BOTH REGIONS, AND SAYING SO IS THE POINT.
+
+      This is the uncomfortable answer written down rather than left to a
+      fallback. Neither provider offers inference that is guaranteed to stay
+      inside the EEA: Gemini processes on Google's infrastructure under standard
+      contractual clauses, and Cloudflare's inference network is not
+      region-pinned. So a studio that chose `eu` gets EU STORAGE — a different
+      database, asserted by a test — and its generations still leave, under the
+      safeguards the sub-processor list names.
+
+      ⚠️ THE ALTERNATIVE WAS NOT A NARROWER LIST, IT WAS AN EMPTY ONE, which
+      would take every AI feature away from exactly the studios most likely to
+      need the residency. Between a promise we cannot keep and a capability we
+      remove, the third option is the true statement — and `protection.list`
+      publishes this map so a studio reads it before choosing rather than after.
+
+      The day either provider offers an EU-pinned endpoint, `eu` becomes a
+      shorter list and nothing else in this file changes.
+    */
+    byRegion: {
+      auto: [
+        "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-image",
+        "@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/qwen/qwen2.5-coder-32b-instruct",
+      ],
+      eu: [
+        "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-image",
+        "@cf/meta/llama-3.3-70b-instruct-fp8-fast", "@cf/qwen/qwen2.5-coder-32b-instruct",
+      ],
+    },
+    optional: true,
+  }),
 });
 
 export type Bindings = typeof bindings;
@@ -2540,6 +2576,20 @@ export const KOVA_AI: AiSpec = {
     { id: "gemini-2.5-pro", provider: "gemini", rate: { input: 4, output: 16 }, thinking: true, imageUnits: 1_100 },
     /* ⚠️ Priced per PICTURE. There is no output ceiling here that means anything. */
     { id: "gemini-2.5-flash-image", provider: "gemini", rate: { input: 1, output: 4 }, perImage: 600 },
+    /*
+      ⚠️ THE SECOND LANE, AND IT IS WHY THE CATALOGUE IS A CATALOGUE. A product
+      that named one provider would be a product where "which company reads my
+      clients' records" was decided by whoever wrote the manifest — and there is
+      no version of that answer that is right for every studio in every country.
+
+      These are text-only: no `imageUnits`, so `modelSuits` will not offer them
+      for a feature that sends a photograph, and no `perImage`, so they are never
+      offered for one that draws. That is derived from the METER rather than
+      declared beside it, because a capability field can disagree with the
+      arithmetic and it disagrees in the expensive direction.
+    */
+    { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", provider: "workers-ai", rate: { input: 1, output: 2 } },
+    { id: "@cf/qwen/qwen2.5-coder-32b-instruct", provider: "workers-ai", rate: { input: 1, output: 2 } },
   ],
   features: {
     "draft-plan": {
@@ -3120,7 +3170,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.27.0",
+  manifestVersion: "0.28.0",
   bindings,
 
   identity: {
@@ -3521,16 +3571,24 @@ export const kova = defineApp({
           terms: "https://resend.com/legal/dpa",
           trust: "https://resend.com/legal/security",
         },
-        /*
-          ⚠️ WORKERS AI IS NOT ON THIS LIST, and it was — which is what the
-          disclosure check found the first time it ran. The platform offers that
-          lane; Kova's catalogue names three models and all three are Gemini, so
-          nothing here reaches it. A company on a sub-processor list that
-          receives nothing is a disclosure that is false in the direction that
-          looks careful, and it is the entry nobody ever removes. Adding a
-          Workers AI model to the catalogue is what puts it back, at the moment
-          it becomes true.
-        */
+        {
+          id: "workers-ai",
+          name: "Cloudflare Workers AI",
+          /*
+            ⚠️ IT CAME OFF THIS LIST AND CAME BACK, WHICH IS THE MECHANISM
+            WORKING. The catalogue held three Gemini models and nothing else, so
+            the disclosure check refused a manifest naming a company that
+            received nothing. Adding two Workers AI models to the catalogue is
+            what put it back — at the moment it became true, in the same commit,
+            without anybody remembering to.
+          */
+          role: "Runs the text models a workspace may choose instead of Google's. Never given a photograph: these models price no image, so nothing that sends one can be pointed at them.",
+          receives: ["content", "usage"],
+          where: "Cloudflare's inference network. Not guaranteed to be EU-only.",
+          safeguard: "dpf",
+          terms: "https://www.cloudflare.com/cloudflare-customer-dpa/",
+          trust: "https://www.cloudflare.com/trust-hub/compliance-resources/",
+        },
         {
           id: "gemini",
           name: "Google (Gemini API)",
@@ -3928,6 +3986,14 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.28.0",
+      at: "2026-08-10",
+      notes: [
+        "Choose which AI model runs each feature — Google's or Cloudflare's — and see which one is running now and who decided it.",
+        "Before you pick a region, read exactly which models each one permits. Storing your records in the EU and where a generation is processed are two different questions, and both are now answered on the page.",
+      ],
+    },
     {
       version: "0.27.0",
       at: "2026-08-10",

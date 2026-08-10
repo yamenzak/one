@@ -3091,6 +3091,78 @@
       "impl": "kova/test/telling.test.ts",
       "proves": "refuses a region this deployment does not have",
       "fails": "a workspace quietly placed somewhere other than where it asked to be, which is the one failure residency cannot have and a default is exactly how it happens"
+    },
+    {
+      "id": "the-model-is-the-workspace-s-decision",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/model-choice.test.ts",
+      "proves": "uses the workspace's choice over the product's opinion",
+      "fails": "a manifest naming one model for every workspace on every deployment — 'which company reads my clients' records' decided by whoever wrote the catalogue"
+    },
+    {
+      "id": "a-stale-choice-does-not-pin-a-workspace",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/model-choice.test.ts",
+      "proves": "falls back to the default when the workspace's pick was turned off",
+      "fails": "a workspace pinned to a model an operator disabled or a region stopped permitting, surfacing as a provider error months after the change that caused it"
+    },
+    {
+      "id": "the-region-outranks-the-manifest",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/model-choice.test.ts",
+      "proves": "refuses rather than running the manifest's default where the region forbids it",
+      "fails": "a product's default model running in a region that does not permit it, for every workspace that never chose one — which is the exact promise residency is"
+    },
+    {
+      "id": "a-model-is-never-substituted",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/model-choice.test.ts",
+      "proves": "picks nothing for a workspace when nothing is permitted",
+      "fails": "quietly running a different model than the one decided — a workspace's data sent to a company it did not choose, at a price nobody quoted, with the bill as the only signal"
+    },
+    {
+      "id": "the-reserve-budgets-what-runs",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/model-choice.test.ts",
+      "proves": "holds more for a dearer model than for the default",
+      "fails": "a reserve computed for the manifest's model while a workspace's dearer choice runs — the cap settles at the cheap price and the platform pays the difference on every call, silently"
+    },
+    {
+      "id": "a-model-suits-what-it-is-priced-for",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/model-choice.test.ts",
+      "proves": "refuses a model that prices no picture for a feature that sends one",
+      "fails": "a vision feature pointed at a text model, whose reserve is computed from the prompt alone and settles at almost nothing while the platform pays for every picture"
+    },
+    {
+      "id": "every-region-says-what-it-permits",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses a multi-region app whose model runner names no region",
+      "fails": "a residency promise that stops at storage — the allow-list mechanism existed, generate enforced it, and no app ever declared one, so an EU workspace's photographs went to exactly the same models as everybody else"
+    },
+    {
+      "id": "the-region-s-model-list-is-published",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/telling.test.ts",
+      "proves": "matches the manifest exactly, so the published claim cannot drift from the binding",
+      "fails": "a workspace choosing a region without being able to read what still leaves it — and a published claim that can differ from the binding the runtime enforces"
     }
   ]
 }

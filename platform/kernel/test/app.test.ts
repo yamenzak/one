@@ -911,3 +911,53 @@ describe("a document somebody is asked to agree to", () => {
     expect(legalProblems([{ id: "x", version: "", title: "", mustAccept: [] }]).length).toBeGreaterThan(2);
   });
 });
+
+/* ------------------------------------------------------------- residency --- */
+
+/**
+ * ⚠️ A REGION THAT NEVER SAYS WHAT IT PERMITS IS A RESIDENCY PROMISE THAT STOPS
+ * AT STORAGE.
+ *
+ * The mechanism was complete for three stages — the binding could carry an
+ * allow-list, `generate` refused a model outside it — and no app ever declared
+ * one. So a workspace that chose the EU had its photographs sent to exactly the
+ * same models as every other workspace, and nothing failed, because falling back
+ * to the app-wide set is what an absent map means.
+ */
+describe("every region says which models it permits", () => {
+  const withAi = (byRegion?: Record<string, readonly string[]>) => ({
+    ...base,
+    tenancy: { regions: ["auto", "eu"] },
+    bindings: { ai: { kind: "inference", subprocessors: ["a", "b"], ...(byRegion ? { byRegion } : {}) } },
+  });
+
+  it("refuses a multi-region app whose model runner names no region", () => {
+    expect(() => assertComposable(withAi())).toThrow(/does not say which models region/);
+  });
+
+  it("names the regions that are missing, rather than reporting that something is", () => {
+    expect(() => assertComposable(withAi({ auto: ["a"] }))).toThrow(/region\(s\) eu/);
+  });
+
+  it("accepts it once every region has answered", () => {
+    expect(() => assertComposable(withAi({ auto: ["a", "b"], eu: ["a"] }))).not.toThrow();
+  });
+
+  /*
+    ⚠️ AND REPEATING THE SET IS A REAL ANSWER. Where no provider offers inference
+    inside a jurisdiction, the honest declaration is that the transfer happens and
+    is covered — a decision somebody made and can be read, rather than one nobody
+    noticed. Refusing it would push apps towards the empty list, which takes the
+    capability away from exactly the workspaces most likely to need the residency.
+  */
+  it("accepts a region that narrows nothing, because that is an answer", () => {
+    expect(() => assertComposable(withAi({ auto: ["a", "b"], eu: ["a", "b"] }))).not.toThrow();
+  });
+
+  /* ⚠️ One region has nothing to narrow, and an app with no model runner has
+     nothing to narrow it to — the check must not invent work for either. */
+  it("asks nothing of a single-region app, or one with no model runner", () => {
+    expect(() => assertComposable({ ...base, tenancy: { regions: ["auto"] }, bindings: { ai: { kind: "inference", subprocessors: ["a"] } } })).not.toThrow();
+    expect(() => assertComposable({ ...base, tenancy: { regions: ["auto", "eu"] }, bindings: { db: { kind: "sql" } } })).not.toThrow();
+  });
+});

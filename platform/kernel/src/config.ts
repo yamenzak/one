@@ -116,6 +116,10 @@ export const PLATFORM_CONFIG = declareConfig({
     why: "Per ENDPOINT, not per account. Each app registers its own webhook and gets its own signing secret; sharing one makes every app fail verification but the one that saved it last.",
   },
   "google.gemini_key": { shared: true, secret: true },
+  "ai.models.disabled": {
+    shared: false, secret: false,
+    why: "Which models a deployment offers is a decision about ITS contracts, its bill and its region. Shared, one product turning a model off would take it away from the others, and the last app to save would decide for all of them.",
+  },
   "turnstile.site_key": { shared: true, secret: false },
   "turnstile.secret_key": { shared: true, secret: true },
   "email.provider": { shared: true, secret: false },

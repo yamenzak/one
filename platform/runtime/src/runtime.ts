@@ -28,6 +28,7 @@ import { INBOX, inboxOperations, type InboxCarrier } from "./inbox-ops.js";
 import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
 import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files-ops.js";
 import { GENERATION, generationOperations, type GenerationCarrier } from "./generate-ops.js";
+import { choicesOf, disabledFrom } from "./generate.js";
 import { OPERATE, OPERATOR, operatorOperations, planOverrides, type OperatorCarrier } from "./operator-ops.js";
 import { CONFIG, configOperations, type ConfigCarrier } from "./config-ops.js";
 import { SETTINGS, settingsFor, settingsOperations, domainAdminOperations, type SettingsCarrier } from "./settings-ops.js";
@@ -1230,6 +1231,19 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             they live, because a price change is not a deploy.
           */
           rates: () => readRates(sharedConfigDb),
+          /*
+            ⚠️ THE WORKSPACE'S OWN PICKS AND THE OPERATOR'S OWN TOGGLES, both
+            read lazily for the same reason the rates are: a request that never
+            generates should not pay for either query.
+
+            They are separate because they are separate people's decisions. The
+            choice is a row in the tenant's own region; the disabled list is this
+            deployment's configuration, and it is deliberately NOT shared —
+            turning a model off for one product must not take it away from the
+            others.
+          */
+          chosen: () => choicesOf(regionalDb, at.tenant?.tenantId ?? ""),
+          disabled: async () => disabledFrom((await readAll(directoryDb))["ai.models.disabled"]),
           /*
             ⚠️ NULL WHERE NOTHING IS BOUND. `generate` refuses on it; nothing
             anywhere substitutes an answer.

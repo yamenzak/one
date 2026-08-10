@@ -230,7 +230,7 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
     kind: "read",
     summary: "Who else receives data held here, what they receive, and where they process it.",
     input: s.object({}),
-    output: s.object({ controller: s.text(), contact: s.text(), subprocessors: s.json(), regions: s.json() }),
+    output: s.object({ controller: s.text(), contact: s.text(), subprocessors: s.json(), regions: s.json(), inference: s.json() }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
     async handler() {
@@ -246,6 +246,25 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
           the one field a residency question is asked about.
         */
         regions: app.tenancy.regions,
+        /*
+          ⚠️ RESIDENCY IS NOT ONLY STORAGE, AND THIS IS WHERE THAT STOPS BEING A
+          SENTENCE IN A COMMENT. A workspace choosing a region is choosing where
+          its records are STORED; which models its generations reach is a
+          separate question with a separate answer, and publishing the two
+          together is what lets somebody choose knowing both.
+
+          It is read off the binding rather than described, so a region that
+          permits everything says so plainly instead of implying otherwise by
+          being absent.
+        */
+        inference: Object.fromEntries(
+          Object.entries(app.bindings as Record<string, { kind?: string; byRegion?: Record<string, readonly string[]>; subprocessors?: readonly string[] }>)
+            .filter(([, store]) => store?.kind === "inference")
+            .map(([name, store]) => [
+              name,
+              Object.fromEntries(app.tenancy.regions.map((r) => [r, store.byRegion?.[r] ?? store.subprocessors ?? []])),
+            ]),
+        ),
       };
     },
   });

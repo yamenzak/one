@@ -15,7 +15,7 @@
  */
 
 import type { AiSpec, AnyOperation, AppSpec, BindingSpec, InferenceHandle, Instant, OperationSpec, Rates, SqlHandle } from "@one/kernel";
-import { operation, s } from "@one/kernel";
+import { chooseModel, modelsFor, operation, s } from "@one/kernel";
 import { FILES, type FilesCarrier } from "./files-ops.js";
 import { fetchMedia, storeMedia } from "./files.js";
 import { generate, judge, spending, type Generated } from "./generate.js";
@@ -30,6 +30,17 @@ export interface GenerationDeps {
   readonly inference: InferenceHandle | null;
   /** ⚠️ Read lazily: only a request that actually generates pays for the query. */
   rates(): Promise<Rates>;
+  /**
+   * ⚠️ THE TWO LAYERS BETWEEN THE MANIFEST'S DEFAULT AND THE REGION'S REFUSAL,
+   * and both are read lazily for the same reason the rates are.
+   *
+   * `chosen` is this workspace's own pick per feature; `disabled` is what the
+   * operator turned off across the deployment. Neither is a fallback for the
+   * other — they are two different people's decisions, and `chooseModel` is
+   * where the four of them meet.
+   */
+  chosen(): Promise<Readonly<Record<string, string>>>;
+  disabled(): Promise<readonly string[]>;
   readonly tenantId: string;
   readonly actorId: string;
 }
@@ -60,6 +71,7 @@ export async function generateWith(
   const d = deps(ctx);
   return generate({
     db: d.db, ai, inference: d.inference, rates: await d.rates(),
+    chosenModel: (await d.chosen())[feature] ?? null, disabledModels: await d.disabled(),
     tenantId: d.tenantId, actorId: d.actorId,
     feature, prompt, at: ctx.now(),
   });
@@ -97,6 +109,7 @@ export async function generateAbout(
   if (!found) return { ok: false, why: "unconfigured", meta: { reason: "that picture is not in this workspace" } };
   return generate({
     db: d.db, ai, inference: d.inference, rates: await d.rates(),
+    chosenModel: (await d.chosen())[feature] ?? null, disabledModels: await d.disabled(),
     tenantId: d.tenantId, actorId: d.actorId,
     feature, prompt, image: { bytes: found.body, contentType: found.row.contentType }, at: ctx.now(),
   });
@@ -132,6 +145,7 @@ export async function drawWith(
   const d = deps(ctx);
   const made = await generate({
     db: d.db, ai, inference: d.inference, rates: await d.rates(),
+    chosenModel: (await d.chosen())[feature] ?? null, disabledModels: await d.disabled(),
     tenantId: d.tenantId, actorId: d.actorId,
     feature, prompt, at: ctx.now(),
   });
@@ -344,5 +358,98 @@ export function generationOperations<B extends BindingSpec>(app: AppSpec<B>): re
     },
   });
 
-  return [spend, wrong] as unknown as readonly AnyOperation[];
+  /**
+   * ⚠️ WHAT THIS WORKSPACE MAY CHOOSE, WITH ITS WORKING SHOWN.
+   *
+   * Same grammar as `explainEntitlements`: per feature, the eligible models, the
+   * one in effect, and WHO decided it. A screen that showed only the answer
+   * cannot tell a workspace that its pick is no longer offered — and that is
+   * exactly the state an operator's toggle or a region's allow-list creates,
+   * silently, months after the change.
+   */
+  const models = operation({
+    id: "ai.models.list",
+    kind: "read",
+    summary: "Which model runs each feature here, and what else this workspace could pick.",
+    input: s.object({}),
+    output: s.object({ features: s.json() }),
+    permission: "ai:read",
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const d = deps(ctx);
+      const [chosen, disabled, rates] = await Promise.all([d.chosen(), d.disabled(), d.rates()]);
+      const features = Object.entries(app.ai!.features).map(([id, feature]) => {
+        const decided = chooseModel({ ai: app.ai!, feature: id, chosen: chosen[id] ?? null, disabled, permitted: d.inference?.permitted ?? [], rates });
+        return {
+          feature: id,
+          summary: feature.summary,
+          /* ⚠️ What is OFFERED, after every layer. A list containing something a
+             region refuses is a control that produces a failure on save. */
+          options: modelsFor({ ai: app.ai!, feature: id, disabled, permitted: d.inference?.permitted ?? [], rates })
+            .map((m) => ({ id: m.id, provider: m.provider })),
+          inEffect: decided.ok ? decided.model.id : null,
+          decidedBy: decided.ok ? decided.source : null,
+          /* ⚠️ And the refusal travels, because "none" and "none this region
+             permits" are different things to go and do something about. */
+          why: decided.ok ? null : decided.why,
+          /* ⚠️ A pick that is no longer eligible is REPORTED rather than shown
+             as though it were running. */
+          stale: Boolean(chosen[id] && decided.ok && decided.model.id !== chosen[id]),
+        };
+      });
+      return { features };
+    },
+  });
+
+  const pick = operation({
+    id: "ai.models.choose",
+    kind: "write",
+    summary: "Choose which model runs one feature for this workspace.",
+    input: s.object({ feature: s.text({ max: 60 }), model: s.optional(s.text({ max: 120 })) }),
+    output: s.object({ feature: s.text(), model: s.text() }),
+    /*
+      ⚠️ THE SETTINGS PERMISSION, NOT `ai:use`. Choosing which company reads a
+      workspace's data is a decision about the workspace, and somebody who may
+      run a generation is not therefore somebody who may redirect every future
+      one to a different provider.
+    */
+    permission: "workspace:settings",
+    idempotency: { mode: "natural", key: "feature" },
+    audit: (i: { feature: string; model?: string }) => ({ subject: i.feature, verb: `model:${i.model ?? "default"}` }),
+    outcome: { message: "Saved", tone: "success", invalidates: ["ai.models.list"] },
+    fails: ["platform.invalid"],
+    async handler(ctx, input: { feature: string; model?: string }) {
+      const d = deps(ctx);
+      if (!app.ai!.features[input.feature]) ctx.fail("platform.invalid", { field: "feature", reason: "not a feature this product has" });
+
+      /* ⚠️ NO MODEL CLEARS THE CHOICE rather than setting an empty one, so
+         going back to the product's default is expressible at all. */
+      if (!input.model) {
+        await d.db.run(`DELETE FROM ai_choice WHERE tenant_id = ? AND feature = ?`, d.tenantId, input.feature);
+        return { feature: input.feature, model: "" };
+      }
+
+      /*
+        ⚠️ REFUSED AT THE DOOR IF IT IS NOT ELIGIBLE. Storing a pick the region
+        does not permit, the operator turned off, or that cannot do what the
+        feature asks would be a row that resolves to the default forever — a
+        setting that appears to have been saved and changes nothing.
+      */
+      const offered = modelsFor({
+        ai: app.ai!, feature: input.feature,
+        disabled: await d.disabled(), permitted: d.inference?.permitted ?? [], rates: await d.rates(),
+      });
+      if (!offered.some((m) => m.id === input.model)) {
+        ctx.fail("platform.invalid", { field: "model", reason: "not offered for this feature here" });
+      }
+      await d.db.run(
+        `INSERT INTO ai_choice (tenant_id, feature, model_id, at) VALUES (?, ?, ?, ?)
+         ON CONFLICT(tenant_id, feature) DO UPDATE SET model_id = excluded.model_id, at = excluded.at`,
+        d.tenantId, input.feature, input.model, ctx.now() as Instant,
+      );
+      return { feature: input.feature, model: input.model };
+    },
+  });
+
+  return [spend, wrong, models, pick] as unknown as readonly AnyOperation[];
 }

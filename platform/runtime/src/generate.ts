@@ -16,7 +16,7 @@
  */
 
 import type { AiSpec, InferenceHandle, Instant, Rates, SchemaModule, SqlHandle } from "@one/kernel";
-import { modelFor, planFeature, settle } from "@one/kernel";
+import { chooseModel, planFeature, settle } from "@one/kernel";
 import { balance, hold as holdCredits, record } from "./ledger.js";
 
 /** The unit every generation is priced in. One word, so two apps cannot disagree. */
@@ -35,9 +35,43 @@ export const GENERATION_SCHEMA: SchemaModule = {
     /* ⚠️ The daily ceiling is a COUNT over this index, never a stored counter. */
     `CREATE INDEX IF NOT EXISTS idx_generation_actor ON generation(tenant_id, actor_id, at);`,
     `CREATE INDEX IF NOT EXISTS idx_generation_recent ON generation(tenant_id, at);`,
+    /*
+      ⚠️ WHICH MODEL A WORKSPACE PICKED FOR ONE FEATURE, and it is per WORKSPACE
+      rather than per deployment because "which company reads my clients'
+      photographs" is the workspace's decision and nobody else's.
+
+      A row is an EXCEPTION, not a setting: no row means the manifest's default,
+      which is why there is nothing to migrate when a catalogue changes and why a
+      workspace that never opened the screen behaves like every other one.
+    */
+    `CREATE TABLE IF NOT EXISTS ai_choice (tenant_id TEXT NOT NULL, feature TEXT NOT NULL, model_id TEXT NOT NULL, at TEXT NOT NULL, PRIMARY KEY (tenant_id, feature));`,
   ],
-  scoped: { tenantColumn: "tenant_id", tenantTables: ["generation"] },
+  scoped: { tenantColumn: "tenant_id", tenantTables: ["generation", "ai_choice"] },
 };
+
+/* ------------------------------------------------------------- the choice --- */
+
+/** What this workspace has picked, by feature. Absent keys mean the default. */
+export async function choicesOf(db: SqlHandle, tenantId: string): Promise<Readonly<Record<string, string>>> {
+  const rows = await db.all<{ feature: string; model_id: string }>(
+    /* unbounded-read: one row per feature this app declares, which is a
+       manifest-sized constant rather than anything a workspace can grow. */
+    `SELECT feature, model_id FROM ai_choice WHERE tenant_id = ?`, tenantId,
+  ).catch(() => []);
+  return Object.fromEntries(rows.map((r) => [r.feature, r.model_id]));
+}
+
+/**
+ * ⚠️ WHAT THE OPERATOR TURNED OFF, NOT WHAT THEY TURNED ON.
+ *
+ * Storing the enabled set would mean a model added to the catalogue is invisible
+ * until somebody goes and enables it — so shipping a new model would silently
+ * reach nobody, which is the same failure as shipping one nobody disclosed. A
+ * disabled list is empty on a fresh deployment and every catalogue entry is
+ * offered, which is what an operator who has expressed no view means.
+ */
+export const disabledFrom = (value: string | undefined): readonly string[] =>
+  (value ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
 /* -------------------------------------------------------------- the day --- */
 
@@ -88,6 +122,15 @@ export interface GenerateInput {
   readonly rates?: Rates;
   /** ⚠️ Null where the deployment binds no model runner. Refused, never mocked. */
   readonly inference: InferenceHandle | null;
+  /**
+   * ⚠️ WHAT THIS WORKSPACE PICKED, and it is honoured only if still eligible. An
+   * operator turning a model off, or a region that stops permitting it, must not
+   * leave one workspace pinned to something unreachable — that failure surfaces
+   * as a provider error months after the change that caused it.
+   */
+  readonly chosenModel?: string | null;
+  /** What the operator turned off, deployment-wide. */
+  readonly disabledModels?: readonly string[];
   readonly tenantId: string;
   readonly actorId: string;
   readonly feature: string;
@@ -118,8 +161,7 @@ export interface GenerateInput {
  */
 export async function generate(input: GenerateInput): Promise<Generated> {
   const feature = input.ai?.features[input.feature];
-  const run = input.ai ? planFeature(input.ai, input.feature, input.prompt, input.rates ?? {}) : null;
-  if (!feature || !run) return { ok: false, why: "unknown_feature" };
+  if (!feature || !input.ai) return { ok: false, why: "unknown_feature" };
 
   /*
     ⚠️ NO RUNNER IS A REFUSAL AND NEVER A FALLBACK. This is the whole reason the
@@ -128,15 +170,36 @@ export async function generate(input: GenerateInput): Promise<Generated> {
   */
   if (!input.inference) return { ok: false, why: "unconfigured" };
 
-  const model = modelFor(input.ai!, feature.model, input.rates ?? {})!;
   /*
-    ⚠️ RESIDENCY IS NOT ONLY STORAGE. A region carries a sub-processor
-    allow-list, and a model outside it is refused rather than quietly run
-    somewhere a workspace was promised its data would not go.
+    ⚠️ THE MODEL IS RESOLVED ONCE, AND THE RESERVE IS COMPUTED FROM WHAT THAT
+    RESOLVED TO. Four layers decide it — the manifest's default, what the
+    operator left enabled, what the workspace picked, and what the region
+    permits — and budgeting the manifest's default while running the workspace's
+    choice would hold the cheap model's price and settle there, with the platform
+    paying the difference on every call and nothing failing.
   */
-  if (input.inference.permitted.length > 0 && !input.inference.permitted.includes(model.id)) {
-    return { ok: false, why: "unconfigured", meta: { reason: "not permitted in this region" } };
+  const decided = chooseModel({
+    ai: input.ai,
+    feature: input.feature,
+    chosen: input.chosenModel ?? null,
+    disabled: input.disabledModels ?? [],
+    permitted: input.inference.permitted,
+    rates: input.rates ?? {},
+  });
+  if (!decided.ok) {
+    /* ⚠️ Which layer refused travels with the refusal: asking an operator to
+       enable one, picking another, and accepting that a region permits none are
+       three different things to go and do. */
+    if (decided.why === "unknown_feature") return { ok: false, why: "unknown_feature" };
+    return {
+      ok: false, why: "unconfigured",
+      meta: { reason: decided.why === "none_permitted" ? "no model this region permits can do this" : "the model this feature names is not in the catalogue" },
+    };
   }
+  const model = decided.model;
+
+  const run = planFeature(input.ai, input.feature, input.prompt, input.rates ?? {}, model.id);
+  if (!run) return { ok: false, why: "unknown_feature" };
 
   /*
     ⚠️ THE PICTURE AND THE DECLARATION HAVE TO AGREE, IN BOTH DIRECTIONS.

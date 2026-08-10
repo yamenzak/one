@@ -687,6 +687,9 @@ export function defineApp<
 export function assertComposable(spec: {
   readonly id: string;
   readonly access: AccessSpec;
+  /** ⚠️ Structurally, because the check is over a store's shape rather than an app's. */
+  readonly bindings?: Readonly<Record<string, unknown>>;
+  readonly tenancy?: { readonly regions: readonly string[] };
   readonly filePurposes?: Readonly<Record<string, FilePurpose>>;
   readonly ai?: AiSpec;
   readonly collections: readonly CollectionSpec[];
@@ -862,6 +865,37 @@ export function assertComposable(spec: {
   if (held.length || declared.length || disclosure.length || agreements.length) {
     const all = [...held, ...declared, ...disclosure, ...agreements];
     throw new Error(`${spec.id}: data protection — ${all.map((p) => `"${p.at}" ${p.why}`).join("; ")}.`);
+  }
+
+  /*
+    ⚠️ A REGION THAT NEVER SAYS WHAT IT PERMITS IS A RESIDENCY PROMISE THAT STOPS
+    AT STORAGE.
+
+    The mechanism was complete — the binding could carry an allow-list and
+    `generate` refused a model outside it — and no app ever declared one, so a
+    workspace that chose the EU had its photographs sent to exactly the same
+    models as every other workspace. Nothing failed, because falling back to the
+    app-wide set is what an absent map means.
+
+    So it is required rather than defaulted, and only where the question exists:
+    one region has nothing to narrow, and an app with no model runner has nothing
+    to narrow it to. Declaring the same set for a region IS an answer — it says
+    the transfer happens and is covered — and the point is that somebody said it.
+  */
+  const inference = Object.entries((spec as { bindings?: Record<string, { kind?: string; byRegion?: Record<string, readonly string[]> }> }).bindings ?? {})
+    .filter(([, store]) => store?.kind === "inference");
+  const regions = (spec as { tenancy?: { regions?: readonly string[] } }).tenancy?.regions ?? [];
+  if (inference.length && regions.length > 1) {
+    for (const [name, store] of inference) {
+      const missing = regions.filter((r) => !(store.byRegion ?? {})[r]);
+      if (missing.length) {
+        throw new Error(
+          `${spec.id}: binding "${name}" does not say which models region(s) ${missing.join(", ")} permit. ` +
+            `Residency that stops at storage is a promise a workspace cannot tell from one that does not — ` +
+            `declare byRegion for every region, repeating the set where nothing narrows.`,
+        );
+      }
+    }
   }
 
   const help = helpProblems(spec.help, spec.collections);

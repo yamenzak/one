@@ -3571,3 +3571,66 @@ right, separate from where the bytes sit.
 ⚠️ THE SUPPORT-SESSION MACHINERY IS THE MITIGATION AND IT ALREADY EXISTED —
 time-boxed, reasoned, announced to the workspace, recorded either way. What was
 missing was any document saying that is what it is for.
+
+## 267. The catalogue held two providers and one of them was unreachable
+
+`feature.model` named a model and that was the whole resolution. Three mechanisms
+existed above it and none could change the answer: an operator had no way to turn
+a model off, a workspace had no way to pick one, and the region's allow-list was
+read from a runtime option no caller ever supplied.
+
+The consequence is the one that matters for a product selling to businesses in
+different countries: "which company reads my clients' records" was decided by
+whoever wrote the manifest, once, for every workspace on every deployment.
+
+`chooseModel` is the four layers in one pure function — manifest default,
+operator's disabled list, workspace's pick, region's allow-list — and it returns
+WHO decided along with what. Nine mutations of it were killed.
+
+⚠️ TWO PROPERTIES ARE WORTH MORE THAN THE FEATURE. A workspace's pick is honoured
+only while it is still eligible, so an operator's toggle cannot pin one workspace
+to something unreachable and surface months later as a provider error. And the
+manifest's own default is subject to the region too — an app naming a model the
+EU does not permit would otherwise run it there for everybody who never chose one,
+which is the exact promise residency is.
+
+⚠️ AND THE RESERVE HAD TO MOVE WITH IT. `planFeature` computed the reserve from
+`feature.model`, so a workspace choosing a dearer model would be metered at the
+cheap one's price — and `settle` caps the charge at what was held, so the platform
+pays the difference on every call with nothing failing. The model is resolved
+once and the same decision is passed to the reserve and to the run, which is
+`planRun`'s rule carried one level up.
+
+## 268. Whether a model can do the job is derived from what it costs
+
+`modelSuits` reads `imageUnits` and `perImage` — figures already in the catalogue
+because the METER needs them — rather than a `capabilities` field beside them. A
+second declaration can disagree with the arithmetic, and it disagrees in one
+direction: a vision feature pointed at a text model holds a reserve computed from
+the prompt alone, settles at almost nothing, and the platform pays for every
+picture anybody sends.
+
+## 269. Residency stopped at storage, and the check that would have said so was
+the one nobody had written
+
+`InferenceStore.subprocessors` carried a comment reading "a region carries a
+sub-processor allow-list, so an EU tenant may resolve a different — or empty —
+model set". It was true of the mechanism and false of every deployment: the map
+lived on `RegionalConfig`, `bindingsFor` was called with `{ defaultRegion }` and
+nothing else, and every region resolved the app-wide set.
+
+It is `byRegion` on the binding now, REQUIRED wherever an app has more than one
+region, refused at composition with the missing regions named. Two things came
+out of writing it:
+
+⚠️ REPEATING THE SET IS A REAL ANSWER, and refusing it would be the wrong check.
+Neither Workers AI nor the Gemini API offers inference pinned inside the EEA, so
+Kova's `eu` list is the same as its `auto` list — the transfer happens and is
+covered by the safeguards the sub-processor list names. The alternative was not a
+shorter list, it was an empty one, which takes every AI feature away from exactly
+the studios most likely to have needed the residency. Between a promise we cannot
+keep and a capability we remove, the third option is the true statement.
+
+⚠️ AND THE TRUE STATEMENT HAS TO BE PUBLISHED. `protection.list` now carries the
+per-region model map, read off the binding, asserted equal to it — so a studio
+reads what still leaves before choosing a region rather than after.

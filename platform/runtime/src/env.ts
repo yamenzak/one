@@ -121,8 +121,6 @@ const actorHandle = (raw: RawActors, region: RegionId, jurisdictional: boolean):
 
 export interface RegionalConfig {
   readonly defaultRegion: RegionId;
-  /** Sub-processors this region permits. Absent means the app's declaration stands. */
-  readonly subprocessors?: Readonly<Record<string, readonly string[]>>;
 }
 
 /**
@@ -189,7 +187,14 @@ function wrap(store: Store, raw: unknown, region: RegionId, cfg: RegionalConfig)
         handle reports it rather than the caller looking it up, because a caller
         that has to remember to check is a caller that will not.
       */
-      const permitted = cfg.subprocessors?.[region] ?? store.subprocessors;
+      /*
+        ⚠️ THE BINDING'S OWN MAP, NOT A RUNTIME OPTION. This read
+        `cfg.subprocessors?.[region]`, which no caller ever supplied — so the
+        allow-list silently resolved to the app-wide set in every region and
+        residency stopped at storage. It is declared beside the models now, and
+        a region with no entry is refused at composition rather than defaulted.
+      */
+      const permitted = store.byRegion?.[region] ?? store.subprocessors;
       const inner = raw as RawInference;
       const h: InferenceHandle = {
         permitted,

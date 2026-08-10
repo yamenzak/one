@@ -1188,6 +1188,14 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-removed-lane-is-refused-not-replaced` | a deployment still configured with a dropped provider silently falling through to whichever lane remains — a sign-in code sent through a company the operator did not choose, while the disclosure stays technically correct | **live** |
 | `a-region-is-a-different-store` | residency that is a column rather than a database — a workspace told its records are in the EU while every query reads the same store as everybody else | **live** |
 | `an-undeclared-region-is-refused` | a workspace quietly placed somewhere other than where it asked to be, which is the one failure residency cannot have and a default is exactly how it happens | **live** |
+| `the-model-is-the-workspace-s-decision` | a manifest naming one model for every workspace on every deployment — 'which company reads my clients' records' decided by whoever wrote the catalogue | **live** |
+| `a-stale-choice-does-not-pin-a-workspace` | a workspace pinned to a model an operator disabled or a region stopped permitting, surfacing as a provider error months after the change that caused it | **live** |
+| `the-region-outranks-the-manifest` | a product's default model running in a region that does not permit it, for every workspace that never chose one — which is the exact promise residency is | **live** |
+| `a-model-is-never-substituted` | quietly running a different model than the one decided — a workspace's data sent to a company it did not choose, at a price nobody quoted, with the bill as the only signal | **live** |
+| `the-reserve-budgets-what-runs` | a reserve computed for the manifest's model while a workspace's dearer choice runs — the cap settles at the cheap price and the platform pays the difference on every call, silently | **live** |
+| `a-model-suits-what-it-is-priced-for` | a vision feature pointed at a text model, whose reserve is computed from the prompt alone and settles at almost nothing while the platform pays for every picture | **live** |
+| `every-region-says-what-it-permits` | a residency promise that stops at storage — the allow-list mechanism existed, generate enforced it, and no app ever declared one, so an EU workspace's photographs went to exactly the same models as everybody else | **live** |
+| `the-region-s-model-list-is-published` | a workspace choosing a region without being able to read what still leaves it — and a published claim that can differ from the binding the runtime enforces | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

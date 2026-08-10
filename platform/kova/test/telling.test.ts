@@ -238,9 +238,14 @@ describe("what this product discloses about where data goes", () => {
     expect(ids).toContain("cloudflare");
     expect(ids).toContain("gemini");
     expect(ids).toContain("openfoodfacts");
-    /* ⚠️ And NOT the lane this product does not use. It was on the list until
-       the disclosure check ran; Kova's catalogue is Gemini only. */
-    expect(ids).not.toContain("workers-ai");
+    /* ⚠️ BOTH INFERENCE LANES, because the catalogue holds both and a workspace
+       chooses between them. This entry came OFF the list when the catalogue was
+       Gemini-only and came back with the models — which is the check working in
+       both directions rather than a list somebody edited twice. */
+    expect(ids).toContain("workers-ai");
+    /* ⚠️ And nothing that receives nothing: a name here that is not true is a
+       false disclosure in the direction that looks careful. */
+    expect(ids).not.toContain("cloudflare-email");
   });
 
   it("says where the data is and who to ask about it", async () => {
@@ -358,5 +363,114 @@ describe("a studio chooses where its clients' records live", () => {
     const founding = await signIn(`${slug}@example.test`, SETUP);
     const out = await post(SETUP, "/api/identity.workspace.create", { slug, region: "mars" }, founding);
     expect(out.res.status).toBe(400);
+  });
+});
+
+/* -------------------------------------------------------------- the model --- */
+
+/**
+ * ⚠️ FOUR LAYERS DECIDE WHICH MODEL RUNS, and until now it was one: the manifest
+ * named a model and every workspace on every deployment got it. The catalogue
+ * carries two providers precisely so that "which company reads my clients'
+ * records" is a decision somebody can make.
+ */
+describe("which model runs a feature here", () => {
+  it("says what is in effect, who decided it, and what else could be picked", async () => {
+    const out = await owner.get("/api/ai.models.list");
+    expect(out.status).toBe(200);
+    const features = out.body.features as unknown as {
+      feature: string; inEffect: string | null; decidedBy: string | null; options: { id: string; provider: string }[];
+    }[];
+    const draft = features.find((f) => f.feature === "draft-plan")!;
+    expect(draft.decidedBy).toBe("manifest");
+    expect(draft.inEffect).toBe("gemini-2.5-flash");
+    /* ⚠️ BOTH LANES ARE OFFERED for a text feature — that is the catalogue being
+       a catalogue rather than one provider with a second one disclosed. */
+    expect(new Set(draft.options.map((o) => o.provider))).toEqual(new Set(["gemini", "workers-ai"]));
+  });
+
+  /*
+    ⚠️ AND NOT FOR A FEATURE THAT SENDS A PHOTOGRAPH. The Workers AI rows price
+    no image, so `modelSuits` will not offer them — derived from the meter rather
+    than declared, because a capability field can disagree with the arithmetic
+    and it disagrees in the direction the platform pays for.
+  */
+  it("does not offer a text model for a feature that reads a picture", async () => {
+    const features = (await owner.get("/api/ai.models.list")).body.features as unknown as
+      { feature: string; options: { id: string }[] }[];
+    const vision = features.find((f) => f.feature === "label-reader")!;
+    expect(vision.options.map((o) => o.id).some((id) => id.startsWith("@cf/"))).toBe(false);
+    expect(vision.options.length).toBeGreaterThan(0);
+  });
+
+  it("takes a choice, reports who decided, and takes it back", async () => {
+    const set = await owner.call("/api/ai.models.choose", { feature: "draft-plan", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" });
+    expect(set.status).toBe(200);
+
+    const after = (await owner.get("/api/ai.models.list")).body.features as unknown as
+      { feature: string; inEffect: string | null; decidedBy: string | null }[];
+    const draft = after.find((f) => f.feature === "draft-plan")!;
+    expect(draft.inEffect).toBe("@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+    expect(draft.decidedBy).toBe("workspace");
+
+    /* ⚠️ Clearing is expressible, or going back to the product's default would
+       be a thing a workspace could do once and never undo. */
+    expect((await owner.call("/api/ai.models.choose", { feature: "draft-plan" })).status).toBe(200);
+    const back = (await owner.get("/api/ai.models.list")).body.features as unknown as
+      { feature: string; decidedBy: string | null }[];
+    expect(back.find((f) => f.feature === "draft-plan")!.decidedBy).toBe("manifest");
+  });
+
+  /*
+    ⚠️ REFUSED AT THE DOOR RATHER THAN STORED. A pick that is not offered would
+    be a row resolving to the default forever — a setting that appears to have
+    been saved and changes nothing.
+  */
+  it("refuses a model that cannot do what the feature asks", async () => {
+    const out = await owner.call("/api/ai.models.choose", { feature: "label-reader", model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" });
+    expect(out.status).toBe(400);
+  });
+
+  it("refuses a feature this product does not have", async () => {
+    expect((await owner.call("/api/ai.models.choose", { feature: "invented", model: "gemini-2.5-flash" })).status).toBe(400);
+  });
+});
+
+/* ------------------------------------------------------- residency, in full --- */
+
+/**
+ * ⚠️ RESIDENCY IS NOT ONLY STORAGE, AND THE PRODUCT HAS TO SAY SO.
+ *
+ * The allow-list mechanism existed, `generate` enforced it, and no app ever
+ * declared one — so a workspace that chose the EU had its photographs sent to
+ * exactly the same models as everybody else. Storage residency was real and
+ * inference residency was a sentence in a comment.
+ */
+describe("what a region actually promises", () => {
+  it("publishes which models each region permits, before anybody chooses one", async () => {
+    const out = await stranger.get("/api/protection.list");
+    const inference = out.body.inference as unknown as Record<string, Record<string, string[]>>;
+    expect(Object.keys(inference)).toContain("ai");
+    /* ⚠️ Every declared region is answered, including the one that narrows
+       nothing — an absent entry would read as "no models here". */
+    for (const region of kova.tenancy.regions) {
+      expect(inference.ai![region], `region ${region} says nothing`).toBeDefined();
+      expect(inference.ai![region]!.length).toBeGreaterThan(0);
+    }
+  });
+
+  /*
+    ⚠️ AND THE HONEST ANSWER TODAY IS THAT THE EU LIST IS NOT SHORTER. Neither
+    provider offers inference pinned inside the EEA, so an EU studio gets EU
+    STORAGE and its generations still leave under the declared safeguards. The
+    value of this assertion is that the day that changes, it fails here rather
+    than being a promise nobody re-read.
+  */
+  it("matches the manifest exactly, so the published claim cannot drift from the binding", async () => {
+    const inference = (await stranger.get("/api/protection.list")).body.inference as unknown as Record<string, Record<string, string[]>>;
+    const declared = (kova.bindings as Record<string, { byRegion?: Record<string, readonly string[]> }>).ai!.byRegion!;
+    for (const region of kova.tenancy.regions) {
+      expect(inference.ai![region]).toEqual([...declared[region]!]);
+    }
   });
 });

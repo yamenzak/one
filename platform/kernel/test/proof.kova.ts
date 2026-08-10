@@ -32,7 +32,13 @@ export const bindings = defineBindings({
   media: objects({ jurisdictional: true }),
   cache: cache(),
   billing: actor({ className: "TenantBillingDO", jurisdictional: true }),
-  ai: inference({ subprocessors: ["cloudflare-workers-ai", "google-gemini"] }),
+  /* ⚠️ TWO REGIONS MEANS EVERY REGION SAYS WHAT IT PERMITS. Falling back to the
+     app-wide set is what made residency stop at storage — a workspace that chose
+     the EU had its data sent to exactly the same models as everybody else. */
+  ai: inference({
+    subprocessors: ["cloudflare-workers-ai", "google-gemini"],
+    byRegion: { eu: ["google-gemini"], auto: ["cloudflare-workers-ai", "google-gemini"] },
+  }),
 });
 
 export const problems = declareProblems({
