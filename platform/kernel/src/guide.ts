@@ -50,7 +50,32 @@ export type Answer =
  * none of them is a collection, and every one of them is something a first-run
  * checklist has to be able to ask about.
  */
-export type PlatformFact = "plan_chosen" | "passkey_registered" | "file_stored" | "colleague_invited";
+export type PlatformFact =
+  | "plan_chosen"
+  | "passkey_registered"
+  | "file_stored"
+  | "colleague_invited"
+  /** ⚠️ The DEPLOYMENT's, not a workspace's — see `Setup`. */
+  | "payments_configured";
+
+/* ------------------------------------------------------------- the whose --- */
+
+/**
+ * ⚠️ WHOSE SETUP THIS IS, AND IT IS THREE THINGS PEOPLE KEEP CALLING ONE.
+ *
+ * A deployment is set up once by whoever runs it. A workspace is set up once by
+ * whoever opened it. A person is set up once by themselves, every time a new one
+ * arrives — and that third one is the one that gets built as the second: a
+ * product ships a workspace wizard, then a customer signs up under a tenant and
+ * is shown the workspace's checklist, which is already finished and none of
+ * which was theirs.
+ *
+ * Naming the scope is also what makes a step ANSWERABLE. A deployment step has
+ * no tenant to count rows in, and a person step counting the workspace's rows is
+ * "done" the moment anybody else did it — which tells a new arrival their setup
+ * is complete when they have done nothing at all.
+ */
+export type Setup = "deployment" | "workspace" | "person";
 
 /* -------------------------------------------------------------- the step --- */
 
@@ -67,6 +92,11 @@ export interface GuideStep {
    * the product good rather than possible.
    */
   readonly required: boolean;
+  /**
+   * ⚠️ WHOSE SETUP THIS IS. Defaults to the workspace — the common case, and the
+   * one that is right when nobody thought about it.
+   */
+  readonly setup?: Setup;
   readonly answer: Answer;
   /**
    * The operation that satisfies it, so the item can offer the action rather
@@ -119,8 +149,17 @@ export function guideProblems(
   collections: readonly CollectionSpec[],
   operations: readonly string[],
   help: readonly string[],
+  /**
+   * ⚠️ WHAT THE REST OF THE MANIFEST MAKES POSSIBLE. A step asking somebody to
+   * upload a file in an app that declares no file purposes has no upload surface
+   * to use — the operations are not mounted at all — and a step asking somebody
+   * to choose a plan in an app selling none is a question with no answers. Both
+   * are unanswerable forever, and both look like a step nobody has got to yet.
+   */
+  offers: { readonly plans: number; readonly filePurposes: number } = { plans: 1, filePurposes: 1 },
 ): readonly GuideProblem[] {
   const known = new Set(collections.map((c) => c.id));
+  const byId = new Map(collections.map((c) => [c.id, c]));
   const fields = new Map(collections.map((c) => [c.id, new Set(Object.keys(c.fields))]));
   const ops = new Set(operations);
   const articles = new Set(help);
@@ -134,12 +173,47 @@ export function guideProblems(
     if (!step.title.trim()) say("has no title");
     if (step.roles.length === 0) say("is for nobody — a step with no audience is one nothing shows");
 
+    const setup = step.setup ?? "workspace";
+
     if (step.answer.kind === "collection") {
+      /*
+        ⚠️ A DEPLOYMENT STEP HAS NO TENANT TO COUNT IN. The operator is not
+        inside a workspace, so a row count there is a question about somebody
+        else's data — answered by whichever workspace happened to be resolved,
+        which is none of them.
+      */
+      if (setup === "deployment") say("is the deployment's, and counts rows in a workspace the operator is not in");
       if (!known.has(step.answer.collection)) say(`counts "${step.answer.collection}", which this app does not declare`);
       else if (step.answer.where && !fields.get(step.answer.collection)!.has(step.answer.where.field)) {
         say(`filters on "${step.answer.where.field}", which "${step.answer.collection}" does not have`);
       }
+      /*
+        ⚠️ AND A PERSON STEP COUNTING THE WORKSPACE'S ROWS IS DONE THE MOMENT
+        ANYBODY ELSE DID IT. A new arrival is told their setup is complete when
+        they have done nothing — which is the failure this scope exists to name,
+        so it is refused rather than warned about.
+      */
+      if (setup === "person" && byId.get(step.answer.collection)?.scope.of !== "subject") {
+        say(`is one person's, and counts a collection scoped to the whole workspace — done the moment anybody else did it`);
+      }
       if (step.answer.atLeast < 1) say("is satisfied by nothing at all, so it is always done");
+    }
+
+    if (step.answer.kind === "platform") {
+      if (step.answer.fact === "plan_chosen" && offers.plans === 0) {
+        say("asks for a plan in an app that sells none, which is a question with no answers");
+      }
+      if (step.answer.fact === "file_stored" && offers.filePurposes === 0) {
+        say("asks for a file in an app that declares no file purposes, so there is no upload surface to use");
+      }
+      /*
+        ⚠️ THE DEPLOYMENT'S FACT IS THE DEPLOYMENT'S STEP. Asking a workspace
+        whether the operator configured payments is showing somebody a task they
+        cannot do and would not understand.
+      */
+      if (step.answer.fact === "payments_configured" && setup !== "deployment") {
+        say("asks a workspace about the deployment's own configuration, which nobody in it can change");
+      }
     }
 
     /*
@@ -173,6 +247,7 @@ export interface Progress {
   readonly body?: string;
   readonly done: boolean;
   readonly required: boolean;
+  readonly setup: Setup;
   readonly does?: string;
   readonly help?: string;
 }
@@ -192,8 +267,14 @@ export function progressFor(
   guide: GuideSpec,
   role: string,
   answered: Readonly<Record<string, boolean>>,
+  /**
+   * ⚠️ THE SCOPES THAT APPLY WHERE THIS IS BEING ASKED, not one of them. Inside
+   * a workspace a person has their own setup AND the workspace's, and splitting
+   * that into two requests is how a client ends up rendering one of them.
+   */
+  scopes: readonly Setup[] = ["workspace"],
 ): { readonly steps: readonly Progress[]; readonly blocking: readonly Progress[] } {
-  const mine = guide.steps.filter((step) => step.roles.includes(role));
+  const mine = guide.steps.filter((step) => step.roles.includes(role) && scopes.includes(step.setup ?? "workspace"));
   const steps = [...mine]
     .sort((a, b) => Number(b.required) - Number(a.required))
     .map((step) => ({
@@ -202,8 +283,68 @@ export function progressFor(
       ...(step.body ? { body: step.body } : {}),
       done: answered[step.id] ?? false,
       required: step.required,
+      setup: step.setup ?? "workspace",
       ...(step.does ? { does: step.does } : {}),
       ...(step.help ? { help: step.help } : {}),
     }));
   return { steps, blocking: steps.filter((step) => step.required && !step.done) };
+}
+
+/* ------------------------------------------------------------ the wizard --- */
+
+/**
+ * ⚠️ THE WIZARD IS A PROJECTION OF THE CHECKLIST, NOT A SECOND LIST.
+ *
+ * Everything here is derived from `progressFor` — the same steps, the same
+ * answers, the same role filter — narrowed to the `required` ones and given a
+ * position. Two systems is how the setup flow and the guidance come to disagree
+ * about what a new workspace still needs, and the disagreement is always
+ * discovered by somebody stuck in the flow.
+ */
+export interface Wizard {
+  readonly setup: Setup;
+  readonly steps: readonly Progress[];
+  /**
+   * Where they are: the index of the first unfinished step, or `of` when there
+   * is nothing left.
+   *
+   * ⚠️ THE FIRST UNFINISHED, NOT THE COUNT OF FINISHED ONES. Somebody who
+   * satisfied step three out of order — a plan chosen from a pricing page, a
+   * passkey added from a prompt — is at step one with step three already ticked,
+   * and a position derived from a count would put them past work they have not
+   * done.
+   */
+  readonly at: number;
+  readonly of: number;
+  readonly done: boolean;
+}
+
+export function wizardFor(
+  guide: GuideSpec,
+  role: string,
+  answered: Readonly<Record<string, boolean>>,
+  setup: Setup = "workspace",
+): Wizard {
+  const steps = progressFor(guide, role, answered, [setup]).steps.filter((step) => step.required);
+  const at = steps.findIndex((step) => !step.done);
+  return { setup, steps, at: at === -1 ? steps.length : at, of: steps.length, done: at === -1 };
+}
+
+/**
+ * Which setup somebody is actually being walked through, of the ones that apply.
+ *
+ * ⚠️ THE OUTER ONE FIRST, AND THE ARGUMENT IS NOT ORDERING. A workspace that is
+ * not set up blocks everybody in it, so finishing a person's own steps first
+ * would walk somebody carefully through their profile inside a workspace that
+ * cannot do anything yet. When every scope is finished the LAST is returned, so
+ * a completed flow reports the innermost — the one whose "done" is theirs.
+ */
+export function wizardOf(
+  guide: GuideSpec,
+  role: string,
+  answered: Readonly<Record<string, boolean>>,
+  scopes: readonly Setup[],
+): Wizard {
+  const walks = scopes.map((setup) => wizardFor(guide, role, answered, setup));
+  return walks.find((walk) => !walk.done) ?? walks[walks.length - 1] ?? wizardFor(guide, role, answered);
 }

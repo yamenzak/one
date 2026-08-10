@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { guideProblems, MAX_HINTS, progressFor, type CollectionSpec, type GuideSpec, type GuideStep } from "../src/index.js";
+import { guideProblems, MAX_HINTS, progressFor, wizardFor, wizardOf, type CollectionSpec, type GuideSpec, type GuideStep } from "../src/index.js";
 
 const collections = [
   { id: "note", fields: { title: {}, pinned: {} } },
@@ -138,5 +138,134 @@ describe("what one person still has to do", () => {
   it("reads an unanswered step as not done rather than as missing", () => {
     expect(progressFor(full, "owner", {}).steps.every((s) => s.done === false)).toBe(true);
     expect(progressFor(full, "owner", { note: true }).steps.find((s) => s.id === "note")!.done).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------ the wizard --- */
+
+/**
+ * ⚠️ THE WIZARD IS A PROJECTION OF THE CHECKLIST, and these assert that it stays
+ * one. Two systems is how a setup flow and a guidance surface come to disagree
+ * about what a new workspace still needs, and the disagreement is always found
+ * by somebody stuck in the flow.
+ */
+describe("the wizard is the required half of the same list", () => {
+  const guide: GuideSpec = {
+    steps: [
+      { id: "pay", title: "Connect a payment provider", roles: ["owner"], setup: "deployment", required: true, answer: { kind: "platform", fact: "payments_configured" } },
+      { id: "plan", title: "Choose a plan", roles: ["owner"], setup: "workspace", required: true, answer: { kind: "platform", fact: "plan_chosen" } },
+      { id: "note", title: "Write a note", roles: ["owner"], setup: "workspace", required: true, answer: { kind: "collection", collection: "thing", atLeast: 1 } },
+      { id: "extra", title: "Something nice", roles: ["owner"], setup: "workspace", required: false, answer: { kind: "collection", collection: "thing", atLeast: 5 } },
+      { id: "theirs", title: "Their own", roles: ["reader"], setup: "person", required: true, answer: { kind: "platform", fact: "passkey_registered" } },
+    ],
+    hints: [],
+  };
+
+  /*
+    ⚠️ ONE SETUP AT A TIME. A person signing up under a workspace shown the
+    workspace's checklist — already finished, none of it theirs — is the failure
+    the scope exists to name.
+  */
+  it("shows one scope's steps and no other's", () => {
+    expect(wizardFor(guide, "owner", {}).steps.map((s) => s.id)).toEqual(["plan", "note"]);
+    expect(wizardFor(guide, "owner", {}, "deployment").steps.map((s) => s.id)).toEqual(["pay"]);
+    expect(wizardFor(guide, "reader", {}, "person").steps.map((s) => s.id)).toEqual(["theirs"]);
+  });
+
+  it("carries only the required ones — the rest is the checklist", () => {
+    expect(wizardFor(guide, "owner", {}).steps.some((s) => s.id === "extra")).toBe(false);
+    expect(progressFor(guide, "owner", {}).steps.some((s) => s.id === "extra")).toBe(true);
+  });
+
+  /*
+    ⚠️ THE FIRST UNFINISHED, NOT THE COUNT OF FINISHED ONES. Somebody who
+    satisfied a later step out of order — a plan chosen from a pricing page, a
+    passkey added at a prompt — is still at the earlier one, and a position
+    derived from a count would put them past work they have not done.
+  */
+  it("stands at the first unfinished step, even when a later one is already done", () => {
+    expect(wizardFor(guide, "owner", { note: true })).toMatchObject({ at: 0, of: 2, done: false });
+    expect(wizardFor(guide, "owner", { plan: true })).toMatchObject({ at: 1, of: 2, done: false });
+  });
+
+  it("is finished when every required step is, and says so", () => {
+    expect(wizardFor(guide, "owner", { plan: true, note: true })).toMatchObject({ at: 2, of: 2, done: true });
+  });
+
+  /*
+    ⚠️ A SCOPE WITH NOTHING REQUIRED IS FINISHED, NOT BROKEN. An app that asks
+    nothing of a new person must not leave them staring at an empty flow.
+  */
+  it("is finished immediately when a scope requires nothing", () => {
+    expect(wizardFor(guide, "owner", {}, "person")).toMatchObject({ of: 0, done: true });
+  });
+
+  /*
+    ⚠️ THE OUTER SCOPE LEADS WHILE IT IS UNFINISHED, and that is not an ordering
+    preference. A workspace that is not set up blocks everybody in it, so
+    finishing somebody's own profile first walks them carefully through a
+    workspace that cannot do anything yet.
+  */
+  it("walks the workspace before the person, and hands over when it is done", () => {
+    const both = ["workspace", "person"] as const;
+    expect(wizardOf(guide, "owner", {}, both).setup).toBe("workspace");
+    expect(wizardOf(guide, "owner", { plan: true, note: true }, both).setup).toBe("person");
+  });
+
+  /*
+    ⚠️ AND WHEN EVERY SCOPE IS FINISHED IT REPORTS THE INNERMOST — the one whose
+    "done" is theirs. Reporting the workspace's would tell somebody the thing
+    they just finished belonged to somebody else.
+  */
+  it("reports the innermost scope once everything is finished", () => {
+    expect(wizardOf(guide, "reader", { theirs: true }, ["workspace", "person"])).toMatchObject({ setup: "person", done: true });
+  });
+});
+
+describe("what a manifest may not say about whose setup a step is", () => {
+  /* Two collections, and the difference between them is the whole point. */
+  const tenantWide = { id: "thing", scope: { of: "tenant" }, fields: { title: {} } } as unknown as CollectionSpec;
+  const theirs = { id: "entry", scope: { of: "subject", subject: "customer" }, fields: { note: {} } } as unknown as CollectionSpec;
+
+  const step = (over: Record<string, unknown>) => ({
+    id: "s", title: "T", roles: ["owner"], required: true, ...over,
+  }) as never;
+  const problems = (over: Record<string, unknown>, offers = { plans: 1, filePurposes: 1 }) =>
+    guideProblems({ steps: [step(over)], hints: [] }, [tenantWide, theirs], ["thing.create"], [], offers)
+      .map((p) => p.why).join("; ");
+
+  /*
+    ⚠️ A DEPLOYMENT STEP HAS NO TENANT TO COUNT IN. The operator is not inside a
+    workspace, so a row count there is a question about somebody else's data,
+    answered by whichever workspace happened to be resolved.
+  */
+  it("refuses a deployment step that counts rows", () => {
+    expect(problems({ setup: "deployment", answer: { kind: "collection", collection: "thing", atLeast: 1 } })).toMatch(/operator is not in/);
+  });
+
+  /*
+    ⚠️ AND A PERSON STEP OVER THE WORKSPACE'S ROWS IS DONE THE MOMENT A COLLEAGUE
+    DOES IT — a new arrival told their setup is complete having done nothing.
+  */
+  it("refuses a person step counting a collection the whole workspace shares", () => {
+    expect(problems({ setup: "person", answer: { kind: "collection", collection: "thing", atLeast: 1 } })).toMatch(/anybody else did it/);
+  });
+
+  it("accepts a person step counting their own", () => {
+    expect(problems({ setup: "person", answer: { kind: "collection", collection: "entry", atLeast: 1 } })).toBe("");
+  });
+
+  /*
+    ⚠️ AND A STEP THE REST OF THE MANIFEST MAKES UNANSWERABLE. An app selling no
+    plans cannot be asked to choose one; an app with no file purposes has no
+    upload surface mounted at all. Both look like a step nobody has got to yet.
+  */
+  it("refuses a step asking for something this manifest does not offer", () => {
+    expect(problems({ answer: { kind: "platform", fact: "plan_chosen" } }, { plans: 0, filePurposes: 1 })).toMatch(/sells none/);
+    expect(problems({ answer: { kind: "platform", fact: "file_stored" } }, { plans: 1, filePurposes: 0 })).toMatch(/no upload surface/);
+  });
+
+  it("refuses a workspace step asking about the deployment's own configuration", () => {
+    expect(problems({ answer: { kind: "platform", fact: "payments_configured" } })).toMatch(/nobody in it can change/);
   });
 });

@@ -1610,3 +1610,73 @@ per person — and a `danger` tone may carry no moment at all.
 The failure both prevent is the same shape as the leaderboard: a product where
 the most-celebrated action is whichever one the business most wants people to
 take, arriving one reasonable declaration at a time.
+
+## 133. There are three setups and products keep shipping one
+
+A deployment is set up once by whoever runs it. A workspace is set up once by
+whoever opened it. A person is set up once by themselves, *every time a new one
+arrives* — and that third one gets built as the second: a product ships a
+workspace wizard, then a customer signs up under a tenant and is handed the
+workspace's checklist, already finished, none of which was theirs.
+
+Naming the scope is also what makes a step answerable. A deployment step has no
+tenant to count rows in; a person step counting the workspace's rows is done the
+moment a colleague does it. Both are refused at composition rather than
+discovered by whoever arrives second.
+
+## 134. The wizard is the required half of the checklist, given a position
+
+Everything in it is derived from the same steps, the same answers and the same
+role filter — narrowed to `required` and ordered. Two systems is how a setup flow
+and a guidance surface come to disagree about what a workspace still needs, and
+the disagreement is always found by somebody stuck in the flow.
+
+The position is **the first unfinished step, not the count of finished ones**.
+Somebody who satisfied a later step out of order — a plan chosen from a pricing
+page, a passkey added at a prompt — is still at the earlier one, and a count
+would walk them past work they have not done.
+
+The outer scope leads while it is unfinished, and that is not an ordering
+preference: a workspace that is not set up blocks everybody in it, so finishing
+somebody's own profile first is a flow completed inside a workspace that cannot
+do anything yet.
+
+## 135. A whole Scope variant was declared and dead
+
+`Scope` has had a `subject` variant since stage 0 — DDL, an index, a place in
+the erasure cascade, a `NOT NULL` column — and no derived operation ever wrote
+it, filtered on it, or mentioned it. Every subject-scoped collection was a table
+that could not be written to, and nothing in the platform noticed, because
+nothing in the platform declared one. `capability-reachable` cannot see this: the
+routes ARE mounted, the tables ARE applied. What is missing is a column.
+
+The general form, and it is the sharper version of the mechanism-with-no-surface
+rule: **an option nobody has taken is an option nobody has tested.** A closed set
+with an unused member is a claim, not a feature. The reference app now declares
+one permanently, which is the only durable fix.
+
+The read rule that came with it: a subject-scoped read narrows to the caller's
+own subject **when they have one**. A customer means "mine" and a coach means
+"this workspace's", and `resolveCaller` already draws that line — a staff caller
+names no subject. It fails safe in the direction that matters: a caller who has a
+subject cannot express a read of somebody else's rows.
+
+## 136. The degrade lane is asserted, not hoped for
+
+A mandatory paid step that refused would mean nobody can finish setup on a
+self-host, or before a deployment's payment provider is configured — failing
+closed on OUR misconfiguration rather than on their non-payment. It holds here
+because choosing a plan RECORDS an intention and grants nothing: only the payment
+provider may stamp a plan. That is now a test on a deployment that genuinely
+cannot take money, rather than a paragraph saying it should be true.
+
+## 137. A mutation harness with a fixed temp path is not safe to run twice
+
+Two runs overlapped, both backing the file under mutation up to `/tmp/orig`, and
+one restored the other's file: `runtime/src/runtime.ts` came back as a copy of
+`kernel/src/guide.ts`. Typecheck caught it immediately, but it could have been
+subtler — the restore is silent and the diff is enormous, so it reads as a bad
+merge rather than as a tool bug.
+
+A backup path is per-process and per-case now. The general form: any tool that
+edits the working tree in place has to assume a second copy of itself is running.

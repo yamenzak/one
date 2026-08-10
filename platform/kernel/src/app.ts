@@ -577,6 +577,7 @@ export function assertComposable(spec: {
     spec.collections,
     [...spec.operations.map((op) => op.id), ...spec.collections.flatMap((c) => DERIVED_VERBS.map((v) => `${c.id}.${v}`))],
     Object.keys(spec.help),
+    { plans: spec.access.plans.length, filePurposes: Object.keys(spec.filePurposes ?? {}).length },
   );
   if (guide.length) {
     throw new Error(`${spec.id}: guide — ${guide.map((g) => `"${g.id}" ${g.why}`).join("; ")}.`);

@@ -73,10 +73,32 @@ const writable = (spec: CollectionSpec): [string, string][] =>
  * clause means there is no list that could forget, and a `platform`-scoped
  * collection says so in its declaration rather than by omitting a filter.
  */
-function scopeClause(spec: CollectionSpec): { where: string; binds: (tenantId: string) => string[] } {
+/**
+ * ⚠️ THE SUBJECT COLUMN NARROWS A READ ONLY FOR SOMEBODY WHO IS A SUBJECT.
+ *
+ * A subject-scoped collection is one whose rows belong to a tenant's own
+ * customer — a client's food log, a member's bookings. Two callers ask about it
+ * and they are asking different questions: a customer means "mine", and a coach
+ * means "this workspace's". `resolveCaller` already draws that line — a staff
+ * caller names no subject — so the narrowing follows from who is asking rather
+ * than from a second permission somebody has to remember to check.
+ *
+ * ⚠️ It FAILS SAFE in the direction that matters: a caller who has a subject can
+ * only ever see their own rows, so the mistake that leaks one customer's records
+ * to another is not expressible here.
+ */
+function scopeClause(spec: CollectionSpec, subjectId?: string): { where: string; binds: (tenantId: string) => string[] } {
   if (spec.scope.of === "platform") return { where: "1 = 1", binds: () => [] };
+  if (spec.scope.of === "subject" && subjectId) {
+    const column = subjectColumn(spec);
+    return { where: `tenant_id = ? AND ${column} = ?`, binds: (tenantId) => [tenantId, subjectId] };
+  }
   return { where: "tenant_id = ?", binds: (tenantId) => [tenantId] };
 }
+
+/** ⚠️ The same derivation `ddl.ts` uses. Two spellings would be one silent join. */
+const subjectColumn = (spec: CollectionSpec): string =>
+  spec.scope.of === "subject" ? `${columnName(spec.scope.subject)}_id` : "";
 
 /* Archived rows are invisible to an ordinary read — `liveClause`, in the kernel. */
 
@@ -100,13 +122,15 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
   const table = tableNameFor(spec);
   const read = access.read ?? `${spec.id}:read`;
   const write = access.write ?? `${spec.id}:write`;
-  const scope = scopeClause(spec);
   const cols = writable(spec);
   const selectable = ["id", "version", "created_at", "updated_at", ...cols.map(([, c]) => c),
     ...(spec.naming ? ["name"] : []), ...(spec.docStatus ? ["docstatus"] : [])];
 
-  const store = (ctx: unknown): { db: SqlHandle; tenantId: string; actor: string } => {
-    const c = ctx as { bind: Record<string, SqlHandle | undefined>; tenantId: string; actor: { userId: string | null } };
+  const store = (ctx: unknown): { db: SqlHandle; tenantId: string; actor: string; scope: ReturnType<typeof scopeClause>; subjectId?: string } => {
+    const c = ctx as {
+      bind: Record<string, SqlHandle | undefined>; tenantId: string;
+      actor: { userId: string | null }; subjectId?: string;
+    };
     /*
       ⚠️ `db` IS THE CONVENTIONAL NAME FOR AN APP'S REGIONAL STORE, and derived
       operations depend on it. An app that binds one under another name gets a
@@ -114,7 +138,10 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     */
     const db = c.bind.db;
     if (!db) throw new Error(`${spec.id}: derived operations need a binding named "db"`);
-    return { db, tenantId: c.tenantId, actor: c.actor.userId ?? "system" };
+    return {
+      db, tenantId: c.tenantId, actor: c.actor.userId ?? "system",
+      scope: scopeClause(spec, c.subjectId), ...(c.subjectId ? { subjectId: c.subjectId } : {}),
+    };
   };
 
   /** The append-only record of who changed what. Off only for pure caches. */
@@ -136,7 +163,7 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     permission: read,
     idempotency: { mode: "none" },
     async handler(ctx, input: { limit?: number; search?: string }) {
-      const { db, tenantId } = store(ctx);
+      const { db, tenantId, scope } = store(ctx);
       /*
         ⚠️ A CEILING WITH NO WAY TO OPT OUT. An unbounded list is one row count
         away from a response nothing can render and a worker that runs out of
@@ -163,7 +190,7 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     idempotency: { mode: "none" },
     fails: ["platform.not_found"],
     async handler(ctx, input: { id: string }) {
-      const { db, tenantId } = store(ctx);
+      const { db, tenantId, scope } = store(ctx);
       const row = await db.first(`SELECT ${selectable.join(", ")} FROM ${table} WHERE id = ? AND ${scope.where}${liveClause(spec)}`, input.id, ...scope.binds(tenantId));
       if (!row) ctx.fail("platform.not_found");
       return { row };
@@ -178,15 +205,24 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     output: s.object({ id: s.id(spec.id), version: s.number({ integer: true }) }),
     permission: write,
     idempotency: { mode: "none" },
+    fails: ["platform.forbidden"],
     audit: () => ({ subject: spec.id, verb: "create" }),
     outcome: { message: `${spec.label.one} saved`, tone: "success", invalidates: [spec.id] },
     async handler(ctx, input: Record<string, unknown>) {
-      const { db, tenantId } = store(ctx);
+      const { db, tenantId, subjectId } = store(ctx);
       const at = ctx.now();
       const id = `${spec.id.slice(0, 3)}_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
       const [names, values] = columnValues(spec, input);
-      const system = ["id", "version", "created_at", "updated_at", ...(spec.scope.of === "platform" ? [] : ["tenant_id"])];
-      const systemValues = [id, 1, at, at, ...(spec.scope.of === "platform" ? [] : [tenantId])];
+      /*
+        ⚠️ A SUBJECT-SCOPED ROW WITH NO SUBJECT IS A ROW NOBODY OWNS. The column
+        is `NOT NULL` in the derived DDL, so writing one without a subject is a
+        constraint violation surfacing as an unavailable — refusing here says
+        what actually happened.
+      */
+      if (spec.scope.of === "subject" && !subjectId) ctx.fail("platform.forbidden");
+      const owned = spec.scope.of === "subject" ? [subjectColumn(spec)] : [];
+      const system = ["id", "version", "created_at", "updated_at", ...(spec.scope.of === "platform" ? [] : ["tenant_id"]), ...owned];
+      const systemValues = [id, 1, at, at, ...(spec.scope.of === "platform" ? [] : [tenantId]), ...(owned.length ? [subjectId!] : [])];
       const all = [...system, ...names];
       await db.run(
         `INSERT INTO ${table} (${all.join(", ")}) VALUES (${all.map(() => "?").join(", ")})`,
@@ -215,7 +251,7 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     outcome: { message: "Saved", tone: "success", invalidates: [spec.id] },
     fails: ["platform.not_found", "platform.conflict", "platform.invalid"],
     async handler(ctx, input: { id: string; version: number; changes: Record<string, unknown> }) {
-      const { db, tenantId } = store(ctx);
+      const { db, tenantId, scope } = store(ctx);
       const current = await db.first<{ version: number; docstatus?: number }>(
         `SELECT version${spec.docStatus ? ", docstatus" : ""} FROM ${table} WHERE id = ? AND ${scope.where}${liveClause(spec)}`,
         input.id, ...scope.binds(tenantId),
@@ -258,7 +294,7 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     audit: (i: { id: string }) => ({ subject: i.id, verb: "delete" }),
     fails: ["platform.not_found"],
     async handler(ctx, input: { id: string }) {
-      const { db, tenantId } = store(ctx);
+      const { db, tenantId, scope } = store(ctx);
       const at = ctx.now() as Instant;
       /*
         ⚠️ WHAT DELETING MEANS IS THE COLLECTION'S DECISION, because it is a
@@ -289,7 +325,7 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     permission: read,
     idempotency: { mode: "none" },
     async handler(ctx, input: { id: string }) {
-      const { db, tenantId } = store(ctx);
+      const { db, tenantId, scope } = store(ctx);
       const entries = await db.all(
         `SELECT verb, actor_id, at FROM activity WHERE tenant_id = ? AND collection = ? AND row_id = ? ORDER BY at DESC LIMIT 100`,
         tenantId, spec.id, input.id,
@@ -312,7 +348,7 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
       audit: (i: { id: string }) => ({ subject: i.id, verb: kind }),
       fails: ["platform.not_found", "platform.invalid"],
       async handler(ctx, input: { id: string }) {
-        const { db, tenantId } = store(ctx);
+        const { db, tenantId, scope } = store(ctx);
         const row = await db.first<Record<string, unknown> & { docstatus: number }>(
           `SELECT ${[...selectable, ...(spec.onDelete.on === "archive" ? ["deleted_at"] : [])].join(", ")} FROM ${table} WHERE id = ? AND ${scope.where}`,
           input.id, ...scope.binds(tenantId),

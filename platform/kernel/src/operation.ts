@@ -107,6 +107,15 @@ export interface Ctx<B extends BindingSpec> {
   readonly bind: ResolvedBindings<B>;
   readonly actor: Actor;
   readonly tenantId: TenantId;
+  /**
+   * WHO THIS CALLER IS ON THE CUSTOMER RAIL, where an app has one.
+   *
+   * ⚠️ ABSENT FOR STAFF, AND THAT ABSENCE IS LOAD-BEARING. A subject-scoped
+   * collection narrows its reads to this when it is present, so "no subject"
+   * means "asking about the workspace" and a value means "asking about mine".
+   * An app that filled it in for staff would hide the roster from the coach.
+   */
+  readonly subjectId?: string;
   readonly region: RegionId;
   /** ⚠️ Injected, so a test is deterministic and a handler cannot read a wall clock. */
   now(): Instant;

@@ -1,5 +1,6 @@
 {
   "collections": [
+    "entry",
     "note",
     "receipt"
   ],
@@ -8,6 +9,8 @@
     "billing:operate",
     "commerce:manage",
     "commerce:read",
+    "entry:read",
+    "entry:write",
     "file:read",
     "file:write",
     "guide:read",
@@ -30,6 +33,12 @@
     "storedBytes"
   ],
   "operations": [
+    "entry.activity",
+    "entry.create",
+    "entry.delete",
+    "entry.list",
+    "entry.read",
+    "entry.update",
     "note.activity",
     "note.create",
     "note.delete",

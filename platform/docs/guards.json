@@ -1120,6 +1120,96 @@
       "impl": "ui/test/motion.test.ts",
       "proves": "replaces what was showing",
       "fails": "a queue of moments \u2014 a batch of writes producing four celebrations in a row, each meaning less than the last, long after the thing that caused them"
+    },
+    {
+      "id": "wizard-is-the-checklist",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/guide.test.ts",
+      "proves": "carries only the required ones \u2014 the rest is the checklist",
+      "fails": "a wizard kept as a second list \u2014 how a setup flow and the guidance come to disagree about what a new workspace still needs, always discovered by somebody stuck in the flow"
+    },
+    {
+      "id": "wizard-stands-where-they-are",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/guide.test.ts",
+      "proves": "stands at the first unfinished step, even when a later one is already done",
+      "fails": "a wizard position derived from how many steps are finished \u2014 somebody who satisfied a later step out of order is walked past work they have not done"
+    },
+    {
+      "id": "outer-setup-leads",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/guide.test.ts",
+      "proves": "walks the workspace before the person, and hands over when it is done",
+      "fails": "a person walked carefully through their own profile inside a workspace that is not set up and cannot do anything yet"
+    },
+    {
+      "id": "person-step-is-theirs",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/guide.test.ts",
+      "proves": "refuses a person step counting a collection the whole workspace shares",
+      "fails": "a person's setup step counting the workspace's rows \u2014 done the moment a colleague does it, so a new arrival is told their setup is complete having done nothing"
+    },
+    {
+      "id": "deployment-step-has-no-tenant",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/guide.test.ts",
+      "proves": "refuses a deployment step that counts rows",
+      "fails": "a deployment step counting rows in a workspace the operator is not in, answered by whichever one happened to resolve"
+    },
+    {
+      "id": "step-the-manifest-can-answer",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses a step asking for a plan in an app that sells none",
+      "fails": "a checklist step the rest of the manifest makes unanswerable \u2014 no plans to choose or no upload surface mounted \u2014 which looks exactly like a step nobody has got to yet"
+    },
+    {
+      "id": "subject-rows-are-theirs",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "hello/test/guide.test.ts",
+      "proves": "keeps one person's rows out of another's list",
+      "fails": "one customer's subject-scoped rows visible to another \u2014 a whole Scope variant that had DDL, an index and an erasure cascade while no derived operation ever wrote or filtered its column"
+    },
+    {
+      "id": "subject-row-needs-a-subject",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "runtime/test/collection.test.ts",
+      "proves": "refuses to create one for a caller who is not a customer",
+      "fails": "a subject-scoped row written with no subject \u2014 the column is NOT NULL, so the failure is a constraint violation surfacing as an unavailable on a request that was simply not this caller's to make"
+    },
+    {
+      "id": "setup-follows-the-door",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "hello/test/guide.test.ts",
+      "proves": "asks about the deployment there and about a workspace everywhere else",
+      "fails": "an operator shown a workspace's checklist, or a workspace shown the deployment's \u2014 a task nobody there can do and would not understand"
+    },
+    {
+      "id": "degrade-lane-finishes",
+      "group": "platform",
+      "stage": "6.5",
+      "status": "live",
+      "impl": "hello/test/guide.test.ts",
+      "proves": "finishes a workspace's wizard on a deployment that cannot take money",
+      "fails": "a mandatory paid step that strands every workspace on a self-host or before the payment provider is configured \u2014 failing closed on our own misconfiguration rather than on theirs"
     }
   ]
 }

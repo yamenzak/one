@@ -362,6 +362,27 @@ describe("a sold capability is withheld by something", () => {
  * destination — which renders, if anything renders it at all, as an anonymous
  * bell that says nothing and goes nowhere.
  */
+describe("a checklist step is refused against the rest of the manifest", () => {
+  /*
+    ⚠️ THE REST OF THE MANIFEST DECIDES WHETHER A STEP IS ANSWERABLE. An app
+    selling no plans cannot be asked to choose one, and an app with no file
+    purposes has no upload surface mounted at all — both are answered "no"
+    forever, and both look like a step nobody has got to yet.
+  */
+  const asking = (fact: string) => ({
+    ...base,
+    guide: { steps: [{ id: "s", title: "T", roles: ["owner"], required: true, answer: { kind: "platform", fact } }], hints: [] },
+  }) as never;
+
+  it("refuses a step asking for a plan in an app that sells none", () => {
+    expect(() => assertComposable(asking("plan_chosen"))).toThrow(/sells none/);
+  });
+
+  it("refuses a step asking for a file in an app with no file purposes", () => {
+    expect(() => assertComposable(asking("file_stored"))).toThrow(/no upload surface/);
+  });
+});
+
 describe("punctuation is refused by the whole manifest", () => {
   const declaring = (outcome: Record<string, unknown>) => ({
     ...base,

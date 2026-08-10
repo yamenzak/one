@@ -318,9 +318,12 @@ export const ${id.replace(/-/g, "")} = defineApp({
   */
   guide: {
     steps: [
-      { id: "choose-plan", title: "Choose a plan", roles: ["owner"], required: true, answer: { kind: "platform", fact: "plan_chosen" } },
-      { id: "first-record", title: "Add your first record", roles: ["owner"], required: false, answer: { kind: "collection", collection: "record", atLeast: 1 }, does: "record.create", help: "records" },
-      { id: "a-passkey", title: "Add a passkey so you can sign in with a tap", roles: ["owner", "reader"], required: false, answer: { kind: "platform", fact: "passkey_registered" } },
+      /* ⚠️ \`setup\` is WHOSE it is: the deployment's, this workspace's, or this
+         person's. A person shown the workspace's checklist — already finished,
+         none of it theirs — is what the third scope exists to prevent. */
+      { id: "choose-plan", title: "Choose a plan", roles: ["owner"], setup: "workspace", required: true, answer: { kind: "platform", fact: "plan_chosen" } },
+      { id: "first-record", title: "Add your first record", roles: ["owner"], setup: "workspace", required: false, answer: { kind: "collection", collection: "record", atLeast: 1 }, does: "record.create", help: "records" },
+      { id: "a-passkey", title: "Add a passkey so you can sign in with a tap", roles: ["owner", "reader"], setup: "person", required: false, answer: { kind: "platform", fact: "passkey_registered" } },
     ],
     /* ⚠️ Capped by the platform, because a hint is the one tracked thing here. */
     hints: [],

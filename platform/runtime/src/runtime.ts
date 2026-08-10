@@ -736,7 +736,21 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
               `SELECT COUNT(*) AS n FROM media WHERE tenant_id = ?`, at.tenant?.tenantId ?? "",
             ).catch(() => null))?.n ?? 0) > 0,
             colleague_invited: (await opts.audienceFor?.(at.tenant?.tenantId ?? "", regionalDb).catch(() => []))!.length > 1,
+            /*
+              ⚠️ THE DEPLOYMENT'S, NOT A WORKSPACE'S. Read from the same flag the
+              standing gate reads, so "we cannot take money" is one fact with one
+              source — a second copy is how a wizard asks an operator to
+              configure something the gate already believes is configured.
+            */
+            payments_configured: opts.chargeable ?? false,
           }),
+          ...(subjectId ? { subjectId } : {}),
+          /*
+            ⚠️ THE OPERATOR DOOR ASKS ABOUT THE DEPLOYMENT. It is the only place a
+            deployment step can be acted on, and showing one inside a workspace is
+            a task nobody there can do and would not understand.
+          */
+          setup: at.door === "admin" ? "deployment" : "workspace",
         },
         [MILESTONES]: {
           db: regionalDb,
@@ -794,6 +808,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         bind,
         actor,
         tenantId: (at.tenant?.tenantId ?? null) as TenantId,
+        ...(subjectId ? { subjectId } : {}),
         region: at.region,
         now: () => new Date().toISOString() as Instant,
         fail: (code, meta) => { throw new DeclaredFailure(code, meta); },

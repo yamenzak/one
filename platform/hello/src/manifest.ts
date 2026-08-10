@@ -77,6 +77,34 @@ export const receipts = collection({
   },
 });
 
+/* ------------------------------------------------------------ collection --- */
+
+/**
+ * A collection whose rows belong to one CUSTOMER rather than to the workspace.
+ *
+ * ⚠️ THE THIRD SCOPE, AND IT WAS DECLARED AND DEAD. `Scope` has had a `subject`
+ * variant since stage 0 — with DDL, an index and a place in the erasure cascade
+ * — and no derived operation ever wrote its column, which is `NOT NULL`. So
+ * every subject-scoped collection was a table that could not be written to, and
+ * nothing in the platform noticed because nothing declared one.
+ *
+ * It is here so that one does, permanently: the person half of the wizard needs
+ * a step somebody can satisfy for themselves, and a step counting the
+ * workspace's rows is done the moment a colleague does it.
+ */
+export const entries = collection({
+  id: "entry",
+  label: { one: "Entry", many: "Entries" },
+  scope: { of: "subject", subject: "customer" },
+  version: true,
+  retention: { days: null, onTenantClose: "purge" },
+  onDelete: { on: "archive" },
+  activity: true,
+  fields: {
+    note: field.text({ required: true, min: 1, max: 500 }),
+  },
+});
+
 /* ------------------------------------------------------------ operation --- */
 
 /**
@@ -157,13 +185,13 @@ export const hello = defineApp({
     weekStart: 1,
   },
   access: {
-    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read"],
+    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write"],
     /*
       Anybody signed in may open a workspace — this is a self-serve product, and
       `workspace:create` is checked on a door that has no tenant to be a member
       of, so a role is the only place it could come from.
     */
-    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read"], reader: ["note:read", "guide:read", "milestone:read"] },
+    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write"], reader: ["note:read", "guide:read", "milestone:read", "entry:read", "entry:write"] },
     /*
       ⚠️ EVERY ENTRY NAMES HOW IT IS WITHHELD, and `defineApp` refuses one whose
       mechanism does not exist. `notes` is gated on the collection rather than on
@@ -214,7 +242,7 @@ export const hello = defineApp({
     auditRetentionDays: 365,
   },
 
-  collections: [notes, receipts],
+  collections: [notes, receipts, entries],
 
   /*
     ⚠️ EVERY EVENT THE PLATFORM'S OWN OPERATIONS RAISE IS DECLARED HERE, and an
@@ -296,7 +324,17 @@ export const hello = defineApp({
   */
   guide: {
     steps: [
-      { id: "choose-plan", title: "Choose a plan", roles: ["owner"], required: true, answer: { kind: "platform", fact: "plan_chosen" } },
+      /*
+        ⚠️ THREE SHAPES, ONE DECLARATION. The deployment is set up once by
+        whoever runs it, a workspace once by whoever opened it, and a person
+        every time a new one arrives — and the third is the one that gets built
+        as the second, so a customer signing up under a tenant is shown the
+        workspace's checklist, already finished, none of which was theirs.
+      */
+      { id: "take-payments", title: "Connect a payment provider", roles: ["owner"], setup: "deployment", required: true, answer: { kind: "platform", fact: "payments_configured" } },
+      { id: "choose-plan", title: "Choose a plan", roles: ["owner"], setup: "workspace", required: true, answer: { kind: "platform", fact: "plan_chosen" } },
+      /* ⚠️ THEIRS, counted against THEIR rows — see the `entry` collection. */
+      { id: "first-entry", title: "Write your first entry", roles: ["owner", "reader"], setup: "person", required: true, answer: { kind: "collection", collection: "entry", atLeast: 1 }, does: "entry.create" },
       { id: "first-note", title: "Write your first note", roles: ["owner", "reader"], required: false, answer: { kind: "collection", collection: "note", atLeast: 1 }, does: "note.create", help: "notes" },
       { id: "a-receipt", title: "Record something you spent", roles: ["owner"], required: false, answer: { kind: "collection", collection: "receipt", atLeast: 1 }, help: "receipts" },
       { id: "a-passkey", title: "Add a passkey", roles: ["owner", "reader"], required: false, answer: { kind: "platform", fact: "passkey_registered" } },

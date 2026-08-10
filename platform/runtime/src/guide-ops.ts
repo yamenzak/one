@@ -7,7 +7,7 @@
  * something untrue about their own workspace.
  */
 
-import type { AnyOperation, AppSpec, BindingSpec, SqlHandle } from "@one/kernel";
+import type { AnyOperation, AppSpec, BindingSpec, Setup, SqlHandle } from "@one/kernel";
 import { operation, s } from "@one/kernel";
 import { dismissHint, guidanceFor, type PlatformFacts } from "./guide.js";
 
@@ -19,6 +19,10 @@ export interface GuideDeps {
   readonly tenantId: string;
   readonly userId: string;
   readonly role: string;
+  /** ⚠️ Who they are on the customer rail, for a step that is one person's. */
+  readonly subjectId?: string;
+  /** ⚠️ Whose setup this door asks about — the deployment's, or a workspace's. */
+  readonly setup?: Setup;
   facts(): Promise<PlatformFacts>;
 }
 
@@ -35,7 +39,12 @@ export function guideOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
     kind: "read",
     summary: "What is still worth doing in this workspace, and what is blocking it.",
     input: s.object({}),
-    output: s.object({ steps: s.json(), blocking: s.json(), hints: s.json(), of: s.number({ integer: true }), done: s.number({ integer: true }) }),
+    output: s.object({
+      steps: s.json(), blocking: s.json(), hints: s.json(),
+      /* ⚠️ The wizard is a PROJECTION of the same answers, not a second call. */
+      wizard: s.json(),
+      of: s.number({ integer: true }), done: s.number({ integer: true }),
+    }),
     /*
       ⚠️ THE PERSON'S OWN LIST, SCOPED BY CONSTRUCTION. The role comes from the
       session rather than from the request, so there is no parameter that could
@@ -45,10 +54,14 @@ export function guideOperations<B extends BindingSpec>(app: AppSpec<B>): readonl
     idempotency: { mode: "none" },
     async handler(ctx) {
       const d = deps(ctx);
-      if (!d.userId) return { steps: [], blocking: [], hints: [], of: 0, done: 0 };
+      if (!d.userId) {
+        return { steps: [], blocking: [], hints: [], wizard: { setup: "workspace", steps: [], at: 0, of: 0, done: true }, of: 0, done: 0 };
+      }
       return guidanceFor({
         db: d.db, guide, collections: app.collections,
         tenantId: d.tenantId, userId: d.userId, role: d.role, facts: await d.facts(),
+        ...(d.subjectId ? { subjectId: d.subjectId } : {}),
+        ...(d.setup ? { setup: d.setup } : {}),
       });
     },
   });

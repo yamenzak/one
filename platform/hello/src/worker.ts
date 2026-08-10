@@ -12,7 +12,7 @@ import {
   ACTIVITY_SCHEMA, applySchema, COMMERCE_SCHEMA, createRuntime, DIRECTORY_SCHEMA, GUIDE_SCHEMA, INBOX_SCHEMA, MEDIA_SCHEMA,
   DOMAIN_SCHEMA, IDENTITY_SCHEMA, LEDGER_SCHEMA, JOB_SCHEMA, MILESTONE_SCHEMA, OTP_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
 } from "@one/runtime";
-import { hello, notes, receipts } from "./manifest.js";
+import { entries, hello, notes, receipts } from "./manifest.js";
 
 /* ---------------------------------------------------------------- schema --- */
 
@@ -21,7 +21,7 @@ import { hello, notes, receipts } from "./manifest.js";
  * erasure cascade and the relocation plan cannot disagree with one another —
  * they are one declaration read four ways.
  */
-const derived = deriveSchema("hello", [notes, receipts]);
+const derived = deriveSchema("hello", [notes, receipts, entries]);
 if (derived.problems.length) throw new Error(`hello: ${derived.problems.map((p) => p.detail).join("; ")}`);
 
 /*
