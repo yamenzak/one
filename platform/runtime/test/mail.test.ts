@@ -9,13 +9,14 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { addressOf, chooseProvider, recorded, send, senderOf, type Post } from "../src/mail.js";
+import { MAIL_HANDED_TO, addressOf, chooseProvider, recorded, send, senderOf, type Post } from "../src/mail.js";
+import { MAIL_LANES } from "@one/kernel";
 import type { Instant } from "@one/kernel";
 
 const AT = "2026-01-10T00:00:00.000Z" as Instant;
 const NOTE = { to: "ro@example.test", subject: "Hello", body: "Your code is 123456." };
 
-const working = { "email.provider": "brevo", "email.from": "Kova <noreply@4dl.app>", "email.brevo.key": "xkeysib-1" };
+const working = { "email.provider": "resend", "email.from": "Kova <noreply@4dl.app>", "email.resend.key": "re_1" };
 
 const spy = (ok = true) => {
   const calls: { url: string; headers: Record<string, string>; body: string }[] = [];
@@ -34,7 +35,7 @@ const never: Post = async () => {
 
 describe("what a deployment sends with", () => {
   it("takes the provider, the sender and the key it was given", () => {
-    expect(chooseProvider(working)).toEqual({ ok: true, provider: "brevo", from: "Kova <noreply@4dl.app>", key: "xkeysib-1" });
+    expect(chooseProvider(working)).toEqual({ ok: true, provider: "resend", from: "Kova <noreply@4dl.app>", key: "re_1" });
   });
 
   /*
@@ -46,8 +47,8 @@ describe("what a deployment sends with", () => {
   it("says which part is missing, not merely that something is", () => {
     expect(chooseProvider({})).toMatchObject({ why: "no_provider" });
     expect(chooseProvider({ "email.provider": "pigeon" })).toMatchObject({ why: "unknown_provider" });
-    expect(chooseProvider({ "email.provider": "brevo" })).toMatchObject({ why: "no_sender" });
-    expect(chooseProvider({ "email.provider": "brevo", "email.from": "a@b" })).toMatchObject({ why: "no_key" });
+    expect(chooseProvider({ "email.provider": "resend" })).toMatchObject({ why: "no_sender" });
+    expect(chooseProvider({ "email.provider": "resend", "email.from": "a@b" })).toMatchObject({ why: "no_key" });
   });
 
   /*
@@ -77,32 +78,36 @@ describe("sending", () => {
     that was never addressed to anybody.
   */
   it("does not call a provider when the deployment is not configured", async () => {
-    const partial: Record<string, string>[] = [{}, { "email.provider": "brevo" }, { "email.provider": "brevo", "email.from": "a@b" }];
+    const partial: Record<string, string>[] = [{}, { "email.provider": "resend" }, { "email.provider": "resend", "email.from": "a@b" }];
     for (const values of partial) {
       expect(await send(values, NOTE, never, AT)).toMatchObject({ ok: false });
     }
   });
 
-  it("sends what Brevo expects, with the sender split", async () => {
+  it("sends what the provider expects, with the sender whole", async () => {
     const s = spy();
-    expect(await send(working, NOTE, s.post, AT)).toEqual({ ok: true, provider: "brevo" });
+    expect(await send(working, NOTE, s.post, AT)).toEqual({ ok: true, provider: "resend" });
     expect(s.calls).toHaveLength(1);
-    expect(s.calls[0]!.url).toContain("brevo");
-    expect(s.calls[0]!.headers["api-key"]).toBe("xkeysib-1");
+    expect(s.calls[0]!.url).toContain("resend");
+    expect(s.calls[0]!.headers.authorization).toBe("Bearer re_1");
 
-    const body = JSON.parse(s.calls[0]!.body) as { sender: { name: string; email: string }; to: { email: string }[]; textContent: string };
-    /* ⚠️ Not the whole string as an address — that arrives from nobody, or is refused. */
-    expect(body.sender).toEqual({ name: "Kova", email: "noreply@4dl.app" });
-    expect(body.to).toEqual([{ email: "ro@example.test" }]);
-    expect(body.textContent).toContain("123456");
+    const body = JSON.parse(s.calls[0]!.body) as { from: string; to: string[]; text: string };
+    expect(body.from).toBe("Kova <noreply@4dl.app>");
+    expect(body.to).toEqual(["ro@example.test"]);
+    expect(body.text).toContain("123456");
   });
 
-  it("sends what Resend expects, with the sender whole", async () => {
-    const s = spy();
-    const values = { "email.provider": "resend", "email.from": "Kova <noreply@4dl.app>", "email.resend.key": "re_1" };
-    expect(await send(values, NOTE, s.post, AT)).toEqual({ ok: true, provider: "resend" });
-    expect(s.calls[0]!.headers.authorization).toBe("Bearer re_1");
-    expect(JSON.parse(s.calls[0]!.body).from).toBe("Kova <noreply@4dl.app>");
+  /*
+    ⚠️ AND A LANE THAT WAS REMOVED IS REFUSED RATHER THAN IGNORED. Brevo was a
+    provider here; a deployment still configured with it now gets
+    `unknown_provider` and sends nothing, which is the honest answer. Falling back
+    to whichever lane remains would send a sign-in code through a company the
+    operator did not choose and the disclosure would still be right, which is the
+    worst combination available.
+  */
+  it("refuses a provider that no longer exists rather than picking one", async () => {
+    const gone = { "email.provider": "brevo", "email.from": "a@b", "email.brevo.key": "x" };
+    expect(await send(gone, NOTE, never, AT)).toEqual({ ok: false, why: "unknown_provider" });
   });
 
   /*
@@ -144,5 +149,43 @@ describe("splitting a sender", () => {
 
   it("does not invent an empty name", () => {
     expect(addressOf("<noreply@4dl.app>")).toEqual({ email: "noreply@4dl.app" });
+  });
+});
+
+/* ------------------------------------------------------- what is disclosed --- */
+
+/**
+ * ⚠️ THE TWO LISTS THAT DRIFT, PINNED TO EACH OTHER.
+ *
+ * A mail provider is added in a file about HTTP requests. A sub-processor is
+ * declared in a file about the law. Nothing connects them, so the first one to
+ * change is right and the second is quietly wrong — and the wrongness is a
+ * customer being told their address goes to a company it does not, or not being
+ * told about one it does.
+ *
+ * `MAIL_HANDED_TO` is the sending side, `MAIL_LANES` is the disclosure side, and
+ * `disclosureProblems` refuses any manifest whose list does not name every entry
+ * in the second. This is the joint between the two.
+ */
+describe("every lane that leaves the process is disclosed", () => {
+  it("names a company for every provider that sends, and nobody for the one that does not", () => {
+    /* ⚠️ The recorded provider is a Map in this worker's memory. Giving it a
+       sub-processor would put a company on a disclosure that receives nothing. */
+    expect(MAIL_HANDED_TO.recorded).toBe(null);
+    for (const [provider, company] of Object.entries(MAIL_HANDED_TO)) {
+      if (provider === "recorded") continue;
+      expect(company, `${provider} sends and hands the message to nobody`).toBeTruthy();
+    }
+  });
+
+  /*
+    ⚠️ EXACTLY EQUAL, IN BOTH DIRECTIONS. A provider the kernel does not know
+    about is an undisclosed recipient; a lane the kernel demands and no provider
+    uses is a company on the list that receives nothing, which every app would
+    then be forced to declare falsely.
+  */
+  it("agrees exactly with what the kernel makes every manifest disclose", () => {
+    const sending = Object.values(MAIL_HANDED_TO).filter((c): c is string => c !== null);
+    expect([...sending].sort()).toEqual([...MAIL_LANES].sort());
   });
 });

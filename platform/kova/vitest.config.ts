@@ -37,10 +37,14 @@ export default defineWorkersConfig({
             DIRECTORY: "one-kova-directory",
             /* The default region keeps the bare name; a second is ADDITIVE beside it. */
             DB: "one-kova-auto",
+            /* ⚠️ THE EU REGION IS REAL IN THE SUITE, not a line in a manifest. A
+               declared region with no store is a workspace that cannot be
+               created, and the only way to know is to create one. */
+            DB_EU: "one-kova-eu",
             /* ⚠️ The store every app binds by the same id — see `sharedConfigBinding`. */
             SHARED: "one-shared-config",
           },
-          r2Buckets: { MEDIA: "one-kova-media" },
+          r2Buckets: { MEDIA: "one-kova-media", MEDIA_EU: "one-kova-media-eu" },
           kvNamespaces: ["CACHE"],
         },
       },

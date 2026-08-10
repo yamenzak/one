@@ -3120,7 +3120,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.26.0",
+  manifestVersion: "0.27.0",
   bindings,
 
   identity: {
@@ -3132,12 +3132,24 @@ export const kova = defineApp({
     appRoot: "kova.4dl.app",
     doors: ["root", "setup", "admin", "slug", "custom"],
     /*
-      ⚠️ ONE REGION ON DAY ONE, and adding a second is additive: the default
-      keeps the bare binding name, so a new region is a new binding rather than a
-      rename of every live worker's. Declaring one this app has no store for is a
-      workspace that is unreachable from the moment it is created.
+      ⚠️ TWO, AND THE EU ONE IS OFFERED RATHER THAN GRANTED ON REQUEST. A studio
+      that needs its clients' records to stay in the EU chooses `eu` when it is
+      created; a studio with no view gets `auto`, which is wherever the request
+      landed. Residency that has to be asked for is residency most people who
+      needed it never got, because they did not know it was a question.
+
+      ⚠️ ADDITIVE, NEVER A RENAME. The default region keeps the BARE binding name
+      — `DB`, `MEDIA` — and `eu` appears beside it as `DB_EU`, `MEDIA_EU`.
+      Suffixing every region would mean adding the second one renames the first,
+      which is a change to a live worker's bindings applied at deploy, where
+      getting it wrong takes the product down rather than degrading a feature.
+
+      ⚠️ AND A REGION DECLARED WITH NO STORE BEHIND IT IS A WORKSPACE THAT IS
+      UNREACHABLE FROM THE MOMENT IT IS CREATED. `bindingsFor` throws
+      `BindingMissing` naming the region and the store, rather than letting a
+      handler discover it as `Cannot read properties of undefined`.
     */
-    regions: ["auto"] as RegionId[],
+    regions: ["auto", "eu"] as RegionId[],
     defaultRegion: "auto" as RegionId,
     /* ⚠️ Kova's own brand words. A studio at `coach.` would be a takeover. */
     reservedSlugs: ["kova", "coach", "team", "studio", "trainer"],
@@ -3383,7 +3395,7 @@ export const kova = defineApp({
         version: "2026-01-01",
         title: "Terms of service",
         body: [
-          "Kova is software a coaching business runs its own practice on. The studio decides who it coaches, what it sells them and what it records about them; we provide the software and store what the studio puts in it.",
+          "Kova is software a coaching business runs its own practice on, provided by Four Degree Labs, Abu Dhabi, United Arab Emirates. The studio decides who it coaches, what it sells them and what it records about them; we provide the software and store what the studio puts in it.",
           "A studio pays us for a plan. Its own customers pay the studio, on the studio's own payment provider — we never see a card number and are not part of that transaction.",
           "You can leave at any time, from any state, including one where a payment has failed. Closing a workspace is reversible for seven days; after that its records are erased and cannot be recovered.",
           "We may act inside a workspace to help with a problem. That is time-boxed, needs a stated reason, is announced to the workspace, and is on the record either way.",
@@ -3396,10 +3408,10 @@ export const kova = defineApp({
         title: "Privacy notice",
         body: [
           "What is stored: who you are (an email address, a name, and a photograph if you add one), and what you record — sessions, meals, measurements, photographs, and what you write in a check-in. A studio's staff can see the records of the people they coach. Other studios cannot see any of it.",
-          "Where it is stored: in one place, chosen by the studio when it was created. Sign-in credentials are held separately from a studio's records, and a passkey never leaves your device.",
+          "Where it is stored: in one place, chosen by the studio when it was created — either the European Union, or wherever the request landed if the studio had no view. Sign-in credentials are held separately from a studio's records, and a passkey never leaves your device.",
           "Who else sees it: nobody, except the services that make specific features work. A photograph you send to be read by a model goes to that model's provider. A message we send you goes through a mail provider. A payment for a plan goes through a payment provider. Nothing is sold, and nothing is used to train anybody's model.",
           "How long: for as long as the workspace exists, unless a record has a shorter limit of its own. A closed workspace is erased after seven days. Asking to be forgotten removes your records and the trail of who touched them.",
-          "What you can ask for: a copy of everything held about you, a correction, or an erasure. Ask the studio that coaches you; they can do all three from inside the product.",
+          "What you can ask for: a copy of everything held about you, a correction, or an erasure. Ask the studio that coaches you; they can do all three from inside the product. If you would rather ask us, write to legal@fourdegreelabs.com and we will pass it to your studio, because the records are theirs to act on.",
         ].join("\n\n"),
         mustAccept: ["owner", "trainer", "assistant", "client"],
       },
@@ -3425,7 +3437,7 @@ export const kova = defineApp({
           "This is the studio's instruction to us about the records it keeps on the people it coaches. For those records the studio decides what is collected and why; we hold them, and we act only on what the studio asks for. For a studio's own account and its bill with us, we decide, and the privacy notice covers that.",
           "What we do with them: store them, show them to the staff the studio gives access to, and run the specific features the studio uses. Nothing else. They are not sold, not shared with another studio, and not used to train anybody's model.",
           "Who else touches them: the companies listed as sub-processors, each for one named job, each under its own processing terms. That list is generated from the product itself rather than maintained by hand, so a feature that sends data somewhere new cannot ship before the list says so. We will not add a sub-processor without the list changing, which is visible here.",
-          "Where they are: in the region the studio chose when its workspace was created, apart from sign-in records, which are held separately. Transfers out of the EEA are covered per sub-processor and named in the list.",
+          "Where they are: in the region the studio chose when its workspace was created — the European Union if it chose that — apart from sign-in records, which are held separately. Transfers out of the EEA are covered per sub-processor and named in the list. Four Degree Labs is itself established in the United Arab Emirates, so our own staff reading a workspace to support it is a transfer as well as a support session; it is time-boxed, reasoned, announced and recorded, as set out below.",
           "Security: access to a workspace is by passkey or a one-time code, never a password. Staff access is per person and per role. Anybody from our side entering a workspace to help is time-boxed, has to give a reason, is announced to the workspace, and is on the record.",
           "If something goes wrong: we tell the studio without undue delay and give it what it needs to make its own notification, because the notification is the studio's to make.",
           "Getting them back or ending this: the studio can export everything at any time, and closing a workspace exports before erasing. Erasure is derived from the same declarations the product is built from, so it covers everything rather than a list somebody remembered to update.",
@@ -3454,8 +3466,8 @@ export const kova = defineApp({
         coaches, and for that we are its processor — so a client's rights run
         against their studio, and we act on the studio's instruction.
       */
-      controller: "4DL controls accounts and its own billing. Each studio controls what it records about the people it coaches; for that data 4DL is the studio's processor.",
-      contact: "privacy@4dl.app",
+      controller: "Four Degree Labs, Abu Dhabi, United Arab Emirates, controls accounts and its own billing. Each studio controls what it records about the people it coaches; for that data Four Degree Labs is the studio's processor and acts on the studio's instruction.",
+      contact: "legal@fourdegreelabs.com",
       assessment: {
         /*
           ⚠️ YES, AND THE REASON IS THE PRODUCT RATHER THAN ITS SIZE. Article 35
@@ -3464,7 +3476,19 @@ export const kova = defineApp({
           weight, sleep, injuries, medication and photographs of bodies.
         */
         required: true,
-        note: "Health data about identifiable people, including photographs, is special category under Article 9. An assessment is owed before the first paying studio and is not complete.",
+        note: [
+          "Health data about identifiable people, including photographs of their bodies, is special category under Article 9. An assessment is owed before the first paying studio and is not complete.",
+          /*
+            ⚠️ AND THE ESTABLISHMENT IS PART OF THE ANSWER, not a footnote. Four
+            Degree Labs is in the UAE, which is outside the EEA and holds no
+            adequacy decision — so serving people in the EU raises Article 27
+            (an EU representative) on top of the transfer question, and staff
+            reading a workspace from Abu Dhabi is itself a transfer even when
+            every byte sits in an EU database. Naming it here is what stops it
+            being discovered by somebody else.
+          */
+          "Four Degree Labs is established in the United Arab Emirates, outside the EEA and with no adequacy decision. Two things follow and neither is settled: whether Article 27 requires an EU representative, and that access by our own staff from the UAE is a transfer in its own right, separate from where the data is stored.",
+        ].join(" "),
       },
       subprocessors: [
         {
@@ -3478,19 +3502,24 @@ export const kova = defineApp({
           trust: "https://www.cloudflare.com/trust-hub/compliance-resources/",
         },
         {
-          id: "cloudflare-email",
-          name: "Cloudflare Email Routing and Email Sending",
           /*
-            ⚠️ THE ONLY MAILER, DELIBERATELY. A second provider is a second
-            processor, a second set of terms and a second place a sign-in code
-            can be read — for a lane that sends one sentence and one link.
+            ⚠️ THE ONLY MAILER, AND THE ID IS THE LANE RATHER THAN THE INTENTION.
+            This entry said `cloudflare-email` while the runtime could be
+            configured with two other providers, so the disclosure named a
+            company that would not have received the message and did not name the
+            one that would. `MAIL_LANES` in `@one/kernel` is now what this must
+            match, and `runtime/test/mail.test.ts` pins that constant to the
+            provider registry — so a second mailer cannot be added without
+            appearing here.
           */
+          id: "resend",
+          name: "Resend, Inc.",
           role: "Sends the messages this product sends: a sign-in code, an invitation, a notification somebody asked to be emailed.",
           receives: ["identity", "contact"],
-          where: "Cloudflare's network.",
+          where: "United States, on infrastructure in the customer's chosen region.",
           safeguard: "dpf",
-          terms: "https://www.cloudflare.com/cloudflare-customer-dpa/",
-          trust: "https://www.cloudflare.com/trust-hub/compliance-resources/",
+          terms: "https://resend.com/legal/dpa",
+          trust: "https://resend.com/legal/security",
         },
         /*
           ⚠️ WORKERS AI IS NOT ON THIS LIST, and it was — which is what the
@@ -3899,6 +3928,14 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.27.0",
+      at: "2026-08-10",
+      notes: [
+        "Choose the European Union when you create your studio, and your clients' records are stored there — in a different database, not a label on the same one.",
+        "The company behind Kova is named: Four Degree Labs, Abu Dhabi. Data-protection questions go to legal@fourdegreelabs.com.",
+      ],
+    },
     {
       version: "0.26.0",
       at: "2026-08-10",

@@ -36,9 +36,31 @@ export const senderOf = (values: Values): string => values["email.from"] ?? "";
 
 /* ------------------------------------------------------------- providers --- */
 
-export type ProviderId = "recorded" | "brevo" | "resend";
+export type ProviderId = "recorded" | "resend";
 
-const PROVIDERS: readonly ProviderId[] = ["recorded", "brevo", "resend"];
+const PROVIDERS: readonly ProviderId[] = ["recorded", "resend"];
+
+/**
+ * ⚠️ WHICH COMPANY EACH LANE HANDS THE MESSAGE TO, and `null` means nobody.
+ *
+ * A provider a deployment MAY choose is a company that MAY receive somebody's
+ * address, so the disclosure has to name it — and the two lists are exactly the
+ * thing that drifts, because a provider is added in a file about HTTP and a
+ * sub-processor is declared in a file about the law.
+ *
+ * `MAIL_LANES` in `@one/kernel` is the disclosure side of the same fact, and
+ * `runtime/test/mail.test.ts` pins them together. Adding a provider here without
+ * adding it there is a test failure rather than an undisclosed recipient.
+ *
+ * ⚠️ `recorded` IS `null` BECAUSE NOTHING LEAVES THE PROCESS. It is a Map in
+ * this worker's memory. Declaring a sub-processor for it would put a company on
+ * a disclosure that receives nothing, which is the failure the disclosure check
+ * exists to refuse in the other direction.
+ */
+export const MAIL_HANDED_TO: Readonly<Record<ProviderId, string | null>> = {
+  recorded: null,
+  resend: "resend",
+};
 
 export type Chosen =
   | { readonly ok: true; readonly provider: ProviderId; readonly from: string; readonly key: string }
@@ -118,22 +140,18 @@ export async function send(values: Values, message: Message, post: Post, at: Ins
     return { ok: true, provider: "recorded" };
   }
 
-  const request: { url: string; headers: Record<string, string>; body: string } = chosen.provider === "brevo"
-    ? {
-        url: "https://api.brevo.com/v3/smtp/email",
-        headers: { "api-key": chosen.key, "content-type": "application/json" },
-        body: JSON.stringify({
-          sender: addressOf(chosen.from),
-          to: [{ email: message.to }],
-          subject: message.subject,
-          textContent: message.body,
-        }),
-      }
-    : {
-        url: "https://api.resend.com/emails",
-        headers: { authorization: `Bearer ${chosen.key}`, "content-type": "application/json" },
-        body: JSON.stringify({ from: chosen.from, to: [message.to], subject: message.subject, text: message.body }),
-      };
+  /*
+    ⚠️ ONE LANE THAT LEAVES THE PROCESS, and the shape is kept as a value rather
+    than inlined because the second one is what the mail provider question is
+    about. Adding it means adding a branch here AND an entry in `MAIL_HANDED_TO`
+    AND one in the kernel's `MAIL_LANES` — the last of which is what makes it
+    appear on the sub-processor list a customer reads.
+  */
+  const request = {
+    url: "https://api.resend.com/emails",
+    headers: { authorization: `Bearer ${chosen.key}`, "content-type": "application/json" },
+    body: JSON.stringify({ from: chosen.from, to: [message.to], subject: message.subject, text: message.body }),
+  };
 
   /*
     ⚠️ A THROW IS A REFUSAL TOO. A provider that is unreachable and one that says

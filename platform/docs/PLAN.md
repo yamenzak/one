@@ -1087,7 +1087,7 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `unbound-changes-nothing` | a single-app deployment broken by a sharing mechanism it does not use | **live** |
 | `nothing-leaves-while-anything-is-missing` | a best-effort send to nobody, or a queued retry — either way a person waiting for a code that was never addressed to anybody | **live** |
 | `the-recorded-provider-is-a-choice` | a fallback reachable by getting config wrong — a production deployment recording its sign-in codes in a map and answering as though the mail went out | **live** |
-| `a-sender-is-split-the-way-the-provider-wants` | a message refused, or arriving from `Kova <noreply@4dl.app>@example.com`, depending on the provider | **live** |
+| `a-sender-is-split-the-way-the-provider-wants` | a sender handed to the mail API in the wrong shape — a message that arrives from nobody or is refused outright, on the one lane a person is waiting on | **live** |
 | `a-code-that-could-not-be-sent-is-not-a-code` | telling somebody to check their inbox for a message that was never addressed to anybody | **live** |
 | `a-rule-sees-whose-row-it-is` | a rule that narrows by customer handed a row belonging to nobody, taking its 'not enough to judge' branch and passing every update | **live** |
 | `reading-what-was-prescribed-is-not-prescribing` | a coaching record turned self-service by one line, because `supplement:write` sat next to `dose:write` in a list | **live** |
@@ -1184,6 +1184,10 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-special-category-obliges-an-assessment` | an app storing health data answering that no impact assessment is required — not a judgement, but the one claim the collections in front of it contradict | **live** |
 | `the-record-of-processing-is-produced` | an Article 30 record that exists as a spreadsheet rather than as a computed answer, describing the product as it was when somebody last had time | **live** |
 | `the-recipients-are-public` | a sub-processor list published behind a session, which is publishing it after the moment Articles 13 and 14 oblige it | **live** |
+| `a-mail-lane-is-disclosed` | a mail provider a deployment may choose that no sub-processor list names — a provider is added in a file about HTTP and a recipient is declared in a file about the law, and nothing else connects them | **live** |
+| `a-removed-lane-is-refused-not-replaced` | a deployment still configured with a dropped provider silently falling through to whichever lane remains — a sign-in code sent through a company the operator did not choose, while the disclosure stays technically correct | **live** |
+| `a-region-is-a-different-store` | residency that is a column rather than a database — a workspace told its records are in the EU while every query reads the same store as everybody else | **live** |
+| `an-undeclared-region-is-refused` | a workspace quietly placed somewhere other than where it asked to be, which is the one failure residency cannot have and a default is exactly how it happens | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

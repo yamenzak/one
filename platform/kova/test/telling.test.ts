@@ -23,10 +23,13 @@ import { kova } from "../src/manifest.js";
 const SLUG = freshSlug("garrigill");
 const STUDIO = `https://${SLUG}.kova.4dl.app`;
 
-const at = (cookie: string) => ({
+/* ⚠️ The origin is a parameter because a second workspace lives at a second
+   address, and driving it from this one is what would make a residency
+   assertion pass while proving nothing. */
+const at = (cookie: string, origin: string = STUDIO) => ({
   async call(path: string, body?: unknown) {
     const res = await worker.fetch(
-      new Request(`${STUDIO}${path}`, {
+      new Request(`${origin}${path}`, {
         method: "POST",
         headers: { "content-type": "application/json", ...(cookie ? { cookie } : {}) },
         body: JSON.stringify(body ?? {}),
@@ -38,7 +41,7 @@ const at = (cookie: string) => ({
   async get(path: string, query: Record<string, string> = {}) {
     const q = new URLSearchParams(query).toString();
     const res = await worker.fetch(
-      new Request(`${STUDIO}${path}${q ? `?${q}` : ""}`, { headers: { ...(cookie ? { cookie } : {}) } }),
+      new Request(`${origin}${path}${q ? `?${q}` : ""}`, { headers: { ...(cookie ? { cookie } : {}) } }),
       env as never,
     );
     return { status: res.status, body: (await res.json()) as Record<string, never> };
@@ -242,7 +245,7 @@ describe("what this product discloses about where data goes", () => {
 
   it("says where the data is and who to ask about it", async () => {
     const out = await stranger.get("/api/protection.list");
-    expect(out.body.contact).toBe("privacy@4dl.app");
+    expect(out.body.contact).toBe("legal@fourdegreelabs.com");
     /* ⚠️ THE REGIONS THE MANIFEST DECLARES, NOT A SENTENCE SOMEBODY WROTE. Kova
        declares one today, and a disclosure naming a region this deployment has
        no store for is wrong in the one field a residency question asks about. */
@@ -298,5 +301,62 @@ describe("what this product discloses about where data goes", () => {
     const scan = record.activities.find((a) => a.collection === "scan");
     expect(scan?.special).toBe(true);
     expect(scan?.condition).toBe("explicit_consent");
+  });
+});
+
+/* ---------------------------------------------------------------- regions --- */
+
+/**
+ * ⚠️ RESIDENCY THAT HAS TO BE ASKED FOR IS RESIDENCY MOST PEOPLE WHO NEEDED IT
+ * NEVER GOT, because they did not know it was a question. `eu` is a choice at
+ * the moment a studio is created, and these assert that choosing it does
+ * something rather than recording a preference.
+ */
+describe("a studio chooses where its clients' records live", () => {
+  it("offers every region the manifest declares, publicly", async () => {
+    const out = await stranger.get("/api/protection.list");
+    expect(out.body.regions as unknown as string[]).toContain("eu");
+  });
+
+  /*
+    ⚠️ THE STORE IS DIFFERENT, NOT A COLUMN. `physicalName` resolves `db` to
+    `DB_EU` for a workspace in `eu` and to the bare `DB` for one in `auto`, so a
+    record written in the first is not merely tagged — it is in another database,
+    and a query in the other region cannot see it however it is written.
+  */
+  it("writes an EU studio's records to the EU store and nowhere else", async () => {
+    const slug = freshSlug("eu");
+    const founding = await signIn(`${slug}@example.test`, SETUP);
+    const made = await post(SETUP, "/api/identity.workspace.create", { slug, region: "eu" }, founding);
+    expect(made.res.status).toBe(200);
+    expect(made.body.region).toBe("eu");
+
+    const origin = `https://${slug}.kova.4dl.app`;
+    const there = at(await signIn(`${slug}@example.test`, origin), origin);
+    const name = `Someone ${crypto.randomUUID().slice(0, 8)}`;
+    expect((await there.call("/api/client.create", { name })).status).toBe(200);
+
+    /*
+      ⚠️ ASSERTED BY WHAT IS THERE, NOT BY HOW MANY. The suite retries once and
+      creating a record is not idempotent, so a count is an assertion about how
+      many times this test has run — which is the one thing it is not about.
+    */
+    const inEu = (await there.get("/api/client.list")).body.rows as unknown as { name: string }[];
+    expect(inEu.map((r) => r.name)).toContain(name);
+
+    const inAuto = (await owner.get("/api/client.list")).body.rows as unknown as { name: string }[];
+    expect(inAuto.map((r) => r.name)).not.toContain(name);
+  });
+
+  /*
+    ⚠️ A REGION NOBODY DECLARED IS REFUSED RATHER THAN DEFAULTED. Quietly placing
+    a workspace somewhere other than where it asked to be is the one failure
+    residency cannot have, and a default is exactly how it happens.
+  */
+  it("refuses a region this deployment does not have", async () => {
+    const slug = freshSlug("mars");
+    const founding = await signIn(`${slug}@example.test`, SETUP);
+    const out = await post(SETUP, "/api/identity.workspace.create", { slug, region: "mars" }, founding);
+    expect(out.res.status).toBe(400);
   });
 });

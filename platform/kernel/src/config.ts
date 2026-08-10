@@ -119,7 +119,13 @@ export const PLATFORM_CONFIG = declareConfig({
   "turnstile.site_key": { shared: true, secret: false },
   "turnstile.secret_key": { shared: true, secret: true },
   "email.provider": { shared: true, secret: false },
-  "email.brevo.key": { shared: true, secret: true },
+  /*
+    ⚠️ ONE KEY BECAUSE THERE IS ONE LANE. `email.brevo.key` was here and its
+    provider is gone: a config key nothing reads is a secret an operator pastes,
+    a console renders, and a rotation policy covers, for a lane that cannot send.
+    The set of `email.*.key` entries is the provider registry seen from the
+    console, and the two have to shrink together.
+  */
   "email.resend.key": { shared: true, secret: true },
   "email.from": {
     shared: false, secret: false,

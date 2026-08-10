@@ -327,6 +327,26 @@ and not reached is a false disclosure in the direction that looks careful — an
 is the entry nobody ever removes, because removing it feels like claiming less.
 The check found one the first time it ran.
 
+**Residency is a store, not a column.** `tenancy.regions` lists the homes that
+exist; `physicalName` resolves `db` to the bare `DB` in the default region and to
+`DB_EU` beside it in a second, so a record written in one region is in another
+database rather than tagged in the same one. ⚠️ Additive, never a rename — adding
+a second region must not change a live worker's existing bindings. A region a
+workspace asks for and the deployment does not have is REFUSED rather than
+defaulted, because quietly placing a workspace elsewhere is the one failure
+residency cannot have.
+
+⚠️ **And it is offered rather than granted on request.** Residency that has to be
+asked for is residency most people who needed it never got, because they did not
+know it was a question.
+
+**The mail lane is the one recipient the manifest cannot see.** The provider is
+deployment configuration rather than a declaration, so the pair that drifts is
+`MAIL_HANDED_TO` in the runtime and `MAIL_LANES` in the kernel — a provider added
+in a file about HTTP, a recipient declared in a file about the law. They are
+asserted equal in both directions, and `MAIL_LANES` is what `disclosureProblems`
+makes every manifest name.
+
 **And the record is a route, not a file.** `protection.list` is public because
 Articles 13 and 14 oblige telling somebody before their data is collected;
 `protection.record` sits behind the permission that reads the audit. There is

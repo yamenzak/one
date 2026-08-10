@@ -381,8 +381,25 @@ export function agreementProblems(input: {
  * that could omit them.
  */
 export const PLATFORM_INFRASTRUCTURE = "cloudflare";
-export const PLATFORM_MAIL = "cloudflare-email";
 export const PLATFORM_PAYMENTS = "stripe";
+
+/**
+ * ⚠️ EVERY COMPANY A DEPLOYMENT'S MAIL COULD BE HANDED TO — not the one it is
+ * configured with today.
+ *
+ * The provider is chosen by CONFIGURATION rather than declared in a manifest, so
+ * the compile-time answer to "who receives an address" is the whole set a
+ * deployment may pick from. Disclosing only the one currently configured would
+ * make the list a fact about one deployment's settings, changing silently when an
+ * operator changes a dropdown.
+ *
+ * ⚠️ AND IT IS PINNED TO THE PROVIDER REGISTRY. `MAIL_HANDED_TO` in the runtime's
+ * `mail.ts` is the same fact from the sending side, and `runtime/test/mail.test.ts`
+ * asserts the two agree — because a provider is added in a file about HTTP and a
+ * sub-processor is declared in a file about the law, which is exactly the pair
+ * that drifts.
+ */
+export const MAIL_LANES: readonly string[] = ["resend"];
 
 /**
  * What a manifest structurally REACHES — read off its own declarations rather
@@ -422,7 +439,9 @@ export function disclosureProblems(
 ): readonly ProtectionProblem[] {
   const need = new Map<string, string>();
   need.set(PLATFORM_INFRASTRUCTURE, "runs every worker, database, object store and cache this product is made of");
-  need.set(PLATFORM_MAIL, "carries every message this product sends, starting with the code somebody signs in with");
+  for (const lane of MAIL_LANES) {
+    need.set(lane, "is a mail lane this deployment may be configured with, so it may be handed the address a sign-in code goes to");
+  }
   if (reaches.charges) need.set(PLATFORM_PAYMENTS, "settles the plans this manifest puts a price on");
   for (const m of reaches.models) need.set(m, "runs a model named in this manifest's catalogue");
   for (const s of reaches.services) need.set(s, "answers a lookup this manifest declares a host for");

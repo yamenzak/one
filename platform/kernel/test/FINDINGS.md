@@ -3516,3 +3516,58 @@ costs more than the cases it would catch. What is left is the set that is never
 anything but a person — `email`, `passport`, `ssn` — plus a health vocabulary
 caught separately, where the same reasoning runs the other way: `weight` on a
 collection is not the weight of a barbell.
+
+## 264. The disclosure named a company that would not have received the message
+
+The mail sub-processor was declared as `cloudflare-email`, deliberately, and it
+was wrong in both directions at once: the runtime could be configured with Brevo
+or Resend, neither of which the list named, and could not be configured with
+Cloudflare at all — Email Sending is a Worker binding and this lane is an HTTP
+`post`. So the entry named a company that would never have seen a sign-in code,
+and omitted the one that would.
+
+⚠️ THE DISCLOSURE CHECK COULD NOT SEE IT, and that is the finding rather than the
+bug. `disclosureProblems` reads what the MANIFEST reaches; the mailer is chosen
+by deployment configuration, so the pair that drifts is the provider registry and
+the sub-processor list — a provider added in a file about HTTP requests, a
+recipient declared in a file about the law.
+
+They are pinned to each other now: `MAIL_HANDED_TO` in `runtime/src/mail.ts` maps
+each provider to the company it hands the message to, `MAIL_LANES` in the kernel
+is what every manifest must disclose, and `runtime/test/mail.test.ts` asserts the
+two are equal in both directions. Brevo is gone, config key and all — a key
+nothing reads is still a secret an operator pastes and a rotation policy covers.
+
+⚠️ AND A DROPPED PROVIDER IS REFUSED, NOT REPLACED. A deployment still configured
+with `brevo` now gets `unknown_provider` and sends nothing. Falling through to
+whichever lane remained would send a sign-in code through a company the operator
+did not choose while the disclosure stayed technically correct, which is the worst
+combination available.
+
+## 265. The residency answer was one region called "auto"
+
+Kova declared `regions: ["auto"]`, so `protection.list` honestly answered
+"wherever the request landed" — and a studio that needed its clients' records in
+the EU had nothing to choose. The machinery was complete: `physicalName` resolves
+`db` to `DB_EU` beside the bare `DB`, `workspace.create` takes and validates a
+region, every sweep and every operator path already loops over `tenancy.regions`,
+and `hello` had been exercising two regions since stage 3.
+
+⚠️ RESIDENCY THAT HAS TO BE ASKED FOR IS RESIDENCY MOST PEOPLE WHO NEEDED IT
+NEVER GOT, because they did not know it was a question. It is offered at creation
+now, and the test asserts the store is DIFFERENT rather than the row being tagged:
+a record written in `eu` is invisible to a query in `auto`, which is the only
+version of the claim that means anything.
+
+## 266. The establishment is part of the assessment
+
+Four Degree Labs is in the United Arab Emirates — outside the EEA, with no
+adequacy decision. Two consequences follow that no amount of choosing an EU
+database addresses, and both are now written into `assessment.note` rather than
+discovered by somebody else: whether Article 27 obliges an EU representative, and
+that our own staff opening a workspace from Abu Dhabi is a transfer in its own
+right, separate from where the bytes sit.
+
+⚠️ THE SUPPORT-SESSION MACHINERY IS THE MITIGATION AND IT ALREADY EXISTED —
+time-boxed, reasoned, announced to the workspace, recorded either way. What was
+missing was any document saying that is what it is for.

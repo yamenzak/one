@@ -2189,8 +2189,8 @@
       "stage": "7",
       "status": "live",
       "impl": "runtime/test/mail.test.ts",
-      "proves": "sends what Brevo expects, with the sender split",
-      "fails": "a message refused, or arriving from `Kova <noreply@4dl.app>@example.com`, depending on the provider"
+      "proves": "sends what the provider expects, with the sender whole",
+      "fails": "a sender handed to the mail API in the wrong shape — a message that arrives from nobody or is refused outright, on the one lane a person is waiting on"
     },
     {
       "id": "a-code-that-could-not-be-sent-is-not-a-code",
@@ -3055,6 +3055,42 @@
       "impl": "kova/test/telling.test.ts",
       "proves": "names every recipient to somebody who is not signed in",
       "fails": "a sub-processor list published behind a session, which is publishing it after the moment Articles 13 and 14 oblige it"
+    },
+    {
+      "id": "a-mail-lane-is-disclosed",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/mail.test.ts",
+      "proves": "agrees exactly with what the kernel makes every manifest disclose",
+      "fails": "a mail provider a deployment may choose that no sub-processor list names — a provider is added in a file about HTTP and a recipient is declared in a file about the law, and nothing else connects them"
+    },
+    {
+      "id": "a-removed-lane-is-refused-not-replaced",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/mail.test.ts",
+      "proves": "refuses a provider that no longer exists rather than picking one",
+      "fails": "a deployment still configured with a dropped provider silently falling through to whichever lane remains — a sign-in code sent through a company the operator did not choose, while the disclosure stays technically correct"
+    },
+    {
+      "id": "a-region-is-a-different-store",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/telling.test.ts",
+      "proves": "writes an EU studio's records to the EU store and nowhere else",
+      "fails": "residency that is a column rather than a database — a workspace told its records are in the EU while every query reads the same store as everybody else"
+    },
+    {
+      "id": "an-undeclared-region-is-refused",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/telling.test.ts",
+      "proves": "refuses a region this deployment does not have",
+      "fails": "a workspace quietly placed somewhere other than where it asked to be, which is the one failure residency cannot have and a default is exactly how it happens"
     }
   ]
 }

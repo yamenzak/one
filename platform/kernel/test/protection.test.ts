@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  PLATFORM_INFRASTRUCTURE, PLATFORM_MAIL, PLATFORM_PAYMENTS,
+  MAIL_LANES, PLATFORM_INFRASTRUCTURE, PLATFORM_PAYMENTS,
   agreementProblems, disclosureProblems, holdingProblems, protectionProblems, ropaOf,
   type Held, type ProtectionSpec, type Subprocessor,
 } from "../src/protection.js";
@@ -168,7 +168,7 @@ describe("the deployment's own declaration", () => {
 /* ------------------------------------------------------------- reached vs declared --- */
 
 describe("the list is checked against what the manifest reaches", () => {
-  const platform = [sub({ id: PLATFORM_INFRASTRUCTURE }), sub({ id: PLATFORM_MAIL })];
+  const platform = [sub({ id: PLATFORM_INFRASTRUCTURE }), ...MAIL_LANES.map((id) => sub({ id }))];
   const nothingReached = { models: [], services: [], charges: false };
 
   /*
@@ -179,7 +179,7 @@ describe("the list is checked against what the manifest reaches", () => {
   */
   it("demands the infrastructure and the mail lane of every app", () => {
     const out = disclosureProblems(nothingReached, []);
-    expect(out.map((p) => p.at).sort()).toEqual([PLATFORM_INFRASTRUCTURE, PLATFORM_MAIL].sort());
+    expect(out.map((p) => p.at).sort()).toEqual([PLATFORM_INFRASTRUCTURE, ...MAIL_LANES].sort());
     expect(disclosureProblems(nothingReached, platform)).toEqual([]);
   });
 
