@@ -107,9 +107,9 @@ without one.
 | `[x]` | `redeem` | client | Redeem a code and see the days arrive |
 | `[x]` | `redemption-code` | owner | Issue a code that tops somebody's access up |
 | | **content** | | |
-| `[ ]` | `content-cover` | trainer | Give an article a cover image without leaving the product |
-| `[ ]` | `content-read` | client | Read what their studio published, in a feed that is theirs |
-| `[ ]` | `content-write` | trainer | Write an article for clients and publish it |
+| `[x]` | `content-cover` | trainer | Give an article a cover image without leaving the product |
+| `[x]` | `content-read` | client | Read what their studio published, in a feed that is theirs |
+| `[x]` | `content-write` | trainer | Write an article for clients and publish it |
 | `[ ]` | `marketplace-public` | everyone | Find out what a studio offers before signing in, or before having an account at all |
 | | **context** | | |
 | `[ ]` | `context-switch` | trainer | Move between the studios they belong to without signing in again |
@@ -180,9 +180,9 @@ without one.
 | `[x]` | `client-restore` | trainer | Bring an archived person back |
 | `[ ]` | `client-self-register` | client | Register themselves where a studio allows it, and be picked up by a coach |
 | | **sessions** | | |
-| `[ ]` | `session-book` | assistant | Book a client into a session |
-| `[ ]` | `session-manage` | assistant | Change or cancel a booking and have the client know |
-| `[ ]` | `session-see` | client | See when they are booked in |
+| `[x]` | `session-book` | assistant | Book a client into a session |
+| `[x]` | `session-manage` | assistant | Change or cancel a booking and have the client know |
+| `[x]` | `session-see` | client | See when they are booked in |
 | | **staff** | | |
 | `[x]` | `staff-invite` | owner | Invite a colleague and give them a role |
 | `[x]` | `staff-permissions` | owner | Narrow what one colleague can do, within their role |

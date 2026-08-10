@@ -413,6 +413,116 @@ export const goals = collection({
   },
 });
 
+/* -------------------------------------------------------------- bookings --- */
+
+/**
+ * An appointment: one person, one coach, one hour.
+ *
+ * ⚠️ `booking`, NOT `session`, and the composition check is why. The platform's
+ * own `sessions` table is what a sign-in leaves behind, and two modules creating
+ * one name means whichever runs first wins while the other's columns silently
+ * never exist. The word a studio uses is still "session" — that is the label's
+ * job, not the id's.
+ *
+ * ⚠️ THE RULE IS ON THE COLLECTION, NOT ON A `session.book` BESIDE IT. A coach
+ * cannot be in two places at once, and a check written into a bespoke booking
+ * operation leaves the derived create standing next to it making the same row
+ * without the check — which is one screen away from being the way bookings are
+ * actually made.
+ */
+export const bookings = collection({
+  id: "booking",
+  label: { one: "Session", many: "Sessions" },
+  scope: { of: "subject", subject: "client" },
+  version: true,
+  /*
+    ⚠️ KEPT, because an appointment history is what a studio bills against and
+    what a client remembers. Purged with the studio, like everything else.
+  */
+  retention: { days: null, onTenantClose: "export-then-purge" },
+  onDelete: { on: "archive" },
+  activity: true,
+  fields: {
+    /* ⚠️ An INSTANT, not a local date — an appointment is a moment two people
+       have to agree on, and a wall-clock time is not one until a zone is known. */
+    startsAt: field.instant({ required: true, label: "Starts" }),
+    minutes: field.number({ required: true, integer: true, min: 5, max: 480, label: "Minutes" }),
+    /* ⚠️ Who is expected. A membership id, because staff are memberships here. */
+    coach: field.text({ required: true, max: 40, label: "Coach" }),
+    place: field.text({ max: 120, label: "Where" }),
+    /*
+      ⚠️ WHAT HAPPENED IS NOT WHETHER IT WAS BOOKED. Deleting a missed session
+      loses the thing a studio most needs to see; `state` keeps it and says so.
+    */
+    state: field.enum(["booked", "attended", "missed", "cancelled"], { required: true, label: "State" }),
+    note: field.text({ multiline: true, max: 1_000 }),
+  },
+  rule: {
+    why: "coach_double_booked" as const,
+    async check({ db, tenantId, table, id, row }) {
+      const coach = String(row.coach ?? "");
+      const startsAt = String(row.startsAt ?? "");
+      const minutes = Number(row.minutes ?? 0);
+      if (!coach || !startsAt || !minutes) return true;
+
+      const from = Date.parse(startsAt);
+      if (!Number.isFinite(from)) return true;
+      const to = from + minutes * 60_000;
+
+      /*
+        ⚠️ A CANCELLED SESSION BLOCKS NOTHING. Keeping the row is how a studio
+        sees what happened; treating it as an occupied hour would make an hour
+        somebody cancelled permanently unbookable.
+      */
+      const clashes = await db.all<{ id: string; starts_at: string; minutes: number }>(
+        `SELECT id, starts_at, minutes FROM ${table}
+         WHERE tenant_id = ? AND coach = ? AND state IN ('booked', 'attended') AND deleted_at IS NULL`,
+        tenantId, coach,
+      );
+      return !clashes.some((c) => {
+        /* ⚠️ Its own row is not a clash with itself, which is what an edit is. */
+        if (c.id === id) return false;
+        const theirs = Date.parse(c.starts_at);
+        if (!Number.isFinite(theirs)) return false;
+        /* ⚠️ Touching is not overlapping: an hour ending at ten leaves ten free. */
+        return from < theirs + c.minutes * 60_000 && theirs < to;
+      });
+    },
+  },
+});
+
+/* -------------------------------------------------------------- articles --- */
+
+/**
+ * Something the studio wrote for the people it coaches.
+ *
+ * ⚠️ PUBLISHED IS A DECISION, NOT A FIELD SOMEBODY MIGHT TICK. A draft a client
+ * can read is the failure this collection has to make impossible, so the read a
+ * client makes is a different operation from the one staff make — `feed`, below
+ * — and a client holds no permission that reaches the drafts at all.
+ */
+export const articles = collection({
+  id: "article",
+  label: { one: "Article", many: "Articles" },
+  scope: { of: "tenant" },
+  version: true,
+  retention: { days: null, onTenantClose: "purge" },
+  onDelete: { on: "archive" },
+  activity: true,
+  search: ["title"],
+  fields: {
+    title: field.text({ required: true, min: 1, max: 200 }),
+    standfirst: field.text({ max: 400, label: "In one line" }),
+    body: field.text({ required: true, multiline: true, max: 40_000 }),
+    cover: field.media({ accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000, label: "Cover" }),
+    /*
+      ⚠️ THE DATE IT WENT OUT, AND NULL MEANS DRAFT. A boolean would lose WHEN,
+      which is the first thing anybody asks about something a studio published.
+    */
+    publishedOn: field.plainDate({ label: "Published" }),
+  },
+});
+
 /* ------------------------------------------------------------ operations --- */
 
 /**
@@ -434,6 +544,7 @@ const T = {
   entries: tableNameFor(entries),
   checkins: tableNameFor(checkins),
   goals: tableNameFor(goals),
+  articles: tableNameFor(articles),
 } as const;
 
 /**
@@ -856,8 +967,87 @@ const STAFF = [
   "food:read", "food:write", "portion:read", "portion:write",
   "checkin:read", "checkin:write", "goal:read", "goal:write",
   "inbox:read", "file:read", "file:write", "guide:read", "milestone:read", "commerce:read", "report:read",
-  "ai:use",
+  "ai:use", "booking:read", "booking:write", "article:read", "article:write", "article:feed",
 ];
+
+/* ------------------------------------------------------------ publishing --- */
+
+/**
+ * ⚠️ PUBLISHING IS A DECISION, AND THE DATE IS THE RECORD OF IT. Writing
+ * `publishedOn` through the derived update would work and would be wrong in one
+ * way that matters: it lets somebody publish a piece dated last year, which is
+ * a claim about when a studio said something.
+ */
+export const publishArticle = operation<
+  Bindings,
+  { articleId: string },
+  { publishedOn: string },
+  "platform.not_found" | "platform.invalid"
+>({
+  id: "article.publish",
+  kind: "write",
+  summary: "Put an article in front of the people this studio coaches.",
+  input: s.object({ articleId: s.text({ max: 40 }) }),
+  output: s.object({ publishedOn: s.text() }),
+  permission: "article:write",
+  idempotency: { mode: "natural", key: "articleId" },
+  audit: (i: { articleId: string }) => ({ subject: i.articleId, verb: "publish" }),
+  outcome: { message: "Published", tone: "success", invalidates: ["article"] },
+  fails: ["platform.not_found", "platform.invalid"],
+  async handler(ctx, input: { articleId: string }) {
+    const row = await ctx.bind.db.first<{ id: string; body: string; published_on: string | null }>(
+      `SELECT id, body, published_on FROM ${T.articles} WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
+      input.articleId, ctx.tenantId,
+    );
+    if (!row) ctx.fail("platform.not_found", { field: "articleId" });
+    /*
+      ⚠️ AN EMPTY PIECE IS NOT PUBLISHABLE. It reaches every client the studio
+      has, and "we sent them a blank page" is not a mistake worth allowing for
+      the sake of an unconstrained write.
+    */
+    if (row!.body.trim().length === 0) ctx.fail("platform.invalid", { field: "body", reason: "empty" });
+
+    /* ⚠️ Today, from the server's clock — not a date somebody may choose. */
+    const publishedOn = ctx.now().slice(0, 10);
+    await ctx.bind.db.run(
+      `UPDATE ${T.articles} SET published_on = ?, updated_at = ? WHERE id = ?`,
+      publishedOn, ctx.now(), row!.id,
+    );
+    return { publishedOn };
+  },
+});
+
+/**
+ * What a client can read.
+ *
+ * ⚠️ A SEPARATE OPERATION, NOT A FILTER ON THE STAFF LIST. A client holding the
+ * collection's own read permission would reach every draft in the studio through
+ * `article.list` — and the version of this that adds `WHERE published_on IS NOT
+ * NULL` to a shared list is one parameter away from not adding it.
+ */
+export const feed = operation<
+  Bindings,
+  { limit?: number },
+  { articles: unknown },
+  never
+>({
+  id: "article.feed",
+  kind: "read",
+  summary: "What this studio has published, most recent first.",
+  input: s.object({ limit: s.optional(s.number({ integer: true, min: 1, max: 100 })) }),
+  output: s.object({ articles: s.json() }),
+  permission: "article:feed",
+  idempotency: { mode: "none" },
+  async handler(ctx, input: { limit?: number }) {
+    const rows = await ctx.bind.db.all(
+      `SELECT id, title, standfirst, body, cover, published_on FROM ${T.articles}
+       WHERE tenant_id = ? AND published_on IS NOT NULL AND deleted_at IS NULL
+       ORDER BY published_on DESC, created_at DESC LIMIT ?`,
+      ctx.tenantId, Math.min(input.limit ?? 20, 100),
+    );
+    return { articles: rows };
+  },
+});
 
 /* ------------------------------------------------------------------- ai --- */
 
@@ -992,7 +1182,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.10.0",
+  manifestVersion: "0.11.0",
   bindings,
 
   identity: {
@@ -1040,7 +1230,10 @@ export const kova = defineApp({
       /* ⚠️ A coach SEES the team and cannot change it — hiring is the owner's. */
       trainer: [...STAFF, "workspace:create", "member:read"],
       /* ⚠️ The front desk sees people and bookings, and prescribes nothing. */
-      assistant: ["client:read", "workout:read", "inbox:read", "guide:read", "milestone:read", "commerce:read", "file:read", "member:read"],
+      /* ⚠️ The front desk sees people and BOOKINGS, and prescribes nothing —
+         which is why `session:write` is here and nothing else new is. */
+      assistant: ["client:read", "workout:read", "inbox:read", "guide:read", "milestone:read", "commerce:read", "file:read", "member:read",
+        "booking:read", "booking:write", "article:feed"],
       /*
         ⚠️ A CLIENT WRITES THEIR OWN RECORD AND READS WHAT WAS PRESCRIBED. The
         row scope does the narrowing — `session`, `set` and `entry` are subject
@@ -1051,6 +1244,10 @@ export const kova = defineApp({
         "entry:read", "entry:write", "food:read", "portion:read", "portion:write",
         /* ⚠️ A client WRITES a check-in and READS the answer; replying is staff's. */
         "checkin:read", "checkin:write", "goal:read",
+        /* ⚠️ They SEE when they are booked in and do not book themselves — and
+           `article:feed` is the published feed, never the collection's own read,
+           which would hand them every draft in the studio. */
+        "booking:read", "article:feed",
         "inbox:read", "guide:read", "milestone:read", "file:read", "commerce:read",
         /* ⚠️ A client may say a generation was wrong. They are the one who read it. */
         "ai:use",
@@ -1188,7 +1385,7 @@ export const kova = defineApp({
     auditRetentionDays: 730,
   },
 
-  collections: [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals],
+  collections: [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles],
 
   notifications: {
     "workspace.created": {
@@ -1236,7 +1433,7 @@ export const kova = defineApp({
     },
   },
 
-  operations: [publish, complete, answer, attention, report, draftPlan, parseFood],
+  operations: [publish, complete, answer, attention, report, draftPlan, parseFood, publishArticle, feed],
 
   help: {
     clients: {
@@ -1313,6 +1510,7 @@ export const kova = defineApp({
   filePurposes: {
     avatar: { label: "Photo", accept: ["image/jpeg", "image/png"], maxBytes: 4_000_000 },
     demo: { label: "Movement demonstration", accept: ["video/mp4", "image/jpeg", "image/png"], maxBytes: 20_000_000 },
+    cover: { label: "Article cover", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000 },
   },
 
   /*
@@ -1458,6 +1656,18 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.11.0",
+      at: "2026-08-10",
+      notes: [
+        "Book somebody in, move it, and record whether they turned up — a session that was missed is kept rather than deleted, because that is the thing worth seeing.",
+        "A coach cannot be booked twice over. An overlapping appointment is refused rather than quietly moved, and an hour that was cancelled is free again.",
+        "A client sees when they are booked in, and only their own.",
+        "Write an article for the people you coach, give it a cover without leaving the product, and publish it when it is ready.",
+        "A draft is a draft: it is not in anybody's feed, and there is no way round to it.",
+        "An empty article cannot be published — it would reach every client you have.",
+      ],
+    },
     {
       version: "0.10.0",
       at: "2026-08-10",

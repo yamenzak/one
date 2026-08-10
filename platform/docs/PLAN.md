@@ -1042,6 +1042,11 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-ceiling-per-person-per-day` | a balance spent by whoever asks first, emptied by one person looping a draft, with a bill as the only signal | **live** |
 | `the-declared-prompt-is-the-sent-prompt` | a reserve computed from one document and a request made with another — the shape unit tests over each half separately stay green through | **live** |
 | `an-unmetered-model-is-refused-at-composition` | a rate of zero holding nothing and charging nothing while the provider still invoices, so the model looks like the cheapest in the catalogue until the end of the month | **live** |
+| `a-product-rule-runs-on-every-derived-write` | a rule written into a bespoke operation while the derived create stands beside it making the same row without the check — which is what a form actually calls | **live** |
+| `a-rule-sees-the-merged-row` | a rule handed only the changes, or handed them under column names, so every lookup is undefined and every update passes | **live** |
+| `a-subject-scoped-row-says-whose-it-is` | staff reading a whole workspace's subject-scoped rows through the same list and getting a column of records with nobody's name against any of them | **live** |
+| `a-draft-is-not-in-the-feed` | a studio's unfinished thinking sent to the people it coaches | **live** |
+| `the-door-beside-the-feed-is-shut` | a correct feed beside a collection read the same person holds, so every draft in the studio is one request away | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

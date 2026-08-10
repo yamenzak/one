@@ -135,7 +135,16 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
   const read = access.read ?? `${spec.id}:read`;
   const write = access.write ?? `${spec.id}:write`;
   const cols = writable(spec);
-  const selectable = ["id", "version", "created_at", "updated_at", ...cols.map(([, c]) => c),
+  /*
+    ⚠️ THE SUBJECT COLUMN IS PART OF THE ROW, and leaving it out is not a
+    narrowing — it is a row nobody can attribute. A customer reading their own
+    list never misses it, which is exactly why it went unnoticed: staff read the
+    WHOLE workspace's rows through the same list, and without this a coach's
+    diary is a column of appointments with nobody's name against any of them.
+  */
+  const selectable = ["id", "version", "created_at", "updated_at",
+    ...(spec.scope.of === "subject" ? [subjectColumn(spec)] : []),
+    ...cols.map(([, c]) => c),
     ...(spec.naming ? ["name"] : []), ...(spec.docStatus ? ["docstatus"] : [])];
 
   const store = (ctx: unknown): { db: SqlHandle; tenantId: string; actor: string; scope: ReturnType<typeof scopeClause>; subjectId?: string } => {
@@ -175,6 +184,26 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
       const why = await mediaRefused(db, tenantId, String(value), f);
       if (why) ctx.fail("platform.invalid", { field: name, reason: why });
     }
+  };
+
+  /**
+   * ⚠️ THE DECLARED RULE, ON EVERY WRITE THAT COULD BREAK IT. It lives on the
+   * collection precisely so there is one place it runs: a product rule enforced
+   * by a bespoke operation leaves the derived create standing beside it making
+   * the same row without the check.
+   *
+   * ⚠️ AND AN UPDATE IS CHECKED AGAINST THE MERGED ROW. Handed only the changes,
+   * a clash check sees a booking with no coach and no time and reports no clash
+   * — so moving a session onto an occupied hour is accepted every time, as long
+   * as the coach was not part of the edit.
+   */
+  const obeys = async (
+    ctx: { fail(code: "platform.conflict", meta: Record<string, string>): never },
+    db: SqlHandle, tenantId: string, id: string | null, row: Record<string, unknown>,
+  ) => {
+    if (!spec.rule) return;
+    const ok = await spec.rule.check({ db, tenantId, table, id, row });
+    if (!ok) ctx.fail("platform.conflict", { reason: spec.rule.why });
   };
 
   /** The append-only record of who changed what. Off only for pure caches. */
@@ -246,6 +275,7 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
       const at = ctx.now();
       const id = `${spec.id.slice(0, 3)}_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
       await checkMedia(ctx, input, db, tenantId);
+      await obeys(ctx, db, tenantId, null, input);
       const [names, values] = columnValues(spec, input);
       /*
         ⚠️ A SUBJECT-SCOPED ROW WITH NO SUBJECT IS A ROW NOBODY OWNS. The column
@@ -314,6 +344,12 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
       }
 
       await checkMedia(ctx, input.changes, db, tenantId);
+      if (spec.rule) {
+        const whole = await db.first<Record<string, unknown>>(
+          `SELECT ${selectable.join(", ")} FROM ${table} WHERE id = ? AND ${scope.where}`, input.id, ...scope.binds(tenantId),
+        );
+        await obeys(ctx, db, tenantId, input.id, { ...fromColumns(spec, whole ?? {}), ...input.changes });
+      }
       const [names, values] = columnValues(spec, input.changes);
       if (!names.length) return { version: current!.version };
       const at = ctx.now();
@@ -468,6 +504,23 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     ...(spec.customerFlag && op.kind === "write" ? { customerFlag: spec.customerFlag } : {}),
   }));
   return gated as unknown as readonly AnyOperation[];
+}
+
+/**
+ * A stored row becomes the shape a rule was written against.
+ *
+ * ⚠️ FIELD NAMES, NOT COLUMN NAMES. A rule reads `startsAt` because that is what
+ * the declaration calls it; handing it `starts_at` makes every lookup `undefined`
+ * and every rule pass, silently, on every update.
+ */
+function fromColumns(spec: CollectionSpec, row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [name, f] of Object.entries(spec.fields)) {
+    if (f.kind === "money") continue;
+    const column = columnName(name);
+    if (column in row) out[name] = f.kind === "bool" ? row[column] === 1 : row[column];
+  }
+  return out;
 }
 
 /** A body becomes columns and binds, money splitting into its two. */

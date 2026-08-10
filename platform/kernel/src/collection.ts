@@ -12,6 +12,7 @@
  * collection view or the chrome around one. This is where the manifest pays.
  */
 
+import type { SqlHandle } from "./bindings.js";
 import type { Dimension, Id, Instant } from "./primitives.js";
 
 /* ---------------------------------------------------------------- fields --- */
@@ -164,6 +165,43 @@ export interface DetailView { readonly tabs: readonly { readonly id: string; rea
 /** What a device keeps when it is offline, and what happens to writes made then. */
 export type OfflinePolicy = "none" | "cache" | "cache-and-queue";
 
+/* -------------------------------------------------------------- the rule --- */
+
+/**
+ * What a rule is asked, and everything it is given to answer with.
+ *
+ * ⚠️ THE ROW IS THE MERGED ONE ON AN UPDATE, never the changes alone. A clash
+ * check handed only what somebody edited sees a booking with no coach and no
+ * time and reports no clash — so moving a session onto an occupied hour is
+ * accepted, every time, as long as the coach was not part of the edit.
+ */
+export interface RuleInput {
+  readonly db: SqlHandle;
+  readonly tenantId: string;
+  /**
+   * ⚠️ HANDED OVER, NEVER DERIVED BY THE RULE. A rule that named its own
+   * collection's table would have to reference the declaration it is part of,
+   * which is a circular type — and one that spelled the name out by hand is a
+   * silent break the day the derivation changes.
+   */
+  readonly table: string;
+  /** ⚠️ The row's own id on an update, so a rule can exclude it from its own check. */
+  readonly id: string | null;
+  readonly row: Readonly<Record<string, unknown>>;
+}
+
+export interface CollectionRule {
+  /**
+   * One word for what went wrong, travelling as the refusal's reason.
+   *
+   * ⚠️ NOT A SENTENCE. It reaches a screen that has the locale and the space;
+   * a kernel that wrote the copy would be a kernel with a translation table.
+   */
+  readonly why: string;
+  /** `true` allows the write. */
+  check(input: RuleInput): Promise<boolean> | boolean;
+}
+
 /* ------------------------------------------------------------- collection --- */
 
 export interface CollectionSpec {
@@ -219,6 +257,22 @@ export interface CollectionSpec {
    * and cannot add another until they renew.
    */
   readonly customerFlag?: string;
+  /**
+   * A rule these rows must satisfy that no column can express.
+   *
+   * ⚠️ IT LIVES ON THE COLLECTION BECAUSE THE DERIVED WRITES ARE WHERE IT HAS TO
+   * RUN. The alternative shape — a bespoke `session.book` that checks for a
+   * clash — leaves the derived `session.create` standing beside it making the
+   * same row without the check, and nothing anywhere reports that there are two
+   * ways to do it. Every product rule written that way is one screen away from
+   * being bypassed.
+   *
+   * ⚠️ AND IT IS A REFUSAL, NEVER A CORRECTION. Moving a booking to the next free
+   * hour, or quietly dropping a duplicate, is the product deciding something on
+   * somebody's behalf and then showing them a screen that does not match what
+   * they typed.
+   */
+  readonly rule?: CollectionRule;
   readonly activity?: boolean;
   readonly search?: readonly string[];
   readonly offline?: OfflinePolicy;

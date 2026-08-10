@@ -2528,3 +2528,47 @@ permission and what to do with the answer, and each of those is the product's.
 manifest that contains it is a circular type, and the catalogue is exactly the
 small thing it actually needs — which is what makes an app's own AI operation
 expressible at all.
+
+## 207. A product rule beside the derived write is a rule with a door next to it
+
+A coach cannot be in two places at once, and the obvious place to say so is a
+`booking.book` operation that checks for a clash. That leaves the derived
+`booking.create` standing beside it, making the same row, without the check —
+and the derived one is what a form actually calls. Every product rule written
+that way is one screen away from being bypassed, and nothing anywhere reports
+that there are two ways to make the row.
+
+So a rule is declared ON the collection and every derived write runs it. It
+refuses rather than corrects: moving a booking to the next free hour is the
+product deciding something on somebody's behalf and then showing them a screen
+that does not match what they typed.
+
+## 208. A rule handed the changes alone is a rule that always passes
+
+An update carries only what somebody edited. A clash check given that sees a
+booking with no coach and no time, takes its "not enough to judge" branch, and
+accepts the move — silently, every time the coach was not part of the edit.
+
+⚠️ AND THE MERGE HAS TO BE IN THE DECLARATION'S OWN NAMES. The stored row is
+columns (`starts_at`); the rule was written against the field (`startsAt`).
+Merged under the wrong keys every lookup is `undefined` and the same branch is
+taken. A mutation swapping one for the other survived the first suite, because
+every case it had changed the field in question — it only shows on an edit that
+changes something else.
+
+## 209. A subject-scoped row that does not say whose it is
+
+The derived list left the subject column out. For the customer reading their own
+records that is invisible — every row is theirs — which is exactly why it went
+unnoticed: staff read the WHOLE workspace's rows through the same list, so a
+coach's diary was a column of appointments with nobody's name against any of
+them.
+
+## 210. A draft a client can read
+
+The ordinary shape of the mistake is one permission and one filter: give clients
+the collection's read permission, filter the list to published in the screen,
+and every half-written piece in the studio is one request away. The feed is a
+separate operation behind a permission staff and clients hold, and the
+collection's own read is one clients do not — because a correct feed is no
+defence if the door beside it is open.

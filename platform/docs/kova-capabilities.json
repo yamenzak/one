@@ -609,21 +609,21 @@
       "persona": "trainer",
       "area": "content",
       "outcome": "Write an article for clients and publish it",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "content-cover",
       "persona": "trainer",
       "area": "content",
       "outcome": "Give an article a cover image without leaving the product",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "content-read",
       "persona": "client",
       "area": "content",
       "outcome": "Read what their studio published, in a feed that is theirs",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "marketplace-public",
@@ -637,21 +637,21 @@
       "persona": "assistant",
       "area": "sessions",
       "outcome": "Book a client into a session",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "session-manage",
       "persona": "assistant",
       "area": "sessions",
       "outcome": "Change or cancel a booking and have the client know",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "session-see",
       "persona": "client",
       "area": "sessions",
       "outcome": "See when they are booked in",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "package-build",

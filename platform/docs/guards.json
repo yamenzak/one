@@ -1966,6 +1966,51 @@
       "impl": "kernel/test/generation.test.ts",
       "proves": "refuses a model priced at nothing, on either side",
       "fails": "a rate of zero holding nothing and charging nothing while the provider still invoices, so the model looks like the cheapest in the catalogue until the end of the month"
+    },
+    {
+      "id": "a-product-rule-runs-on-every-derived-write",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/booking.test.ts",
+      "proves": "refuses a second person onto the same coach's hour",
+      "fails": "a rule written into a bespoke operation while the derived create stands beside it making the same row without the check \u2014 which is what a form actually calls"
+    },
+    {
+      "id": "a-rule-sees-the-merged-row",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/booking.test.ts",
+      "proves": "refuses a coach being swapped onto an hour they already have",
+      "fails": "a rule handed only the changes, or handed them under column names, so every lookup is undefined and every update passes"
+    },
+    {
+      "id": "a-subject-scoped-row-says-whose-it-is",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/booking.test.ts",
+      "proves": "sees their own appointments and nobody else's",
+      "fails": "staff reading a whole workspace's subject-scoped rows through the same list and getting a column of records with nobody's name against any of them"
+    },
+    {
+      "id": "a-draft-is-not-in-the-feed",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/writing.test.ts",
+      "proves": "sees what was published and not what was not",
+      "fails": "a studio's unfinished thinking sent to the people it coaches"
+    },
+    {
+      "id": "the-door-beside-the-feed-is-shut",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/writing.test.ts",
+      "proves": "cannot reach the drafts through the collection",
+      "fails": "a correct feed beside a collection read the same person holds, so every draft in the studio is one request away"
     }
   ]
 }
