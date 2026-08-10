@@ -2822,3 +2822,62 @@ of, kept under a heading that says it was removed.
 is about; once the row is deleted there is nothing left to join to, so a run that
 erased first and looked afterwards finds nothing to remove and reports a complete
 erasure over entries nobody can attribute — including us.
+
+## 228. A photograph was metered as though it were the sentence describing it
+
+A provider bills a picture as a flat block of input units — a thousand or more,
+larger than most prompts — and none of it appears in the text. So a vision
+feature metered by the existing arithmetic held what its words came to, the
+settle capped there, and the platform paid the rest.
+
+Every property that makes a defect survive is present: it SUCCEEDS, the answer
+is good, nothing throws, nothing logs, and the amount is plausible. And it
+scales with use — photographing a meal is the feature people reach for most, so
+the cheapest-looking line in the catalogue is the one running up the largest
+invoice.
+
+⚠️ THE PICTURE IS DECLARED ON THE FEATURE, NOT DECIDED PER CALL. Deciding per
+call means an image can be attached to a feature whose reserve was computed
+without one, which is the same transfer arriving through a door the catalogue
+cannot be checked at. Declared, `aiProblems` can refuse a vision feature whose
+model prices no picture — before anybody calls anything.
+
+## 229. An image is a different metering shape, not a different content type
+
+Priced per picture, with no input side worth counting and no output ceiling that
+means anything. Through the token arithmetic it holds the cost of the sentence
+that asked for it. And a usage block cannot be allowed to settle it: there are no
+units to report, so a provider that returns one for its text models would
+discount every image by whatever happened to be in it.
+
+⚠️ THE BYTES HAVE TO LAND SOMEWHERE ACCOUNTED FOR. A generated image handed back
+as data is an object nothing counts against the workspace's storage, nothing
+erases when it closes, and nothing can serve again tomorrow — so the only way to
+keep it is to generate it again and pay again. It goes through the same store
+every upload does, which is what keeps "what does this workspace hold" a question
+with one answer.
+
+## 230. `refusalProblem` wrote the code over the reason
+
+`{ ...(g.meta ?? {}), reason: g.why }` — so a refusal carrying "that picture is
+not in this workspace" was answered with the word `unconfigured`, and so was one
+carrying "this asks for a picture and none was given", and so was a missing model
+binding. Three different things to go and do, computed correctly, discarded on
+the way out.
+
+It cost about twenty minutes here: three new features failed with one message
+that pointed at none of the three causes. The actual cause was the region's
+sub-processor allow-list, which names every model an app may reach — a catalogue
+entry added without a matching line there is a feature that refuses everything
+and says nothing about why.
+
+## 231. An entitlement key that is a customer flag resolves to nothing
+
+`entitlement: "nutrition"` on a new operation, where `nutrition` is a flag a
+CLIENT buys from a studio and not a capability a studio buys from us. Two rails,
+never merged — so the gate looked the key up on the tenant rail, found nothing,
+and refused the feature for everybody.
+
+⚠️ It fails CLOSED, which is why it is a finding and not an incident: the
+symptom is a feature nobody can use rather than one nobody is charged for. The
+same mistake on `customerFlag` would fail the other way.

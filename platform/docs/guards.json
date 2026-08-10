@@ -2299,6 +2299,69 @@
       "impl": "kova/test/training.test.ts",
       "proves": "is not answered by editing the row directly",
       "fails": "a swap request the client opens with `swap:write` and then allows with the same permission through the derived update"
+    },
+    {
+      "id": "a-photograph-is-metered-as-a-photograph",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/generation.test.ts",
+      "proves": "adds the picture's units to the reserve",
+      "fails": "a vision call metered on its words alone — the provider bills a flat block of input units for the picture, the reserve holds none of them, the cap settles at the words, and the platform pays the difference on every photograph while every call succeeds"
+    },
+    {
+      "id": "a-vision-feature-needs-a-model-that-prices-pictures",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/generation.test.ts",
+      "proves": "refuses a manifest whose vision feature runs on a model that prices no picture",
+      "fails": "a catalogue where the cheapest-looking line is the one running up the largest invoice, because nothing at runtime would ever report it"
+    },
+    {
+      "id": "a-picture-is-priced-per-picture",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/generation.test.ts",
+      "proves": "holds the per-picture price rather than the price of the prompt",
+      "fails": "an image forced through the token arithmetic, holding the cost of the sentence that asked for it — and a request for four that held the price of one"
+    },
+    {
+      "id": "the-picture-and-the-declaration-agree",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/generate.test.ts",
+      "proves": "refuses a text feature given a picture, rather than quietly running it",
+      "fails": "an image attached to a feature whose reserve was computed for text — which SUCCEEDS, answers well, charges a fraction, and leaves the provider's bill with us"
+    },
+    {
+      "id": "a-generated-picture-lands-in-the-library",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/seeing.test.ts",
+      "proves": "comes back as a file in the studio's own library",
+      "fails": "bytes handed to a browser that nothing counts against the workspace's storage, nothing erases when it closes, and nothing can serve again — so keeping it means generating it a second time and paying again"
+    },
+    {
+      "id": "a-picture-read-is-a-picture-the-workspace-holds",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/seeing.test.ts",
+      "proves": "cannot be handed a picture from another studio",
+      "fails": "one workspace's photograph read by another's request — and a lookup that forgot its tenant binding refuses an invented id while serving a real one, so only a real foreign id finds it"
+    },
+    {
+      "id": "a-refusal-keeps-its-own-words",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/seeing.test.ts",
+      "proves": "refuses a picture this workspace does not hold, and says so",
+      "fails": "the generic code written over the specific reason, so \"that picture is not in this workspace\", \"this asks for a picture and none was given\" and a missing model binding all read as one word nobody can act on"
     }
   ]
 }

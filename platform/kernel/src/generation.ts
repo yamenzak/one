@@ -17,7 +17,7 @@
  */
 
 import type { Run } from "./meter.js";
-import { planRun } from "./meter.js";
+import { planImages, planRun } from "./meter.js";
 
 /* -------------------------------------------------------------- the model --- */
 
@@ -39,6 +39,23 @@ export interface ModelSpec {
    * property of the model rather than of the thing being asked.
    */
   readonly thinking?: boolean;
+  /**
+   * ⚠️ INPUT UNITS ONE ATTACHED IMAGE COSTS. Absent means this model cannot be
+   * given one — declared per model because a provider prices a picture as a flat
+   * block of input units and every provider picks a different block.
+   *
+   * A vision feature on a model with no figure here is refused at composition,
+   * because the reserve would be computed from the text alone: it would hold
+   * almost nothing, the cap would settle at almost nothing, and every photograph
+   * anybody sends is one the platform pays for in full.
+   */
+  readonly imageUnits?: number;
+  /**
+   * ⚠️ CREDITS PER GENERATED IMAGE. A picture is priced per picture, and forcing
+   * it through the unit arithmetic bills it at the cost of the sentence that
+   * asked for it.
+   */
+  readonly perImage?: number;
 }
 
 /* ------------------------------------------------------------ the feature --- */
@@ -69,6 +86,32 @@ export interface FeatureSpec {
    * budget rather than a race.
    */
   readonly dailyPerPerson: number;
+  /**
+   * ⚠️ WHETHER THIS FEATURE IS GIVEN A PICTURE, DECLARED RATHER THAN INFERRED
+   * FROM THE CALL.
+   *
+   * Deciding per request means a caller can attach one to a feature whose model
+   * cannot take it, or to a feature whose reserve did not budget for it — and
+   * the second is the expensive one, because it succeeds. Declaring it makes the
+   * catalogue answerable before anybody calls anything: a feature that takes an
+   * image is refused unless its model prices one.
+   */
+  readonly takes?: "image";
+  /**
+   * What comes back. `text` unless stated.
+   *
+   * ⚠️ AN IMAGE IS A DIFFERENT METERING SHAPE, not a different content type on
+   * the same one. It is priced per picture, there is no output ceiling that
+   * means anything, and what comes back is BYTES — which have to be stored,
+   * counted against the workspace's quota and erased with it, none of which a
+   * text answer needs.
+   */
+  readonly produces?: "text" | "image";
+  /**
+   * ⚠️ HOW MANY IMAGES ONE CALL ASKS FOR, and it is part of the reserve. A
+   * request for four that held the price of one is three the platform pays for.
+   */
+  readonly images?: number;
 }
 
 export interface AiSpec {
@@ -91,12 +134,27 @@ export function planFeature(spec: AiSpec, featureId: string, prompt: string, rat
   if (!feature) return null;
   const model = modelFor(spec, feature.model, rates);
   if (!model) return null;
+  /*
+    ⚠️ A PICTURE IS PRICED PER PICTURE. Running it through the unit arithmetic
+    would hold the cost of the sentence that asked for it, which is a fraction
+    of a per-image price — so the cap settles at that fraction and the platform
+    pays the rest on every image anybody generates.
+  */
+  if (feature.produces === "image") {
+    return planImages({ perImage: model.perImage ?? 0, count: feature.images ?? 1 });
+  }
   return planRun({
     system: feature.system,
     prompt,
     maxOutput: feature.maxOutput,
     thinking: model.thinking ?? false,
     rate: model.rate,
+    /*
+      ⚠️ THE PICTURE'S OWN UNITS, WHICH ARE NOWHERE IN THE TEXT. Declared on the
+      FEATURE rather than passed by the caller, so a reserve cannot be computed
+      for one request and an image attached to another.
+    */
+    ...(feature.takes === "image" ? { imageUnits: model.imageUnits ?? 0 } : {}),
   });
 }
 
@@ -181,8 +239,27 @@ export function aiProblems(spec: AiSpec | undefined): readonly AiProblem[] {
     if (feature.system.trim().length === 0) {
       out.push({ id, why: "sends no system text, so the reserve is computed from a document that is not the one sent" });
     }
-    if (!Number.isInteger(feature.maxOutput) || feature.maxOutput < 1) {
+    if (feature.produces !== "image" && (!Number.isInteger(feature.maxOutput) || feature.maxOutput < 1)) {
       out.push({ id, why: "asks for no bounded output, so nothing caps what one call can spend" });
+    }
+    const model = spec.models.find((m) => m.id === feature.model);
+    /*
+      ⚠️ A VISION FEATURE ON A MODEL THAT DOES NOT PRICE A PICTURE. The reserve
+      is then computed from the text alone: it holds almost nothing, the cap
+      settles at almost nothing, and every photograph is one the platform pays
+      for in full. It succeeds every time, which is why nothing else would find
+      it — and it scales with USE, so the cheapest-looking line in the catalogue
+      runs up the largest invoice.
+    */
+    if (feature.takes === "image" && model && !(model.imageUnits! > 0)) {
+      out.push({ id, why: `is given a picture and its model "${feature.model}" prices none, so every image on it is unmetered` });
+    }
+    /* ⚠️ The same failure on the other side: an image produced and not priced. */
+    if (feature.produces === "image" && model && !(model.perImage! > 0)) {
+      out.push({ id, why: `produces images and its model "${feature.model}" prices none, so every one is unmetered` });
+    }
+    if (feature.produces === "image" && feature.images !== undefined && (!Number.isInteger(feature.images) || feature.images < 1)) {
+      out.push({ id, why: "asks for a number of images that is not a whole number of images" });
     }
     if (!Number.isInteger(feature.dailyPerPerson) || feature.dailyPerPerson < 1) {
       out.push({ id, why: "sets no daily ceiling per person, so one person can empty the balance before anybody else opens the product" });

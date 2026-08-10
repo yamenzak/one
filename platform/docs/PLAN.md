@@ -1079,6 +1079,13 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-starting-value-is-declared-not-demanded` | a field that is required AND write-restricted, which is a collection the person the feature is for cannot write a row into — the declaration refusing its own use | **live** |
 | `forgetting-somebody-takes-the-trail` | the activity trail being tenant-scoped where the cascade is subject-scoped, so "forget this person" leaves a dated list of every time their record was touched — and reading the ids after the rows go finds nothing to attribute, to anyone, including us | **live** |
 | `an-answer-is-not-given-by-the-person-asking` | a swap request the client opens with `swap:write` and then allows with the same permission through the derived update | **live** |
+| `a-photograph-is-metered-as-a-photograph` | a vision call metered on its words alone — the provider bills a flat block of input units for the picture, the reserve holds none of them, the cap settles at the words, and the platform pays the difference on every photograph while every call succeeds | **live** |
+| `a-vision-feature-needs-a-model-that-prices-pictures` | a catalogue where the cheapest-looking line is the one running up the largest invoice, because nothing at runtime would ever report it | **live** |
+| `a-picture-is-priced-per-picture` | an image forced through the token arithmetic, holding the cost of the sentence that asked for it — and a request for four that held the price of one | **live** |
+| `the-picture-and-the-declaration-agree` | an image attached to a feature whose reserve was computed for text — which SUCCEEDS, answers well, charges a fraction, and leaves the provider's bill with us | **live** |
+| `a-generated-picture-lands-in-the-library` | bytes handed to a browser that nothing counts against the workspace's storage, nothing erases when it closes, and nothing can serve again — so keeping it means generating it a second time and paying again | **live** |
+| `a-picture-read-is-a-picture-the-workspace-holds` | one workspace's photograph read by another's request — and a lookup that forgot its tenant binding refuses an invented id while serving a real one, so only a real foreign id finds it | **live** |
+| `a-refusal-keeps-its-own-words` | the generic code written over the specific reason, so "that picture is not in this workspace", "this asks for a picture and none was given" and a missing model binding all read as one word nobody can act on | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

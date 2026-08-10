@@ -855,21 +855,21 @@
       "persona": "trainer",
       "area": "ai",
       "outcome": "Draft a meal plan the same way",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "ai-snap-meal",
       "persona": "client",
       "area": "ai",
       "outcome": "Photograph a meal and have it logged",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "ai-label-reader",
       "persona": "client",
       "area": "ai",
       "outcome": "Photograph a nutrition label and get the food",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "ai-parse-food",
@@ -883,42 +883,42 @@
       "persona": "trainer",
       "area": "ai",
       "outcome": "Generate how-to text for a movement in the studio's voice",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "ai-supplement-guide",
       "persona": "trainer",
       "area": "ai",
       "outcome": "Generate supplement guidance with a stated basis",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "ai-lab-extract",
       "persona": "trainer",
       "area": "ai",
       "outcome": "Read a lab report photograph into values a coach can use",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "ai-client-summary",
       "persona": "trainer",
       "area": "ai",
       "outcome": "Read a summary of a client's month instead of assembling it from four places",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "ai-article",
       "persona": "trainer",
       "area": "ai",
       "outcome": "Draft an article and a cover image for it",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "ai-image",
       "persona": "trainer",
       "area": "ai",
       "outcome": "Generate an image for the studio's own use",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "ai-feedback",

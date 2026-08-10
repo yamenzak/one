@@ -72,6 +72,20 @@ export interface Estimate {
   readonly thinking: boolean;
   /** Units per input unit and per output unit, from the catalogue. */
   readonly rate: { readonly input: number; readonly output: number };
+  /**
+   * ⚠️ INPUT UNITS ONE ATTACHED IMAGE COSTS, and it is nowhere in the text.
+   *
+   * Providers bill a picture as a flat block of input units — hundreds to
+   * thousands of them, more than most prompts — and none of that is visible to
+   * a reserve computed from characters. A vision call metered on its text alone
+   * holds almost nothing, so the cap settles at almost nothing, and every
+   * photograph anybody sends is one the platform pays for in full.
+   *
+   * ⚠️ AND THE FAILURE SCALES WITH USE. Photographing a meal is the feature
+   * people use most, so the cheapest-looking line in the catalogue is the one
+   * running up the largest invoice.
+   */
+  readonly imageUnits?: number;
 }
 
 /**
@@ -82,9 +96,29 @@ export interface Estimate {
  * they are what the expensive requests produce.
  */
 export function planRun(e: Estimate): Run {
-  const input = Math.ceil((e.system.length + e.prompt.length) / charsPerUnit(e.system + e.prompt));
+  const text = Math.ceil((e.system.length + e.prompt.length) / charsPerUnit(e.system + e.prompt));
+  const input = text + (e.imageUnits ?? 0);
   const output = e.thinking ? Math.ceil(e.maxOutput * THINKING_WIDENING) : e.maxOutput;
   return { system: e.system, reserve: Math.ceil(input * e.rate.input + output * e.rate.output) };
+}
+
+/* ------------------------------------------------------------- pictures --- */
+
+/**
+ * What one generated image holds.
+ *
+ * ⚠️ A PICTURE IS PRICED PER PICTURE, NOT PER UNIT, and forcing it through the
+ * token arithmetic is how a shipping product came to bill an image at the cost
+ * of the sentence that asked for it. There is no input side worth counting and
+ * no output ceiling that means anything — the request either produces an image
+ * or it does not.
+ *
+ * ⚠️ AND THE COUNT IS PART OF THE RESERVE. A request for four images that held
+ * the price of one is three images the platform pays for, and asking for several
+ * at once is the ordinary case rather than the exotic one.
+ */
+export function planImages(e: { readonly perImage: number; readonly count: number }): Run {
+  return { system: "", reserve: Math.ceil(e.perImage * Math.max(1, e.count)) };
 }
 
 /* ------------------------------------------------------------- settlement --- */

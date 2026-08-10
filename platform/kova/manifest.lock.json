@@ -87,8 +87,17 @@
     "training"
   ],
   "operations": [
+    "ai.article",
+    "ai.client-summary",
+    "ai.draft-meals",
     "ai.draft-plan",
+    "ai.exercise-guide",
+    "ai.image",
+    "ai.lab-extract",
+    "ai.label-reader",
     "ai.parse-food",
+    "ai.snap-meal",
+    "ai.supplement-guide",
     "alternative.create",
     "alternative.delete",
     "alternative.list",

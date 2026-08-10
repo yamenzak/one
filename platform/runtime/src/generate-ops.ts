@@ -16,6 +16,8 @@
 
 import type { AiSpec, AnyOperation, AppSpec, BindingSpec, InferenceHandle, Instant, Rates, SqlHandle } from "@one/kernel";
 import { operation, s } from "@one/kernel";
+import { FILES, type FilesCarrier } from "./files-ops.js";
+import { fetchMedia, storeMedia } from "./files.js";
 import { generate, judge, spending, type Generated } from "./generate.js";
 import { balance } from "./ledger.js";
 import { CREDITS } from "./generate.js";
@@ -64,6 +66,103 @@ export async function generateWith(
 }
 
 /**
+ * Ask for a generation ABOUT A PICTURE the workspace already holds.
+ *
+ * ⚠️ THE IMAGE IS NAMED BY ITS MEDIA ID, NEVER SENT AS BYTES. A lane that took
+ * raw bytes here would be a second way into a model's input with nothing
+ * counting the storage, nothing stripping the metadata a phone attaches, and
+ * nothing erasing it when the workspace goes. Going through the upload the
+ * platform already has means a photograph in a request is a photograph in the
+ * media ledger, with one answer to "what does this workspace hold".
+ *
+ * ⚠️ AND IT IS SCOPED. `fetchMedia` binds the tenant, so a caller naming
+ * another workspace's file gets the same answer as one naming a file that does
+ * not exist — which is the only answer that tells them nothing.
+ */
+export async function generateAbout(
+  ctx: { now(): Instant },
+  ai: AiSpec,
+  feature: string,
+  prompt: string,
+  mediaId: string,
+): Promise<Generated> {
+  const d = deps(ctx);
+  const f = (ctx as unknown as FilesCarrier)[FILES];
+  const found = await fetchMedia(f.db, f.objects, f.tenantId, mediaId);
+  /*
+    ⚠️ A MISSING PICTURE IS REFUSED BEFORE ANYTHING IS HELD. Holding first and
+    discovering afterwards means a refund on every mistyped id, and a refund
+    that fails is credits taken for a call nobody made.
+  */
+  if (!found) return { ok: false, why: "unconfigured", meta: { reason: "that picture is not in this workspace" } };
+  return generate({
+    db: d.db, ai, inference: d.inference, rates: await d.rates(),
+    tenantId: d.tenantId, actorId: d.actorId,
+    feature, prompt, image: { bytes: found.body, contentType: found.row.contentType }, at: ctx.now(),
+  });
+}
+
+/** What a generated picture came back as, once it is in the workspace's own store. */
+export type Drawn =
+  | { readonly ok: true; readonly id: string; readonly mediaId: string; readonly charged: number; readonly balance: number }
+  | Extract<Generated, { ok: false }>
+  | { readonly ok: false; readonly why: "provider"; readonly meta: Readonly<Record<string, string>> };
+
+/**
+ * Ask for a picture, and keep it.
+ *
+ * ⚠️ WHAT COMES BACK IS BYTES, AND BYTES HAVE TO LAND SOMEWHERE ACCOUNTED FOR.
+ * A generated image returned as a data URL for the browser to deal with is an
+ * object nothing counts against the workspace's storage, nothing erases when it
+ * closes, and nothing can serve again tomorrow — so the only way to keep it is
+ * to generate it a second time and pay again.
+ *
+ * ⚠️ THE STORAGE CEILING IS CHECKED AFTER THE MODEL RAN AND THE CHARGE STANDS.
+ * That is the honest order rather than the flattering one: the provider did the
+ * work and invoices us for it whether or not we found room. Refunding here would
+ * make a full workspace a free image generator.
+ */
+export async function drawWith(
+  ctx: { now(): Instant },
+  ai: AiSpec,
+  feature: string,
+  prompt: string,
+  keep: { readonly name: string; readonly purpose: string },
+): Promise<Drawn> {
+  const d = deps(ctx);
+  const made = await generate({
+    db: d.db, ai, inference: d.inference, rates: await d.rates(),
+    tenantId: d.tenantId, actorId: d.actorId,
+    feature, prompt, at: ctx.now(),
+  });
+  if (!made.ok) return made;
+
+  const drawn = made.output as { bytes?: ArrayBuffer; contentType?: string } | undefined;
+  if (!drawn?.bytes) {
+    return { ok: false, why: "provider", meta: { reason: "the model answered with no picture" } };
+  }
+
+  const f = (ctx as unknown as FilesCarrier)[FILES];
+  const stored = await storeMedia({
+    db: f.db, objects: f.objects, tenantId: f.tenantId, actorId: f.actorId,
+    body: drawn.bytes, contentType: drawn.contentType ?? "image/png",
+    name: keep.name, purpose: keep.purpose, allowance: f.allowance,
+    maxBytes: MAX_GENERATED_BYTES, at: ctx.now(),
+  });
+  if (!stored.ok) {
+    return { ok: false, why: "provider", meta: { reason: stored.why, charged: String(made.charged) } };
+  }
+  return { ok: true, id: made.id, mediaId: stored.row.id, charged: made.charged, balance: made.balance };
+}
+
+/**
+ * ⚠️ A CEILING ON WHAT A MODEL MAY HAND BACK, separate from the upload's. A
+ * provider that answers with something enormous would otherwise be a way to
+ * fill a workspace's storage that no person ever chose.
+ */
+export const MAX_GENERATED_BYTES = 12 * 1024 * 1024;
+
+/**
  * ⚠️ EACH REFUSAL BECOMES A DIFFERENT PROBLEM, because each is a different thing
  * to do next: buy credits, wait until tomorrow, tell somebody the deployment is
  * misconfigured, or try again. A handler that mapped all four to one code would
@@ -73,7 +172,14 @@ export function refusalProblem(g: Extract<Generated, { ok: false }>): {
   readonly code: "platform.quota_reached" | "platform.unavailable" | "platform.invalid" | "platform.too_many";
   readonly meta: Readonly<Record<string, string>>;
 } {
-  const meta: Record<string, string> = { ...(g.meta ?? {}), reason: g.why };
+  /*
+    ⚠️ THE REFUSAL'S OWN WORDS SURVIVE, and `reason` is what carries them. Writing
+    the code over that key replaced "that picture is not in this workspace" and
+    "this asks for a picture and none was given" with the word `unconfigured` —
+    so three different mistakes a caller can fix produced one message nobody can
+    act on, and the specific half was computed and thrown away.
+  */
+  const meta: Record<string, string> = { reason: g.why, ...(g.meta ?? {}) };
   switch (g.why) {
     case "no_credits": return { code: "platform.quota_reached", meta: { limit: meta.have ?? "0", used: meta.need ?? "0", ...meta } };
     case "daily_ceiling": return { code: "platform.too_many", meta: { retryAfter: "tomorrow", ...meta } };

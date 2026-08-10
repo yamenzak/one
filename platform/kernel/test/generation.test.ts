@@ -173,3 +173,118 @@ describe("what a model costs, corrected centrally", () => {
     expect(modelFor(spec(), "gpt-9-ultra", { "gpt-9-ultra": { rate: { input: 1, output: 1 } } })).toBeNull();
   });
 });
+
+
+/* ------------------------------------------------------------- a picture --- */
+
+/**
+ * ⚠️ A PHOTOGRAPH IS A FLAT BLOCK OF INPUT UNITS AND NONE OF IT IS IN THE TEXT.
+ *
+ * Providers bill hundreds to thousands of them per picture — more than most
+ * prompts — so a vision call metered on its words holds a fraction of what it
+ * costs. The cap then settles at that fraction and the platform pays the rest,
+ * on every call, with every call succeeding. Nothing throws, nothing logs, and
+ * the failure scales with USE: photographing a meal is the feature people reach
+ * for most, so the cheapest-looking line runs up the largest invoice.
+ */
+describe("what a picture costs on the way in", () => {
+  const spec: AiSpec = {
+    models: [
+      { id: "sees", provider: "p", rate: { input: 1, output: 4 }, imageUnits: 1_100 },
+      { id: "blind", provider: "p", rate: { input: 1, output: 4 } },
+    ],
+    features: {
+      read: { summary: "s", model: "sees", system: "SYSTEM", maxOutput: 100, dailyPerPerson: 5, takes: "image" },
+      words: { summary: "s", model: "sees", system: "SYSTEM", maxOutput: 100, dailyPerPerson: 5 },
+    },
+  };
+
+  it("adds the picture's units to the reserve", () => {
+    const withPicture = planFeature(spec, "read", "porridge")!.reserve;
+    const wordsOnly = planFeature(spec, "words", "porridge")!.reserve;
+    expect(withPicture - wordsOnly).toBe(1_100);
+  });
+
+  /* ⚠️ Only where the FEATURE declared it. A reserve that guessed from the call
+     could be computed for one request and an image attached to another. */
+  it("adds nothing to a feature that takes no picture", () => {
+    expect(planFeature(spec, "words", "porridge")!.reserve)
+      .toBe(planFeature({ ...spec, models: [spec.models[1]!, spec.models[0]!] }, "words", "porridge")!.reserve);
+  });
+
+  /*
+    ⚠️ A VISION FEATURE ON A MODEL THAT PRICES NO PICTURE IS REFUSED AT
+    COMPOSITION, because at runtime it is a successful call that silently
+    under-charges — the one failure class nothing else here would find.
+  */
+  it("refuses a manifest whose vision feature runs on a model that prices no picture", () => {
+    const bad: AiSpec = {
+      models: [{ id: "blind", provider: "p", rate: { input: 1, output: 4 } }],
+      features: { read: { summary: "s", model: "blind", system: "S", maxOutput: 10, dailyPerPerson: 1, takes: "image" } },
+    };
+    expect(aiProblems(bad).map((p) => p.why).join()).toMatch(/prices none/);
+  });
+
+  it("says nothing about the same model used without a picture", () => {
+    const fine: AiSpec = {
+      models: [{ id: "blind", provider: "p", rate: { input: 1, output: 4 } }],
+      features: { words: { summary: "s", model: "blind", system: "S", maxOutput: 10, dailyPerPerson: 1 } },
+    };
+    expect(aiProblems(fine)).toEqual([]);
+  });
+});
+
+describe("what a picture costs on the way out", () => {
+  const spec: AiSpec = {
+    models: [{ id: "draws", provider: "p", rate: { input: 1, output: 4 }, perImage: 600 }],
+    features: {
+      one: { summary: "s", model: "draws", system: "S", maxOutput: 1, dailyPerPerson: 5, produces: "image" },
+      four: { summary: "s", model: "draws", system: "S", maxOutput: 1, dailyPerPerson: 5, produces: "image", images: 4 },
+    },
+  };
+
+  /*
+    ⚠️ PRICED PER PICTURE, NOT PER UNIT. Through the token arithmetic an image
+    holds the cost of the sentence that asked for it — a fraction of the real
+    price — and the platform pays the rest every time.
+  */
+  it("holds the per-picture price rather than the price of the prompt", () => {
+    expect(planFeature(spec, "one", "a kettlebell")!.reserve).toBe(600);
+  });
+
+  it("holds the same whatever the prompt is", () => {
+    expect(planFeature(spec, "one", "a kettlebell on a gym floor ".repeat(50))!.reserve).toBe(600);
+  });
+
+  /* ⚠️ Asking for several at once is the ordinary case, and three of four
+     unbudgeted is three the platform pays for. */
+  it("counts every picture asked for", () => {
+    expect(planFeature(spec, "four", "a kettlebell")!.reserve).toBe(2_400);
+  });
+
+  it("refuses a manifest that produces images on a model pricing none", () => {
+    const bad: AiSpec = {
+      models: [{ id: "text", provider: "p", rate: { input: 1, output: 4 } }],
+      features: { one: { summary: "s", model: "text", system: "S", maxOutput: 1, dailyPerPerson: 1, produces: "image" } },
+    };
+    expect(aiProblems(bad).map((p) => p.why).join()).toMatch(/produces images.*prices none/);
+  });
+
+  /* ⚠️ An output ceiling means nothing for a picture, so demanding one would be
+     a formality — but a count that is not a whole number of pictures is real. */
+  it("does not demand an output ceiling of an image feature", () => {
+    const noCeiling: AiSpec = {
+      models: [{ id: "draws", provider: "p", rate: { input: 1, output: 4 }, perImage: 600 }],
+      features: { one: { summary: "s", model: "draws", system: "S", maxOutput: 0, dailyPerPerson: 1, produces: "image" } },
+    };
+    expect(aiProblems(noCeiling).map((p) => p.why).join()).not.toMatch(/bounded output/);
+  });
+
+  it("refuses half a picture", () => {
+    const bad: AiSpec = {
+      models: [{ id: "draws", provider: "p", rate: { input: 1, output: 4 }, perImage: 600 }],
+      features: { one: { summary: "s", model: "draws", system: "S", maxOutput: 1, dailyPerPerson: 1, produces: "image", images: 0 } },
+    };
+    expect(aiProblems(bad).map((p) => p.why).join()).toMatch(/whole number of images/);
+  });
+});

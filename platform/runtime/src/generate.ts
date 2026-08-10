@@ -92,6 +92,14 @@ export interface GenerateInput {
   readonly actorId: string;
   readonly feature: string;
   readonly prompt: string;
+  /**
+   * ⚠️ A PICTURE, WHERE THE FEATURE DECLARED IT TAKES ONE. It arrives as bytes
+   * that are ALREADY in the media store — uploaded through the platform's own
+   * path, so counted against the workspace's quota and erased with it. A lane
+   * that took raw bytes here would be a second way to put somebody's photograph
+   * into a request with nothing accounting for it.
+   */
+  readonly image?: { readonly bytes: ArrayBuffer; readonly contentType: string };
   readonly at: Instant;
 }
 
@@ -130,6 +138,20 @@ export async function generate(input: GenerateInput): Promise<Generated> {
     return { ok: false, why: "unconfigured", meta: { reason: "not permitted in this region" } };
   }
 
+  /*
+    ⚠️ THE PICTURE AND THE DECLARATION HAVE TO AGREE, IN BOTH DIRECTIONS.
+    An image sent to a feature that declared none is metered by a reserve that
+    budgeted for text alone — it succeeds, and the platform pays for the picture.
+    A feature that declared one and was sent nothing is a request the model
+    cannot answer, refused here rather than as a provider error somebody retries.
+  */
+  if (feature.takes === "image" && !input.image) {
+    return { ok: false, why: "unconfigured", meta: { reason: "this asks for a picture and none was given" } };
+  }
+  if (feature.takes !== "image" && input.image) {
+    return { ok: false, why: "unconfigured", meta: { reason: "this takes no picture" } };
+  }
+
   const used = await spentToday(input.db, input.tenantId, input.actorId, input.feature, input.at);
   if (used >= feature.dailyPerPerson) {
     return { ok: false, why: "daily_ceiling", meta: { limit: String(feature.dailyPerPerson), used: String(used) } };
@@ -151,9 +173,21 @@ export async function generate(input: GenerateInput): Promise<Generated> {
   let reported: number | null = null;
   let failed = false;
   try {
-    const answer = await input.inference.run(model.id, { system: run.system, prompt: input.prompt, maxOutput: feature.maxOutput });
+    const answer = await input.inference.run(model.id, {
+      system: run.system,
+      prompt: input.prompt,
+      maxOutput: feature.maxOutput,
+      ...(input.image ? { image: input.image } : {}),
+      ...(feature.produces === "image" ? { produces: "image" as const, images: feature.images ?? 1 } : {}),
+    });
     output = (answer as { output?: unknown })?.output ?? answer;
-    reported = usageOf(answer, model.rate);
+    /*
+      ⚠️ AN IMAGE SETTLES AT THE RESERVE, ALWAYS. There are no units to report
+      and nothing a provider could say that would make the picture cheaper — so
+      reading a usage block here would let a provider that returns one for its
+      text models discount every image by whatever happened to be in it.
+    */
+    reported = feature.produces === "image" ? null : usageOf(answer, model.rate);
   } catch {
     failed = true;
   }

@@ -373,3 +373,72 @@ describe("what the credits were spent on", () => {
     expect(await judge(w.db, "t", "gen_nothing", "wrong", "")).toBe(false);
   });
 });
+
+/* ---------------------------------------------------- the picture lanes --- */
+
+/**
+ * ⚠️ THE DECLARATION AND THE CALL HAVE TO AGREE, IN BOTH DIRECTIONS, and only
+ * one of the two mistakes is loud.
+ *
+ * A feature that declared a picture and was sent none is a request the model
+ * cannot answer — it fails visibly, as a provider error somebody retries. The
+ * other way round is the expensive one: an image attached to a feature whose
+ * reserve was computed for text alone SUCCEEDS, returns a good answer, and
+ * leaves the platform paying for the thousand-odd input units the provider
+ * billed and nothing held.
+ */
+describe("a picture and the feature that did or did not ask for one", () => {
+  const sees: AiSpec = {
+    models: [{ id: "sees", provider: "p", rate: { input: 1, output: 2 }, imageUnits: 1_000 }],
+    features: {
+      read: { summary: "Read", model: "sees", system: "You read pictures.", maxOutput: 100, dailyPerPerson: 5, takes: "image" },
+      words: { summary: "Words", model: "sees", system: "You read words.", maxOutput: 100, dailyPerPerson: 5 },
+    },
+  };
+  const picture = { bytes: new Uint8Array([1, 2, 3]).buffer, contentType: "image/jpeg" };
+
+  const call = async (feature: string, image?: { bytes: ArrayBuffer; contentType: string }) => {
+    const w = world();
+    await record(w.db, "t_1", { unit: CREDITS, amount: 100_000, reason: "test", actorId: "op" }, AT);
+    const out = await generate({
+      db: w.db, ai: sees, inference: runner({ output: "ok" }),
+      tenantId: "t_1", actorId: "u_1", feature, prompt: "what is this",
+      ...(image ? { image } : {}), at: AT,
+    });
+    return { out, spent: 100_000 - (await balance(w.db, "t_1", CREDITS)) };
+  };
+
+  it("runs a vision feature given a picture", async () => {
+    const { out } = await call("read", picture);
+    expect(out.ok).toBe(true);
+  });
+
+  /* ⚠️ Nothing is held: the refusal is above the debit, so a mistake here costs
+     a refund rather than being one. */
+  it("refuses a vision feature given none, and holds nothing", async () => {
+    const { out, spent } = await call("read");
+    expect(out.ok).toBe(false);
+    expect(!out.ok && out.meta?.reason).toMatch(/asks for a picture/);
+    expect(spent).toBe(0);
+  });
+
+  /*
+    ⚠️ THIS IS THE EXPENSIVE ONE, AND IT IS THE ONE THAT WOULD SUCCEED. An image
+    on a feature that declared none is metered by a reserve computed from the
+    text: it answers, it charges a fraction, and the provider bills the picture.
+    Nothing throws and nothing logs.
+  */
+  it("refuses a text feature given a picture, rather than quietly running it", async () => {
+    const { out, spent } = await call("words", picture);
+    expect(out.ok).toBe(false);
+    expect(!out.ok && out.meta?.reason).toMatch(/takes no picture/);
+    expect(spent).toBe(0);
+  });
+
+  it("holds the picture's own units when it does run", async () => {
+    const withPicture = (await call("read", picture)).spent;
+    const wordsOnly = (await call("words")).spent;
+    /* The two system texts differ by a few characters, so this is a floor. */
+    expect(withPicture - wordsOnly).toBeGreaterThanOrEqual(1_000);
+  });
+});

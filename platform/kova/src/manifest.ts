@@ -16,7 +16,7 @@
 import { daysBetween, daysLeft, progressOf } from "./goals.js";
 import { energyOf, overDays, portionOf, totalOf, type Macros } from "./nutrition.js";
 import { bestOf, consistency, expectedOver, needing, prescribedPerWeek, soonest } from "./reading.js";
-import { forgetSubject, generateWith, lapsedAcross, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
+import { drawWith, forgetSubject, generateAbout, generateWith, lapsedAcross, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
 import { progressWeek, weekAt, WEEKS_SHAPE, type Week } from "./plans.js";
 import {
   UNLIMITED,
@@ -42,7 +42,14 @@ export const bindings = defineBindings({
     generation refuses and says so; nothing anywhere invents an answer and
     charges for it.
   */
-  ai: inference({ subprocessors: ["gemini-2.5-flash"], optional: true }),
+  /*
+    ⚠️ EVERY MODEL THIS APP MAY REACH, NAMED. A region carries a sub-processor
+    allow-list, and one not on it is REFUSED rather than quietly run somewhere a
+    workspace was promised its data would not go — so adding a model to the
+    catalogue and forgetting this line is a feature that answers "not permitted
+    in this region" and nothing else.
+  */
+  ai: inference({ subprocessors: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-image"], optional: true }),
 });
 
 export type Bindings = typeof bindings;
@@ -1510,7 +1517,21 @@ export const forgetClient = operation<
  */
 export const KOVA_AI: AiSpec = {
   models: [
-    { id: "gemini-2.5-flash", provider: "google", rate: { input: 1, output: 4 } },
+    /*
+      ⚠️ `imageUnits` IS WHAT A PICTURE COSTS ON THE INPUT SIDE, and it is not
+      in the text anywhere. A vision call metered on its prompt alone holds
+      almost nothing, settles at almost nothing, and every photograph is one the
+      platform pays for in full — on the feature people use most.
+    */
+    { id: "gemini-2.5-flash", provider: "google", rate: { input: 1, output: 4 }, imageUnits: 1_100 },
+    /*
+      ⚠️ A REASONING MODEL FOR THE ONE READING THAT MATTERS CLINICALLY. A lab
+      report misread is a number a coach acts on, and `thinking` widens the
+      reserve because such a model spends units the request does not show.
+    */
+    { id: "gemini-2.5-pro", provider: "google", rate: { input: 4, output: 16 }, thinking: true, imageUnits: 1_100 },
+    /* ⚠️ Priced per PICTURE. There is no output ceiling here that means anything. */
+    { id: "gemini-2.5-flash-image", provider: "google", rate: { input: 1, output: 4 }, perImage: 600 },
   ],
   features: {
     "draft-plan": {
@@ -1535,6 +1556,138 @@ export const KOVA_AI: AiSpec = {
       ].join("\n"),
       maxOutput: 600,
       dailyPerPerson: 30,
+    },
+
+    "draft-meals": {
+      summary: "A meal plan from a sentence",
+      model: "gemini-2.5-flash",
+      system: [
+        "You draft eating plans for a coach to edit. Answer with JSON only.",
+        "Shape: { \"weeks\": [{ \"days\": [{ \"name\": string, \"meals\": [{ \"name\": string, \"foods\": [{ \"name\": string, \"grams\": number }] }] }] }] }.",
+        "Do not invent allergies, intolerances, medication or a calorie target: you have not been given any, and a coach reading a confident detail you made up is the failure that matters here.",
+        "Where the brief is not specific enough, choose the ordinary option and say so in a note on the day.",
+      ].join("\n"),
+      maxOutput: 4_000,
+      dailyPerPerson: 20,
+    },
+
+    /* ------------------------------------------------------ from a picture --- */
+
+    /*
+      ⚠️ THE THREE BELOW DECLARE `takes: "image"`, AND THE DECLARATION IS WHAT
+      MAKES THEM SAFE TO PRICE. A feature that decided per request whether a
+      picture was attached would compute its reserve from the text and then send
+      a photograph — succeeding every time, and costing the platform the
+      difference on every call.
+    */
+    "snap-meal": {
+      summary: "A photograph of a meal, as foods and portions",
+      model: "gemini-2.5-flash",
+      system: [
+        "You read a photograph of a meal and answer with foods and portions. JSON only.",
+        "Shape: { \"foods\": [{ \"name\": string, \"grams\": number, \"confident\": boolean }] }.",
+        "Grams are the eaten weight, estimated from what is visible. Set confident to false whenever the amount is a guess — which for a photograph is most of the time. A number somebody has to check is useful; one that looks certain and is not is worse than none.",
+        "If the picture is not of food, answer with an empty list rather than describing what it is.",
+      ].join("\n"),
+      maxOutput: 600,
+      dailyPerPerson: 30,
+      takes: "image",
+    },
+    "label-reader": {
+      summary: "A photograph of a nutrition label, as a food",
+      model: "gemini-2.5-flash",
+      system: [
+        "You read a nutrition label and answer with one food. JSON only.",
+        "Shape: { \"name\": string, \"per100g\": { \"kcal\": number, \"protein\": number, \"carbs\": number, \"fat\": number }, \"confident\": boolean }.",
+        "Convert whatever basis the label uses to per 100 g. If it is stated per serving and the serving weight is not legible, set confident to false rather than assuming a serving size.",
+        "Never fill a figure the label does not carry. An absent number is absent; a plausible one is a food somebody will log for months.",
+      ].join("\n"),
+      maxOutput: 400,
+      dailyPerPerson: 30,
+      takes: "image",
+    },
+    "lab-extract": {
+      summary: "A photograph of a lab report, as values",
+      model: "gemini-2.5-pro",
+      system: [
+        "You read a laboratory report and answer with the values it carries. JSON only.",
+        "Shape: { \"values\": [{ \"name\": string, \"value\": number, \"unit\": string, \"low\": number, \"high\": number, \"legible\": boolean }] }.",
+        "⚠️ Transcribe. Do not interpret, do not diagnose, and do not comment on whether a value is concerning — a coach is not a clinician and neither are you.",
+        "Copy the reference range exactly as printed; ranges differ between laboratories and a remembered one is wrong.",
+        "Where a digit is not legible, set legible to false and leave the value at zero. A misread decimal point is a tenfold error in something somebody acts on.",
+      ].join("\n"),
+      maxOutput: 2_000,
+      dailyPerPerson: 10,
+      takes: "image",
+    },
+
+    /* ------------------------------------------------------ writing things --- */
+
+    "exercise-guide": {
+      summary: "How to do a movement, in the studio's voice",
+      model: "gemini-2.5-flash",
+      system: [
+        "You write short how-to text for one strength movement, for a client to read on a phone mid-session.",
+        "Setup, execution, and the two mistakes people actually make. Plain prose, no headings, under 180 words.",
+        "Do not name a weight, a rep count or a tempo: those are the coach's prescription and this text is read beside it.",
+        "Do not give medical advice or tell somebody a movement is safe for them.",
+      ].join("\n"),
+      maxOutput: 500,
+      dailyPerPerson: 30,
+    },
+    "supplement-guide": {
+      summary: "Guidance on a supplement, with its basis stated",
+      model: "gemini-2.5-flash",
+      system: [
+        "You write a short note on one supplement for a coach to review before it reaches anybody.",
+        "Say what the evidence actually supports and how strong it is. Where the evidence is thin, say that plainly rather than hedging into a recommendation.",
+        "⚠️ Name interactions and who should not take it. Omitting a contraindication is the failure that matters here, and a note that reads well and leaves one out is worse than no note.",
+        "Under 200 words. No dose: the dose is the coach's, and this is read beside it.",
+      ].join("\n"),
+      maxOutput: 600,
+      dailyPerPerson: 20,
+    },
+    "client-summary": {
+      summary: "A month of somebody's training and eating, read back",
+      model: "gemini-2.5-flash",
+      system: [
+        "You summarise one client's month from the figures given, for their coach.",
+        "What changed, what held, and what is worth asking them about. Under 200 words, plain prose.",
+        "⚠️ Use only the figures in the brief. Do not infer a mood, a reason or a life event from a gap in the data — a missed week is a missed week, and a confident story about why is the thing a coach would repeat back to somebody.",
+        "Where the data is too thin to say anything, say that.",
+      ].join("\n"),
+      maxOutput: 600,
+      dailyPerPerson: 20,
+    },
+    "article": {
+      summary: "A draft article for the studio's own feed",
+      model: "gemini-2.5-flash",
+      system: [
+        "You draft a short article for a personal-training studio to publish, for a coach to edit before it goes out.",
+        "Plain prose under 700 words. No headings, no lists, no calls to action.",
+        "Do not cite a study you cannot name, do not give medical advice, and do not make a claim about results anybody can be held to.",
+      ].join("\n"),
+      maxOutput: 2_000,
+      dailyPerPerson: 10,
+    },
+
+    /* --------------------------------------------------------- and a picture --- */
+
+    /*
+      ⚠️ PRICED PER PICTURE, WHICH IS WHY IT IS A DIFFERENT SHAPE RATHER THAN A
+      DIFFERENT CONTENT TYPE. There is no output ceiling that means anything and
+      nothing a provider could report that would make the image cheaper — so it
+      settles at the reserve, always.
+    */
+    "image": {
+      summary: "A picture for the studio's own use",
+      model: "gemini-2.5-flash-image",
+      system: "You draw a single photographic image for a personal-training studio to use in its own material. No text in the image, no logos, and no recognisable real person.",
+      /* ⚠️ Meaningless for a picture, and kept truthful rather than zero. */
+      maxOutput: 1,
+      dailyPerPerson: 10,
+      produces: "image",
+      images: 1,
     },
   },
 };
@@ -1622,11 +1775,300 @@ export const parseFood = operation<
   },
 });
 
+/* ----------------------------------------------------- reading a picture --- */
+
+/**
+ * ⚠️ ONE OPERATION SHAPE FOR ALL THREE, AND THE PICTURE IS NAMED BY ITS MEDIA
+ * ID. The bytes are already in the workspace's own store — uploaded through the
+ * platform's path, so stripped of the metadata a phone attaches, counted against
+ * the storage ceiling, and erased when the workspace is. A lane that took bytes
+ * on this request would be a second way into a model's input with none of that.
+ */
+const readsAPicture = (o: {
+  id: string;
+  feature: string;
+  summary: string;
+  permission: string;
+  customerFlag?: string;
+  entitlement?: string;
+  verb: string;
+  subject: string;
+}) => operation<
+  Bindings,
+  { photo: string; note?: string },
+  { generation: string; read: unknown; charged: number },
+  "platform.invalid" | "platform.quota_reached" | "platform.too_many" | "platform.unavailable"
+>({
+  id: o.id,
+  kind: "write",
+  summary: o.summary,
+  input: s.object({ photo: s.text({ max: 40 }), note: s.optional(s.text({ max: 300 })) }),
+  output: s.object({ generation: s.text(), read: s.json(), charged: s.number({ integer: true }) }),
+  permission: o.permission,
+  ...(o.customerFlag ? { customerFlag: o.customerFlag } : {}),
+  ...(o.entitlement ? { entitlement: o.entitlement } : {}),
+  idempotency: { mode: "none" },
+  audit: () => ({ subject: o.subject, verb: o.verb }),
+  fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
+  /*
+    ⚠️ NOT A TOOL. A model that can hand another model a photograph out of this
+    workspace's library, on a request nobody made, spends a studio's credits on
+    pictures nobody chose to have read.
+  */
+  tool: false,
+  async handler(ctx, input: { photo: string; note?: string }) {
+    const out = await generateAbout(ctx, KOVA_AI, o.feature, input.note ?? "", input.photo);
+    if (!out.ok) {
+      const problem = refusalProblem(out);
+      ctx.fail(problem.code, problem.meta);
+    }
+    const done = out as Extract<typeof out, { ok: true }>;
+    /*
+      ⚠️ IT ANSWERS; IT DOES NOT WRITE. A reading saved straight into somebody's
+      diary or their lab record is a number nobody checked, filed under a
+      coach's name — and for a lab report that is a clinical figure the studio
+      would then act on.
+    */
+    return { generation: done.id, read: done.output, charged: done.charged };
+  },
+});
+
+export const snapMeal = readsAPicture({
+  id: "ai.snap-meal",
+  feature: "snap-meal",
+  summary: "Photograph a meal and get it back as foods and portions, to check.",
+  permission: "portion:write",
+  customerFlag: "nutrition",
+  verb: "snap",
+  subject: "portion",
+});
+
+export const labelReader = readsAPicture({
+  id: "ai.label-reader",
+  feature: "label-reader",
+  summary: "Photograph a nutrition label and get the food, to check and save.",
+  permission: "food:write",
+  customerFlag: "nutrition",
+  verb: "read-label",
+  subject: "food",
+});
+
+/*
+  ⚠️ THE COACH'S, NOT THE CLIENT'S, AND IT TRANSCRIBES RATHER THAN INTERPRETS.
+  A lab report read by a model produces figures somebody acts on; the reading is
+  handed to whoever ordered the test, and the model is told in its own system
+  text not to say whether anything is concerning.
+*/
+export const labExtract = readsAPicture({
+  id: "ai.lab-extract",
+  feature: "lab-extract",
+  summary: "Read a lab report photograph into values, for a coach to check.",
+  permission: "lab:write",
+  verb: "extract",
+  subject: "lab",
+});
+
+/* ------------------------------------------------------- writing things --- */
+
+/**
+ * ⚠️ ONE SHAPE FOR EVERY DRAFT, AND NONE OF THEM SAVES ANYTHING. Each answers
+ * with text for a person to read, edit and keep through the ordinary surface. A
+ * generated paragraph written straight into a movement, a supplement or the
+ * studio's feed is text nobody approved, published under the studio's name.
+ */
+const drafts = (o: {
+  id: string;
+  feature: string;
+  summary: string;
+  permission: string;
+  entitlement?: string;
+  verb: string;
+  subject: string;
+  max: number;
+}) => operation<
+  Bindings,
+  { about: string },
+  { generation: string; draft: unknown; charged: number },
+  "platform.invalid" | "platform.quota_reached" | "platform.too_many" | "platform.unavailable"
+>({
+  id: o.id,
+  kind: "write",
+  summary: o.summary,
+  input: s.object({ about: s.text({ min: 3, max: o.max }) }),
+  output: s.object({ generation: s.text(), draft: s.json(), charged: s.number({ integer: true }) }),
+  permission: o.permission,
+  ...(o.entitlement ? { entitlement: o.entitlement } : {}),
+  idempotency: { mode: "none" },
+  audit: () => ({ subject: o.subject, verb: o.verb }),
+  fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
+  tool: false,
+  async handler(ctx, input: { about: string }) {
+    const out = await generateWith(ctx, KOVA_AI, o.feature, input.about);
+    if (!out.ok) {
+      const problem = refusalProblem(out);
+      ctx.fail(problem.code, problem.meta);
+    }
+    const done = out as Extract<typeof out, { ok: true }>;
+    return { generation: done.id, draft: done.output, charged: done.charged };
+  },
+});
+
+export const draftMeals = drafts({
+  id: "ai.draft-meals",
+  feature: "draft-meals",
+  summary: "Draft an eating plan from a sentence, to edit rather than to keep.",
+  permission: "programme:write",
+  /*
+    ⚠️ `training` RATHER THAN `nutrition`, BECAUSE `nutrition` IS A CUSTOMER FLAG.
+    Two rails, never merged: an entitlement is what the studio bought from us and
+    a flag is what a client bought from the studio. Naming a flag here is an
+    entitlement nothing resolves — which the gate reads as absent, so the feature
+    is refused for everybody.
+  */
+  entitlement: "training",
+  verb: "draft-meals",
+  subject: "programme",
+  max: 600,
+});
+
+export const exerciseGuide = drafts({
+  id: "ai.exercise-guide",
+  feature: "exercise-guide",
+  summary: "Draft how-to text for a movement, in the studio's voice.",
+  permission: "movement:write",
+  verb: "guide",
+  subject: "movement",
+  max: 200,
+});
+
+export const supplementGuide = drafts({
+  id: "ai.supplement-guide",
+  feature: "supplement-guide",
+  summary: "Draft guidance on a supplement, with what the evidence supports.",
+  permission: "supplement:write",
+  verb: "guide",
+  subject: "supplement",
+  max: 200,
+});
+
+export const draftArticle = drafts({
+  id: "ai.article",
+  feature: "article",
+  summary: "Draft an article for the studio's feed, to edit before it goes out.",
+  permission: "article:write",
+  verb: "draft",
+  subject: "article",
+  max: 400,
+});
+
+/* ------------------------------------------------------ a month, read back --- */
+
+/**
+ * ⚠️ THE FIGURES ARE ASSEMBLED HERE AND THE MODEL IS GIVEN NOTHING ELSE.
+ *
+ * A summary is only worth having if it is about this person, and the way that
+ * goes wrong is a prompt carrying a name and a date range while the model
+ * supplies the content. So the brief is built from the same reads the report
+ * screen uses, and `requireClientAccess` decides whose figures they are before
+ * a single credit is held.
+ */
+export const clientSummary = operation<
+  Bindings,
+  { clientId: string; days?: number },
+  { generation: string; summary: unknown; charged: number },
+  "platform.not_found" | "platform.forbidden" | "platform.invalid" | "platform.quota_reached" | "platform.too_many" | "platform.unavailable"
+>({
+  id: "ai.client-summary",
+  kind: "write",
+  summary: "Read a summary of somebody's month instead of assembling it from four places.",
+  input: s.object({ clientId: s.text({ max: 40 }), days: s.optional(s.number({ integer: true, min: 7, max: 90 })) }),
+  output: s.object({ generation: s.text(), summary: s.json(), charged: s.number({ integer: true }) }),
+  permission: "client:read",
+  idempotency: { mode: "none" },
+  audit: (i: { clientId: string }) => ({ subject: i.clientId, verb: "summarise" }),
+  fails: ["platform.not_found", "platform.forbidden", "platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
+  tool: false,
+  async handler(ctx, input: { clientId: string; days?: number }) {
+    const person = await ctx.bind.db.first<{ id: string; name: string }>(
+      `SELECT id, name FROM ${T.clients} WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
+      input.clientId, ctx.tenantId,
+    );
+    if (!person) ctx.fail("platform.not_found", { field: "clientId" });
+
+    const days = input.days ?? 28;
+    const since = new Date(Date.parse(ctx.now()) - days * 86_400_000).toISOString().slice(0, 10);
+    const count = async (sql: string, ...binds: unknown[]) =>
+      (await ctx.bind.db.first<{ n: number }>(sql, ...binds))?.n ?? 0;
+
+    const workouts = await count(`SELECT COUNT(*) AS n FROM ${T.workouts} WHERE tenant_id = ? AND client_id = ? AND day >= ? AND deleted_at IS NULL`, ctx.tenantId, person!.id, since);
+    const sets = await count(`SELECT COUNT(*) AS n FROM ${T.sets} WHERE tenant_id = ? AND client_id = ? AND created_at >= ?`, ctx.tenantId, person!.id, since);
+    const meals = await count(`SELECT COUNT(*) AS n FROM ${T.entries} WHERE tenant_id = ? AND client_id = ? AND day >= ? AND deleted_at IS NULL`, ctx.tenantId, person!.id, since);
+    const checkins = await count(`SELECT COUNT(*) AS n FROM ${T.checkins} WHERE tenant_id = ? AND client_id = ? AND until >= ? AND deleted_at IS NULL`, ctx.tenantId, person!.id, since);
+
+    /*
+      ⚠️ COUNTS, NOT A NAME. What the model is given is what it may talk about,
+      and a brief carrying somebody's name invites a sentence about the person
+      rather than about the numbers. Nothing here identifies anybody.
+    */
+    const brief = [
+      `Over the last ${days} days: ${workouts} workouts recorded, ${sets} sets logged,`,
+      `${meals} meals logged, ${checkins} check-ins answered.`,
+    ].join(" ");
+
+    const out = await generateWith(ctx, KOVA_AI, "client-summary", brief);
+    if (!out.ok) {
+      const problem = refusalProblem(out);
+      ctx.fail(problem.code, problem.meta);
+    }
+    const done = out as Extract<typeof out, { ok: true }>;
+    return { generation: done.id, summary: done.output, charged: done.charged };
+  },
+});
+
+/* -------------------------------------------------------------- a picture --- */
+
+/**
+ * ⚠️ WHAT COMES BACK IS BYTES, AND THEY LAND IN THE WORKSPACE'S OWN LIBRARY.
+ *
+ * A generated image handed to the browser as data is an object nothing counts
+ * against the studio's storage, nothing erases when it closes, and nothing can
+ * serve again tomorrow — so keeping it means generating it a second time and
+ * paying again. It goes through the same store every upload does, which is what
+ * makes "what does this workspace hold" a question with one answer.
+ */
+export const drawImage = operation<
+  Bindings,
+  { about: string },
+  { generation: string; media: string; charged: number },
+  "platform.invalid" | "platform.quota_reached" | "platform.too_many" | "platform.unavailable"
+>({
+  id: "ai.image",
+  kind: "write",
+  summary: "Generate a picture for the studio's own use, kept in its library.",
+  input: s.object({ about: s.text({ min: 3, max: 400 }) }),
+  output: s.object({ generation: s.text(), media: s.text(), charged: s.number({ integer: true }) }),
+  permission: "article:write",
+  idempotency: { mode: "none" },
+  audit: () => ({ subject: "media", verb: "draw" }),
+  fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
+  tool: false,
+  async handler(ctx, input: { about: string }) {
+    const out = await drawWith(ctx, KOVA_AI, "image", input.about, { name: "Generated image", purpose: "cover" });
+    if (!out.ok) {
+      const problem = refusalProblem(out as never);
+      ctx.fail(problem.code, problem.meta);
+    }
+    const done = out as Extract<typeof out, { ok: true }>;
+    return { generation: done.id, media: done.mediaId, charged: done.charged };
+  },
+});
+
+
 export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.16.0",
+  manifestVersion: "0.17.0",
   bindings,
 
   identity: {
@@ -1891,7 +2333,12 @@ export const kova = defineApp({
     },
   },
 
-  operations: [publish, complete, answer, attention, report, draftPlan, parseFood, publishArticle, feed, usage, copyWeek, decideSwap, forgetClient],
+  operations: [
+    publish, complete, answer, attention, report, publishArticle, feed, usage, copyWeek,
+    decideSwap, forgetClient,
+    draftPlan, parseFood, draftMeals, snapMeal, labelReader, labExtract,
+    exerciseGuide, supplementGuide, clientSummary, draftArticle, drawImage,
+  ],
 
   help: {
     clients: {
@@ -1969,6 +2416,18 @@ export const kova = defineApp({
     avatar: { label: "Photo", accept: ["image/jpeg", "image/png"], maxBytes: 4_000_000 },
     demo: { label: "Movement demonstration", accept: ["video/mp4", "image/jpeg", "image/png"], maxBytes: 20_000_000 },
     cover: { label: "Article cover", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000 },
+    /*
+      ⚠️ A PHOTOGRAPH TAKEN TO BE READ IS STILL A FILE THE WORKSPACE HOLDS. It
+      goes through the ordinary upload — stripped of the metadata a phone
+      attaches, counted against the storage ceiling, erased with the workspace —
+      and the reading names it by id. A lane that took bytes on the generation
+      request would be a second way into the store with none of that.
+    */
+    meal: { label: "Meal photograph", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000 },
+    label: { label: "Nutrition label", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000 },
+    /* ⚠️ Its own purpose rather than sharing `report`: a lab result is the most
+       sensitive thing this product stores, and a purpose is a path segment. */
+    "lab-report": { label: "Lab report", accept: ["image/jpeg", "image/png"], maxBytes: 12_000_000 },
   },
 
   /*
@@ -2114,6 +2573,20 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.17.0",
+      at: "2026-08-10",
+      notes: [
+        "Photograph a meal and get it back as foods and portions to check. Amounts read off a photograph are guesses, and it says which ones are.",
+        "Photograph a nutrition label and get the food. Anything the label does not carry is left blank rather than filled in with something plausible.",
+        "Photograph a lab report and get the values, transcribed — including the reference range exactly as printed, because ranges differ between laboratories. It reads; it does not interpret, and a digit it cannot make out is marked rather than guessed.",
+        "Draft an eating plan from a sentence, the way you already draft a training one.",
+        "Draft how-to text for a movement, and guidance on a supplement with what the evidence actually supports and who should not take it.",
+        "Read a summary of somebody's month instead of assembling it from four screens.",
+        "Draft an article for your feed, and generate a picture to go with it. The picture is kept in your library, so using it again costs nothing.",
+        "None of these saves anything. Every one comes back for you to read, edit and keep — a generated row filed under your name is one nobody approved.",
+      ],
+    },
     {
       version: "0.16.0",
       at: "2026-08-10",
