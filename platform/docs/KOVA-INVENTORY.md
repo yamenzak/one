@@ -85,11 +85,11 @@ without one.
 | `[x]` | `water-log` | client | Record what they drank |
 | `[ ]` | `wellness-score` | client | See one honest number for how the week has gone |
 | | **checkins** | | |
-| `[ ]` | `check-in` | client | Report in on a schedule: how it went, how they feel, what changed |
-| `[ ]` | `check-in-feedback` | trainer | Answer a check-in so the client hears back |
+| `[x]` | `check-in` | client | Report in on a schedule: how it went, how they feel, what changed |
+| `[x]` | `check-in-feedback` | trainer | Answer a check-in so the client hears back |
 | `[ ]` | `check-in-prefill` | client | Not retype what the app already knows about their week |
-| `[ ]` | `goal-set` | trainer | Set a goal with a number and a date |
-| `[ ]` | `goal-track` | client | See how far along a goal is without doing the arithmetic |
+| `[x]` | `goal-set` | trainer | Set a goal with a number and a date |
+| `[x]` | `goal-track` | client | See how far along a goal is without doing the arithmetic |
 | | **commerce** | | |
 | `[ ]` | `access-capabilities` | client | See what their package actually lets them do |
 | `[ ]` | `access-override` | owner | Make an exception for one client without changing the package |
@@ -175,7 +175,7 @@ without one.
 | `[ ]` | `client-delete` | owner | Remove somebody entirely, on request, and have that be final |
 | `[ ]` | `client-invite-self` | client | Accept an invitation and land in the right studio without being told an address |
 | `[ ]` | `client-offboard-request` | trainer | Ask an owner to release a client, and have the owner decide |
-| `[ ]` | `client-preferences` | trainer | Record how somebody trains and eats now, and see when that was last reviewed |
+| `[x]` | `client-preferences` | trainer | Record how somebody trains and eats now, and see when that was last reviewed |
 | `[x]` | `client-profile` | trainer | Record who somebody is: their details, their situation and how they train |
 | `[x]` | `client-restore` | trainer | Bring an archived person back |
 | `[ ]` | `client-self-register` | client | Register themselves where a studio allows it, and be picked up by a coach |

@@ -1381,6 +1381,51 @@
       "impl": "kova/test/nutrition.e2e.test.ts",
       "proves": "keeps both current, and stands down only the same kind",
       "fails": "publishing a way of training removing somebody's way of eating \u2014 a data loss they discover in a supermarket"
+    },
+    {
+      "id": "document-transition-emits",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses a submit that raises an event no notification declares",
+      "fails": "a document's own transition raising an event no notification declares \u2014 invisible in `operations` because nobody wrote those, and arriving at the single most notification-worthy moment the product has"
+    },
+    {
+      "id": "checkin-freezes-words-not-numbers",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/checkin.test.ts",
+      "proves": "has nowhere to store a weight at all",
+      "fails": "a report copying the numbers it was written beside \u2014 the shape that produced three documented bug classes, where correcting a weigh-in left the old value in every check-in that copied it"
+    },
+    {
+      "id": "submitted-words-stop-moving",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/checkin.test.ts",
+      "proves": "stops the words moving once it is sent",
+      "fails": "a report that can be quietly rewritten after somebody replied to it, which makes the reply meaningless"
+    },
+    {
+      "id": "goal-measures-from-the-baseline",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/goals.test.ts",
+      "proves": "is measured the same way, and is not 120% done on day one",
+      "fails": "progress computed as current over target \u2014 it says somebody at 90 kg aiming for 75 is 120% done before they have lost a gram, and that somebody who gained is doing better"
+    },
+    {
+      "id": "overdue-is-not-clamped",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/goals.test.ts",
+      "proves": "goes negative rather than resting at zero",
+      "fails": "a deadline clamped at zero, so a product says '0 days left' forever instead of '11 days late'"
     }
   ]
 }

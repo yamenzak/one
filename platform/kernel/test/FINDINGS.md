@@ -1901,3 +1901,65 @@ on publish would take somebody's eating away for publishing their training — a
 data loss they would discover in a supermarket. The mutation that removed the
 `kind` predicate was caught, which is the only reason to write it that way rather
 than to remember it.
+
+## 158. A report freezes the words and never the numbers
+
+The old check-in wrote COPIES of that week's weight, sleep and mood into its own
+columns so a coach would see what was reported at the time, then read those
+copies back beside the originals, merging per date and per field. Three
+documented bug classes came out of that one decision.
+
+The separation that removes it: what must not change is what somebody SAID. A
+number they later corrected was simply wrong, and a coach reading last month's
+check-in should see the right weight rather than the typo. So the document
+freezes the narrative, the entries keep one home, and there is nothing to merge —
+the old shape is not merely avoided, it is unrepresentable, because there is
+nowhere on a check-in to put a weight.
+
+## 159. Submitting a document was the one moment that could not raise an event
+
+`docStatus` had no `emits`, so the most notification-worthy thing a document ever
+does — somebody FINISHING it — was silent. Every app wanting to be told had to
+add a second operation beside the lifecycle, which then had to be kept in step
+with it: two ways to finish a document, one of which tells people.
+
+Found by the third app slice rather than by reading the type. The check that came
+with it matters as much: a derived transition's event is invisible in
+`operations`, because nobody wrote those operations — so `raisedEvents` reads the
+collections too, and an undeclared one is refused rather than arriving as an
+anonymous bell.
+
+## 160. Half of all goals count downwards, and the obvious formula is backwards
+
+`current / target` says somebody at 90 kg aiming for 75 is 120% done before they
+have lost a gram, and that somebody who GAINED weight is doing better. Progress
+measured from the BASELINE towards the target is the only formula that reads
+correctly in both directions — which is why a goal records where somebody
+started, not only where they are going.
+
+Three smaller rules fell out of it, each wrong in a way nobody would notice:
+reached means PAST the target rather than equal to it (an overshoot would sit at
+99% forever); a target equal to the baseline is "hold" rather than a division by
+zero, because keeping a weight is a real goal; and a deadline goes NEGATIVE
+rather than resting at zero, because "0 days left" and "11 days late" are
+different things to say to somebody.
+
+## 161. A goal stores no progress, for the same reason a food stores no calories
+
+Where somebody is now is a question about the entries they have recorded. A
+stored `current` is a second copy that goes stale the moment a weigh-in is
+corrected — and it goes stale SILENTLY, because nothing about a number that is
+merely old looks wrong. Two versions of Kova in a row have now reached the same
+conclusion from different directions: the derived value is the one that cannot
+lie.
+
+## 162. Recognition is the caller's, even when staff act on somebody's behalf
+
+A coach filing a check-in for a client does not earn the client's milestone. That
+is the rule working rather than a gap — a badge handed to whoever typed it is
+recognition for the wrong person — but it is worth stating, because the opposite
+reading is available and would have been implemented by accident.
+
+The consequence to know: a client's milestones are earned by a client's own
+sessions. Whether a coach's entry on their behalf should count towards them is a
+product question, and the honest answer today is that it does not.

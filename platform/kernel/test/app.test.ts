@@ -362,6 +362,38 @@ describe("a sold capability is withheld by something", () => {
  * destination — which renders, if anything renders it at all, as an anonymous
  * bell that says nothing and goes nowhere.
  */
+describe("a document's own transitions raise events, and they are checked too", () => {
+  const filing = (event: string): Record<string, unknown> => ({
+    ...base,
+    collections: [{
+      id: "report", label: { one: "Report", many: "Reports" }, scope: { of: "tenant" },
+      version: true, retention: { days: null, onTenantClose: "purge" }, onDelete: { on: "archive" },
+      docStatus: { amendable: false, immutableAfterSubmit: [], emits: { submit: event } },
+      fields: { title: {} },
+    }],
+  });
+
+  /*
+    ⚠️ A DERIVED TRANSITION'S EVENT IS INVISIBLE IN `operations`, because nobody
+    wrote those operations. An undeclared one is a notification with no copy, no
+    icon and no destination — arriving at the single most notification-worthy
+    moment the product has.
+  */
+  it("refuses a submit that raises an event no notification declares", () => {
+    expect(() => assertComposable(filing("report.filed") as never)).toThrow(/report\.filed/);
+  });
+
+  it("accepts one the registry declares", () => {
+    expect(() => assertComposable({
+      ...filing("report.filed"),
+      notifications: {
+        ...base.notifications,
+        "report.filed": { category: "activity", tone: "info", icon: "check", title: "Filed", link: { to: "inbox" }, roles: ["owner"] },
+      },
+    } as never)).not.toThrow();
+  });
+});
+
 describe("a price list may only promise what exists", () => {
   /*
     ⚠️ A PLAN NAMING A KEY NOBODY DECLARED IS SOLD, PAID FOR AND ENFORCED BY

@@ -316,6 +316,82 @@ export const entries = collection({
   },
 });
 
+/* ------------------------------------------------------------ reporting --- */
+
+/**
+ * Somebody reporting in, and the coach answering.
+ *
+ * ⚠️ A CHECK-IN FREEZES THE WORDS AND NEVER THE NUMBERS. The old product's
+ * check-in wrote COPIES of that week's weight, sleep and mood into its own
+ * columns so a coach would see what was reported at the time — and then read
+ * those copies back beside the originals, merging per date and per field. Three
+ * documented bug classes came out of it.
+ *
+ * What must not change is what somebody SAID. A number they later corrected was
+ * simply wrong, and a coach reading last month's check-in should see the right
+ * weight, not the typo. So the document freezes the narrative, the entries keep
+ * one home, and there is nothing to merge.
+ */
+export const checkins = collection({
+  id: "checkin",
+  label: { one: "Check-in", many: "Check-ins" },
+  scope: { of: "subject", subject: "client" },
+  version: true,
+  retention: { days: null, onTenantClose: "export-then-purge" },
+  onDelete: { on: "archive" },
+  /*
+    ⚠️ SUBMITTING IS THE EVENT, and the transition raises it — rather than a
+    second operation beside the lifecycle that has to be kept in step with it.
+  */
+  docStatus: { amendable: true, immutableAfterSubmit: ["since", "until", "howItWent"], emits: { submit: "checkin.filed" } },
+  activity: true,
+  fields: {
+    /* ⚠️ `since`/`until` rather than `from`/`to`, which are SQL keywords. */
+    since: field.plainDate({ required: true, label: "Covering from" }),
+    until: field.plainDate({ required: true, label: "Covering to" }),
+    howItWent: field.text({ required: true, multiline: true, max: 4_000, label: "How it went" }),
+    stuckOn: field.text({ multiline: true, max: 2_000, label: "What you are stuck on" }),
+    /*
+      ⚠️ THE ANSWER IS NOT FROZEN, because it is written after the document is
+      submitted — the whole point of a check-in is that somebody replies to it.
+    */
+    answer: field.text({ multiline: true, max: 4_000 }),
+  },
+});
+
+/**
+ * Something somebody is working towards.
+ *
+ * ⚠️ IT STORES NO PROGRESS. Where they are now is a question about the entries
+ * they have recorded, answered from the one place those numbers live. A stored
+ * `current` is a second copy that goes stale the moment a weigh-in is corrected,
+ * and it goes stale SILENTLY — nothing about a number that is merely old looks
+ * wrong.
+ *
+ * ⚠️ AND IT RECORDS WHERE THEY STARTED. Half of all goals count downwards, and
+ * progress measured as `current / target` says somebody at 90 kg aiming for 75
+ * is 120% done before they have lost a gram. The baseline is what makes one
+ * formula read correctly in both directions.
+ */
+export const goals = collection({
+  id: "goal",
+  label: { one: "Goal", many: "Goals" },
+  scope: { of: "subject", subject: "client" },
+  version: true,
+  retention: { days: null, onTenantClose: "export-then-purge" },
+  onDelete: { on: "archive" },
+  activity: true,
+  fields: {
+    /** The same vocabulary an entry uses, so progress is a query rather than a join by hand. */
+    kind: field.enum(["weight", "waist", "hip", "chest", "arm", "thigh", "sleep", "mood", "water", "steps"], { required: true }),
+    start: field.number({ required: true, label: "Where they started" }),
+    target: field.number({ required: true }),
+    /* ⚠️ `dueOn`, not `by` — a third SQL keyword caught at declaration rather than at boot. */
+    dueOn: field.plainDate({ label: "By" }),
+    why: field.text({ multiline: true, max: 1_000 }),
+  },
+});
+
 /* ------------------------------------------------------------ operations --- */
 
 /**
@@ -399,12 +475,44 @@ export const complete = operation<Bindings, { workoutId: string }, { completed: 
   },
 });
 
+/**
+ * ⚠️ ANSWERING IS AN EVENT, AND THE REASON IS THE PRODUCT RATHER THAN THE CODE.
+ * A check-in nobody replies to is the single most common way a coaching
+ * relationship ends, so the reply is a thing that HAPPENS — told to the person
+ * who wrote it, at the moment it lands — rather than a field that quietly gains
+ * a value some time later.
+ */
+export const answer = operation<Bindings, { checkinId: string; answer: string }, { answered: string }, "platform.not_found">({
+  id: "checkin.answer",
+  kind: "write",
+  summary: "Reply to a check-in, so the person who wrote it hears back.",
+  input: s.object({ checkinId: s.text({ max: 40 }), answer: s.text({ min: 1, max: 4_000 }) }),
+  output: s.object({ answered: s.text() }),
+  permission: "checkin:write",
+  idempotency: { mode: "none" },
+  audit: (i: { checkinId: string }) => ({ subject: i.checkinId, verb: "answer" }),
+  outcome: { message: "Reply sent", tone: "success", moment: "acknowledge", invalidates: ["checkin"] },
+  emits: ["checkin.answered"],
+  fails: ["platform.not_found"],
+  help: "checkins" as never,
+  async handler(ctx, input: { checkinId: string; answer: string }) {
+    const row = await ctx.bind.db.first<{ id: string }>(
+      `SELECT id FROM checkins WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
+      input.checkinId, ctx.tenantId,
+    );
+    if (!row) ctx.fail("platform.not_found", { field: "checkinId" });
+    await ctx.bind.db.run(`UPDATE checkins SET answer = ?, updated_at = ? WHERE id = ?`, input.answer, ctx.now(), row!.id);
+    return { answered: row!.id };
+  },
+});
+
 /* ------------------------------------------------------------------- app --- */
 
 const STAFF = [
   "client:read", "client:write", "movement:read", "movement:write", "programme:read", "programme:write",
   "workout:read", "workout:write", "set:read", "set:write", "entry:read", "entry:write",
   "food:read", "food:write", "portion:read", "portion:write",
+  "checkin:read", "checkin:write", "goal:read", "goal:write",
   "inbox:read", "file:read", "file:write", "guide:read", "milestone:read", "commerce:read",
 ];
 
@@ -412,7 +520,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.2.0",
+  manifestVersion: "0.3.0",
   bindings,
 
   identity: {
@@ -459,6 +567,8 @@ export const kova = defineApp({
       client: [
         "programme:read", "movement:read", "workout:read", "workout:write", "set:read", "set:write",
         "entry:read", "entry:write", "food:read", "portion:read", "portion:write",
+        /* ⚠️ A client WRITES a check-in and READS the answer; replying is staff's. */
+        "checkin:read", "checkin:write", "goal:read",
         "inbox:read", "guide:read", "milestone:read", "file:read", "commerce:read",
       ],
     },
@@ -522,7 +632,7 @@ export const kova = defineApp({
     auditRetentionDays: 730,
   },
 
-  collections: [clients, movements, programmes, workouts, sets, foods, portions, entries],
+  collections: [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals],
 
   notifications: {
     "workspace.created": {
@@ -550,6 +660,19 @@ export const kova = defineApp({
       link: { to: "collection", collection: "workout" },
       roles: ["owner", "trainer"],
     },
+    /* ⚠️ Raised by the document's own transition, not by an operation beside it. */
+    "checkin.filed": {
+      category: "activity", tone: "info", icon: "check",
+      title: "A check-in came in",
+      link: { to: "collection", collection: "checkin" },
+      roles: ["owner", "trainer"],
+    },
+    "checkin.answered": {
+      category: "activity", tone: "success", icon: "check",
+      title: "Your coach replied",
+      link: { to: "collection", collection: "checkin" },
+      roles: ["client"],
+    },
     "milestone.earned": {
       category: "activity", tone: "success", icon: "sparkle",
       title: "{title}", link: { to: "inbox" },
@@ -557,7 +680,7 @@ export const kova = defineApp({
     },
   },
 
-  operations: [publish, complete],
+  operations: [publish, complete, answer],
 
   help: {
     clients: {
@@ -592,6 +715,17 @@ export const kova = defineApp({
       title: "Logging what you ate",
       body: "Pick the food, say how much, and say which meal it was. The amount is in the food's own unit — two eggs is two, not a hundred and twenty grams. The day's totals come from the portions themselves, so correcting one corrects the day.",
       surfaces: ["portion"],
+    },
+    checkins: {
+      title: "Reporting in, and hearing back",
+      body: "A check-in is what you say about a stretch of time: how it went and what you are stuck on. Once you send it, what you wrote stops being editable — your coach is replying to what you actually said. The numbers are not copied into it, so correcting a weigh-in corrects it everywhere, including here.",
+      steps: ["Open Check-ins", "Say how it went", "Send"],
+      surfaces: ["checkin"],
+    },
+    goals: {
+      title: "Working towards something",
+      body: "A goal records where you started, where you are going, and by when. How far along you are is worked out from what you have logged, so it is never out of date — and it is measured from where you started, which is the only way a goal to lose weight and a goal to gain weight read the same.",
+      surfaces: ["goal"],
     },
     entries: {
       title: "Keeping track of yourself",
@@ -652,6 +786,19 @@ export const kova = defineApp({
       rule: { kind: "streak", event: "workout.completed", days: 7 },
       roles: ["client"],
     },
+    "first-checkin": {
+      title: "You reported in",
+      body: "The thing that keeps a coaching relationship going.",
+      icon: "check",
+      rule: { kind: "first", event: "checkin.filed" },
+      roles: ["client"],
+    },
+    "ten-checkins": {
+      title: "Ten check-ins",
+      icon: "check",
+      rule: { kind: "count", event: "checkin.filed", reaches: 10 },
+      roles: ["client"],
+    },
     "fifty-sessions": {
       title: "Fifty workouts",
       icon: "check",
@@ -661,6 +808,15 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.3.0",
+      at: "2026-08-10",
+      notes: [
+        "Report in on how a stretch of time went, and hear back from your coach.",
+        "What you wrote in a check-in stops being editable once you send it — your coach is replying to what you said.",
+        "Set a goal and see how far along it is, worked out from what you have logged rather than typed in again.",
+      ],
+    },
     {
       version: "0.2.0",
       at: "2026-08-10",

@@ -119,7 +119,7 @@
       "persona": "trainer",
       "area": "roster",
       "outcome": "Record how somebody trains and eats now, and see when that was last reviewed",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-browse",
@@ -539,7 +539,7 @@
       "persona": "client",
       "area": "checkins",
       "outcome": "Report in on a schedule: how it went, how they feel, what changed",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "check-in-prefill",
@@ -553,21 +553,21 @@
       "persona": "trainer",
       "area": "checkins",
       "outcome": "Answer a check-in so the client hears back",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "goal-set",
       "persona": "trainer",
       "area": "checkins",
       "outcome": "Set a goal with a number and a date",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "goal-track",
       "persona": "client",
       "area": "checkins",
       "outcome": "See how far along a goal is without doing the arithmetic",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-report",

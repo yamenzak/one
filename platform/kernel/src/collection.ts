@@ -119,6 +119,21 @@ export interface DocStatus {
   readonly amendable: boolean;
   /** Frozen once submitted; an amendment supersedes rather than edits. */
   readonly immutableAfterSubmit: readonly string[];
+  /**
+   * ⚠️ SUBMITTING IS THE MOST NOTIFICATION-WORTHY MOMENT A DOCUMENT HAS, and
+   * until this existed it was the one thing in the product that could not raise
+   * an event. A row appearing is not news; somebody FINISHING it is — a client
+   * filing their check-in, an invoice going out, a cycle being signed off.
+   *
+   * Without it every app that wanted to be told had to add a second operation
+   * beside the lifecycle, which then had to be kept in step with it: two ways to
+   * finish a document, one of which tells people.
+   */
+  readonly emits?: {
+    readonly submit?: string;
+    readonly cancel?: string;
+    readonly amend?: string;
+  };
 }
 
 /** `CL-.YYYY.-.####` — a human-quotable name, allocated once, never reused. */

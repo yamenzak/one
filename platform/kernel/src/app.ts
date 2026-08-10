@@ -339,10 +339,20 @@ export function raisedEvents(spec: {
   readonly operations: readonly OperationSpec<any, any, any, string>[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly jobs?: readonly JobSpec<any>[];
+  readonly collections?: readonly CollectionSpec[];
 }): readonly string[] {
   const out = new Set<string>();
   for (const source of [...spec.operations, ...(spec.jobs ?? [])]) {
     for (const event of source.emits ?? []) out.add(event);
+  }
+  /*
+    ⚠️ A DOCUMENT'S OWN TRANSITIONS RAISE EVENTS TOO, and they are invisible in
+    `operations` because nobody wrote those operations — they are derived. An
+    undeclared one is a notification with no copy, no icon and no destination,
+    arriving at the single most notification-worthy moment the product has.
+  */
+  for (const c of spec.collections ?? []) {
+    for (const event of Object.values(c.docStatus?.emits ?? {})) if (event) out.add(event);
   }
   return [...out];
 }
@@ -366,6 +376,7 @@ export function recognisableEvents(spec: {
 
 export function undeclaredEmits(spec: {
   readonly notifications: NotificationRegistry;
+  readonly collections?: readonly CollectionSpec[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly operations: readonly OperationSpec<any, any, any, string>[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature

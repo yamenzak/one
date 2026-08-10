@@ -12,9 +12,9 @@ import {
   DOMAIN_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA,
   GUIDE_SCHEMA, JOB_SCHEMA, MEDIA_SCHEMA, MILESTONE_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
 } from "@one/runtime";
-import { clients, entries, foods, kova, movements, portions, programmes, sets, workouts } from "./manifest.js";
+import { checkins, clients, entries, foods, goals, kova, movements, portions, programmes, sets, workouts } from "./manifest.js";
 
-const derived = deriveSchema("kova", [clients, movements, programmes, workouts, sets, foods, portions, entries]);
+const derived = deriveSchema("kova", [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals]);
 if (derived.problems.length) throw new Error(`kova: ${derived.problems.map((p) => p.detail).join("; ")}`);
 
 /* ⚠️ ORDER IS DEPENDENCY ORDER, DECLARED — the runner validates it rather than

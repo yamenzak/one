@@ -365,6 +365,12 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
       permission: write,
       idempotency: { mode: "natural", key: "id" },
       audit: (i: { id: string }) => ({ subject: i.id, verb: kind }),
+      /*
+        ⚠️ THE TRANSITION IS WHAT RAISES IT, so there is one way to finish a
+        document rather than an operation beside the lifecycle that has to be
+        kept in step with it.
+      */
+      ...(spec.docStatus?.emits?.[kind] ? { emits: [spec.docStatus.emits[kind]!] } : {}),
       fails: ["platform.not_found", "platform.invalid"],
       async handler(ctx, input: { id: string }) {
         const { db, tenantId, scope } = store(ctx);
