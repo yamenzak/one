@@ -2611,3 +2611,40 @@ while a guard existed for exactly that class in the app tree it replaces.
 ladder was counting keeps `past_due_at` and is suspended on schedule for an
 invoice nobody is waiting for. The row reads `active` throughout, and the
 operator who comped them has no reason to look again.
+
+## 213. A registry with no store is a design nobody can use
+
+`config.ts` had the whole of the two-layer resolution — non-empty wins, the
+shared allow-list enforced on write as well as on read, redaction for secrets —
+and not one caller. No table, no surface, no consumer. It was correct, tested at
+the unit level, and a deployment could not set a single key.
+
+That is the fourth instance of the same class found inside the platform in two
+increments, and it has a shape worth naming: the pure half is the enjoyable part
+to write and the part that survives review, so it gets written first and then
+looks finished.
+
+## 214. `chargeable` was a boolean an app passed in
+
+The gate that holds an unpaid workspace to setup asked the app whether the
+deployment could take money — so it could answer yes while the payment provider
+had no key at all. The failure is not a 500: it is every workspace on a
+self-host stranded in setup over OUR misconfiguration, which is precisely the
+thing the "fail closed on their non-payment, open on ours" rule was written to
+prevent, defeated by the flag it was implemented with.
+
+Reading the same rows the payment lane reads is the only version that cannot
+drift. And the mode picks the lane: both keys are stored at once so going live
+is a switch rather than a re-paste, and live mode holding only a test key is NOT
+chargeable — the alternative is a checkout that fails at the till.
+
+## 215. A refusal and a crash are the same status
+
+Removing the "no shared store bound" check left `d.shared!` reaching for null,
+which throws, which the runtime turns into the same 503 the stated refusal
+produces. The mutation survived a test asserting the status.
+
+⚠️ THE ASSERTION HAS TO BE ON WHAT WAS SAID, not on what came back. A crash
+carries no `meta` and writes nothing while saying nothing either — so the test
+now checks the reason AND that the value did not quietly land in the app's own
+store instead.

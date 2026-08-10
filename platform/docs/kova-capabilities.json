@@ -1065,7 +1065,7 @@
       "persona": "operator",
       "area": "operator",
       "outcome": "Configure the payment provider, in test and live, without re-pasting keys",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "op-catalog",

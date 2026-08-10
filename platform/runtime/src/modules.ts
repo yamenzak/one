@@ -23,6 +23,13 @@ import { MEDIA_SCHEMA } from "./files.js";
 import { GUIDE_SCHEMA } from "./guide.js";
 import { MILESTONE_SCHEMA } from "./milestone.js";
 import { GENERATION_SCHEMA } from "./generate.js";
+import { CONFIG_SCHEMA } from "./config.js";
+import { DIRECTORY_SCHEMA, DOMAIN_SCHEMA } from "./directory.js";
+import { IDENTITY_SCHEMA } from "./identity.js";
+import { OTP_SCHEMA } from "./identity-ops.js";
+import { PROVIDER_SCHEMA } from "./provider.js";
+import { PLATFORM_STATE_SCHEMA } from "./maintenance.js";
+import { JOB_SCHEMA } from "./jobs.js";
 
 /** Everything the platform owns in a REGIONAL store. An app appends its own. */
 export const PLATFORM_REGIONAL: readonly SchemaModule[] = [
@@ -36,4 +43,25 @@ export const PLATFORM_REGIONAL: readonly SchemaModule[] = [
   GUIDE_SCHEMA,
   MILESTONE_SCHEMA,
   GENERATION_SCHEMA,
+];
+
+/**
+ * Everything the platform owns in the GLOBAL store — the one read before a
+ * region is known.
+ *
+ * ⚠️ ASSEMBLED HERE FOR THE SAME REASON THE REGIONAL LIST IS, and both apps were
+ * assembling this one by hand. A forgotten module is not an error: the table is
+ * absent, the routes over it are mounted, and every suite is green because
+ * nothing drove the surface nobody could reach. `CONFIG_SCHEMA` is the newest
+ * entry and would have been the next one missed.
+ */
+export const PLATFORM_GLOBAL: readonly SchemaModule[] = [
+  DIRECTORY_SCHEMA,
+  DOMAIN_SCHEMA,
+  IDENTITY_SCHEMA,
+  OTP_SCHEMA as SchemaModule,
+  PROVIDER_SCHEMA,
+  PLATFORM_STATE_SCHEMA,
+  JOB_SCHEMA,
+  CONFIG_SCHEMA,
 ];

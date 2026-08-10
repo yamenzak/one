@@ -156,7 +156,7 @@ without one.
 | `[ ]` | `op-email` | operator | Configure how the deployment sends mail, and prove it works |
 | `[x]` | `op-maintenance` | operator | Close the deployment for work, read-only or fully, and say so |
 | `[x]` | `op-parked` | operator | Read the payment events nothing could place, and replay them |
-| `[ ]` | `op-stripe` | operator | Configure the payment provider, in test and live, without re-pasting keys |
+| `[x]` | `op-stripe` | operator | Configure the payment provider, in test and live, without re-pasting keys |
 | `[x]` | `op-tenants` | operator | See every studio on the deployment and what it is on |
 | `[x]` | `op-topup` | operator | Give a studio credits |
 | | **reports** | | |

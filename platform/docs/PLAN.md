@@ -1054,6 +1054,12 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-closed-deployment-says-something` | a product that has simply vanished, with nothing for whoever is holding it to tell the person in front of them | **live** |
 | `the-switch-does-not-close-its-own-door` | a maintenance switch nobody can turn off, because the way out of maintenance is a request | **live** |
 | `a-deployment-key-is-not-held-inside-a-workspace` | a workspace owner holding the key to the payment dead letter and the scheduler's run table — both of which are the whole deployment's, so it is a cross-tenant read with a screen in front of it | **live** |
+| `a-secret-is-write-only` | a console that can display a payment provider's key — leaked through a screen share, a support session, or any read vulnerability | **live** |
+| `an-unshared-key-cannot-reach-the-shared-store` | a per-endpoint secret written where every app resolves it, invisible until a second product fails verification with no trace of where the value came from | **live** |
+| `chargeable-is-read-not-declared` | a gate claiming the deployment can charge while the payment provider has no key — every workspace on a self-host stranded in setup over our own misconfiguration | **live** |
+| `the-mode-picks-the-lane` | a checkout that fails at the till, because both lanes are stored at once and a deployment answered yes on the strength of the wrong one | **live** |
+| `an-undeclared-key-is-refused-not-stored` | a row an operator can see on a screen and no consumer will ever read, which is indistinguishable from a setting that does not work | **live** |
+| `a-refusal-is-not-a-crash` | reaching for a store that is not there, which throws into the same 503 a stated refusal produces — so the status alone cannot tell 'we told you' from 'it fell over' | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

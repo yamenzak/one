@@ -12,10 +12,10 @@
  * argument for having built it.
  */
 
-import { deriveSchema } from "@one/kernel";
+import { deriveSchema, PLATFORM_CONFIG } from "@one/kernel";
 import {
-  applySchema, createRuntime, DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, JOB_SCHEMA,
-  OTP_SCHEMA, PLATFORM_REGIONAL, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, type RawEnv,
+  applySchema, createRuntime,
+  PLATFORM_GLOBAL, PLATFORM_REGIONAL, type RawEnv,
 } from "@one/runtime";
 import { entries, hello, notes, receipts } from "./manifest.js";
 
@@ -35,7 +35,7 @@ if (derived.problems.length) throw new Error(`hello: ${derived.problems.map((p) 
   array — a wrong order used to produce an ALTER against a table that did not
   exist yet, swallowed, leaving a column that silently never appeared.
 */
-const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, PLATFORM_STATE_SCHEMA, JOB_SCHEMA];
+const GLOBAL_MODULES = PLATFORM_GLOBAL;
 export const REGIONAL_MODULES = [...PLATFORM_REGIONAL, derived.module];
 
 
@@ -54,6 +54,12 @@ export const REGIONAL_MODULES = [...PLATFORM_REGIONAL, derived.module];
 export const delivered = new Map<string, string>();
 
 const runtime = createRuntime(hello, {
+  /*
+    ⚠️ EVERY KEY THIS DEPLOYMENT READS, DECLARED. The console shows exactly this
+    list and refuses anything outside it, so a typo in a key name is a refusal
+    rather than a row nothing consumes.
+  */
+  config: PLATFORM_CONFIG,
   directoryBinding: "DIRECTORY",
   identityBinding: "DIRECTORY",
   sessionsBinding: "db",

@@ -332,3 +332,93 @@ describe("payment events nothing could place", () => {
     expect((await coach("/api/billing.parked.replay", { eventId: "evt_nothing", tenantId })).status).toBe(403);
   });
 });
+
+/* ------------------------------------------------------- configuration --- */
+
+describe("configuring the deployment", () => {
+  /*
+    ⚠️ THE BOOTSTRAP IS WHY THIS SCREEN IS THE SECOND DAY'S. A fresh deployment
+    cannot send email until a provider is configured; reaching this needs an
+    operator session, which needs a code, which needs email. No screen can break
+    that circle — provisioning seeds the first rows, because a workflow with
+    database access can do what a login cannot.
+  */
+  it("lists exactly the keys this deployment reads", async () => {
+    const out = await operator("/api/admin.config");
+    expect(out.status).toBe(200);
+    const keys = out.body.keys as unknown as { key: string; secret: boolean; source: string }[];
+    expect(keys.map((k) => k.key)).toContain("stripe.mode");
+    expect(keys.find((k) => k.key === "stripe.test.secret_key")!.secret).toBe(true);
+    /* ⚠️ No shared store bound here, and it says so rather than implying one. */
+    expect(out.body.shared).toBe(false);
+  });
+
+  it("is not reachable from inside a studio", async () => {
+    expect((await coach("/api/admin.config")).status).toBe(403);
+    expect((await coach("/api/admin.config.set", { key: "stripe.mode", value: "live", scope: "app" })).status).toBe(403);
+  });
+
+  /*
+    ⚠️ A SECRET'S VALUE NEVER COMES BACK. Whether it is SET is the real question;
+    a console that can display a key leaks one through a screen share, a support
+    session, or any read vulnerability.
+  */
+  it("takes a secret and never hands it back", async () => {
+    const set = await operator("/api/admin.config.set", { key: "stripe.test.secret_key", value: "sk_test_notreal", scope: "app" });
+    expect(set.status).toBe(200);
+
+    const out = await operator("/api/admin.config");
+    expect(JSON.stringify(out.body)).not.toContain("sk_test_notreal");
+    const key = (out.body.keys as unknown as { key: string; value: unknown }[]).find((k) => k.key === "stripe.test.secret_key")!;
+    expect(key.value).toBe(true);
+  });
+
+  /*
+    ⚠️ AND CONFIGURING THE PROVIDER IS WHAT MAKES THE DEPLOYMENT CHARGEABLE. It
+    was a boolean an app passed in, so the gate that holds an unpaid workspace to
+    setup could say "we can charge" while there was no key at all — and the
+    failure is every workspace on a self-host stranded over OUR misconfiguration.
+  */
+  it("changes whether an unpaid workspace is held to setup", async () => {
+    /* The studio is comped, so start from a workspace that never chose a plan. */
+    const fresh = "https://ilkley.kova.4dl.app";
+    const founding = await signIn("ilkley@example.test", SETUP);
+    await post(SETUP, "/api/identity.workspace.create", { slug: "ilkley" }, founding);
+    const theirs = at(fresh)(await signIn("ilkley@example.test", fresh));
+
+    /* With a key configured, a workspace that never paid is held to setup. */
+    const held = await theirs("/api/movement.create", { name: "Nope", pattern: "squat" });
+    expect(held.status).toBe(402);
+
+    /* Take the key away, and the gate stands down — it was OUR configuration. */
+    await operator("/api/admin.config.set", { key: "stripe.test.secret_key", value: "", scope: "app" });
+    expect((await theirs("/api/movement.create", { name: "Fine", pattern: "squat" })).status).toBe(200);
+  });
+
+  it("refuses a key nothing reads", async () => {
+    const out = await operator("/api/admin.config.set", { key: "strip.mode", value: "live", scope: "app" });
+    expect(out.status).toBe(400);
+    expect(out.body.meta).toMatchObject({ field: "key" });
+  });
+
+  /*
+    ⚠️ AND A DEPLOYMENT WITH NO SHARED STORE SAYS SO RATHER THAN WRITING
+    SOMEWHERE. Silently writing the shared value into this app's own store would
+    be a key that works here and nowhere else, discovered by the second app.
+  */
+  it("refuses a shared write where there is nothing shared to write to", async () => {
+    const out = await operator("/api/admin.config.set", { key: "stripe.mode", value: "live", scope: "shared" });
+    expect(out.status).toBe(503);
+    /*
+      ⚠️ A STATED REFUSAL, NOT A CRASH. Reaching for a store that is not there
+      throws, and the runtime turns any throw into the same 503 — so asserting
+      the status alone cannot tell "we told you" from "it fell over", and the
+      version that falls over writes nothing while saying nothing either.
+    */
+    expect(out.body.meta).toMatchObject({ reason: "this deployment binds no shared configuration store" });
+
+    /* ⚠️ And it did not quietly land in this app's own store instead. */
+    const keys = (await operator("/api/admin.config")).body.keys as unknown as { key: string; source: string }[];
+    expect(keys.find((k) => k.key === "stripe.mode")!.source).toBe("unset");
+  });
+});

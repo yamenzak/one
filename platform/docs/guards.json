@@ -2074,6 +2074,60 @@
       "impl": "hello/test/jobs.solo.test.ts",
       "proves": "answers the operator surface too",
       "fails": "a workspace owner holding the key to the payment dead letter and the scheduler's run table \u2014 both of which are the whole deployment's, so it is a cross-tenant read with a screen in front of it"
+    },
+    {
+      "id": "a-secret-is-write-only",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/config.test.ts",
+      "proves": "says whether a secret is set and never what it is",
+      "fails": "a console that can display a payment provider's key \u2014 leaked through a screen share, a support session, or any read vulnerability"
+    },
+    {
+      "id": "an-unshared-key-cannot-reach-the-shared-store",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/config.test.ts",
+      "proves": "refuses a per-app key aimed at the shared store",
+      "fails": "a per-endpoint secret written where every app resolves it, invisible until a second product fails verification with no trace of where the value came from"
+    },
+    {
+      "id": "chargeable-is-read-not-declared",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "changes whether an unpaid workspace is held to setup",
+      "fails": "a gate claiming the deployment can charge while the payment provider has no key \u2014 every workspace on a self-host stranded in setup over our own misconfiguration"
+    },
+    {
+      "id": "the-mode-picks-the-lane",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/config.test.ts",
+      "proves": "is false in live mode with only a test key",
+      "fails": "a checkout that fails at the till, because both lanes are stored at once and a deployment answered yes on the strength of the wrong one"
+    },
+    {
+      "id": "an-undeclared-key-is-refused-not-stored",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "refuses a key nothing reads",
+      "fails": "a row an operator can see on a screen and no consumer will ever read, which is indistinguishable from a setting that does not work"
+    },
+    {
+      "id": "a-refusal-is-not-a-crash",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/operating.solo.test.ts",
+      "proves": "refuses a shared write where there is nothing shared to write to",
+      "fails": "reaching for a store that is not there, which throws into the same 503 a stated refusal produces \u2014 so the status alone cannot tell 'we told you' from 'it fell over'"
     }
   ]
 }

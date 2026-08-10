@@ -12,10 +12,10 @@
  * argument for having built it.
  */
 
-import { deriveSchema } from "@one/kernel";
+import { deriveSchema, PLATFORM_CONFIG } from "@one/kernel";
 import {
-  applySchema, createRuntime, DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, JOB_SCHEMA,
-  OTP_SCHEMA, PLATFORM_REGIONAL, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, type RawEnv,
+  applySchema, createRuntime,
+  PLATFORM_GLOBAL, PLATFORM_REGIONAL, type RawEnv,
 } from "@one/runtime";
 import { articles, bookings, checkins, clients, entries, foods, goals, kova, movements, portions, programmes, sets, workouts } from "./manifest.js";
 
@@ -25,7 +25,7 @@ if (derived.problems.length) throw new Error(`kova: ${derived.problems.map((p) =
 /* ⚠️ ORDER IS DEPENDENCY ORDER, DECLARED — the runner validates it rather than
    trusting the array, because a wrong order produces an ALTER against a table
    that does not exist yet, swallowed, leaving a column that never appeared. */
-const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, PLATFORM_STATE_SCHEMA, JOB_SCHEMA];
+const GLOBAL_MODULES = PLATFORM_GLOBAL;
 export const REGIONAL_MODULES = [...PLATFORM_REGIONAL, derived.module];
 
 
@@ -33,6 +33,12 @@ export const REGIONAL_MODULES = [...PLATFORM_REGIONAL, derived.module];
 export const delivered = new Map<string, string>();
 
 const runtime = createRuntime(kova, {
+  /*
+    ⚠️ EVERY KEY THIS DEPLOYMENT READS, DECLARED. The console shows exactly this
+    list and refuses anything outside it, so a typo in a key name is a refusal
+    rather than a row nothing consumes.
+  */
+  config: PLATFORM_CONFIG,
   directoryBinding: "DIRECTORY",
   identityBinding: "DIRECTORY",
   sessionsBinding: "db",

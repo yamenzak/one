@@ -1182,7 +1182,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.12.0",
+  manifestVersion: "0.13.0",
   bindings,
 
   identity: {
@@ -1659,6 +1659,17 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.13.0",
+      at: "2026-08-10",
+      notes: [
+        "Configure the deployment from one screen: every key it reads, where each value came from, and whether it is set.",
+        "A key that is typed wrong is refused rather than saved, so a setting that appears to be there always is.",
+        "Secrets can be set and can never be read back. Whether one is configured is the question a screen actually answers.",
+        "The payment provider's test and live keys are held at once, so going live is a switch rather than a re-paste — and live mode with only a test key is honestly not chargeable.",
+        "Whether we can take money is now read from that configuration rather than declared, so nobody is held to a setup step over a provider we never configured.",
+      ],
+    },
     {
       version: "0.12.0",
       at: "2026-08-10",

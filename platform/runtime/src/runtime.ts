@@ -15,7 +15,7 @@
 
 import type {
   Actor, AnyOperation, AppSpec, AuditEntry, BindingSpec, Caller, Ctx, Instant, Problem,
-  InferenceHandle, ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
+  ConfigRegistry, InferenceHandle, ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
 } from "@one/kernel";
 import {
   ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT,
@@ -28,6 +28,8 @@ import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
 import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files-ops.js";
 import { GENERATION, generationOperations, type GenerationCarrier } from "./generate-ops.js";
 import { OPERATOR, operatorOperations, type OperatorCarrier } from "./operator-ops.js";
+import { CONFIG, configOperations, type ConfigCarrier } from "./config-ops.js";
+import { chargeableFrom, readAll } from "./config.js";
 import { GUIDE, guideOperations, type GuideCarrier } from "./guide-ops.js";
 import { MILESTONES, milestoneOperations, type MilestoneCarrier } from "./milestone-ops.js";
 import { MILESTONE_EARNED, dayIn, earnerOf, recognise } from "./milestone.js";
@@ -139,7 +141,21 @@ export interface RuntimeOptions<B extends BindingSpec> {
    * strand every workspace over our own misconfiguration. Defaults to false, so
    * a deployment that says nothing sells nothing.
    */
-  readonly chargeable?: boolean;
+  /**
+   * ⚠️ EVERY KEY THIS DEPLOYMENT READS, DECLARED. The console shows exactly this
+   * list, refuses anything outside it, and knows from it which values are
+   * secrets and which may reach the shared store — so a typo in a key name is a
+   * refusal rather than a row nothing consumes.
+   */
+  readonly config?: ConfigRegistry;
+  /**
+   * The store every app binds by the same id.
+   *
+   * ⚠️ ABSENT IS THE ORDINARY CASE and changes nothing: a deployment with one
+   * app resolves its own values and falls through to nothing. It is what a
+   * self-host and every test run are.
+   */
+  readonly sharedConfigBinding?: string;
   /**
    * How to count what a key's ceiling applies to, where a collection cannot.
    *
@@ -245,7 +261,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...operatorOperations(app), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...operatorOperations(app), ...configOperations(app), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -609,9 +625,17 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             */
             subjectId: subjectFor(app.access.customerRail, session?.accountId ?? null, membership),
           };
+      /*
+        ⚠️ WHETHER WE CAN CHARGE IS READ, NOT DECLARED. It was a boolean an app
+        passed in, so the gate that holds an unpaid workspace to setup could say
+        "we can charge" while the payment provider had no key at all — and the
+        failure is not a 500, it is every workspace on a self-host stranded in
+        setup over OUR misconfiguration.
+      */
+      const chargeable = chargeableFrom(await readAll(directoryDb));
       const sub = at.tenant ? await readSubscription(regionalDb, at.tenant.tenantId) : PARKED;
       const standingState = at.tenant
-        ? standingFor(sub, new Date().toISOString() as Instant, opts.chargeable ?? false)
+        ? standingFor(sub, new Date().toISOString() as Instant, chargeable)
         : ({ standing: "active", reason: "ok" } as StandingState);
       const gate = gateFor(standingState);
       const entitlements = resolveEntitlements({
@@ -627,7 +651,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           already stands down here; the allowances have to as well, or the gate
           opens onto a product that permits nothing.
         */
-        floorPlan: opts.chargeable === true ? null : floorPlan(app.access.plans),
+        floorPlan: chargeable ? null : floorPlan(app.access.plans),
       });
       /*
         ⚠️ THE SECOND RAIL RESOLVES THROUGH THE SAME WALK THE CAPABILITIES SCREEN
@@ -863,7 +887,17 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier = {
+        [CONFIG]: {
+          own: directoryDb,
+          /*
+            ⚠️ THE SAME TABLE IN ANOTHER DATABASE, bound by the same id in every
+            app. Null where a deployment binds none, which resolves to this app's
+            own values and nothing else.
+          */
+          shared: opts.sharedConfigBinding ? globalSql(env, opts.sharedConfigBinding) : null,
+          registry: opts.config ?? {},
+        },
         [OPERATOR]: {
           global: directoryDb,
           /*
@@ -929,7 +963,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
               source — a second copy is how a wizard asks an operator to
               configure something the gate already believes is configured.
             */
-            payments_configured: opts.chargeable ?? false,
+            payments_configured: chargeable,
           }),
           ...(subjectId ? { subjectId } : {}),
           /*
@@ -979,7 +1013,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         [COMMERCE]: {
           db: regionalDb,
           tenantId: at.tenant?.tenantId ?? "",
-          chargeable: opts.chargeable ?? false,
+          chargeable,
           entitlements: caller.entitlements,
           global: directoryDb,
           /*
