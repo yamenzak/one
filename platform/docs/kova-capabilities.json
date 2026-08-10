@@ -175,14 +175,14 @@
       "persona": "trainer",
       "area": "roster",
       "outcome": "Ask an owner to release a client, and have the owner decide",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-self-register",
       "persona": "client",
       "area": "roster",
       "outcome": "Register themselves where a studio allows it, and be picked up by a coach",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "exercise-library",
@@ -588,7 +588,7 @@
       "persona": "owner",
       "area": "reports",
       "outcome": "See how the studio is doing as a business, not as a list of people",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "retention-report",
@@ -778,21 +778,21 @@
       "persona": "owner",
       "area": "billing",
       "outcome": "Move up or down, and be told what changes before they commit",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "downgrade-check",
       "persona": "owner",
       "area": "billing",
       "outcome": "Be told what a smaller plan would cost them, in their own data, before choosing",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "credits-buy",
       "persona": "owner",
       "area": "billing",
       "outcome": "Buy credits for the generative features",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "credits-see",
@@ -806,7 +806,7 @@
       "persona": "owner",
       "area": "billing",
       "outcome": "Change a card, read an invoice, cancel — on the payment provider",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "standing",

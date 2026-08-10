@@ -2994,3 +2994,43 @@ decision was protecting and which the copy would have broken. `energy` joined
 ⚠️ IT WAS CAUGHT BY A TEST WRITTEN TO PIN A DECISION, not by one describing
 behaviour. That is what those are for, and it is the second time this session
 that an old assertion has stopped a plausible new mistake.
+
+## 238. Making the catalogue editable left the storefront reading the old one
+
+The previous increment made plans editable and wired the GATE to the result. Six
+other read sites kept reading `app.access.plans` — the shelf, the preview, the
+standing screen and the plan chooser among them.
+
+So an operator raising a price would have changed what is charged and not what is
+shown; lowering a ceiling would have changed what is enforced and not what is
+promised. A customer reads three on the pricing page, is given ten, and the
+receipt agrees with neither. Every number involved is a perfectly ordinary
+number, and nothing throws.
+
+⚠️ THE FIX IS THAT THE CATALOGUE IS RESOLVED ONCE PER REQUEST AND HANDED DOWN,
+beside the entitlements, from the same call the gate resolves through. Two reads
+of the same overrides would agree today and disagree the first time either is
+touched — which is the shape this platform keeps finding, and the shape it keeps
+answering the same way.
+
+⚠️ AND IT IS THE COST OF THE PREVIOUS INCREMENT'S OWN WORK. Adding an override
+layer means every reader of the thing overridden is now a candidate. The gate was
+the one that felt like the answer; it was the one the tests were about.
+
+## 239. A request that could answer itself, twice
+
+Two records in this product are shaped like a question — a client asking to swap
+a movement, and a coach asking to be released from a client. In both, the asker
+must hold the collection's write permission in order to ask at all, which puts
+the answering fields on the same row behind the same derived update.
+
+The swap was closed in an earlier increment. The release was written new, in this
+one, and the field-level narrowing was easy to get right BECAUSE the earlier one
+existed to copy. What was missing was anything that would catch the third.
+
+⚠️ SO THE CHECK WALKS THE SHAPE RATHER THAN NAMING THE TWO. A test that asserted
+`swap` and `release` passes forever while somebody adds a fourth request-shaped
+record with an open answer. `asking.test.ts` insists that every collection with an
+`asked` state has a narrower write on its state AND on every field carrying the
+answer — because a decision with an open "what we agreed" field is one the asker
+writes for themselves.

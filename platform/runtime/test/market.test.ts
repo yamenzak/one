@@ -28,7 +28,7 @@ const explode = () => { throw new Error("the store was touched"); };
 const db = { all: explode, first: explode, run: explode, batch: explode } as unknown as SqlHandle;
 
 const preview = (toPlanId: string, usage: (key: string) => Promise<number> | null) =>
-  previewOf({ app, db, tenantId: "t_1", currentPlanId: null, toPlanId, usage });
+  previewOf({ app, selling: app.access.plans, db, tenantId: "t_1", currentPlanId: null, toPlanId, usage });
 
 describe("the preview counts what the gate counts", () => {
   /*

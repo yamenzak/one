@@ -16,13 +16,13 @@
 import { daysBetween, daysLeft, progressOf } from "./goals.js";
 import { energyOf, overDays, portionOf, totalOf, type Macros } from "./nutrition.js";
 import { bestOf, consistency, expectedOver, needing, prescribedPerWeek, soonest } from "./reading.js";
-import { drawWith, forgetSubject, generateAbout, generateWith, lapsedAcross, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
+import { drawWith, forgetSubject, generateAbout, generateWith, lapsedAcross, readSettings, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
 import { progressWeek, weekAt, WEEKS_SHAPE, type Week } from "./plans.js";
 import { FASTING_ZONES, wellnessOf, zoneAt } from "./living.js";
 import {
   UNLIMITED,
   cache, collection, defineApp, defineBindings, field,
-  inference, objects, operation, rungFor, s, sql, tableNameFor,
+  inference, objects, operation, rungFor, s, sql, tableNameFor, type SettingsSpec,
   type AiSpec, type Currency, type Locale, type RegionId, type SqlHandle, type TimeZone,
 } from "@one/kernel";
 
@@ -507,6 +507,36 @@ export const swaps = collection({
 });
 
 
+
+/* ------------------------------------------------------------ offboarding --- */
+
+/**
+ * A coach asking to be released from somebody, and the owner's answer.
+ *
+ * ⚠️ A REQUEST RATHER THAN AN ACT, because a coach removing a client removes the
+ * studio's relationship with a paying customer — and the person best placed to
+ * notice that is not the person who has stopped wanting to do it. The record is
+ * also the useful half: three of these about the same client is a fact about the
+ * client, and three from the same coach is a fact about the coach.
+ */
+export const releases = collection({
+  id: "release",
+  label: { one: "Release request", many: "Release requests" },
+  scope: { of: "tenant" },
+  version: true,
+  retention: { days: null, onTenantClose: "purge" },
+  onDelete: { on: "purge" },
+  activity: true,
+  fields: {
+    client: field.ref("client", { onDelete: "cascade", required: true }),
+    why: field.text({ required: true, multiline: true, max: 1_000, label: "Why" }),
+    /* ⚠️ Set by the decision, never by the person asking — the same line the
+       swap request draws, for the same reason. */
+    state: field.enum(["asked", "agreed", "declined"], { required: true, initial: "asked", label: "State", write: "member:manage" }),
+    answer: field.text({ max: 1_000, label: "What the owner said", write: "member:manage" }),
+  },
+});
+
 /* --------------------------------------------------------------- fasting --- */
 
 /**
@@ -881,6 +911,7 @@ export const articles = collection({
  */
 const T = {
   clients: tableNameFor(clients),
+  releases: tableNameFor(releases),
   fasts: tableNameFor(fasts),
   photos: tableNameFor(photos),
   scans: tableNameFor(scans),
@@ -1331,6 +1362,9 @@ const STAFF = [
   */
   "fast:read", "fast:write", "photo:read", "photo:write",
   "choice:read", "choice:write", "scan:read", "scan:write",
+  /* ⚠️ A coach ASKS to be released and the owner decides — `member:manage` on
+     the two answering fields is what makes that true rather than a convention. */
+  "release:read", "release:write",
 ];
 
 /* ------------------------------------------------------------ publishing --- */
@@ -1973,6 +2007,156 @@ export const bodyScan = operation<
   },
 });
 
+
+/* ------------------------------------------------------- self-registration --- */
+
+/**
+ * Somebody adding themselves to a studio that allows it.
+ *
+ * ⚠️ ALLOWED PER STUDIO, DEFAULT OFF, and the default is the whole safety of it.
+ * An open registration on every workspace means anybody who guesses a slug
+ * becomes a client of that studio — which consumes a seat on its plan, appears
+ * on its roster, and is a stranger in a list of people it coaches.
+ *
+ * ⚠️ AND IT CREATES A CLIENT RECORD RATHER THAN A MEMBERSHIP WITH POWERS. What
+ * arrives is somebody waiting to be picked up by a coach; the studio decides
+ * what happens next.
+ */
+export const selfRegister = operation<
+  Bindings,
+  { name: string; email: string },
+  { ok: boolean },
+  "platform.invalid" | "platform.forbidden" | "platform.quota_reached"
+>({
+  id: "client.register",
+  kind: "write",
+  summary: "Add yourself to a studio that takes new clients.",
+  input: s.object({ name: s.text({ min: 1, max: 120 }), email: s.text({ max: 200 }) }),
+  output: s.object({ ok: s.bool() }),
+  /*
+    ⚠️ PUBLIC, BECAUSE THE PERSON DOES NOT HAVE AN ACCOUNT YET. That is exactly
+    why the studio's own switch has to be checked in the handler: the door is
+    open by design and the decision is the studio's.
+  */
+  permission: "public",
+  idempotency: { mode: "natural", key: "email" },
+  audit: (i: { email: string }) => ({ subject: i.email, verb: "register" }),
+  outcome: { message: "Sent", tone: "success" },
+  fails: ["platform.invalid", "platform.forbidden", "platform.quota_reached"],
+  /* ⚠️ Not a tool: it writes a person into a studio's roster. */
+  tool: false,
+  async handler(ctx, input: { name: string; email: string }) {
+    const settings = await readSettings(ctx.bind.db, KOVA_SETTINGS, ctx.tenantId);
+    if (settings["studio.selfRegister"] !== true) {
+      ctx.fail("platform.forbidden", { reason: "this studio adds clients itself" });
+    }
+    const email = input.email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) ctx.fail("platform.invalid", { field: "email" });
+
+    /*
+      ⚠️ THE SEAT CEILING IS CHECKED HERE AND NOT BY THE GATE, because the gate
+      counts against the CALLER's entitlements and this caller has none — they
+      are not a member of anything yet. Without it an open studio is one anybody
+      can push past its own plan.
+    */
+    const held = await ctx.bind.db.first<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM ${T.clients} WHERE tenant_id = ? AND deleted_at IS NULL`, ctx.tenantId,
+    );
+    const allowed = Number(settings["studio.selfRegisterCeiling"] ?? 0);
+    if (allowed > 0 && (held?.n ?? 0) >= allowed) {
+      ctx.fail("platform.quota_reached", { limit: String(allowed), used: String(held?.n ?? 0) });
+    }
+
+    /*
+      ⚠️ THE SAME ANSWER WHETHER OR NOT THEY ARE ALREADY ON THE ROSTER. Telling
+      them apart turns this into a membership oracle: type an address, learn
+      whether that person is coached here — which for a health product is a
+      disclosure on its own.
+    */
+    const already = await ctx.bind.db.first<{ id: string }>(
+      `SELECT id FROM ${T.clients} WHERE tenant_id = ? AND email = ?`, ctx.tenantId, email,
+    );
+    if (already) return { ok: true };
+
+    const id = `cli_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
+    const at = ctx.now();
+    await ctx.bind.db.run(
+      `INSERT INTO ${T.clients} (id, tenant_id, version, created_at, updated_at, name, email) VALUES (?, ?, 1, ?, ?, ?, ?)`,
+      id, ctx.tenantId, at, at, input.name, email,
+    );
+    return { ok: true };
+  },
+});
+
+/* ------------------------------------------------------- how the studio is --- */
+
+/**
+ * The studio as a business rather than as a list of people.
+ *
+ * ⚠️ COUNTS AND MOVEMENT, NOT A DASHBOARD OF EVERYTHING. The three questions an
+ * owner actually asks are how many people they coach, how many are active, and
+ * whether that is going up — and a screen answering thirty questions answers
+ * none of them, because nobody reads it twice.
+ */
+export const rosterAnalytics = operation<
+  Bindings,
+  { days?: number },
+  { clients: number; active: number; joined: number; left: number; sessions: number; lapsing: number },
+  never
+>({
+  id: "studio.analytics",
+  kind: "read",
+  summary: "How the studio is doing: who is on the roster, who is active, and which way it is going.",
+  input: s.object({ days: s.optional(s.number({ integer: true, min: 7, max: 365 })) }),
+  output: s.object({
+    clients: s.number({ integer: true }), active: s.number({ integer: true }),
+    joined: s.number({ integer: true }), left: s.number({ integer: true }),
+    sessions: s.number({ integer: true }), lapsing: s.number({ integer: true }),
+  }),
+  /* ⚠️ The owner's. A coach's view of the studio is their own clients, which is
+     `coach.attention` — this is the business, and the business is not theirs. */
+  permission: "commerce:manage",
+  idempotency: { mode: "none" },
+  async handler(ctx, input: { days?: number }) {
+    const days = input.days ?? 30;
+    const since = new Date(Date.parse(ctx.now()) - days * 86_400_000).toISOString();
+    const sinceDay = since.slice(0, 10);
+    const db = ctx.bind.db;
+    const count = async (sql: string, ...binds: unknown[]) =>
+      (await db.first<{ n: number }>(sql, ...binds))?.n ?? 0;
+
+    return {
+      clients: await count(`SELECT COUNT(*) AS n FROM ${T.clients} WHERE tenant_id = ? AND deleted_at IS NULL`, ctx.tenantId),
+      /*
+        ⚠️ ACTIVE MEANS THEY DID SOMETHING, not that their record exists. A roster
+        count on its own is the number that flatters — it only ever goes up, and
+        it goes up fastest when nobody is being coached.
+      */
+      active: await count(
+        `SELECT COUNT(DISTINCT client_id) AS n FROM ${T.workouts} WHERE tenant_id = ? AND day >= ? AND deleted_at IS NULL`,
+        ctx.tenantId, sinceDay,
+      ),
+      joined: await count(
+        `SELECT COUNT(*) AS n FROM ${T.clients} WHERE tenant_id = ? AND created_at >= ? AND deleted_at IS NULL`,
+        ctx.tenantId, since,
+      ),
+      /* ⚠️ Left is archived-in-the-window, which is the only leaving this
+         product records. A purge leaves nothing to count, correctly. */
+      left: await count(
+        `SELECT COUNT(*) AS n FROM ${T.clients} WHERE tenant_id = ? AND deleted_at >= ?`,
+        ctx.tenantId, since,
+      ),
+      sessions: await count(
+        `SELECT COUNT(*) AS n FROM ${T.workouts} WHERE tenant_id = ? AND day >= ? AND deleted_at IS NULL`,
+        ctx.tenantId, sinceDay,
+      ),
+      /* ⚠️ Whose access runs out inside the window — the number that turns into
+         next month's roster count, and the only one here that is a warning. */
+      lapsing: (await lapsedAcross(db, ctx.tenantId, ctx.now(), 500)).length,
+    };
+  },
+});
+
 /* ------------------------------------------------------------------- ai --- */
 
 /**
@@ -2559,11 +2743,91 @@ export const drawImage = operation<
 });
 
 
+/**
+ * ⚠️ DECLARED BESIDE THE MANIFEST RATHER THAN INSIDE IT, because a HANDLER reads
+ * it. `readSettings` needs the registry to apply the declared fallbacks, and an
+ * operation reaching into the manifest that contains it is a circular type — the
+ * same reason `KOVA_AI` sits out here.
+ */
+export const KOVA_SETTINGS: SettingsSpec = {
+    "studio.weekStart": {
+      label: "Weeks start on",
+      kind: "enum",
+      values: ["monday", "sunday", "saturday"],
+      fallback: "monday",
+      help: "Which day a training week and a consistency count begin on.",
+    },
+    /*
+      ⚠️ A NUMBER WITH A CEILING, because this is what a client is shown as
+      overdue — and a studio that typed 400 has turned the whole feature off
+      without meaning to.
+    */
+    "studio.checkInDays": {
+      label: "Check in every",
+      kind: "number",
+      min: 1,
+      max: 90,
+      fallback: 7,
+      help: "How often you expect somebody to check in. What the coach's attention list counts against.",
+    },
+    "studio.replyDays": {
+      label: "Answer a check-in within",
+      kind: "number",
+      min: 1,
+      max: 30,
+      fallback: 3,
+      help: "How long an unanswered check-in may sit before it is flagged to you.",
+    },
+    /*
+      ⚠️ NARROWER THAN THE SCREEN IT IS ON. Turning the client feed off takes
+      something away from everybody the studio coaches, so it is the owner's
+      rather than any coach who can open settings.
+    */
+    /*
+      ⚠️ OFF BY DEFAULT, AND THE DEFAULT IS THE WHOLE SAFETY OF IT. An open
+      registration means anybody who guesses a studio's address becomes a client
+      of it — consuming a seat, appearing on the roster, and being a stranger in
+      a list of people that studio coaches.
+    */
+    "studio.selfRegister": {
+      label: "Let people add themselves",
+      kind: "bool",
+      fallback: false,
+      write: "member:manage",
+      help: "When on, somebody with your studio's address can put themselves on the roster for a coach to pick up.",
+    },
+    /*
+      ⚠️ A CEILING ON WHAT AN OPEN DOOR CAN DO. The plan's own client quota is
+      checked against the CALLER's entitlements, and a self-registering caller
+      has none — so without a bound of the studio's own, an open studio is one
+      anybody can push past its own plan.
+    */
+    "studio.selfRegisterCeiling": {
+      label: "Stop taking new ones at",
+      kind: "number",
+      min: 0,
+      max: 5_000,
+      fallback: 0,
+      write: "member:manage",
+      help: "How many people may be on the roster before self-registration closes. Zero means no limit of its own.",
+    },
+    "studio.publishFeed": {
+      label: "Publish articles to clients",
+      kind: "bool",
+      fallback: true,
+      /* ⚠️ The OWNER's: withdrawing the feed takes something away from everybody
+         the studio coaches, which is a decision about what is offered rather
+         than about how anybody is coached. */
+      write: "commerce:manage",
+      help: "When off, published articles stay in the studio and no client sees the feed.",
+    },
+};
+
 export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.19.0",
+  manifestVersion: "0.20.0",
   bindings,
 
   identity: {
@@ -2690,6 +2954,17 @@ export const kova = defineApp({
       storedBytes: { label: "Storage", unit: "bytes", parked: 200_000_000, enforcement: "quota" },
       training: { label: "Training plans", parked: true, enforcement: "gate" },
     },
+    /*
+      ⚠️ CREDITS ARE BOUGHT SEPARATELY FROM A PLAN, because running out of them
+      is not a reason to sell somebody a bigger product. A studio drafting plans
+      all week and a studio that has never opened the AI features are on the same
+      tier and should be.
+    */
+    creditPacks: [
+      { id: "small", name: "10,000 credits", price: { minor: 900, currency: "USD" as Currency }, credits: 10_000 },
+      { id: "medium", name: "50,000 credits", price: { minor: 3_900, currency: "USD" as Currency }, credits: 50_000 },
+      { id: "large", name: "200,000 credits", price: { minor: 12_900, currency: "USD" as Currency }, credits: 200_000 },
+    ],
     plans: [
       {
         id: "solo",
@@ -2816,53 +3091,9 @@ export const kova = defineApp({
     arrive whether they are declared here or not, because the sign-in screen
     wears them before there is a session to resolve these with.
   */
-  settings: {
-    "studio.weekStart": {
-      label: "Weeks start on",
-      kind: "enum",
-      values: ["monday", "sunday", "saturday"],
-      fallback: "monday",
-      help: "Which day a training week and a consistency count begin on.",
-    },
-    /*
-      ⚠️ A NUMBER WITH A CEILING, because this is what a client is shown as
-      overdue — and a studio that typed 400 has turned the whole feature off
-      without meaning to.
-    */
-    "studio.checkInDays": {
-      label: "Check in every",
-      kind: "number",
-      min: 1,
-      max: 90,
-      fallback: 7,
-      help: "How often you expect somebody to check in. What the coach's attention list counts against.",
-    },
-    "studio.replyDays": {
-      label: "Answer a check-in within",
-      kind: "number",
-      min: 1,
-      max: 30,
-      fallback: 3,
-      help: "How long an unanswered check-in may sit before it is flagged to you.",
-    },
-    /*
-      ⚠️ NARROWER THAN THE SCREEN IT IS ON. Turning the client feed off takes
-      something away from everybody the studio coaches, so it is the owner's
-      rather than any coach who can open settings.
-    */
-    "studio.publishFeed": {
-      label: "Publish articles to clients",
-      kind: "bool",
-      fallback: true,
-      /* ⚠️ The OWNER's: withdrawing the feed takes something away from everybody
-         the studio coaches, which is a decision about what is offered rather
-         than about how anybody is coached. */
-      write: "commerce:manage",
-      help: "When off, published articles stay in the studio and no client sees the feed.",
-    },
-  },
+  settings: KOVA_SETTINGS,
   collections: [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles, supplements, doses, labs, assignments, alternatives, swaps,
-    fasts, photos, mealChoices, scans],
+    fasts, photos, mealChoices, scans, releases],
 
   notifications: {
     "workspace.created": {
@@ -2915,7 +3146,7 @@ export const kova = defineApp({
     decideSwap, forgetClient,
     draftPlan, parseFood, draftMeals, snapMeal, labelReader, labExtract,
     exerciseGuide, supplementGuide, clientSummary, draftArticle, drawImage, bodyScan,
-    fastNow, wellness, today, prefill, compare,
+    fastNow, wellness, today, prefill, compare, selfRegister, rosterAnalytics,
   ],
 
   help: {
@@ -3154,6 +3385,18 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.20.0",
+      at: "2026-08-10",
+      notes: [
+        "See what moving to another plan would gain, lose and strain — against the prices this deployment actually sells, not the ones it shipped with.",
+        "Buy credits separately from your plan. Running out of them is not a reason to sell you a bigger product.",
+        "One place to change a card, read an invoice or cancel — and where billing is not set up, a sentence saying so rather than a link that opens nothing.",
+        "A coach can ask to be released from a client, with a reason. The owner decides, and the request is a record either way.",
+        "Let people add themselves to your studio, if you want that. It is off until you turn it on, it stops at a number you set, and it tells a stranger nothing about who you already coach.",
+        "See how the studio is doing as a business: who is on the roster, who is actually training, who joined, who left, and whose access runs out soon.",
+      ],
+    },
     {
       version: "0.19.0",
       at: "2026-08-10",

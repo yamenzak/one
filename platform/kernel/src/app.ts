@@ -31,8 +31,8 @@ import type { NotificationRegistry } from "./notify.js";
 import type { Release, Retired } from "./release.js";
 import { releaseProblems } from "./release.js";
 import { PLATFORM_EVENTS, danglingLinks } from "./notify.js";
-import type { EntitlementDef, PlanSpec } from "./entitlement.js";
-import { parkingAboveFloor } from "./entitlement.js";
+import type { CreditPack, EntitlementDef, PlanSpec } from "./entitlement.js";
+import { packProblems, parkingAboveFloor } from "./entitlement.js";
 import type { Currency, Locale, RegionId, TimeZone, UnitSystem } from "./primitives.js";
 import type { ProblemCatalog, ProblemDef } from "./problem.js";
 import { PLATFORM_PROBLEMS } from "./problem.js";
@@ -168,6 +168,17 @@ export interface AccessSpec {
   readonly entitlements: Readonly<Record<string, EntitlementDef>>;
   /** The catalogue. Empty is a legitimate deployment — one with nothing for sale. */
   readonly plans: readonly PlanSpec[];
+  /**
+   * ⚠️ WHAT A WORKSPACE MAY BUY TO TOP UP ITS GENERATION BALANCE, and it is
+   * separate from the plan on purpose: credits are consumption and a plan is
+   * access. An app that sold them together would answer "I have run out" with an
+   * upgrade, which is a bigger set of features where somebody wanted more of the
+   * one they were already using.
+   *
+   * Empty is a real answer — an app that generates nothing, or one whose
+   * deployment funds credits some other way.
+   */
+  readonly creditPacks?: readonly CreditPack[];
   /**
    * Whether this app sells to its tenants' own customers, and WHO the customer
    * is when it does.
@@ -754,6 +765,16 @@ export function assertComposable(spec: {
     with a string fallback is `NaN` for every workspace that has not set it,
     which on the day it ships is all of them.
   */
+  /*
+    ⚠️ A PACK THAT GRANTS NOTHING OR COSTS NOTHING IS A PURCHASE THAT SUCCEEDS
+    AND MOVES NO BALANCE, or a tap anybody can refill from for free. Neither
+    throws at runtime; both are money.
+  */
+  const packs = packProblems(spec.access.creditPacks ?? []);
+  if (packs.length) {
+    throw new Error(`${spec.id}: credit pack(s) ${packs.map((p) => `"${p.id}" ${p.why}`).join("; ")}.`);
+  }
+
   const settings = settingsProblems({ ...spec.settings ?? {} });
   if (settings.length) {
     throw new Error(`${spec.id}: setting(s) ${settings.map((p) => `"${p.key}" ${p.why}`).join("; ")}.`);

@@ -52,6 +52,13 @@ export const shelf = (plans: readonly PlanSpec[], declared: Readonly<Record<stri
 
 export async function previewOf<B extends BindingSpec>(input: {
   readonly app: AppSpec<B>;
+  /**
+   * ⚠️ THE CATALOGUE AS IT IS SOLD TODAY. A preview computed against the
+   * DECLARED plans tells somebody what they would gain and lose under prices and
+   * ceilings the deployment stopped selling — and the gate would then enforce
+   * different ones, which is a promise broken at the moment it is made.
+   */
+  readonly selling: readonly PlanSpec[];
   readonly db: SqlHandle;
   readonly tenantId: string;
   readonly currentPlanId: string | null;
@@ -60,9 +67,9 @@ export async function previewOf<B extends BindingSpec>(input: {
   usage(key: string): Promise<number> | null;
 }): Promise<Preview | null> {
   const declared = input.app.access.entitlements;
-  const to = input.app.access.plans.find((p) => p.id === input.toPlanId);
+  const to = input.selling.find((p) => p.id === input.toPlanId);
   if (!to) return null;
-  const from = input.app.access.plans.find((p) => p.id === input.currentPlanId) ?? null;
+  const from = input.selling.find((p) => p.id === input.currentPlanId) ?? null;
 
   /*
     ⚠️ ONLY THE KEYS THAT CAN BE COUNTED. A ceiling nothing counts is one the

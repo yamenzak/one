@@ -1107,6 +1107,17 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-file-purpose-says-who-may-upload` | one permission on the upload operation giving every kind of file the same answer — which shipped as a client who could not upload at all, so every camera feature built for them was refused at its first step on a different operation | **live** |
 | `a-purpose-names-a-permission-somebody-holds` | an upload nobody can make, failing as a 403 on a screen that offered the control | **live** |
 | `a-number-is-read-from-its-one-home` | a score computed from a copy on a weekly report — correcting the original then leaves the score saying something else, and neither throws | **live** |
+| `a-shelf-shows-what-is-sold` | a price list showing what the app was declared with while the gate enforces what the deployment currently sells — a customer told a plan includes three and given ten, with a receipt that agrees with neither | **live** |
+| `a-preview-reads-the-sold-catalogue` | somebody told what they would gain under ceilings the deployment stopped selling — a promise broken at the moment it is made | **live** |
+| `buying-credits-grants-none` | a balance anybody refills by calling the purchase endpoint | **live** |
+| `an-unpayable-purchase-refuses` | a pending purchase nothing will ever settle — a workspace waiting for credits that are not coming, with no signal at all | **live** |
+| `a-billing-link-goes-somewhere` | "manage billing" opening nothing, which is a bug somebody reports where a sentence would have been an answer | **live** |
+| `self-registration-is-off-until-a-studio-says` | anybody who guesses a workspace's address becoming a client of it — consuming a seat, appearing on the roster, a stranger among the people it coaches | **live** |
+| `an-open-door-has-a-ceiling-of-its-own` | a plan quota checked against the CALLER's entitlements where the caller belongs to nothing yet — so an open studio is one anybody can push past its own plan | **live** |
+| `registration-is-not-a-membership-oracle` | type an address, learn whether that person is coached here — a disclosure on its own for a health product | **live** |
+| `a-roster-count-is-not-an-active-count` | the number that flatters — it only ever goes up, and it goes up fastest when nobody is being coached | **live** |
+| `a-request-is-not-its-own-answer` | a client marking their own swap allowed and a coach agreeing to their own release — both open because the asker must hold the collection's write permission in order to ask at all | **live** |
+| `a-credit-pack-grants-something-and-costs-something` | a purchase that succeeds and moves no balance, or a tap anybody refills from for free | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

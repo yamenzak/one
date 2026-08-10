@@ -64,12 +64,12 @@ without one.
 | `[x]` | `ai-snap-meal` | client | Photograph a meal and have it logged |
 | `[x]` | `ai-supplement-guide` | trainer | Generate supplement guidance with a stated basis |
 | | **billing** | | |
-| `[ ]` | `billing-portal` | owner | Change a card, read an invoice, cancel — on the payment provider |
-| `[ ]` | `credits-buy` | owner | Buy credits for the generative features |
+| `[x]` | `billing-portal` | owner | Change a card, read an invoice, cancel — on the payment provider |
+| `[x]` | `credits-buy` | owner | Buy credits for the generative features |
 | `[x]` | `credits-see` | owner | See what credits were spent on |
-| `[ ]` | `downgrade-check` | owner | Be told what a smaller plan would cost them, in their own data, before choosing |
+| `[x]` | `downgrade-check` | owner | Be told what a smaller plan would cost them, in their own data, before choosing |
 | `[x]` | `plan-browse` | owner | See what the platform sells and what each plan includes |
-| `[ ]` | `plan-change` | owner | Move up or down, and be told what changes before they commit |
+| `[x]` | `plan-change` | owner | Move up or down, and be told what changes before they commit |
 | `[x]` | `plan-choose` | owner | Choose a plan and pay for it |
 | `[x]` | `standing` | owner | Know where they stand when a payment fails, and how to fix it |
 | | **body** | | |
@@ -164,7 +164,7 @@ without one.
 | `[x]` | `client-report` | trainer | See one client's whole picture: body, training, nutrition, consistency |
 | `[x]` | `retention-report` | owner | See who is at risk of leaving before they leave |
 | `[x]` | `roster-activity` | owner | See who on the roster is active and who has gone quiet |
-| `[ ]` | `roster-analytics` | owner | See how the studio is doing as a business, not as a list of people |
+| `[x]` | `roster-analytics` | owner | See how the studio is doing as a business, not as a list of people |
 | | **roster** | | |
 | `[x]` | `client-add` | trainer | Add somebody they coach, by inviting them or by entering them directly |
 | `[x]` | `client-archive` | trainer | Stop coaching somebody without losing what they did |
@@ -174,11 +174,11 @@ without one.
 | `[x]` | `client-coaches` | client | See who is coaching them, with their faces |
 | `[x]` | `client-delete` | owner | Remove somebody entirely, on request, and have that be final |
 | `[x]` | `client-invite-self` | client | Accept an invitation and land in the right studio without being told an address |
-| `[ ]` | `client-offboard-request` | trainer | Ask an owner to release a client, and have the owner decide |
+| `[x]` | `client-offboard-request` | trainer | Ask an owner to release a client, and have the owner decide |
 | `[x]` | `client-preferences` | trainer | Record how somebody trains and eats now, and see when that was last reviewed |
 | `[x]` | `client-profile` | trainer | Record who somebody is: their details, their situation and how they train |
 | `[x]` | `client-restore` | trainer | Bring an archived person back |
-| `[ ]` | `client-self-register` | client | Register themselves where a studio allows it, and be picked up by a coach |
+| `[x]` | `client-self-register` | client | Register themselves where a studio allows it, and be picked up by a coach |
 | | **sessions** | | |
 | `[x]` | `session-book` | assistant | Book a client into a session |
 | `[x]` | `session-manage` | assistant | Change or cancel a booking and have the client know |

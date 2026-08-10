@@ -256,6 +256,51 @@ export function parkingAboveFloor(
     .map(([key]) => key);
 }
 
+/* ------------------------------------------------------------ credit packs --- */
+
+/**
+ * What a workspace can buy to top up its generation balance.
+ *
+ * ⚠️ SEPARATE FROM THE PLAN, because credits are consumption and a plan is
+ * access. Folding them together makes the answer to "I have run out" an upgrade
+ * — which sells somebody a bigger set of features when what they wanted was more
+ * of the one they were using.
+ *
+ * ⚠️ AND THE SIZE IS IN THE SAME UNIT THE METER SPENDS. A pack described in
+ * pounds, requests or "generations" is one nobody can reconcile against a
+ * balance, and the reconciliation is the only question anybody asks about it.
+ */
+export interface CreditPack {
+  readonly id: string;
+  readonly name: string;
+  readonly price: Money;
+  /** Credits granted. The unit `settle` charges in. */
+  readonly credits: number;
+}
+
+/**
+ * ⚠️ EVERY ONE OF THESE IS A PACK SOMEBODY COULD BUY AND GET NOTHING FROM, and
+ * none of them throws — the purchase succeeds and the balance does not move,
+ * which is the worst shape a money bug can take.
+ */
+export function packProblems(packs: readonly CreditPack[]): readonly { readonly id: string; readonly why: string }[] {
+  const out: { id: string; why: string }[] = [];
+  const seen = new Set<string>();
+  for (const pack of packs) {
+    if (seen.has(pack.id)) out.push({ id: pack.id, why: "is declared twice, so which one a purchase grants depends on order" });
+    seen.add(pack.id);
+    if (!Number.isInteger(pack.credits) || pack.credits < 1) {
+      out.push({ id: pack.id, why: "grants no credits, so buying it moves nothing" });
+    }
+    /*
+      ⚠️ A FREE PACK IS NOT A PROMOTION, IT IS AN UNMETERED TAP. Anybody may buy
+      it repeatedly, and the platform pays for every generation it funds.
+    */
+    if (pack.price.minor <= 0) out.push({ id: pack.id, why: "costs nothing, so it is a balance anybody can refill for free" });
+  }
+  return out;
+}
+
 /* --------------------------------------------------------- editing a plan --- */
 
 /**

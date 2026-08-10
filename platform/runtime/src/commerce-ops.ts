@@ -28,6 +28,8 @@ import {
 } from "./commerce.js";
 import { attribute, claimByCustomer, claimEvent, listParked, park, rememberCustomer, resolveParked, verifySignature } from "./provider.js";
 import { OPERATE } from "./operator-ops.js";
+import { balance } from "./ledger.js";
+import { CREDITS } from "./generate.js";
 import { parseStripeEvent } from "./provider-stripe.js";
 import { previewOf, shelf } from "./market.js";
 
@@ -46,6 +48,23 @@ export interface CommerceDeps {
    * somewhere down in a handler.
    */
   readonly chargeable: boolean;
+  /**
+   * ⚠️ THE CATALOGUE AS IT IS ACTUALLY SOLD, NOT AS IT WAS DECLARED.
+   *
+   * An operator's edit that the storefront never reads is a price list screen
+   * showing one number while the gate enforces another — a customer told a plan
+   * includes three and given ten, or told ten and given three, with a receipt
+   * that agrees with neither. Resolved ONCE per request beside the entitlements,
+   * so the shelf, the preview, the standing screen and the chooser cannot
+   * disagree with each other or with the gate.
+   */
+  readonly selling: readonly PlanSpec[];
+  /**
+   * ⚠️ THE PROVIDER'S OWN BILLING SCREEN, where the deployment has one. Null is
+   * a real answer and is reported as one — a "manage billing" link that opens
+   * nothing is worse than a sentence saying billing is not set up.
+   */
+  readonly portalUrl: string | null;
   /**
    * ⚠️ THE RESOLVED VALUES, HANDED DOWN — not re-read here.
    *
@@ -98,7 +117,7 @@ export function commerceOperations<B extends BindingSpec>(app: AppSpec<B>): read
     permission: "public",
     idempotency: { mode: "none" },
     async handler(ctx) {
-      return { plans: shelf(app.access.plans, app.access.entitlements), chargeable: deps(ctx).chargeable };
+      return { plans: shelf(deps(ctx).selling, app.access.entitlements), chargeable: deps(ctx).chargeable };
     },
   });
 
@@ -121,7 +140,7 @@ export function commerceOperations<B extends BindingSpec>(app: AppSpec<B>): read
     async handler(ctx, input: { planId: string }) {
       const d = deps(ctx);
       const out = await previewOf({
-        app, db: d.db, tenantId: d.tenantId,
+        app, selling: d.selling, db: d.db, tenantId: d.tenantId,
         currentPlanId: d.currentPlanId ?? null, toPlanId: input.planId,
         usage: d.usage,
       });
@@ -142,7 +161,7 @@ export function commerceOperations<B extends BindingSpec>(app: AppSpec<B>): read
       const d = deps(ctx);
       const sub = await readSubscription(d.db, d.tenantId);
       const state = standingFor(sub, ctx.now(), d.chargeable);
-      const plan = app.access.plans.find((p) => p.id === sub.planId) ?? null;
+      const plan = d.selling.find((p) => p.id === sub.planId) ?? null;
       /*
         ⚠️ THE EXPLAINED WALK, NOT A SECOND ONE. This is the same function the
         gate resolves through, so a screen cannot promise something a route
@@ -186,13 +205,108 @@ export function commerceOperations<B extends BindingSpec>(app: AppSpec<B>): read
     tool: false,
     async handler(ctx, input: { planId: string }) {
       const d = deps(ctx);
-      if (!app.access.plans.some((p) => p.id === input.planId)) ctx.fail("platform.not_found", { field: "planId" });
+      if (!d.selling.some((p) => p.id === input.planId)) ctx.fail("platform.not_found", { field: "planId" });
       await choosePlan(d.db, d.tenantId, input.planId, ctx.now());
       return { pendingPlanId: input.planId, chargeable: d.chargeable };
     },
   });
 
-  return [plans, preview, standing, choose] as unknown as readonly AnyOperation[];
+
+  /**
+   * ⚠️ CREDITS ARE CONSUMPTION AND A PLAN IS ACCESS, so running out is answered
+   * with more of what you were using rather than with a bigger product.
+   */
+  const packs = operation({
+    id: "billing.packs",
+    kind: "read",
+    summary: "What this workspace can buy to top up its balance.",
+    input: s.object({}),
+    output: s.object({ packs: s.json(), balance: s.number({ integer: true }), chargeable: s.bool() }),
+    permission: "billing:manage",
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const d = deps(ctx);
+      return {
+        packs: app.access.creditPacks ?? [],
+        /* ⚠️ The balance travels with the shelf, because "how many do I have"
+           is the question that brought them to this screen. */
+        balance: await balance(d.db, d.tenantId, CREDITS),
+        chargeable: d.chargeable,
+      };
+    },
+  });
+
+  /**
+   * Buy one.
+   *
+   * ⚠️ IT OPENS AN INTENT AND GRANTS NOTHING. Credits are minted by the
+   * provider's confirmation and by an operator, and by nothing else — an
+   * operation that granted on request would be a balance anybody could refill by
+   * calling it.
+   *
+   * ⚠️ AND WITH NO PROVIDER IT REFUSES AND SAYS WHY. Answering cleanly with a
+   * pending purchase nothing will ever settle is a workspace waiting for credits
+   * that are not coming, with no signal at all.
+   */
+  const buy = operation({
+    id: "billing.credits.buy",
+    kind: "write",
+    summary: "Buy a pack of credits.",
+    input: s.object({ packId: s.text({ max: 60 }) }),
+    output: s.object({ packId: s.text(), credits: s.number({ integer: true }), payAt: s.optional(s.text()) }),
+    permission: "billing:manage",
+    idempotency: { mode: "none" },
+    audit: (i: { packId: string }) => ({ subject: i.packId, verb: "buy-credits" }),
+    fails: ["platform.not_found", "platform.unavailable"],
+    /*
+      ⚠️ NOT A TOOL. It is a purchase. A model that can make one can be talked
+      into it by a sentence in something it was asked to read.
+    */
+    tool: false,
+    async handler(ctx, input: { packId: string }) {
+      const d = deps(ctx);
+      const pack = (app.access.creditPacks ?? []).find((p) => p.id === input.packId);
+      if (!pack) ctx.fail("platform.not_found", { field: "packId" });
+      if (!d.chargeable) {
+        ctx.fail("platform.unavailable", { reason: "this deployment cannot take a payment yet" });
+      }
+      /*
+        ⚠️ THE BALANCE DOES NOT MOVE HERE. What comes back is where to pay; the
+        credits arrive when the provider says the money did.
+      */
+      return { packId: pack!.id, credits: pack!.credits, ...(d.portalUrl ? { payAt: d.portalUrl } : {}) };
+    },
+  });
+
+  /**
+   * Where to change a card, read what was charged, or cancel.
+   *
+   * ⚠️ IT IS THE PROVIDER'S SCREEN AND NOT A COPY OF IT. Rebuilding billing
+   * history and card management inside the product means holding card details,
+   * reproducing tax documents, and being wrong about both in a different way
+   * from the provider — who is the one the payer's bank will ask.
+   *
+   * ⚠️ AND AN UNCONFIGURED DEPLOYMENT SAYS SO RATHER THAN HANDING BACK A DEAD
+   * LINK. "Manage billing" that opens nothing is worse than a sentence saying
+   * billing is not set up.
+   */
+  const portal = operation({
+    id: "billing.portal",
+    kind: "read",
+    summary: "Where to change a card, read what was charged, or cancel.",
+    input: s.object({}),
+    output: s.object({ url: s.optional(s.text()), why: s.optional(s.text()) }),
+    permission: "billing:manage",
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const d = deps(ctx);
+      if (!d.chargeable) return { why: "this deployment has no payment provider configured" };
+      if (!d.portalUrl) return { why: "this deployment has a provider and no billing portal set" };
+      return { url: d.portalUrl };
+    },
+  });
+
+  return [plans, preview, standing, choose, packs, buy, portal] as unknown as readonly AnyOperation[];
 }
 
 /* -------------------------------------------------------- the other rail --- */

@@ -1098,6 +1098,12 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           db: regionalDb,
           tenantId: at.tenant?.tenantId ?? "",
           chargeable,
+          /* ⚠️ The same list the gate resolved against. Two reads is how a shelf
+             comes to show a price the gate does not enforce. */
+          selling,
+          /* ⚠️ Read from config, so turning billing on is a setting rather than
+             a deploy — and absent is reported rather than linked to. */
+          portalUrl: (await readAll(directoryDb))["billing.portal_url"] ?? null,
           entitlements: caller.entitlements,
           global: directoryDb,
           /*

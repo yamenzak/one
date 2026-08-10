@@ -13,7 +13,7 @@ import {
   NO_OVERRIDES, UNLIMITED,
   balanceOf, catalogueOf, charsPerUnit, daysRemaining, explainCustomerFlags, explainEntitlements,
   extendBudget, floorPlan, gateFor, heldEntitlements, mayPurchase, packageContradictions,
-  parkingAboveFloor, planRun, refuseCatalogueEdit, resolveCustomerFlags, resolveEntitlements, reversal,
+  packProblems, parkingAboveFloor, planRun, refuseCatalogueEdit, resolveCustomerFlags, resolveEntitlements, reversal,
   snapshotDowngrade,
   DESTRUCTIVE_FLOOR_DAYS, ladderProblems, lapsedFor, runwayFor, rungFor, settle, withinQuota,
   type Allowance, type EntitlementDef, type FlagDef, type Instant, type PackageSpec, type PlanSpec,
@@ -559,5 +559,30 @@ describe("holding an existing subscriber at what they were sold", () => {
       gate: { reads: true, writes: true, app: true },
     });
     expect(out.seats).toMatchObject({ value: 2, from: "grandfathered", planValue: 1 });
+  });
+});
+
+/* ------------------------------------------------------------ credit packs --- */
+
+/**
+ * ⚠️ EVERY ONE OF THESE IS A PACK SOMEBODY COULD BUY AND GET NOTHING FROM, and
+ * none of them throws: the purchase succeeds and the balance does not move,
+ * which is the worst shape a money bug can take.
+ */
+describe("what a workspace may buy to top up", () => {
+  it("refuses a pack that grants nothing or costs nothing", () => {
+    expect(packProblems([{ id: "a", name: "A", price: { minor: 900, currency: "USD" }, credits: 0 }])
+      .map((p) => p.why).join()).toMatch(/no credits/);
+    expect(packProblems([{ id: "b", name: "B", price: { minor: 0, currency: "USD" }, credits: 10 }])
+      .map((p) => p.why).join()).toMatch(/costs nothing/);
+  });
+
+  it("refuses two packs sharing an id", () => {
+    const twice = { id: "a", name: "A", price: { minor: 900, currency: "USD" as const }, credits: 10 };
+    expect(packProblems([twice, twice]).map((p) => p.why).join()).toMatch(/declared twice/);
+  });
+
+  it("says nothing about a sound one", () => {
+    expect(packProblems([{ id: "a", name: "A", price: { minor: 900, currency: "USD" }, credits: 10_000 }])).toEqual([]);
   });
 });

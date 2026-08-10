@@ -2551,6 +2551,105 @@
       "impl": "kova/test/dailies.test.ts",
       "proves": "follows a correction to the number it was computed from",
       "fails": "a score computed from a copy on a weekly report — correcting the original then leaves the score saying something else, and neither throws"
+    },
+    {
+      "id": "a-shelf-shows-what-is-sold",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/running.test.ts",
+      "proves": "shows an operator's edit rather than what the app shipped with",
+      "fails": "a price list showing what the app was declared with while the gate enforces what the deployment currently sells — a customer told a plan includes three and given ten, with a receipt that agrees with neither"
+    },
+    {
+      "id": "a-preview-reads-the-sold-catalogue",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/running.test.ts",
+      "proves": "previews against the same catalogue",
+      "fails": "somebody told what they would gain under ceilings the deployment stopped selling — a promise broken at the moment it is made"
+    },
+    {
+      "id": "buying-credits-grants-none",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/running.test.ts",
+      "proves": "moves no balance when a pack is bought",
+      "fails": "a balance anybody refills by calling the purchase endpoint"
+    },
+    {
+      "id": "an-unpayable-purchase-refuses",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/running.test.ts",
+      "proves": "refuses on a deployment that cannot take a payment, rather than pretending",
+      "fails": "a pending purchase nothing will ever settle — a workspace waiting for credits that are not coming, with no signal at all"
+    },
+    {
+      "id": "a-billing-link-goes-somewhere",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/running.test.ts",
+      "proves": "says why there is nowhere to go, rather than offering a dead link",
+      "fails": "\"manage billing\" opening nothing, which is a bug somebody reports where a sentence would have been an answer"
+    },
+    {
+      "id": "self-registration-is-off-until-a-studio-says",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/running.test.ts",
+      "proves": "is refused by a studio that has not turned it on",
+      "fails": "anybody who guesses a workspace's address becoming a client of it — consuming a seat, appearing on the roster, a stranger among the people it coaches"
+    },
+    {
+      "id": "an-open-door-has-a-ceiling-of-its-own",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/running.test.ts",
+      "proves": "stops at the ceiling the studio set",
+      "fails": "a plan quota checked against the CALLER's entitlements where the caller belongs to nothing yet — so an open studio is one anybody can push past its own plan"
+    },
+    {
+      "id": "registration-is-not-a-membership-oracle",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/running.test.ts",
+      "proves": "says the same thing to somebody already on the roster",
+      "fails": "type an address, learn whether that person is coached here — a disclosure on its own for a health product"
+    },
+    {
+      "id": "a-roster-count-is-not-an-active-count",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/running.test.ts",
+      "proves": "separates who is on the roster from who is training",
+      "fails": "the number that flatters — it only ever goes up, and it goes up fastest when nobody is being coached"
+    },
+    {
+      "id": "a-request-is-not-its-own-answer",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/asking.test.ts",
+      "proves": "puts every answering field behind the same permission as its state",
+      "fails": "a client marking their own swap allowed and a coach agreeing to their own release — both open because the asker must hold the collection's write permission in order to ask at all"
+    },
+    {
+      "id": "a-credit-pack-grants-something-and-costs-something",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/commerce.test.ts",
+      "proves": "refuses a pack that grants nothing or costs nothing",
+      "fails": "a purchase that succeeds and moves no balance, or a tap anybody refills from for free"
     }
   ]
 }
