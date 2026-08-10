@@ -17,7 +17,7 @@
  * They differ by one verb.
  */
 
-import { tenantCascade, type CascadeStep, type Instant, type ObjectHandle, type SchemaModule, type SqlHandle } from "@one/kernel";
+import { subjectCascade, tenantCascade, type CascadeStep, type Instant, type ObjectHandle, type SchemaModule, type SqlHandle, type SubjectStep } from "@one/kernel";
 import { eraseObjects } from "./files.js";
 
 /**
@@ -147,4 +147,84 @@ export async function eraseTenant(
     }
   }
   return { tables, absent, objects: bytes.objects, stranded: 0 };
+}
+
+/* ------------------------------------------------------------ one person --- */
+
+export const subjectPlan = (modules: readonly SchemaModule[]): readonly SubjectStep[] => subjectCascade(modules);
+
+export interface Forgotten {
+  readonly tables: readonly string[];
+  /** ⚠️ Tables the plan named that this database does not have. Reported, not hidden. */
+  readonly absent: readonly string[];
+  /** Rows of the activity trail that went with them. */
+  readonly trail: number;
+}
+
+/**
+ * Forget one person, everywhere this workspace kept them.
+ *
+ * ⚠️ DERIVED, FOR THE REASON THE TENANT PLAN IS — and more so. A hand-written
+ * list for one subject is worse than a hand-written one for a workspace, because
+ * nobody notices a table that was missed for ONE person: the workspace keeps
+ * working, the screens are all correct, and a record somebody asked to be rid of
+ * is still answering queries in a table nobody thought about.
+ *
+ * ⚠️ BOTH COLUMNS ARE BOUND. Deleting by subject alone reaches across workspaces
+ * the moment two of them mint the same id, and ids are the app's — so a platform
+ * that assumed they were unique would be assuming something it cannot check.
+ *
+ * ⚠️ AND IT DOES NOT TOUCH THE SUBJECT'S OWN ROW. What "removing a client" means
+ * to a product — archive the record, keep an invoice, free a seat — is the app's
+ * decision, and one this cannot make. It clears what HANGS OFF them.
+ */
+export async function eraseSubject(
+  db: SqlHandle,
+  plan: readonly SubjectStep[],
+  tenantId: string,
+  subjectId: string,
+  trailTable = "activity",
+): Promise<Forgotten> {
+  const tables: string[] = [];
+  const absent: string[] = [];
+  /*
+    ⚠️ THE TRAIL IS TENANT-SCOPED, SO THE CASCADE CANNOT SEE IT, and what it
+    holds about somebody is not nothing: a dated list of every time their record
+    was touched and by whom. Left behind, "forget this person" produces a
+    workspace that still knows they existed, when they were edited and how
+    often — which is the shape of the thing they asked to be rid of.
+
+    ⚠️ THE IDS ARE READ BEFORE THE ROWS GO, because afterwards there is nothing
+    left to join to. A trail entry names the row it is about, and once that row
+    is deleted the entry is an orphan nobody can attribute — including us.
+  */
+  const trailIds = new Set<string>([subjectId]);
+  for (const step of plan) {
+    const rows = await db.all<{ id: string }>(
+      `SELECT id FROM ${step.table} WHERE ${step.tenantColumn} = ? AND ${step.subjectColumn} = ?`,
+      tenantId, subjectId,
+    ).catch(() => []);
+    for (const r of rows) trailIds.add(r.id);
+  }
+
+  for (const step of plan) {
+    try {
+      await db.run(`DELETE FROM ${step.table} WHERE ${step.tenantColumn} = ? AND ${step.subjectColumn} = ?`, tenantId, subjectId);
+      tables.push(step.table);
+    } catch {
+      absent.push(step.table);
+    }
+  }
+
+  let trail = 0;
+  for (const id of trailIds) {
+    const before = await db.first<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM ${trailTable} WHERE tenant_id = ? AND row_id = ?`, tenantId, id,
+    ).catch(() => null);
+    if (!before) continue;
+    await db.run(`DELETE FROM ${trailTable} WHERE tenant_id = ? AND row_id = ?`, tenantId, id).catch(() => undefined);
+    trail += before.n;
+  }
+
+  return { tables, absent, trail };
 }

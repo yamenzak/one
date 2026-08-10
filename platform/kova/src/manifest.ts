@@ -16,7 +16,8 @@
 import { daysBetween, daysLeft, progressOf } from "./goals.js";
 import { energyOf, overDays, portionOf, totalOf, type Macros } from "./nutrition.js";
 import { bestOf, consistency, expectedOver, needing, prescribedPerWeek, soonest } from "./reading.js";
-import { generateWith, lapsedAcross, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
+import { forgetSubject, generateWith, lapsedAcross, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
+import { progressWeek, weekAt, WEEKS_SHAPE, type Week } from "./plans.js";
 import {
   UNLIMITED,
   cache, collection, defineApp, defineBindings, field,
@@ -230,6 +231,14 @@ export const sets = collection({
     reps: field.number({ integer: true, min: 0, max: 1_000 }),
     /** How hard it felt. The one number that makes a log worth reading later. */
     effort: field.number({ integer: true, min: 1, max: 10, label: "Effort" }),
+    /*
+      ⚠️ WHICH ROUND OF A GROUP THIS WAS, and it is what makes a superset a
+      superset in the history rather than only in the plan. Without it, three
+      rounds of bench-and-row are six sets in an order nobody can reconstruct —
+      and "what did I do last time" is the question the whole collection exists
+      to answer.
+    */
+    round: field.number({ integer: true, min: 1, max: 100, label: "Round" }),
   },
 });
 
@@ -410,6 +419,70 @@ export const goals = collection({
     /* ⚠️ `dueOn`, not `by` — a third SQL keyword caught at declaration rather than at boot. */
     dueOn: field.plainDate({ label: "By" }),
     why: field.text({ multiline: true, max: 1_000 }),
+  },
+});
+
+/* --------------------------------------------------------- alternatives --- */
+
+/**
+ * A movement that stands in for another.
+ *
+ * ⚠️ A COLLECTION RATHER THAN A LIST ON THE MOVEMENT, because a stand-in has a
+ * REASON and the reason is the useful half. "Goblet squat instead of back squat"
+ * says nothing; "instead of back squat, if the bar hurts your shoulder" is
+ * something a client can act on and a different coach can trust.
+ *
+ * ⚠️ AND IT IS DIRECTIONAL. What stands in for a back squat is not what a back
+ * squat stands in for, and a symmetric list quietly asserts both.
+ */
+export const alternatives = collection({
+  id: "alternative",
+  label: { one: "Alternative", many: "Alternatives" },
+  scope: { of: "tenant" },
+  version: true,
+  retention: { days: null, onTenantClose: "purge" },
+  onDelete: { on: "purge" },
+  fields: {
+    movement: field.ref("movement", { onDelete: "cascade", required: true }),
+    substitute: field.ref("movement", { onDelete: "cascade", required: true }),
+    why: field.text({ required: true, max: 400, label: "When to use it" }),
+  },
+});
+
+/* ---------------------------------------------------------------- swaps --- */
+
+/**
+ * A client asking to do something else, and the answer.
+ *
+ * ⚠️ ONE RECORD, NOT A MESSAGE. A swap asked for in a chat is a decision nobody
+ * can find afterwards — and the question a coach is actually answering is "may
+ * I do this instead", which has exactly three states and belongs in a row.
+ *
+ * ⚠️ AND THE ANSWER IS THE COACH'S. A client may open one and may not decide
+ * one, which is the same line every other prescription in this product draws.
+ */
+export const swaps = collection({
+  id: "swap",
+  label: { one: "Swap request", many: "Swap requests" },
+  scope: { of: "subject", subject: "client" },
+  customerFlag: "training",
+  version: true,
+  retention: { days: null, onTenantClose: "purge" },
+  onDelete: { on: "purge" },
+  activity: true,
+  fields: {
+    movement: field.ref("movement", { onDelete: "cascade", required: true }),
+    why: field.text({ required: true, max: 500, label: "Why" }),
+    /*
+      ⚠️ THE ANSWER IS THE STUDIO'S, AND THESE THREE `write` DECLARATIONS ARE
+      WHAT MAKE THAT TRUE. A client must hold `swap:write` to open a request at
+      all, and that same permission opens the derived update — so without a
+      narrower write on the answering fields, `swap.decide` is a lock beside an
+      open window and anybody can mark their own request allowed.
+    */
+    state: field.enum(["asked", "allowed", "refused"], { required: true, initial: "asked", label: "State", write: "programme:write" }),
+    substitute: field.ref("movement", { onDelete: "null", write: "programme:write" }),
+    answer: field.text({ max: 500, label: "What the coach said", write: "programme:write" }),
   },
 });
 
@@ -681,6 +754,8 @@ const T = {
   checkins: tableNameFor(checkins),
   goals: tableNameFor(goals),
   articles: tableNameFor(articles),
+  alternatives: tableNameFor(alternatives),
+  swaps: tableNameFor(swaps),
 } as const;
 
 /**
@@ -1106,6 +1181,7 @@ const STAFF = [
   "ai:use", "booking:read", "booking:write", "article:read", "article:write", "article:feed",
   "supplement:read", "supplement:write", "dose:read", "dose:write", "lab:read", "lab:write",
   "assignment:read", "assignment:write",
+  "alternative:read", "alternative:write", "swap:read", "swap:write",
 ];
 
 /* ------------------------------------------------------------ publishing --- */
@@ -1184,6 +1260,236 @@ export const feed = operation<
       ctx.tenantId, Math.min(input.limit ?? 20, 100),
     );
     return { articles: rows };
+  },
+});
+
+/* ------------------------------------------------------------- movements --- */
+
+/**
+ * Where a movement is used, before anybody changes or removes it.
+ *
+ * ⚠️ THE QUESTION IS ASKED BEFORE A DESTRUCTIVE ACT, which is what makes it
+ * worth a surface. A movement renamed under a live plan changes what a client
+ * reads tomorrow; one deleted takes every set logged against it with it, and the
+ * derived delete cannot say so because a count is a query the collection layer
+ * has no reason to run.
+ */
+export const usage = operation<
+  Bindings,
+  { movementId: string },
+  { sets: number; programmes: number; alternatives: number; swaps: number },
+  never
+>({
+  id: "movement.usage",
+  kind: "read",
+  summary: "How much of the studio depends on this movement.",
+  input: s.object({ movementId: s.text({ max: 40 }) }),
+  output: s.object({
+    sets: s.number({ integer: true }), programmes: s.number({ integer: true }),
+    alternatives: s.number({ integer: true }), swaps: s.number({ integer: true }),
+  }),
+  permission: "movement:read",
+  idempotency: { mode: "none" },
+  async handler(ctx, input: { movementId: string }) {
+    const count = async (sql: string, ...binds: unknown[]) =>
+      (await ctx.bind.db.first<{ n: number }>(sql, ...binds))?.n ?? 0;
+
+    /*
+      ⚠️ A PROGRAMME'S BODY IS JSON, so this is a text match rather than a join —
+      which is the price of the decision that weeks are read and written whole,
+      stated where it is paid. It over-counts a movement whose id appears in a
+      note, and over-counting is the safe direction for a question asked before
+      deleting something.
+    */
+    return {
+      sets: await count(`SELECT COUNT(*) AS n FROM ${T.sets} WHERE tenant_id = ? AND movement = ?`, ctx.tenantId, input.movementId),
+      programmes: await count(
+        `SELECT COUNT(*) AS n FROM ${T.programmes} WHERE tenant_id = ? AND deleted_at IS NULL AND weeks LIKE ?`,
+        ctx.tenantId, `%${input.movementId}%`,
+      ),
+      alternatives: await count(
+        `SELECT COUNT(*) AS n FROM ${T.alternatives} WHERE tenant_id = ? AND (movement = ? OR substitute = ?)`,
+        ctx.tenantId, input.movementId, input.movementId,
+      ),
+      swaps: await count(`SELECT COUNT(*) AS n FROM ${T.swaps} WHERE tenant_id = ? AND movement = ?`, ctx.tenantId, input.movementId),
+    };
+  },
+});
+
+/* ------------------------------------------------------------ copying --- */
+
+/**
+ * Repeat a week, with progression.
+ *
+ * ⚠️ THE ARITHMETIC IS PURE AND LIVES IN `plans.ts`; this is the read, the
+ * append and the version bump. A coach writing a four-week block writes week one
+ * and then the same movements three more times with different numbers — and
+ * every one of those is a chance to change a movement in one week and not the
+ * next.
+ */
+export const copyWeek = operation<
+  Bindings,
+  { programmeId: string; week: number; loadPercent?: number; repsAdded?: number },
+  { weeks: number },
+  "platform.not_found" | "platform.invalid"
+>({
+  id: "programme.copy-week",
+  kind: "write",
+  summary: "Add a copy of one week to the end, with the progression you asked for.",
+  input: s.object({
+    programmeId: s.text({ max: 40 }),
+    week: s.number({ integer: true, min: 1, max: 52 }),
+    loadPercent: s.optional(s.number({ min: -50, max: 50 })),
+    repsAdded: s.optional(s.number({ integer: true, min: -20, max: 20 })),
+  }),
+  output: s.object({ weeks: s.number({ integer: true }) }),
+  permission: "programme:write",
+  entitlement: "training",
+  idempotency: { mode: "none" },
+  audit: (i: { programmeId: string }) => ({ subject: i.programmeId, verb: "copy-week" }),
+  outcome: { message: "Week added", tone: "success", invalidates: ["programme"] },
+  fails: ["platform.not_found", "platform.invalid"],
+  async handler(ctx, input: { programmeId: string; week: number; loadPercent?: number; repsAdded?: number }) {
+    const row = await ctx.bind.db.first<{ id: string; weeks: string; version: number }>(
+      `SELECT id, weeks, version FROM ${T.programmes} WHERE id = ? AND tenant_id = ? AND deleted_at IS NULL`,
+      input.programmeId, ctx.tenantId,
+    );
+    if (!row) ctx.fail("platform.not_found", { field: "programmeId" });
+
+    /*
+      ⚠️ AN UNREADABLE BODY IS REFUSED RATHER THAN REPLACED. A JSON column that
+      will not parse is a plan somebody wrote; overwriting it with a fresh array
+      would lose it in the course of a convenience.
+    */
+    let weeks: Week[];
+    try {
+      const parsed = JSON.parse(row!.weeks) as unknown;
+      if (!Array.isArray(parsed)) throw new Error("not a list");
+      weeks = parsed as Week[];
+    } catch {
+      ctx.fail("platform.invalid", { field: "weeks", reason: "this plan's weeks cannot be read" });
+      throw new Error("unreachable");
+    }
+
+    const source = weekAt(weeks, input.week);
+    if (!source) ctx.fail("platform.invalid", { field: "week", reason: "there is no such week" });
+
+    const next = [...weeks, progressWeek(source!, {
+      ...(input.loadPercent === undefined ? {} : { loadPercent: input.loadPercent }),
+      ...(input.repsAdded === undefined ? {} : { repsAdded: input.repsAdded }),
+    })];
+    await ctx.bind.db.run(
+      `UPDATE ${T.programmes} SET weeks = ?, version = version + 1, updated_at = ? WHERE id = ?`,
+      JSON.stringify(next), ctx.now(), row!.id,
+    );
+    return { weeks: next.length };
+  },
+});
+
+/* ----------------------------------------------------------- deciding --- */
+
+/**
+ * Answer a swap request.
+ *
+ * ⚠️ THE ANSWER IS THE COACH'S, AND THAT IS WHY IT IS NOT THE DERIVED UPDATE. A
+ * client holds `swap:write` so they can ask; the same permission on the derived
+ * update would let them mark their own request allowed, which is the whole
+ * question answering itself.
+ */
+export const decideSwap = operation<
+  Bindings,
+  { swapId: string; allow: boolean; substitute?: string; answer?: string },
+  { state: string },
+  "platform.not_found" | "platform.invalid"
+>({
+  id: "swap.decide",
+  kind: "write",
+  summary: "Allow or refuse a swap, with what to do instead.",
+  input: s.object({
+    swapId: s.text({ max: 40 }),
+    allow: s.bool(),
+    substitute: s.optional(s.text({ max: 40 })),
+    answer: s.optional(s.text({ max: 500 })),
+  }),
+  output: s.object({ state: s.text() }),
+  /* ⚠️ Prescribing is a coach's act, so it carries the prescribing permission. */
+  permission: "programme:write",
+  idempotency: { mode: "natural", key: "swapId" },
+  audit: (i: { swapId: string }) => ({ subject: i.swapId, verb: "decide" }),
+  outcome: { message: "Answered", tone: "success", invalidates: ["swap"] },
+  fails: ["platform.not_found", "platform.invalid"],
+  async handler(ctx, input: { swapId: string; allow: boolean; substitute?: string; answer?: string }) {
+    const row = await ctx.bind.db.first<{ id: string; state: string }>(
+      `SELECT id, state FROM ${T.swaps} WHERE id = ? AND tenant_id = ?`, input.swapId, ctx.tenantId,
+    );
+    if (!row) ctx.fail("platform.not_found", { field: "swapId" });
+
+    /*
+      ⚠️ ALLOWING ONE WITHOUT SAYING WHAT INSTEAD IS NOT AN ANSWER. The client
+      asked what to do; "yes" on its own leaves them standing in a gym having
+      been told they may do something unspecified.
+    */
+    if (input.allow && !input.substitute) ctx.fail("platform.invalid", { field: "substitute", reason: "say what to do instead" });
+
+    const state = input.allow ? "allowed" : "refused";
+    await ctx.bind.db.run(
+      `UPDATE ${T.swaps} SET state = ?, substitute = ?, answer = ?, version = version + 1, updated_at = ? WHERE id = ?`,
+      state, input.substitute ?? null, input.answer ?? "", ctx.now(), row!.id,
+    );
+    return { state };
+  },
+});
+
+/* ----------------------------------------------------------- forgetting --- */
+
+/**
+ * Remove somebody entirely, on request, and have that be final.
+ *
+ * ⚠️ DELETING A CLIENT ARCHIVES THE RECORD, AND THAT IS RIGHT FOR ALMOST EVERY
+ * CASE — a studio tidying its roster has not been asked to destroy anything. This
+ * is the other case, and it is the one somebody has a right to: everything that
+ * hangs off a person, gone, in one act they can be told completed.
+ *
+ * ⚠️ THE PLAN IS DERIVED, never listed here. A hand-written list for one subject
+ * is worse than one for a workspace: nobody notices a table that was missed for
+ * ONE person, because the studio keeps working and every screen is correct while
+ * a record somebody asked to be rid of is still answering queries.
+ */
+export const forgetClient = operation<
+  Bindings,
+  { clientId: string; confirm: string },
+  { tables: unknown; absent: unknown; trail: number },
+  "platform.not_found" | "platform.invalid"
+>({
+  id: "client.forget",
+  kind: "write",
+  summary: "Erase everything about one person, permanently.",
+  input: s.object({ clientId: s.text({ max: 40 }), confirm: s.text({ max: 200 }) }),
+  output: s.object({ tables: s.json(), absent: s.json(), trail: s.number({ integer: true }) }),
+  /* ⚠️ The owner's, not a coach's. It is the one act in the product with no undo. */
+  permission: "workspace:close",
+  idempotency: { mode: "none" },
+  audit: (i: { clientId: string }) => ({ subject: i.clientId, verb: "forget" }),
+  outcome: { message: "Forgotten", tone: "warning", invalidates: ["client"] },
+  fails: ["platform.not_found", "platform.invalid"],
+  tool: false,
+  async handler(ctx, input: { clientId: string; confirm: string }) {
+    const row = await ctx.bind.db.first<{ id: string; name: string }>(
+      `SELECT id, name FROM ${T.clients} WHERE id = ? AND tenant_id = ?`, input.clientId, ctx.tenantId,
+    );
+    if (!row) ctx.fail("platform.not_found", { field: "clientId" });
+
+    /*
+      ⚠️ THE CONFIRMATION IS THEIR NAME, TYPED. A yes/no dialog in front of
+      something irreversible is a reflex rather than a decision, and this is the
+      one act in the product that cannot be undone.
+    */
+    if (input.confirm !== row!.name) ctx.fail("platform.invalid", { field: "confirm", reason: "type their name to confirm" });
+
+    const out = await forgetSubject(ctx, ctx.tenantId, row!.id);
+    /* ⚠️ And the record itself, last: the cascade clears what hangs off them. */
+    await ctx.bind.db.run(`DELETE FROM ${T.clients} WHERE id = ? AND tenant_id = ?`, row!.id, ctx.tenantId);
+    return out;
   },
 });
 
@@ -1320,7 +1626,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.15.0",
+  manifestVersion: "0.16.0",
   bindings,
 
   identity: {
@@ -1389,6 +1695,9 @@ export const kova = defineApp({
         /* ⚠️ They READ what was prescribed and RECORD taking it; prescribing is
            staff's, and so is writing up what a report said. */
         "supplement:read", "dose:read", "dose:write", "lab:read", "assignment:read",
+        /* ⚠️ They ASK for a swap and read the alternatives a coach wrote; the
+           answer is the coach's, which is why `swap:decide` is not here. */
+        "alternative:read", "swap:read", "swap:write",
         "inbox:read", "guide:read", "milestone:read", "file:read", "commerce:read",
         /* ⚠️ A client may say a generation was wrong. They are the one who read it. */
         "ai:use",
@@ -1529,7 +1838,12 @@ export const kova = defineApp({
     auditRetentionDays: 730,
   },
 
-  collections: [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles, supplements, doses, labs, assignments],
+  /*
+    ⚠️ WHAT A `json` COLUMN ACTUALLY HOLDS. Without this the field name is a
+    comment and the column takes any shape — see `WEEKS_SHAPE`.
+  */
+  schemas: { "programme.weeks": WEEKS_SHAPE },
+  collections: [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles, supplements, doses, labs, assignments, alternatives, swaps],
 
   notifications: {
     "workspace.created": {
@@ -1577,7 +1891,7 @@ export const kova = defineApp({
     },
   },
 
-  operations: [publish, complete, answer, attention, report, draftPlan, parseFood, publishArticle, feed],
+  operations: [publish, complete, answer, attention, report, draftPlan, parseFood, publishArticle, feed, usage, copyWeek, decideSwap, forgetClient],
 
   help: {
     clients: {
@@ -1800,6 +2114,20 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.16.0",
+      at: "2026-08-10",
+      notes: [
+        "Write down which movement stands in for which, and WHY — \"instead of a back squat, if the bar hurts your shoulder\". The client reads them; the coach writes them.",
+        "Ask to swap a movement you cannot do today, and get an answer. Allowing one means saying what to do instead — \"yes\" on its own leaves somebody standing in a gym.",
+        "Before renaming or removing a movement, see everything that depends on it: sets logged, plans, stand-ins, swap requests.",
+        "Repeat a week with progression — a percentage on the loads, a count on the reps — rather than retyping it. Loads round to something you can actually put on a bar.",
+        "Group movements into supersets and circuits, and log what was done as rounds.",
+        "Record training that was not prescribed. Somebody who played five a side on Thursday did training.",
+        "See what was changed on somebody's record, by whom, and when.",
+        "Erase somebody entirely, on request, with their name typed to confirm — everything that hangs off them, and the record of it, in one act.",
+      ],
+    },
     {
       version: "0.15.0",
       at: "2026-08-10",

@@ -130,6 +130,17 @@ export interface Ctx<B extends BindingSpec> {
    */
   readonly included: Readonly<Record<string, boolean>>;
   readonly region: RegionId;
+  /**
+   * Whether this caller holds a permission.
+   *
+   * ⚠️ THE GATE ANSWERS THE OPERATION'S OWN QUESTION AND NO OTHER. A field may
+   * be narrower than the row it lives in — a swap request the customer opens and
+   * only the studio may answer — and the gate cannot see fields. Without this,
+   * `write` on a field is a declaration nothing reads: the operation-level
+   * refusal stands, the derived update beside it does not, and the lock is
+   * beside an open window.
+   */
+  holds(permission: string): boolean;
   /** ⚠️ Injected, so a test is deterministic and a handler cannot read a wall clock. */
   now(): Instant;
   /** Raise a declared failure. The only way out other than returning. */

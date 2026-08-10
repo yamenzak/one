@@ -16,7 +16,7 @@
 import type { AnyOperation, AppSpec, BindingSpec, Instant, ObjectHandle, SchemaModule, SqlHandle } from "@one/kernel";
 import { operation, s } from "@one/kernel";
 import { OPERATE } from "./operator-ops.js";
-import { erasurePlan, eraseTenant, exportTenant } from "./data.js";
+import { erasurePlan, eraseSubject, exportTenant, subjectPlan, eraseTenant, type Forgotten } from "./data.js";
 import { jobHistory } from "./jobs.js";
 
 /** ⚠️ A symbol, so an app cannot reach the plan by writing a property name. */
@@ -169,4 +169,22 @@ export function dataOperations<B extends BindingSpec>(_app: AppSpec<B>): readonl
   });
 
   return [takeIt, close, cancel, erase, runs] as unknown as readonly AnyOperation[];
+}
+
+/**
+ * Forget one person, from inside an app's own handler.
+ *
+ * ⚠️ THE PLAN COMES FROM THE RUNTIME'S OWN MODULE LIST, not from the app. An app
+ * that assembled it would be assembling the thing this platform derives — and
+ * would do it from `worker.ts`, which imports the manifest, so the manifest
+ * cannot import it back. Reading it off the context is what makes "forget this
+ * client" expressible in the file where the product decides what that means.
+ */
+export async function forgetSubject(
+  ctx: unknown,
+  tenantId: string,
+  subjectId: string,
+): Promise<Forgotten> {
+  const d = deps(ctx);
+  return eraseSubject(d.db, subjectPlan(d.modules), tenantId, subjectId);
 }

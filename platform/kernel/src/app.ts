@@ -12,6 +12,7 @@
 
 import type { BindingSpec } from "./bindings.js";
 import type { CollectionSpec } from "./collection.js";
+import type { Shape } from "./validate.js";
 import type { FlagDef } from "./customer.js";
 import type { AiSpec } from "./generation.js";
 import { aiProblems } from "./generation.js";
@@ -293,6 +294,22 @@ export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = Probl
    */
   readonly ai?: AiSpec;
   /**
+   * ⚠️ WHAT A `json` FIELD ACTUALLY CONTAINS, and it is not optional the moment
+   * one exists.
+   *
+   * A `json` field names a schema — `field.json("programme.weeks")` — and that
+   * name used to be a comment: nothing read it, so the column took any shape at
+   * all. The characteristic failure is not a crash. Code that reads the body
+   * walks the keys it expects, finds none of them, and returns the input
+   * unchanged: a plan whose days carry `items` where the reader wants
+   * `movements` copies a week and applies no progression, saves, and reports
+   * success. Every number is right and nothing moved.
+   *
+   * ⚠️ REGISTERED BY THE APP, because the SHAPE is the product's. A platform
+   * that owned it would be owning what a training plan is.
+   */
+  readonly schemas?: Readonly<Record<string, Shape<unknown>>>;
+  /**
    * ⚠️ SCHEDULED WORK IS DECLARED, NOT CRON'D. A cron entry in a deployment
    * config is a capability with no surface, no test, no audit and no record that
    * it ran — and the characteristic failure is silence rather than an error.
@@ -554,6 +571,7 @@ export function assertComposable(spec: {
   readonly releases: readonly Release[];
   readonly guide?: GuideSpec;
   readonly milestones?: MilestoneRegistry;
+  readonly schemas?: Readonly<Record<string, Shape<unknown>>>;
   readonly problems: Readonly<Record<string, unknown>>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- heterogeneous by nature
   readonly jobs?: readonly JobSpec<any>[];
@@ -668,6 +686,31 @@ export function assertComposable(spec: {
   const missing = danglingHelp(spec.help, referenced);
   if (missing.length) {
     throw new Error(`${spec.id}: help article(s) ${missing.join(", ")} are linked to and not declared.`);
+  }
+
+  /*
+    ⚠️ A `json` FIELD NAMING AN UNREGISTERED SCHEMA IS AN UNVALIDATED COLUMN
+    WEARING A CONTRACT'S CLOTHES.
+
+    The name reads like a promise and used to be a comment: the column took any
+    shape at all, and the failure that follows is silent rather than loud. Code
+    that reads the body walks the keys it expects, finds none of them, and hands
+    the input back unchanged — so a plan whose days carry `items` where the
+    reader wants `movements` copies a week, applies no progression, saves, and
+    reports success with every number correct and nothing moved.
+
+    Refusing at composition costs one registration; the alternative costs a
+    column of malformed records nobody can find.
+  */
+  const unregistered = spec.collections.flatMap((c) =>
+    Object.entries(c.fields)
+      .filter(([, f]) => f.kind === "json" && !(spec.schemas ?? {})[(f as { schema: string }).schema])
+      .map(([name, f]) => `${c.id}.${name} names "${(f as { schema: string }).schema}"`));
+  if (unregistered.length) {
+    throw new Error(
+      `${spec.id}: ${unregistered.join(", ")} — a json field must name a schema this manifest registers, ` +
+        `or the column takes any shape and the reader silently returns its input unchanged.`,
+    );
   }
 
   /*

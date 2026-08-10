@@ -2738,3 +2738,87 @@ collection with a rule.
 It is the same defect as merging under column names, one column over, and it
 survived until a test edited a row in a way that had to be refused BECAUSE of
 whose row it was.
+
+## 222. A SQL keyword found a whole batch's worth of the same shape
+
+`instead` — the obvious name for the movement a stand-in stands in for — is a
+SQLite keyword, and the derivation refused it at boot with the collection and
+the field named. One rename, thirty seconds, and it is the LAST cheap finding in
+this batch: everything below was found by writing tests that assumed the
+platform kept a promise it was only making.
+
+## 223. The subject column belonged to the module, not the table
+
+A collection declares which person its rows hang off. The derivation kept ONE
+such column per module and overwrote it per collection, so an app scoping one
+table to a client and another to a coach ends up with whichever was declared
+last.
+
+The failure is silent in the worst available way. Erasing a client runs
+`DELETE … WHERE coach_id = ?` against a table whose column is `client_id`;
+SQLite throws; the purge catches — it MUST, because an older database
+legitimately lacks a module's tables — and reports the table as "absent". So a
+person asked to be forgotten, we said yes, and every row is still there under a
+heading that reads like an old database.
+
+Kova has one subject today, so nothing was wrong in the running product. It was
+wrong in the mechanism, which is the thing three more apps will inherit.
+
+## 224. Reads spoke storage while writes spoke the declaration
+
+A collection took `howItWent`, a real boolean and a real object on the way in,
+and handed back `how_it_went`, `1`, and a JSON column as the TEXT it is stored
+in. Every consumer had to know both vocabularies.
+
+That is not untidy, it is a corruption path with no error anywhere on it. The
+obvious client — read a record, change one field, send it back — takes a JSON
+column out as a string and puts it back as one. The column then holds an encoded
+encoding; the next read returns a string that parses to a string; the read after
+that returns a string that parses to a string that parses to an object. Nothing
+throws at any point and every response is a 200.
+
+## 225. `field.json("programme.weeks")` validated nothing
+
+The schema name was a comment. Nothing read it, so the column took any shape at
+all — and the failure that follows has no exception in it: code that reads the
+body walks the keys it expects, finds none of them, and returns its input
+unchanged.
+
+Kova had TWO readers of that column and they disagreed about its key.
+`progressWeek` reads `days[].movements`; `prescribedPerWeek` read `days[].items`.
+So depending on which shape the writer happened to produce, either copying a week
+applied no progression, or the report said nothing was prescribed — each with
+every number correct, saved cleanly, reported as a success.
+
+⚠️ AND DROPPING AN UNDECLARED KEY IS RIGHT FOR A REQUEST AND WRONG FOR A RECORD.
+An object shape silently discards what it was not told about, which is correct
+for an envelope a newer client sends — and wrong for a body stored WHOLE, where
+what is dropped is not ignored but LOST: the caller sent it, the write answered
+200, and the record they believe they saved is not the one in the column.
+`strict` is that difference, and it is declared per shape rather than imposed on
+every request.
+
+## 226. The operation was locked and the window beside it was open
+
+`swap.decide` carried a careful comment about why answering a swap request is the
+coach's act and not the client's — written while the derived `swap.update` took
+the same three fields behind the permission the client must hold to ASK.
+
+`read` and `write` have been on a field since stage 0 and were enforced by
+nothing, so the narrower declaration that would have closed it was available,
+documented, and dead. The half that was genuinely missing is `initial`: a field
+that is required AND write-restricted is a collection the person the feature is
+for cannot write a row into, so the two declarations together produced a
+refusal of their own use.
+
+## 227. Forgetting somebody left a dated record that they existed
+
+The erasure cascade is subject-scoped and the activity trail is tenant-scoped, so
+the derived walk could not see it. What stayed behind was every time their record
+was touched and by whom — which is the shape of the thing somebody asks to be rid
+of, kept under a heading that says it was removed.
+
+⚠️ AND THE IDS HAVE TO BE READ BEFORE THE ROWS GO. A trail entry names the row it
+is about; once the row is deleted there is nothing left to join to, so a run that
+erased first and looked afterwards finds nothing to remove and reports a complete
+erasure over entries nobody can attribute — including us.

@@ -53,8 +53,7 @@ export const MEMBERSHIP_SCHEMA: SchemaModule = {
   scoped: {
     tenantColumn: "tenant_id",
     tenantTables: ["membership"],
-    subjectColumn: "subject_id",
-    subjectTables: ["membership"],
+    subjectTables: [{ table: "membership", column: "subject_id" }],
   },
 };
 

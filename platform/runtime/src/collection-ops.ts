@@ -32,14 +32,22 @@ import { mediaRefused } from "./files.js";
  * one — SQLite's types are per value — and every count computed from the column
  * would be wrong with nothing throwing.
  */
-export function shapeForField(f: Field): Shape<unknown> {
+export function shapeForField(f: Field, schemas: Schemas = {}): Shape<unknown> {
   switch (f.kind) {
     case "text": return s.text({ ...(f.min !== undefined ? { min: f.min } : {}), ...(f.max ? { max: f.max } : {}) }) as Shape<unknown>;
     case "number": return s.number({ ...(f.integer ? { integer: true } : {}), ...(f.min !== undefined ? { min: f.min } : {}), ...(f.max !== undefined ? { max: f.max } : {}) }) as Shape<unknown>;
     case "bool": return s.bool() as Shape<unknown>;
     case "enum": return s.enum(f.values) as Shape<unknown>;
     case "ref": return s.id(f.to) as Shape<unknown>;
-    case "json": return s.json() as Shape<unknown>;
+    /*
+      ⚠️ THE REGISTERED SHAPE, NOT `s.json()`. A json field NAMES its schema, and
+      the name was decoration until an app registered one — so the column took
+      any shape and a reader walking keys it never found returned its input
+      unchanged, silently. `assertComposable` refuses a name nothing registers,
+      so the fallback below is unreachable through a composed app and is here
+      only so this function stays total.
+    */
+    case "json": return (schemas[f.schema] ?? s.json()) as Shape<unknown>;
     case "money": return s.money() as Shape<unknown>;
     case "instant": return s.instant() as Shape<unknown>;
     case "plainDate": return s.plainDate() as Shape<unknown>;
@@ -50,11 +58,18 @@ export function shapeForField(f: Field): Shape<unknown> {
   }
 }
 
-const bodyShape = (spec: CollectionSpec, partial: boolean, owner = false): Shape<Record<string, unknown>> => {
+const bodyShape = (spec: CollectionSpec, partial: boolean, owner = false, schemas: Schemas = {}): Shape<Record<string, unknown>> => {
   const fields: Record<string, Shape<unknown>> = {};
   for (const [name, f] of Object.entries(spec.fields)) {
-    const shape = shapeForField(f);
-    fields[name] = partial || !f.required ? (s.optional(shape) as Shape<unknown>) : shape;
+    const shape = shapeForField(f, schemas);
+    /*
+      ⚠️ A FIELD WITH AN `initial` IS NEVER REQUIRED ON THE WIRE. The create
+      fills it, so demanding it would make the declaration a formality somebody
+      has to satisfy — and where the field is also write-restricted, an
+      impossible one.
+    */
+    const optional = partial || !f.required || f.initial !== undefined;
+    fields[name] = optional ? (s.optional(shape) as Shape<unknown>) : shape;
   }
   /*
     ⚠️ STAFF WRITE ON SOMEBODY'S BEHALF, AND CUSTOMERS DO NOT NAME ANYBODY.
@@ -116,6 +131,9 @@ const subjectColumn = (spec: CollectionSpec): string =>
 
 /* ------------------------------------------------------------- operations --- */
 
+/** Named body shapes the app registered. See `AppSpec.schemas`. */
+export type Schemas = Readonly<Record<string, Shape<unknown>>>;
+
 export interface CollectionAccess {
   /** Defaults to `<id>:read` and `<id>:write`. */
   readonly read?: string;
@@ -130,7 +148,7 @@ export interface CollectionAccess {
  * ones that refuse: absent. A surface that exists and always refuses is a
  * surface somebody will try to make work.
  */
-export function collectionOperations(spec: CollectionSpec, access: CollectionAccess = {}): readonly AnyOperation[] {
+export function collectionOperations(spec: CollectionSpec, access: CollectionAccess = {}, schemas: Schemas = {}): readonly AnyOperation[] {
   const table = tableNameFor(spec);
   const read = access.read ?? `${spec.id}:read`;
   const write = access.write ?? `${spec.id}:write`;
@@ -237,8 +255,8 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
       const searching = input.search && terms.length;
       const where = `${scope.where}${liveClause(spec)}${searching ? ` AND (${terms.map((t) => `${columnName(t)} LIKE ?`).join(" OR ")})` : ""}`;
       const binds = [...scope.binds(tenantId), ...(searching ? terms.map(() => `%${input.search}%`) : [])];
-      const rows = await db.all(`SELECT ${selectable.join(", ")} FROM ${table} WHERE ${where} ORDER BY created_at DESC LIMIT ?`, ...binds, limit);
-      return { rows };
+      const rows = await db.all<Record<string, unknown>>(`SELECT ${selectable.join(", ")} FROM ${table} WHERE ${where} ORDER BY created_at DESC LIMIT ?`, ...binds, limit);
+      return { rows: rows.map((r) => present(spec, r)) };
     },
   });
 
@@ -253,9 +271,9 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     fails: ["platform.not_found"],
     async handler(ctx, input: { id: string }) {
       const { db, tenantId, scope } = store(ctx);
-      const row = await db.first(`SELECT ${selectable.join(", ")} FROM ${table} WHERE id = ? AND ${scope.where}${liveClause(spec)}`, input.id, ...scope.binds(tenantId));
+      const row = await db.first<Record<string, unknown>>(`SELECT ${selectable.join(", ")} FROM ${table} WHERE id = ? AND ${scope.where}${liveClause(spec)}`, input.id, ...scope.binds(tenantId));
       if (!row) ctx.fail("platform.not_found");
-      return { row };
+      return { row: present(spec, row!) };
     },
   });
 
@@ -263,20 +281,28 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     id: `${spec.id}.create`,
     kind: "write",
     summary: `Add a ${spec.label.one.toLowerCase()}.`,
-    input: bodyShape(spec, false, true),
+    input: bodyShape(spec, false, true, schemas),
     output: s.object({ id: s.id(spec.id), version: s.number({ integer: true }) }),
     permission: write,
     idempotency: { mode: "none" },
-    fails: ["platform.invalid"],
+    fails: ["platform.invalid", "platform.forbidden"],
     audit: () => ({ subject: spec.id, verb: "create" }),
     outcome: { message: `${spec.label.one} saved`, tone: "success", invalidates: [spec.id] },
     async handler(ctx, input: Record<string, unknown>) {
       const { db, tenantId, subjectId } = store(ctx);
       const at = ctx.now();
       const id = `${spec.id.slice(0, 3)}_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
-      await checkMedia(ctx, input, db, tenantId);
-      await obeys(ctx, db, tenantId, null, input);
-      const [names, values] = columnValues(spec, input);
+      const refusedFields = unwritable(spec, input, (p) => ctx.holds(p));
+      if (refusedFields.length) ctx.fail("platform.forbidden", { fields: refusedFields.join(", ") });
+      /*
+        ⚠️ AFTER THE WRITE CHECK, so a caller who SENT a restricted field is
+        still refused rather than having their value quietly replaced by the
+        initial — which would report success and store something else.
+      */
+      const body = withInitials(spec, input);
+      await checkMedia(ctx, body, db, tenantId);
+      await obeys(ctx, db, tenantId, null, body);
+      const [names, values] = columnValues(spec, body);
       /*
         ⚠️ A SUBJECT-SCOPED ROW WITH NO SUBJECT IS A ROW NOBODY OWNS. The column
         is `NOT NULL` in the derived DDL, so writing one without a subject is a
@@ -315,13 +341,13 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
       the one that bites is a tool call racing a person — same defect, worse
       timing, and nobody watching.
     */
-    input: s.object({ id: s.id(spec.id), version: s.number({ integer: true }), changes: bodyShape(spec, true) }),
+    input: s.object({ id: s.id(spec.id), version: s.number({ integer: true }), changes: bodyShape(spec, true, false, schemas) }),
     output: s.object({ version: s.number({ integer: true }) }),
     permission: write,
     idempotency: { mode: "none" },
     audit: (i: { id: string }) => ({ subject: i.id, verb: "update" }),
     outcome: { message: "Saved", tone: "success", invalidates: [spec.id] },
-    fails: ["platform.not_found", "platform.conflict", "platform.invalid"],
+    fails: ["platform.not_found", "platform.conflict", "platform.invalid", "platform.forbidden"],
     async handler(ctx, input: { id: string; version: number; changes: Record<string, unknown> }) {
       const { db, tenantId, scope } = store(ctx);
       const current = await db.first<{ version: number; docstatus?: number }>(
@@ -342,6 +368,9 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
         const refused = refusesChange(state, spec, Object.keys(input.changes));
         if (refused.length) ctx.fail("platform.invalid", { fields: refused.join(", ") });
       }
+
+      const refusedFields = unwritable(spec, input.changes, (p) => ctx.holds(p));
+      if (refusedFields.length) ctx.fail("platform.forbidden", { fields: refusedFields.join(", ") });
 
       await checkMedia(ctx, input.changes, db, tenantId);
       if (spec.rule) {
@@ -523,18 +552,102 @@ function fromColumns(spec: CollectionSpec, row: Record<string, unknown>): Record
     as merging under column names, one column over.
   */
   if (spec.scope.of === "subject") out[spec.scope.subject] = row[subjectColumn(spec)];
-  /*
-    ⚠️ THE SUBJECT IS PART OF THE ROW, and it is not one of the declared fields —
-    so a merge that walked `fields` alone handed every rule a row belonging to
-    nobody. A rule that narrows by customer then finds no customer, takes its
-    "not enough to judge" branch, and passes every update. It is the same defect
-    as merging under column names, one column over.
-  */
 
   for (const [name, f] of Object.entries(spec.fields)) {
     if (f.kind === "money") continue;
     const column = columnName(name);
     if (column in row) out[name] = f.kind === "bool" ? row[column] === 1 : row[column];
+  }
+  return out;
+}
+
+/**
+ * A stored row as the caller who wrote it would recognise it.
+ *
+ * ⚠️ A COLLECTION SPEAKS ONE VOCABULARY IN BOTH DIRECTIONS. Writes take declared
+ * field names, real booleans and real objects; reads were handing back storage —
+ * `how_it_went` for a field called `howItWent`, `1` for a bool, and a JSON
+ * column as the TEXT it is stored in.
+ *
+ * The mismatch is not merely untidy. The obvious client — read a record, change
+ * one thing, send it back — takes a JSON field out as a string and puts it back
+ * as one, so the column ends up holding an encoded encoding, and the next read
+ * returns a string that parses to a string. Nothing throws at any point.
+ *
+ * ⚠️ SYSTEM COLUMNS KEEP THEIR STORAGE NAMES. `id`, `version`, `created_at` and
+ * `updated_at` are the platform's rather than the collection's, they appear in
+ * every payload the platform emits, and renaming them here would make one
+ * surface disagree with the rest for no gain.
+ */
+function present(spec: CollectionSpec, row: Record<string, unknown>): Record<string, unknown> {
+  const declared = new Set<string>();
+  for (const name of Object.keys(spec.fields)) declared.add(columnName(name));
+  const out: Record<string, unknown> = {};
+  for (const [column, value] of Object.entries(row)) if (!declared.has(column)) out[column] = value;
+
+  for (const [name, f] of Object.entries(spec.fields)) {
+    const column = columnName(name);
+    if (f.kind === "money") {
+      if (`${column}_minor` in row) {
+        out[name] = { minor: row[`${column}_minor`], currency: row[`${column}_currency`] };
+        delete out[`${column}_minor`];
+        delete out[`${column}_currency`];
+      }
+      continue;
+    }
+    if (!(column in row)) continue;
+    const v = row[column];
+    if (f.kind === "bool") out[name] = v === null || v === undefined ? null : v === 1;
+    /*
+      ⚠️ AN UNPARSEABLE COLUMN TRAVELS AS IT IS RATHER THAN AS AN ERROR. It is
+      somebody's record, and a read that refuses is a record they can no longer
+      see at all — which is strictly worse than one they can see is wrong.
+    */
+    else if (f.kind === "json" && typeof v === "string") out[name] = parseOr(v);
+    else out[name] = v;
+  }
+  return out;
+}
+
+const parseOr = (text: string): unknown => {
+  try { return JSON.parse(text); } catch { return text; }
+};
+
+
+/**
+ * Fields this body sets that the caller may not write.
+ *
+ * ⚠️ A FIELD MAY BE NARROWER THAN ITS ROW, and until this ran, `write` on a
+ * field was a declaration nothing read.
+ *
+ * The shape it exists for: a customer opens a record and the studio answers it.
+ * A swap request is the clearest — the client must hold the collection's write
+ * permission to ASK, and that same permission opened the derived update, so they
+ * could set `state` to allowed and answer their own question. Putting the answer
+ * behind its own operation is a lock beside an open window while the update is
+ * still there.
+ *
+ * ⚠️ REFUSED, NOT DROPPED. Silently ignoring a field somebody sent is a save
+ * button that reports success and changes nothing, which is the failure mode
+ * this platform treats as worse than an error.
+ */
+function unwritable(spec: CollectionSpec, body: Record<string, unknown>, holds: (p: string) => boolean): readonly string[] {
+  const out: string[] = [];
+  for (const [name, f] of Object.entries(spec.fields)) {
+    if (!f.write) continue;
+    if (!Object.prototype.hasOwnProperty.call(body, name)) continue;
+    if (!holds(f.write)) out.push(name);
+  }
+  return out;
+}
+
+/** ⚠️ Declared starting values, for keys the caller left out. See `Field.initial`. */
+function withInitials(spec: CollectionSpec, body: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...body };
+  for (const [name, f] of Object.entries(spec.fields)) {
+    if (f.initial === undefined) continue;
+    if (Object.prototype.hasOwnProperty.call(out, name)) continue;
+    out[name] = f.initial;
   }
   return out;
 }

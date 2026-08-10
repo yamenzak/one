@@ -162,3 +162,49 @@ describe("a query string is made into the shape's types before it is parsed", ()
   });
 });
 
+
+/*
+  ⚠️ DROPPING A KEY NOBODY DECLARED IS RIGHT FOR A REQUEST AND WRONG FOR A
+  RECORD, and `strict` is the difference.
+
+  A client one version ahead sends a field this deployment has not learned
+  about; refusing that would break it for no reason. But a body STORED WHOLE is
+  the other case: what is dropped is not ignored, it is lost. The caller sent it,
+  the write answered 200, and the record they believe they saved is not the one
+  in the column — a plan day carrying `items` where the schema says `movements`
+  becomes an empty day, saved cleanly, read afterwards as prescribing nothing.
+*/
+describe("a key nobody declared", () => {
+  const loose = s.object({ name: s.text() });
+  const strict = s.object({ name: s.text() }, { strict: true });
+
+  it("is dropped by an ordinary object", () => {
+    const out = loose.parse({ name: "Ro", extra: 1 });
+    expect(out.ok).toBe(true);
+    expect(out.ok && out.value).toEqual({ name: "Ro" });
+  });
+
+  it("is refused by a strict one, and named", () => {
+    const out = strict.parse({ name: "Ro", movements: [] });
+    expect(out.ok).toBe(false);
+    expect(!out.ok && out.issues.map((i) => i.path)).toContain("movements");
+  });
+
+  it("leaves a well-formed body alone either way", () => {
+    expect(strict.parse({ name: "Ro" })).toEqual(loose.parse({ name: "Ro" }));
+  });
+
+  /* ⚠️ The path is nested, so a bad key deep in a plan body is findable. */
+  it("names where the stray key was", () => {
+    const nested = s.object({ day: strict }, { strict: true });
+    const out = nested.parse({ day: { name: "Monday", items: [] } });
+    expect(!out.ok && out.issues.map((i) => i.path)).toContain("day.items");
+  });
+
+  /* A missing required key is still a separate complaint from a stray one. */
+  it("still reports what is missing", () => {
+    const out = strict.parse({ items: [] });
+    expect(!out.ok && out.issues.map((i) => i.message).sort())
+      .toEqual(["is not something this holds", "is required"]);
+  });
+});

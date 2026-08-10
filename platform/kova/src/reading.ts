@@ -107,9 +107,16 @@ export function prescribedPerWeek(body: unknown): number | null {
   for (const week of body) {
     const list = (week as { days?: unknown })?.days;
     if (!Array.isArray(list)) continue;
+    /*
+      ⚠️ `movements`, WHICH IS WHAT THE REGISTERED SHAPE SAYS. This read `items`
+      while the progression arithmetic read `movements` — two readers of one
+      column disagreeing about its key, so a plan written by either produced a
+      confident zero from the other. Neither throws; the report simply says
+      nothing was prescribed.
+    */
     days += list.filter((d) => {
-      const items = (d as { items?: unknown })?.items;
-      return Array.isArray(items) && items.length > 0;
+      const movements = (d as { movements?: unknown })?.movements;
+      return Array.isArray(movements) && movements.length > 0;
     }).length;
   }
   return days === 0 ? null : days / body.length;

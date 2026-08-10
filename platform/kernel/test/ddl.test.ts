@@ -61,3 +61,47 @@ describe("a name SQL cannot take", () => {
     expect(problems.map((p) => p.detail).join()).toMatch(/table "values"/);
   });
 });
+
+/*
+  ⚠️ THE SUBJECT COLUMN IS THE COLLECTION'S, NOT THE MODULE'S. A product may
+  hang one table off a client and another off a coach, and both are correct — so
+  the derivation records which per table. Carrying one for the whole module
+  takes whichever was declared last, and erasing a client then runs
+  `DELETE … WHERE coach_id = ?` against the client table: SQLite throws, the
+  purge catches (it must — an old database legitimately lacks a table), and a
+  complete erasure is reported over rows that are still there.
+*/
+describe("two subjects in one app", () => {
+  const scoped = (id: string, subject: string) => collection({
+    id,
+    label: { one: id, many: `${id}s` },
+    scope: { of: "subject", subject },
+    version: true,
+    retention: { days: null, onTenantClose: "purge" },
+    onDelete: { on: "purge" },
+    fields: { note: field.text() },
+  });
+
+  const { module, problems } = deriveSchema("app", [scoped("note", "client"), scoped("shift", "coach")]);
+
+  it("derives without complaint", () => {
+    expect(problems).toEqual([]);
+  });
+
+  it("gives each table its own subject column", () => {
+    expect(module.scoped?.subjectTables).toEqual([
+      { table: "notes", column: "client_id" },
+      { table: "shifts", column: "coach_id" },
+    ]);
+  });
+
+  /* Both are still the tenant's, because erasing a workspace takes both. */
+  it("keeps both in the tenant cascade as well", () => {
+    expect(module.scoped?.tenantTables).toEqual(["notes", "shifts"]);
+  });
+
+  it("indexes each on the column it actually has", () => {
+    expect(module.ddl).toContain("CREATE INDEX IF NOT EXISTS idx_notes_subject ON notes(client_id);");
+    expect(module.ddl).toContain("CREATE INDEX IF NOT EXISTS idx_shifts_subject ON shifts(coach_id);");
+  });
+});

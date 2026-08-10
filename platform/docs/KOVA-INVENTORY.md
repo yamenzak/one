@@ -169,10 +169,10 @@ without one.
 | `[x]` | `client-add` | trainer | Add somebody they coach, by inviting them or by entering them directly |
 | `[x]` | `client-archive` | trainer | Stop coaching somebody without losing what they did |
 | `[x]` | `client-assign` | owner | Decide which coach works with which client, and change it |
-| `[ ]` | `client-audit` | owner | See what was changed on somebody's record, by whom, and when |
+| `[x]` | `client-audit` | owner | See what was changed on somebody's record, by whom, and when |
 | `[x]` | `client-browse` | trainer | Find one person among many, by name, by state, or by who is falling behind |
 | `[x]` | `client-coaches` | client | See who is coaching them, with their faces |
-| `[ ]` | `client-delete` | owner | Remove somebody entirely, on request, and have that be final |
+| `[x]` | `client-delete` | owner | Remove somebody entirely, on request, and have that be final |
 | `[x]` | `client-invite-self` | client | Accept an invitation and land in the right studio without being told an address |
 | `[ ]` | `client-offboard-request` | trainer | Ask an owner to release a client, and have the owner decide |
 | `[x]` | `client-preferences` | trainer | Record how somebody trains and eats now, and see when that was last reviewed |
@@ -201,18 +201,18 @@ without one.
 | `[x]` | `supplement-log` | client | Record that they took what was prescribed |
 | `[x]` | `supplement-prescribe` | trainer | Prescribe supplements with a dose and a reason |
 | | **training** | | |
-| `[ ]` | `exercise-alternatives` | trainer | Say which movements stand in for which, so a swap is not a guess |
+| `[x]` | `exercise-alternatives` | trainer | Say which movements stand in for which, so a swap is not a guess |
 | `[x]` | `exercise-detail` | trainer | Describe a movement well enough that somebody could do it unsupervised |
 | `[x]` | `exercise-library` | trainer | Build a library of the movements this studio uses |
 | `[ ]` | `exercise-search-external` | trainer | Find a movement in a public catalogue rather than typing it out |
-| `[ ]` | `exercise-swap-decide` | trainer | Decide a swap request, with the alternatives already in front of them |
-| `[ ]` | `exercise-swap-request` | client | Ask to swap a movement they cannot do, and get an answer |
-| `[ ]` | `exercise-usage` | trainer | See where a movement is used before changing or removing it |
-| `[ ]` | `extra-workout` | client | Record activity that was not part of the plan |
+| `[x]` | `exercise-swap-decide` | trainer | Decide a swap request, with the alternatives already in front of them |
+| `[x]` | `exercise-swap-request` | client | Ask to swap a movement they cannot do, and get an answer |
+| `[x]` | `exercise-usage` | trainer | See where a movement is used before changing or removing it |
+| `[x]` | `extra-workout` | client | Record activity that was not part of the plan |
 | `[x]` | `plan-build` | trainer | Write a training plan: weeks, days, movements, sets, targets |
-| `[ ]` | `plan-copy-week` | trainer | Repeat a week with progression, rather than retyping it |
+| `[x]` | `plan-copy-week` | trainer | Repeat a week with progression, rather than retyping it |
 | `[x]` | `plan-follow` | client | See what they are meant to do today, and what comes next |
-| `[ ]` | `plan-groups` | trainer | Group movements into supersets and circuits, and have them logged as rounds |
+| `[x]` | `plan-groups` | trainer | Group movements into supersets and circuits, and have them logged as rounds |
 | `[x]` | `plan-publish` | trainer | Publish a plan so the client is following it, and know they were told |
 | `[x]` | `plan-template` | trainer | Keep a plan as a template and start the next client from it |
 | `[x]` | `plan-variants` | trainer | Give one client more than one plan and switch which is current |

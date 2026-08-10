@@ -92,11 +92,11 @@ describe("how much of what was asked for happened", () => {
 });
 
 describe("how much a programme actually asks for", () => {
-  const week = (days: number) => ({ days: Array.from({ length: days }, () => ({ items: [{}] })) });
+  const week = (days: number) => ({ days: Array.from({ length: days }, () => ({ movements: [{}] })) });
 
   it("counts the days that have anything in them", () => {
     expect(prescribedPerWeek([week(4)])).toBe(4);
-    expect(prescribedPerWeek([{ days: [{ items: [{}] }, { items: [] }, {}] }])).toBe(1);
+    expect(prescribedPerWeek([{ days: [{ movements: [{}] }, { movements: [] }, {}] }])).toBe(1);
   });
 
   /*

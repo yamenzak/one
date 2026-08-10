@@ -74,7 +74,7 @@ beforeAll(async () => {
   await call("/api/goal.create", { client: plain, kind: "weight", start: 90, target: 80 });
 
   /* A four-week block that deloads: 4, 4, 4, 2 — three and a half a week. */
-  const week = (days: number) => ({ days: Array.from({ length: days }, () => ({ items: [{ movement: "x" }] })) });
+  const week = (days: number) => ({ days: Array.from({ length: days }, () => ({ movements: [{ movement: "x" }] })) });
   const programme = await call("/api/programme.create", {
     title: "Winter block", kind: "training", client: ro, weeks: [week(4), week(4), week(4), week(2)],
   });

@@ -23,6 +23,21 @@ interface FieldCommon {
   /** Who may read and write this FIELD, when that is narrower than the row. */
   readonly read?: string;
   readonly write?: string;
+  /**
+   * What a create fills in when the body does not.
+   *
+   * ⚠️ THE PIECE THAT MAKES A NARROWER `write` USABLE ON A REQUIRED FIELD. A
+   * swap request starts `asked` and only the studio may move it — but a field
+   * that is required AND write-restricted cannot be created by the person the
+   * feature is for, so the two declarations together produce a collection
+   * nobody can write a row into.
+   *
+   * ⚠️ AND IT IS NOT THE SAME AS A COLUMN DEFAULT. A SQL default applies to
+   * rows this platform did not write; this applies to the operation, so the
+   * value is validated by the field's own shape and appears in the audit and
+   * the response like any other.
+   */
+  readonly initial?: string | number | boolean;
   /** Excluded from exports and from anything an AI tool can see. */
   readonly sensitive?: boolean;
 }

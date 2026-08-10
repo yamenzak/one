@@ -297,7 +297,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     started over, and here it cannot be written.
   */
   for (const spec of app.collections) {
-    for (const op of collectionOperations(spec)) byPath.set(routeFor(op).path, op);
+    for (const op of collectionOperations(spec, {}, app.schemas ?? {})) byPath.set(routeFor(op).path, op);
   }
   for (const op of app.operations as readonly AnyOperation[]) {
     const path = routeFor(op).path;
@@ -1133,6 +1133,12 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         */
         included: verdict.included ?? {},
         region: at.region,
+        /*
+          ⚠️ THE SAME SET THE GATE JUDGED WITH. Recomputing it here from roles
+          would be a second resolver, and the two would agree until one of them
+          learned about impersonation or a customer rail and the other did not.
+        */
+        holds: (permission: string) => caller.permissions.has(permission),
         now: () => new Date().toISOString() as Instant,
         fail: (code, meta) => { throw new DeclaredFailure(code, meta); },
       };

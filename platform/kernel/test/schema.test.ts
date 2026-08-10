@@ -13,8 +13,8 @@ import {
   declareConfig, PLATFORM_CONFIG, redactConfig, resolveConfig, resolveKey, writableToShared,
 } from "../src/config.js";
 import {
-  fingerprintOf, tablesIn, tenantCascade, unscopedTables, validateComposition, validateModule,
-  type SchemaModule,
+  fingerprintOf, subjectCascade, tablesIn, tenantCascade, unscopedTables, validateComposition,
+  validateModule, type SchemaModule,
 } from "../src/schema.js";
 
 /* ---------------------------------------------------------------- config --- */
@@ -229,5 +229,50 @@ describe("erasure is derived from the declarations", () => {
 
   it("reads table names out of the DDL rather than being told them", () => {
     expect(tablesIn(notify)).toEqual(["notifications"]);
+  });
+
+  /*
+    ⚠️ THE SUBJECT COLUMN TRAVELS WITH ITS TABLE, and this is the check that
+    makes the alternative impossible rather than merely discouraged.
+
+    One column per module takes whichever collection was declared last, and then
+    forgetting a client runs `DELETE … WHERE coach_id = ?` against a table whose
+    column is `client_id`. SQLite throws, the purge catches — it must, because an
+    older database legitimately lacks a table — and the run reports a successful
+    erasure over rows that are all still there. Nothing anywhere says otherwise.
+  */
+  it("carries a subject column per table, so two subjects cannot overwrite each other", () => {
+    const mixed: SchemaModule = {
+      id: "mixed", ddl: [],
+      scoped: {
+        tenantColumn: "tenant_id",
+        tenantTables: ["notes", "shifts"],
+        subjectTables: [
+          { table: "notes", column: "client_id" },
+          { table: "shifts", column: "coach_id" },
+        ],
+      },
+    };
+    expect(subjectCascade([mixed])).toEqual([
+      { table: "notes", tenantColumn: "tenant_id", subjectColumn: "client_id", moduleId: "mixed" },
+      { table: "shifts", tenantColumn: "tenant_id", subjectColumn: "coach_id", moduleId: "mixed" },
+    ]);
+  });
+
+  /* ⚠️ BOTH COLUMNS, ALWAYS. By subject alone reaches across workspaces the
+     moment two of them mint the same id — and ids are the app's. */
+  it("binds the tenant column on every subject step", () => {
+    const m: SchemaModule = {
+      id: "m", ddl: [],
+      scoped: { tenantColumn: "workspace", subjectTables: [{ table: "notes", column: "client_id" }] },
+    };
+    expect(subjectCascade([m])).toEqual([
+      { table: "notes", tenantColumn: "workspace", subjectColumn: "client_id", moduleId: "m" },
+    ]);
+  });
+
+  /* A module that scopes nothing to a person contributes nothing to this walk. */
+  it("skips a module with no subject tables at all", () => {
+    expect(subjectCascade([tenancy, notify])).toEqual([]);
   });
 });

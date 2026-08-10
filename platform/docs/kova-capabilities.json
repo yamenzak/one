@@ -1,17 +1,17 @@
 {
   "$comment": [
-    "THE CAPABILITY INVENTORY \u2014 what a person can accomplish in Kova today.",
+    "THE CAPABILITY INVENTORY — what a person can accomplish in Kova today.",
     "",
-    "\u26a0\ufe0f OUTCOMES, NEVER SCREENS. 'A coach can see how a client's strength is",
+    "⚠️ OUTCOMES, NEVER SCREENS. 'A coach can see how a client's strength is",
     "trending' is a capability; 'the Progress tab has four lenses' is an",
     "implementation, and writing it that way is how a rewrite becomes a port",
-    "wearing different colours. See docs/KOVA.md \u00a71.1.",
+    "wearing different colours. See docs/KOVA.md §1.1.",
     "",
     "It is the ONE artefact that crosses from the old codebase to the new one, and",
     "it is the acceptance contract for stage 7 and stage 8: every line is performed",
     "against the migrated tenant, by the persona named, in a browser.",
     "",
-    "status: old | built | dropped. A `dropped` entry carries a `why` \u2014 a removal",
+    "status: old | built | dropped. A `dropped` entry carries a `why` — a removal",
     "and an oversight look identical without one."
   ],
   "capabilities": [
@@ -69,7 +69,7 @@
       "id": "studio-brand",
       "persona": "owner",
       "area": "studio",
-      "outcome": "Make the product look like their business \u2014 name, logo, colours",
+      "outcome": "Make the product look like their business — name, logo, colours",
       "status": "old"
     },
     {
@@ -147,7 +147,7 @@
       "persona": "owner",
       "area": "roster",
       "outcome": "Remove somebody entirely, on request, and have that be final",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-assign",
@@ -168,7 +168,7 @@
       "persona": "owner",
       "area": "roster",
       "outcome": "See what was changed on somebody's record, by whom, and when",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-offboard-request",
@@ -203,7 +203,7 @@
       "persona": "trainer",
       "area": "training",
       "outcome": "Say which movements stand in for which, so a swap is not a guess",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "exercise-search-external",
@@ -217,7 +217,7 @@
       "persona": "trainer",
       "area": "training",
       "outcome": "See where a movement is used before changing or removing it",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "plan-build",
@@ -231,14 +231,14 @@
       "persona": "trainer",
       "area": "training",
       "outcome": "Repeat a week with progression, rather than retyping it",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "plan-groups",
       "persona": "trainer",
       "area": "training",
       "outcome": "Group movements into supersets and circuits, and have them logged as rounds",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "plan-publish",
@@ -301,21 +301,21 @@
       "persona": "client",
       "area": "training",
       "outcome": "Ask to swap a movement they cannot do, and get an answer",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "exercise-swap-decide",
       "persona": "trainer",
       "area": "training",
       "outcome": "Decide a swap request, with the alternatives already in front of them",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "extra-workout",
       "persona": "client",
       "area": "training",
       "outcome": "Record activity that was not part of the plan",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "workout-review",
@@ -805,7 +805,7 @@
       "id": "billing-portal",
       "persona": "owner",
       "area": "billing",
-      "outcome": "Change a card, read an invoice, cancel \u2014 on the payment provider",
+      "outcome": "Change a card, read an invoice, cancel — on the payment provider",
       "status": "old"
     },
     {
@@ -931,7 +931,7 @@
       "id": "ai-budget",
       "persona": "owner",
       "area": "ai",
-      "outcome": "Not be surprised by a bill \u2014 a ceiling per day, per person",
+      "outcome": "Not be surprised by a bill — a ceiling per day, per person",
       "status": "built"
     },
     {

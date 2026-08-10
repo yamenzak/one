@@ -170,7 +170,7 @@ describe("asking for a lab test", () => {
     });
     expect(made.status).toBe(200);
     panel = made.body.id as unknown as string;
-    expect((await coach.call(`/api/lab.read?id=${panel}`)).body.row).toMatchObject({ taken_on: null, report: null });
+    expect((await coach.call(`/api/lab.read?id=${panel}`)).body.row).toMatchObject({ takenOn: null, report: null });
   });
 
   /*

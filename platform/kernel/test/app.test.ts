@@ -14,7 +14,8 @@ import { TENANT_DOORS, TENANTLESS_DOORS, DIRECTORY_REGION, classifyHost, cookieD
 import { assertComposable, coverage, undeclaredEmits, type AccessSpec } from "../src/app.js";
 import type { EntitlementDef, PlanSpec } from "../src/entitlement.js";
 import type { FlagDef } from "../src/customer.js";
-import type { CollectionSpec } from "../src/collection.js";
+import { collection, field, type CollectionSpec } from "../src/collection.js";
+import { s } from "../src/validate.js";
 import type { NotificationDef } from "../src/notify.js";
 import type { HelpRegistry } from "../src/help.js";
 import type { Release } from "../src/release.js";
@@ -733,5 +734,56 @@ describe("what a manifest says to a person", () => {
 
   it("holds the real manifest to all of it", () => {
     expect(() => assertComposable(kova)).not.toThrow();
+  });
+});
+
+/* --------------------------------------------- what a json column holds --- */
+
+/**
+ * ⚠️ A `json` FIELD NAMING AN UNREGISTERED SCHEMA IS AN UNVALIDATED COLUMN
+ * WEARING A CONTRACT'S CLOTHES.
+ *
+ * The name reads like a promise and was a comment: nothing read it, so the
+ * column took any shape at all. What follows is silent rather than loud — code
+ * that reads the body walks the keys it expects, finds none of them, and returns
+ * its input unchanged. A training plan whose days carry `items` where every
+ * reader wants `movements` copies a week, applies no progression, saves, and
+ * reports success with every number correct and nothing moved.
+ */
+describe("a json column says what it holds, or the manifest is refused", () => {
+  const withBody = (schema: string): CollectionSpec => collection({
+    id: "note",
+    label: { one: "Note", many: "Notes" },
+    scope: { of: "tenant" },
+    version: true,
+    retention: { days: null, onTenantClose: "purge" },
+    onDelete: { on: "purge" },
+    fields: { body: field.json(schema, { required: true }) },
+  });
+
+  it("refuses a field naming a schema nothing registers", () => {
+    expect(() => assertComposable({ ...base, collections: [withBody("note.v1")] }))
+      .toThrow(/note\.body names "note\.v1"/);
+  });
+
+  it("accepts it once the manifest registers the shape", () => {
+    expect(() => assertComposable({
+      ...base,
+      collections: [withBody("note.v1")],
+      schemas: { "note.v1": s.object({ text: s.text() }) as never },
+    })).not.toThrow();
+  });
+
+  /* ⚠️ The name is matched exactly. A near-miss is the case this is for. */
+  it("refuses a schema registered under a different name", () => {
+    expect(() => assertComposable({
+      ...base,
+      collections: [withBody("note.v1")],
+      schemas: { "note.v2": s.object({ text: s.text() }) as never },
+    })).toThrow(/note\.v1/);
+  });
+
+  it("says nothing about an app with no json fields at all", () => {
+    expect(() => assertComposable({ ...base })).not.toThrow();
   });
 });

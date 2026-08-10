@@ -51,7 +51,7 @@ const photo = (tag: number): ArrayBuffer =>
     0xff, 0xdb, 0x00, 0x05, 1, 2, 3, 0xff, 0xda, 0x00, 0x02, 9, 9, tag, 0xff, 0xd9,
   ]).buffer;
 
-type Article = { id: string; title: string; published_on: string | null };
+type Article = { id: string; title: string; publishedOn: string | null };
 
 let coach: ReturnType<typeof as>;
 let coachCookie = "";
@@ -80,7 +80,7 @@ describe("writing something", () => {
     });
     expect(made.status).toBe(200);
     draft = made.body.id as unknown as string;
-    expect((await coach.call(`/api/article.read?id=${draft}`)).body.row).toMatchObject({ published_on: null });
+    expect((await coach.call(`/api/article.read?id=${draft}`)).body.row).toMatchObject({ publishedOn: null });
   });
 
   /*
@@ -125,7 +125,7 @@ describe("publishing", () => {
     const out = await coach.call("/api/article.publish", { articleId: live });
     expect(out.status).toBe(200);
     expect(String(out.body.publishedOn)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect((await coach.call(`/api/article.read?id=${live}`)).body.row).toMatchObject({ published_on: out.body.publishedOn });
+    expect((await coach.call(`/api/article.read?id=${live}`)).body.row).toMatchObject({ publishedOn: out.body.publishedOn });
   });
 
   /*
@@ -161,7 +161,7 @@ describe("what a client reads", () => {
     const feed = out.body.articles as unknown as Article[];
     expect(feed.map((a) => a.id)).toContain(live);
     expect(feed.map((a) => a.id)).not.toContain(draft);
-    expect(feed.every((a) => a.published_on !== null)).toBe(true);
+    expect(feed.every((a) => a.publishedOn !== null)).toBe(true);
   });
 
   /*

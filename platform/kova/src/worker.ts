@@ -17,9 +17,9 @@ import {
   applySchema, createRuntime,
   PLATFORM_GLOBAL, PLATFORM_REGIONAL, type RawEnv,
 } from "@one/runtime";
-import { articles, assignments, bookings, checkins, clients, doses, entries, foods, goals, kova, labs, movements, portions, programmes, sets, supplements, workouts } from "./manifest.js";
+import { alternatives, articles, assignments, bookings, checkins, clients, doses, entries, foods, goals, kova, labs, movements, portions, programmes, sets, supplements, swaps, workouts } from "./manifest.js";
 
-const derived = deriveSchema("kova", [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles, supplements, doses, labs, assignments]);
+const derived = deriveSchema("kova", [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles, supplements, doses, labs, assignments, alternatives, swaps]);
 if (derived.problems.length) throw new Error(`kova: ${derived.problems.map((p) => p.detail).join("; ")}`);
 
 /* ⚠️ ORDER IS DEPENDENCY ORDER, DECLARED — the runner validates it rather than

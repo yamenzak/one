@@ -181,7 +181,19 @@ export const s = {
    * Forwarding the extra is how a mass-assignment bug happens: a field nobody
    * declared reaches a writer that spreads its input.
    */
-  object<F extends Record<string, Shape<unknown> | Optional<unknown>>>(fields: F): Shape<ObjectOf<F>> {
+  /**
+   * ⚠️ `strict` REFUSES A KEY NOBODY DECLARED, and it exists for one case: a
+   * body that is STORED WHOLE.
+   *
+   * Dropping an undeclared key is right for a request envelope — a client one
+   * version ahead sends a field this deployment has not learned about, and
+   * refusing would break it for no reason. It is wrong for a JSON column,
+   * because what is dropped is not ignored, it is LOST: the caller sent it, the
+   * write answered 200, and the record they think they saved is not the one
+   * stored. A day carrying `items` where the schema says `movements` is then a
+   * plan with an empty day, saved cleanly, read as prescribing nothing.
+   */
+  object<F extends Record<string, Shape<unknown> | Optional<unknown>>>(fields: F, o: { strict?: boolean } = {}): Shape<ObjectOf<F>> {
     const json: Record<string, { shape: JsonShape; optional: boolean }> = {};
     for (const [key, f] of Object.entries(fields)) json[key] = { shape: f.json, optional: isOptional(f) };
 
@@ -190,6 +202,13 @@ export const s = {
       const source = v as Record<string, unknown>;
       const out: Record<string, unknown> = {};
       const issues: Issue[] = [];
+
+      if (o.strict) {
+        for (const key of Object.keys(source)) {
+          if (Object.prototype.hasOwnProperty.call(fields, key)) continue;
+          issues.push({ path: path ? `${path}.${key}` : key, message: "is not something this holds" });
+        }
+      }
 
       for (const [key, f] of Object.entries(fields)) {
         const at = path ? `${path}.${key}` : key;

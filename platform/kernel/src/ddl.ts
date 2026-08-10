@@ -14,7 +14,7 @@
  */
 
 import type { CollectionSpec, Field } from "./collection.js";
-import type { SchemaModule } from "./schema.js";
+import type { SchemaModule, SubjectTable } from "./schema.js";
 
 /* --------------------------------------------------------------- columns --- */
 
@@ -163,8 +163,7 @@ export function deriveSchema(moduleId: string, collections: readonly CollectionS
   const problems: DerivationProblem[] = [];
   const ddl: string[] = [];
   const tenantTables: string[] = [];
-  const subjectTables: string[] = [];
-  let subjectColumn: string | undefined;
+  const subjectTables: SubjectTable[] = [];
 
   for (const spec of collections) {
     const table = tableNameFor(spec);
@@ -215,9 +214,14 @@ export function deriveSchema(moduleId: string, collections: readonly CollectionS
     }
     if (spec.scope.of === "subject") {
       tenantTables.push(table);
-      subjectTables.push(table);
-      subjectColumn = `${columnName(spec.scope.subject)}_id`;
-      ddl.push(`CREATE INDEX IF NOT EXISTS idx_${table}_subject ON ${table}(${subjectColumn});`);
+      /*
+        ⚠️ PER TABLE, because the subject is the collection's choice. Two
+        collections in one app may hang off different people, and a single
+        column for the module would erase one of them by the other's key.
+      */
+      const column = `${columnName(spec.scope.subject)}_id`;
+      subjectTables.push({ table, column });
+      ddl.push(`CREATE INDEX IF NOT EXISTS idx_${table}_subject ON ${table}(${column});`);
     }
     // A platform-scoped collection is indexed by nothing here on purpose: it has
     // no tenant, and inventing an index for it would be guessing at a query.
@@ -227,7 +231,7 @@ export function deriveSchema(moduleId: string, collections: readonly CollectionS
     id: moduleId,
     ...(after ? { after } : {}),
     ddl,
-    ...(tenantTables.length ? { scoped: { tenantColumn: "tenant_id", tenantTables, ...(subjectColumn ? { subjectColumn, subjectTables } : {}) } } : {}),
+    ...(tenantTables.length ? { scoped: { tenantColumn: "tenant_id", tenantTables, ...(subjectTables.length ? { subjectTables } : {}) } } : {}),
   };
   return { module, problems };
 }
