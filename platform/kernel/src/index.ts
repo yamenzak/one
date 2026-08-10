@@ -34,6 +34,7 @@ export * from "./release.js";
 export * from "./job.js";
 export * from "./guide.js";
 export * from "./milestone.js";
+export * from "./generation.js";
 export * from "./moment.js";
 export * from "./market.js";
 export * from "./resolve.js";

@@ -799,7 +799,7 @@
       "persona": "owner",
       "area": "billing",
       "outcome": "See what credits were spent on",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "billing-portal",
@@ -848,7 +848,7 @@
       "persona": "trainer",
       "area": "ai",
       "outcome": "Draft a training plan from a sentence and edit it, rather than starting blank",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "ai-draft-meal",
@@ -876,7 +876,7 @@
       "persona": "client",
       "area": "ai",
       "outcome": "Describe a meal in words and have it logged",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "ai-exercise-guide",
@@ -925,14 +925,14 @@
       "persona": "trainer",
       "area": "ai",
       "outcome": "Say a generation was wrong, and have that recorded",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "ai-budget",
       "persona": "owner",
       "area": "ai",
       "outcome": "Not be surprised by a bill \u2014 a ceiling per day, per person",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "staff-invite",

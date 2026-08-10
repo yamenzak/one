@@ -15,7 +15,7 @@
 
 import type {
   Actor, AnyOperation, AppSpec, AuditEntry, BindingSpec, Caller, Ctx, Instant, Problem,
-  ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
+  InferenceHandle, ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
 } from "@one/kernel";
 import {
   ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT,
@@ -26,6 +26,7 @@ import { COMMERCE, commerceOperations, customerOperations, providerOperations, t
 import { INBOX, inboxOperations, type InboxCarrier } from "./inbox-ops.js";
 import { DATA, dataOperations, type DataCarrier } from "./data-ops.js";
 import { FILES, fileOperations, allowanceFrom, type FilesCarrier } from "./files-ops.js";
+import { GENERATION, generationOperations, type GenerationCarrier } from "./generate-ops.js";
 import { GUIDE, guideOperations, type GuideCarrier } from "./guide-ops.js";
 import { MILESTONES, milestoneOperations, type MilestoneCarrier } from "./milestone-ops.js";
 import { MILESTONE_EARNED, dayIn, earnerOf, recognise } from "./milestone.js";
@@ -180,6 +181,13 @@ export interface RuntimeOptions<B extends BindingSpec> {
   /** Where files live. `media` by convention, named so an app may differ. */
   readonly objectsBinding?: keyof B & string;
   /**
+   * ⚠️ ABSENT MEANS THIS DEPLOYMENT GENERATES NOTHING, and every feature refuses
+   * rather than falling back. A platform-side mock reachable by getting a
+   * binding wrong is how a product ends up fabricating output in production and
+   * charging for it.
+   */
+  readonly inferenceBinding?: keyof B & string;
+  /**
    * The NAME of the deployment variable holding the provider's signing secret.
    *
    * ⚠️ ABSENT MEANS THE WEBHOOK REFUSES, and that is the safe direction. The
@@ -236,7 +244,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -854,7 +862,17 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier = {
+        [GENERATION]: {
+          db: regionalDb,
+          /*
+            ⚠️ NULL WHERE NOTHING IS BOUND. `generate` refuses on it; nothing
+            anywhere substitutes an answer.
+          */
+          inference: (bind[opts.inferenceBinding ?? "ai"] as InferenceHandle | undefined) ?? null,
+          tenantId: at.tenant?.tenantId ?? "",
+          actorId: actor.userId ?? "system",
+        },
         [INBOX]: { db: regionalDb, tenantId: at.tenant?.tenantId ?? "", userId: session?.accountId ?? null },
         [FILES]: {
           db: regionalDb,

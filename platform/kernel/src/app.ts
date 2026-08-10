@@ -13,6 +13,8 @@
 import type { BindingSpec } from "./bindings.js";
 import type { CollectionSpec } from "./collection.js";
 import type { FlagDef } from "./customer.js";
+import type { AiSpec } from "./generation.js";
+import { aiProblems } from "./generation.js";
 import type { GuideSpec } from "./guide.js";
 import { guideProblems } from "./guide.js";
 import type { HelpRegistry } from "./help.js";
@@ -281,6 +283,16 @@ export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = Probl
    */
   readonly filePurposes: Readonly<Record<string, FilePurpose>>;
   /**
+   * ⚠️ THE CATALOGUE IS THE PLATFORM'S AND THE PROMPT IS THE APP'S. Rates are a
+   * fact about a provider's price list, identical in every product, and getting
+   * one wrong is a transfer rather than a bug. What to ask for is the whole of
+   * what makes a product different.
+   *
+   * Absent means this app generates nothing, and the surface is absent rather
+   * than present and refusing.
+   */
+  readonly ai?: AiSpec;
+  /**
    * ⚠️ SCHEDULED WORK IS DECLARED, NOT CRON'D. A cron entry in a deployment
    * config is a capability with no surface, no test, no audit and no record that
    * it ran — and the characteristic failure is silence rather than an error.
@@ -535,6 +547,7 @@ export function assertComposable(spec: {
   readonly id: string;
   readonly access: AccessSpec;
   readonly filePurposes?: Readonly<Record<string, FilePurpose>>;
+  readonly ai?: AiSpec;
   readonly collections: readonly CollectionSpec[];
   readonly notifications: NotificationRegistry;
   readonly help: HelpRegistry;
@@ -681,6 +694,19 @@ export function assertComposable(spec: {
     the largest tenant crosses the runtime's time limit — and then it fails, is
     retried, fails at the same size, and the work never happens again.
   */
+  /*
+    ⚠️ EVERY AI REFUSAL HERE IS A FAILURE THAT COSTS MONEY RATHER THAN THROWING.
+    A feature pointed at an undeclared model cannot compute a reserve; a rate of
+    zero holds nothing and charges nothing while the provider still invoices; an
+    absent per-person ceiling is a balance one person empties in an afternoon.
+    None of them is visible in a green suite, because each produces a perfectly
+    successful generation.
+  */
+  const ai = aiProblems(spec.ai);
+  if (ai.length) {
+    throw new Error(`${spec.id}: ai — ${ai.map((a) => `"${a.id}" ${a.why}`).join("; ")}.`);
+  }
+
   const unbounded = (spec.jobs ?? []).filter((j) => !Number.isInteger(j.batch) || j.batch < 1).map((j) => j.id);
   if (unbounded.length) {
     throw new Error(`${spec.id}: job(s) ${unbounded.join(", ")} declare no bound on one run.`);

@@ -147,6 +147,14 @@ export function bindingsFor<B extends BindingSpec>(
     for (const [logical, store] of Object.entries(spec)) {
       const physical = physicalName(logical, store, region, cfg.defaultRegion);
       const raw = env[physical];
+      /*
+        ⚠️ ONE KIND OF STORE MAY BE ABSENT, AND ONLY WHERE IT SAYS SO. A missing
+        database is a broken deployment; a missing model runner is a deployment
+        that does not generate, which is a real and supported configuration —
+        a self-host, or anything before somebody has bought credits. It resolves
+        to nothing, every generation refuses, and nothing substitutes an answer.
+      */
+      if (!raw && store.kind === "inference" && store.optional) continue;
       if (!raw) throw new BindingMissing(logical, physical, region);
       out[logical] = wrap(store, raw, region, cfg);
     }

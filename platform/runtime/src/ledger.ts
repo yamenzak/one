@@ -63,3 +63,30 @@ export async function balance(db: SqlHandle, tenantId: string, unit: string): Pr
   );
   return row?.total ?? 0;
 }
+
+/**
+ * Debit, but only if the balance covers it.
+ *
+ * ⚠️ THE CHECK IS PART OF THE WRITE, and that is the whole reason this is not
+ * "read the balance, then call `record`". Two calls that both read a sufficient
+ * balance and both proceed overspend it — and for metered work the overspend is
+ * not a wrong number, it is a second call to a provider that the platform pays
+ * for. Reading first and writing second leaves exactly that window open however
+ * close together the two statements are written.
+ *
+ * ⚠️ AND `false` IS A REFUSAL, NOT AN ERROR. There was not enough; the caller has
+ * something to say to somebody. A throw here would be indistinguishable from the
+ * store being down, which is a different sentence entirely.
+ */
+export async function hold(db: SqlHandle, tenantId: string, entry: Entry, at: Instant): Promise<boolean> {
+  const id = crypto.randomUUID();
+  await db.run(
+    `INSERT INTO ledger (id, tenant_id, unit, amount, reason, ref, actor_id, at)
+     SELECT ?, ?, ?, ?, ?, ?, ?, ?
+     WHERE (SELECT COALESCE(SUM(amount), 0) FROM ledger WHERE tenant_id = ? AND unit = ?) >= ?`,
+    id, tenantId, entry.unit, entry.amount, entry.reason, entry.ref ?? null, entry.actorId, at,
+    tenantId, entry.unit, Math.abs(entry.amount),
+  );
+  const landed = await db.first<{ id: string }>(`SELECT id FROM ledger WHERE id = ?`, id);
+  return landed !== null;
+}

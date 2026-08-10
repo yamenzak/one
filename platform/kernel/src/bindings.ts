@@ -91,6 +91,19 @@ export interface InferenceStore extends StoreCommon {
   readonly kind: "inference";
   readonly regional: false;
   /**
+   * ⚠️ THE ONE STORE A DEPLOYMENT MAY LEGITIMATELY NOT HAVE, and the reason it
+   * is declared rather than assumed. A missing database is a broken deployment;
+   * a missing model runner is a deployment that does not generate — a self-host,
+   * a region with no permitted sub-processor, an installation before anybody has
+   * bought credits. Every generation refuses, and nothing anywhere substitutes
+   * an answer.
+   *
+   * ⚠️ IT IS NOT A GENERAL ESCAPE HATCH. An app whose product IS generation
+   * should leave it absent, so a runner that fails to bind is a deployment that
+   * fails to start rather than one that silently does nothing.
+   */
+  readonly optional?: boolean;
+  /**
    * Residency is not only storage. A region carries a sub-processor allow-list,
    * so an EU tenant may resolve a different — or empty — model set.
    */
@@ -126,8 +139,14 @@ export function defineBindings<const B extends BindingSpec>(spec: B): B {
 }
 
 /** What a handler actually receives: resolved handles, never a region parameter. */
+/**
+ * ⚠️ AN OPTIONAL STORE IS TYPED AS POSSIBLY ABSENT, because it is. Resolving it
+ * to a handle the type says is always there would move the failure from the
+ * declaration — where it is one honest branch — into whichever handler happened
+ * to reach for it first.
+ */
 export type ResolvedBindings<B extends BindingSpec> = {
-  readonly [K in keyof B]: Handle<B[K]>;
+  readonly [K in keyof B]: B[K] extends { readonly optional: true } ? Handle<B[K]> | undefined : Handle<B[K]>;
 };
 
 /* --------------------------------------------------------------- handles --- */

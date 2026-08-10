@@ -2456,3 +2456,75 @@ It is decidable from the manifest alone, so it is refused at composition.
 both a photograph and a scan beside a purpose that takes only the photograph,
 which is perfectly fillable — and a mutation from `some` to `every` survived
 until the fixture had a field wider than its purpose to distinguish them.
+
+## 202. The mock was the vulnerability, not the fallback
+
+A shipping product had three ways to generate without metering: a console
+switch, a missing binding, and a provider failure falling back. All three
+typechecked, passed every test, and in production fabricated output — including
+clinical values read from a photographed lab report — while still charging for
+it. Every one of them reached the same platform-side mock.
+
+The fix is not a better guard on the mock. There is no mock: a deployment with
+no model runner refuses, and a test that wants deterministic output supplies the
+runner itself, in its own bindings, exactly as production supplies a real one.
+One of those is reachable by getting a config wrong; the other is not reachable
+at all.
+
+⚠️ AND THAT MAKES THE RUNNER THE ONE STORE A DEPLOYMENT MAY LEGITIMATELY LACK.
+Treated like a missing database it takes every route down with it, so a
+workspace with no AI answers 503 on everything it has. Declared optional, a
+missing one costs the studio its generation and nothing else — which is the
+whole difference between a supported configuration and an outage.
+
+## 203. Reading a balance and then running is not a check
+
+The first version read the balance, refused if it was short, and ran. Two calls
+that both read a sufficient balance both proceed — and the overspend is not a
+wrong number on a screen: it is a second call to a provider that the platform
+pays for in full and can never bill.
+
+The rule is the one finding 193 already stated on the other rail: when a check
+and a write are the same decision, the check has to be part of the WHERE clause.
+`hold` is a conditional insert; `false` is a refusal rather than an error.
+
+⚠️ AND THE TEST HAS TO COUNT PROVIDER CALLS, NOT ANSWERS. A debit taken after
+the run refuses the second caller too — after it has already run — so asserting
+on the two results cannot tell the implementations apart. The mutation survived
+until the fake counted what the provider was asked to do.
+
+## 204. A rate of zero is not free, it is unmetered
+
+A model priced at zero holds nothing, charges nothing and moves no balance,
+while the provider invoices as usual. It reads, in every report, as the cheapest
+model in the catalogue right up to the end of the month.
+
+That and three siblings are decidable from the manifest alone — a feature naming
+an undeclared model, an empty system text, an absent output bound, an absent
+per-person ceiling — so all four are refused at composition. None of them throws
+at runtime; each produces a perfectly successful generation.
+
+## 205. A per-person ceiling is what makes a balance a budget
+
+A workspace balance is spent by whoever asks first. One person looping a draft
+empties it before anybody else opens the product, and the only signal is a bill
+— so the ceiling is declared per feature, per person, per day, and it is not
+optional in the type.
+
+⚠️ FAILED ATTEMPTS COUNT TOWARDS IT. Recording only the successes makes a
+failing provider something somebody can loop past for free, and leaves the
+question "why did this stop working" with nowhere to look — while still
+answering "why was I charged".
+
+## 206. The catalogue is the platform's and the prompt is the app's
+
+Rates are a fact about a provider's price list, identical in every product, and
+getting one wrong is a transfer rather than a bug. What to ask for is the whole
+of what makes a product different. So the platform derives no operation per
+feature — it would have to guess the input shape, the output shape, the
+permission and what to do with the answer, and each of those is the product's.
+
+⚠️ THE SEAM TAKES THE CATALOGUE, NOT THE APP. An operation reaching into the
+manifest that contains it is a circular type, and the catalogue is exactly the
+small thing it actually needs — which is what makes an app's own AI operation
+expressible at all.

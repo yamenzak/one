@@ -1035,6 +1035,13 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `every-write-that-sets-a-file-checks-it` | the check landing on the create alone, leaving the same unverified id one save away — and the save after the first is the write a form actually makes | **live** |
 | `a-file-in-use-is-not-deleted` | a delete pressed in the library leaving a broken image on a screen somewhere else, with nothing connecting the two | **live** |
 | `a-media-field-no-upload-can-fill` | a form control nobody can use, discovered at the save after the upload has already succeeded | **live** |
+| `no-model-without-a-hold` | a generation path that reaches a provider before anything is held, so every call the balance could not cover is one the platform pays for and can never bill | **live** |
+| `a-missing-runner-never-invents` | a platform-side mock reachable by getting a binding wrong — the shape that had a product returning fabricated clinical values and charging for them | **live** |
+| `a-missing-runner-costs-only-generation` | a model runner treated like a missing database, so a deployment that simply has no AI answers 503 on every route it has | **live** |
+| `one-call-at-a-time-against-one-balance` | two callers both reading a sufficient balance and both running — an overspend that is not a wrong number but a second provider call nobody can be billed for | **live** |
+| `a-ceiling-per-person-per-day` | a balance spent by whoever asks first, emptied by one person looping a draft, with a bill as the only signal | **live** |
+| `the-declared-prompt-is-the-sent-prompt` | a reserve computed from one document and a request made with another — the shape unit tests over each half separately stay green through | **live** |
+| `an-unmetered-model-is-refused-at-composition` | a rate of zero holding nothing and charging nothing while the provider still invoices, so the model looks like the cheapest in the catalogue until the end of the month | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

@@ -1,0 +1,375 @@
+/**
+ * METERED GENERATION — the order, the two ceilings, and the refund.
+ *
+ * ⚠️ THERE IS NO PATH TO A MODEL THAT DOES NOT HOLD CREDITS FIRST, and that is
+ * what these assertions are about. A shipping product had three ways to generate
+ * without metering — a console switch, a missing binding, and a provider failure
+ * falling back — and all three typechecked, passed every test, and fabricated
+ * output in production while charging for it.
+ */
+
+import { describe, expect, it } from "vitest";
+import { CREDITS, dayOf, generate, judge, spending, spentToday, usageOf } from "../src/generate.js";
+import { balance, record } from "../src/ledger.js";
+import type { AiSpec, InferenceHandle, Instant, SqlHandle } from "@one/kernel";
+
+const AT = "2026-01-10T09:00:00.000Z" as Instant;
+const LATER = "2026-01-10T18:00:00.000Z" as Instant;
+const TOMORROW = "2026-01-11T09:00:00.000Z" as Instant;
+
+const ai: AiSpec = {
+  models: [{ id: "gemini-2.5-flash", provider: "google", rate: { input: 1, output: 2 } }],
+  features: {
+    draft: { summary: "Draft", model: "gemini-2.5-flash", system: "You draft things.", maxOutput: 100, dailyPerPerson: 2 },
+  },
+};
+
+/* -------------------------------------------------------------- fixtures --- */
+
+/** Enough of a store to answer the ledger's three statements and the audit row. */
+function world() {
+  const ledger: { id: string; unit: string; amount: number; ref: string | null }[] = [];
+  const gens: Record<string, unknown>[] = [];
+  const db = {
+    async first<T>(sql: string, ...p: readonly unknown[]) {
+      if (sql.includes("SUM(amount)")) return { total: ledger.filter((e) => e.unit === p[1]).reduce((n, e) => n + e.amount, 0) } as T;
+      if (sql.includes("COUNT(*) AS n FROM ledger")) return { n: ledger.filter((e) => e.unit === p[1]).length } as T;
+      /* ⚠️ Whether the conditional debit landed. The only way to tell it apart. */
+      if (sql.includes("SELECT id FROM ledger")) return (ledger.find((e) => e.id === p[0]) ?? null) as T | null;
+      if (sql.includes("FROM generation") && sql.includes("COUNT(*)")) {
+        const [, actor, feature, since] = p as [string, string, string, string];
+        return { n: gens.filter((g) => g.actor_id === actor && g.feature === feature && String(g.at) >= since).length } as T;
+      }
+      if (sql.includes("FROM generation")) return (gens.find((g) => g.id === p[1]) ?? null) as T | null;
+      return null as T | null;
+    },
+    async all<T>(sql: string, _t: unknown, limit: number) {
+      if (sql.includes("FROM generation")) return [...gens].reverse().slice(0, limit) as T[];
+      return [] as T[];
+    },
+    async run(sql: string, ...p: readonly unknown[]) {
+      if (sql.includes("INSERT OR IGNORE INTO ledger")) ledger.push({ id: p[0] as string, unit: p[2] as string, amount: p[3] as number, ref: (p[5] ?? null) as string | null });
+      /*
+        ⚠️ THE CONDITIONAL DEBIT, MODELLED AS ONE STATEMENT — which is what it
+        is in the store. A fake that read the balance and then pushed would make
+        the racing test pass against an implementation that does not.
+      */
+      if (sql.includes("INSERT INTO ledger") && sql.includes("WHERE (SELECT")) {
+        const unit = p[2] as string;
+        const covered = ledger.filter((e) => e.unit === unit).reduce((n, e) => n + e.amount, 0) >= (p[10] as number);
+        if (covered) ledger.push({ id: p[0] as string, unit, amount: p[3] as number, ref: (p[5] ?? null) as string | null });
+      }
+      if (sql.startsWith("INSERT INTO generation")) {
+        gens.push({ id: p[0], tenant_id: p[1], feature: p[2], model: p[3], actor_id: p[4], held: p[5], charged: p[6], verdict: null, at: p[7] });
+      }
+      if (sql.startsWith("UPDATE generation")) {
+        const row = gens.find((g) => g.id === p[3]);
+        if (row) { row.verdict = p[0]; row.note = p[1]; }
+      }
+    },
+  } as unknown as SqlHandle;
+  return { db, ledger, gens };
+}
+
+const runner = (answer: unknown, permitted: readonly string[] = []): InferenceHandle => ({
+  permitted,
+  async run() {
+    if (answer instanceof Error) throw answer;
+    return answer;
+  },
+});
+
+/** Counts what the provider was actually asked to do — which is what a bill counts. */
+const counting = (answer: unknown, delayTicks = 3) => {
+  const calls: string[] = [];
+  return {
+    calls,
+    handle: {
+      permitted: [] as readonly string[],
+      async run(model: string) {
+        calls.push(model);
+        for (let i = 0; i < delayTicks; i++) await Promise.resolve();
+        return answer;
+      },
+    } as InferenceHandle,
+  };
+};
+
+const fund = async (w: ReturnType<typeof world>, amount: number) =>
+  record(w.db, "t", { unit: CREDITS, amount, reason: "bought", actorId: "op" }, AT);
+
+const ask = (w: ReturnType<typeof world>, inference: InferenceHandle | null, over: Partial<Parameters<typeof generate>[0]> = {}) =>
+  generate({ db: w.db, ai, inference, tenantId: "t", actorId: "u", feature: "draft", prompt: "four weeks", at: AT, ...over });
+
+/* ---------------------------------------------------------------- happy --- */
+
+describe("one metered generation", () => {
+  it("holds, runs, settles at what was reported, and hands back the output", async () => {
+    const w = world();
+    await fund(w, 10_000);
+    const out = await ask(w, runner({ output: "a plan", usage: { input: 10, output: 20 } }));
+    expect(out.ok).toBe(true);
+    /* 10 × 1 + 20 × 2 = 50 */
+    expect((out as { charged: number }).charged).toBe(50);
+    expect(await balance(w.db, "t", CREDITS)).toBe(10_000 - 50);
+    expect((out as { output: unknown }).output).toBe("a plan");
+  });
+
+  /*
+    ⚠️ A MISSING USAGE REPORT SETTLES AT THE RESERVE, NEVER AT A RECOUNT. A
+    recount can only ever come in low — the cap catches the other direction — so
+    it would turn every unreported call into a discount.
+  */
+  it("charges the whole reserve when the provider says nothing about usage", async () => {
+    const w = world();
+    await fund(w, 10_000);
+    const out = await ask(w, runner({ output: "a plan" }));
+    const held = w.gens[0]!.held as number;
+    expect((out as { charged: number }).charged).toBe(held);
+    expect(await balance(w.db, "t", CREDITS)).toBe(10_000 - held);
+  });
+
+  /*
+    ⚠️ THE CAP IS THE WHOLE ASYMMETRY. Charging more than was held would let a
+    runaway call empty a balance nobody authorised — so a report above the
+    reserve settles at the reserve, and the difference is the platform's.
+  */
+  it("never charges more than it held, whatever the provider reports", async () => {
+    const w = world();
+    await fund(w, 10_000);
+    const out = await ask(w, runner({ output: "x", usage: { input: 1_000_000, output: 1_000_000 } }));
+    expect((out as { charged: number }).charged).toBe(w.gens[0]!.held);
+  });
+});
+
+/* -------------------------------------------------------------- ceilings --- */
+
+describe("what stops a call before it costs anything", () => {
+  /*
+    ⚠️ NO RUNNER IS A REFUSAL AND NEVER A FALLBACK. A platform-side mock is
+    reachable by getting a binding wrong, which is how a product ends up
+    inventing clinical values and billing for them.
+  */
+  it("refuses when nothing is bound to run a model, and takes no credits", async () => {
+    const w = world();
+    await fund(w, 10_000);
+    const out = await ask(w, null);
+    expect(out).toMatchObject({ ok: false, why: "unconfigured" });
+    expect(await balance(w.db, "t", CREDITS)).toBe(10_000);
+  });
+
+  it("refuses a feature the manifest does not declare", async () => {
+    const w = world();
+    await fund(w, 10_000);
+    expect(await ask(w, runner({ output: "x" }), { feature: "nonesuch" })).toMatchObject({ ok: false, why: "unknown_feature" });
+  });
+
+  /*
+    ⚠️ RESIDENCY IS NOT ONLY STORAGE. A region carries a sub-processor
+    allow-list, and a model outside it is refused rather than quietly run
+    somewhere a workspace was promised its data would not go.
+  */
+  it("refuses a model this region does not permit", async () => {
+    const w = world();
+    await fund(w, 10_000);
+    const out = await ask(w, runner({ output: "x" }, ["some-eu-model"]));
+    expect(out).toMatchObject({ ok: false, why: "unconfigured" });
+    expect(await balance(w.db, "t", CREDITS)).toBe(10_000);
+  });
+
+  /*
+    ⚠️ THE BALANCE IS CHECKED BEFORE THE RUN, not after. A run that succeeds
+    against a balance nobody checked is a call the platform pays for in full.
+  */
+  it("refuses a workspace that cannot afford the reserve, and says what it needs", async () => {
+    const w = world();
+    await fund(w, 5);
+    const out = await ask(w, runner({ output: "x" }));
+    expect(out).toMatchObject({ ok: false, why: "no_credits" });
+    expect((out as { meta: Record<string, string> }).meta.have).toBe("5");
+    expect(w.gens).toHaveLength(0);
+  });
+
+  /*
+    ⚠️ THE PER-PERSON CEILING IS THE ONE THAT MAKES A BALANCE A BUDGET. Without
+    it, whoever asks first spends everything and the only signal is a bill.
+  */
+  it("refuses a person past their own daily ceiling while the workspace has credits", async () => {
+    const w = world();
+    await fund(w, 100_000);
+    expect((await ask(w, runner({ output: "1" }))).ok).toBe(true);
+    expect((await ask(w, runner({ output: "2" }), { at: LATER })).ok).toBe(true);
+    const third = await ask(w, runner({ output: "3" }), { at: LATER });
+    expect(third).toMatchObject({ ok: false, why: "daily_ceiling" });
+    expect((third as { meta: Record<string, string> }).meta.limit).toBe("2");
+  });
+
+  /*
+    ⚠️ AND IT IS PER PERSON, which is the half a workspace-wide counter loses:
+    one coach at their limit must not stop the rest of the studio working.
+  */
+  it("does not spend one person's ceiling on somebody else's behalf", async () => {
+    const w = world();
+    await fund(w, 100_000);
+    await ask(w, runner({ output: "1" }));
+    await ask(w, runner({ output: "2" }), { at: LATER });
+    expect((await ask(w, runner({ output: "3" }), { actorId: "other" })).ok).toBe(true);
+  });
+
+  it("lets them start again the next day", async () => {
+    const w = world();
+    await fund(w, 100_000);
+    await ask(w, runner({ output: "1" }));
+    await ask(w, runner({ output: "2" }), { at: LATER });
+    expect((await ask(w, runner({ output: "3" }), { at: TOMORROW })).ok).toBe(true);
+  });
+});
+
+/* ----------------------------------------------------------------- race --- */
+
+describe("two calls at once against one call's worth of credits", () => {
+  /*
+    ⚠️ THE HOLD IS TAKEN BEFORE THE RUN, AND THE CHECK IS PART OF THE WRITE.
+    Reading a balance and then running leaves a window in which both callers see
+    enough — and the overspend is not a wrong number on a screen, it is a second
+    call to a provider that the platform pays for in full and can never bill.
+
+    ⚠️ WHAT IS COUNTED IS PROVIDER CALLS, not results. A debit taken after the
+    run refuses the second caller too — after it has already run — so asserting
+    on the answers alone cannot tell the two implementations apart.
+  */
+  it("runs the model once, not twice", async () => {
+    const w = world();
+    const reserve = (await (async () => {
+      await fund(w, 1_000_000);
+      const probe = await ask(w, runner({ output: "x" }));
+      return (probe as { charged: number }).charged;
+    })());
+
+    const fresh = world();
+    await fund(fresh, reserve);
+    const provider = counting({ output: "x" });
+    const both = await Promise.all([
+      generate({ db: fresh.db, ai, inference: provider.handle, tenantId: "t", actorId: "a", feature: "draft", prompt: "four weeks", at: AT }),
+      generate({ db: fresh.db, ai, inference: provider.handle, tenantId: "t", actorId: "b", feature: "draft", prompt: "four weeks", at: AT }),
+    ]);
+
+    expect(provider.calls).toHaveLength(1);
+    expect(both.filter((r) => r.ok)).toHaveLength(1);
+    expect(both.find((r) => !r.ok)).toMatchObject({ why: "no_credits" });
+    expect(await balance(fresh.db, "t", CREDITS)).toBeGreaterThanOrEqual(0);
+  });
+});
+
+/* -------------------------------------------------------------- failures --- */
+
+describe("when the provider fails", () => {
+  /*
+    ⚠️ REFUNDED IN FULL, because the workspace has no output. A provider that
+    failed after doing work is the provider's problem with us, not ours with the
+    workspace.
+  */
+  it("gives the hold back", async () => {
+    const w = world();
+    await fund(w, 10_000);
+    const out = await ask(w, runner(new Error("upstream")));
+    expect(out).toMatchObject({ ok: false, why: "provider" });
+    expect(await balance(w.db, "t", CREDITS)).toBe(10_000);
+  });
+
+  /*
+    ⚠️ AND IT STILL RECORDS THE ATTEMPT. A table holding only successes answers
+    "why was I charged" and none of "why did this stop working" — and it makes
+    the daily ceiling something a failing provider lets somebody loop past for
+    free.
+  */
+  it("records the attempt, so a failing feature is not an unbounded one", async () => {
+    const w = world();
+    await fund(w, 10_000);
+    await ask(w, runner(new Error("upstream")));
+    await ask(w, runner(new Error("upstream")), { at: LATER });
+    expect(w.gens).toHaveLength(2);
+    expect(await ask(w, runner({ output: "x" }), { at: LATER })).toMatchObject({ ok: false, why: "daily_ceiling" });
+  });
+});
+
+/* ---------------------------------------------------------------- usage --- */
+
+describe("reading what a provider reported", () => {
+  const rate = { input: 1, output: 2 };
+
+  it("prices both sides separately", () => {
+    expect(usageOf({ usage: { input: 10, output: 20 } }, rate)).toBe(50);
+  });
+
+  /*
+    ⚠️ A PARTIAL REPORT IS NO REPORT. Counting the half that arrived and assuming
+    zero for the other is a guess in the cheap direction, which is the one
+    direction the cap does not catch.
+  */
+  it("says nothing rather than half of something", () => {
+    expect(usageOf({ usage: { input: 10 } }, rate)).toBeNull();
+    expect(usageOf({ usage: {} }, rate)).toBeNull();
+    expect(usageOf({}, rate)).toBeNull();
+    expect(usageOf(null, rate)).toBeNull();
+  });
+});
+
+/* -------------------------------------------------------------- the day --- */
+
+describe("what a day is", () => {
+  /*
+    ⚠️ ONE CLOCK FOR THE DEPLOYMENT. A ceiling anchored on each caller's own
+    timezone resets at a different moment for every person in a workspace, and
+    twice a year some of them get an extra hour of allowance.
+  */
+  it("is the UTC date, whatever hour it is", () => {
+    expect(dayOf(AT)).toBe("2026-01-10");
+    expect(dayOf(LATER)).toBe("2026-01-10");
+    expect(dayOf(TOMORROW)).toBe("2026-01-11");
+  });
+
+  it("counts only today, and only this feature", async () => {
+    const w = world();
+    await fund(w, 100_000);
+    await ask(w, runner({ output: "x" }));
+    expect(await spentToday(w.db, "t", "u", "draft", AT)).toBe(1);
+    expect(await spentToday(w.db, "t", "u", "other", AT)).toBe(0);
+    expect(await spentToday(w.db, "t", "u", "draft", TOMORROW)).toBe(0);
+  });
+});
+
+/* ------------------------------------------------------------- the trail --- */
+
+describe("what the credits were spent on", () => {
+  it("lists what was charged, most recent first", async () => {
+    const w = world();
+    await fund(w, 100_000);
+    await ask(w, runner({ output: "1", usage: { input: 1, output: 1 } }));
+    await ask(w, runner({ output: "2", usage: { input: 2, output: 2 } }), { at: LATER });
+    const out = await spending(w.db, "t", 10);
+    expect(out).toHaveLength(2);
+    expect(out[0]!.at).toBe(LATER);
+    expect(out[0]!.feature).toBe("draft");
+    expect(out[0]!.verdict).toBeNull();
+  });
+
+  /*
+    ⚠️ THE ONLY WAY A MODEL CHOICE IS EVER REVISITED. Without somewhere to say
+    "this was wrong", the only signal a catalogue gets is that people quietly
+    stop using a feature — which reads, in every metric, as one nobody wanted.
+  */
+  it("records that a generation was wrong, against the generation", async () => {
+    const w = world();
+    await fund(w, 100_000);
+    const out = await ask(w, runner({ output: "nonsense" }));
+    const id = (out as { id: string }).id;
+    expect(await judge(w.db, "t", id, "wrong", "invented a movement")).toBe(true);
+    expect((await spending(w.db, "t", 10))[0]!.verdict).toBe("wrong");
+  });
+
+  it("says nothing was there rather than pretending it recorded one", async () => {
+    const w = world();
+    expect(await judge(w.db, "t", "gen_nothing", "wrong", "")).toBe(false);
+  });
+});

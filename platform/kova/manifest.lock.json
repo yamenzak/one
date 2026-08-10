@@ -12,6 +12,8 @@
     "workout"
   ],
   "permissions": [
+    "ai:read",
+    "ai:use",
     "billing:manage",
     "billing:operate",
     "checkin:read",
@@ -60,6 +62,8 @@
     "training"
   ],
   "operations": [
+    "ai.draft-plan",
+    "ai.parse-food",
     "checkin.activity",
     "checkin.amend",
     "checkin.answer",

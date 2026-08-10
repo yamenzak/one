@@ -51,22 +51,22 @@ without one.
 |---|---|---|---|
 | | **ai** | | |
 | `[ ]` | `ai-article` | trainer | Draft an article and a cover image for it |
-| `[ ]` | `ai-budget` | owner | Not be surprised by a bill — a ceiling per day, per person |
+| `[x]` | `ai-budget` | owner | Not be surprised by a bill — a ceiling per day, per person |
 | `[ ]` | `ai-client-summary` | trainer | Read a summary of a client's month instead of assembling it from four places |
 | `[ ]` | `ai-draft-meal` | trainer | Draft a meal plan the same way |
-| `[ ]` | `ai-draft-plan` | trainer | Draft a training plan from a sentence and edit it, rather than starting blank |
+| `[x]` | `ai-draft-plan` | trainer | Draft a training plan from a sentence and edit it, rather than starting blank |
 | `[ ]` | `ai-exercise-guide` | trainer | Generate how-to text for a movement in the studio's voice |
-| `[ ]` | `ai-feedback` | trainer | Say a generation was wrong, and have that recorded |
+| `[x]` | `ai-feedback` | trainer | Say a generation was wrong, and have that recorded |
 | `[ ]` | `ai-image` | trainer | Generate an image for the studio's own use |
 | `[ ]` | `ai-lab-extract` | trainer | Read a lab report photograph into values a coach can use |
 | `[ ]` | `ai-label-reader` | client | Photograph a nutrition label and get the food |
-| `[ ]` | `ai-parse-food` | client | Describe a meal in words and have it logged |
+| `[x]` | `ai-parse-food` | client | Describe a meal in words and have it logged |
 | `[ ]` | `ai-snap-meal` | client | Photograph a meal and have it logged |
 | `[ ]` | `ai-supplement-guide` | trainer | Generate supplement guidance with a stated basis |
 | | **billing** | | |
 | `[ ]` | `billing-portal` | owner | Change a card, read an invoice, cancel — on the payment provider |
 | `[ ]` | `credits-buy` | owner | Buy credits for the generative features |
-| `[ ]` | `credits-see` | owner | See what credits were spent on |
+| `[x]` | `credits-see` | owner | See what credits were spent on |
 | `[ ]` | `downgrade-check` | owner | Be told what a smaller plan would cost them, in their own data, before choosing |
 | `[x]` | `plan-browse` | owner | See what the platform sells and what each plan includes |
 | `[ ]` | `plan-change` | owner | Move up or down, and be told what changes before they commit |

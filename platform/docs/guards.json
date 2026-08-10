@@ -1903,6 +1903,69 @@
       "impl": "kernel/test/app.test.ts",
       "proves": "refuses a field whose types no purpose takes",
       "fails": "a form control nobody can use, discovered at the save after the upload has already succeeded"
+    },
+    {
+      "id": "no-model-without-a-hold",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/generate.test.ts",
+      "proves": "holds, runs, settles at what was reported, and hands back the output",
+      "fails": "a generation path that reaches a provider before anything is held, so every call the balance could not cover is one the platform pays for and can never bill"
+    },
+    {
+      "id": "a-missing-runner-never-invents",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/generate.test.ts",
+      "proves": "refuses when nothing is bound to run a model, and takes no credits",
+      "fails": "a platform-side mock reachable by getting a binding wrong \u2014 the shape that had a product returning fabricated clinical values and charging for them"
+    },
+    {
+      "id": "a-missing-runner-costs-only-generation",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/generating.test.ts",
+      "proves": "serves everything that is not generation",
+      "fails": "a model runner treated like a missing database, so a deployment that simply has no AI answers 503 on every route it has"
+    },
+    {
+      "id": "one-call-at-a-time-against-one-balance",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/generate.test.ts",
+      "proves": "runs the model once, not twice",
+      "fails": "two callers both reading a sufficient balance and both running \u2014 an overspend that is not a wrong number but a second provider call nobody can be billed for"
+    },
+    {
+      "id": "a-ceiling-per-person-per-day",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/generate.test.ts",
+      "proves": "refuses a person past their own daily ceiling while the workspace has credits",
+      "fails": "a balance spent by whoever asks first, emptied by one person looping a draft, with a bill as the only signal"
+    },
+    {
+      "id": "the-declared-prompt-is-the-sent-prompt",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/generating.test.ts",
+      "proves": "sends exactly the declared system text, and charges what was reported",
+      "fails": "a reserve computed from one document and a request made with another \u2014 the shape unit tests over each half separately stay green through"
+    },
+    {
+      "id": "an-unmetered-model-is-refused-at-composition",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/generation.test.ts",
+      "proves": "refuses a model priced at nothing, on either side",
+      "fails": "a rate of zero holding nothing and charging nothing while the provider still invoices, so the model looks like the cheapest in the catalogue until the end of the month"
     }
   ]
 }

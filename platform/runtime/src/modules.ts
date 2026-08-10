@@ -22,6 +22,7 @@ import { INBOX_SCHEMA } from "./inbox.js";
 import { MEDIA_SCHEMA } from "./files.js";
 import { GUIDE_SCHEMA } from "./guide.js";
 import { MILESTONE_SCHEMA } from "./milestone.js";
+import { GENERATION_SCHEMA } from "./generate.js";
 
 /** Everything the platform owns in a REGIONAL store. An app appends its own. */
 export const PLATFORM_REGIONAL: readonly SchemaModule[] = [
@@ -34,4 +35,5 @@ export const PLATFORM_REGIONAL: readonly SchemaModule[] = [
   MEDIA_SCHEMA,
   GUIDE_SCHEMA,
   MILESTONE_SCHEMA,
+  GENERATION_SCHEMA,
 ];

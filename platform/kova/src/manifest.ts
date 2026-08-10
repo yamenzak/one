@@ -16,12 +16,12 @@
 import { daysBetween, daysLeft, progressOf } from "./goals.js";
 import { energyOf, overDays, portionOf, totalOf, type Macros } from "./nutrition.js";
 import { bestOf, consistency, expectedOver, needing, prescribedPerWeek, soonest } from "./reading.js";
-import { lapsedAcross, laddersFrozen, readLadder, readSubscription, runwayAcross } from "@one/runtime";
+import { generateWith, lapsedAcross, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
 import {
   UNLIMITED,
   cache, collection, defineApp, defineBindings, field,
-  objects, operation, rungFor, s, sql, tableNameFor,
-  type Currency, type Locale, type RegionId, type SqlHandle, type TimeZone,
+  inference, objects, operation, rungFor, s, sql, tableNameFor,
+  type AiSpec, type Currency, type Locale, type RegionId, type SqlHandle, type TimeZone,
 } from "@one/kernel";
 
 /* -------------------------------------------------------------- bindings --- */
@@ -30,6 +30,18 @@ export const bindings = defineBindings({
   db: sql(),
   media: objects({ jurisdictional: true }),
   cache: cache(),
+  /*
+    ⚠️ THE ALLOW-LIST IS THE RESIDENCY ANSWER, and it is here rather than in the
+    catalogue because it is a fact about where a deployment may send data rather
+    than about what a model costs. A model outside it is refused; nothing runs
+    somewhere a studio was told its clients' records would not go.
+  */
+  /*
+    ⚠️ OPTIONAL, because a Kova with no model runner is a working Kova. Every
+    generation refuses and says so; nothing anywhere invents an answer and
+    charges for it.
+  */
+  ai: inference({ subprocessors: ["gemini-2.5-flash"], optional: true }),
 });
 
 export type Bindings = typeof bindings;
@@ -844,13 +856,143 @@ const STAFF = [
   "food:read", "food:write", "portion:read", "portion:write",
   "checkin:read", "checkin:write", "goal:read", "goal:write",
   "inbox:read", "file:read", "file:write", "guide:read", "milestone:read", "commerce:read", "report:read",
+  "ai:use",
 ];
+
+/* ------------------------------------------------------------------- ai --- */
+
+/**
+ * ⚠️ THE RATES ARE THE PROVIDER'S PRICE LIST AND THE PROMPTS ARE KOVA'S. A
+ * catalogue held by the platform would have to be edited for every product;
+ * prompts held by the platform would make every product the same one.
+ *
+ * ⚠️ AND THE DAILY CEILING IS PER PERSON, NOT PER STUDIO. A studio-wide balance
+ * is spent by whoever asks first — one coach looping a draft empties it before
+ * anybody else opens the product, and the only signal is a bill.
+ *
+ * ⚠️ IT IS DECLARED BEFORE THE OPERATIONS THAT USE IT, deliberately: an
+ * operation reaching into the manifest that contains it is a circular type, and
+ * a catalogue is exactly the small thing it actually needs.
+ */
+export const KOVA_AI: AiSpec = {
+  models: [
+    { id: "gemini-2.5-flash", provider: "google", rate: { input: 1, output: 4 } },
+  ],
+  features: {
+    "draft-plan": {
+      summary: "A training plan from a sentence",
+      model: "gemini-2.5-flash",
+      system: [
+        "You draft strength-training programmes for a coach to edit. Answer with JSON only.",
+        "Shape: { \"weeks\": [{ \"days\": [{ \"name\": string, \"movements\": [{ \"movement\": string, \"sets\": number, \"reps\": number, \"note\": string }] }] }] }.",
+        "Name movements in plain English. Do not invent a client's history, injuries or measurements: you have not been given any, and a coach reading a confident detail you made up is the failure that matters here.",
+        "Where the brief is not specific enough, choose the conservative option and say so in the note.",
+      ].join("\n"),
+      maxOutput: 4_000,
+      dailyPerPerson: 20,
+    },
+    "parse-food": {
+      summary: "A meal described in words, as foods and portions",
+      model: "gemini-2.5-flash",
+      system: [
+        "You turn a sentence about a meal into foods and portions. Answer with JSON only.",
+        "Shape: { \"foods\": [{ \"name\": string, \"grams\": number, \"confident\": boolean }] }.",
+        "Grams are the eaten weight. Where the sentence does not say how much, estimate an ordinary serving and set confident to false — a number somebody has to check is useful, and one that looks certain and is not is worse than none.",
+      ].join("\n"),
+      maxOutput: 600,
+      dailyPerPerson: 30,
+    },
+  },
+};
+
+/**
+ * ⚠️ THE PROMPT IS KOVA'S AND THE METER IS THE PLATFORM'S. What to ask a model
+ * for is the whole of what makes a coaching product different; what one call may
+ * hold, charge and how often one person may make it is the same arithmetic in
+ * every product, and getting it wrong is a transfer rather than a bug.
+ *
+ * ⚠️ AND A DRAFT IS A DRAFT. Neither of these writes anything: the answer comes
+ * back for a person to read, edit and save through the ordinary surface. A
+ * generated row saved straight into somebody's programme is a plan nobody
+ * approved, arriving under a coach's name.
+ */
+export const draftPlan = operation<
+  Bindings,
+  { brief: string },
+  { generation: string; draft: unknown; charged: number },
+  "platform.invalid" | "platform.quota_reached" | "platform.too_many" | "platform.unavailable"
+>({
+  id: "ai.draft-plan",
+  kind: "write",
+  summary: "Draft a training plan from a sentence, to edit rather than to keep.",
+  input: s.object({ brief: s.text({ min: 10, max: 600 }) }),
+  output: s.object({ generation: s.text(), draft: s.json(), charged: s.number({ integer: true }) }),
+  permission: "programme:write",
+  entitlement: "training",
+  /*
+    ⚠️ NOT IDEMPOTENT ON THE BRIEF. Asking twice for a draft of the same sentence
+    is a person asking for a different draft, which is the whole way this feature
+    is used — collapsing the second call onto the first would return the answer
+    they were trying to replace.
+  */
+  idempotency: { mode: "none" },
+  audit: () => ({ subject: "programme", verb: "draft" }),
+  fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
+  /*
+    ⚠️ NOT A TOOL. A model asking a model to draft a plan spends a studio's
+    credits on a request nobody made, and the output is a draft a person was
+    supposed to read.
+  */
+  tool: false,
+  async handler(ctx, input: { brief: string }) {
+    const out = await generateWith(ctx, KOVA_AI, "draft-plan", input.brief);
+    if (!out.ok) {
+      const problem = refusalProblem(out);
+      ctx.fail(problem.code, problem.meta);
+    }
+    const done = out as Extract<typeof out, { ok: true }>;
+    return { generation: done.id, draft: done.output, charged: done.charged };
+  },
+});
+
+/**
+ * ⚠️ THE CLIENT'S OWN, AND GATED ON WHAT THEY BOUGHT. Describing a meal in words
+ * is the nutrition surface — a client whose package does not include eating must
+ * not be able to spend the studio's credits on it.
+ */
+export const parseFood = operation<
+  Bindings,
+  { text: string },
+  { generation: string; foods: unknown; charged: number },
+  "platform.invalid" | "platform.quota_reached" | "platform.too_many" | "platform.unavailable"
+>({
+  id: "ai.parse-food",
+  kind: "write",
+  summary: "Say what you ate in words, and get it back as foods and portions.",
+  input: s.object({ text: s.text({ min: 3, max: 500 }) }),
+  output: s.object({ generation: s.text(), foods: s.json(), charged: s.number({ integer: true }) }),
+  permission: "portion:write",
+  customerFlag: "nutrition",
+  idempotency: { mode: "none" },
+  audit: () => ({ subject: "portion", verb: "parse" }),
+  fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
+  tool: false,
+  async handler(ctx, input: { text: string }) {
+    const out = await generateWith(ctx, KOVA_AI, "parse-food", input.text);
+    if (!out.ok) {
+      const problem = refusalProblem(out);
+      ctx.fail(problem.code, problem.meta);
+    }
+    const done = out as Extract<typeof out, { ok: true }>;
+    return { generation: done.id, foods: done.output, charged: done.charged };
+  },
+});
 
 export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.9.0",
+  manifestVersion: "0.10.0",
   bindings,
 
   identity: {
@@ -883,7 +1025,7 @@ export const kova = defineApp({
   access: {
     permissions: [
       ...STAFF, "workspace:create", "workspace:close", "billing:manage", "billing:operate", "commerce:manage",
-      "member:read", "member:manage", "report:read",
+      "member:read", "member:manage", "report:read", "ai:read",
     ],
     roles: {
       /*
@@ -892,7 +1034,9 @@ export const kova = defineApp({
         what it is called, so this key is not decoration — remove it here and a
         new studio is founded with nobody able to invite anybody into it.
       */
-      owner: [...STAFF, "workspace:create", "workspace:close", "billing:manage", "billing:operate", "commerce:manage", "member:read", "member:manage"],
+      /* ⚠️ `ai:read` is the OWNER's alone — what the studio's credits went on is
+         a question about the bill, and the bill is theirs. */
+      owner: [...STAFF, "workspace:create", "workspace:close", "billing:manage", "billing:operate", "commerce:manage", "member:read", "member:manage", "ai:read"],
       /* ⚠️ A coach SEES the team and cannot change it — hiring is the owner's. */
       trainer: [...STAFF, "workspace:create", "member:read"],
       /* ⚠️ The front desk sees people and bookings, and prescribes nothing. */
@@ -908,6 +1052,8 @@ export const kova = defineApp({
         /* ⚠️ A client WRITES a check-in and READS the answer; replying is staff's. */
         "checkin:read", "checkin:write", "goal:read",
         "inbox:read", "guide:read", "milestone:read", "file:read", "commerce:read",
+        /* ⚠️ A client may say a generation was wrong. They are the one who read it. */
+        "ai:use",
         /* ⚠️ Their OWN report. The row scope on `client.report` is what stops it
            being anybody else's. */
         "report:read",
@@ -1090,7 +1236,7 @@ export const kova = defineApp({
     },
   },
 
-  operations: [publish, complete, answer, attention, report],
+  operations: [publish, complete, answer, attention, report, draftPlan, parseFood],
 
   help: {
     clients: {
@@ -1154,6 +1300,16 @@ export const kova = defineApp({
     },
   },
 
+  /*
+    ⚠️ THE RATES ARE THE PROVIDER'S PRICE LIST AND THE PROMPTS ARE KOVA'S. A
+    catalogue held by the platform would have to be edited for every product;
+    prompts held by the platform would make every product the same one.
+
+    ⚠️ AND THE DAILY CEILING IS PER PERSON, NOT PER STUDIO. A studio-wide balance
+    is spent by whoever asks first — one coach looping a draft empties it before
+    anybody else opens the product, and the only signal is a bill.
+  */
+  ai: KOVA_AI,
   filePurposes: {
     avatar: { label: "Photo", accept: ["image/jpeg", "image/png"], maxBytes: 4_000_000 },
     demo: { label: "Movement demonstration", accept: ["video/mp4", "image/jpeg", "image/png"], maxBytes: 20_000_000 },
@@ -1302,6 +1458,18 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.10.0",
+      at: "2026-08-10",
+      notes: [
+        "Draft a training plan from a sentence and edit it, rather than starting from a blank week.",
+        "A client can say what they ate in words and get it back as foods and portions to check.",
+        "Nothing is saved for you: a draft comes back to read and change, because a plan nobody approved should not arrive under your name.",
+        "See what your credits were spent on, by whom, and on what — including the attempts that failed and cost nothing.",
+        "Say a generation was wrong. It is recorded against that generation, which is the only way the models we use ever get reconsidered.",
+        "Nobody can spend the studio's credits without limit: there is a ceiling per person per day, so one afternoon cannot empty the balance.",
+      ],
+    },
     {
       version: "0.9.0",
       at: "2026-08-10",
