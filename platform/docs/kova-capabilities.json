@@ -672,14 +672,14 @@
       "persona": "owner",
       "area": "commerce",
       "outcome": "Take payment on their own provider, in their own country",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "package-manual",
       "persona": "owner",
       "area": "commerce",
       "outcome": "Confirm a payment taken outside the product, without a provider at all",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "package-grant",
@@ -693,7 +693,7 @@
       "persona": "client",
       "area": "commerce",
       "outcome": "Buy access from their studio and start using it immediately",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "access-runway",
@@ -742,7 +742,8 @@
       "persona": "owner",
       "area": "commerce",
       "outcome": "Discount their own prices with a code they control",
-      "status": "old"
+      "status": "dropped",
+      "why": "A discount must be applied by whoever owns the checkout page, and the studio owns it. Kova opens an intent and hands over an address; it never sees the price the customer is charged, so a discount stored here would be a number nothing enforces. Access codes, which grant days rather than reduce a price, are the honest version of this and are not affected."
     },
     {
       "id": "purchase-history",

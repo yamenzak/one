@@ -1,6 +1,12 @@
 /**
  * WHO IS IN A STUDIO — end to end, through the doors a real person uses.
  *
+ * ⚠️ EVERY ADDRESS HERE IS THIS SUITE'S OWN. A sign-in code is delivered against
+ * an EMAIL, so two files signing the same address in stay green alone and fail
+ * intermittently together — the second request overwrites the first's code, the
+ * verify fails, and what a reader sees is a 403 from a caller who looks signed
+ * in. Shared fixture addresses are how a suite becomes order-dependent.
+ *
  * ⚠️ THIS SUITE EXISTS BECAUSE THE ANSWER USED TO BE "EVERYBODY, AS AN OWNER".
  * Every app here resolved its caller with `permissions: new Set(roles.owner)`
  * for anybody signed in — a scaffold that typechecks, passes every other test,
@@ -71,7 +77,7 @@ describe("a signed-in stranger holds nothing here", () => {
     never invited: they are not a member, so they hold no permission at all.
   */
   it("cannot read the roster, or anything else", async () => {
-    const stranger = as(await signIn("passer-by@example.test", STUDIO));
+    const stranger = as(await signIn("passer-by@marsden.example.test", STUDIO));
     expect((await stranger("/api/member.list")).status).toBe(403);
     expect((await stranger("/api/client.list")).status).toBe(403);
     expect((await stranger("/api/client.create", { name: "Mine now" })).status).toBe(403);
@@ -93,19 +99,19 @@ describe("an invitation is claimed by signing in", () => {
     cannot be used to test this on the entry plan.
   */
   it("is pending until somebody signs in with that address, and then it is theirs", async () => {
-    const sent = await owner("/api/member.invite", { email: "Ro@Example.test", role: "client" });
+    const sent = await owner("/api/member.invite", { email: "Ro@Marsden.Example.test", role: "client" });
     expect(sent.status).toBe(200);
     expect(sent.body).toMatchObject({ state: "invited" });
 
     /* ⚠️ Folded: people do not type their own address consistently. */
     const before = (await owner("/api/member.list")).body as unknown as Roster;
-    expect(before.members.find((m) => m.email === "ro@example.test")!.state).toBe("invited");
+    expect(before.members.find((m) => m.email === "ro@marsden.example.test")!.state).toBe("invited");
 
-    const ro = as(await signIn("ro@example.test", STUDIO));
+    const ro = as(await signIn("ro@marsden.example.test", STUDIO));
     expect((await ro("/api/programme.list")).status).toBe(200);
 
     const after = (await owner("/api/member.list")).body as unknown as Roster;
-    expect(after.members.find((m) => m.email === "ro@example.test")!.state).toBe("accepted");
+    expect(after.members.find((m) => m.email === "ro@marsden.example.test")!.state).toBe("accepted");
   });
 
   /*
@@ -115,14 +121,14 @@ describe("an invitation is claimed by signing in", () => {
     billing lane and every other client's record.
   */
   it("gives them their role and not the inviter's", async () => {
-    const ro = as(await signIn("ro@example.test", STUDIO));
+    const ro = as(await signIn("ro@marsden.example.test", STUDIO));
     expect((await ro("/api/member.list")).status).toBe(403);
     expect((await ro("/api/client.create", { name: "Somebody else" })).status).toBe(403);
     expect((await ro("/api/member.invite", { email: "nobody@example.test", role: "owner" })).status).toBe(403);
   });
 
   it("refuses a role this app does not have", async () => {
-    const bad = await owner("/api/member.invite", { email: "ghost@example.test", role: "superuser" });
+    const bad = await owner("/api/member.invite", { email: "ghost@marsden.example.test", role: "superuser" });
     expect(bad.status).toBe(400);
     expect(bad.body.meta).toMatchObject({ field: "role" });
   });
@@ -143,7 +149,7 @@ describe("the seat ceiling", () => {
     const r = (await owner("/api/member.list")).body as unknown as Roster;
     expect(r.seats.used).toBe(r.seats.allowed);
 
-    const over = await owner("/api/member.invite", { email: "colleague@example.test", role: "trainer" });
+    const over = await owner("/api/member.invite", { email: "colleague@marsden.example.test", role: "trainer" });
     expect(over.status).toBe(402);
   });
 
@@ -154,7 +160,7 @@ describe("the seat ceiling", () => {
   */
   it("does not count the people the studio coaches", async () => {
     const before = ((await owner("/api/member.list")).body as unknown as Roster).seats.used;
-    expect((await owner("/api/member.invite", { email: "second-client@example.test", role: "client" })).status).toBe(200);
+    expect((await owner("/api/member.invite", { email: "second-client@marsden.example.test", role: "client" })).status).toBe(200);
     expect(((await owner("/api/member.list")).body as unknown as Roster).seats.used).toBe(before);
   });
 });
@@ -164,15 +170,15 @@ describe("the seat ceiling", () => {
 describe("removing somebody", () => {
   it("takes their access away at once", async () => {
     const roster = (await owner("/api/member.list")).body as unknown as Roster;
-    const ro = roster.members.find((m) => m.email === "ro@example.test")!;
+    const ro = roster.members.find((m) => m.email === "ro@marsden.example.test")!;
 
     expect((await owner("/api/member.remove", { id: ro.id })).status).toBe(200);
     /* ⚠️ Now, not when their session expires — a cookie outlives a removal by days. */
-    const gone = as(await signIn("ro@example.test", STUDIO));
+    const gone = as(await signIn("ro@marsden.example.test", STUDIO));
     expect((await gone("/api/programme.list")).status).toBe(403);
 
     const after = (await owner("/api/member.list")).body as unknown as Roster;
-    expect(after.members.some((m) => m.email === "ro@example.test")).toBe(false);
+    expect(after.members.some((m) => m.email === "ro@marsden.example.test")).toBe(false);
   });
 
   /*
@@ -181,9 +187,9 @@ describe("removing somebody", () => {
     update leaves them revoked, and an owner can never undo a removal.
   */
   it("lets a removed person be invited back", async () => {
-    expect((await owner("/api/member.invite", { email: "ro@example.test", role: "client" })).status).toBe(200);
+    expect((await owner("/api/member.invite", { email: "ro@marsden.example.test", role: "client" })).status).toBe(200);
     const roster = (await owner("/api/member.list")).body as unknown as Roster;
-    expect(roster.members.some((m) => m.email === "ro@example.test")).toBe(true);
+    expect(roster.members.some((m) => m.email === "ro@marsden.example.test")).toBe(true);
   });
 
   /*
@@ -209,7 +215,7 @@ describe("narrowing one person within their role", () => {
   */
   it("takes one thing away and leaves the rest of the role", async () => {
     const roster = (await owner("/api/member.list")).body as unknown as Roster;
-    const ro = roster.members.find((m) => m.email === "ro@example.test")!;
+    const ro = roster.members.find((m) => m.email === "ro@marsden.example.test")!;
 
     const out = await owner("/api/member.permissions", { id: ro.id, grants: [], revoked: ["workout:write"] });
     expect(out.status).toBe(200);
@@ -217,7 +223,7 @@ describe("narrowing one person within their role", () => {
     expect(held).not.toContain("workout:write");
     expect(held).toContain("workout:read");
 
-    const them = as(await signIn("ro@example.test", STUDIO));
+    const them = as(await signIn("ro@marsden.example.test", STUDIO));
     expect((await them("/api/workout.list")).status).toBe(200);
     expect((await them("/api/workout.create", { client: ro.subjectId ?? "cli_x", day: "2026-08-01" })).status).toBe(403);
   });
@@ -229,17 +235,17 @@ describe("narrowing one person within their role", () => {
   */
   it("refuses to hand out something the granter does not have themselves", async () => {
     const roster = (await owner("/api/member.list")).body as unknown as Roster;
-    const ro = roster.members.find((m) => m.email === "ro@example.test")!;
+    const ro = roster.members.find((m) => m.email === "ro@marsden.example.test")!;
 
     /* A trainer may read the team; they may not widen anybody, including themselves. */
-    await owner("/api/member.invite", { email: "second-client@example.test", role: "client" });
-    const lesser = as(await signIn("second-client@example.test", STUDIO));
+    await owner("/api/member.invite", { email: "second-client@marsden.example.test", role: "client" });
+    const lesser = as(await signIn("second-client@marsden.example.test", STUDIO));
     expect((await lesser("/api/member.permissions", { id: ro.id, grants: ["client:write"], revoked: [] })).status).toBe(403);
   });
 
   it("refuses a permission this app does not declare", async () => {
     const roster = (await owner("/api/member.list")).body as unknown as Roster;
-    const ro = roster.members.find((m) => m.email === "ro@example.test")!;
+    const ro = roster.members.find((m) => m.email === "ro@marsden.example.test")!;
     const bad = await owner("/api/member.permissions", { id: ro.id, grants: ["everythng:read"], revoked: [] });
     expect(bad.status).toBe(400);
     expect(bad.body.meta).toMatchObject({ field: "grants" });

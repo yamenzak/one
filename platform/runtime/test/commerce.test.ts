@@ -123,12 +123,27 @@ describe("the customer rail is mounted only where an app declares one", () => {
     expect(customerOperations(app({}))).toEqual([]);
   });
 
-  it("mounts the offer, the grant, the explanation and the corrections when it does", () => {
+  it("mounts the whole rail when it does — the offer, the money and the corrections", () => {
     const ids = customerOperations(app({ access: withRail })).map((op) => op.id).sort();
     expect(ids).toEqual([
-      "commerce.capabilities", "commerce.days", "commerce.grant", "commerce.history",
-      "commerce.override", "commerce.package.save", "commerce.packages",
+      "commerce.capabilities", "commerce.checkout", "commerce.confirm", "commerce.days",
+      "commerce.grant", "commerce.history", "commerce.override", "commerce.package.save",
+      "commerce.packages", "commerce.payments", "commerce.payments.set", "commerce.purchases",
+      "webhook.customer",
     ]);
+  });
+
+  /*
+    ⚠️ THE WORKSPACE'S OWN WEBHOOK IS ON THE `webhook` LANE, which survives every
+    rung of the payment ladder. A workspace suspended over its own bill still has
+    customers mid-checkout, and refusing their provider's notification would take
+    money on a page we do not control and grant nothing for it.
+  */
+  it("puts the customer webhook on a lane the standing ladder cannot close", () => {
+    const hook = customerOperations(app({ access: withRail })).find((op) => op.id === "webhook.customer")!;
+    expect(ALWAYS_ALLOWED).toContain(laneOf(hook));
+    expect(hook.permission).toBe(PUBLIC);
+    expect(hook.tool).toBe(false);
   });
 
   /*
@@ -139,7 +154,7 @@ describe("the customer rail is mounted only where an app declares one", () => {
   */
   it("keeps every per-customer write away from the assistant", () => {
     const ops = customerOperations(app({ access: withRail }));
-    for (const id of ["commerce.grant", "commerce.override", "commerce.days"]) {
+    for (const id of ["commerce.grant", "commerce.override", "commerce.days", "commerce.confirm", "commerce.checkout", "commerce.payments.set"]) {
       expect(ops.find((op) => op.id === id)?.tool, id).toBe(false);
     }
   });

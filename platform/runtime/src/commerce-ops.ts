@@ -13,14 +13,15 @@
  * choice is recorded, nothing is charged, and the screen says so.
  */
 
-import type { Allowance, AnyOperation, AppSpec, BindingSpec, EntitlementDef, Money, PlanSpec, SqlHandle } from "@one/kernel";
+import type { Allowance, AnyOperation, AppSpec, BindingSpec, EntitlementDef, Instant, Money, PlanSpec, SqlHandle } from "@one/kernel";
 import {
   explainCustomerFlags, explainEntitlements, gateFor, heldEntitlements, mayPurchase, packageLines,
   operation, packageContradictions, PUBLIC, runwayFor, s,
 } from "@one/kernel";
 import {
-  applyPackage, applyPayment, choosePlan, grantsFor, listPackages, priorGrants, readAccess, readPackage,
-  setOverrides, setRemainingDays,
+  applyPackage, applyPayment, choosePlan, grantsFor, listPackages, openPurchase, priorGrants,
+  purchasesFor, readAccess, readPackage, readPayments, readPurchase, savePayments, setOverrides,
+  setRemainingDays, settlePurchase, credentialProblem, verifySecretOf,
   readSubscription, savePackage, standingFor,
 } from "./commerce.js";
 import { attribute, claimByCustomer, claimEvent, listParked, park, rememberCustomer, resolveParked, verifySignature } from "./provider.js";
@@ -201,6 +202,45 @@ export function commerceOperations<B extends BindingSpec>(app: AppSpec<B>): read
  * stage builds on by mistake, and its refusals read as policy rather than as
  * "this product does not do that".
  */
+/**
+ * ⚠️ ONE SETTLEMENT PATH FOR BOTH LANES, and it is the whole reason `manual` is
+ * not second-class. A signed notification and a coach pressing confirm arrive
+ * here identically: the same conditional write decides whether this delivery is
+ * the one that counts, and the same grant applies. Two routes to "they paid"
+ * disagree eventually, and the disagreement is always about money.
+ */
+async function settle(
+  ctx: { now(): Instant; fail(code: string, meta?: Record<string, string | number | boolean>): never },
+  d: CommerceDeps,
+  purchaseId: string,
+  by: string,
+  ref: string | null,
+): Promise<{ purchaseId: string; daysAdded: number; alreadySettled: boolean }> {
+  const purchase = await readPurchase(d.db, d.tenantId, purchaseId);
+  if (!purchase) ctx.fail("platform.not_found", { field: "purchaseId" });
+
+  const at = ctx.now();
+  /*
+    ⚠️ THE CONDITIONAL WRITE IS THE LOCK. A provider redelivering a success, or a
+    coach pressing the button twice, must not buy the package again — and a
+    read-then-write would let both through on the same second.
+  */
+  const ours = await settlePurchase(d.db, d.tenantId, purchase!.id, by, ref, at);
+  if (!ours) return { purchaseId: purchase!.id, daysAdded: 0, alreadySettled: true };
+
+  const pkg = await readPackage(d.db, d.tenantId, purchase!.packageId);
+  /*
+    ⚠️ A PACKAGE DELETED BETWEEN PAYING AND SETTLING LEAVES THE INTENT SETTLED
+    AND NOTHING GRANTED, which is the honest state: the money moved, and what it
+    bought no longer exists for anybody to describe. It is visible in the
+    purchase list rather than swallowed.
+  */
+  if (!pkg) return { purchaseId: purchase!.id, daysAdded: 0, alreadySettled: false };
+
+  const applied = await applyPackage(d.db, d.tenantId, purchase!.subjectId, pkg, at, purchase!.id);
+  return { purchaseId: purchase!.id, daysAdded: applied.daysAdded, alreadySettled: false };
+}
+
 export function customerOperations<B extends BindingSpec>(app: AppSpec<B>): readonly AnyOperation[] {
   if (!app.access.customerRail) return [];
 
@@ -459,7 +499,209 @@ export function customerOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
-  return [offer, save, grant, capabilities, override, repair, history] as unknown as readonly AnyOperation[];
+  /* ------------------------------------------------------- being paid --- */
+
+  const payments = operation({
+    id: "commerce.payments",
+    kind: "read",
+    summary: "How this workspace takes money from its own customers.",
+    input: s.object({}),
+    output: s.object({ provider: s.text(), checkoutUrl: s.text(), verifies: s.bool() }),
+    permission: "commerce:read",
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const d = deps(ctx);
+      const setup = await readPayments(d.db, d.tenantId);
+      /* ⚠️ The secret is never returned, only whether one is stored. */
+      return { provider: setup.provider, checkoutUrl: setup.checkoutUrl ?? "", verifies: setup.verifies };
+    },
+  });
+
+  const setPayments = operation({
+    id: "commerce.payments.set",
+    kind: "write",
+    summary: "Say where customers pay, and how a notification is verified.",
+    input: s.object({
+      provider: s.text({ max: 16 }),
+      checkoutUrl: s.optional(s.text({ max: 500 })),
+      verifySecret: s.optional(s.text({ max: 200 })),
+    }),
+    output: s.object({ provider: s.text(), verifies: s.bool() }),
+    permission: "commerce:manage",
+    idempotency: { mode: "none" },
+    audit: (i: { provider: string }) => ({ subject: i.provider, verb: "payments" }),
+    outcome: { message: "Payment settings saved", tone: "success", invalidates: ["commerce.payments"] },
+    fails: ["platform.invalid"],
+    tool: false,
+    async handler(ctx, input: { provider: string; checkoutUrl?: string; verifySecret?: string }) {
+      const d = deps(ctx);
+      if (input.provider !== "manual" && input.provider !== "link") {
+        ctx.fail("platform.invalid", { field: "provider", reason: "manual or link" });
+      }
+      /*
+        ⚠️ A LANE THAT SENDS SOMEBODY SOMEWHERE MUST HAVE SOMEWHERE TO SEND THEM.
+        Storing `link` with no address produces a checkout that answers with an
+        empty URL, which a screen renders as a broken button rather than as
+        anything anybody can act on.
+      */
+      const url = input.checkoutUrl?.trim() || null;
+      if (input.provider === "link" && !url) ctx.fail("platform.invalid", { field: "checkoutUrl", reason: "required" });
+      if (url && !/^https:\/\//.test(url)) ctx.fail("platform.invalid", { field: "checkoutUrl", reason: "must be https" });
+
+      const secret = input.verifySecret?.trim() || null;
+      if (secret) {
+        const unsafe = credentialProblem(secret);
+        if (unsafe) ctx.fail("platform.invalid", { field: "verifySecret", reason: unsafe });
+      }
+      await savePayments(
+        d.db, d.tenantId,
+        { provider: input.provider === "link" ? "link" : "manual", checkoutUrl: url, verifySecret: secret },
+        ctx.now(),
+      );
+      const after = await readPayments(d.db, d.tenantId);
+      return { provider: after.provider, verifies: after.verifies };
+    },
+  });
+
+  const checkout = operation({
+    id: "commerce.checkout",
+    kind: "write",
+    summary: "Say you want to buy a package, and be told where to pay for it.",
+    input: s.object({ subjectId: s.text({ max: 120 }), packageId: s.text({ max: 60 }) }),
+    output: s.object({ purchaseId: s.text(), payAt: s.text(), amount: s.json(), settlement: s.text() }),
+    permission: "commerce:read",
+    /* ⚠️ A customer may open one for themselves and nobody else. */
+    scope: (i: { subjectId: string }) => ({ subject: i.subjectId }),
+    idempotency: { mode: "none" },
+    audit: (i: { packageId: string }) => ({ subject: i.packageId, verb: "checkout" }),
+    fails: ["platform.not_found", "platform.conflict"],
+    tool: false,
+    async handler(ctx, input: { subjectId: string; packageId: string }) {
+      const d = deps(ctx);
+      const pkg = await readPackage(d.db, d.tenantId, input.packageId);
+      if (!pkg) ctx.fail("platform.not_found", { field: "packageId" });
+
+      /*
+        ⚠️ REFUSED HERE RATHER THAN AT SETTLEMENT. A once-only package somebody
+        can pay for and not receive is worse than one they cannot buy — the money
+        has moved on a page this platform does not control, and there is nothing
+        here that could give it back.
+      */
+      const verdict = mayPurchase(pkg!, await priorGrants(d.db, d.tenantId, input.subjectId));
+      if (!verdict.allowed) ctx.fail("platform.conflict", { reason: verdict.refusal });
+
+      const setup = await readPayments(d.db, d.tenantId);
+      const purchase = await openPurchase(d.db, d.tenantId, input.subjectId, pkg!, ctx.now());
+      return {
+        purchaseId: purchase.id,
+        /*
+          ⚠️ THE WORKSPACE OWNS THAT PAGE, NOT US. We open an intent and hand
+          over an address; tokenization, 3DS, retries and the money itself stay
+          on the other side of it. That is the whole reason this abstraction can
+          survive a provider it has never heard of.
+        */
+        payAt: setup.checkoutUrl ?? "",
+        amount: purchase.amount,
+        /* ⚠️ Said out loud, because "pay and wait" and "pay and it works" are
+           different promises and a screen has to make the right one. */
+        settlement: setup.provider === "link" && setup.verifies ? "automatic" : "confirmed_by_the_workspace",
+      };
+    },
+  });
+
+  const confirm = operation({
+    id: "commerce.confirm",
+    kind: "write",
+    summary: "Confirm a customer paid, and apply what they bought.",
+    input: s.object({ purchaseId: s.text({ max: 40 }), ref: s.optional(s.text({ max: 200 })) }),
+    output: s.object({ purchaseId: s.text(), daysAdded: s.number({ integer: true }), alreadySettled: s.bool() }),
+    permission: "commerce:manage",
+    idempotency: { mode: "none" },
+    audit: (i: { purchaseId: string }) => ({ subject: i.purchaseId, verb: "confirm" }),
+    outcome: { message: "Payment confirmed", tone: "success", moment: "acknowledge", invalidates: ["commerce.capabilities"] },
+    emits: ["package.granted"],
+    fails: ["platform.not_found"],
+    /*
+      ⚠️ NOT A TOOL. "Somebody says they paid" is the one sentence a model must
+      never be able to act on, and it is a sentence that turns up in every
+      support inbox.
+    */
+    tool: false,
+    async handler(ctx, input: { purchaseId: string; ref?: string }) {
+      const d = deps(ctx);
+      return settle(ctx, d, input.purchaseId, `staff:${d.tenantId}`, input.ref ?? null);
+    },
+  });
+
+  /*
+    ⚠️ THE WORKSPACE'S OWN PROVIDER TELLING US SOMEBODY PAID, and it is PUBLIC by
+    construction — a provider cannot hold a session. So the SIGNATURE is the
+    whole of the authentication, and a workspace with no stored secret must be
+    REFUSED rather than trusted: this endpoint grants paid access, so an
+    unverifiable lane is an open door for every workspace that has configured
+    nothing, which is most of them.
+  */
+  const notified = operation({
+    id: "webhook.customer",
+    kind: "write",
+    summary: "Receive the workspace's own provider saying a customer paid.",
+    input: s.object({}),
+    output: s.object({ outcome: s.text() }),
+    permission: PUBLIC,
+    // vocabulary-exempt: the provider retries, so it supplies the key that says
+    // two deliveries are one event.
+    idempotency: { mode: "client-supplied" },
+    fails: ["platform.forbidden", "platform.invalid", "platform.not_found"],
+    tool: false,
+    async handler(ctx) {
+      const d = deps(ctx);
+      const secret = await verifySecretOf(d.db, d.tenantId);
+      /*
+        ⚠️ NO SECRET IS A REFUSAL, NOT A PASS. `manual` is the default, so most
+        workspaces have none — and answering them 200 would make this the way in
+        for anybody who can guess a purchase id.
+      */
+      if (!secret) ctx.fail("platform.forbidden", { reason: "no_verification_configured" });
+
+      const verdict = await verifySignature({ secret: secret!, body: d.body, header: d.signature, now: ctx.now() });
+      if (!verdict.ok) ctx.fail("platform.forbidden", { reason: verdict.why ?? "wrong" });
+
+      let said: { purchaseId?: unknown; ref?: unknown };
+      try { said = JSON.parse(d.body) as typeof said; } catch { return ctx.fail("platform.invalid", { reason: "unreadable" }); }
+      if (typeof said.purchaseId !== "string") ctx.fail("platform.invalid", { field: "purchaseId" });
+
+      const out = await settle(
+        ctx as never, d, said.purchaseId as string, "provider",
+        typeof said.ref === "string" ? said.ref : null,
+      );
+      return { outcome: out.alreadySettled ? "already_settled" : "settled" };
+    },
+  });
+
+  const purchases = operation({
+    id: "commerce.purchases",
+    kind: "read",
+    summary: "What has been asked for and what has been paid for.",
+    input: s.object({ subjectId: s.optional(s.text({ max: 120 })) }),
+    output: s.object({ purchases: s.json() }),
+    permission: "commerce:read",
+    idempotency: { mode: "none" },
+    async handler(ctx, input: { subjectId?: string }) {
+      const d = deps(ctx);
+      /*
+        ⚠️ A CUSTOMER SEES THEIR OWN AND NOTHING ELSE, decided from the SESSION
+        rather than from the request — an optional filter that a customer could
+        set to somebody else's id is not a filter, it is the hole.
+      */
+      const mine = (ctx as { subjectId?: string }).subjectId;
+      return { purchases: await purchasesFor(d.db, d.tenantId, mine ?? input.subjectId ?? null) };
+    },
+  });
+
+  return [
+    offer, save, grant, capabilities, override, repair, history,
+    payments, setPayments, checkout, confirm, notified, purchases,
+  ] as unknown as readonly AnyOperation[];
 }
 
 /* ------------------------------------------------------------- the wire --- */

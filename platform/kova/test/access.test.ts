@@ -51,8 +51,8 @@ beforeAll(async () => {
 
   ro = (await coach("/api/client.create", { name: "Ro" })).body.id as unknown as string;
   /* ⚠️ The membership NAMES the record, which is what makes them a customer. */
-  await coach("/api/member.invite", { email: "ro@example.test", role: "client", subjectId: ro });
-  client = as(await signIn("ro@example.test", STUDIO));
+  await coach("/api/member.invite", { email: "ro@harlow.example.test", role: "client", subjectId: ro });
+  client = as(await signIn("ro@harlow.example.test", STUDIO));
 
   await coach("/api/commerce.package.save", {
     id: "full", name: "Coaching + nutrition", price: { minor: 12_000, currency: "USD" },

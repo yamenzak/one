@@ -65,6 +65,22 @@ export const COMMERCE_SCHEMA: SchemaModule = {
     */
     `CREATE TABLE IF NOT EXISTS subject_access (tenant_id TEXT NOT NULL, subject_id TEXT NOT NULL, package_id TEXT, flags_json TEXT NOT NULL DEFAULT '{}', overrides_json TEXT NOT NULL DEFAULT '{}', budgets_json TEXT NOT NULL DEFAULT '{}', updated_at TEXT NOT NULL, PRIMARY KEY (tenant_id, subject_id));`,
     `CREATE TABLE IF NOT EXISTS package_grant (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, subject_id TEXT NOT NULL, package_id TEXT NOT NULL, ref TEXT, at TEXT NOT NULL);`,
+    /*
+      ⚠️ AN INTENT, NOT A PAYMENT. The workspace is paid on ITS OWN provider and
+      this platform is never in the money path — so what is recorded here is that
+      somebody said they wanted to buy something, and separately that somebody
+      with authority said it was paid for. Storing a payment would be storing a
+      claim we cannot check.
+    */
+    `CREATE TABLE IF NOT EXISTS customer_purchase (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, subject_id TEXT NOT NULL, package_id TEXT NOT NULL, amount_minor INTEGER NOT NULL, currency TEXT NOT NULL, status TEXT NOT NULL, ref TEXT, settled_by TEXT, opened_at TEXT NOT NULL, settled_at TEXT);`,
+    `CREATE INDEX IF NOT EXISTS idx_purchase_open ON customer_purchase(tenant_id, status, opened_at);`,
+    /*
+      ⚠️ ONE ROW PER WORKSPACE, AND THE SECRET IN IT MAY ONLY VERIFY. A stored
+      credential that could CHARGE would make this database a vault of live
+      merchant keys, which is a worse liability than anything it would save.
+      `safeConfig` is what keeps it to a signing secret.
+    */
+    `CREATE TABLE IF NOT EXISTS tenant_payments (tenant_id TEXT PRIMARY KEY, provider TEXT NOT NULL, checkout_url TEXT, verify_secret TEXT, updated_at TEXT NOT NULL);`,
     `CREATE INDEX IF NOT EXISTS idx_grant_subject ON package_grant(tenant_id, subject_id);`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_grant_ref ON package_grant(tenant_id, ref) WHERE ref IS NOT NULL;`,
   ],
@@ -445,6 +461,153 @@ export async function grantsFor(
     tenantId, subjectId,
   );
   return rows.map((r) => ({ packageId: r.package_id, at: r.at as Instant, ref: r.ref }));
+}
+
+/* -------------------------------------------------------- being paid --- */
+
+/**
+ * HOW A WORKSPACE TAKES MONEY FROM ITS OWN CUSTOMERS.
+ *
+ * ⚠️ `manual` IS THE DEFAULT AND IS NOT A SECOND-CLASS LANE. It works in every
+ * country on day one, needs no account anywhere, and every automated provider
+ * degrades to it — which is the property that makes this abstraction survivable.
+ * A design where the automated path is the real one and the manual path is a
+ * fallback ends up with two settlement routes that disagree.
+ */
+export interface PaymentSetup {
+  readonly provider: "manual" | "link";
+  /** Where the customer is sent to pay. The workspace owns this page, not us. */
+  readonly checkoutUrl: string | null;
+  /** Whether a signing secret is stored. ⚠️ Never the secret itself. */
+  readonly verifies: boolean;
+}
+
+/**
+ * ⚠️ A STORED CREDENTIAL MAY VERIFY, NEVER ACT.
+ *
+ * A signing secret checks that a notification came from the workspace's own
+ * provider. An API key would let this platform CHARGE somebody's customers,
+ * which is a liability nothing here needs to take on — so a value that looks
+ * like one is refused rather than stored.
+ */
+export function credentialProblem(secret: string): string | null {
+  const looksLikeAKey = /^(sk_|rk_|pk_live|api[-_]?key|bearer\s)/i.test(secret.trim());
+  return looksLikeAKey ? "that looks like an API key; only a signing secret belongs here" : null;
+}
+
+export async function readPayments(db: SqlHandle, tenantId: string): Promise<PaymentSetup> {
+  const row = await db.first<{ provider: string; checkout_url: string | null; verify_secret: string | null }>(
+    `SELECT provider, checkout_url, verify_secret FROM tenant_payments WHERE tenant_id = ?`, tenantId,
+  );
+  if (!row) return { provider: "manual", checkoutUrl: null, verifies: false };
+  return {
+    provider: row.provider === "link" ? "link" : "manual",
+    checkoutUrl: row.checkout_url,
+    verifies: Boolean(row.verify_secret),
+  };
+}
+
+/** ⚠️ Read only where it is used — never returned to a caller. */
+export async function verifySecretOf(db: SqlHandle, tenantId: string): Promise<string | null> {
+  const row = await db.first<{ verify_secret: string | null }>(
+    `SELECT verify_secret FROM tenant_payments WHERE tenant_id = ?`, tenantId,
+  );
+  return row?.verify_secret ?? null;
+}
+
+export async function savePayments(
+  db: SqlHandle,
+  tenantId: string,
+  setup: { readonly provider: "manual" | "link"; readonly checkoutUrl: string | null; readonly verifySecret: string | null },
+  at: Instant,
+): Promise<void> {
+  await db.run(
+    `INSERT INTO tenant_payments (tenant_id, provider, checkout_url, verify_secret, updated_at) VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(tenant_id) DO UPDATE SET provider = excluded.provider, checkout_url = excluded.checkout_url,
+       verify_secret = COALESCE(excluded.verify_secret, tenant_payments.verify_secret), updated_at = excluded.updated_at`,
+    tenantId, setup.provider, setup.checkoutUrl, setup.verifySecret, at,
+  );
+}
+
+/* --------------------------------------------------------- purchases --- */
+
+export interface Purchase {
+  readonly id: string;
+  readonly subjectId: string;
+  readonly packageId: string;
+  readonly amount: { readonly minor: number; readonly currency: string };
+  readonly status: "open" | "settled" | "cancelled";
+  readonly ref: string | null;
+  readonly openedAt: Instant;
+  readonly settledAt: Instant | null;
+}
+
+const toPurchase = (r: {
+  id: string; subject_id: string; package_id: string; amount_minor: number; currency: string;
+  status: string; ref: string | null; opened_at: string; settled_at: string | null;
+}): Purchase => ({
+  id: r.id, subjectId: r.subject_id, packageId: r.package_id,
+  amount: { minor: r.amount_minor, currency: r.currency },
+  status: r.status === "settled" ? "settled" : r.status === "cancelled" ? "cancelled" : "open",
+  ref: r.ref, openedAt: r.opened_at as Instant, settledAt: (r.settled_at as Instant | null) ?? null,
+});
+
+const PURCHASE_COLUMNS = `id, subject_id, package_id, amount_minor, currency, status, ref, opened_at, settled_at`;
+
+export async function openPurchase(
+  db: SqlHandle, tenantId: string, subjectId: string, pkg: PackageSpec, at: Instant,
+): Promise<Purchase> {
+  const id = `pur_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
+  await db.run(
+    `INSERT INTO customer_purchase (id, tenant_id, subject_id, package_id, amount_minor, currency, status, opened_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
+    id, tenantId, subjectId, pkg.id, pkg.price.minor, pkg.price.currency, at,
+  );
+  return {
+    id, subjectId, packageId: pkg.id, amount: { minor: pkg.price.minor, currency: pkg.price.currency },
+    status: "open", ref: null, openedAt: at, settledAt: null,
+  };
+}
+
+export async function readPurchase(db: SqlHandle, tenantId: string, id: string): Promise<Purchase | null> {
+  const row = await db.first<Parameters<typeof toPurchase>[0]>(
+    `SELECT ${PURCHASE_COLUMNS} FROM customer_purchase WHERE tenant_id = ? AND id = ?`, tenantId, id,
+  );
+  return row ? toPurchase(row) : null;
+}
+
+export async function purchasesFor(
+  db: SqlHandle, tenantId: string, subjectId: string | null,
+): Promise<readonly Purchase[]> {
+  const rows = subjectId
+    ? await db.all<Parameters<typeof toPurchase>[0]>(
+        `SELECT ${PURCHASE_COLUMNS} FROM customer_purchase WHERE tenant_id = ? AND subject_id = ? ORDER BY opened_at DESC LIMIT 200`,
+        tenantId, subjectId)
+    : await db.all<Parameters<typeof toPurchase>[0]>(
+        `SELECT ${PURCHASE_COLUMNS} FROM customer_purchase WHERE tenant_id = ? ORDER BY opened_at DESC LIMIT 200`, tenantId);
+  return rows.map(toPurchase);
+}
+
+/**
+ * Mark an intent paid, exactly once.
+ *
+ * ⚠️ THE UPDATE IS THE LOCK. A provider that redelivers a success, or a coach
+ * pressing confirm twice, must not grant the package again — so settling is a
+ * conditional write on `status = 'open'` and the caller applies the package only
+ * when it changed a row. Checking first and writing after is the same bug with
+ * more steps.
+ */
+export async function settlePurchase(
+  db: SqlHandle, tenantId: string, id: string, by: string, ref: string | null, at: Instant,
+): Promise<boolean> {
+  await db.run(
+    `UPDATE customer_purchase SET status = 'settled', settled_at = ?, settled_by = ?, ref = ? WHERE tenant_id = ? AND id = ? AND status = 'open'`,
+    at, by, ref, tenantId, id,
+  );
+  const row = await db.first<{ settled_at: string | null; settled_by: string | null }>(
+    `SELECT settled_at, settled_by FROM customer_purchase WHERE tenant_id = ? AND id = ?`, tenantId, id,
+  );
+  return row?.settled_at === at && row?.settled_by === by;
 }
 
 /**

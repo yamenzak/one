@@ -1723,6 +1723,69 @@
       "impl": "kova/test/access.test.ts",
       "proves": "does not warn about an expiry somebody does not have",
       "fails": "every client who never bought anything at the top of the attention list, which is the fastest way to teach a coach to stop opening it"
+    },
+    {
+      "id": "a-workspace-with-nothing-configured-can-be-paid",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/buying.test.ts",
+      "proves": "applies what was bought when the studio says it was paid",
+      "fails": "a manual lane treated as a fallback rather than the default — most workspaces have configured nothing, and a product that needs a provider before anybody can buy anything is a setup screen with a product behind it"
+    },
+    {
+      "id": "an-intent-grants-nothing",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/buying.test.ts",
+      "proves": "opens an intent and grants nothing at all",
+      "fails": "saying you will pay counting as paying — access applied on the strength of a customer pressing a button, on a platform that is never in the money path and cannot check"
+    },
+    {
+      "id": "settling-twice-buys-once",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/buying.test.ts",
+      "proves": "answers a redelivery without granting again",
+      "fails": "a provider retrying a success it timed out on, or a coach pressing confirm twice, buying the package again — and a read-then-write lets both through on the same second"
+    },
+    {
+      "id": "an-unverifiable-notice-is-refused",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/buying.test.ts",
+      "proves": "refuses a workspace with no verification configured",
+      "fails": "a public endpoint that grants paid access answering 200 to a workspace with no secret — which is most of them, and turns it into a way in for anybody who can guess a purchase id"
+    },
+    {
+      "id": "a-stored-credential-may-verify-never-act",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/buying.test.ts",
+      "proves": "refuses a credential that could charge somebody",
+      "fails": "a database of live merchant keys — a signing secret checks a notification came from the workspace's provider; an API key would let this platform charge their customers"
+    },
+    {
+      "id": "a-once-only-package-is-refused-before-paying",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/buying.test.ts",
+      "proves": "refuses a once-only package before sending anybody to pay",
+      "fails": "somebody paying on a page this platform does not control and receiving nothing, with no way here to give it back"
+    },
+    {
+      "id": "a-customers-purchases-are-their-own",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/buying.test.ts",
+      "proves": "sees their own purchases and not the studio's other customers'",
+      "fails": "an optional filter a customer can point at somebody else's id, which is not a filter — it is the hole with a parameter in front of it"
     }
   ]
 }

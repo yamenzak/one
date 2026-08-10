@@ -1015,6 +1015,13 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-repair-is-not-a-purchase` | a correction written into the grant ledger, after which 'what have they bought from us' has no answer — and a once-per-customer package can never be sold again | **live** |
 | `the-soonest-scope-is-what-warns` | warning on the headline runway, which is a maximum — so somebody with ninety days of training and three of nutrition reads as fully covered | **live** |
 | `no-expiry-is-not-an-expiry` | every client who never bought anything at the top of the attention list, which is the fastest way to teach a coach to stop opening it | **live** |
+| `a-workspace-with-nothing-configured-can-be-paid` | a manual lane treated as a fallback rather than the default — most workspaces have configured nothing, and a product that needs a provider before anybody can buy anything is a setup screen with a product behind it | **live** |
+| `an-intent-grants-nothing` | saying you will pay counting as paying — access applied on the strength of a customer pressing a button, on a platform that is never in the money path and cannot check | **live** |
+| `settling-twice-buys-once` | a provider retrying a success it timed out on, or a coach pressing confirm twice, buying the package again — and a read-then-write lets both through on the same second | **live** |
+| `an-unverifiable-notice-is-refused` | a public endpoint that grants paid access answering 200 to a workspace with no secret — which is most of them, and turns it into a way in for anybody who can guess a purchase id | **live** |
+| `a-stored-credential-may-verify-never-act` | a database of live merchant keys — a signing secret checks a notification came from the workspace's provider; an API key would let this platform charge their customers | **live** |
+| `a-once-only-package-is-refused-before-paying` | somebody paying on a page this platform does not control and receiving nothing, with no way here to give it back | **live** |
+| `a-customers-purchases-are-their-own` | an optional filter a customer can point at somebody else's id, which is not a filter — it is the hole with a parameter in front of it | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

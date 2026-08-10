@@ -77,7 +77,41 @@ const rel = (f) => relative(ROOT, f);
  * sterilisation record, wrong for a customer profile"). Code may not. So the
  * vocabulary and escape-hatch checks read source with comments removed, and the
  * exemption scanner reads the comments they came from.
+ *
  */
+
+/**
+ * The same, with string CONTENTS blanked as well.
+ *
+ * ⚠️ FOR THE TYPE CHECKS ONLY, AND THE VOCABULARY CHECK MUST NOT USE IT. A
+ * manifest holds PROSE — release notes, help articles, the copy on a refusal —
+ * and reading it as code fails on ordinary English: "confirm a payment you took
+ * any other way" was reported as an unstated `any`. A guard a product sentence
+ * can trip is one people learn to route around, and it takes the real findings
+ * with it.
+ *
+ * ⚠️ But a product NOUN in a string is a real finding — a shared package with
+ * "client" as a default label has product vocabulary in it whether or not the
+ * compiler sees it. So the vocabulary scan keeps reading strings, and only the
+ * checks that are about TYPES stop.
+ */
+function stripStrings(src) {
+  let out = "";
+  let quote = null;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
+    if (quote) {
+      if (c === "\\") { out += "  "; i++; continue; }
+      if (c === quote) { quote = null; out += c; continue; }
+      /* Length-preserving, so every reported line number stays true. */
+      out += c === "\n" ? "\n" : " ";
+      continue;
+    }
+    if (c === '"' || c === "'" || c === "`") quote = c;
+    out += c;
+  }
+  return out;
+}
 function stripComments(src) {
   let out = "";
   let i = 0;
@@ -213,7 +247,7 @@ const HATCHES = /\b(escapeHatch|passthrough|rawConfig|customJson|arbitrary|unsaf
 let hatchHits = 0;
 for (const file of srcFiles) {
   const src = read(file);
-  const code = stripComments(src);
+  const code = stripStrings(stripComments(src));
   for (const m of code.matchAll(HATCHES)) {
     const line = code.slice(0, m.index).split("\n").length;
     if (exempted(src, line, "hatch-exempt")) continue;
@@ -230,7 +264,7 @@ ok(`escape hatch: ${hatchHits} found`);
 let anyHits = 0;
 for (const file of srcFiles) {
   const src = read(file);
-  const code = stripComments(src);
+  const code = stripStrings(stripComments(src));
   for (const m of code.matchAll(/\bany\b/g)) {
     const line = code.slice(0, m.index).split("\n").length;
     const above = src.split("\n").slice(Math.max(0, line - 3), line).join("\n");

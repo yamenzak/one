@@ -850,7 +850,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.6.0",
+  manifestVersion: "0.7.0",
   bindings,
 
   identity: {
@@ -1228,6 +1228,17 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.7.0",
+      at: "2026-08-10",
+      notes: [
+        "Take payment for a package on your own provider, in your own country — or confirm a payment you took any other way, by hand.",
+        "A client can say they want a package and be sent to your page to pay for it. Nothing is granted until somebody says it was paid.",
+        "Confirming twice, or your provider telling us twice, never buys it twice.",
+        "See what has been asked for and what has been paid for; a client sees only their own.",
+        "A once-only package is refused before anybody is sent to pay, rather than after.",
+      ],
+    },
     {
       version: "0.6.0",
       at: "2026-08-10",

@@ -2231,3 +2231,97 @@ mean nothing.
 Same resolution as finding 167. The fix was to surface it — `commerce.override`
 reports the exceptions in force — rather than to assert on a store nobody reads
 or to delete a correct distinction because nothing observed it.
+
+## 183. The platform is never in the money path, and the abstraction survives because of it
+
+A workspace is paid on ITS OWN provider, in its own country, on a page it owns.
+What is recorded here is that somebody said they wanted to buy something, and
+separately that somebody with authority said it was paid for. Storing a payment
+would be storing a claim nobody here can check.
+
+The consequence worth stating is what that BUYS. Tokenization, 3DS, retries,
+chargebacks and the money itself stay on the other side of a URL — so a provider
+this platform has never heard of is a checkout address and a signing secret,
+rather than a client library, a country list and a compliance surface.
+
+## 184. `manual` is the default, not the fallback, and that is why both lanes settle through one path
+
+Most workspaces have configured nothing, and a product that needs a payment
+provider before anybody can buy anything is a setup screen with a product behind
+it. So the manual lane is the ordinary case: the workspace takes money however it
+already does, and somebody confirms.
+
+The design rule that follows: a signed notification and a coach pressing confirm
+arrive at the SAME function. A shape where the automated path is the real one and
+the manual path is a bolt-on ends with two settlement routes that disagree, and
+the disagreement is always about money.
+
+## 185. The conditional write is the lock, and a read-then-write is the same bug with more steps
+
+A provider retrying a success it timed out on is the ordinary case rather than
+the strange one, and a coach pressing confirm twice because the first press
+looked slow is ordinary too. Settling is therefore `UPDATE … WHERE status =
+'open'` and the caller applies the package only when it changed a row.
+
+Checking whether it is already settled and then writing leaves a window that both
+deliveries fit through, and the window is exactly as wide as one database round
+trip — which is where redeliveries land.
+
+## 186. A public endpoint that grants paid access must refuse what it cannot verify
+
+The customer webhook has no session by construction, so the signature is the
+whole of the authentication. The case that matters is the workspace with NO
+secret configured — which is most of them, because manual is the default. Reading
+that as "nothing to check, carry on" turns the endpoint into a way to grant paid
+access to anybody who can guess a purchase id, for the majority of workspaces on
+the deployment.
+
+No secret is a refusal. The same reasoning as the platform's own webhook, one
+rail down, and it had to be made twice because the two rails resolve their secret
+from different places.
+
+## 187. A once-only package is refused before the money moves
+
+Refusing at settlement is correct and useless: the payment already happened on a
+page this platform does not control, and there is nothing here that could give it
+back. Somebody who can pay and not receive is worse off than somebody who cannot
+buy, so `mayPurchase` runs when the intent is OPENED.
+
+It still runs at settlement too, through `applyPackage`'s ledger — the check at
+checkout is about not taking somebody's money, and the one at settlement is about
+not granting twice. They are different questions that happen to share a function.
+
+## 188. A filter a customer can point at somebody else is not a filter
+
+`commerce.purchases` takes an optional `subjectId`, which reads as a convenience
+and is the hole with a parameter in front of it. Who a caller may see is decided
+from the SESSION: a caller who is a customer sees their own and the request's
+filter is ignored; a caller who is not one is staff, and their reach is their
+permissions.
+
+It survived one round of mutation testing because the fixture had a single
+customer with purchases — filtering by nobody and filtering by them return the
+same rows. A second person buying something is what made the two implementations
+distinguishable.
+
+## 189. Tenant-scope discount codes are DROPPED, not pending
+
+A discount has to be applied by whoever owns the checkout page, and the workspace
+owns it. Kova opens an intent and hands over an address; it never sees the price
+the customer is actually charged, so a percentage stored here would be a number
+nothing enforces and a report nothing could reconcile.
+
+Recorded as dropped with the reason rather than left on the list, because an
+outstanding item nobody intends to build is indistinguishable from one nobody has
+got to yet. Access codes — which grant DAYS rather than reduce a price — are the
+honest version of the same want, and are unaffected.
+
+## 190. Two test files signing in the same address is an order-dependent suite
+
+A sign-in code is delivered against an EMAIL. Two suites using `ro@example.test`
+pass alone and fail together: the second request overwrites the first's code, the
+verify fails, and what a reader sees is a 403 from a caller who looks perfectly
+signed in — with no hint that the cause is in another file.
+
+Every fixture address is now its own suite's. The general rule: a fixture keyed
+on something global is a fixture that works until the suite grows.
