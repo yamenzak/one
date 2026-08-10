@@ -2817,6 +2817,13 @@ const readsAPicture = (o: {
   audit: () => ({ subject: o.subject, verb: o.verb }),
   fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
   /*
+    ⚠️ DECLARED ON THE FACTORY, so every reading built from it gets the same
+    acknowledgement. Five generations shipped with none at all — a write that
+    spends somebody's credits and answers with nothing a screen is told to say,
+    which is the one place silence reads as "did that work?".
+  */
+  outcome: { message: "Read", tone: "success", invalidates: ["ai.spending"] },
+  /*
     ⚠️ NOT A TOOL. A model that can hand another model a photograph out of this
     workspace's library, on a request nobody made, spends a studio's credits on
     pictures nobody chose to have read.
@@ -2907,6 +2914,8 @@ const drafts = (o: {
   idempotency: { mode: "none" },
   audit: () => ({ subject: o.subject, verb: o.verb }),
   fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
+  /* ⚠️ The same, once, for every draft this factory makes. */
+  outcome: { message: "Drafted", tone: "success", invalidates: ["ai.spending"] },
   tool: false,
   async handler(ctx, input: { about: string }) {
     const out = await generateWith(ctx, KOVA_AI, o.feature, input.about);
@@ -3167,7 +3176,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.22.0",
+  manifestVersion: "0.23.0",
   bindings,
 
   identity: {
@@ -3746,6 +3755,13 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.23.0",
+      at: "2026-08-10",
+      notes: [
+        "Reading a photograph or drafting from a sentence now says it worked. Five of them spent credits and answered with nothing.",
+      ],
+    },
     {
       version: "0.22.0",
       at: "2026-08-10",

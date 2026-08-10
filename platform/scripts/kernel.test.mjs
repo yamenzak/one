@@ -377,6 +377,93 @@ for (const [name, d] of decls) {
 }
 ok(`exports: ${exported} declared, ${exported - bad} reachable from a proof`);
 
+/* ------------------------------------------------ 7. DECLARATION CONSUMED --- */
+
+/**
+ * ⚠️ A DECLARATION NOTHING ACTS ON IS DECORATION, AND IT READS EXACTLY LIKE A
+ * FEATURE.
+ *
+ * This is check 5 one level down, and it is the failure this repository keeps
+ * finding by hand. `help`, `governance.legal` and `releases` were each declared,
+ * validated at composition, covered by a guard and served by no route — and the
+ * thoroughness of the validation is what made them look covered. A guard that
+ * asks whether a help article is short enough cannot ask whether anybody can
+ * open it.
+ *
+ * So every field on every `*Spec` interface in the kernel must be READ by some
+ * other file in the kernel or the runtime. Its own file does not count: that is
+ * precisely where validation lives, and validating a thing nobody consumes is
+ * the shape being caught.
+ *
+ * ⚠️ THE UNCONSUMED LIST IS THE STAGE'S TO-DO, WRITTEN DOWN. Every entry is a
+ * field an app can write today that changes nothing, with the reason it is not
+ * wired yet. It may only SHRINK — an entry that becomes consumed fails until it
+ * is deleted, so it cannot rot into a permanent exemption — and a NEW unconsumed
+ * declaration fails on the commit that adds it rather than at the next audit.
+ */
+const UNCONSUMED = {
+  /* Waiting on the renderer — every one is a screen-shaped declaration. */
+  "CollectionSpec.views": "the list/grid/detail layouts; nothing renders yet",
+  "CollectionSpec.print": "a print view; nothing renders yet",
+  "CollectionSpec.realtime": "which collections push live; there is no socket yet",
+  "CollectionSpec.offline": "the precache and queue policy; there is no service worker yet",
+  "AppSpec.sounds": "the surface audio map; nothing plays yet",
+  "SoundSpec.pack": "which audio set; nothing plays yet",
+
+  /* Real gaps, and each is a behaviour an app has already been told it has. */
+  "TenancySpec.doors": "an app declares its doors and host resolution ignores the declaration, so an app that says it has no setup door has one anyway",
+  "CollectionSpec.retention": "how long rows live and what happens on workspace close — declared per collection, and the erasure cascade treats every collection alike",
+  "OperationSpec.meter": "what an operation consumes; generation meters through its own path and this field meters nothing",
+  "OperationSpec.rateLimit": "per actor, tenant or IP — nothing counts requests, so every declaration is a ceiling with no counter",
+  "GovernanceSpec.impersonation": "the time box and the announcement for operator access; there is no impersonation surface at all",
+  "GovernanceSpec.auditRetentionDays": "how long the audit is kept; nothing prunes it",
+  "FormatSpec.weekStart": "which day a week begins on; every weekly read picks its own",
+  "IdentitySpec.sessionScope": "how far a session reaches; the cookie logic does not read it",
+
+  /* Consumed outside these two directories, which this check cannot see. */
+  "AppSpec.retired": "read by each app's own lock comparison — see the `lock-exists` guard",
+};
+
+const specFiles = walk(join(ROOT, "kernel", "src")).filter((f) => f.endsWith(".ts"));
+const declaredIn = new Map();
+for (const file of specFiles) {
+  const text = readFileSync(file, "utf8");
+  for (const m of text.matchAll(/export interface (\w*Spec\w*)\s*(?:<[^>]*>)?\s*\{([\s\S]*?)\n\}/g)) {
+    for (const f of m[2].matchAll(/\n  readonly (\w+)\??[:<]/g)) {
+      declaredIn.set(`${m[1]}.${f[1]}`, file);
+    }
+  }
+}
+if (declaredIn.size < 40) {
+  fail(`kernel/src: only ${declaredIn.size} spec field(s) found, so this check proves nothing about the rest.`);
+}
+
+const consumers = [...specFiles, ...walk(join(ROOT, "runtime", "src")).filter((f) => f.endsWith(".ts"))]
+  .map((f) => [f, readFileSync(f, "utf8")]);
+
+let consumed = 0;
+for (const [key, home] of [...declaredIn].sort()) {
+  const field = key.split(".")[1];
+  /* ⚠️ `.field` or `["field"]` — the two ways a value is actually taken out. */
+  const used = new RegExp(`(?:\\.|\\[")${field}\\b`);
+  const reader = consumers.find(([file, text]) => file !== home && used.test(text));
+  if (reader) {
+    consumed++;
+    if (key in UNCONSUMED) {
+      fail(`${key} is listed as unconsumed and ${relative(ROOT, reader[0])} reads it.\n` +
+           `       Delete the entry — the list may only shrink, or it stops being read.`);
+    }
+    continue;
+  }
+  if (!(key in UNCONSUMED)) {
+    fail(`${key} is declared and nothing outside ${relative(ROOT, home)} reads it.\n` +
+         `       An app can write it and nothing will happen. Wire it, or add it to\n` +
+         `       UNCONSUMED with what it would do — a declaration nobody consumes\n` +
+         `       reads exactly like a feature.`);
+  }
+}
+ok(`consumed: ${consumed}/${declaredIn.size} spec field(s) acted on, ${Object.keys(UNCONSUMED).length} declared and not yet wired`);
+
 /* -------------------------------------------------------------------------- */
 
 if (bad) {

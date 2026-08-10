@@ -1160,8 +1160,23 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `consent-is-per-version` | an acceptance recorded against a document rather than a version, so publishing new terms silently inherits every consent ever given | **live** |
 | `consent-comes-from-a-person` | a model agreeing to terms on somebody's behalf, which makes the ledger worthless as evidence — the only thing it is for | **live** |
 | `a-channel-is-a-promise-about-delivery` | a switch in a settings screen that silently does nothing — somebody turns it on and stops watching their inbox | **live** |
+| `a-declaration-is-consumed` | a manifest field an app can write that changes nothing — declared, validated in the file that declares it, and read by no other code, which is the shape that shipped help, legal, releases, an unenforced rate limit, an unread retention policy and an impersonation contract with no surface | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
+
+⚠️ **AND A DECLARATION NOTHING ACTS ON IS DECORATION.** `kernel-declaration-consumed`
+is the general form of the failure this document keeps recording one instance of
+at a time: every field on every `*Spec` must be read by some file other than the
+one declaring it, because the declaring file is exactly where validation lives
+and validating something nobody consumes is what made `help`, `legal` and
+`releases` look covered. Fifteen fields are carried in its `UNCONSUMED` list with
+what each would do — six waiting on the renderer, one consumed outside the
+directories the check can see, and **eight real gaps**: an app's declared
+`doors` that host resolution ignores, per-collection `retention` the erasure
+cascade does not read, `meter` and `rateLimit` on an operation that meter and
+limit nothing, `impersonation` with no surface at all, `auditRetentionDays` that
+prunes nothing, `weekStart` that every weekly read ignores, and `sessionScope`
+the cookie logic does not consult. The list may only shrink.
 
 ⚠️ **AND THE COMMAND HAS TO BE RUN BY SOMETHING NOBODY HAS TO REMEMBER.** The
 registry checked that a script NAMED each guard, and said yes for all 36

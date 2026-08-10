@@ -3251,3 +3251,61 @@ on is a reason to stop watching the inbox.
 channel is a promise about delivery; it comes back with the offline work that
 gives it something to reach. The `push` COLUMN stays on the preferences table —
 dropping a column on a live table to reclaim a byte is a risk taken for tidiness.
+
+## 251. Fifteen declarations an app can write that change nothing
+
+The last three findings were three instances of one shape, found by hand, one
+audit at a time. This is the shape stated generally and turned into a check.
+
+Every field on every `*Spec` interface in the kernel must be READ by some file
+other than the one declaring it. The declaring file does not count, and that
+exclusion is the whole idea: validation lives exactly there, and validating
+something nobody consumes is what made `help`, `legal` and `releases` look
+covered for twenty-one versions.
+
+Run over the kernel, 117 of 132 spec fields are acted on. The other fifteen are
+carried with a reason each. Six are waiting on the renderer (`views`, `print`,
+`realtime`, `offline`, `sounds`, `pack`) and one is consumed outside the
+directories the check can see (`retired`, read by each app's lock comparison).
+The remaining eight are real, and every one is a behaviour an app has already
+been told it has:
+
+- **`TenancySpec.doors`** — an app declares which doors it has and host
+  resolution ignores the declaration, so an app that says it has no `setup` door
+  has one anyway. A declared restriction that is not applied.
+- **`CollectionSpec.retention`** — `days` and `onTenantClose` per collection,
+  and the erasure cascade treats every collection alike. MANIFEST.md §9 lists
+  retention as day-zero because it "informs the schema and the erasure cascade".
+- **`OperationSpec.meter`** — generation meters through its own path; this field
+  meters nothing, so an operation declaring `{ unit: "credits" }` is free.
+- **`OperationSpec.rateLimit`** — nothing counts requests. §9 lists it day-zero
+  because it "shapes the request pipeline".
+- **`GovernanceSpec.impersonation`** — a time box and an announcement for
+  operator access, with no impersonation surface at all. `Actor.impersonatedBy`
+  exists in the primitives and nothing ever sets it. §9: "the audit trail must
+  exist from the first support session."
+- **`GovernanceSpec.auditRetentionDays`** — nothing prunes the audit.
+- **`FormatSpec.weekStart`** — every weekly read picks its own boundary.
+- **`IdentitySpec.sessionScope`** — the cookie logic does not consult it.
+
+⚠️ THE LIST MAY ONLY SHRINK, and that is what makes it a plan rather than an
+excuse: an entry that becomes consumed fails until it is deleted, and a NEW
+unconsumed declaration fails on the commit that adds it rather than at the next
+audit. Which is the point — this check exists so that the next one of these is
+found by a script on a Tuesday instead of by a person reading a document.
+
+## 252. Five generations that spent credits and said nothing
+
+`readsAPicture` and `drafts` are operation factories in Kova — one builds "send
+a picture to a model and return what it read", the other "draft something from a
+sentence" — and between them they make seven of the AI operations.
+
+Neither declared an `outcome`, so five writes that spend a workspace's credits
+answered with nothing a screen is told to say. MANIFEST.md §2's own table has the
+case: a result the user cannot see happen is a toast, and silence is reserved for
+"something visibly happened already". A generation is the opposite of visible.
+
+⚠️ AND THE FIX IS ONE LINE BECAUSE THE FACTORIES EXIST. Declared on the factory,
+every reading and every draft built from it acknowledges the same way — which is
+the argument for the factories being the platform's rather than one app's, since
+the next app writes the same two.

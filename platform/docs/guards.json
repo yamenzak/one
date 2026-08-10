@@ -2839,6 +2839,15 @@
       "impl": "kernel/test/notify.test.ts",
       "proves": "offers only the channels something actually delivers",
       "fails": "a switch in a settings screen that silently does nothing \u2014 somebody turns it on and stops watching their inbox"
+    },
+    {
+      "id": "a-declaration-is-consumed",
+      "group": "kernel",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/kernel.test.mjs",
+      "proves": "consumed:",
+      "fails": "a manifest field an app can write that changes nothing \u2014 declared, validated in the file that declares it, and read by no other code, which is the shape that shipped help, legal, releases, an unenforced rate limit, an unread retention policy and an impersonation contract with no surface"
     }
   ]
 }
