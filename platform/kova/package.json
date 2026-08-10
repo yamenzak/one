@@ -1,0 +1,23 @@
+{
+  "name": "@one/kova",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A ONE app. Everything it does beyond one collection is the platform's.",
+  "scripts": {
+    "test": "vitest run && vitest run --config vitest.node.config.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit",
+    "clean": "rm -rf .turbo *.tsbuildinfo"
+  },
+  "dependencies": {
+    "@one/kernel": "workspace:*",
+    "@one/runtime": "workspace:*",
+    "@one/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "0.8.55",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}

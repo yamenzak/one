@@ -41,12 +41,41 @@ describe("a row that belongs to one customer needs one", () => {
   /*
     ⚠️ A ROW WITH NO SUBJECT IS A ROW NOBODY OWNS, and the column will not take a
     null — so without this refusal the failure is a constraint violation
-    surfacing as "something went wrong on our side", on a request that was simply
-    not something this caller can make.
+    surfacing as "something went wrong on our side", on a request that was
+    missing one field.
   */
   it("refuses to create one for a caller who is not a customer", async () => {
     await expect(ops.get("entry.create")!.handler(ctxFor() as never, { note: "hi" } as never))
-      .rejects.toThrow("platform.forbidden");
+      .rejects.toThrow("platform.invalid");
+  });
+
+  /*
+    ⚠️ STAFF WRITE ON SOMEBODY'S BEHALF. A coach records a workout for a client
+    constantly, and a caller with no subject of their own is staff — so the body
+    names whose it is, and the row is theirs.
+  */
+  it("takes the subject from the body when the caller has none", async () => {
+    const wrote: unknown[][] = [];
+    const db = { ...exploding, run: async (...args: unknown[]) => { wrote.push(args); } } as unknown as SqlHandle;
+    const ctx = { ...ctxFor(), bind: { db } };
+    await ops.get("entry.create")!.handler(ctx as never, { note: "hi", customer: "c_1" } as never);
+    expect(String(wrote[0]![0])).toContain("customer_id");
+    expect(wrote[0]).toContain("c_1");
+  });
+
+  /*
+    ⚠️ AND THE CALLER'S OWN SUBJECT WINS OVER THE BODY. A customer naming
+    somebody else is writing into another person's history, so the field is
+    ignored rather than trusted — the narrowing cannot be argued out of over the
+    wire.
+  */
+  it("ignores a subject in the body when the caller has one of their own", async () => {
+    const wrote: unknown[][] = [];
+    const db = { ...exploding, run: async (...args: unknown[]) => { wrote.push(args); } } as unknown as SqlHandle;
+    const ctx = { ...ctxFor("c_mine"), bind: { db } };
+    await ops.get("entry.create")!.handler(ctx as never, { note: "hi", customer: "c_someone_else" } as never);
+    expect(wrote[0]).toContain("c_mine");
+    expect(wrote[0]).not.toContain("c_someone_else");
   });
 
   /*

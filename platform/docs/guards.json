@@ -1309,6 +1309,33 @@
       "impl": "scripts/capabilities.test.mjs",
       "proves": "the client half is most of the daily use",
       "fails": "an inventory written from the studio's side only, so the half of the product that is used every day is not part of the acceptance contract"
+    },
+    {
+      "id": "no-reserved-column",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/ddl.test.ts",
+      "proves": "refuses a field whose column is a SQL keyword, naming it",
+      "fails": "a field or collection whose derived name is a SQL keyword \u2014 the DDL is generated, so nobody reads it, and the syntax error throws out of the boot-time schema apply, answering 503 on every route with no mention of a column"
+    },
+    {
+      "id": "subject-write-on-behalf",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/collection.test.ts",
+      "proves": "takes the subject from the body when the caller has none",
+      "fails": "staff unable to write a record on somebody's behalf \u2014 a coach recording a workout for a client is the core loop of a coaching product, and a subject taken only from the caller refuses it outright"
+    },
+    {
+      "id": "subject-cannot-be-argued",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/collection.test.ts",
+      "proves": "ignores a subject in the body when the caller has one of their own",
+      "fails": "one customer writing a row into another's history by naming them in the body \u2014 the row scope narrowed on read and not on write"
     }
   ]
 }

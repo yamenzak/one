@@ -52,6 +52,21 @@ const packages = readdirSync(ROOT, { withFileTypes: true })
   .map((e) => e.name);
 
 const srcFiles = packages.flatMap((p) => walk(join(ROOT, p, "src")));
+
+/**
+ * ⚠️ AN APP IS ALLOWED PRODUCT WORDS; THAT IS WHAT AN APP IS.
+ *
+ * The vocabulary rule is about SHARED code — a framework that knows what a
+ * client is has a product's assumptions welded into it. A manifest that could
+ * not say "client" would be a coaching product unable to name the person being
+ * coached, which is the rule eating the thing it exists to protect.
+ *
+ * The discriminator is declared rather than a list of directory names: an app is
+ * a package that has a `src/manifest.ts`, because that is precisely what makes
+ * one on this platform. Every other check below still applies to it.
+ */
+const isApp = (p) => existsSync(join(ROOT, p, "src", "manifest.ts"));
+const sharedFiles = packages.filter((p) => !isApp(p)).flatMap((p) => walk(join(ROOT, p, "src")));
 const testFiles = packages.flatMap((p) => walk(join(ROOT, p, "test")));
 const testCorpus = testFiles.map((f) => readFileSync(f, "utf8")).join("\n");
 const read = (f) => readFileSync(f, "utf8");
@@ -171,7 +186,7 @@ const fileExemptions = (src) =>
   new Set([...src.matchAll(/vocabulary-exempt-file\(([a-z]+)\):\s*\S/g)].map((m) => m[1]));
 
 let vocabHits = 0;
-for (const file of srcFiles) {
+for (const file of sharedFiles) {
   const src = read(file);
   const code = stripComments(src);
   const perFile = fileExemptions(src);

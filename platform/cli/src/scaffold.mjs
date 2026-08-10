@@ -44,6 +44,13 @@ export function filesFor(id) {
   const Name = title(id);
   return {
     "package.json": packageJson(id),
+    /*
+      ⚠️ WITHOUT THIS THE GENERATED APP DOES NOT TYPECHECK. Its own boot test
+      imports `cloudflare:test`, whose types come from the pool's reference — so
+      the scaffold shipped an app that passed `test` and failed `typecheck` on
+      the first run, which is the worst possible first impression of a framework.
+    */
+    "env.d.ts": `/// <reference types="@cloudflare/vitest-pool-workers" />\n`,
     "tsconfig.json": tsconfig(),
     "vitest.config.ts": vitestConfig(id),
     "vitest.node.config.ts": vitestNodeConfig(),

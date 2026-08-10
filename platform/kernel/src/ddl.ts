@@ -114,6 +114,36 @@ export const tableNameFor = (spec: CollectionSpec): string => `${columnName(spec
 export const liveClause = (spec: CollectionSpec): string =>
   spec.onDelete.on === "archive" ? " AND deleted_at IS NULL" : "";
 
+/**
+ * ⚠️ SQL KEYWORDS A COLUMN OR TABLE NAME MAY NOT BE, and this list is here
+ * because the first real app on the platform hit it within a minute.
+ *
+ * A field called `on` — the day something happened, which is exactly what a
+ * coaching product wants to call it — derives `on TEXT NOT NULL` and SQLite
+ * answers `near "on": syntax error`. That throws out of `applySchema`, which
+ * runs at boot, so EVERY route answers 503 with a reference number and no
+ * mention of a column. The DDL is generated, so no human ever reads it.
+ *
+ * Quoting the identifiers instead would work and is worse: it makes every hand-
+ * written query in an app carry quotes forever, and the one that forgets fails
+ * the same way. Refusing the name costs one rename, once, at declaration time.
+ */
+const RESERVED = new Set([
+  "abort", "action", "add", "after", "all", "alter", "analyze", "and", "as", "asc", "attach", "autoincrement",
+  "before", "begin", "between", "by", "cascade", "case", "cast", "check", "collate", "column", "commit",
+  "conflict", "constraint", "create", "cross", "current", "current_date", "current_time", "current_timestamp",
+  "database", "default", "deferrable", "deferred", "delete", "desc", "detach", "distinct", "do", "drop",
+  "each", "else", "end", "escape", "except", "exclusive", "exists", "explain", "fail", "filter", "first",
+  "following", "for", "foreign", "from", "full", "glob", "group", "having", "if", "ignore", "immediate",
+  "in", "index", "indexed", "initially", "inner", "insert", "instead", "intersect", "into", "is", "isnull",
+  "join", "key", "last", "left", "like", "limit", "match", "natural", "no", "not", "notnull", "null", "nulls",
+  "of", "offset", "on", "or", "order", "outer", "over", "partition", "plan", "pragma", "preceding", "primary",
+  "query", "raise", "range", "recursive", "references", "regexp", "reindex", "release", "rename", "replace",
+  "restrict", "returning", "right", "rollback", "row", "rows", "savepoint", "select", "set", "table", "temp",
+  "temporary", "then", "to", "transaction", "trigger", "unbounded", "union", "unique", "update", "using",
+  "vacuum", "values", "view", "virtual", "when", "where", "window", "with", "without",
+]);
+
 export interface DerivationProblem {
   readonly collectionId: string;
   readonly rule: string;
@@ -147,8 +177,26 @@ export function deriveSchema(moduleId: string, collections: readonly CollectionS
       colliding with a system column — a declared `version`, `id` or `tenant_id` —
       would shadow machinery the platform depends on.
     */
+    /*
+      ⚠️ THE TABLE NAME TOO. A collection called `value` derives `values`, and a
+      collection called `row` derives `rows` — both keywords, both a 503 on every
+      route from the first boot.
+    */
+    if (RESERVED.has(table)) {
+      problems.push({
+        collectionId: spec.id, rule: "reserved",
+        detail: `derives the table "${table}", which is a SQL keyword — every statement naming it is a syntax error`,
+      });
+    }
+
     const seen = new Map<string, string | null>();
     for (const c of cols) {
+      if (RESERVED.has(c.name)) {
+        problems.push({
+          collectionId: spec.id, rule: "reserved",
+          detail: `"${c.name}"${c.from ? ` (from ${c.from})` : ""} is a SQL keyword — the generated DDL is a syntax error, and it throws at boot rather than at declaration`,
+        });
+      }
       if (seen.has(c.name)) {
         const first = seen.get(c.name);
         problems.push({

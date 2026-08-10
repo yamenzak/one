@@ -20,28 +20,28 @@
       "persona": "everyone",
       "area": "identity",
       "outcome": "Sign in with a code sent to their email address, with no password anywhere",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "passkey-add",
       "persona": "everyone",
       "area": "identity",
       "outcome": "Register a passkey and afterwards sign in with a fingerprint or face",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "passkey-remove",
       "persona": "everyone",
       "area": "identity",
       "outcome": "See which devices they have registered and remove one they no longer have",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "session-list",
       "persona": "everyone",
       "area": "identity",
       "outcome": "See where they are signed in and end a session on a device they no longer hold",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "units",
@@ -55,7 +55,7 @@
       "persona": "everyone",
       "area": "identity",
       "outcome": "Delete their own account and understand what that removes",
-      "status": "old",
+      "status": "built",
       "note": "The person's own right, distinct from a studio closing."
     },
     {
@@ -63,7 +63,7 @@
       "persona": "owner",
       "area": "studio",
       "outcome": "Open a studio at an address of their choosing and be its owner",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "studio-brand",
@@ -91,14 +91,14 @@
       "persona": "owner",
       "area": "studio",
       "outcome": "Close the studio, change their mind for a week, and export what was theirs",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-add",
       "persona": "trainer",
       "area": "roster",
       "outcome": "Add somebody they coach, by inviting them or by entering them directly",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-invite-self",
@@ -112,7 +112,7 @@
       "persona": "trainer",
       "area": "roster",
       "outcome": "Record who somebody is: their details, their situation and how they train",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-preferences",
@@ -126,21 +126,21 @@
       "persona": "trainer",
       "area": "roster",
       "outcome": "Find one person among many, by name, by state, or by who is falling behind",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-archive",
       "persona": "trainer",
       "area": "roster",
       "outcome": "Stop coaching somebody without losing what they did",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-restore",
       "persona": "trainer",
       "area": "roster",
       "outcome": "Bring an archived person back",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-delete",
@@ -189,14 +189,14 @@
       "persona": "trainer",
       "area": "training",
       "outcome": "Build a library of the movements this studio uses",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "exercise-detail",
       "persona": "trainer",
       "area": "training",
       "outcome": "Describe a movement well enough that somebody could do it unsupervised",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "exercise-alternatives",
@@ -224,7 +224,7 @@
       "persona": "trainer",
       "area": "training",
       "outcome": "Write a training plan: weeks, days, movements, sets, targets",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "plan-copy-week",
@@ -245,28 +245,28 @@
       "persona": "trainer",
       "area": "training",
       "outcome": "Publish a plan so the client is following it, and know they were told",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "plan-template",
       "persona": "trainer",
       "area": "training",
       "outcome": "Keep a plan as a template and start the next client from it",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "plan-variants",
       "persona": "trainer",
       "area": "training",
       "outcome": "Give one client more than one plan and switch which is current",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "plan-follow",
       "persona": "client",
       "area": "training",
       "outcome": "See what they are meant to do today, and what comes next",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "workout-player",
@@ -280,14 +280,14 @@
       "persona": "client",
       "area": "training",
       "outcome": "Record what they actually lifted, including when it differed from the plan",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "workout-history",
       "persona": "client",
       "area": "training",
       "outcome": "Look back at what they lifted last time, at the moment they need it",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "workout-prs",
@@ -322,7 +322,7 @@
       "persona": "trainer",
       "area": "training",
       "outcome": "See what a client actually did against what was prescribed",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "food-library",
@@ -462,7 +462,7 @@
       "persona": "client",
       "area": "body",
       "outcome": "Record their weight and measurements and see them move",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "body-scan",
@@ -497,28 +497,28 @@
       "persona": "client",
       "area": "body",
       "outcome": "Record how they slept",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "mood-log",
       "persona": "client",
       "area": "body",
       "outcome": "Record how they felt",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "water-log",
       "persona": "client",
       "area": "body",
       "outcome": "Record what they drank",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "steps-log",
       "persona": "client",
       "area": "body",
       "outcome": "Record how much they moved outside training",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "wellness-score",
@@ -763,14 +763,14 @@
       "persona": "owner",
       "area": "billing",
       "outcome": "See what the platform sells and what each plan includes",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "plan-choose",
       "persona": "owner",
       "area": "billing",
       "outcome": "Choose a plan and pay for it",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "plan-change",
@@ -812,7 +812,7 @@
       "persona": "owner",
       "area": "billing",
       "outcome": "Know where they stand when a payment fails, and how to fix it",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "media-upload",
@@ -973,14 +973,14 @@
       "persona": "everyone",
       "area": "notifications",
       "outcome": "See what happened while they were away, in one list",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "notification-prefs",
       "persona": "everyone",
       "area": "notifications",
       "outcome": "Decide what interrupts them, by category, without losing the record",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "email-templates",

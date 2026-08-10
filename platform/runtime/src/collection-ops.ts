@@ -49,11 +49,22 @@ export function shapeForField(f: Field): Shape<unknown> {
   }
 }
 
-const bodyShape = (spec: CollectionSpec, partial: boolean): Shape<Record<string, unknown>> => {
+const bodyShape = (spec: CollectionSpec, partial: boolean, owner = false): Shape<Record<string, unknown>> => {
   const fields: Record<string, Shape<unknown>> = {};
   for (const [name, f] of Object.entries(spec.fields)) {
     const shape = shapeForField(f);
     fields[name] = partial || !f.required ? (s.optional(shape) as Shape<unknown>) : shape;
+  }
+  /*
+    ⚠️ STAFF WRITE ON SOMEBODY'S BEHALF, AND CUSTOMERS DO NOT NAME ANYBODY.
+    A coach records a workout for a client constantly; the client records their
+    own. So a subject-scoped create takes the subject from the CALLER when they
+    have one, and from the body when they do not — and the body is only consulted
+    for a caller with no subject of their own, which is what makes it impossible
+    for one customer to write a row into another's history.
+  */
+  if (owner && spec.scope.of === "subject") {
+    fields[spec.scope.subject] = s.optional(s.text({ max: 40 })) as Shape<unknown>;
   }
   return s.object(fields) as Shape<Record<string, unknown>>;
 };
@@ -201,11 +212,11 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
     id: `${spec.id}.create`,
     kind: "write",
     summary: `Add a ${spec.label.one.toLowerCase()}.`,
-    input: bodyShape(spec, false),
+    input: bodyShape(spec, false, true),
     output: s.object({ id: s.id(spec.id), version: s.number({ integer: true }) }),
     permission: write,
     idempotency: { mode: "none" },
-    fails: ["platform.forbidden"],
+    fails: ["platform.invalid"],
     audit: () => ({ subject: spec.id, verb: "create" }),
     outcome: { message: `${spec.label.one} saved`, tone: "success", invalidates: [spec.id] },
     async handler(ctx, input: Record<string, unknown>) {
@@ -219,10 +230,18 @@ export function collectionOperations(spec: CollectionSpec, access: CollectionAcc
         constraint violation surfacing as an unavailable — refusing here says
         what actually happened.
       */
-      if (spec.scope.of === "subject" && !subjectId) ctx.fail("platform.forbidden");
+      /*
+        ⚠️ THE CALLER'S OWN SUBJECT WINS OVER THE BODY. A customer naming somebody
+        else is writing into another person's history, so their own is used and
+        the field is ignored — the narrowing cannot be argued out of over the
+        wire. Staff have no subject, so theirs comes from the body.
+      */
+      const named = spec.scope.of === "subject" ? (input[spec.scope.subject] as string | undefined) : undefined;
+      const owner = subjectId ?? named;
+      if (spec.scope.of === "subject" && !owner) ctx.fail("platform.invalid", { field: spec.scope.subject });
       const owned = spec.scope.of === "subject" ? [subjectColumn(spec)] : [];
       const system = ["id", "version", "created_at", "updated_at", ...(spec.scope.of === "platform" ? [] : ["tenant_id"]), ...owned];
-      const systemValues = [id, 1, at, at, ...(spec.scope.of === "platform" ? [] : [tenantId]), ...(owned.length ? [subjectId!] : [])];
+      const systemValues = [id, 1, at, at, ...(spec.scope.of === "platform" ? [] : [tenantId]), ...(owned.length ? [owner!] : [])];
       const all = [...system, ...names];
       await db.run(
         `INSERT INTO ${table} (${all.join(", ")}) VALUES (${all.map(() => "?").join(", ")})`,

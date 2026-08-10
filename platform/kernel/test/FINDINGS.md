@@ -1779,3 +1779,84 @@ the only question being asked.
 
 Row counts are deliberately absent: they are a property of a deployment rather
 than of a repository, and a number written into a document is wrong the day after.
+
+## 147. Six tables became one, and three documented bug classes went with them
+
+The old schema had `sleep_logs`, `mood_logs`, `water_logs`, `steps_logs`,
+`activity_logs` and `measurements` — six shapes for "a person recorded a number
+on a day" — plus a check-in that wrote COPIES into them, plus readers merging per
+date and per field with the dedicated table winning. Its own documentation names
+the consequences: sleep logged in one place never appeared in the other, a
+wellness score double-counted a day rated twice, and one column was read by a
+report nothing ever wrote.
+
+One collection with a declared `kind` makes none of them expressible. The design
+freedom asked for was spent here first, and it was the cheapest win available.
+
+The same move collapsed four plan tables into one, where **a template is a plan
+with no client** — not a different kind of thing, the same thing not yet
+addressed to anybody.
+
+## 148. Rows or JSON is decided per collection, and both answers appear in one manifest
+
+A plan's body is a JSON column: weeks, days and items are read and written WHOLE,
+and nobody queries "every plan whose Tuesday has a squat". A SET is rows: "what
+did I lift last time" is the most-asked question in a gym and it is asked per
+movement across every workout a person has ever done — an index or a scan of
+every session's JSON.
+
+The two look inconsistent and are not, and both arguments are written down beside
+the declarations precisely so neither is copied to the wrong side.
+
+## 149. The first real app hit three platform footguns in the first hour
+
+**A field called `on`.** The day something happened — exactly what a coaching
+product wants to call it — derives `on TEXT NOT NULL`, and SQLite answers
+`near "on": syntax error`. That throws out of `applySchema`, which runs at boot,
+so every route answers 503 with a reference number and no mention of a column.
+The DDL is generated, so no human ever reads it. `deriveSchema` now refuses a
+reserved word, and the same check immediately caught a second one — `current` on
+the plan — which would have been the next 503.
+
+**A collection called `plan`.** It derives `plans`, which is the billing
+catalogue's table. The composed schema runner already refused that outright,
+which is the only reason it took a minute rather than a week — and the rename to
+`programme` is the better product word anyway, because an owner deals with both
+senses of "plan" daily.
+
+**A collection called `session`.** Same shape, colliding with the auth session
+table. Renamed to `workout`, which is also what a person actually says.
+
+The general form: the platform's own table names and SQL's keywords are a
+namespace an app shares without being told. Two of the three were caught by
+checks that already existed; the third is a check that exists now.
+
+## 150. Staff write on somebody's behalf, and that is a hole a subject scope leaves
+
+A subject-scoped create took the subject from the caller — which is right for a
+customer and wrong for everybody else. A coach records a workout for a client
+constantly, and under that rule they could not, at all: 403 on the core loop.
+
+The rule now: the subject comes from the caller when they have one, and from the
+body when they do not. A caller with no subject is staff by construction, and a
+customer naming somebody else has their own used instead — the narrowing cannot
+be argued out of over the wire.
+
+## 151. The scaffold shipped an app that passed `test` and failed `typecheck`
+
+`one new kova` produced a boot test importing `cloudflare:test` and no
+`env.d.ts` to type it. The suite is green and the typecheck is red on the first
+command anybody runs, which is the worst possible first impression of a
+framework. Found by generating a real product rather than by reading the
+template.
+
+## 152. The vocabulary rule was eating the thing it protects
+
+`kernel.test.mjs` refuses product nouns in `platform/**` source — a framework
+that knows what a client is has a product's assumptions welded into it. Kova's
+manifest failed on its first line, because a coaching product that cannot name
+the person being coached is not a product.
+
+The discriminator is declared rather than a list of directory names: **an app is
+a package with a `src/manifest.ts`**, which is precisely what makes one on this
+platform. Every other check still applies to it.

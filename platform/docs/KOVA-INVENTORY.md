@@ -68,21 +68,21 @@ without one.
 | `[ ]` | `credits-buy` | owner | Buy credits for the generative features |
 | `[ ]` | `credits-see` | owner | See what credits were spent on |
 | `[ ]` | `downgrade-check` | owner | Be told what a smaller plan would cost them, in their own data, before choosing |
-| `[ ]` | `plan-browse` | owner | See what the platform sells and what each plan includes |
+| `[x]` | `plan-browse` | owner | See what the platform sells and what each plan includes |
 | `[ ]` | `plan-change` | owner | Move up or down, and be told what changes before they commit |
-| `[ ]` | `plan-choose` | owner | Choose a plan and pay for it |
-| `[ ]` | `standing` | owner | Know where they stand when a payment fails, and how to fix it |
+| `[x]` | `plan-choose` | owner | Choose a plan and pay for it |
+| `[x]` | `standing` | owner | Know where they stand when a payment fails, and how to fix it |
 | | **body** | | |
 | `[ ]` | `body-report` | client | See how their body has changed over months, not days |
 | `[ ]` | `body-scan` | client | Estimate body composition from photographs, guided through the poses |
 | `[ ]` | `body-scan-voice` | client | Be talked through a scan hands-free |
-| `[ ]` | `measurements` | client | Record their weight and measurements and see them move |
-| `[ ]` | `mood-log` | client | Record how they felt |
+| `[x]` | `measurements` | client | Record their weight and measurements and see them move |
+| `[x]` | `mood-log` | client | Record how they felt |
 | `[ ]` | `progress-photos` | client | Keep progress photographs and compare two of them side by side |
-| `[ ]` | `sleep-log` | client | Record how they slept |
-| `[ ]` | `steps-log` | client | Record how much they moved outside training |
+| `[x]` | `sleep-log` | client | Record how they slept |
+| `[x]` | `steps-log` | client | Record how much they moved outside training |
 | `[ ]` | `today` | client | Open the app and see what today asks of them, in one place |
-| `[ ]` | `water-log` | client | Record what they drank |
+| `[x]` | `water-log` | client | Record what they drank |
 | `[ ]` | `wellness-score` | client | See one honest number for how the week has gone |
 | | **checkins** | | |
 | `[ ]` | `check-in` | client | Report in on a schedule: how it went, how they feel, what changed |
@@ -116,11 +116,11 @@ without one.
 | `[ ]` | `dashboard-arrange` | trainer | Arrange what they see first, so the thing they check hourly is at the top |
 | `[ ]` | `offline-log` | client | Log a set in a basement and have it arrive when they surface |
 | | **identity** | | |
-| `[ ]` | `account-delete` | everyone | Delete their own account and understand what that removes |
-| `[ ]` | `passkey-add` | everyone | Register a passkey and afterwards sign in with a fingerprint or face |
-| `[ ]` | `passkey-remove` | everyone | See which devices they have registered and remove one they no longer have |
-| `[ ]` | `session-list` | everyone | See where they are signed in and end a session on a device they no longer hold |
-| `[ ]` | `sign-in` | everyone | Sign in with a code sent to their email address, with no password anywhere |
+| `[x]` | `account-delete` | everyone | Delete their own account and understand what that removes |
+| `[x]` | `passkey-add` | everyone | Register a passkey and afterwards sign in with a fingerprint or face |
+| `[x]` | `passkey-remove` | everyone | See which devices they have registered and remove one they no longer have |
+| `[x]` | `session-list` | everyone | See where they are signed in and end a session on a device they no longer hold |
+| `[x]` | `sign-in` | everyone | Sign in with a code sent to their email address, with no password anywhere |
 | `[ ]` | `units` | everyone | Choose whether they read weights and measures in metric or imperial |
 | | **media** | | |
 | `[ ]` | `avatar` | trainer | Give a client a face, so a roster is people rather than rows |
@@ -129,8 +129,8 @@ without one.
 | `[ ]` | `media-upload` | trainer | Upload an image or a video and watch it arrive |
 | | **notifications** | | |
 | `[ ]` | `email-templates` | owner | Change the words the studio sends, and sign them |
-| `[ ]` | `inbox` | everyone | See what happened while they were away, in one list |
-| `[ ]` | `notification-prefs` | everyone | Decide what interrupts them, by category, without losing the record |
+| `[x]` | `inbox` | everyone | See what happened while they were away, in one list |
+| `[x]` | `notification-prefs` | everyone | Decide what interrupts them, by category, without losing the record |
 | | **nutrition** | | |
 | `[ ]` | `fasting-timer` | client | Run a fast and see which phase they are in |
 | `[ ]` | `food-barcode` | client | Scan a barcode and get the food rather than typing it |
@@ -166,18 +166,18 @@ without one.
 | `[ ]` | `roster-activity` | owner | See who on the roster is active and who has gone quiet |
 | `[ ]` | `roster-analytics` | owner | See how the studio is doing as a business, not as a list of people |
 | | **roster** | | |
-| `[ ]` | `client-add` | trainer | Add somebody they coach, by inviting them or by entering them directly |
-| `[ ]` | `client-archive` | trainer | Stop coaching somebody without losing what they did |
+| `[x]` | `client-add` | trainer | Add somebody they coach, by inviting them or by entering them directly |
+| `[x]` | `client-archive` | trainer | Stop coaching somebody without losing what they did |
 | `[ ]` | `client-assign` | owner | Decide which coach works with which client, and change it |
 | `[ ]` | `client-audit` | owner | See what was changed on somebody's record, by whom, and when |
-| `[ ]` | `client-browse` | trainer | Find one person among many, by name, by state, or by who is falling behind |
+| `[x]` | `client-browse` | trainer | Find one person among many, by name, by state, or by who is falling behind |
 | `[ ]` | `client-coaches` | client | See who is coaching them, with their faces |
 | `[ ]` | `client-delete` | owner | Remove somebody entirely, on request, and have that be final |
 | `[ ]` | `client-invite-self` | client | Accept an invitation and land in the right studio without being told an address |
 | `[ ]` | `client-offboard-request` | trainer | Ask an owner to release a client, and have the owner decide |
 | `[ ]` | `client-preferences` | trainer | Record how somebody trains and eats now, and see when that was last reviewed |
-| `[ ]` | `client-profile` | trainer | Record who somebody is: their details, their situation and how they train |
-| `[ ]` | `client-restore` | trainer | Bring an archived person back |
+| `[x]` | `client-profile` | trainer | Record who somebody is: their details, their situation and how they train |
+| `[x]` | `client-restore` | trainer | Bring an archived person back |
 | `[ ]` | `client-self-register` | client | Register themselves where a studio allows it, and be picked up by a coach |
 | | **sessions** | | |
 | `[ ]` | `session-book` | assistant | Book a client into a session |
@@ -191,8 +191,8 @@ without one.
 | `[ ]` | `staff-seats` | owner | Know how many seats they have and how many are used |
 | | **studio** | | |
 | `[ ]` | `studio-brand` | owner | Make the product look like their business — name, logo, colours |
-| `[ ]` | `studio-close` | owner | Close the studio, change their mind for a week, and export what was theirs |
-| `[ ]` | `studio-create` | owner | Open a studio at an address of their choosing and be its owner |
+| `[x]` | `studio-close` | owner | Close the studio, change their mind for a week, and export what was theirs |
+| `[x]` | `studio-create` | owner | Open a studio at an address of their choosing and be its owner |
 | `[ ]` | `studio-domain` | owner | Serve the product from a domain they own, with a certificate that works |
 | `[ ]` | `studio-settings` | owner | Set how the studio behaves: what a lapsed client loses, and when |
 | | **supplements** | | |
@@ -202,25 +202,25 @@ without one.
 | `[ ]` | `supplement-prescribe` | trainer | Prescribe supplements with a dose and a reason |
 | | **training** | | |
 | `[ ]` | `exercise-alternatives` | trainer | Say which movements stand in for which, so a swap is not a guess |
-| `[ ]` | `exercise-detail` | trainer | Describe a movement well enough that somebody could do it unsupervised |
-| `[ ]` | `exercise-library` | trainer | Build a library of the movements this studio uses |
+| `[x]` | `exercise-detail` | trainer | Describe a movement well enough that somebody could do it unsupervised |
+| `[x]` | `exercise-library` | trainer | Build a library of the movements this studio uses |
 | `[ ]` | `exercise-search-external` | trainer | Find a movement in a public catalogue rather than typing it out |
 | `[ ]` | `exercise-swap-decide` | trainer | Decide a swap request, with the alternatives already in front of them |
 | `[ ]` | `exercise-swap-request` | client | Ask to swap a movement they cannot do, and get an answer |
 | `[ ]` | `exercise-usage` | trainer | See where a movement is used before changing or removing it |
 | `[ ]` | `extra-workout` | client | Record activity that was not part of the plan |
-| `[ ]` | `plan-build` | trainer | Write a training plan: weeks, days, movements, sets, targets |
+| `[x]` | `plan-build` | trainer | Write a training plan: weeks, days, movements, sets, targets |
 | `[ ]` | `plan-copy-week` | trainer | Repeat a week with progression, rather than retyping it |
-| `[ ]` | `plan-follow` | client | See what they are meant to do today, and what comes next |
+| `[x]` | `plan-follow` | client | See what they are meant to do today, and what comes next |
 | `[ ]` | `plan-groups` | trainer | Group movements into supersets and circuits, and have them logged as rounds |
-| `[ ]` | `plan-publish` | trainer | Publish a plan so the client is following it, and know they were told |
-| `[ ]` | `plan-template` | trainer | Keep a plan as a template and start the next client from it |
-| `[ ]` | `plan-variants` | trainer | Give one client more than one plan and switch which is current |
-| `[ ]` | `workout-history` | client | Look back at what they lifted last time, at the moment they need it |
-| `[ ]` | `workout-log` | client | Record what they actually lifted, including when it differed from the plan |
+| `[x]` | `plan-publish` | trainer | Publish a plan so the client is following it, and know they were told |
+| `[x]` | `plan-template` | trainer | Keep a plan as a template and start the next client from it |
+| `[x]` | `plan-variants` | trainer | Give one client more than one plan and switch which is current |
+| `[x]` | `workout-history` | client | Look back at what they lifted last time, at the moment they need it |
+| `[x]` | `workout-log` | client | Record what they actually lifted, including when it differed from the plan |
 | `[ ]` | `workout-player` | client | Work through a session set by set, on a phone, in a gym |
 | `[ ]` | `workout-prs` | client | See their own bests, and know when they set a new one |
-| `[ ]` | `workout-review` | trainer | See what a client actually did against what was prescribed |
+| `[x]` | `workout-review` | trainer | See what a client actually did against what was prescribed |
 <!-- /generated -->
 
 ---
