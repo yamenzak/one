@@ -347,6 +347,31 @@ in a file about HTTP, a recipient declared in a file about the law. They are
 asserted equal in both directions, and `MAIL_LANES` is what `disclosureProblems`
 makes every manifest name.
 
+**Consent is enforced, not merely recorded.** Two ledgers, and conflating them
+is the mistake the second exists to prevent. A LEGAL DOCUMENT is accepted per
+account per version — being told what happens — and until the documents a role
+owes are accepted, every write is refused with 451 while reads are served.
+ARTICLE 9 EXPLICIT CONSENT is per SUBJECT, given by the person the data is about,
+and it carries a property no document acceptance has: it can be withdrawn, as
+easily as it was given, and new records stop immediately. Withdrawal is a column,
+never a delete — removing the row destroys exactly the evidence that the
+processing which already happened was lawful.
+
+⚠️ **The lanes that survive both gates are load-bearing**: identity, because
+somebody has to be able to sign in to reach the document; exit, because leaving is
+always allowed; and the acceptance itself, or agreeing to the terms would require
+having agreed to the terms.
+
+**And the model that runs a generation is four decisions, not one.** The
+manifest's default, what the operator left enabled, what the workspace picked, and
+what the region permits — resolved once by `chooseModel`, which returns WHO
+decided. A workspace's pick is honoured only while it is still eligible, the
+manifest's default is subject to the region like everything else, and the reserve
+is computed for whatever that resolved to. Whether a model can do what a feature
+asks is derived from what it COSTS (`imageUnits`, `perImage`) rather than declared
+beside it, because a capability field can disagree with the arithmetic and it
+disagrees in the direction the platform pays for.
+
 **And the record is a route, not a file.** `protection.list` is public because
 Articles 13 and 14 oblige telling somebody before their data is collected;
 `protection.record` sits behind the permission that reads the audit. There is
