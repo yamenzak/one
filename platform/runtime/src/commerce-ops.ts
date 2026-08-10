@@ -13,15 +13,17 @@
  * choice is recorded, nothing is charged, and the screen says so.
  */
 
-import type { Allowance, AnyOperation, AppSpec, BindingSpec, EntitlementDef, Instant, Money, PlanSpec, SqlHandle } from "@one/kernel";
+import type { Allowance, AnyOperation, AppSpec, BindingSpec, EntitlementDef, Instant, Ladder, Money, PlanSpec, SqlHandle } from "@one/kernel";
 import {
-  explainCustomerFlags, explainEntitlements, gateFor, heldEntitlements, mayPurchase, packageLines,
-  operation, packageContradictions, PUBLIC, runwayFor, s,
+  DESTRUCTIVE_FLOOR_DAYS, explainCustomerFlags, explainEntitlements, extendBudget, gateFor,
+  heldEntitlements, ladderProblems, mayPurchase, packageLines, operation, packageContradictions,
+  PUBLIC, runwayFor, s,
 } from "@one/kernel";
 import {
-  applyPackage, applyPayment, choosePlan, grantsFor, listPackages, openPurchase, priorGrants,
-  purchasesFor, readAccess, readPackage, readPayments, readPurchase, savePayments, setOverrides,
-  setRemainingDays, settlePurchase, credentialProblem, verifySecretOf,
+  applyPackage, applyPayment, choosePlan, claimCode, codesFor, grantsFor, issueCode, listPackages,
+  openPurchase, priorGrants, purchasesFor, readAccess, readLadder, readPackage, readPayments,
+  readPurchase, savePayments, saveLadder, setOverrides, setRemainingDays, settlePurchase,
+  credentialProblem, verifySecretOf,
   readSubscription, savePackage, standingFor,
 } from "./commerce.js";
 import { attribute, claimByCustomer, claimEvent, listParked, park, rememberCustomer, resolveParked, verifySignature } from "./provider.js";
@@ -698,9 +700,153 @@ export function customerOperations<B extends BindingSpec>(app: AppSpec<B>): read
     },
   });
 
+  /* ------------------------------------------------------------ lapsing --- */
+
+  const lapse = operation({
+    id: "commerce.lapse",
+    kind: "read",
+    summary: "What happens to a customer whose access has run out.",
+    input: s.object({}),
+    output: s.object({ ladder: s.json(), floorDays: s.number({ integer: true }) }),
+    permission: "commerce:read",
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const d = deps(ctx);
+      /* ⚠️ The floor travels with the setting, so a screen can say why before
+         somebody types something that will be refused. */
+      return { ladder: await readLadder(d.db, d.tenantId), floorDays: DESTRUCTIVE_FLOOR_DAYS };
+    },
+  });
+
+  const setLapse = operation({
+    id: "commerce.lapse.set",
+    kind: "write",
+    summary: "Decide what happens to a customer whose access has run out, and when.",
+    input: s.object({ ladder: s.json() }),
+    output: s.object({ ladder: s.json() }),
+    permission: "commerce:manage",
+    idempotency: { mode: "none" },
+    audit: () => ({ subject: "lapse", verb: "set" }),
+    outcome: { message: "Saved", tone: "success", invalidates: ["commerce.lapse"] },
+    fails: ["platform.invalid"],
+    tool: false,
+    async handler(ctx, input: { ladder: Ladder }) {
+      const d = deps(ctx);
+      const ladder = (input.ladder && typeof input.ladder === "object" ? input.ladder : {}) as Ladder;
+      /*
+        ⚠️ REFUSED RATHER THAN CLAMPED. Quietly doing something gentler than what
+        somebody typed leaves a settings screen showing a number the sweep does
+        not use — and the number they meant was about deleting people's records.
+      */
+      const problems = ladderProblems(ladder);
+      if (problems.length) ctx.fail("platform.invalid", { field: "ladder", reason: problems.join("; ") });
+
+      await saveLadder(d.db, d.tenantId, ladder, ctx.now());
+      return { ladder };
+    },
+  });
+
+  /* -------------------------------------------------------------- codes --- */
+
+  const issue = operation({
+    id: "commerce.code.issue",
+    kind: "write",
+    summary: "Issue a code that tops somebody's access up.",
+    input: s.object({
+      code: s.text({ min: 4, max: 40 }),
+      scope: s.text({ max: 60 }),
+      days: s.number({ integer: true, min: 1, max: 3_650 }),
+      uses: s.number({ integer: true, min: 1, max: 10_000 }),
+      expiresAt: s.optional(s.text({ max: 40 })),
+    }),
+    output: s.object({ code: s.text(), scope: s.text(), days: s.number({ integer: true }), usesLeft: s.number({ integer: true }) }),
+    permission: "commerce:manage",
+    idempotency: { mode: "natural", key: "code" },
+    audit: (i: { code: string }) => ({ subject: i.code, verb: "issue" }),
+    outcome: { message: "Code issued", tone: "success", invalidates: ["commerce.codes"] },
+    fails: ["platform.invalid", "platform.conflict"],
+    tool: false,
+    async handler(ctx, input: { code: string; scope: string; days: number; uses: number; expiresAt?: string }) {
+      const d = deps(ctx);
+      const scopes = new Set(Object.values(app.access.customerFlags).flatMap((f) => (f.scope ? [f.scope] : [])));
+      if (!scopes.has(input.scope)) {
+        ctx.fail("platform.invalid", { field: "scope", reason: `nothing is gated on it: ${[...scopes].join(", ")}` });
+      }
+      const code = input.code.trim().toUpperCase();
+      const taken = (await codesFor(d.db, d.tenantId)).some((c) => c.code === code);
+      if (taken) ctx.fail("platform.conflict", { field: "code", reason: "already issued" });
+
+      const made = await issueCode(
+        d.db, d.tenantId,
+        { code, scope: input.scope, days: input.days, uses: input.uses, expiresAt: (input.expiresAt ?? null) as Instant | null },
+        ctx.now(),
+      );
+      return { code: made.code, scope: made.scope, days: made.days, usesLeft: made.usesLeft };
+    },
+  });
+
+  const codes = operation({
+    id: "commerce.codes",
+    kind: "read",
+    summary: "The codes this workspace has issued, and what is left of them.",
+    input: s.object({}),
+    output: s.object({ codes: s.json() }),
+    permission: "commerce:manage",
+    idempotency: { mode: "none" },
+    async handler(ctx) {
+      const d = deps(ctx);
+      return { codes: await codesFor(d.db, d.tenantId) };
+    },
+  });
+
+  const redeem = operation({
+    id: "commerce.redeem",
+    kind: "write",
+    summary: "Redeem a code and see the days arrive.",
+    input: s.object({ subjectId: s.text({ max: 120 }), code: s.text({ min: 4, max: 40 }) }),
+    output: s.object({ scope: s.text(), daysAdded: s.number({ integer: true }), runway: s.json() }),
+    permission: "commerce:read",
+    /* ⚠️ Onto their own access and nobody else's. */
+    scope: (i: { subjectId: string }) => ({ subject: i.subjectId }),
+    idempotency: { mode: "none" },
+    audit: (i: { code: string }) => ({ subject: i.code, verb: "redeem" }),
+    outcome: { message: "Days added", tone: "success", moment: "acknowledge", invalidates: ["commerce.capabilities"] },
+    fails: ["platform.not_found", "platform.conflict"],
+    /*
+      ⚠️ NOT A TOOL. A code is a string, and a model that can redeem one can be
+      handed one in a document and asked to try it.
+    */
+    tool: false,
+    async handler(ctx, input: { subjectId: string; code: string }) {
+      const d = deps(ctx);
+
+      /*
+        ⚠️ A CODE TOPS UP; IT NEVER CREATES ACCESS — and this is checked BEFORE
+        the use is claimed. This route is callable by a customer, so a code that
+        leaks would otherwise mint access for anybody holding the string, and
+        every attempt would burn a use belonging to somebody who was given it.
+      */
+      const access = await readAccess(d.db, d.tenantId, input.subjectId);
+      if (!access.packageId) ctx.fail("platform.conflict", { reason: "no_package_to_top_up" });
+
+      const claimed = await claimCode(d.db, d.tenantId, input.code.trim().toUpperCase(), ctx.now());
+      if (!claimed) ctx.fail("platform.not_found", { field: "code" });
+
+      const budgets: Record<string, Instant> = { ...access.budgets };
+      /* ⚠️ Queued onto what is running, exactly as a purchase is. */
+      budgets[claimed!.scope] = extendBudget(budgets[claimed!.scope] ?? null, ctx.now(), claimed!.days);
+      await d.db.run(
+        `UPDATE subject_access SET budgets_json = ?, updated_at = ? WHERE tenant_id = ? AND subject_id = ?`,
+        JSON.stringify(budgets), ctx.now(), d.tenantId, input.subjectId,
+      );
+      return { scope: claimed!.scope, daysAdded: claimed!.days, runway: runwayFor(budgets, ctx.now()) };
+    },
+  });
+
   return [
     offer, save, grant, capabilities, override, repair, history,
     payments, setPayments, checkout, confirm, notified, purchases,
+    lapse, setLapse, issue, codes, redeem,
   ] as unknown as readonly AnyOperation[];
 }
 

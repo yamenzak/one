@@ -2325,3 +2325,64 @@ signed in — with no hint that the cause is in another file.
 
 Every fixture address is now its own suite's. The general rule: a fixture keyed
 on something global is a fixture that works until the suite grows.
+
+## 191. `skipped` meant two things, and the runner read the wrong one
+
+`JobResult.skipped` is documented as "anything skipped for a reason worth
+knowing", and the runner has a rule that a run where nothing succeeded and
+something was skipped is a FAILURE — correct, because that is a broken job
+wearing a partial success's clothes.
+
+The first real sweep on this platform reported one skip per workspace that had
+not configured the feature. Most workspaces have not configured most features, so
+every run went red on a deployment where nothing was wrong at all — and an alarm
+that is always on is an alarm nobody reads, which costs the real failure it was
+built for.
+
+`idle` is the second meaning, split out: deliberately not swept, reported so
+"the ladder ran and there was nothing to do" stays distinguishable from "the
+ladder did not run", and excluded from the failure rule.
+
+## 192. A sweep is global, so its test cannot share a database
+
+The scheduled handler visits every workspace in the directory. Run beside other
+suites on shared storage it archives their clients, deletes their records, and
+races them for the run row that decides whether it is due — and the symptom is
+four unrelated suites failing on data that was correct when they wrote it.
+
+The repository already had the answer: `*.solo.test.ts` in its own invocation,
+introduced for the maintenance switch. The line is "does this act on the whole
+deployment", not the subject, and the lapse sweep is the second thing to qualify.
+
+## 193. A refused claim must not write
+
+`claimCode` decided whether a code had uses left AFTER issuing the decrement, so
+a spent code went to −1, then −2, and the "uses left" a workspace is shown
+counted down every time somebody tried a code that no longer worked. The refusal
+was correct throughout; the store was not.
+
+The general shape, and the second time it has come up: when a check and a write
+are the same statement, the check has to be part of the WHERE clause. When they
+are separate, the check goes first — and "first" means before anything is
+written, not before the answer is returned.
+
+## 194. A ladder that goes backwards is not a ladder
+
+Deleting before archiving means the archive rung never happens, which reads on a
+settings screen as a step somebody configured and gets. Refused rather than
+reordered, for the same reason the destructive floor is refused rather than
+clamped: quietly doing something other than what an operator typed leaves a
+screen showing a number the sweep does not use, and the number they meant was
+about deleting people's records.
+
+## 195. Lapsed is measured from the LAST thing to expire
+
+Taking the earliest starts the clock on somebody who is still paying for
+something else, and the rungs at the end of this ladder are archive and delete.
+And "holds nothing" is null rather than zero: a customer who never bought
+anything has not lapsed, so a workspace switching the ladder on for the first
+time would otherwise archive every record it had ever created, on day one.
+
+The second case is reachable through an ordinary product path — an exception set
+by hand opens a customer's access row with no budgets in it — which is why it is
+a test rather than a comment.

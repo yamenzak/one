@@ -5,7 +5,7 @@
   "type": "module",
   "description": "A ONE app. Everything it does beyond one collection is the platform's.",
   "scripts": {
-    "test": "vitest run && vitest run --config vitest.node.config.ts",
+    "test": "vitest run && vitest run --config vitest.solo.config.ts && vitest run --config vitest.node.config.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "clean": "rm -rf .turbo *.tsbuildinfo"

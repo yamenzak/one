@@ -728,14 +728,14 @@
       "persona": "owner",
       "area": "commerce",
       "outcome": "Issue a code that tops somebody's access up",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "redeem",
       "persona": "client",
       "area": "commerce",
       "outcome": "Redeem a code and see the days arrive",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "promo-code",
@@ -757,7 +757,7 @@
       "persona": "owner",
       "area": "commerce",
       "outcome": "Decide what happens to a client whose access ran out, and when",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "plan-browse",

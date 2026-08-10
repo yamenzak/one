@@ -256,3 +256,96 @@ export function packageContradictions(
   }
   return out;
 }
+
+/* ------------------------------------------------------------- lapsing --- */
+
+/**
+ * WHAT A WORKSPACE DOES ABOUT A CUSTOMER WHOSE ACCESS RAN OUT.
+ *
+ * ⚠️ THE WORKSPACE'S RULE, NOT THE PLATFORM'S, and the rungs are ordered by how
+ * much they take away. Access running out already withholds what was sold — this
+ * is the separate question of what happens to the RECORD afterwards, and the
+ * answer differs by trade: a coaching studio archives after a season, a clinic
+ * may be required to keep everything for years.
+ */
+export const RUNGS = ["none", "read_only", "blocked", "archive", "delete"] as const;
+export type Rung = (typeof RUNGS)[number];
+
+/**
+ * ⚠️ THE DESTRUCTIVE PAIR CARRIES A FLOOR, and it is not advisory. Archiving or
+ * deleting somebody a fortnight after a payment slipped is a support incident
+ * with no undo — a card expires, somebody is on holiday, an invoice sits in a
+ * spam folder. Below this, the setting is refused rather than clamped, because
+ * silently doing something gentler than what an operator typed is its own
+ * failure.
+ */
+export const DESTRUCTIVE_FLOOR_DAYS = 14;
+
+export interface Ladder {
+  /** Days after access lapses, per rung. Absent means the rung never happens. */
+  readonly readOnlyAfter?: number;
+  readonly blockedAfter?: number;
+  readonly archiveAfter?: number;
+  readonly deleteAfter?: number;
+}
+
+/** Why a ladder cannot be saved. Empty is the whole of the pass condition. */
+export function ladderProblems(ladder: Ladder): readonly string[] {
+  const out: string[] = [];
+  const rungs: readonly [Rung, number | undefined][] = [
+    ["read_only", ladder.readOnlyAfter], ["blocked", ladder.blockedAfter],
+    ["archive", ladder.archiveAfter], ["delete", ladder.deleteAfter],
+  ];
+  for (const [name, days] of rungs) {
+    if (days === undefined) continue;
+    if (!Number.isInteger(days) || days < 0) out.push(`${name}: not a number of days`);
+    else if ((name === "archive" || name === "delete") && days < DESTRUCTIVE_FLOOR_DAYS) {
+      out.push(`${name}: at least ${DESTRUCTIVE_FLOOR_DAYS} days`);
+    }
+  }
+  /*
+    ⚠️ A LADDER THAT GOES BACKWARDS IS NOT A LADDER. Deleting before archiving
+    means the archive rung never happens, which reads on the settings screen as
+    a step somebody configured and gets, and is neither.
+  */
+  const set = rungs.filter(([, d]) => d !== undefined).map(([n, d]) => [n, d!] as const);
+  for (let i = 1; i < set.length; i++) {
+    if (set[i]![1] < set[i - 1]![1]) out.push(`${set[i]![0]}: comes before ${set[i - 1]![0]}`);
+  }
+  return out;
+}
+
+/**
+ * Which rung a customer has reached.
+ *
+ * ⚠️ THE FURTHEST ONE, not the first one crossed — a sweep that missed a week
+ * must land somebody where they should be today rather than walking them through
+ * every rung it skipped. Each rung's action is idempotent for the same reason.
+ */
+export function rungFor(daysLapsed: number, ladder: Ladder): Rung {
+  let at: Rung = "none";
+  if (ladder.readOnlyAfter !== undefined && daysLapsed >= ladder.readOnlyAfter) at = "read_only";
+  if (ladder.blockedAfter !== undefined && daysLapsed >= ladder.blockedAfter) at = "blocked";
+  if (ladder.archiveAfter !== undefined && daysLapsed >= ladder.archiveAfter) at = "archive";
+  if (ladder.deleteAfter !== undefined && daysLapsed >= ladder.deleteAfter) at = "delete";
+  return at;
+}
+
+/**
+ * How long ago the last thing they held ran out.
+ *
+ * ⚠️ MEASURED FROM THE LATEST EXPIRY, so somebody who still holds one scope has
+ * not lapsed at all. Taking the earliest would start the clock on a customer who
+ * is still paying for something — and the rungs at the end of it are destructive.
+ *
+ * Null when they hold nothing that ever expired, which is not the same as zero:
+ * a customer who never bought anything has not lapsed, and a ladder that treated
+ * them as lapsed would archive every record a workspace ever created.
+ */
+export function lapsedFor(budgets: Readonly<Record<string, Instant>>, now: Instant): number | null {
+  const times = Object.values(budgets).map((at) => Date.parse(at));
+  if (!times.length) return null;
+  const last = Math.max(...times);
+  const days = Math.floor((Date.parse(now) - last) / DAY_MS);
+  return days > 0 ? days : null;
+}

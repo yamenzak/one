@@ -14,7 +14,7 @@ import {
   balanceOf, charsPerUnit, daysRemaining, explainCustomerFlags, explainEntitlements,
   extendBudget, floorPlan, gateFor, heldEntitlements, mayPurchase, packageContradictions,
   parkingAboveFloor, planRun, resolveCustomerFlags, resolveEntitlements, reversal,
-  runwayFor, settle, withinQuota,
+  DESTRUCTIVE_FLOOR_DAYS, ladderProblems, lapsedFor, runwayFor, rungFor, settle, withinQuota,
   type Allowance, type EntitlementDef, type FlagDef, type Instant, type PackageSpec, type PlanSpec,
 } from "../src/index.js";
 
@@ -292,6 +292,75 @@ describe("days of access", () => {
 });
 
 /* ---------------------------------------------------------------- meter --- */
+
+describe("what happens after access runs out", () => {
+  /*
+    ⚠️ THE FURTHEST RUNG, NOT THE FIRST ONE CROSSED. A sweep that missed a week
+    must land somebody where they should be today rather than walking them
+    through every rung it skipped — which for the destructive pair would mean
+    archiving somebody on the way to deleting them, in one run.
+  */
+  const ladder = { readOnlyAfter: 3, blockedAfter: 10, archiveAfter: 30, deleteAfter: 90 };
+
+  it("reports where somebody has actually got to", () => {
+    expect(rungFor(0, ladder)).toBe("none");
+    expect(rungFor(2, ladder)).toBe("none");
+    expect(rungFor(3, ladder)).toBe("read_only");
+    expect(rungFor(29, ladder)).toBe("blocked");
+    expect(rungFor(200, ladder)).toBe("delete");
+  });
+
+  it("never reaches a rung the workspace did not set", () => {
+    expect(rungFor(1_000, { readOnlyAfter: 7 })).toBe("read_only");
+    expect(rungFor(1_000, {})).toBe("none");
+  });
+
+  /*
+    ⚠️ THE DESTRUCTIVE PAIR CARRIES A FLOOR, AND IT IS REFUSED RATHER THAN
+    CLAMPED. Archiving somebody a fortnight after a payment slipped is a support
+    incident with no undo — a card expires, somebody is on holiday, an invoice
+    sits in a spam folder — and quietly doing something gentler than what an
+    operator typed leaves a settings screen showing a number nothing uses.
+  */
+  it("refuses to archive or delete sooner than the floor", () => {
+    expect(ladderProblems({ archiveAfter: DESTRUCTIVE_FLOOR_DAYS })).toEqual([]);
+    expect(ladderProblems({ archiveAfter: DESTRUCTIVE_FLOOR_DAYS - 1 })).toHaveLength(1);
+    expect(ladderProblems({ deleteAfter: 1 })).toHaveLength(1);
+    /* ⚠️ And the gentle rungs have no floor: read-only on day one is a choice. */
+    expect(ladderProblems({ readOnlyAfter: 0, blockedAfter: 1 })).toEqual([]);
+  });
+
+  /* ⚠️ A ladder that goes backwards is not a ladder — the skipped rung reads on
+     a settings screen as a step somebody configured and gets, and is neither. */
+  it("refuses a rung that comes before the one above it", () => {
+    expect(ladderProblems({ archiveAfter: 90, deleteAfter: 30 })).toHaveLength(1);
+    expect(ladderProblems({ readOnlyAfter: 10, blockedAfter: 3 })).toHaveLength(1);
+  });
+
+  /*
+    ⚠️ LAPSED IS MEASURED FROM THE LATEST EXPIRY. Taking the earliest starts the
+    clock on somebody who is still paying for something else — and the rungs at
+    the end of this are archive and delete.
+  */
+  it("counts from the last thing to run out, not the first", () => {
+    const now = "2026-03-01T00:00:00.000Z" as Instant;
+    expect(lapsedFor({ coaching: "2026-02-01T00:00:00.000Z" as Instant, food: "2026-02-24T00:00:00.000Z" as Instant }, now)).toBe(5);
+  });
+
+  /*
+    ⚠️ AND SOMEBODY WHO HOLDS NOTHING HAS NOT LAPSED. Null rather than zero: a
+    customer who never bought anything would otherwise be at the bottom of the
+    ladder on day one, and a workspace that switched the ladder on would archive
+    every record it had ever created.
+  */
+  it("says nothing at all about somebody who never held anything", () => {
+    expect(lapsedFor({}, "2026-03-01T00:00:00.000Z" as Instant)).toBeNull();
+  });
+
+  it("says nothing about somebody whose access is still running", () => {
+    expect(lapsedFor({ coaching: "2026-04-01T00:00:00.000Z" as Instant }, "2026-03-01T00:00:00.000Z" as Instant)).toBeNull();
+  });
+});
 
 describe("metering", () => {
   /*

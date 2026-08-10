@@ -1786,6 +1786,69 @@
       "impl": "kova/test/buying.test.ts",
       "proves": "sees their own purchases and not the studio's other customers'",
       "fails": "an optional filter a customer can point at somebody else's id, which is not a filter — it is the hole with a parameter in front of it"
+    },
+    {
+      "id": "a-destructive-rung-has-a-floor",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/lapsing.solo.test.ts",
+      "proves": "refuses to archive or delete sooner than the floor",
+      "fails": "archiving somebody a fortnight after a payment slipped — a card expires, somebody is on holiday, an invoice sits in a spam folder — and it is a support incident with no undo"
+    },
+    {
+      "id": "the-furthest-rung-not-the-next",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/lapsing.solo.test.ts",
+      "proves": "lands somebody at the furthest rung rather than the next one",
+      "fails": "a sweep that missed a week walking somebody through every rung it skipped — which for the destructive pair means archiving on the way past to deleting, in one run"
+    },
+    {
+      "id": "a-lapse-sweep-freezes-on-our-own-arrears",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/lapsing.solo.test.ts",
+      "proves": "does nothing at all while the studio is itself past due",
+      "fails": "a workspace the platform suspended quietly shredding a roster it can no longer see — whatever dispute is going on, it is not a reason to act on their customers' records for them"
+    },
+    {
+      "id": "holding-nothing-is-not-lapsed",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/lapsing.solo.test.ts",
+      "proves": "leaves alone somebody who never held anything",
+      "fails": "a ladder switched on for the first time archiving every record the workspace ever created, because 'nothing has expired' was read as 'everything expired long ago'"
+    },
+    {
+      "id": "idle-is-not-a-failed-sweep",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/lapsing.solo.test.ts",
+      "proves": "does not read a roster for a studio that configured no ladder",
+      "fails": "one skip per workspace that has not configured the feature — which is most of them — turning an ordinary deployment into a permanently failing job, the alarm nobody ends up reading"
+    },
+    {
+      "id": "a-code-tops-up-never-creates",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/lapsing.solo.test.ts",
+      "proves": "refuses somebody holding no package, without spending a use",
+      "fails": "a leaked code minting access for anybody holding the string — and every attempt burning a use belonging to the person it was given to"
+    },
+    {
+      "id": "a-refused-claim-spends-nothing",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/lapsing.solo.test.ts",
+      "proves": "spends a use each time and then refuses",
+      "fails": "a spent code decremented past zero on every further attempt, so the uses a workspace is shown counts down forever for a code that no longer works"
     }
   ]
 }

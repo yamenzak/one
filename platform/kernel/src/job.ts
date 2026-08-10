@@ -76,8 +76,30 @@ export interface JobResult {
   readonly done: number;
   /** Left for the next run because the ceiling was reached. */
   readonly more: boolean;
-  /** Anything skipped for a reason worth knowing. Reported, never swallowed. */
+  /**
+   * Anything left undone because something WENT WRONG. Reported, never swallowed.
+   *
+   * ⚠️ THIS IS AN ERROR SIGNAL, NOT A COUNT OF WORK NOT NEEDED, and the runner
+   * reads it as one: a run where nothing succeeded and something was skipped is
+   * recorded as FAILED, because that is a broken job wearing a partial success's
+   * clothes. Use `idle` for a tenant that simply had nothing to do.
+   */
   readonly skipped?: number;
+  /**
+   * Tenants that were deliberately not swept — nothing configured, or a rule
+   * says not now.
+   *
+   * ⚠️ REPORTED SEPARATELY BECAUSE MOST TENANTS ARE USUALLY IDLE, and counting
+   * them as skipped makes an ordinary deployment a permanently failing job.
+   * That is not hypothetical: the first real sweep on this platform reported one
+   * skip per workspace that had not configured the feature, and every run went
+   * red on a deployment where nothing was wrong at all.
+   *
+   * It still travels, because "the ladder ran and there was nothing to do" and
+   * "the ladder did not run" are different answers to the only question anybody
+   * asks about a sweep.
+   */
+  readonly idle?: number;
 }
 
 export interface JobSpec<B extends BindingSpec = BindingSpec> {

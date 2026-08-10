@@ -16,12 +16,12 @@
 import { daysBetween, daysLeft, progressOf } from "./goals.js";
 import { energyOf, overDays, portionOf, totalOf, type Macros } from "./nutrition.js";
 import { bestOf, consistency, expectedOver, needing, prescribedPerWeek, soonest } from "./reading.js";
-import { runwayAcross } from "@one/runtime";
+import { lapsedAcross, laddersFrozen, readLadder, readSubscription, runwayAcross } from "@one/runtime";
 import {
   UNLIMITED,
   cache, collection, defineApp, defineBindings, field,
-  objects, operation, s, sql, tableNameFor,
-  type Currency, type Locale, type RegionId, type TimeZone,
+  objects, operation, rungFor, s, sql, tableNameFor,
+  type Currency, type Locale, type RegionId, type SqlHandle, type TimeZone,
 } from "@one/kernel";
 
 /* -------------------------------------------------------------- bindings --- */
@@ -850,7 +850,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.7.0",
+  manifestVersion: "0.8.0",
   bindings,
 
   identity: {
@@ -1159,7 +1159,81 @@ export const kova = defineApp({
     demo: { label: "Movement demonstration", accept: ["video/mp4", "image/jpeg", "image/png"], maxBytes: 20_000_000 },
   },
 
-  jobs: [],
+  /*
+    ⚠️ ONE SWEEP, AND WHAT IT DOES IS THE PRODUCT'S. The platform works out WHO
+    has lapsed and how far down the ladder they have got; what "archive" means
+    for a client record is a thing only this app can know. The seam is the whole
+    reason the ladder is shared and the consequence is not.
+  */
+  jobs: [
+    {
+      id: "lapsed-clients",
+      summary: "Act on clients whose access has run out, by the studio's own rule.",
+      every: "daily",
+      scope: "tenant",
+      /* ⚠️ Bounded, so a large studio catches up over runs rather than timing out. */
+      batch: 200,
+      async handler(ctx) {
+        const db = ctx.bind.db as SqlHandle;
+        const tenantId = ctx.tenantId!;
+
+        /*
+          ⚠️ FROZEN WHILE THE STUDIO IS BEHIND ON ITS OWN BILL. A studio the
+          platform has suspended must not be quietly shredding a roster it can no
+          longer see — whatever is going on between us and them, it is not a
+          reason to act on their clients' records on their behalf.
+        */
+        const sub = await readSubscription(db, tenantId);
+        if (laddersFrozen(sub)) return { done: 0, more: false, idle: 1 };
+
+        /*
+          ⚠️ A STUDIO THAT HAS CONFIGURED NO LADDER IS NOT SWEPT AT ALL, and it
+          says so rather than reporting a clean run over nothing. Without the
+          skip, every studio on the deployment pays for a scan of its whole
+          customer table every day to decide that nobody is anywhere — and a
+          report of "0 done" cannot be told from a sweep that found nothing.
+        */
+        const ladder = await readLadder(db, tenantId);
+        if (Object.keys(ladder).length === 0) return { done: 0, more: false, idle: 1 };
+
+        const lapsed = await lapsedAcross(db, tenantId, ctx.now(), ctx.batch + 1);
+        const batch = lapsed.slice(0, ctx.batch);
+
+        let done = 0;
+        for (const who of batch) {
+          const rung = rungFor(who.days, ladder);
+          /*
+            ⚠️ THE FURTHEST RUNG, AND THE ACTION IS IDEMPOTENT. A sweep that
+            missed a week must land somebody where they should be today rather
+            than walking them through every rung it skipped — and it will see
+            them again tomorrow.
+          */
+          if (rung === "archive") {
+            await db.run(
+              `UPDATE ${T.clients} SET deleted_at = COALESCE(deleted_at, ?), updated_at = ? WHERE tenant_id = ? AND id = ?`,
+              ctx.now(), ctx.now(), tenantId, who.subjectId,
+            );
+            done++;
+          } else if (rung === "delete") {
+            /*
+              ⚠️ ARCHIVING KEEPS THE SEAT AND DELETING FREES ONE, which is the
+              difference a studio is actually choosing between. An archived
+              client is still somebody they coach and are not coaching right now.
+            */
+            await db.run(`DELETE FROM ${T.clients} WHERE tenant_id = ? AND id = ?`, tenantId, who.subjectId);
+            done++;
+          }
+          /*
+            ⚠️ `read_only` AND `blocked` NEED NO WRITE AT ALL. Access running out
+            already withholds what was sold — a customer flag resolves off the
+            moment the days do. Writing a second copy of that state is how two
+            answers to "may they log this" come to disagree.
+          */
+        }
+        return { done, more: lapsed.length > ctx.batch };
+      },
+    },
+  ],
 
   /*
     ⚠️ THREE SETUPS, ONE DECLARATION. The deployment is set up by whoever runs
@@ -1228,6 +1302,17 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.8.0",
+      at: "2026-08-10",
+      notes: [
+        "Decide what happens to a client whose access ran out, and when — read-only, blocked, archived, or removed.",
+        "Archiving or removing somebody cannot be set sooner than a fortnight after they lapse, because a card expiring is not a decision to leave.",
+        "Nothing happens to anybody while your own studio is behind on its bill.",
+        "Issue a code that tops somebody's access up, with a number of uses and a date it stops working.",
+        "A code adds days to access somebody already has; it never creates access on its own.",
+      ],
+    },
     {
       version: "0.7.0",
       at: "2026-08-10",

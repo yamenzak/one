@@ -19,11 +19,13 @@ import {
   type SchemaModule,
   type SqlHandle,
   type FlagDef,
+  type Ladder,
   type PackageSpec,
   type Runway,
   type StandingState,
   extendBudget,
   heldEntitlements,
+  lapsedFor,
   resolveCustomerFlags,
   runwayFor,
 } from "@one/kernel";
@@ -81,6 +83,14 @@ export const COMMERCE_SCHEMA: SchemaModule = {
       `safeConfig` is what keeps it to a signing secret.
     */
     `CREATE TABLE IF NOT EXISTS tenant_payments (tenant_id TEXT PRIMARY KEY, provider TEXT NOT NULL, checkout_url TEXT, verify_secret TEXT, updated_at TEXT NOT NULL);`,
+    /* What a workspace does about a customer whose access ran out. Its rule, not ours. */
+    `CREATE TABLE IF NOT EXISTS customer_lapse (tenant_id TEXT PRIMARY KEY, ladder_json TEXT NOT NULL, updated_at TEXT NOT NULL);`,
+    /*
+      ⚠️ A CODE TOPS UP; IT NEVER CREATES ACCESS. The redeem route is callable by
+      a customer, so a code that leaks must not mint access for whoever holds the
+      string — it adds days to something somebody already has.
+    */
+    `CREATE TABLE IF NOT EXISTS access_code (code TEXT NOT NULL, tenant_id TEXT NOT NULL, scope TEXT NOT NULL, days INTEGER NOT NULL, uses_left INTEGER NOT NULL, expires_at TEXT, created_at TEXT NOT NULL, PRIMARY KEY (tenant_id, code));`,
     `CREATE INDEX IF NOT EXISTS idx_grant_subject ON package_grant(tenant_id, subject_id);`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_grant_ref ON package_grant(tenant_id, ref) WHERE ref IS NOT NULL;`,
   ],
@@ -608,6 +618,127 @@ export async function settlePurchase(
     `SELECT settled_at, settled_by FROM customer_purchase WHERE tenant_id = ? AND id = ?`, tenantId, id,
   );
   return row?.settled_at === at && row?.settled_by === by;
+}
+
+/* ----------------------------------------------------------- lapsing --- */
+
+export async function readLadder(db: SqlHandle, tenantId: string): Promise<Ladder> {
+  const row = await db.first<{ ladder_json: string }>(
+    `SELECT ladder_json FROM customer_lapse WHERE tenant_id = ?`, tenantId,
+  );
+  return row ? (json(row.ladder_json) as Ladder) : {};
+}
+
+export async function saveLadder(db: SqlHandle, tenantId: string, ladder: Ladder, at: Instant): Promise<void> {
+  await db.run(
+    `INSERT INTO customer_lapse (tenant_id, ladder_json, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT(tenant_id) DO UPDATE SET ladder_json = excluded.ladder_json, updated_at = excluded.updated_at`,
+    tenantId, JSON.stringify(ladder), at,
+  );
+}
+
+/**
+ * ⚠️ THE SWEEP FREEZES WHILE THE WORKSPACE ITSELF IS BEHIND ON ITS OWN BILL.
+ *
+ * A workspace the PLATFORM suspended must not be quietly shredding a roster it
+ * can no longer see — and the rungs at the end of this ladder are archive and
+ * delete. Whatever dispute is going on between us and them, it is not a reason
+ * to act on their customers' records on their behalf.
+ *
+ * ⚠️ AND IT IS READ FROM WHAT THE PROVIDER SAID, not from `standingFor`. That
+ * function takes `chargeable` and reports a parking row as read-only where a
+ * provider exists — so on a self-host, where nobody can pay and no row is ever
+ * stamped, using it would freeze every ladder on the deployment forever.
+ */
+export function laddersFrozen(sub: Subscription): boolean {
+  return sub.pastDueAt !== null || sub.closingAt !== null || sub.status === "cancelled";
+}
+
+/** Everybody whose access has run out, with how long ago. One query. */
+export async function lapsedAcross(
+  db: SqlHandle, tenantId: string, at: Instant, limit: number,
+): Promise<readonly { readonly subjectId: string; readonly days: number }[]> {
+  const rows = await db.all<{ subject_id: string; budgets_json: string }>(
+    `SELECT subject_id, budgets_json FROM subject_access WHERE tenant_id = ? ORDER BY subject_id LIMIT ?`,
+    tenantId, limit,
+  );
+  return rows.flatMap((r) => {
+    const days = lapsedFor(json(r.budgets_json) as never, at);
+    return days === null ? [] : [{ subjectId: r.subject_id, days }];
+  });
+}
+
+/* -------------------------------------------------------------- codes --- */
+
+export interface AccessCode {
+  readonly code: string;
+  readonly scope: string;
+  readonly days: number;
+  readonly usesLeft: number;
+  readonly expiresAt: Instant | null;
+}
+
+export async function issueCode(
+  db: SqlHandle,
+  tenantId: string,
+  input: { readonly code: string; readonly scope: string; readonly days: number; readonly uses: number; readonly expiresAt: Instant | null },
+  at: Instant,
+): Promise<AccessCode> {
+  await db.run(
+    `INSERT INTO access_code (code, tenant_id, scope, days, uses_left, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    input.code, tenantId, input.scope, input.days, input.uses, input.expiresAt, at,
+  );
+  return { code: input.code, scope: input.scope, days: input.days, usesLeft: input.uses, expiresAt: input.expiresAt };
+}
+
+export async function codesFor(db: SqlHandle, tenantId: string): Promise<readonly AccessCode[]> {
+  const rows = await db.all<{ code: string; scope: string; days: number; uses_left: number; expires_at: string | null }>(
+    `SELECT code, scope, days, uses_left, expires_at FROM access_code WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 200`,
+    tenantId,
+  );
+  return rows.map((r) => ({
+    code: r.code, scope: r.scope, days: r.days, usesLeft: r.uses_left,
+    expiresAt: (r.expires_at as Instant | null) ?? null,
+  }));
+}
+
+/**
+ * Claim one use of a code, or nothing.
+ *
+ * ⚠️ THE CONDITIONAL WRITE IS THE LOCK, exactly as it is for a settlement. A
+ * code with one use left, redeemed by two people in the same second, must be
+ * spent once — and a read-then-write leaves a window precisely one round trip
+ * wide, which for a code somebody posted publicly is a window that gets used.
+ */
+export async function claimCode(
+  db: SqlHandle, tenantId: string, code: string, at: Instant,
+): Promise<AccessCode | null> {
+  const row = await db.first<{ scope: string; days: number; uses_left: number; expires_at: string | null }>(
+    `SELECT scope, days, uses_left, expires_at FROM access_code WHERE tenant_id = ? AND code = ?`, tenantId, code,
+  );
+  if (!row) return null;
+  if (row.expires_at && row.expires_at <= at) return null;
+  /*
+    ⚠️ A SPENT CODE IS REFUSED BEFORE ANYTHING IS WRITTEN. Deciding afterwards
+    still runs the decrement, so a code with none left goes to −1, then −2, and
+    the "uses left" a workspace is shown counts DOWN every time somebody tries a
+    code that no longer works.
+  */
+  if (row.uses_left <= 0) return null;
+
+  const before = row.uses_left;
+  await db.run(
+    `UPDATE access_code SET uses_left = uses_left - 1 WHERE tenant_id = ? AND code = ? AND uses_left = ?`,
+    tenantId, code, before,
+  );
+  const after = await db.first<{ uses_left: number }>(
+    `SELECT uses_left FROM access_code WHERE tenant_id = ? AND code = ?`, tenantId, code,
+  );
+  if (before <= 0 || after?.uses_left !== before - 1) return null;
+  return {
+    code, scope: row.scope, days: row.days, usesLeft: after.uses_left,
+    expiresAt: (row.expires_at as Instant | null) ?? null,
+  };
 }
 
 /**

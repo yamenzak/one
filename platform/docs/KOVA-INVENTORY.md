@@ -95,7 +95,7 @@ without one.
 | `[x]` | `access-override` | owner | Make an exception for one client without changing the package |
 | `[x]` | `access-repair` | owner | Correct somebody's remaining days by hand, with a reason, audited |
 | `[x]` | `access-runway` | client | See how many days they have left, per thing they hold |
-| `[ ]` | `lapse-ladder` | owner | Decide what happens to a client whose access ran out, and when |
+| `[x]` | `lapse-ladder` | owner | Decide what happens to a client whose access ran out, and when |
 | `[x]` | `package-build` | owner | Design what they sell: a block of days and what it lets a client do |
 | `[x]` | `package-buy` | client | Buy access from their studio and start using it immediately |
 | `[x]` | `package-contradictions` | owner | Be told when a package sells something it also switches off |
@@ -104,8 +104,8 @@ without one.
 | `[x]` | `package-sell` | owner | Take payment on their own provider, in their own country |
 | `[–]` | `promo-code` | owner | Discount their own prices with a code they control — **dropped:** A discount must be applied by whoever owns the checkout page, and the studio owns it. Kova opens an intent and hands over an address; it never sees the price the customer is charged, so a discount stored here would be a number nothing enforces. Access codes, which grant days rather than reduce a price, are the honest version of this and are not affected. |
 | `[x]` | `purchase-history` | client | See what they have bought from this studio |
-| `[ ]` | `redeem` | client | Redeem a code and see the days arrive |
-| `[ ]` | `redemption-code` | owner | Issue a code that tops somebody's access up |
+| `[x]` | `redeem` | client | Redeem a code and see the days arrive |
+| `[x]` | `redemption-code` | owner | Issue a code that tops somebody's access up |
 | | **content** | | |
 | `[ ]` | `content-cover` | trainer | Give an article a cover image without leaving the product |
 | `[ ]` | `content-read` | client | Read what their studio published, in a feed that is theirs |

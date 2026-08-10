@@ -26,9 +26,15 @@ export const JOB_SCHEMA: SchemaModule = {
       than about any workspace — and because the runner has to know what is due
       before it knows which region to open.
     */
-    `CREATE TABLE IF NOT EXISTS job_run (id TEXT PRIMARY KEY, job TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT, done INTEGER NOT NULL DEFAULT 0, skipped INTEGER NOT NULL DEFAULT 0, more INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0, detail TEXT);`,
+    /* ⚠️ `idle` is separate from `skipped`: one is an error signal and the other
+       is "nothing to do", and the runner reads them differently. */
+    `CREATE TABLE IF NOT EXISTS job_run (id TEXT PRIMARY KEY, job TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT, done INTEGER NOT NULL DEFAULT 0, skipped INTEGER NOT NULL DEFAULT 0, idle INTEGER NOT NULL DEFAULT 0, more INTEGER NOT NULL DEFAULT 0, failed INTEGER NOT NULL DEFAULT 0, detail TEXT);`,
     `CREATE INDEX IF NOT EXISTS idx_job_run_recent ON job_run(job, started_at);`,
   ],
+  /* ⚠️ For a database that already has the table. The runner tolerates a
+     duplicate-column failure here and nowhere else, which is what makes adding
+     one to a live deployment an edit rather than a migration. */
+  alters: [`ALTER TABLE job_run ADD COLUMN idle INTEGER NOT NULL DEFAULT 0;`],
 };
 
 /* ------------------------------------------------------------- the clock --- */
@@ -56,6 +62,7 @@ export interface RunReport {
   readonly ran: boolean;
   readonly done: number;
   readonly skipped: number;
+  readonly idle: number;
   readonly more: boolean;
   readonly failed: boolean;
   readonly detail?: string;
@@ -88,12 +95,13 @@ export async function runDue<B>(
   for (const spec of jobs) {
     const startedAt = deps.now();
     if (!isDue(spec, await lastSuccess(deps.global, spec.id), startedAt)) {
-      reports.push({ job: spec.id, ran: false, done: 0, skipped: 0, more: false, failed: false });
+      reports.push({ job: spec.id, ran: false, done: 0, skipped: 0, idle: 0, more: false, failed: false });
       continue;
     }
 
     let done = 0;
     let skipped = 0;
+    let idle = 0;
     let more = false;
     let failed = false;
     let detail: string | undefined;
@@ -101,7 +109,7 @@ export async function runDue<B>(
     try {
       if (spec.scope === "platform") {
         const out = await one(spec, deps, deps.regions[0] ?? ("auto" as RegionId), null);
-        done += out.done; skipped += out.skipped ?? 0; more ||= out.more;
+        done += out.done; skipped += out.skipped ?? 0; idle += out.idle ?? 0; more ||= out.more;
       } else {
         for (const region of deps.regions) {
           for (const tenant of await deps.tenants(region)) {
@@ -113,7 +121,7 @@ export async function runDue<B>(
             */
             try {
               const out = await one(spec, deps, region, tenant.tenantId);
-              done += out.done; skipped += out.skipped ?? 0; more ||= out.more;
+              done += out.done; skipped += out.skipped ?? 0; idle += out.idle ?? 0; more ||= out.more;
             } catch (e) {
               skipped++;
               detail = describe(e);
@@ -134,13 +142,19 @@ export async function runDue<B>(
       clothes. Recorded as a success, its clock advances and it never retries:
       the run table fills with healthy-looking rows and the work stops.
     */
+    /*
+      ⚠️ `idle` IS NOT PART OF THIS RULE. Most workspaces have not configured most
+      features, so a sweep that reports one idle per workspace is the ordinary
+      case — folding it in here made an ordinary deployment a permanently failing
+      job, which is the alarm nobody ends up reading.
+    */
     if (!failed && skipped > 0 && done === 0) {
       failed = true;
       detail = detail ?? "every tenant skipped";
     }
 
-    await record(deps.global, spec.id, startedAt, deps.now(), { done, skipped, more, failed, detail });
-    reports.push({ job: spec.id, ran: true, done, skipped, more, failed, ...(detail ? { detail } : {}) });
+    await record(deps.global, spec.id, startedAt, deps.now(), { done, skipped, idle, more, failed, detail });
+    reports.push({ job: spec.id, ran: true, done, skipped, idle, more, failed, ...(detail ? { detail } : {}) });
   }
 
   return reports;
@@ -168,11 +182,11 @@ async function record(
   jobId: string,
   startedAt: Instant,
   finishedAt: Instant,
-  out: { done: number; skipped: number; more: boolean; failed: boolean; detail?: string },
+  out: { done: number; skipped: number; idle: number; more: boolean; failed: boolean; detail?: string },
 ): Promise<void> {
   await db.run(
-    `INSERT INTO job_run (id, job, started_at, finished_at, done, skipped, more, failed, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    crypto.randomUUID(), jobId, startedAt, finishedAt, out.done, out.skipped, out.more ? 1 : 0, out.failed ? 1 : 0, out.detail ?? null,
+    `INSERT INTO job_run (id, job, started_at, finished_at, done, skipped, idle, more, failed, detail) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    crypto.randomUUID(), jobId, startedAt, finishedAt, out.done, out.skipped, out.idle, out.more ? 1 : 0, out.failed ? 1 : 0, out.detail ?? null,
   ).catch(() => undefined);
 }
 
@@ -184,6 +198,7 @@ export interface JobHistory {
   readonly finishedAt: string | null;
   readonly done: number;
   readonly skipped: number;
+  readonly idle: number;
   readonly more: boolean;
   readonly failed: boolean;
   readonly detail: string | null;
@@ -199,11 +214,11 @@ export interface JobHistory {
 export async function jobHistory(db: SqlHandle, limit: number): Promise<readonly JobHistory[]> {
   const rows = await db.all<{
     job: string; started_at: string; finished_at: string | null;
-    done: number; skipped: number; more: number; failed: number; detail: string | null;
-  }>(`SELECT job, started_at, finished_at, done, skipped, more, failed, detail FROM job_run ORDER BY started_at DESC LIMIT ?`, limit)
+    done: number; skipped: number; idle: number; more: number; failed: number; detail: string | null;
+  }>(`SELECT job, started_at, finished_at, done, skipped, idle, more, failed, detail FROM job_run ORDER BY started_at DESC LIMIT ?`, limit)
     .catch(() => []);
   return rows.map((r) => ({
     job: r.job, startedAt: r.started_at, finishedAt: r.finished_at,
-    done: r.done, skipped: r.skipped, more: r.more === 1, failed: r.failed === 1, detail: r.detail,
+    done: r.done, skipped: r.skipped, idle: r.idle, more: r.more === 1, failed: r.failed === 1, detail: r.detail,
   }));
 }

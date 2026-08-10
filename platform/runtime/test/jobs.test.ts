@@ -32,7 +32,7 @@ function global_() {
         if (sql.startsWith("INSERT INTO job_run")) {
           runs.push({
             id: p[0], job: p[1], started_at: p[2], finished_at: p[3],
-            done: p[4], skipped: p[5], more: p[6], failed: p[7], detail: p[8],
+            done: p[4], skipped: p[5], idle: p[6], more: p[7], failed: p[8], detail: p[9],
           });
         }
       },

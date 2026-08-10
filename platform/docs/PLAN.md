@@ -1022,6 +1022,13 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-stored-credential-may-verify-never-act` | a database of live merchant keys — a signing secret checks a notification came from the workspace's provider; an API key would let this platform charge their customers | **live** |
 | `a-once-only-package-is-refused-before-paying` | somebody paying on a page this platform does not control and receiving nothing, with no way here to give it back | **live** |
 | `a-customers-purchases-are-their-own` | an optional filter a customer can point at somebody else's id, which is not a filter — it is the hole with a parameter in front of it | **live** |
+| `a-destructive-rung-has-a-floor` | archiving somebody a fortnight after a payment slipped — a card expires, somebody is on holiday, an invoice sits in a spam folder — and it is a support incident with no undo | **live** |
+| `the-furthest-rung-not-the-next` | a sweep that missed a week walking somebody through every rung it skipped — which for the destructive pair means archiving on the way past to deleting, in one run | **live** |
+| `a-lapse-sweep-freezes-on-our-own-arrears` | a workspace the platform suspended quietly shredding a roster it can no longer see — whatever dispute is going on, it is not a reason to act on their customers' records for them | **live** |
+| `holding-nothing-is-not-lapsed` | a ladder switched on for the first time archiving every record the workspace ever created, because 'nothing has expired' was read as 'everything expired long ago' | **live** |
+| `idle-is-not-a-failed-sweep` | one skip per workspace that has not configured the feature — which is most of them — turning an ordinary deployment into a permanently failing job, the alarm nobody ends up reading | **live** |
+| `a-code-tops-up-never-creates` | a leaked code minting access for anybody holding the string — and every attempt burning a use belonging to the person it was given to | **live** |
+| `a-refused-claim-spends-nothing` | a spent code decremented past zero on every further attempt, so the uses a workspace is shown counts down forever for a code that no longer works | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

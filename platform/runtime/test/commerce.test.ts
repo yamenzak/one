@@ -126,10 +126,11 @@ describe("the customer rail is mounted only where an app declares one", () => {
   it("mounts the whole rail when it does — the offer, the money and the corrections", () => {
     const ids = customerOperations(app({ access: withRail })).map((op) => op.id).sort();
     expect(ids).toEqual([
-      "commerce.capabilities", "commerce.checkout", "commerce.confirm", "commerce.days",
-      "commerce.grant", "commerce.history", "commerce.override", "commerce.package.save",
+      "commerce.capabilities", "commerce.checkout", "commerce.code.issue", "commerce.codes",
+      "commerce.confirm", "commerce.days", "commerce.grant", "commerce.history",
+      "commerce.lapse", "commerce.lapse.set", "commerce.override", "commerce.package.save",
       "commerce.packages", "commerce.payments", "commerce.payments.set", "commerce.purchases",
-      "webhook.customer",
+      "commerce.redeem", "webhook.customer",
     ]);
   });
 
@@ -154,7 +155,11 @@ describe("the customer rail is mounted only where an app declares one", () => {
   */
   it("keeps every per-customer write away from the assistant", () => {
     const ops = customerOperations(app({ access: withRail }));
-    for (const id of ["commerce.grant", "commerce.override", "commerce.days", "commerce.confirm", "commerce.checkout", "commerce.payments.set"]) {
+    for (const id of [
+      "commerce.grant", "commerce.override", "commerce.days", "commerce.confirm",
+      "commerce.checkout", "commerce.payments.set", "commerce.code.issue", "commerce.redeem",
+      "commerce.lapse.set",
+    ]) {
       expect(ops.find((op) => op.id === id)?.tool, id).toBe(false);
     }
   });
