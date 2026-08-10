@@ -36,7 +36,7 @@ let clientId = "";
 beforeAll(async () => {
   const staff = await signIn("westgate@example.test", SETUP);
   await post(SETUP, "/api/identity.workspace.create", { slug: "westgate" }, staff);
-  coach = await signIn("westgate-coach@example.test", STUDIO);
+  coach = await signIn("westgate@example.test", STUDIO);
   clientId = (await call("/api/client.create", { name: "Ro" })).body.id as unknown as string;
 });
 

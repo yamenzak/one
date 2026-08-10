@@ -49,7 +49,7 @@ const call = async (path: string, body?: unknown) => {
 beforeAll(async () => {
   const staff = await signIn("files@example.test", SETUP);
   await post(SETUP, "/api/identity.workspace.create", { slug: "files" }, staff);
-  member = await signIn("files-owner@example.test", ORIGIN);
+  member = await signIn("files@example.test", ORIGIN);
 });
 
 /* --------------------------------------------------------------- upload --- */

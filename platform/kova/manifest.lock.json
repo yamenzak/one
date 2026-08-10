@@ -30,6 +30,8 @@
     "goal:write",
     "guide:read",
     "inbox:read",
+    "member:manage",
+    "member:read",
     "milestone:read",
     "movement:read",
     "movement:write",
@@ -51,6 +53,7 @@
   ],
   "entitlements": [
     "clients",
+    "seats",
     "storedBytes",
     "training"
   ],

@@ -39,7 +39,7 @@ const inboxTypes = async () =>
 beforeAll(async () => {
   const staff = await signIn("shelf@example.test", SETUP);
   await post(SETUP, "/api/identity.workspace.create", { slug: "shelf" }, staff);
-  member = await signIn("shelf-owner@example.test", ORIGIN);
+  member = await signIn("shelf@example.test", ORIGIN);
 });
 
 /* --------------------------------------------------------------- the read --- */

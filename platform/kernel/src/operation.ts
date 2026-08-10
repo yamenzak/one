@@ -232,3 +232,16 @@ export function operation<B extends BindingSpec, I, O, const F extends string = 
 
 /** What a caller gets back. A failure is always a `Problem`, never a string. */
 export type Result<O> = { readonly ok: true; readonly data: O } | { readonly ok: false; readonly problem: Problem };
+
+/**
+ * ⚠️ THE ONE PERMISSION THAT IS NOT A PERMISSION, and it is a DECLARATION rather
+ * than an absence.
+ *
+ * Signing in, asking for a code and reading who you are must work with no
+ * session, so they need a way to say so. The alternative — an optional
+ * `permission` field, where leaving it out means public — makes the most
+ * dangerous state in the system the one you get by forgetting to type
+ * something. Here, an operation with no permission does not compile, and a
+ * public one says the word.
+ */
+export const PUBLIC = "public";

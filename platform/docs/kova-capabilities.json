@@ -105,7 +105,7 @@
       "persona": "client",
       "area": "roster",
       "outcome": "Accept an invitation and land in the right studio without being told an address",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "client-profile",
@@ -938,35 +938,35 @@
       "persona": "owner",
       "area": "staff",
       "outcome": "Invite a colleague and give them a role",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "staff-roster",
       "persona": "owner",
       "area": "staff",
       "outcome": "See who is on the team, including who has not accepted yet",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "staff-permissions",
       "persona": "owner",
       "area": "staff",
       "outcome": "Narrow what one colleague can do, within their role",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "staff-remove",
       "persona": "owner",
       "area": "staff",
       "outcome": "Remove somebody and free the seat",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "staff-seats",
       "persona": "owner",
       "area": "staff",
       "outcome": "Know how many seats they have and how many are used",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "inbox",

@@ -2035,3 +2035,110 @@ week" answers a different question from "nine of fourteen" — made it observabl
 and the mutation died. The general shape: when a mutation of a correct
 distinction survives, the fix is usually to surface it rather than to remove it
 or to assert it artificially.
+
+## 168. Every app resolved its caller with an authorization bypass
+
+`resolveCaller` was the app's answer to "what may this person do here", and all
+three apps in this repository answered it identically:
+
+    permissions: new Set(session ? app.access.roles.owner : [])
+
+Anybody signed in, on any workspace's own address, held the owner's powers over
+it. It typechecks, it passes every other test, and no suite can distinguish it
+from a working roster — because the fixtures sign in as somebody who ought to be
+an owner. The comment above it said "a real app reads a membership row here",
+which is the shape of the problem: the seam was correct and the only
+implementations of it were scaffolds.
+
+Memberships are the platform's now. What made that the right call was not the
+duplication — it was that the duplicated thing was a security decision, and the
+version an app writes to make its first test pass is always the permissive one.
+
+## 169. A workspace whose creator is not a member is unreachable, not empty
+
+Creating one places a directory row and applies a schema; nothing made the
+creator anything. The result is not an empty workspace — it is one that answers
+403 to every request, from the person who just made it, with the routing row, the
+tables and the session all perfectly correct. There is no later step that could
+repair it either: inviting somebody requires already being a member.
+
+The founding membership is written by the creation itself, and the role it uses
+is chosen by CAPABILITY rather than by name — the one that holds `member:manage`.
+An app is free to call its administrators anything, and a platform matching on
+the word `owner` would found unreachable workspaces for any app that did.
+
+## 170. The first write a region ever takes is the one that finds it unbooted
+
+Booting a regional database is lazy and keyed on the region a REQUEST resolved
+to. A workspace is created on the setup door, which resolved whatever region
+that door defaults to, and the creator may have asked for a different one — so
+the founding membership is written into a store nothing has ever opened.
+
+The runtime's own comment warns about exactly this ("a tenant placed there
+resolves correctly, reaches the right database, and finds nothing in it"), and
+the gap survived because until there was a founding membership, nothing wrote to
+a fresh region until somebody made a request that resolved to it. Adding the
+first cross-region write is what turned a documented hazard into a red test.
+
+## 171. An invitation is the membership row, and there is no "accept"
+
+Two tables — members and invitations — make a roster a UNION every screen has to
+remember, so the pending half is missing from at least one of them, an owner
+re-invites somebody already invited, and a seat ceiling counts one table while
+the other grows. `accepted_at IS NULL` is "invited"; there is nothing to keep in
+step.
+
+And signing in with the address IS the acceptance. A separate accept step is one
+a person can only complete from a link in an email they may no longer have. The
+predicate that makes it safe is `account_id IS NULL`: a claim may take an
+unclaimed row and nothing else, or an address that has changed hands becomes a
+way into its previous owner's workspace.
+
+## 172. A seat counted on acceptance is a ceiling anybody can pass
+
+Invite twenty people and wait. Every one of them is a promise the workspace has
+made, and none of them counts until the day they happen to sign in — at which
+point the overage arrives all at once, as a bill rather than as a refusal. The
+count is `revoked_at IS NULL`, accepted or not.
+
+The mirror-image mistake is counting the wrong roles: Kova's clients are members
+of a studio, and counting them would price a coaching business by its customers
+twice, since it already pays per client. Which roles count is a pricing decision
+and is declared per app.
+
+## 173. "The customer is the signed-in account" is right in one shape and silently wrong in the other
+
+Every app's caller resolver returned the account id as the customer-rail subject.
+That is correct where the signed-in person IS the customer, and in a product
+where staff act on somebody's behalf it makes a coach their own customer —
+holding their client's package while the client holds nothing. Nothing throws,
+and the capabilities screen agrees with the gate because both are wrong together.
+
+It is a declaration now (`customerRail: "member" | "record"`), which is the
+smallest thing that could carry the difference — and it is the same lesson as
+the caller resolver: what looked like an app's answer was one of two shapes, and
+neither app was choosing between them.
+
+## 174. A declared permission is not a held one
+
+An operation naming a permission the manifest does not declare was already
+refused. The next failure along was not: a permission that IS declared and that
+no role and no personal set holds refuses every caller, forever, including the
+workspace owner — and a 403 from that is indistinguishable from a permission
+somebody forgot to grant, on a feature that reads as one nobody uses.
+
+It is checked in the runtime rather than in the manifest, because the surface an
+app declares is not the surface it has: files, the inbox, billing, the roster and
+the checklist all arrive from the platform, and half the keys this catches belong
+to operations nobody in the app wrote.
+
+## 175. `personal` is the permission set that has no role to live in
+
+Somebody has to create their first workspace before belonging to one, and a role
+cannot express that — a role is held inside a tenant and this caller is outside
+every tenant. Leaving it to the caller resolver is precisely what produced the
+scaffold in finding 168: "give a signed-in person the owner role" is the shortest
+way to make the setup door work, and it is a bypass on every other door.
+
+The empty list is a real answer — an app nobody may join except by invitation —
+which is why it is required rather than optional.

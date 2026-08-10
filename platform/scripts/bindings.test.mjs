@@ -154,8 +154,18 @@ else {
 const appDirs = packages.filter((p) => existsSync(join(ROOT, p, "src", "worker.ts")));
 let unreachable = 0;
 for (const appDir of appDirs) {
-  const worker = readFileSync(join(ROOT, appDir, "src", "worker.ts"), "utf8");
-  const composed = new Set([...stripComments(worker).matchAll(/\b([A-Z][A-Z_]*_SCHEMA)\b/g)].map((m) => m[1]));
+  const worker = stripComments(readFileSync(join(ROOT, appDir, "src", "worker.ts"), "utf8"));
+  /*
+    ⚠️ `PLATFORM_REGIONAL` IS A COMPOSITION, so following it is the difference
+    between checking what an app mounts and checking what an app types. The
+    regional modules moved into one exported list precisely so nobody assembles
+    it by hand and misses one; reading only the worker would report every one of
+    them as absent and make the fix look like the bug.
+  */
+  const through = worker.includes("PLATFORM_REGIONAL")
+    ? readFileSync(join(ROOT, "runtime", "src", "modules.ts"), "utf8")
+    : "";
+  const composed = new Set([...`${worker}\n${through}`.matchAll(/\b([A-Z][A-Z_]*_SCHEMA)\b/g)].map((m) => m[1]));
 
   /*
     Every schema the runtime's own operations read from. A module absent here is
@@ -166,6 +176,7 @@ for (const appDir of appDirs) {
     IDENTITY_SCHEMA: "the accounts and credentials every sign-in reads",
     OTP_SCHEMA: "the sign-in codes the emailed lane writes",
     SESSION_SCHEMA: "the sessions every authenticated request validates",
+    MEMBERSHIP_SCHEMA: "who is in a workspace, which is what every permission is resolved from",
     DIRECTORY_SCHEMA: "the tenant directory every request resolves through",
   };
   for (const [mod, why] of Object.entries(REQUIRED)) {

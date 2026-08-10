@@ -2,15 +2,20 @@
  * THE WORKER — and how little of it there is, is the point.
  *
  * ⚠️ NOTHING HERE ROUTES, GATES, RESOLVES A TENANT, PICKS A REGION, CREATES A
- * WORKSPACE OR APPLIES A SCHEMA. All of it is derived from the manifest. What
- * remains is the two things a framework genuinely cannot decide for an app: who
- * a caller is, and what the app's own tables hold.
+ * WORKSPACE, DECIDES WHAT A CALLER MAY DO, OR APPLIES A SCHEMA. All of it is
+ * derived from the manifest.
+ *
+ * ⚠️ IT USED TO RESOLVE THE CALLER, and what it wrote was `permissions: new
+ * Set(roles.owner)` for anybody signed in — a scaffold that typechecks, passes
+ * every test, and hands every visitor of every workspace the owner's powers.
+ * That is now the membership store's answer, and the shape of this file is the
+ * argument for having built it.
  */
 
-import { deriveSchema, type Actor, type Resolved, type Session } from "@one/kernel";
+import { deriveSchema } from "@one/kernel";
 import {
-  ACTIVITY_SCHEMA, applySchema, COMMERCE_SCHEMA, createRuntime, DIRECTORY_SCHEMA, GUIDE_SCHEMA, INBOX_SCHEMA, MEDIA_SCHEMA,
-  DOMAIN_SCHEMA, IDENTITY_SCHEMA, LEDGER_SCHEMA, JOB_SCHEMA, MILESTONE_SCHEMA, OTP_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
+  applySchema, createRuntime, DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, JOB_SCHEMA,
+  OTP_SCHEMA, PLATFORM_REGIONAL, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, type RawEnv,
 } from "@one/runtime";
 import { entries, hello, notes, receipts } from "./manifest.js";
 
@@ -31,48 +36,11 @@ if (derived.problems.length) throw new Error(`hello: ${derived.problems.map((p) 
   exist yet, swallowed, leaving a column that silently never appeared.
 */
 const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, PLATFORM_STATE_SCHEMA, JOB_SCHEMA];
-export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, INBOX_SCHEMA, MEDIA_SCHEMA, GUIDE_SCHEMA, MILESTONE_SCHEMA, derived.module];
+export const REGIONAL_MODULES = [...PLATFORM_REGIONAL, derived.module];
 
 
 /* -------------------------------------------------------------- identity --- */
 
-/**
- * ⚠️ IDENTITY IS THE PLATFORM'S; AUTHORIZATION IS THE APP'S. The session arrives
- * already validated against the origin it came in on — an app never reads the
- * cookie, so there is one session format and one place it is checked. What
- * remains is the question only this app can answer: what may this person do in
- * THIS workspace.
- *
- * A real app reads a membership row here. `hello` grants the owner role to
- * whoever is signed in, because it has no roster.
- *
- * ⚠️ NOTE WHAT IT NO LONGER RETURNS: entitlements, and a gate. What a workspace
- * bought and where it stands are resolved by the platform from the subscription
- * row, so an app cannot answer them generously by accident — which is what the
- * previous version of this function did, handing back every declared key
- * unconditionally.
- */
-async function resolveCaller(session: Session | null, at: Resolved): Promise<{
-  actor: Actor;
-  permissions: ReadonlySet<string>;
-  subjectId: string | undefined;
-}> {
-  return {
-    /*
-      ⚠️ WHO THE CALLER IS ON THE CUSTOMER RAIL IS THE APP'S ANSWER. In `hello`
-      the signed-in person IS the customer, because it has no roster; a product
-      with one names the record they are acting as. The platform resolves what
-      that customer may do — the app only says who they are.
-    */
-    subjectId: session?.accountId ?? undefined,
-    actor: {
-      userId: session?.accountId ?? null,
-      tenantId: at.tenant?.tenantId ?? null,
-      kind: session ? "user" : "system",
-    },
-    permissions: new Set<string>(session ? hello.access.roles.owner : []),
-  };
-}
 
 /* --------------------------------------------------------------- runtime --- */
 
@@ -123,7 +91,6 @@ const runtime = createRuntime(hello, {
     record.
   */
 
-  resolveCaller,
   /*
     ⚠️ THE DIRECTORY AND THE REGIONAL DATABASE ARE COMPOSED SEPARATELY, because
     they are different stores with different residency: one is global and holds

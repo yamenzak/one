@@ -43,7 +43,7 @@ beforeAll(async () => {
   const staff = await signIn("data@example.test", SETUP);
   const made = await post(SETUP, "/api/identity.workspace.create", { slug: "data" }, staff);
   tenantId = made.body.tenantId as string;
-  member = await signIn("keeper@example.test", ORIGIN);
+  member = await signIn("data@example.test", ORIGIN);
 });
 
 /* ------------------------------------------------------------ collection --- */
@@ -289,7 +289,14 @@ describe("a tenant can be moved, verified, and moved back", () => {
     await copyTenant(from, to, REGIONAL_MODULES, tenantId);
     const dropped = await dropSourceCopy(from, REGIONAL_MODULES, tenantId, "2026-08-09T13:00:00.000Z" as never);
     expect(dropped.deleted.some((t) => t.table === "notes" && t.rows > 0)).toBe(true);
-    expect((await call("/api/note.list")).body.rows).toEqual([]);
+    /*
+      ⚠️ THE MEMBERSHIPS GO WITH IT, which is what a caller notices first: the
+      workspace still routes here, and nobody is a member of it any more. That is
+      the drop being complete rather than a gap — a region that kept its
+      memberships after the data left would still let people in to read nothing.
+    */
+    expect(dropped.deleted.some((t) => t.table === "membership")).toBe(true);
+    expect((await call("/api/note.list")).status).toBe(403);
   });
 });
 

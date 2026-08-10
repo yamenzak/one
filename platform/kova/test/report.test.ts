@@ -56,7 +56,7 @@ const report = async (clientId: string, days?: number) =>
 beforeAll(async () => {
   const staff = await signIn("calder@example.test", SETUP);
   await post(SETUP, "/api/identity.workspace.create", { slug: "calder" }, staff);
-  cookie = await signIn("calder-coach@example.test", STUDIO);
+  cookie = await signIn("calder@example.test", STUDIO);
 
   ro = (await call("/api/client.create", { name: "Ro" })).body.id as unknown as string;
   /* Somebody with nothing at all: no programme, no entries, no food. */

@@ -46,7 +46,7 @@ beforeAll(async () => {
   const staff = await signIn("closed@example.test", SETUP);
   const made = await post(SETUP, "/api/identity.workspace.create", { slug: "closed" }, staff);
   tenantId = made.body.tenantId as string;
-  member = await signIn("closed-owner@example.test", ORIGIN);
+  member = await signIn("closed@example.test", ORIGIN);
   await call("/api/note.create", { title: "something worth keeping" });
 });
 

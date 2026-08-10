@@ -43,13 +43,13 @@ beforeAll(async () => {
   const staff = await signIn("money@example.test", SETUP);
   const made = await post(SETUP, "/api/identity.workspace.create", { slug: "money" }, staff);
   tenantId = made.body.tenantId as string;
-  member = await signIn("owner@example.test", ORIGIN);
+  member = await signIn("money@example.test", ORIGIN);
   /*
     ⚠️ IN `hello` THE SIGNED-IN PERSON IS THE CUSTOMER, because it has no roster.
     Which record a caller acts as is the app's answer; what that record may do is
     the platform's.
   */
-  subject = accountIds.get("owner@example.test") ?? "";
+  subject = accountIds.get("money@example.test") ?? "";
 });
 
 /* ------------------------------------------------------------- catalogue --- */
@@ -324,7 +324,7 @@ describe("the storefront is derived from what the gate enforces", () => {
     const free = plans.find((p) => p.id === "free")!;
 
     /* Every declared key, so two plans are columns of one table rather than two lists. */
-    expect(free.includes.map((l) => l.key).sort()).toEqual(["notes", "receiptsStored", "storedBytes"]);
+    expect(free.includes.map((l) => l.key).sort()).toEqual(["notes", "receiptsStored", "seats", "storedBytes"]);
     expect(free.includes.find((l) => l.key === "receiptsStored")!.label).toBe("Receipts kept");
   });
 

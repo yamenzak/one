@@ -36,7 +36,7 @@ let egg = "";
 beforeAll(async () => {
   const staff = await signIn("eastgate@example.test", SETUP);
   await post(SETUP, "/api/identity.workspace.create", { slug: "eastgate" }, staff);
-  coach = await signIn("eastgate-coach@example.test", STUDIO);
+  coach = await signIn("eastgate@example.test", STUDIO);
   clientId = (await call("/api/client.create", { name: "Sam" })).body.id as unknown as string;
 });
 

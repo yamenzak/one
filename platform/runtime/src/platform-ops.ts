@@ -12,9 +12,10 @@
  * region validation and standing default are the platform's.
  */
 
-import type { AnyOperation, AppSpec, BindingSpec, Caller, RegionId, SqlHandle, TenantId } from "@one/kernel";
+import type { AnyOperation, AppSpec, BindingSpec, Caller, Instant, RegionId, SqlHandle, TenantId } from "@one/kernel";
 import { check, nothing, operation, PUBLIC, s, toolNameFor, toolsFor, UNIVERSAL_RESERVED } from "@one/kernel";
 import { placeTenant } from "./directory.js";
+import { invite } from "./membership.js";
 
 /**
  * ⚠️ A SYMBOL, so an app cannot reach it by writing the property name.
@@ -29,6 +30,35 @@ export const DIRECTORY = Symbol.for("one.runtime.directory");
 
 export interface DirectoryCarrier { readonly [DIRECTORY]: SqlHandle }
 
+/**
+ * ⚠️ THE NEW WORKSPACE'S OWN REGION, not the caller's.
+ *
+ * A workspace is created on the setup door, which resolved whatever region that
+ * door defaults to — and the creator may have asked for a different one. Writing
+ * the founding membership into `ctx.bind` would put it in the region the DOOR
+ * resolved, so the workspace would be created in Frankfurt and its only member
+ * recorded in Virginia. Nobody could enter it, and the row would look correct in
+ * both places.
+ */
+export const FOUNDER = Symbol.for("one.runtime.founder");
+
+export interface FounderDeps {
+  /**
+   * The regional store for a named region — BOOTED, then resolved.
+   *
+   * ⚠️ THE FIRST WRITE A REGION EVER TAKES IS THIS ONE, and until it happened
+   * nothing had ever made the runtime open that database. Booting is lazy and
+   * keyed on the region a REQUEST resolved to, so creating a workspace in a
+   * region nobody is in yet reaches a store with no tables in it. The founding
+   * membership is what finds that, because it is the first row anybody writes.
+   */
+  sessionsIn(region: RegionId): Promise<SqlHandle>;
+  readonly email: string | null;
+  readonly userId: string | null;
+}
+
+export interface FounderCarrier { readonly [FOUNDER]: FounderDeps }
+
 /** `hello`, `my-gym`, `north-clinic` — a DNS label, and never a door. */
 export function slugProblem(slug: string, reserved: readonly string[]): string | null {
   if (!/^[a-z0-9]([a-z0-9-]{1,30}[a-z0-9])?$/.test(slug)) return "not a valid address";
@@ -40,6 +70,21 @@ export function slugProblem(slug: string, reserved: readonly string[]): string |
   */
   if (UNIVERSAL_RESERVED.includes(slug) || reserved.includes(slug)) return "that address is taken";
   return null;
+}
+
+/**
+ * Which role the person who creates a workspace holds in it.
+ *
+ * ⚠️ THE ONE THAT CAN MANAGE MEMBERS, chosen by what it can DO rather than by
+ * what it is called. An app is free to call its administrators anything —
+ * `owner`, `principal`, `admin` — and a platform that matched on the word would
+ * silently found workspaces whose creator cannot invite anybody.
+ *
+ * Null when no role can, which is a real app: one where every workspace is
+ * provisioned by an operator rather than created by its own members.
+ */
+export function foundingRole<B extends BindingSpec>(app: AppSpec<B>): string | null {
+  return Object.entries(app.access.roles).find(([, keys]) => keys.includes("member:manage"))?.[0] ?? null;
 }
 
 export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): readonly AnyOperation[] {
@@ -105,6 +150,24 @@ export function platformOperations<B extends BindingSpec>(app: AppSpec<B>): read
         standing: { standing: "active", reason: "ok" },
         domains: [],
       });
+
+      /*
+        ⚠️ THE CREATOR IS ITS FIRST MEMBER, WRITTEN HERE OR NOWHERE. A workspace
+        whose creator has no membership is a workspace nobody can enter: the
+        directory row is correct, the tables exist, and every request answers 403
+        because the caller belongs to nothing. There is no later step that could
+        fix it either — inviting somebody requires being a member.
+      */
+      const founder = (ctx as unknown as FounderCarrier)[FOUNDER];
+      const owner = foundingRole(app);
+      if (owner && founder?.email) {
+        await invite(
+          await founder.sessionsIn(region),
+          tenantId,
+          { email: founder.email, role: owner, invitedBy: founder.userId as never },
+          ctx.now() as Instant,
+        );
+      }
       return { tenantId, slug: input.slug, region };
     },
   });

@@ -57,7 +57,7 @@ const base = {
   id: "test",
   access: {
     permissions: [], roles: {}, plans: [], entitlements: {},
-    customerRail: false, customerFlags: {}, seats: { counts: [] },
+    customerRail: false as const, customerFlags: {}, seats: { counts: [] }, personal: [],
   },
   collections: [],
   /* ⚠️ The three the platform raises: an app that declares none announces none. */

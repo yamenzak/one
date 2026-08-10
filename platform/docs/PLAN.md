@@ -993,6 +993,19 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `best-set-is-worth-not-weight` | a personal best sorted by what was on the bar, which tells somebody their hardest session was their easiest — and a report showing the estimate rather than the set they actually did | **live** |
 | `no-programme-is-not-nought-per-cent` | a consistency bar at 0% for somebody nobody prescribed anything to — an accusation about sessions that a parsing failure or an empty block invented | **live** |
 | `report-is-computed-never-kept` | a report written to a table, which is wrong the moment anybody corrects an entry and is wrong silently — nothing about a stale number looks stale | **live** |
+| `a-signed-in-stranger-holds-nothing` | the scaffold every app in this repository shipped — `permissions: new Set(roles.owner)` for anybody signed in, which typechecks, passes every other test, and hands any account that finds a workspace's address the owner's powers over it | **live** |
+| `a-workspace-has-a-founding-member` | a workspace nobody can enter — directory row correct, tables created, every request 403, and no later step could fix it because inviting somebody requires already being a member | **live** |
+| `an-invitation-is-claimed-by-signing-in` | an invitation redeemable only from a link in an email somebody may no longer have, and a roster whose pending half is a second table every screen has to remember to union | **live** |
+| `a-member-holds-their-own-role` | a client reaching the roster, the billing lane and every other client's record, because the caller resolver answered with the owner's set for anybody it recognised | **live** |
+| `the-last-administrator-stays` | a workspace with its data intact, routing correctly, and nobody able to invite anybody into it — which is not closing it, and has no undo | **live** |
+| `a-pending-invitation-occupies-a-seat` | a ceiling anybody passes by inviting twenty people and waiting — the overage arriving days later, all at once, as a bill rather than a refusal | **live** |
+| `a-claim-may-only-take-an-unclaimed-row` | signing in with an address that once belonged to somebody else becoming a way into their workspace — identities are global and long-lived, and an address changes hands | **live** |
+| `the-customer-is-declared-not-guessed` | a coach resolving as their own customer — holding their client's package while the client holds nothing, with the capabilities screen agreeing with the gate because both are wrong together | **live** |
+| `the-founding-role-is-a-capability` | matching on the word `owner`, so an app that calls its administrators anything else founds workspaces whose creator cannot invite anybody | **live** |
+| `a-workspace-nobody-could-enter-is-refused` | a manifest that founds unreachable workspaces, discovered by the first person who signs up rather than at composition | **live** |
+| `a-declared-permission-is-a-held-one` | an operation refusing every caller forever, including the owner, with a 403 indistinguishable from a permission somebody forgot to grant | **live** |
+| `nobody-grants-what-they-lack` | a two-step escalation — anybody who can edit permissions grants themselves the key they lack, then uses it, and the only sign is that somebody has been an owner for a month | **live** |
+| `a-narrowing-is-a-diff` | a stored permission set instead of an exception — so a role gaining a key next month reaches nobody who was ever narrowed, and one losing a key keeps working for them | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

@@ -45,6 +45,20 @@ import type { OperationSpec } from "./operation.js";
 export const STORAGE_ENTITLEMENT = "storedBytes";
 
 /**
+ * ⚠️ THE SECOND KEY THE PLATFORM ITSELF ENFORCES, and it is named here for the
+ * same reason.
+ *
+ * A seat ceiling is counted by the membership surface, which is the platform's —
+ * so the key it counts against cannot be a word each app picks. An app that
+ * called it `staff` would declare a ceiling that `member.invite` never reads,
+ * and the overage would appear as a bill rather than as a refusal.
+ *
+ * Declaring it is optional; an app whose `seats.counts` is empty sells no seats
+ * and needs no key.
+ */
+export const SEATS_ENTITLEMENT = "seats";
+
+/**
  * ⚠️ `accept` IS THE CONTENT TYPE, NOT THE EXTENSION. An extension is whatever
  * somebody typed; the content type is what the browser said and what the reader
  * will trust.
@@ -114,16 +128,44 @@ export interface FormatSpec {
 export interface AccessSpec {
   readonly permissions: readonly string[];
   readonly roles: Readonly<Record<string, readonly string[]>>;
+  /**
+   * What a signed-in person holds BEFORE they belong to any workspace.
+   *
+   * ⚠️ REQUIRED, AND USUALLY ONE KEY. Somebody has to be able to create their
+   * first workspace before being a member of one, and a role cannot express
+   * that — a role is held inside a tenant, and this caller is outside every
+   * tenant. Leaving it to the caller resolver is what produced the scaffold in
+   * every app here: "give a signed-in person the owner role" is the shortest
+   * way to make the setup door work, and it is an authorization bypass on every
+   * other door.
+   *
+   * The empty list is a real answer: an app nobody may join except by
+   * invitation.
+   */
+  readonly personal: readonly string[];
   /** What the platform sells this app's tenants, and how each one is withheld. */
   readonly entitlements: Readonly<Record<string, EntitlementDef>>;
   /** The catalogue. Empty is a legitimate deployment — one with nothing for sale. */
   readonly plans: readonly PlanSpec[];
   /**
-   * ⚠️ Whether this app sells to its tenants' own customers. Two flag systems,
-   * never merged — and an app that says no may not then declare flags, because
-   * the rail is what decides whether anything resolves them.
+   * Whether this app sells to its tenants' own customers, and WHO the customer
+   * is when it does.
+   *
+   * ⚠️ TWO FLAG SYSTEMS, NEVER MERGED — and an app that says `false` may not
+   * then declare flags, because the rail is what decides whether anything
+   * resolves them.
+   *
+   * ⚠️ AND THE SUBJECT IS DECLARED RATHER THAN RESOLVED BY EACH APP. In one
+   * product the customer IS the signed-in person; in another they are a record
+   * somebody was assigned to. That one difference is the whole of what an app's
+   * caller resolver used to exist for — and the version every app wrote returned
+   * the account id, which is right for the first shape and silently wrong for
+   * the second.
+   *
+   * - `"member"` — the signed-in account is the customer.
+   * - `"record"` — the membership names the record they are, on the invitation.
    */
-  readonly customerRail: boolean;
+  readonly customerRail: false | "member" | "record";
   readonly customerFlags: Readonly<Record<string, FlagDef>>;
   /**
    * ⚠️ REQUIRED, and the empty list is the honest way to say "nothing counts".
@@ -415,6 +457,13 @@ export function coverage(spec: {
     report the ceiling as unenforced and refuse a perfectly correct manifest.
   */
   if (Object.keys(spec.filePurposes ?? {}).length) quotaed.add(STORAGE_ENTITLEMENT);
+  /*
+    ⚠️ AND THE ROSTER'S CEILING THE SAME WAY. `member.invite` counts against
+    seats, it is the platform's operation, and an app that declared the ceiling
+    would be told nothing enforces it — while the enforcement sits in code the
+    app never wrote and cannot name.
+  */
+  if (spec.access.seats.counts.length) quotaed.add(SEATS_ENTITLEMENT);
   for (const op of spec.operations) {
     if (op.entitlement) gated.add(op.entitlement);
     if (op.quota) quotaed.add(op.quota);
@@ -521,6 +570,34 @@ export function assertComposable(spec: {
     throw new Error(
       `${spec.id}: the parking state is more generous than the cheapest plan for ${generous.join(", ")} — ` +
         `not paying would buy more than paying does.`,
+    );
+  }
+
+  /*
+    ⚠️ A PERMISSION NAMED NOWHERE IN THE MANIFEST IS A KEY NO GATE READS. On the
+    personal set it is worse than merely inert: it is the set that decides
+    whether anybody can create their first workspace, so a typo there is a
+    product nobody can sign up to, refusing with the same 403 as a genuine lack
+    of permission.
+  */
+  const undeclared = spec.access.personal.filter((p) => !spec.access.permissions.includes(p));
+  if (undeclared.length) {
+    throw new Error(`${spec.id}: personal permission(s) ${undeclared.join(", ")} are not in access.permissions.`);
+  }
+
+  /*
+    ⚠️ AN APP THAT LETS PEOPLE CREATE WORKSPACES AND HAS NO ROLE THAT CAN MANAGE
+    MEMBERS FOUNDS WORKSPACES NOBODY CAN ENTER. The platform makes the creator a
+    member in the role that can invite others, chosen by capability rather than
+    by name — so with no such role there is no founding membership, and the new
+    workspace answers 403 to its own creator with every row looking correct.
+  */
+  const canCreate = [...spec.access.personal, ...Object.values(spec.access.roles).flat()].includes("workspace:create");
+  const canManage = Object.values(spec.access.roles).some((keys) => keys.includes("member:manage"));
+  if (canCreate && !canManage) {
+    throw new Error(
+      `${spec.id}: somebody may create a workspace but no role holds member:manage, ` +
+        `so a new workspace has no founding member and nobody can enter it.`,
     );
   }
 

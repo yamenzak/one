@@ -18,7 +18,7 @@ import type {
   ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
 } from "@one/kernel";
 import {
-  ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, PLATFORM_PROBLEMS, STORAGE_ENTITLEMENT,
+  ALWAYS_ALLOWED, assertComposable, auditFor, check, cookieDomainFor, gateFor, laneOf, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT,
   floorPlan, fromQuery, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
@@ -35,9 +35,11 @@ import { readMaintenance, refuses } from "./maintenance.js";
 import { runDue, type RunReport } from "./jobs.js";
 import { dispatch, interpolatable, type Delivery } from "./inbox.js";
 import { customerFlagsFor, PARKED, readSubscription, standingFor } from "./commerce.js";
+import { claim, memberOf, membersOf, permissionsOf, seatsUsed, subjectFor } from "./membership.js";
+import { MEMBERS, membershipOperations, type MemberCarrier } from "./membership-ops.js";
 import { sqlDirectory } from "./directory.js";
 import { collectionOperations } from "./collection-ops.js";
-import { DIRECTORY, TOOLS, platformOperations, toolOperations, type DirectoryCarrier, type ToolCarrier } from "./platform-ops.js";
+import { DIRECTORY, FOUNDER, TOOLS, platformOperations, toolOperations, type DirectoryCarrier, type FounderCarrier, type ToolCarrier } from "./platform-ops.js";
 import { identityOperations, PLATFORM, type PlatformCarrier, type PlatformDeps } from "./identity-ops.js";
 import { identityStore, readCookie, SESSION_COOKIE, sessionStore } from "./identity.js";
 
@@ -93,11 +95,17 @@ export interface RuntimeOptions<B extends BindingSpec> {
   /**
    * What this caller may do, given who they are.
    *
+   * ⚠️ OPTIONAL, AND OMITTING IT IS THE RIGHT ANSWER FOR ALMOST EVERY APP. The
+   * default resolves the caller's MEMBERSHIP of this workspace and reads their
+   * permissions from the manifest's roles — which is the same question every app
+   * was answering, and every app in this repository answered it with a scaffold
+   * that handed OWNER to any signed-in caller. A scaffold in this position
+   * typechecks, passes every test, and is an authorization bypass.
+   *
    * ⚠️ IDENTITY IS NOT AUTHORIZATION. The platform answers "who is this" from a
    * session; "what may they do here" is a question about a membership in one
-   * tenant of one app, and it stays the app's. Handing the resolved account in
-   * rather than letting an app read the cookie is what keeps the session format
-   * — and its validation — in one place.
+   * tenant of one app. The membership store is the platform's now; supplying
+   * this is for a product whose answer genuinely is not a membership.
    *
    * ⚠️ IT RETURNS PERMISSIONS, NEVER ENTITLEMENTS OR A GATE. What a workspace
    * bought and where it stands on the payment ladder are the PLATFORM's answers,
@@ -106,7 +114,7 @@ export interface RuntimeOptions<B extends BindingSpec> {
    * handed it every declared key unconditionally. There is no honest reason for
    * an app to be able to widen its own entitlements at the door.
    */
-  resolveCaller(session: Session | null, at: Resolved): Promise<{
+  resolveCaller?(session: Session | null, at: Resolved): Promise<{
     readonly actor: Actor;
     readonly permissions: ReadonlySet<string>;
     /**
@@ -135,17 +143,19 @@ export interface RuntimeOptions<B extends BindingSpec> {
    *
    * ⚠️ SEATS ARE THE CASE THIS EXISTS FOR. A collection's quota is counted from
    * its own table by the platform; a seat is a membership row in whatever the
-   * app calls its roster, and no framework can know which of those rows count.
+   * app calls its member table, and no framework can know which of those rows count.
    */
   countQuota?(key: string, db: SqlHandle, tenantId: string): Promise<number>;
   /**
    * Who is in this workspace, and in what role.
    *
-   * ⚠️ THE PLATFORM DECIDES WHETHER TO TELL SOMEBODY; THE APP SAYS WHO THERE IS.
-   * A roster is the one thing a framework genuinely cannot know — in one product
-   * it is a membership table, in another every signed-in account. Absent means
-   * notifications are recorded nowhere, which is honest for an app with no
-   * roster and visible in the tests rather than silently empty.
+   * ⚠️ OPTIONAL, AND THE DEFAULT IS THE MEMBERSHIP ROSTER — which is what "who
+   * is in this workspace" now means everywhere. Supplying it is for a product
+   * whose audience genuinely is not its members.
+   *
+   * ⚠️ AND ONLY ACCEPTED MEMBERS ARE TOLD ANYTHING. An invitation nobody has
+   * claimed has no account behind it, so a notification addressed to it is a row
+   * nobody can ever read.
    */
   audienceFor?(tenantId: string, db: SqlHandle): Promise<readonly { readonly userId: string; readonly role: string }[]>;
   /**
@@ -226,7 +236,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...guideOperations(app), ...milestoneOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -265,6 +275,19 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     directoryRegion: app.identity.directoryRegion,
   };
   const regional = (env: RawEnv) => bindingsFor(app.bindings, env, { defaultRegion: app.tenancy.defaultRegion });
+
+  /*
+    ⚠️ ONE ANSWER TO "WHO IS IN THIS WORKSPACE", used by the dispatcher and by
+    the checklist alike. Two would drift, and the way they drift is that a
+    notification reaches somebody the checklist says is not there.
+  */
+  const audienceOf = async (tenantId: TenantId, db: SqlHandle) => {
+    if (opts.audienceFor) return opts.audienceFor(tenantId, db);
+    const members = await membersOf(db, tenantId);
+    return members
+      .filter((m) => m.accountId !== null)
+      .map((m) => ({ userId: m.accountId as string, role: m.role }));
+  };
 
   /*
     ⚠️ A CEILING NOBODY CAN COUNT IS NOT A CEILING, and this is where that stops
@@ -312,8 +335,32 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     );
   }
 
+  /*
+    ⚠️ AND DECLARING ONE IS NOT THE SAME AS ANYBODY BEING ABLE TO HOLD IT. A
+    permission in `access.permissions` that appears in no role and in no personal
+    set refuses every caller, forever, including the workspace owner — and the
+    symptom is a 403 indistinguishable from a permission somebody forgot to
+    grant, on a feature that reads as one nobody uses.
+
+    ⚠️ IT IS CHECKED HERE RATHER THAN IN THE MANIFEST because the surface an app
+    declares is not the surface it has: files, the inbox, billing, the member list and
+    the checklist all arrive from the platform, and half the keys this catches
+    belong to operations nobody in the app wrote.
+  */
+  const holdable = new Set<string>([...app.access.personal, ...Object.values(app.access.roles).flat()]);
+  const unheld = [...new Set(
+    [...byPath.values()].filter((op) => op.permission !== PUBLIC && !holdable.has(op.permission)).map((op) => op.permission),
+  )];
+  if (unheld.length) {
+    throw new Error(
+      `${app.id}: no role and no personal set holds ${unheld.join(", ")}, so the operation(s) needing them refuse everybody — including the owner.`,
+    );
+  }
+
   for (const op of byPath.values()) {
-    if (op.quota && !counters.has(op.quota) && !opts.countQuota) {
+    /* ⚠️ Seats are counted from the memberships by the platform, which is
+       where the rows are — see `seatsUsed`. */
+    if (op.quota && op.quota !== SEATS_ENTITLEMENT && !counters.has(op.quota) && !opts.countQuota) {
       throw new Error(`${app.id}: "${op.id}" counts against "${op.quota}", which nothing can count — declare it on a collection or supply countQuota.`);
     }
   }
@@ -479,8 +526,6 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         deliverCode: opts.deliverCode,
       };
 
-      const { actor, permissions, subjectId } = await opts.resolveCaller(session, at);
-
       /*
         ⚠️ ONE READ, ONE WALK, AND THE GATE IS DOWNSTREAM OF BOTH. The
         subscription row is the single source for what a workspace bought and
@@ -491,6 +536,70 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         request.
       */
       const regionalDb = bind[opts.sessionsBinding] as SqlHandle;
+
+      /*
+        ⚠️ THE MEMBERSHIP IS READ ONCE, HERE, and everything about the caller
+        follows from it. Resolving it inside a handler would mean resolving it
+        differently in the next one.
+      */
+      let membership = null as Awaited<ReturnType<typeof memberOf>>;
+      if (session && at.tenant) {
+        membership = await memberOf(regionalDb, at.tenant.tenantId, session.accountId);
+        /*
+          ⚠️ AND AN UNCLAIMED INVITATION IS PICKED UP ON SIGHT. An invitation
+          that needed a separate "accept" call is one a person can only redeem
+          from an email they may no longer have — signing in with the address it
+          was sent to IS the acceptance, and the claim is refused unless the row
+          is still unclaimed.
+        */
+        if (!membership) {
+          membership = await claim(regionalDb, at.tenant.tenantId, session.accountId, session.snapshot.email, new Date().toISOString() as Instant);
+        }
+      }
+
+      const { actor, permissions, subjectId } = opts.resolveCaller
+        ? await opts.resolveCaller(session, at)
+        : {
+            actor: {
+              userId: session?.accountId ?? null,
+              tenantId: at.tenant?.tenantId ?? null,
+              kind: (session ? "user" : "system") as Actor["kind"],
+            },
+            /*
+              ⚠️ A SIGNED-IN PERSON WHO IS NOT A MEMBER HOLDS THE PERSONAL SET
+              AND NOTHING ELSE. Somebody has to be able to create their first
+              workspace before belonging to one, and that is the whole of what
+              `access.personal` is for — an empty set there means an app where
+              only an invitation can let anybody in, which is a real product.
+            */
+            /*
+              ⚠️ THREE ANSWERS, AND THE DOOR DECIDES WHICH. Inside a workspace it
+              is the membership. On the OPERATOR door there is no workspace to be
+              a member of, so it is the app's `operator` role — the door itself is
+              the control, exactly as it already is for every other operator-only
+              behaviour. Everywhere else it is the personal set, which is what
+              somebody holds before they belong to anything.
+
+              DEFER(one-172) stage:7 — the operator door admits any signed-in
+              account. An allow-list belongs here, and it is the same gap the
+              door has had since it was added.
+            */
+            permissions: at.tenant
+              ? permissionsOf(app.access.roles, membership)
+              : !session
+                ? new Set<string>()
+                : at.door === "admin" && app.access.roles.operator
+                  ? new Set(app.access.roles.operator)
+                  : new Set(app.access.personal),
+            /*
+              ⚠️ WHO THE CUSTOMER IS, FROM THE MANIFEST. `"member"` means the
+              signed-in account; `"record"` means the membership names one. Every
+              app's own resolver returned the account id, which is correct for
+              the first shape and silently wrong for the second — a coach would
+              resolve as their own customer and hold their client's package.
+            */
+            subjectId: subjectFor(app.access.customerRail, session?.accountId ?? null, membership),
+          };
       const sub = at.tenant ? await readSubscription(regionalDb, at.tenant.tenantId) : PARKED;
       const standingState = at.tenant
         ? standingFor(sub, new Date().toISOString() as Instant, opts.chargeable ?? false)
@@ -558,7 +667,9 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         const count = counters.get(key);
         const used = count
           ? await count(regionalDb, at.tenant.tenantId)
-          : await opts.countQuota!(key, regionalDb, at.tenant.tenantId);
+          : key === SEATS_ENTITLEMENT
+            ? await seatsUsed(regionalDb, at.tenant.tenantId as TenantId, app.access.seats.counts)
+            : await opts.countQuota!(key, regionalDb, at.tenant.tenantId);
         if (!withinQuota(verdict.quotaRequired.allowance, used)) {
           return problemResponse({ ...QUOTA_REACHED, meta: { limit: String(verdict.quotaRequired.allowance), used: String(used) } }, ref);
         }
@@ -611,7 +722,13 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         three separate resolutions is how a person comes to be an owner to one
         and a reader to the next.
       */
-      const personRole = opts.roleOf?.(permissions) ?? "owner";
+      /*
+        ⚠️ THE MEMBERSHIP KNOWS IT, so nothing has to guess. `roleOf` derives one
+        from a permission set, which is a reconstruction of something the row
+        already says — and a reconstruction that disagrees is a person who is an
+        owner to the checklist and a reader to the shelf.
+      */
+      const personRole = membership?.role ?? opts.roleOf?.(permissions) ?? (session ? "owner" : "guest");
       /*
         ⚠️ THE DEVICE SAYS WHERE IT IS STANDING; THE MANIFEST IS THE FALLBACK.
         A day boundary is the one thing a streak is made of, and UTC is nobody's
@@ -651,8 +768,8 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           happened and was already answered; throwing here would report a
           successful change as an error and invite a retry that duplicates it.
         */
-        if (target.emits?.length && at.tenant && opts.audienceFor) {
-          const audience = await opts.audienceFor(at.tenant.tenantId, regionalDb).catch(() => []);
+        if (target.emits?.length && at.tenant) {
+          const audience = await audienceOf(at.tenant.tenantId as TenantId, regionalDb).catch(() => []);
           for (const type of target.emits) {
             await dispatch({
               db: regionalDb, registry: app.notifications, tenantId: at.tenant.tenantId,
@@ -709,7 +826,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GuideCarrier & MilestoneCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier = {
         [INBOX]: { db: regionalDb, tenantId: at.tenant?.tenantId ?? "", userId: session?.accountId ?? null },
         [FILES]: {
           db: regionalDb,
@@ -744,7 +861,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             file_stored: ((await regionalDb.first<{ n: number }>(
               `SELECT COUNT(*) AS n FROM media WHERE tenant_id = ?`, at.tenant?.tenantId ?? "",
             ).catch(() => null))?.n ?? 0) > 0,
-            colleague_invited: (await opts.audienceFor?.(at.tenant?.tenantId ?? "", regionalDb).catch(() => []))!.length > 1,
+            colleague_invited: (await audienceOf((at.tenant?.tenantId ?? "") as TenantId, regionalDb).catch(() => [])).length > 1,
             /*
               ⚠️ THE DEPLOYMENT'S, NOT A WORKSPACE'S. Read from the same flag the
               standing gate reads, so "we cannot take money" is one fact with one
@@ -761,6 +878,18 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           */
           setup: at.door === "admin" ? "deployment" : "workspace",
         },
+        [MEMBERS]: {
+          db: regionalDb,
+          tenantId: (at.tenant?.tenantId ?? "") as TenantId,
+          userId: session?.accountId ?? null,
+          permissions: caller.permissions,
+          /*
+            ⚠️ THE CEILING COMES FROM THE RESOLVED WALK, not from the plan row. A
+            grandfathered or operator-adjusted seat count is the whole reason
+            that walk exists, and reading the plan here would quietly ignore it.
+          */
+          seatsAllowed: caller.entitlements[SEATS_ENTITLEMENT] ?? 0,
+        },
         [MILESTONES]: {
           db: regionalDb,
           tenantId: at.tenant?.tenantId ?? "",
@@ -775,6 +904,15 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           isOperator: at.door === "admin",
         },
         [PLATFORM]: platform,
+        [FOUNDER]: {
+          sessionsIn: async (region) => {
+            const there = regional(env)(region as ResolvedRegion);
+            if (opts.onBoot) await once(region, () => opts.onBoot!.region(there, region));
+            return there[opts.sessionsBinding] as SqlHandle;
+          },
+          email: session?.snapshot.email ?? null,
+          userId: session?.accountId ?? null,
+        },
         [COMMERCE]: {
           db: regionalDb,
           tenantId: at.tenant?.tenantId ?? "",

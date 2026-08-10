@@ -241,10 +241,13 @@ export const ${id.replace(/-/g, "")} = defineApp({
   },
 
   access: {
-    permissions: ["record:read", "record:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "file:read", "file:write", "guide:read"],
+    permissions: ["record:read", "record:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "file:read", "file:write", "guide:read", "member:read", "member:manage"],
     roles: {
-      owner: ["record:read", "record:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "file:read", "file:write", "guide:read"],
-      reader: ["record:read", "inbox:read", "file:read", "guide:read"],
+      /* ⚠️ \`member:manage\` is what makes this the FOUNDING role — the platform
+         picks it by what it can do, so a role without it founds a workspace
+         nobody can be invited into. */
+      owner: ["record:read", "record:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "file:read", "file:write", "guide:read", "member:read", "member:manage"],
+      reader: ["record:read", "inbox:read", "file:read", "guide:read", "member:read"],
     },
     /* ⚠️ Every entry names HOW it is withheld, and composition refuses one whose
        mechanism does not exist. \`parked\` is what a workspace that never chose a
@@ -265,9 +268,12 @@ export const ${id.replace(/-/g, "")} = defineApp({
         entitlements: { records: true, storedBytes: 20_000_000 },
       },
     ],
+    /* ⚠️ "member" when the signed-in person IS the customer, "record" when the
+       membership names the record they are. false sells nothing. */
     customerRail: false,
     customerFlags: {},
     seats: { counts: ["owner"] },
+    personal: ["workspace:create"],
   },
 
   governance: {
@@ -376,11 +382,10 @@ const worker = (id) => `/**
  * remains is the one thing a framework genuinely cannot decide: who a caller is.
  */
 
-import { deriveSchema, type Actor, type Resolved, type Session } from "@one/kernel";
+import { deriveSchema } from "@one/kernel";
 import {
-  ACTIVITY_SCHEMA, applySchema, COMMERCE_SCHEMA, createRuntime, DIRECTORY_SCHEMA,
-  DOMAIN_SCHEMA, IDENTITY_SCHEMA, INBOX_SCHEMA, LEDGER_SCHEMA, OTP_SCHEMA,
-  GUIDE_SCHEMA, JOB_SCHEMA, MEDIA_SCHEMA, MILESTONE_SCHEMA, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, SESSION_SCHEMA, type RawEnv,
+  applySchema, createRuntime, DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, JOB_SCHEMA,
+  OTP_SCHEMA, PLATFORM_REGIONAL, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, type RawEnv,
 } from "@one/runtime";
 import { ${id.replace(/-/g, "")}, records } from "./manifest.js";
 
@@ -391,28 +396,8 @@ if (derived.problems.length) throw new Error(\`${id}: \${derived.problems.map((p
    trusting the array, because a wrong order produces an ALTER against a table
    that does not exist yet, swallowed, leaving a column that never appeared. */
 const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, PLATFORM_STATE_SCHEMA, JOB_SCHEMA];
-export const REGIONAL_MODULES = [SESSION_SCHEMA, ACTIVITY_SCHEMA, LEDGER_SCHEMA, COMMERCE_SCHEMA, INBOX_SCHEMA, MEDIA_SCHEMA, GUIDE_SCHEMA, MILESTONE_SCHEMA, derived.module];
+export const REGIONAL_MODULES = [...PLATFORM_REGIONAL, derived.module];
 
-/**
- * ⚠️ IDENTITY IS THE PLATFORM'S; AUTHORIZATION IS THE APP'S. What it returns is
- * permissions and nothing else — what a workspace bought and where it stands are
- * resolved from the subscription, so an app cannot answer them generously by
- * accident.
- */
-async function resolveCaller(session: Session | null, at: Resolved): Promise<{
-  actor: Actor;
-  permissions: ReadonlySet<string>;
-}> {
-  return {
-    actor: {
-      userId: session?.accountId ?? null,
-      tenantId: at.tenant?.tenantId ?? null,
-      kind: session ? "user" : "system",
-    },
-    /* A real app reads a membership row here. */
-    permissions: new Set<string>(session ? ${id.replace(/-/g, "")}.access.roles.owner : []),
-  };
-}
 
 /** ⚠️ A code that is only ever logged is a code that never arrives. */
 export const delivered = new Map<string, string>();
@@ -429,7 +414,6 @@ const runtime = createRuntime(${id.replace(/-/g, "")}, {
      which is the honest state of a deployment with no provider. */
   webhookSecretVar: "PROVIDER_WEBHOOK_SECRET",
   deliverCode: async (email, code) => { delivered.set(email, code); },
-  resolveCaller,
   /* ⚠️ Who is in this workspace is the app's answer, and the ONE thing a
      framework cannot supply. */
   audienceFor: async (_tenantId, db) => {

@@ -808,7 +808,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.4.0",
+  manifestVersion: "0.5.0",
   bindings,
 
   identity: {
@@ -841,12 +841,20 @@ export const kova = defineApp({
   access: {
     permissions: [
       ...STAFF, "workspace:create", "workspace:close", "billing:manage", "billing:operate", "commerce:manage",
+      "member:read", "member:manage",
     ],
     roles: {
-      owner: [...STAFF, "workspace:create", "workspace:close", "billing:manage", "billing:operate", "commerce:manage"],
-      trainer: [...STAFF, "workspace:create"],
+      /*
+        ⚠️ `member:manage` IS WHAT MAKES A ROLE THE FOUNDING ONE. The platform
+        picks the role that creates a workspace by what it can DO rather than by
+        what it is called, so this key is not decoration — remove it here and a
+        new studio is founded with nobody able to invite anybody into it.
+      */
+      owner: [...STAFF, "workspace:create", "workspace:close", "billing:manage", "billing:operate", "commerce:manage", "member:read", "member:manage"],
+      /* ⚠️ A coach SEES the team and cannot change it — hiring is the owner's. */
+      trainer: [...STAFF, "workspace:create", "member:read"],
       /* ⚠️ The front desk sees people and bookings, and prescribes nothing. */
-      assistant: ["client:read", "workout:read", "inbox:read", "guide:read", "milestone:read", "commerce:read", "file:read"],
+      assistant: ["client:read", "workout:read", "inbox:read", "guide:read", "milestone:read", "commerce:read", "file:read", "member:read"],
       /*
         ⚠️ A CLIENT WRITES THEIR OWN RECORD AND READS WHAT WAS PRESCRIBED. The
         row scope does the narrowing — `session`, `set` and `entry` are subject
@@ -859,6 +867,13 @@ export const kova = defineApp({
         "checkin:read", "checkin:write", "goal:read",
         "inbox:read", "guide:read", "milestone:read", "file:read", "commerce:read",
       ],
+      /*
+        ⚠️ WHAT SOMEBODY MAY DO ON THE OPERATOR DOOR, where there is no studio to
+        be a member of. The door is the control; this says what it opens onto,
+        and it is deliberately narrow — the deployment's own checklist and its
+        payment plumbing, never a studio's records.
+      */
+      operator: ["guide:read", "billing:operate", "inbox:read"],
     },
 
     /*
@@ -870,6 +885,13 @@ export const kova = defineApp({
     */
     entitlements: {
       clients: { label: "People you coach", parked: 1, enforcement: "quota" },
+      /*
+        ⚠️ THE OWNER'S OWN SEAT IS ONE OF THEM, which is why the floor is one
+        rather than zero: a studio of one coach is the entry plan's whole shape.
+        The founding membership is written without asking, because a workspace
+        whose creator does not fit is a workspace nobody can enter.
+      */
+      seats: { label: "Staff", parked: 1, enforcement: "quota" },
       storedBytes: { label: "Storage", unit: "bytes", parked: 200_000_000, enforcement: "quota" },
       training: { label: "Training plans", parked: true, enforcement: "gate" },
     },
@@ -880,7 +902,7 @@ export const kova = defineApp({
         price: { minor: 499, currency: "USD" as Currency },
         period: "month",
         trialDays: 14,
-        entitlements: { clients: 3, storedBytes: 2_000_000_000, training: true },
+        entitlements: { clients: 3, seats: 1, storedBytes: 2_000_000_000, training: true },
       },
       {
         id: "studio",
@@ -888,7 +910,7 @@ export const kova = defineApp({
         price: { minor: 2900, currency: "USD" as Currency },
         period: "month",
         trialDays: 14,
-        entitlements: { clients: 25, storedBytes: 20_000_000_000, training: true },
+        entitlements: { clients: 25, seats: 5, storedBytes: 20_000_000_000, training: true },
       },
       {
         id: "max",
@@ -896,7 +918,7 @@ export const kova = defineApp({
         price: { minor: 9900, currency: "USD" as Currency },
         period: "month",
         trialDays: 14,
-        entitlements: { clients: UNLIMITED, storedBytes: 100_000_000_000, training: true },
+        entitlements: { clients: UNLIMITED, seats: UNLIMITED, storedBytes: 100_000_000_000, training: true },
       },
     ],
 
@@ -906,9 +928,17 @@ export const kova = defineApp({
       is honest (the surface exists, empty) and declaring flags for it would not
       be, because nothing gates them.
     */
-    customerRail: true,
+    /* ⚠️ A CLIENT RECORD IS THE CUSTOMER, not the account that signs in. A coach
+       acts on somebody's behalf all day; resolving the caller's own account as
+       the subject would give the coach the client's package and the client
+       nothing. The membership names the record, on the invitation. */
+    customerRail: "record",
     customerFlags: {},
     seats: { counts: ["owner", "trainer", "assistant"] },
+    /* ⚠️ What somebody holds before they belong to a studio: opening one. A coach
+       invited to somebody else's studio arrives with a membership and needs
+       nothing here; a person starting their own has no membership to read. */
+    personal: ["workspace:create"],
   },
 
   governance: {
@@ -1106,6 +1136,16 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.5.0",
+      at: "2026-08-10",
+      notes: [
+        "Invite a colleague or a client by email — they sign in with that address and land in your studio, with the role you gave them.",
+        "See who is on the team, including anybody who has not accepted yet, and how many seats your plan includes.",
+        "Narrow what one colleague can do within their role, without inventing a new role for them.",
+        "A client now sees only what a client is meant to see. Nobody who was not invited can see anything at all.",
+      ],
+    },
     {
       version: "0.4.0",
       at: "2026-08-10",

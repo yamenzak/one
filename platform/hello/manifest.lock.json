@@ -15,6 +15,8 @@
     "file:write",
     "guide:read",
     "inbox:read",
+    "member:manage",
+    "member:read",
     "milestone:read",
     "note:read",
     "note:write",
@@ -30,6 +32,7 @@
   "entitlements": [
     "notes",
     "receiptsStored",
+    "seats",
     "storedBytes"
   ],
   "operations": [

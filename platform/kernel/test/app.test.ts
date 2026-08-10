@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import { kova } from "./proof.app.js";
 import { PLATFORM_PROBLEMS, type Problem, type ProblemCode, type ProviderAdapter } from "../src/problem.js";
 import { TENANT_DOORS, TENANTLESS_DOORS, DIRECTORY_REGION, classifyHost, cookieDomainFor, type Door, type DoorConfig } from "../src/doors.js";
-import { assertComposable, coverage, undeclaredEmits } from "../src/app.js";
+import { assertComposable, coverage, undeclaredEmits, type AccessSpec } from "../src/app.js";
 import type { EntitlementDef, PlanSpec } from "../src/entitlement.js";
 import type { FlagDef } from "../src/customer.js";
 import type { CollectionSpec } from "../src/collection.js";
@@ -240,8 +240,9 @@ const base = {
     access: {
       permissions: [], roles: {}, plans: [] as PlanSpec[],
       entitlements: {} as Record<string, EntitlementDef>,
-      customerRail: false, customerFlags: {} as Record<string, FlagDef>,
+      customerRail: false as AccessSpec["customerRail"], customerFlags: {} as Record<string, FlagDef>,
       seats: { counts: [] },
+      personal: [],
     },
   collections: [] as CollectionSpec[],
   /*
@@ -262,6 +263,49 @@ const base = {
   problems: {},
   operations: [] as never[],
 };
+
+/* -------------------------------------------------------- getting in --- */
+
+describe("who can get into a workspace at all", () => {
+  /*
+    ⚠️ A WORKSPACE WHOSE CREATOR CANNOT INVITE ANYBODY IS UNREACHABLE, not empty.
+    The platform makes the creator a member in the role that can manage members,
+    chosen by capability rather than by name — so with no such role there is no
+    founding membership, every request answers 403, and the directory row, the
+    tables and the session are all perfectly correct.
+  */
+  it("refuses an app where somebody may create a workspace and no role can manage it", () => {
+    expect(() => assertComposable({
+      ...base,
+      access: { ...base.access, personal: ["workspace:create"], permissions: ["workspace:create"] },
+    })).toThrow(/member:manage/);
+  });
+
+  it("accepts it once a role can", () => {
+    expect(() => assertComposable({
+      ...base,
+      access: {
+        ...base.access,
+        permissions: ["workspace:create", "member:manage"],
+        personal: ["workspace:create"],
+        roles: { owner: ["member:manage"] },
+      },
+    })).not.toThrow();
+  });
+
+  /*
+    ⚠️ AND A PERSONAL PERMISSION IS A PERMISSION. On that set a typo is worse
+    than inert: it is what decides whether anybody can create their first
+    workspace, so the product refuses every signup with the same 403 as a
+    genuine lack of permission.
+  */
+  it("refuses a personal permission the manifest never declared", () => {
+    expect(() => assertComposable({
+      ...base,
+      access: { ...base.access, personal: ["worksapce:create"] },
+    })).toThrow(/worksapce:create/);
+  });
+});
 
 describe("a sold capability is withheld by something", () => {
   it("refuses an entitlement declared as a gate that no operation names", () => {
@@ -315,11 +359,11 @@ describe("a sold capability is withheld by something", () => {
   it("refuses a customer capability the interface hides and no route withholds", () => {
     expect(() => assertComposable({
       ...base,
-      access: { ...base.access, customerRail: true, customerFlags: { bodyReport: { label: "Some capability", parked: false, enforcement: "shape" } } },
+      access: { ...base.access, customerRail: "member", customerFlags: { bodyReport: { label: "Some capability", parked: false, enforcement: "shape" } } },
     })).toThrow(/bodyReport/);
     expect(() => assertComposable({
       ...base,
-      access: { ...base.access, customerRail: true, customerFlags: { bodyReport: { label: "Some capability", parked: false, enforcement: "shape" } } },
+      access: { ...base.access, customerRail: "member", customerFlags: { bodyReport: { label: "Some capability", parked: false, enforcement: "shape" } } },
       operations: [{ ...stub, shape: { body: "bodyReport" } }] as never,
     })).not.toThrow();
   });

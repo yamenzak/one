@@ -39,3 +39,18 @@ export async function signIn(email: string, origin: string): Promise<string> {
   if (typeof body.accountId === "string") accountIds.set(email, body.accountId);
   return (res.headers.get("set-cookie") ?? "").split(";")[0]!;
 }
+
+/**
+ * A colleague or a customer arriving the way a real one does: invited by
+ * somebody who may invite, then signing in with the address it was sent to.
+ *
+ * ⚠️ NOT A SHORTCUT AROUND THE ROSTER, for the same reason `signIn` is not one
+ * around the sign-in ceremony. A fixture that inserted a membership row would
+ * let the invitation path rot while every other suite stayed green — and a
+ * signed-in account with no membership now holds nothing at all, which is the
+ * whole point.
+ */
+export async function joinAs(origin: string, host: string, email: string, role: string): Promise<string> {
+  await post(origin, "/api/member.invite", { email, role }, host);
+  return signIn(email, origin);
+}

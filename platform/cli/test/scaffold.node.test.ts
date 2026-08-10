@@ -93,10 +93,22 @@ describe("the generated worker composes what the platform exports", () => {
       composed is the exact failure this check exists for — the name is present,
       the reader sees it, and the table is never created. Searching the whole
       file would find the import and call it mounted.
+
+      ⚠️ AND `PLATFORM_REGIONAL` COUNTS, BECAUSE IT IS ITSELF SUCH AN ARRAY. The
+      regional modules moved into one exported list precisely so an app cannot
+      assemble it by hand and miss one; a check that only read the worker would
+      report every one of them as unmounted and make the fix look like the bug.
     */
     const worker = files["src/worker.ts"]!;
-    const mounted = [...worker.matchAll(/_MODULES = \[([^\]]*)\]/g)].map((m) => m[1]!).join(",");
-    expect(mounted).not.toBe("");
+    const arrays = [...worker.matchAll(/_MODULES = \[([^\]]*)\]/g)].map((m) => m[1]!).join(",");
+    expect(arrays).not.toBe("");
+    const platform = arrays.includes("PLATFORM_REGIONAL")
+      ? [...read("runtime/src/modules.ts").matchAll(/^\s{2}(\w+_SCHEMA),$/gm)].map((m) => m[1]!)
+      : [];
+    expect(platform.length, "PLATFORM_REGIONAL is spread but composes nothing").toBeGreaterThan(
+      arrays.includes("PLATFORM_REGIONAL") ? 5 : -1,
+    );
+    const mounted = [arrays, ...platform].join(",");
     expect(modules.filter((name) => !mounted.includes(name))).toEqual([]);
   });
 

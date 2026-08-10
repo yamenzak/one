@@ -19,6 +19,10 @@ import type { BindingSpec } from "./bindings.js";
 import type { Allowance } from "./entitlement.js";
 import { grants, withinQuota } from "./entitlement.js";
 import type { OperationSpec } from "./operation.js";
+/* ⚠️ Re-exported: `PUBLIC` is what a `permission` field may say, so it lives
+   beside the field. Every existing importer reads it from here. */
+import { PUBLIC } from "./operation.js";
+export { PUBLIC };
 import type { StandingGate } from "./standing.js";
 import { permits } from "./standing.js";
 
@@ -110,18 +114,6 @@ export type Verdict =
  * be the worst failure in the file, so it is a returned obligation rather than
  * an omission.
  */
-/**
- * ⚠️ THE ONE PERMISSION THAT IS NOT A PERMISSION, and it is a DECLARATION rather
- * than an absence.
- *
- * Signing in, asking for a code and reading who you are must work with no
- * session, so they need a way to say so. The alternative — an optional
- * `permission` field, where leaving it out means public — makes the most
- * dangerous state in the system the one you get by forgetting to type
- * something. Here, an operation with no permission does not compile, and a
- * public one says the word.
- */
-export const PUBLIC = "public";
 
 export function check(op: AnyOperation, caller: Caller): Verdict {
   if (!permits(caller.gate, laneOf(op), op.kind === "write")) return { allowed: false, refusal: "standing" };

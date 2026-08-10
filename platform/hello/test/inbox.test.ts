@@ -45,7 +45,7 @@ const rowOf = async (type: string): Promise<Row | undefined> => (await inbox()).
 beforeAll(async () => {
   const staff = await signIn("bell@example.test", SETUP);
   await post(SETUP, "/api/identity.workspace.create", { slug: "bell" }, staff);
-  member = await signIn("bell-owner@example.test", ORIGIN);
+  member = await signIn("bell@example.test", ORIGIN);
 });
 
 /* ------------------------------------------------------------- the write --- */

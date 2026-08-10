@@ -38,7 +38,7 @@ beforeAll(async () => {
   const staff = await signIn("leave@example.test", SETUP);
   const made = await post(SETUP, "/api/identity.workspace.create", { slug: "leave" }, staff);
   tenantId = made.body.tenantId as string;
-  member = await signIn("leave-owner@example.test", ORIGIN);
+  member = await signIn("leave@example.test", ORIGIN);
   await call("/api/note.create", { title: "something worth keeping" });
 });
 
@@ -120,7 +120,16 @@ describe("being forgotten", () => {
     const res = await call("/api/exit.erase", { confirm: tenantId });
     expect(res.status).toBe(200);
     expect((res.body.absent as unknown as string[])).toEqual([]);
-    expect(((await call("/api/exit.export")).body.tables as unknown as Record<string, unknown[]>).notes!.length).toBe(0);
+
+    /*
+      ⚠️ AND THE MEMBERSHIPS WERE ERASED TOO, WHICH IS WHY THIS CANNOT ASSERT ON
+      AN EMPTY EXPORT. Erasure is derived from every module's own scope
+      declaration, so the table saying who was in the workspace goes with the
+      rest of it — and the caller who asked for the erasure is no longer a member
+      of anything. Being locked out is the erasure working; reading back an empty
+      export would mean the row that let them in had survived.
+    */
+    expect((await call("/api/exit.export")).status).toBe(403);
   });
 });
 

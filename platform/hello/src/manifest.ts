@@ -185,13 +185,18 @@ export const hello = defineApp({
     weekStart: 1,
   },
   access: {
-    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write"],
+    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage"],
     /*
       Anybody signed in may open a workspace — this is a self-serve product, and
       `workspace:create` is checked on a door that has no tenant to be a member
       of, so a role is the only place it could come from.
     */
-    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write"], reader: ["note:read", "guide:read", "milestone:read", "entry:read", "entry:write"] },
+    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "billing:operate", "inbox:read", "workspace:close", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage"], reader: ["note:read", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read"],
+      /* ⚠️ WHAT SOMEBODY MAY DO ON THE OPERATOR DOOR, where there is no
+         workspace to be a member of. The door is the control; this says what it
+         opens onto. Deliberately narrow: the deployment's own checklist and the
+         billing lane, never a workspace's records. */
+      operator: ["guide:read", "billing:operate", "inbox:read"] },
     /*
       ⚠️ EVERY ENTRY NAMES HOW IT IS WITHHELD, and `defineApp` refuses one whose
       mechanism does not exist. `notes` is gated on the collection rather than on
@@ -204,6 +209,10 @@ export const hello = defineApp({
       /* ⚠️ BYTES, not files. A ceiling counted in rows is one a single large
          upload walks straight past. */
       storedBytes: { label: "Storage", unit: "bytes", parked: 2_000_000, enforcement: "quota" },
+      /* ⚠️ Counted by the platform from the memberships, because that is where
+         the rows are. An app supplying its own counter for this would be
+         counting a table it does not own. */
+      seats: { label: "People", parked: 5, enforcement: "quota" },
     },
     plans: [
       {
@@ -212,7 +221,7 @@ export const hello = defineApp({
         price: { minor: 0, currency: "EUR" as Currency },
         period: "month",
         trialDays: 0,
-        entitlements: { notes: true, receiptsStored: 5, storedBytes: 2_000_000 },
+        entitlements: { notes: true, receiptsStored: 5, storedBytes: 2_000_000, seats: 5 },
       },
       {
         id: "keeper",
@@ -220,7 +229,7 @@ export const hello = defineApp({
         price: { minor: 500, currency: "EUR" as Currency },
         period: "month",
         trialDays: 14,
-        entitlements: { notes: true, receiptsStored: UNLIMITED, storedBytes: 50_000_000 },
+        entitlements: { notes: true, receiptsStored: UNLIMITED, storedBytes: 50_000_000, seats: UNLIMITED },
       },
     ],
     /*
@@ -230,11 +239,19 @@ export const hello = defineApp({
       intersection — which is what stops a workspace selling something it did
       not itself buy.
     */
-    customerRail: true,
+    /* ⚠️ The signed-in person IS the customer here — `hello` has no roster of
+       people somebody else is acting on behalf of. Kova is the other shape. */
+    customerRail: "member",
     customerFlags: {
       digest: { label: "Rolled-up notes", parked: false, enforcement: "gate", scope: "reading", requires: "notes" },
     },
-    seats: { counts: ["owner"] },
+    /* ⚠️ EVERYBODY IN THE WORKSPACE IS A SEAT HERE. Which roles count is a
+       pricing decision, not a technical one — Kova excludes the people a studio
+       coaches, because charging per customer twice is not what its plan says. */
+    seats: { counts: ["owner", "reader"] },
+    /* ⚠️ What somebody holds before they belong to anything: making their first
+       workspace, and nothing else. */
+    personal: ["workspace:create"],
   },
   governance: {
     legal: [{ id: "terms", version: "2026-01-01", mustAccept: ["owner"] }],

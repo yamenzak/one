@@ -81,9 +81,9 @@ export const kova = defineApp({
   },
 
   access: {
-    permissions: ["client:read", "plan:publish", "commerce:grant", "staff:invite"],
+    permissions: ["client:read", "plan:publish", "commerce:grant", "staff:invite", "workspace:create", "member:manage"],
     roles: {
-      owner: ["client:read", "plan:publish", "commerce:grant", "staff:invite"],
+      owner: ["client:read", "plan:publish", "commerce:grant", "staff:invite", "workspace:create", "member:manage"],
       trainer: ["client:read", "plan:publish"],
       customer: ["client:read"],
     },
@@ -130,7 +130,7 @@ export const kova = defineApp({
 
     // This app sells to its tenants' own customers, so there are two flag
     // systems and a capability is their intersection.
-    customerRail: true,
+    customerRail: "member",
 
     /*
       ⚠️ `requires` NAMES THE ENTITLEMENT THE WORKSPACE ITSELF MUST HOLD. The
@@ -150,6 +150,7 @@ export const kova = defineApp({
     },
 
     seats: { counts: ["owner", "trainer"] },
+    personal: ["workspace:create"],
   },
 
   governance: {

@@ -27,7 +27,7 @@ const handle = (binding: string): SqlHandle =>
 beforeAll(async () => {
   const staff = await signIn("sweep@example.test", SETUP);
   await post(SETUP, "/api/identity.workspace.create", { slug: "sweep" }, staff);
-  member = await signIn("sweep-owner@example.test", ORIGIN);
+  member = await signIn("sweep@example.test", ORIGIN);
 });
 
 const deps = (now: string) => ({

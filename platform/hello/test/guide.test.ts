@@ -10,7 +10,7 @@
 import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "../src/worker.js";
-import { post, SETUP, signIn } from "./session.js";
+import { joinAs, post, SETUP, signIn } from "./session.js";
 
 const ORIGIN = "https://guide.hello.4dl.app";
 let member = "";
@@ -39,7 +39,7 @@ const guidance = async () => (await call("/api/guide.progress")).body as unknown
 beforeAll(async () => {
   const staff = await signIn("guide@example.test", SETUP);
   await post(SETUP, "/api/identity.workspace.create", { slug: "guide" }, staff);
-  member = await signIn("guide-owner@example.test", ORIGIN);
+  member = await signIn("guide@example.test", ORIGIN);
 });
 
 /* -------------------------------------------------------------- the list --- */
@@ -160,7 +160,7 @@ describe("whose setup is being asked about", () => {
     expect(out.wizard.steps.map((s) => s.id)).toEqual(["first-entry"]);
 
     /* And a person who has not chosen a plan is still walked through that first. */
-    const fresh = await signIn("guide-fresh@example.test", ORIGIN);
+    const fresh = await joinAs(ORIGIN, member, "guide-fresh@example.test", "reader");
     expect(((await call("/api/guide.progress", undefined, fresh)).body as unknown as Guidance).wizard.setup).toBe("person");
   });
 
@@ -190,7 +190,7 @@ describe("whose setup is being asked about", () => {
       the same workspace has written nothing, so their step is still open even
       though the workspace now contains an entry.
     */
-    const other = await signIn("guide-second@example.test", ORIGIN);
+    const other = await joinAs(ORIGIN, member, "guide-second@example.test", "reader");
     const theirs = (await call("/api/guide.progress", undefined, other)).body as unknown as Guidance;
     expect(theirs.steps.find((s) => s.id === "first-entry")!.done).toBe(false);
   });
@@ -201,7 +201,7 @@ describe("whose setup is being asked about", () => {
     customer another's records is not expressible.
   */
   it("keeps one person's rows out of another's list", async () => {
-    const other = await signIn("guide-third@example.test", ORIGIN);
+    const other = await joinAs(ORIGIN, member, "guide-third@example.test", "reader");
     const mine = (await call("/api/entry.list")).body as unknown as { rows: { note: string }[] };
     const theirs = (await call("/api/entry.list", undefined, other)).body as unknown as { rows: { note: string }[] };
     expect(mine.rows.some((r) => r.note === "mine")).toBe(true);

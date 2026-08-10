@@ -39,7 +39,9 @@ const counted = operation({
   input: s.object({}),
   output: s.object({}),
   permission: "seat:take",
-  quota: "seats",
+  /* ⚠️ NOT `seats`: that one the platform counts itself, from the membership
+     roster, so naming it here would test the exemption rather than the rule. */
+  quota: "desks",
   idempotency: { mode: "none" },
   async handler() { return {}; },
 });
@@ -64,9 +66,18 @@ const app = (over: Partial<AppSpec<typeof bindings>>): AppSpec<typeof bindings> 
       naming a permission nothing declares 403s for everybody, forever, and reads
       as a feature nobody uses.
     */
-    permissions: ["seat:take", "thing:read", "thing:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "commerce:read", "commerce:manage", "file:read", "file:write", "guide:read", "milestone:read"],
-    roles: {}, entitlements: {}, plans: [],
-    customerRail: false, customerFlags: {}, seats: { counts: [] },
+    permissions: ["seat:take", "thing:read", "thing:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "commerce:read", "commerce:manage", "file:read", "file:write", "guide:read", "milestone:read", "member:read", "member:manage"],
+    /*
+      ⚠️ AND A ROLE THAT HOLDS THEM. Declaring a permission is not the same as
+      anybody being able to hold one: an operation whose permission appears in no
+      role and no personal set refuses every caller, including the owner, and
+      reads exactly like a feature nobody uses.
+    */
+    roles: {
+      owner: ["seat:take", "thing:read", "thing:write", "workspace:create", "workspace:close", "billing:manage", "billing:operate", "inbox:read", "commerce:read", "commerce:manage", "file:read", "file:write", "guide:read", "milestone:read", "member:read", "member:manage"],
+    },
+    entitlements: {}, plans: [],
+    customerRail: false as const, customerFlags: {}, seats: { counts: [] }, personal: ["workspace:create"],
   },
   governance: { legal: [], impersonation: { maxMinutes: 30, announce: true }, auditRetentionDays: 365 },
   collections: [],
@@ -106,7 +117,7 @@ const opts = {
  * do that here" — rather than as "this product does not have that".
  */
 describe("the customer rail is mounted only where an app declares one", () => {
-  const withRail = { ...app({}).access, customerRail: true, customerFlags: { digest: { label: "Some capability", parked: false, enforcement: { derived: "n/a here" } as const } } };
+  const withRail = { ...app({}).access, customerRail: "member" as const, customerFlags: { digest: { label: "Some capability", parked: false, enforcement: { derived: "n/a here" } as const } } };
 
   it("mounts nothing at all when the app has no rail", () => {
     expect(customerOperations(app({}))).toEqual([]);
@@ -383,22 +394,36 @@ describe("the runtime refuses a manifest that would sell something it cannot wit
   */
   it("refuses an operation counting against a key nothing can count", () => {
     expect(() => createRuntime(app({
-      access: { ...app({}).access, entitlements: { seats: { label: "Some capability", parked: 3, enforcement: "quota" } } },
+      access: { ...app({}).access, entitlements: { desks: { label: "Some capability", parked: 3, enforcement: "quota" } } },
       operations: [counted] as never,
     }), opts)).toThrow(/which nothing can count/);
   });
 
   it("accepts it once a collection declares the same key", () => {
     expect(() => createRuntime(app({
-      access: { ...app({}).access, entitlements: { seats: { label: "Some capability", parked: 3, enforcement: "quota" } } },
-      collections: [{ ...stored, quota: "seats" }],
+      access: { ...app({}).access, entitlements: { desks: { label: "Some capability", parked: 3, enforcement: "quota" } } },
+      collections: [{ ...stored, quota: "desks" }],
       operations: [counted] as never,
+    }), opts)).not.toThrow();
+  });
+
+  /*
+    ⚠️ AND `seats` IS THE ONE KEY THE PLATFORM COUNTS ITSELF, from the membership
+    roster — because the rows are the platform's now. An app forced to supply a
+    counter for it would be supplying one for a table it does not own, and the
+    obvious wrong answer (count accepted members only) is a ceiling anybody can
+    pass by inviting people and waiting.
+  */
+  it("counts seats itself, without the app supplying anything", () => {
+    expect(() => createRuntime(app({
+      access: { ...app({}).access, entitlements: { seats: { label: "Some capability", parked: 3, enforcement: "quota" } }, seats: { counts: ["owner"] } },
+      operations: [{ ...counted, quota: "seats" }] as never,
     }), opts)).not.toThrow();
   });
 
   it("accepts it when the app says how to count", () => {
     expect(() => createRuntime(app({
-      access: { ...app({}).access, entitlements: { seats: { label: "Some capability", parked: 3, enforcement: "quota" } } },
+      access: { ...app({}).access, entitlements: { desks: { label: "Some capability", parked: 3, enforcement: "quota" } } },
       operations: [counted] as never,
     }), { ...opts, countQuota: async () => 0 })).not.toThrow();
   });
@@ -434,6 +459,22 @@ describe("the runtime refuses a surface no role can reach", () => {
     }), opts)).toThrow(/inbox:read/);
   });
 
+  /*
+    ⚠️ AND DECLARING IS NOT HOLDING. A permission listed in `access.permissions`
+    that appears in no role and no personal set refuses every caller, forever,
+    including the owner — and the 403 is indistinguishable from one somebody
+    forgot to grant, on a feature that reads as one nobody uses.
+  */
+  it("refuses a permission every role happens to leave out", () => {
+    const roles = app({}).access.roles;
+    expect(() => createRuntime(app({
+      access: {
+        ...app({}).access,
+        roles: { owner: (roles.owner ?? []).filter((p) => p !== "inbox:read") },
+      },
+    }), opts)).toThrow(/inbox:read/);
+  });
+
   it("accepts one that declares every permission its surface implies", () => {
     expect(() => createRuntime(app({ collections: [stored] }), opts)).not.toThrow();
   });
@@ -455,7 +496,7 @@ describe("what the platform raises is what the kernel says it raises", () => {
     expect(built).toBeDefined();
     const raised = new Set<string>();
     /* ⚠️ With the customer rail ON, or `package.granted` is not mounted to be found. */
-    const railed = app({ access: { ...app({}).access, customerRail: true } });
+    const railed = app({ access: { ...app({}).access, customerRail: "member" } });
     for (const op of [...platformOperations(railed), ...commerceOperations(railed), ...customerOperations(railed), ...identityOperations(railed)]) {
       for (const e of op.emits ?? []) raised.add(e);
     }

@@ -1525,6 +1525,123 @@
       "impl": "kova/test/report.test.ts",
       "proves": "measures a goal from its baseline, and follows a correction",
       "fails": "a report written to a table, which is wrong the moment anybody corrects an entry and is wrong silently — nothing about a stale number looks stale"
+    },
+    {
+      "id": "a-signed-in-stranger-holds-nothing",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/membership.test.ts",
+      "proves": "cannot read the roster, or anything else",
+      "fails": "the scaffold every app in this repository shipped — `permissions: new Set(roles.owner)` for anybody signed in, which typechecks, passes every other test, and hands any account that finds a workspace's address the owner's powers over it"
+    },
+    {
+      "id": "a-workspace-has-a-founding-member",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/membership.test.ts",
+      "proves": "puts the person who made it on the roster, as the role that can invite",
+      "fails": "a workspace nobody can enter — directory row correct, tables created, every request 403, and no later step could fix it because inviting somebody requires already being a member"
+    },
+    {
+      "id": "an-invitation-is-claimed-by-signing-in",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/membership.test.ts",
+      "proves": "is pending until somebody signs in with that address, and then it is theirs",
+      "fails": "an invitation redeemable only from a link in an email somebody may no longer have, and a roster whose pending half is a second table every screen has to remember to union"
+    },
+    {
+      "id": "a-member-holds-their-own-role",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/membership.test.ts",
+      "proves": "gives them their role and not the inviter's",
+      "fails": "a client reaching the roster, the billing lane and every other client's record, because the caller resolver answered with the owner's set for anybody it recognised"
+    },
+    {
+      "id": "the-last-administrator-stays",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/membership.test.ts",
+      "proves": "refuses to remove the last person who can manage the roster",
+      "fails": "a workspace with its data intact, routing correctly, and nobody able to invite anybody into it — which is not closing it, and has no undo"
+    },
+    {
+      "id": "a-pending-invitation-occupies-a-seat",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/membership.test.ts",
+      "proves": "refuses the one that would go over, while the seats are still only promised",
+      "fails": "a ceiling anybody passes by inviting twenty people and waiting — the overage arriving days later, all at once, as a bill rather than a refusal"
+    },
+    {
+      "id": "a-claim-may-only-take-an-unclaimed-row",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/membership.test.ts",
+      "proves": "is not taken over by whoever holds it now",
+      "fails": "signing in with an address that once belonged to somebody else becoming a way into their workspace — identities are global and long-lived, and an address changes hands"
+    },
+    {
+      "id": "the-customer-is-declared-not-guessed",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/membership.test.ts",
+      "proves": "is the record the membership names where somebody acts on another's behalf",
+      "fails": "a coach resolving as their own customer — holding their client's package while the client holds nothing, with the capabilities screen agreeing with the gate because both are wrong together"
+    },
+    {
+      "id": "the-founding-role-is-a-capability",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/membership.test.ts",
+      "proves": "is the one that can manage members, whatever it is named",
+      "fails": "matching on the word `owner`, so an app that calls its administrators anything else founds workspaces whose creator cannot invite anybody"
+    },
+    {
+      "id": "a-workspace-nobody-could-enter-is-refused",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses an app where somebody may create a workspace and no role can manage it",
+      "fails": "a manifest that founds unreachable workspaces, discovered by the first person who signs up rather than at composition"
+    },
+    {
+      "id": "a-declared-permission-is-a-held-one",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/commerce.test.ts",
+      "proves": "refuses a permission every role happens to leave out",
+      "fails": "an operation refusing every caller forever, including the owner, with a 403 indistinguishable from a permission somebody forgot to grant"
+    },
+    {
+      "id": "nobody-grants-what-they-lack",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/membership.test.ts",
+      "proves": "refuses a deputy handing out a key that was taken away from them",
+      "fails": "a two-step escalation — anybody who can edit permissions grants themselves the key they lack, then uses it, and the only sign is that somebody has been an owner for a month"
+    },
+    {
+      "id": "a-narrowing-is-a-diff",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/membership.test.ts",
+      "proves": "takes one thing away and leaves the rest of the role",
+      "fails": "a stored permission set instead of an exception — so a role gaining a key next month reaches nobody who was ever narrowed, and one losing a key keeps working for them"
     }
   ]
 }

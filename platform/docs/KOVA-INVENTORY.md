@@ -173,7 +173,7 @@ without one.
 | `[x]` | `client-browse` | trainer | Find one person among many, by name, by state, or by who is falling behind |
 | `[ ]` | `client-coaches` | client | See who is coaching them, with their faces |
 | `[ ]` | `client-delete` | owner | Remove somebody entirely, on request, and have that be final |
-| `[ ]` | `client-invite-self` | client | Accept an invitation and land in the right studio without being told an address |
+| `[x]` | `client-invite-self` | client | Accept an invitation and land in the right studio without being told an address |
 | `[ ]` | `client-offboard-request` | trainer | Ask an owner to release a client, and have the owner decide |
 | `[x]` | `client-preferences` | trainer | Record how somebody trains and eats now, and see when that was last reviewed |
 | `[x]` | `client-profile` | trainer | Record who somebody is: their details, their situation and how they train |
@@ -184,11 +184,11 @@ without one.
 | `[ ]` | `session-manage` | assistant | Change or cancel a booking and have the client know |
 | `[ ]` | `session-see` | client | See when they are booked in |
 | | **staff** | | |
-| `[ ]` | `staff-invite` | owner | Invite a colleague and give them a role |
-| `[ ]` | `staff-permissions` | owner | Narrow what one colleague can do, within their role |
-| `[ ]` | `staff-remove` | owner | Remove somebody and free the seat |
-| `[ ]` | `staff-roster` | owner | See who is on the team, including who has not accepted yet |
-| `[ ]` | `staff-seats` | owner | Know how many seats they have and how many are used |
+| `[x]` | `staff-invite` | owner | Invite a colleague and give them a role |
+| `[x]` | `staff-permissions` | owner | Narrow what one colleague can do, within their role |
+| `[x]` | `staff-remove` | owner | Remove somebody and free the seat |
+| `[x]` | `staff-roster` | owner | See who is on the team, including who has not accepted yet |
+| `[x]` | `staff-seats` | owner | Know how many seats they have and how many are used |
 | | **studio** | | |
 | `[ ]` | `studio-brand` | owner | Make the product look like their business — name, logo, colours |
 | `[x]` | `studio-close` | owner | Close the studio, change their mind for a week, and export what was theirs |

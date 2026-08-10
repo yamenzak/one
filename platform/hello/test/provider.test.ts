@@ -72,8 +72,8 @@ beforeAll(async () => {
   const staff = await signIn("rail@example.test", SETUP);
   const made = await post(SETUP, "/api/identity.workspace.create", { slug: "rail" }, staff);
   tenantId = made.body.tenantId as string;
-  member = await signIn("rail-owner@example.test", ORIGIN);
-  expect(accountIds.get("rail-owner@example.test")).toBeTruthy();
+  member = await signIn("rail@example.test", ORIGIN);
+  expect(accountIds.get("rail@example.test")).toBeTruthy();
 });
 
 /* ---------------------------------------------------------- verification --- */

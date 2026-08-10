@@ -29,7 +29,10 @@ async function studio(slug: string) {
   const staff = await signIn(`${slug}@example.test`, SETUP);
   await post(SETUP, "/api/identity.workspace.create", { slug }, staff);
   const origin = `https://${slug}.kova.4dl.app`;
-  const cookie = await signIn(`${slug}-coach@example.test`, origin);
+  /* ⚠️ THE FOUNDER, not a stranger. A studio's creator is its first member; a
+     signed-in account with no membership now holds nothing at all, which is the
+     whole point of the roster and is what these fixtures used to bypass. */
+  const cookie = await signIn(`${slug}@example.test`, origin);
 
   const call = async (path: string, body?: unknown) => {
     const res = await worker.fetch(

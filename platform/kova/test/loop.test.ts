@@ -41,7 +41,7 @@ let workoutId = "";
 beforeAll(async () => {
   const staff = await signIn("northgate@example.test", SETUP);
   await post(SETUP, "/api/identity.workspace.create", { slug: "northgate" }, staff);
-  coach = await signIn("coach@example.test", STUDIO);
+  coach = await signIn("northgate@example.test", STUDIO);
 });
 
 /* ------------------------------------------------------------- the setup --- */

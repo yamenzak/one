@@ -31,7 +31,7 @@ const callTool = (name: string, input: unknown, cookie = member) =>
 beforeAll(async () => {
   const staff = await signIn("tools@example.test", SETUP);
   await post(SETUP, "/api/identity.workspace.create", { slug: "tools" }, staff);
-  member = await signIn("agent@example.test", ORIGIN);
+  member = await signIn("tools@example.test", ORIGIN);
 });
 
 describe("an agent drives the product through the same operations a person does", () => {
