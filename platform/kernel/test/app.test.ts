@@ -468,6 +468,7 @@ describe("a media field is refused against the file purposes", () => {
   */
   const withField = (accept: readonly string[], purposes: Record<string, unknown>) => ({
     ...base,
+    access: { ...base.access, permissions: [...base.access.permissions, "note:write"] },
     collections: [{
       ...stubCollection,
       id: "person",
@@ -477,7 +478,7 @@ describe("a media field is refused against the file purposes", () => {
   }) as never;
 
   it("accepts a field a declared purpose can produce", () => {
-    expect(() => assertComposable(withField(["image/png"], { photo: { label: "P", accept: ["image/png"], maxBytes: 1_000 } }))).not.toThrow();
+    expect(() => assertComposable(withField(["image/png"], { photo: { label: "P", accept: ["image/png"], maxBytes: 1_000, permission: "note:write" } }))).not.toThrow();
   });
 
   /*
@@ -487,11 +488,11 @@ describe("a media field is refused against the file purposes", () => {
     would make a field narrower than its purpose the only legal shape.
   */
   it("accepts a field that takes more than the purpose does, so long as they overlap", () => {
-    expect(() => assertComposable(withField(["image/png", "image/jpeg"], { photo: { label: "P", accept: ["image/png"], maxBytes: 1_000 } }))).not.toThrow();
+    expect(() => assertComposable(withField(["image/png", "image/jpeg"], { photo: { label: "P", accept: ["image/png"], maxBytes: 1_000, permission: "note:write" } }))).not.toThrow();
   });
 
   it("refuses a field whose types no purpose takes", () => {
-    expect(() => assertComposable(withField(["image/heic"], { photo: { label: "P", accept: ["image/png"], maxBytes: 1_000 } })))
+    expect(() => assertComposable(withField(["image/heic"], { photo: { label: "P", accept: ["image/png"], maxBytes: 1_000, permission: "note:write" } })))
       .toThrow(/person\.face/);
   });
 
@@ -785,5 +786,37 @@ describe("a json column says what it holds, or the manifest is refused", () => {
 
   it("says nothing about an app with no json fields at all", () => {
     expect(() => assertComposable({ ...base })).not.toThrow();
+  });
+});
+
+/* ------------------------------------------------------- who may upload --- */
+
+/**
+ * ⚠️ A PURPOSE ANSWERS "WHO MAY PUT ONE HERE", and it is the same kind of
+ * question as "what may go in it".
+ *
+ * One permission on the upload operation gives every kind of file the same
+ * answer, and the two ends of the range are not close: a movement demonstration
+ * is the studio's, and a photograph of a client's own body is theirs. That
+ * shipped as a client who could not upload at all — so every camera feature
+ * built FOR them carried their permission, carried their flag, and was refused
+ * at its first step, on a different operation from the feature.
+ */
+describe("a file purpose says who may upload under it", () => {
+  const withPurpose = (permission: string) => ({
+    ...base,
+    access: { ...base.access, permissions: [...base.access.permissions, "mine:write"] },
+    filePurposes: { photo: { label: "P", accept: ["image/png"], maxBytes: 1_000, permission } },
+  });
+
+  it("accepts one naming a permission the app declares", () => {
+    expect(() => assertComposable(withPurpose("mine:write"))).not.toThrow();
+  });
+
+  /* ⚠️ A permission nobody can hold is an upload nobody can make, and it fails
+     as a 403 on a screen that offered the control. */
+  it("refuses one naming a permission nobody can hold", () => {
+    expect(() => assertComposable(withPurpose("imaginary:write")))
+      .toThrow(/"photo" needs "imaginary:write"/);
   });
 });

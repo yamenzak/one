@@ -258,8 +258,8 @@ export const kova = defineApp({
     unanswerable at the moment somebody is uploading.
   */
   filePurposes: {
-    progressPhoto: { label: "Progress photo", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000 },
-    exerciseClip: { label: "Exercise demonstration", accept: ["video/mp4"], maxBytes: 20_000_000 },
+    progressPhoto: { label: "Progress photo", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000, permission: "client:read" },
+    exerciseClip: { label: "Exercise demonstration", accept: ["video/mp4"], maxBytes: 20_000_000, permission: "client:read" },
   },
 
   releases: [

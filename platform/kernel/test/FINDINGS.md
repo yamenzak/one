@@ -2957,3 +2957,40 @@ assertion in this repo exists because of one of these.
 mid-sign-in against; a tidy-up that emptied it took another file's undelivered
 code with it — which was one of the three wrong hypotheses, added as a fix and
 removed as a cause.
+
+## 236. A client could not upload anything, so every camera feature was unreachable
+
+`file:write` was staff-only, with a comment on the test that pinned it: "their
+photographs arrive through the surfaces built for them". No such surface existed.
+
+So `ai.snap-meal`, `ai.label-reader` and progress photographs all carried a
+client's permission and a client's customer flag, and were refused at their first
+step — the upload — on a DIFFERENT operation. Nothing could report that: each
+feature's own gate said yes, and the 403 arrived from an endpoint whose failure
+looks like an ordinary permission decision.
+
+⚠️ THE FIX IS THAT A PURPOSE SAYS WHO MAY UPLOAD UNDER IT. A purpose is already a
+policy — what a file is for, which types, how large — and "who may put one here"
+is the same question. One permission on the operation forces one answer for every
+kind of file a product holds, and the ends of that range are not close: a movement
+demonstration is the studio's and a photograph of a client's own body is theirs.
+
+The composition check that came with it refuses a purpose naming a permission
+nobody can hold, because that is an upload nobody can make failing as a 403 on a
+screen that offered the control.
+
+## 237. The check-in nearly regained the columns it was designed without
+
+Writing the wellness score, the obvious move was to put sleep, mood, energy and a
+weight on the weekly check-in — and an existing test refused it by name, with the
+reason: numbers live in `entry`, one fact one home, and a figure copied onto a
+report is a second version nobody can correct.
+
+Reading them from `entry` instead is both correct and better: correcting a
+mistyped weigh-in now moves the score, which is the property the original
+decision was protecting and which the copy would have broken. `energy` joined
+`sleep` and `mood` as an entry kind rather than as a column on a report.
+
+⚠️ IT WAS CAUGHT BY A TEST WRITTEN TO PIN A DECISION, not by one describing
+behaviour. That is what those are for, and it is the second time this session
+that an old assertion has stopped a plausible new mistake.

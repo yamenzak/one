@@ -371,7 +371,7 @@
       "persona": "trainer",
       "area": "nutrition",
       "outcome": "Offer alternatives within a meal so a plan survives real life",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "meal-plan-follow",
@@ -385,7 +385,7 @@
       "persona": "client",
       "area": "nutrition",
       "outcome": "Choose a different option within a meal their coach allowed",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "food-log",
@@ -427,7 +427,7 @@
       "persona": "client",
       "area": "nutrition",
       "outcome": "Run a fast and see which phase they are in",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "supplement-prescribe",
@@ -469,7 +469,7 @@
       "persona": "client",
       "area": "body",
       "outcome": "Estimate body composition from photographs, guided through the poses",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "body-scan-voice",
@@ -490,7 +490,7 @@
       "persona": "client",
       "area": "body",
       "outcome": "Keep progress photographs and compare two of them side by side",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "sleep-log",
@@ -525,14 +525,14 @@
       "persona": "client",
       "area": "body",
       "outcome": "See one honest number for how the week has gone",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "today",
       "persona": "client",
       "area": "body",
       "outcome": "Open the app and see what today asks of them, in one place",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "check-in",
@@ -546,7 +546,7 @@
       "persona": "client",
       "area": "checkins",
       "outcome": "Not retype what the app already knows about their week",
-      "status": "old"
+      "status": "built"
     },
     {
       "id": "check-in-feedback",

@@ -18,6 +18,7 @@ import { energyOf, overDays, portionOf, totalOf, type Macros } from "./nutrition
 import { bestOf, consistency, expectedOver, needing, prescribedPerWeek, soonest } from "./reading.js";
 import { drawWith, forgetSubject, generateAbout, generateWith, lapsedAcross, laddersFrozen, readLadder, readSubscription, refusalProblem, runwayAcross } from "@one/runtime";
 import { progressWeek, weekAt, WEEKS_SHAPE, type Week } from "./plans.js";
+import { FASTING_ZONES, wellnessOf, zoneAt } from "./living.js";
 import {
   UNLIMITED,
   cache, collection, defineApp, defineBindings, field,
@@ -346,7 +347,13 @@ export const entries = collection({
       Monday. The same rule the milestone engine's streaks run on.
     */
     day: field.plainDate({ required: true, label: "Day" }),
-    kind: field.enum(["weight", "waist", "hip", "chest", "arm", "thigh", "sleep", "mood", "water", "steps"], { required: true }),
+    /*
+      ⚠️ `energy` JOINS `sleep` AND `mood` HERE RATHER THAN ON A CHECK-IN. One
+      fact, one home: a number copied onto a weekly report is a second version of
+      it that nobody can correct, and correcting the original then leaves the
+      report saying something else. The wellness score reads this table.
+    */
+    kind: field.enum(["weight", "waist", "hip", "chest", "arm", "thigh", "sleep", "mood", "energy", "water", "steps"], { required: true }),
     value: field.number({ required: true }),
     note: field.text({ max: 500 }),
   },
@@ -420,7 +427,13 @@ export const goals = collection({
   activity: true,
   fields: {
     /** The same vocabulary an entry uses, so progress is a query rather than a join by hand. */
-    kind: field.enum(["weight", "waist", "hip", "chest", "arm", "thigh", "sleep", "mood", "water", "steps"], { required: true }),
+    /*
+      ⚠️ `energy` JOINS `sleep` AND `mood` HERE RATHER THAN ON A CHECK-IN. One
+      fact, one home: a number copied onto a weekly report is a second version of
+      it that nobody can correct, and correcting the original then leaves the
+      report saying something else. The wellness score reads this table.
+    */
+    kind: field.enum(["weight", "waist", "hip", "chest", "arm", "thigh", "sleep", "mood", "energy", "water", "steps"], { required: true }),
     start: field.number({ required: true, label: "Where they started" }),
     target: field.number({ required: true }),
     /* ⚠️ `dueOn`, not `by` — a third SQL keyword caught at declaration rather than at boot. */
@@ -490,6 +503,123 @@ export const swaps = collection({
     state: field.enum(["asked", "allowed", "refused"], { required: true, initial: "asked", label: "State", write: "programme:write" }),
     substitute: field.ref("movement", { onDelete: "null", write: "programme:write" }),
     answer: field.text({ max: 500, label: "What the coach said", write: "programme:write" }),
+  },
+});
+
+
+/* --------------------------------------------------------------- fasting --- */
+
+/**
+ * A fast, started and stopped by the person doing it.
+ *
+ * ⚠️ TWO TIMESTAMPS, NOT A DURATION. A duration is a number computed once and
+ * then wrong the moment anybody's clock, timezone or memory disagrees with it —
+ * and the question people ask is "how long have I been fasting", which is a
+ * function of now rather than a stored figure.
+ *
+ * ⚠️ AND AN OPEN FAST IS ONE WITH NO END. There is no `state` column, because a
+ * state beside two timestamps is a third thing that can disagree with them.
+ */
+export const fasts = collection({
+  id: "fast",
+  label: { one: "Fast", many: "Fasts" },
+  scope: { of: "subject", subject: "client" },
+  customerFlag: "nutrition",
+  version: true,
+  retention: { days: null, onTenantClose: "export-then-purge" },
+  onDelete: { on: "purge" },
+  fields: {
+    startedAt: field.instant({ required: true, label: "Started" }),
+    endedAt: field.instant({ label: "Ended" }),
+    note: field.text({ max: 500, label: "How it went" }),
+  },
+});
+
+/* ------------------------------------------------------------- photographs --- */
+
+/**
+ * A progress photograph.
+ *
+ * ⚠️ ITS OWN COLLECTION RATHER THAN A FIELD ON A MEASUREMENT, because the
+ * question is "show me these two side by side" and that is a query across
+ * records. A photograph hanging off a measurement is one nobody can find unless
+ * they remember the day they were weighed.
+ *
+ * ⚠️ AND THE POSE IS PART OF IT. Two photographs compared from different angles
+ * show a change that is not there — which for a body is the specific way this
+ * feature misleads somebody about themselves.
+ */
+export const photos = collection({
+  id: "photo",
+  label: { one: "Photo", many: "Photos" },
+  scope: { of: "subject", subject: "client" },
+  customerFlag: "body",
+  version: true,
+  retention: { days: null, onTenantClose: "export-then-purge" },
+  /* ⚠️ Purged, never archived. Somebody deleting a photograph of their own body
+     means it is gone, not hidden. */
+  onDelete: { on: "purge" },
+  fields: {
+    day: field.plainDate({ required: true, label: "Day" }),
+    pose: field.enum(["front", "side", "back"], { required: true, initial: "front", label: "Pose" }),
+    image: field.media({ accept: ["image/jpeg", "image/png"], maxBytes: 12_000_000, required: true }),
+    note: field.text({ max: 300 }),
+  },
+});
+
+/* -------------------------------------------------------------- meal swaps --- */
+
+/**
+ * Which option somebody actually took, out of the ones their coach allowed.
+ *
+ * ⚠️ RECORDED RATHER THAN INFERRED FROM WHAT THEY LOGGED. A coach offering three
+ * versions of lunch wants to know which one is being chosen — and working that
+ * out by matching logged foods against a plan is a guess that gets steadily
+ * worse as somebody's logging gets looser, which is exactly when the answer
+ * matters.
+ */
+export const mealChoices = collection({
+  id: "choice",
+  label: { one: "Meal choice", many: "Meal choices" },
+  scope: { of: "subject", subject: "client" },
+  customerFlag: "nutrition",
+  version: true,
+  retention: { days: null, onTenantClose: "purge" },
+  onDelete: { on: "purge" },
+  fields: {
+    day: field.plainDate({ required: true, label: "Day" }),
+    programme: field.ref("programme", { onDelete: "cascade", required: true }),
+    meal: field.text({ required: true, max: 80, label: "Meal" }),
+    option: field.text({ required: true, max: 80, label: "Chosen" }),
+  },
+});
+
+/* ------------------------------------------------------------------ scans --- */
+
+/**
+ * A body-composition estimate read off photographs.
+ *
+ * ⚠️ AN ESTIMATE, STORED AS ONE. The number is a model's reading of a picture,
+ * so the record carries what it was read FROM and how sure it was — and a
+ * product that stored it in the same column as a caliper measurement would be
+ * one where nobody can tell a photograph from a clinic.
+ */
+export const scans = collection({
+  id: "scan",
+  label: { one: "Body scan", many: "Body scans" },
+  scope: { of: "subject", subject: "client" },
+  customerFlag: "body",
+  version: true,
+  retention: { days: null, onTenantClose: "export-then-purge" },
+  onDelete: { on: "purge" },
+  fields: {
+    day: field.plainDate({ required: true, label: "Day" }),
+    bodyFat: field.number({ min: 1, max: 70, label: "Body fat (%)" }),
+    /* ⚠️ The model's own confidence, kept beside the number it qualifies. */
+    confident: field.bool({ label: "Confident" }),
+    front: field.media({ accept: ["image/jpeg", "image/png"], maxBytes: 12_000_000 }),
+    side: field.media({ accept: ["image/jpeg", "image/png"], maxBytes: 12_000_000 }),
+    note: field.text({ max: 500 }),
   },
 });
 
@@ -751,6 +881,10 @@ export const articles = collection({
  */
 const T = {
   clients: tableNameFor(clients),
+  fasts: tableNameFor(fasts),
+  photos: tableNameFor(photos),
+  scans: tableNameFor(scans),
+  choices: tableNameFor(mealChoices),
   movements: tableNameFor(movements),
   programmes: tableNameFor(programmes),
   workouts: tableNameFor(workouts),
@@ -1189,6 +1323,14 @@ const STAFF = [
   "supplement:read", "supplement:write", "dose:read", "dose:write", "lab:read", "lab:write",
   "assignment:read", "assignment:write",
   "alternative:read", "alternative:write", "swap:read", "swap:write",
+  /*
+    ⚠️ STAFF HOLD BOTH HALVES OF ALL FOUR. A fast, a photograph, a meal choice
+    and a scan are records the CLIENT produces — but a coach who could not
+    correct a mistyped one would be sending people back into their own history
+    to fix a number the coach spotted.
+  */
+  "fast:read", "fast:write", "photo:read", "photo:write",
+  "choice:read", "choice:write", "scan:read", "scan:write",
 ];
 
 /* ------------------------------------------------------------ publishing --- */
@@ -1500,6 +1642,337 @@ export const forgetClient = operation<
   },
 });
 
+
+/* ---------------------------------------------------------------- living --- */
+
+/**
+ * The fast in progress, and where it has got to.
+ *
+ * ⚠️ COMPUTED FROM THE CLOCK, NEVER STORED. "How long have I been fasting" is a
+ * function of now; a stored duration is a number that was right once and is
+ * wrong from the next second — and the screen showing it is the one people leave
+ * open.
+ */
+export const fastNow = operation<
+  Bindings,
+  { clientId?: string },
+  { fast: unknown; zone: unknown; hours: unknown; zones: unknown },
+  never
+>({
+  id: "fast.now",
+  kind: "read",
+  summary: "The fast you are in, and how long it has been.",
+  input: s.object({ clientId: s.optional(s.text({ max: 40 })) }),
+  output: s.object({ fast: s.json(), zone: s.json(), hours: s.json(), zones: s.json() }),
+  permission: "fast:read",
+  customerFlag: "nutrition",
+  idempotency: { mode: "none" },
+  async handler(ctx, input: { clientId?: string }) {
+    /*
+      ⚠️ THE CALLER'S OWN SUBJECT WINS. A client asking about somebody else is
+      asking about a person they may not see, and the narrowing follows from who
+      is asking rather than from a second check somebody has to remember.
+    */
+    const who = ctx.subjectId ?? input.clientId ?? "";
+    const row = await ctx.bind.db.first<{ id: string; started_at: string; ended_at: string | null }>(
+      `SELECT id, started_at, ended_at FROM ${T.fasts} WHERE tenant_id = ? AND client_id = ? AND ended_at IS NULL
+       ORDER BY started_at DESC LIMIT 1`,
+      ctx.tenantId, who,
+    );
+    if (!row) return { fast: null, zone: null, hours: null, zones: FASTING_ZONES };
+    const at = zoneAt(row.started_at, ctx.now());
+    return {
+      fast: { id: row.id, startedAt: row.started_at },
+      zone: at?.zone ?? null,
+      hours: at?.hours ?? null,
+      /* ⚠️ The whole ladder travels, so a screen can show what is ahead without
+         a second call and without a copy of the zones of its own. */
+      zones: FASTING_ZONES,
+    };
+  },
+});
+
+/**
+ * One honest number for how a week went.
+ *
+ * ⚠️ IT SAYS WHAT IT WAS COMPUTED FROM, and that is not decoration. A score of 82
+ * from two inputs looks exactly like one from five, and the first is somebody
+ * being told they are doing well because they slept.
+ */
+export const wellness = operation<
+  Bindings,
+  { clientId?: string; days?: number },
+  { score: unknown; from: unknown; coverage: number },
+  never
+>({
+  id: "client.wellness",
+  kind: "read",
+  summary: "How the week has gone, in one number, with what it is based on.",
+  input: s.object({ clientId: s.optional(s.text({ max: 40 })), days: s.optional(s.number({ integer: true, min: 7, max: 30 })) }),
+  output: s.object({ score: s.json(), from: s.json(), coverage: s.number() }),
+  permission: "checkin:read",
+  idempotency: { mode: "none" },
+  async handler(ctx, input: { clientId?: string; days?: number }) {
+    const who = ctx.subjectId ?? input.clientId ?? "";
+    const days = input.days ?? 7;
+    const since = new Date(Date.parse(ctx.now()) - days * 86_400_000).toISOString().slice(0, 10);
+
+    /*
+      ⚠️ READ FROM `entry`, WHICH IS WHERE THESE NUMBERS LIVE. A check-in carries
+      prose and no figures on purpose — one fact, one home — so a score computed
+      from a copy on the report would be scoring a second version nobody can
+      correct, and correcting the original would leave the score unchanged.
+    */
+    const logged = await ctx.bind.db.all<{ kind: string; value: number }>(
+      `SELECT kind, value FROM ${T.entries} WHERE tenant_id = ? AND client_id = ? AND day >= ? AND deleted_at IS NULL
+       AND kind IN ('sleep', 'mood', 'energy')`,
+      ctx.tenantId, who, since,
+    );
+    const column = (kind: string) => logged.filter((r) => r.kind === kind).map((r) => r.value);
+
+    const done = (await ctx.bind.db.first<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM ${T.workouts} WHERE tenant_id = ? AND client_id = ? AND day >= ? AND deleted_at IS NULL`,
+      ctx.tenantId, who, since,
+    ))?.n ?? 0;
+    const loggedDays = (await ctx.bind.db.first<{ n: number }>(
+      `SELECT COUNT(DISTINCT day) AS n FROM ${T.entries} WHERE tenant_id = ? AND client_id = ? AND day >= ? AND deleted_at IS NULL`,
+      ctx.tenantId, who, since,
+    ))?.n ?? 0;
+
+    const plan = await ctx.bind.db.first<{ weeks: string }>(
+      `SELECT weeks FROM ${T.programmes} WHERE tenant_id = ? AND client = ? AND kind = 'training' AND active = 1 AND deleted_at IS NULL LIMIT 1`,
+      ctx.tenantId, who,
+    );
+    const perWeek = plan ? prescribedPerWeek(safeJson(plan.weeks)) : null;
+    const expected = expectedOver(perWeek, days);
+
+    return wellnessOf({
+      sleep: column("sleep"),
+      mood: column("mood"),
+      energy: column("energy"),
+      /* ⚠️ Only where something was actually prescribed. Nothing asked for is a
+         question nobody put, not a week of zero training. */
+      ...(expected > 0 ? { sessions: { done, expected } } : {}),
+      loggedDays,
+    });
+  },
+});
+
+/** ⚠️ An unreadable plan body is no plan, not a throw on a screen somebody opened. */
+const safeJson = (text: string): unknown => {
+  try { return JSON.parse(text); } catch { return null; }
+};
+
+/**
+ * What today asks of somebody, in one place.
+ *
+ * ⚠️ ONE CALL, BECAUSE THE ALTERNATIVE IS FIVE AND A SPINNER. The first screen a
+ * client opens is the one that decides whether the product feels like a tool or
+ * a chore, and five round trips on a phone in a gym is the chore.
+ */
+export const today = operation<
+  Bindings,
+  { day: string; clientId?: string },
+  { day: string; plan: unknown; workout: unknown; meals: unknown; checkIn: unknown; fasting: unknown },
+  never
+>({
+  id: "client.today",
+  kind: "read",
+  summary: "What today asks of you: the session, the meals, anything outstanding.",
+  input: s.object({ day: s.plainDate(), clientId: s.optional(s.text({ max: 40 })) }),
+  output: s.object({ day: s.text(), plan: s.json(), workout: s.json(), meals: s.json(), checkIn: s.json(), fasting: s.json() }),
+  permission: "workout:read",
+  idempotency: { mode: "none" },
+  async handler(ctx, input: { day: string; clientId?: string }) {
+    const who = ctx.subjectId ?? input.clientId ?? "";
+    const db = ctx.bind.db;
+
+    const training = await db.first<{ id: string; title: string; weeks: string }>(
+      `SELECT id, title, weeks FROM ${T.programmes} WHERE tenant_id = ? AND client = ? AND kind = 'training' AND active = 1 AND deleted_at IS NULL LIMIT 1`,
+      ctx.tenantId, who,
+    );
+    const eating = await db.first<{ id: string; title: string; weeks: string }>(
+      `SELECT id, title, weeks FROM ${T.programmes} WHERE tenant_id = ? AND client = ? AND kind = 'eating' AND active = 1 AND deleted_at IS NULL LIMIT 1`,
+      ctx.tenantId, who,
+    );
+    const workout = await db.first<{ id: string; docstatus: number }>(
+      `SELECT id, docstatus FROM ${T.workouts} WHERE tenant_id = ? AND client_id = ? AND day = ? AND deleted_at IS NULL LIMIT 1`,
+      ctx.tenantId, who, input.day,
+    );
+    /*
+      ⚠️ AN OUTSTANDING CHECK-IN IS ONE WITH NO ANSWER, not one nobody wrote. The
+      thing a client needs to see is that their coach has not replied yet; the
+      thing a coach needs is the opposite, and that is `coach.attention`.
+    */
+    const checkIn = await db.first<{ id: string; until: string }>(
+      `SELECT id, until FROM ${T.checkins} WHERE tenant_id = ? AND client_id = ? AND (answer IS NULL OR answer = '') AND deleted_at IS NULL
+       ORDER BY until DESC LIMIT 1`,
+      ctx.tenantId, who,
+    );
+    const fast = await db.first<{ id: string; started_at: string }>(
+      `SELECT id, started_at FROM ${T.fasts} WHERE tenant_id = ? AND client_id = ? AND ended_at IS NULL ORDER BY started_at DESC LIMIT 1`,
+      ctx.tenantId, who,
+    );
+
+    return {
+      day: input.day,
+      plan: training ? { id: training.id, title: training.title } : null,
+      workout: workout ? { id: workout.id, submitted: workout.docstatus === 1 } : null,
+      /* ⚠️ The MEALS of the eating plan, not the plan — a client on this screen
+         is choosing lunch, not reading a document. */
+      meals: eating ? { id: eating.id, title: eating.title, weeks: safeJson(eating.weeks) } : null,
+      checkIn: checkIn ? { id: checkIn.id, until: checkIn.until } : null,
+      fasting: fast ? { id: fast.id, ...(zoneAt(fast.started_at, ctx.now()) ?? {}) } : null,
+    };
+  },
+});
+
+/**
+ * What the app already knows about somebody's week.
+ *
+ * ⚠️ IT PREFILLS AND NEVER SUBMITS. A check-in answered by the app on somebody's
+ * behalf is a coaching record nobody wrote, and the whole value of the thing is
+ * that a person read the week back and said something about it.
+ */
+export const prefill = operation<
+  Bindings,
+  { since: string; until: string; clientId?: string },
+  { workouts: number; loggedDays: number; sets: number; weight: unknown; wellness: unknown },
+  never
+>({
+  id: "checkin.prefill",
+  kind: "read",
+  summary: "What the app already knows about your week, to save retyping it.",
+  input: s.object({ since: s.plainDate(), until: s.plainDate(), clientId: s.optional(s.text({ max: 40 })) }),
+  output: s.object({
+    workouts: s.number({ integer: true }), loggedDays: s.number({ integer: true }),
+    sets: s.number({ integer: true }), weight: s.json(), wellness: s.json(),
+  }),
+  permission: "checkin:write",
+  customerFlag: "checkins",
+  idempotency: { mode: "none" },
+  async handler(ctx, input: { since: string; until: string; clientId?: string }) {
+    const who = ctx.subjectId ?? input.clientId ?? "";
+    const db = ctx.bind.db;
+    const count = async (sql: string, ...binds: unknown[]) =>
+      (await db.first<{ n: number }>(sql, ...binds))?.n ?? 0;
+
+    const workouts = await count(
+      `SELECT COUNT(*) AS n FROM ${T.workouts} WHERE tenant_id = ? AND client_id = ? AND day BETWEEN ? AND ? AND deleted_at IS NULL`,
+      ctx.tenantId, who, input.since, input.until,
+    );
+    const loggedDays = await count(
+      `SELECT COUNT(DISTINCT day) AS n FROM ${T.entries} WHERE tenant_id = ? AND client_id = ? AND day BETWEEN ? AND ? AND deleted_at IS NULL`,
+      ctx.tenantId, who, input.since, input.until,
+    );
+    const sets = await count(
+      `SELECT COUNT(*) AS n FROM ${T.sets} s JOIN ${T.workouts} w ON w.id = s.workout
+       WHERE s.tenant_id = ? AND s.client_id = ? AND w.day BETWEEN ? AND ?`,
+      ctx.tenantId, who, input.since, input.until,
+    );
+    /* ⚠️ From `entry`, the one home for a number. See the note on the kind. */
+    const weighed = await db.first<{ value: number }>(
+      `SELECT value FROM ${T.entries} WHERE tenant_id = ? AND client_id = ? AND kind = 'weight' AND deleted_at IS NULL
+       ORDER BY day DESC LIMIT 1`,
+      ctx.tenantId, who,
+    );
+
+    return {
+      workouts, loggedDays, sets,
+      /*
+        ⚠️ THE LAST WEIGHT IS OFFERED, NOT ASSUMED. It is there so somebody who
+        has not changed does not retype it — filling it in as this week's figure
+        would put a number they did not measure into their own history.
+      */
+      weight: weighed?.value ?? null,
+      wellness: null,
+    };
+  },
+});
+
+/**
+ * Two photographs, side by side.
+ *
+ * ⚠️ THE SAME POSE OR NOTHING. Two pictures from different angles show a change
+ * that is not there, which for a photograph of somebody's own body is the
+ * specific way this feature misleads the person it is for.
+ */
+export const compare = operation<
+  Bindings,
+  { pose: string; clientId?: string },
+  { pose: string; first: unknown; latest: unknown; days: unknown },
+  "platform.not_found"
+>({
+  id: "photo.compare",
+  kind: "read",
+  summary: "The first and the most recent photograph in one pose.",
+  input: s.object({ pose: s.enum(["front", "side", "back"]), clientId: s.optional(s.text({ max: 40 })) }),
+  output: s.object({ pose: s.text(), first: s.json(), latest: s.json(), days: s.json() }),
+  permission: "photo:read",
+  customerFlag: "body",
+  idempotency: { mode: "none" },
+  async handler(ctx, input: { pose: string; clientId?: string }) {
+    const who = ctx.subjectId ?? input.clientId ?? "";
+    const rows = await ctx.bind.db.all<{ id: string; day: string; image: string }>(
+      `SELECT id, day, image FROM ${T.photos} WHERE tenant_id = ? AND client_id = ? AND pose = ? ORDER BY day ASC`,
+      ctx.tenantId, who, input.pose,
+    );
+    if (rows.length === 0) return { pose: input.pose, first: null, latest: null, days: null };
+    const first = rows[0]!;
+    const latest = rows[rows.length - 1]!;
+    /*
+      ⚠️ ONE PHOTOGRAPH IS NOT A COMPARISON, and saying so is better than showing
+      the same picture twice — which reads as "no change" to the one person who
+      most wants there to be some.
+    */
+    if (rows.length === 1) return { pose: input.pose, first: shot(first), latest: null, days: null };
+    return {
+      pose: input.pose,
+      first: shot(first),
+      latest: shot(latest),
+      days: Math.round((Date.parse(latest.day) - Date.parse(first.day)) / 86_400_000),
+    };
+  },
+});
+
+const shot = (r: { id: string; day: string; image: string }) => ({ id: r.id, day: r.day, image: r.image });
+
+/**
+ * A body-composition estimate, read off photographs.
+ *
+ * ⚠️ IT ANSWERS AND DOES NOT SAVE. The number is a model's reading of a picture
+ * of somebody's body — the person decides whether that goes into their own
+ * history, and a product that filed it for them would be writing a judgement
+ * about them that they never agreed to.
+ */
+export const bodyScan = operation<
+  Bindings,
+  { front: string; side?: string; note?: string },
+  { generation: string; read: unknown; charged: number },
+  "platform.invalid" | "platform.quota_reached" | "platform.too_many" | "platform.unavailable"
+>({
+  id: "ai.body-scan",
+  kind: "write",
+  summary: "Estimate body composition from photographs, to check rather than to keep.",
+  input: s.object({ front: s.text({ max: 40 }), side: s.optional(s.text({ max: 40 })), note: s.optional(s.text({ max: 300 })) }),
+  output: s.object({ generation: s.text(), read: s.json(), charged: s.number({ integer: true }) }),
+  permission: "scan:write",
+  customerFlag: "body",
+  idempotency: { mode: "none" },
+  audit: () => ({ subject: "scan", verb: "estimate" }),
+  fails: ["platform.invalid", "platform.quota_reached", "platform.too_many", "platform.unavailable"],
+  tool: false,
+  async handler(ctx, input: { front: string; side?: string; note?: string }) {
+    const out = await generateAbout(ctx, KOVA_AI, "body-scan", input.note ?? "", input.front);
+    if (!out.ok) {
+      const problem = refusalProblem(out);
+      ctx.fail(problem.code, problem.meta);
+    }
+    const done = out as Extract<typeof out, { ok: true }>;
+    return { generation: done.id, read: done.output, charged: done.charged };
+  },
+});
+
 /* ------------------------------------------------------------------- ai --- */
 
 /**
@@ -1679,6 +2152,28 @@ export const KOVA_AI: AiSpec = {
       nothing a provider could report that would make the image cheaper — so it
       settles at the reserve, always.
     */
+    /*
+      ⚠️ THE MOST CAREFUL PROMPT IN THE PRODUCT. It reads a photograph of
+      somebody's body and answers with a number they will act on, so it is told
+      to say when it cannot tell — and the operation that calls it ANSWERS rather
+      than saving, because whether a model's judgement about their body goes into
+      their history is theirs to decide.
+    */
+    "body-scan": {
+      summary: "Body composition estimated from a photograph",
+      model: "gemini-2.5-flash",
+      system: [
+        "You estimate body-fat percentage from a photograph, for a coach and a client to consider. JSON only.",
+        "Shape: { \"bodyFat\": number, \"confident\": boolean, \"basis\": string }.",
+        "⚠️ Set confident to false whenever the pose, the lighting or the clothing makes this a guess — which is most photographs. An estimate that looks certain is one somebody will compare against next month and read a change into.",
+        "Give a single number, not a range, and say in one short sentence what you read it from.",
+        "Do not comment on the person's appearance, do not say whether the figure is good or bad, and do not give health or dietary advice. You are reading a picture, not assessing a patient.",
+      ].join("\n"),
+      maxOutput: 400,
+      dailyPerPerson: 10,
+      takes: "image",
+    },
+
     "image": {
       summary: "A picture for the studio's own use",
       model: "gemini-2.5-flash-image",
@@ -2068,7 +2563,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.17.0",
+  manifestVersion: "0.19.0",
   bindings,
 
   identity: {
@@ -2146,6 +2641,17 @@ export const kova = defineApp({
         /* ⚠️ They ASK for a swap and read the alternatives a coach wrote; the
            answer is the coach's, which is why `swap:decide` is not here. */
         "alternative:read", "swap:read", "swap:write",
+        /* ⚠️ Their own body and their own eating. A client who could not start a
+           fast, keep a photograph or say which lunch they took would be a client
+           the features were built for and withheld from. */
+        "fast:read", "fast:write", "photo:read", "photo:write",
+        "choice:read", "choice:write", "scan:read", "scan:write",
+        /*
+          ⚠️ `file:read` AND NO BLANKET WRITE. What a client may upload is decided
+          by the PURPOSE — their own meal, their own label, their own progress
+          photograph — and each of those names a permission they already hold.
+          A general write over the studio's storage stays the coach's.
+        */
         "inbox:read", "guide:read", "milestone:read", "file:read", "commerce:read",
         /* ⚠️ A client may say a generation was wrong. They are the one who read it. */
         "ai:use",
@@ -2247,6 +2753,18 @@ export const kova = defineApp({
         parked: false,
       },
       /*
+        ⚠️ ITS OWN FLAG, because photographs of somebody's body are the most
+        sensitive thing this product holds and a studio may sell coaching without
+        ever asking for one. Folding them under `training` would mean everybody
+        on a training package is offered a camera.
+      */
+      body: {
+        label: "Body composition and progress photos",
+        enforcement: "gate",
+        scope: "coaching",
+        parked: false,
+      },
+      /*
         ⚠️ SHAPED, NOT GATED, and this is the case the rule exists for. One report
         carries the body, the training and the nutrition lenses; refusing it
         outright takes the ungated halves down with the sold one, and returning a
@@ -2343,7 +2861,8 @@ export const kova = defineApp({
       help: "When off, published articles stay in the studio and no client sees the feed.",
     },
   },
-  collections: [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles, supplements, doses, labs, assignments, alternatives, swaps],
+  collections: [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles, supplements, doses, labs, assignments, alternatives, swaps,
+    fasts, photos, mealChoices, scans],
 
   notifications: {
     "workspace.created": {
@@ -2395,7 +2914,8 @@ export const kova = defineApp({
     publish, complete, answer, attention, report, publishArticle, feed, usage, copyWeek,
     decideSwap, forgetClient,
     draftPlan, parseFood, draftMeals, snapMeal, labelReader, labExtract,
-    exerciseGuide, supplementGuide, clientSummary, draftArticle, drawImage,
+    exerciseGuide, supplementGuide, clientSummary, draftArticle, drawImage, bodyScan,
+    fastNow, wellness, today, prefill, compare,
   ],
 
   help: {
@@ -2471,9 +2991,12 @@ export const kova = defineApp({
   */
   ai: KOVA_AI,
   filePurposes: {
-    avatar: { label: "Photo", accept: ["image/jpeg", "image/png"], maxBytes: 4_000_000 },
-    demo: { label: "Movement demonstration", accept: ["video/mp4", "image/jpeg", "image/png"], maxBytes: 20_000_000 },
-    cover: { label: "Article cover", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000 },
+    avatar: { label: "Photo", accept: ["image/jpeg", "image/png"], maxBytes: 4_000_000, permission: "client:write" },
+    demo: { label: "Movement demonstration", accept: ["video/mp4", "image/jpeg", "image/png"], maxBytes: 20_000_000, permission: "movement:write" },
+    cover: { label: "Article cover", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000, permission: "article:write" },
+    /* ⚠️ Its own purpose: a photograph of somebody's body is not a meal photo,
+       and a purpose is a path segment as well as a policy. */
+    "body-photo": { label: "Progress photograph", accept: ["image/jpeg", "image/png"], maxBytes: 12_000_000, permission: "photo:write" },
     /*
       ⚠️ A PHOTOGRAPH TAKEN TO BE READ IS STILL A FILE THE WORKSPACE HOLDS. It
       goes through the ordinary upload — stripped of the metadata a phone
@@ -2481,11 +3004,11 @@ export const kova = defineApp({
       and the reading names it by id. A lane that took bytes on the generation
       request would be a second way into the store with none of that.
     */
-    meal: { label: "Meal photograph", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000 },
-    label: { label: "Nutrition label", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000 },
+    meal: { label: "Meal photograph", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000, permission: "portion:write" },
+    label: { label: "Nutrition label", accept: ["image/jpeg", "image/png"], maxBytes: 8_000_000, permission: "food:write" },
     /* ⚠️ Its own purpose rather than sharing `report`: a lab result is the most
        sensitive thing this product stores, and a purpose is a path segment. */
-    "lab-report": { label: "Lab report", accept: ["image/jpeg", "image/png"], maxBytes: 12_000_000 },
+    "lab-report": { label: "Lab report", accept: ["image/jpeg", "image/png"], maxBytes: 12_000_000, permission: "lab:write" },
   },
 
   /*
@@ -2631,6 +3154,20 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.19.0",
+      at: "2026-08-10",
+      notes: [
+        "Open the app and see what today asks of you — the session, the meals, anything outstanding — on one screen.",
+        "Run a fast and see which phase you are in. It counts from when you started, stops when you stop, and the phases describe what is ordinary rather than claiming anything medical.",
+        "One number for how the week went, and it says what it was computed from. Below two things to go on it declines to give one at all: a score from a single good night's sleep is worse than no score.",
+        "A check-in comes prefilled with what the app already knows — sessions, days logged, your last weight. It fills nothing in and submits nothing; reading the week back is the point.",
+        "Keep progress photographs and compare two of them. The same pose only, because two angles show a change that is not there.",
+        "Estimate body composition from a photograph. It says when it is guessing — which for a photograph is most of the time — and it never saves anything without you.",
+        "Coaches can offer alternatives within a meal, so a plan survives a morning with no eggs. Clients pick one, and the choice is recorded rather than guessed at from what was logged.",
+        "Clients can upload their own meal photographs, labels and progress photos. They could not before, which quietly made every camera feature unreachable by the person it was built for.",
+      ],
+    },
     {
       version: "0.17.0",
       at: "2026-08-10",

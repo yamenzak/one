@@ -74,20 +74,20 @@ without one.
 | `[x]` | `standing` | owner | Know where they stand when a payment fails, and how to fix it |
 | | **body** | | |
 | `[x]` | `body-report` | client | See how their body has changed over months, not days |
-| `[ ]` | `body-scan` | client | Estimate body composition from photographs, guided through the poses |
+| `[x]` | `body-scan` | client | Estimate body composition from photographs, guided through the poses |
 | `[ ]` | `body-scan-voice` | client | Be talked through a scan hands-free |
 | `[x]` | `measurements` | client | Record their weight and measurements and see them move |
 | `[x]` | `mood-log` | client | Record how they felt |
-| `[ ]` | `progress-photos` | client | Keep progress photographs and compare two of them side by side |
+| `[x]` | `progress-photos` | client | Keep progress photographs and compare two of them side by side |
 | `[x]` | `sleep-log` | client | Record how they slept |
 | `[x]` | `steps-log` | client | Record how much they moved outside training |
-| `[ ]` | `today` | client | Open the app and see what today asks of them, in one place |
+| `[x]` | `today` | client | Open the app and see what today asks of them, in one place |
 | `[x]` | `water-log` | client | Record what they drank |
-| `[ ]` | `wellness-score` | client | See one honest number for how the week has gone |
+| `[x]` | `wellness-score` | client | See one honest number for how the week has gone |
 | | **checkins** | | |
 | `[x]` | `check-in` | client | Report in on a schedule: how it went, how they feel, what changed |
 | `[x]` | `check-in-feedback` | trainer | Answer a check-in so the client hears back |
-| `[ ]` | `check-in-prefill` | client | Not retype what the app already knows about their week |
+| `[x]` | `check-in-prefill` | client | Not retype what the app already knows about their week |
 | `[x]` | `goal-set` | trainer | Set a goal with a number and a date |
 | `[x]` | `goal-track` | client | See how far along a goal is without doing the arithmetic |
 | | **commerce** | | |
@@ -132,7 +132,7 @@ without one.
 | `[x]` | `inbox` | everyone | See what happened while they were away, in one list |
 | `[x]` | `notification-prefs` | everyone | Decide what interrupts them, by category, without losing the record |
 | | **nutrition** | | |
-| `[ ]` | `fasting-timer` | client | Run a fast and see which phase they are in |
+| `[x]` | `fasting-timer` | client | Run a fast and see which phase they are in |
 | `[ ]` | `food-barcode` | client | Scan a barcode and get the food rather than typing it |
 | `[x]` | `food-create` | client | Enter a food nobody has entered yet, once, and reuse it |
 | `[x]` | `food-library` | trainer | Build a library of foods with the numbers this studio trusts |
@@ -141,8 +141,8 @@ without one.
 | `[x]` | `food-recent` | client | Reach the things they eat often without searching each time |
 | `[ ]` | `food-search-external` | client | Find a food in a public database when the studio has not entered it |
 | `[x]` | `macro-breakdown` | client | See how a day adds up against their targets |
-| `[ ]` | `meal-option-swap` | client | Choose a different option within a meal their coach allowed |
-| `[ ]` | `meal-plan-arrangements` | trainer | Offer alternatives within a meal so a plan survives real life |
+| `[x]` | `meal-option-swap` | client | Choose a different option within a meal their coach allowed |
+| `[x]` | `meal-plan-arrangements` | trainer | Offer alternatives within a meal so a plan survives real life |
 | `[x]` | `meal-plan-build` | trainer | Write a meal plan: days, meals, options, portions |
 | `[x]` | `meal-plan-follow` | client | See what they are meant to eat today and tick it off |
 | `[x]` | `nutrition-report` | trainer | See how a client has been eating, over time, without reading every entry |

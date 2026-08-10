@@ -27,9 +27,35 @@ export interface Item {
   readonly group?: string;
 }
 
+/**
+ * ⚠️ ONE MEAL, WITH THE VERSIONS OF IT A COACH WILL ACCEPT.
+ *
+ * A plan that names one breakfast survives until the first morning somebody has
+ * no eggs, and then it is a plan they are failing rather than following. Offering
+ * two or three is the difference between a prescription and something a person
+ * can actually live on — and it has to be the COACH's list, or "I had something
+ * else" is untracked either way.
+ */
+export interface Option {
+  readonly label: string;
+  readonly foods?: readonly { readonly name: string; readonly grams?: number }[];
+}
+
+export interface Meal {
+  readonly name: string;
+  readonly options?: readonly Option[];
+}
+
 export interface Day {
   readonly name?: string;
   readonly movements?: readonly Item[];
+  /**
+   * ⚠️ THE SAME BODY CARRIES BOTH KINDS OF PLAN. A programme is training or
+   * eating, and both are weeks of days — so one shape with two optional lists is
+   * one schema to validate and one reader to write, where two would be two of
+   * everything that agree until somebody edits one.
+   */
+  readonly meals?: readonly Meal[];
 }
 
 export interface Week {
@@ -54,6 +80,22 @@ export const WEEKS_SHAPE = s.array(
     days: s.optional(s.array(
       s.object({
         name: s.optional(s.text({ max: 80 })),
+        meals: s.optional(s.array(
+          s.object({
+            name: s.text({ max: 80 }),
+            options: s.optional(s.array(
+              s.object({
+                label: s.text({ max: 80 }),
+                foods: s.optional(s.array(
+                  s.object({ name: s.text({ max: 120 }), grams: s.optional(s.number({ min: 0, max: 5_000 })) }),
+                  { max: 30 },
+                )),
+              }, { strict: true }),
+              { max: 6 },
+            )),
+          }, { strict: true }),
+          { max: 8 },
+        )),
         movements: s.optional(s.array(
           s.object({
             movement: s.text({ max: 40 }),

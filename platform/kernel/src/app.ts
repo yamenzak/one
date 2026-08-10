@@ -73,6 +73,22 @@ export interface FilePurpose {
   readonly maxBytes: number;
   /** One line, for the picker. What this is for, in the reader's words. */
   readonly label: string;
+  /**
+   * ⚠️ WHO MAY UPLOAD UNDER IT, AND IT IS REQUIRED.
+   *
+   * A purpose is a POLICY — what a file is for, which types it takes, how large
+   * it may be — and "who may put one here" is the same question. Leaving it to a
+   * single permission on the operation forces one answer for every kind of file
+   * a product holds, and the two ends of that range are not close: a movement
+   * demonstration is the studio's, and a photograph of a client's own body is
+   * not.
+   *
+   * The alternative shipped, and it was a client who could not upload at all —
+   * so every camera feature built FOR them carried their permission, carried
+   * their flag, and was refused at its first step. Nothing reported that,
+   * because the refusal was on a different operation from the feature.
+   */
+  readonly permission: string;
 }
 
 /* -------------------------------------------------------------- identity --- */
@@ -762,6 +778,21 @@ export function assertComposable(spec: {
     succeeded, which is the worst place to learn it. An app with a media field
     and no purposes at all is the same failure with nothing to compare against.
   */
+  /*
+    ⚠️ A PURPOSE NAMING A PERMISSION NOBODY CAN HOLD IS AN UPLOAD NOBODY CAN
+    MAKE, and it fails as a 403 on a screen that offered the control.
+  */
+  const declaredPermissions = new Set(spec.access.permissions);
+  const unholdable = Object.entries(spec.filePurposes ?? {})
+    .filter(([, p]) => !declaredPermissions.has(p.permission))
+    .map(([id, p]) => `"${id}" needs "${p.permission}"`);
+  if (unholdable.length) {
+    throw new Error(
+      `${spec.id}: file purpose(s) ${unholdable.join(", ")}, which this app does not declare — ` +
+        `so nothing can be uploaded under them.`,
+    );
+  }
+
   const purposeTypes = Object.values(spec.filePurposes ?? {}).flatMap((p) => p.accept);
   const unfillable = spec.collections.flatMap((c) =>
     Object.entries(c.fields)

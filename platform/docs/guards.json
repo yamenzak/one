@@ -2470,6 +2470,87 @@
       "impl": "kova/test/settling.test.ts",
       "proves": "says what the seat ceiling is when it refuses one",
       "fails": "\"Your plan includes undefined, and undefined are in use\" — a detail template rendered against meta a raise site never supplied, which nothing throws on because the missing value is a legal undefined"
+    },
+    {
+      "id": "a-score-says-what-it-was-computed-from",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/living.test.ts",
+      "proves": "reports what it was computed from",
+      "fails": "a wellness score of 82 from two inputs looking exactly like one from five — somebody told they are doing well because they slept once"
+    },
+    {
+      "id": "an-absent-input-is-not-a-zero",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/living.test.ts",
+      "proves": "scores what was recorded and ignores what was not",
+      "fails": "a score that falls hardest in the weeks people log least — which are the hard ones, and the ones the score is read in"
+    },
+    {
+      "id": "a-fast-nobody-started-is-not-hour-zero",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/living.test.ts",
+      "proves": "says nothing about a fast that has not started",
+      "fails": "\"Fed — still digesting\" shown to somebody who has not begun, which reads as a working timer stuck at zero"
+    },
+    {
+      "id": "a-finished-fast-stops-counting",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/dailies.test.ts",
+      "proves": "stops reporting one that has been ended",
+      "fails": "a timer that keeps counting a fast somebody stopped last week, which reads as one nobody can turn off"
+    },
+    {
+      "id": "two-photographs-are-the-same-pose-or-nothing",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/dailies.test.ts",
+      "proves": "does not mix poses",
+      "fails": "a front and a side compared as though they were the same angle — a change shown to somebody about their own body that is not there"
+    },
+    {
+      "id": "one-photograph-is-not-a-comparison",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/dailies.test.ts",
+      "proves": "does not compare a single photograph with itself",
+      "fails": "the same picture shown twice, which reads as \"no change\" to the one person who most wants there to be some"
+    },
+    {
+      "id": "a-file-purpose-says-who-may-upload",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/dailies.test.ts",
+      "proves": "lets a client upload what is theirs and nothing else",
+      "fails": "one permission on the upload operation giving every kind of file the same answer — which shipped as a client who could not upload at all, so every camera feature built for them was refused at its first step on a different operation"
+    },
+    {
+      "id": "a-purpose-names-a-permission-somebody-holds",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kernel/test/app.test.ts",
+      "proves": "refuses one naming a permission nobody can hold",
+      "fails": "an upload nobody can make, failing as a 403 on a screen that offered the control"
+    },
+    {
+      "id": "a-number-is-read-from-its-one-home",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "kova/test/dailies.test.ts",
+      "proves": "follows a correction to the number it was computed from",
+      "fails": "a score computed from a copy on a weekly report — correcting the original then leaves the score saying something else, and neither throws"
     }
   ]
 }

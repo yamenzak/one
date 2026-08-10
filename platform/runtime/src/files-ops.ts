@@ -60,7 +60,14 @@ export function fileOperations<B extends BindingSpec>(app: AppSpec<B>): readonly
     */
     input: s.object({ name: s.text({ min: 1, max: 200 }), purpose: s.enum(purposes) }),
     output: s.object({ id: s.text(), bytes: s.number({ integer: true }), stripped: s.bool(), fresh: s.bool() }),
-    permission: "file:write",
+    /*
+      ⚠️ THE OPERATION ADMITS ANYBODY WHO MAY SEE FILES AND THE PURPOSE DECIDES
+      THE REST. Who may upload a movement demonstration and who may upload a
+      photograph of their own body are different questions with different
+      answers, and one permission on this operation can only give them the same
+      one. The handler refuses on the purpose's own permission, below.
+    */
+    permission: "file:read",
     /*
       ⚠️ COUNTED AGAINST STORAGE BY THE GENERIC GATE AS WELL. That one refuses a
       workspace already at its ceiling, cheaply, before a byte is read; the
@@ -71,7 +78,7 @@ export function fileOperations<B extends BindingSpec>(app: AppSpec<B>): readonly
     idempotency: { mode: "natural", key: "name" },
     audit: (i: { name: string }) => ({ subject: i.name, verb: "upload" }),
     outcome: { message: "Uploaded", tone: "success", invalidates: ["file.list"] },
-    fails: ["platform.invalid", "platform.quota_reached"],
+    fails: ["platform.invalid", "platform.quota_reached", "platform.forbidden"],
     /*
       ⚠️ NOT A TOOL. A model cannot produce bytes over this transport, and an
       operation it can only ever call wrongly is one that wastes a turn and
@@ -82,6 +89,17 @@ export function fileOperations<B extends BindingSpec>(app: AppSpec<B>): readonly
       const d = deps(ctx);
       const declared = app.filePurposes?.[input.purpose];
       if (!declared) ctx.fail("platform.invalid", { field: "purpose" });
+
+      /*
+        ⚠️ THE PURPOSE DECIDES WHO MAY UPLOAD UNDER IT. One permission on this
+        operation gives every kind of file the same answer, and the range is not
+        narrow: a movement demonstration is the studio's, a photograph of
+        somebody's own body is theirs. Refusing here rather than at the gate is
+        what lets both be true on one endpoint.
+      */
+      if (!ctx.holds(declared!.permission)) {
+        ctx.fail("platform.forbidden", { field: "purpose", reason: input.purpose });
+      }
 
       if (d.body.byteLength === 0) ctx.fail("platform.invalid", { field: "body", reason: "empty" });
       /*

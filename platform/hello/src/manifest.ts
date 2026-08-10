@@ -329,7 +329,7 @@ export const hello = defineApp({
 
   /* ⚠️ A closed set: what may be uploaded, which types, how large. */
   filePurposes: {
-    attachment: { label: "Attachment", accept: ["image/jpeg", "image/png", "text/plain"], maxBytes: 4_000_000 },
+    attachment: { label: "Attachment", accept: ["image/jpeg", "image/png", "text/plain"], maxBytes: 4_000_000, permission: "file:write" },
   },
 
   jobs: [tidy],

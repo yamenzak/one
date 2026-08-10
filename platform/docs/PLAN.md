@@ -1098,6 +1098,15 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `editing-a-plan-down-holds-existing-subscribers` | a workspace losing seats it paid for mid-period with no notice, because `grandfathered_json` was read by the resolver and written by nothing | **live** |
 | `unlimited-is-the-top-not-a-small-number` | -1 compared arithmetically, so "you had unlimited and now have five" records no snapshot at all — silently, for exactly the workspaces with the most to lose | **live** |
 | `a-problem-sentence-has-no-holes` | "Your plan includes undefined, and undefined are in use" — a detail template rendered against meta a raise site never supplied, which nothing throws on because the missing value is a legal undefined | **live** |
+| `a-score-says-what-it-was-computed-from` | a wellness score of 82 from two inputs looking exactly like one from five — somebody told they are doing well because they slept once | **live** |
+| `an-absent-input-is-not-a-zero` | a score that falls hardest in the weeks people log least — which are the hard ones, and the ones the score is read in | **live** |
+| `a-fast-nobody-started-is-not-hour-zero` | "Fed — still digesting" shown to somebody who has not begun, which reads as a working timer stuck at zero | **live** |
+| `a-finished-fast-stops-counting` | a timer that keeps counting a fast somebody stopped last week, which reads as one nobody can turn off | **live** |
+| `two-photographs-are-the-same-pose-or-nothing` | a front and a side compared as though they were the same angle — a change shown to somebody about their own body that is not there | **live** |
+| `one-photograph-is-not-a-comparison` | the same picture shown twice, which reads as "no change" to the one person who most wants there to be some | **live** |
+| `a-file-purpose-says-who-may-upload` | one permission on the upload operation giving every kind of file the same answer — which shipped as a client who could not upload at all, so every camera feature built for them was refused at its first step on a different operation | **live** |
+| `a-purpose-names-a-permission-somebody-holds` | an upload nobody can make, failing as a 403 on a screen that offered the control | **live** |
+| `a-number-is-read-from-its-one-home` | a score computed from a copy on a weekly report — correcting the original then leaves the score saying something else, and neither throws | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 
