@@ -10,6 +10,11 @@
 import type { ComponentStates } from "./state.js";
 
 export const COMPONENTS: readonly ComponentStates[] = [
+  /* ⚠️ The shell and its one navigation surface are components like any other:
+     `RENDERER_OWNS` forbids an app to build them, so the package owes them, and
+     the boundary guard reads THIS list to check that it does. */
+  { id: "shell", interaction: ["idle"] },
+  { id: "nav", interaction: ["idle", "hover", "pressed", "focus"] },
   { id: "surface", interaction: ["idle"] },
   { id: "text", interaction: ["idle"] },
   { id: "no-data", interaction: ["idle"] },
@@ -50,6 +55,39 @@ export const COMPONENTS: readonly ComponentStates[] = [
   { id: "badge", interaction: ["idle"] },
   { id: "medallion", interaction: ["idle"] },
   { id: "glyph", interaction: ["idle"] },
+  { id: "icon", interaction: ["idle", "pressed"] },
+
+  /*
+    ── THE FORM. ⚠️ EVERY ONE OF THESE IS ON `RENDERER_OWNS`, so an app cannot
+    build its own — which means the package OWES each of them. That half of the
+    boundary went unchecked for four stages and unmet for all of them.
+  */
+  { id: "form", interaction: ["idle"] },
+  { id: "field", interaction: ["idle", "focus", "invalid", "disabled"] },
+  { id: "input", interaction: ["idle", "hover", "focus", "invalid", "disabled"] },
+  { id: "textarea", interaction: ["idle", "focus", "invalid", "disabled"] },
+  { id: "select", interaction: ["idle", "focus", "invalid", "disabled"] },
+  { id: "checkbox", interaction: ["idle", "focus", "disabled"] },
+  { id: "radio", interaction: ["idle", "focus", "disabled"] },
+  { id: "switch", interaction: ["idle", "focus", "disabled"] },
+  { id: "dial", interaction: ["idle", "focus", "disabled"] },
+  { id: "save-bar", interaction: ["idle", "busy"] },
+  { id: "bulk-actions", interaction: ["idle"] },
+
+  /* ── READING SURFACES. */
+  { id: "page-header", interaction: ["idle"] },
+  { id: "breadcrumb", interaction: ["idle", "hover", "focus"] },
+  { id: "steps", interaction: ["idle"] },
+  { id: "pagination", interaction: ["idle", "hover", "focus", "disabled"] },
+  { id: "table", interaction: ["idle"] },
+  { id: "stat", interaction: ["idle"] },
+  { id: "progress", interaction: ["idle"], data: ["unknown", "ready"] },
+  { id: "disclosure", interaction: ["idle", "focus"] },
+  { id: "menu", interaction: ["idle", "hover", "focus"] },
+  { id: "toast", interaction: ["idle"] },
+  { id: "tooltip", interaction: ["idle"] },
+  { id: "spinner", interaction: ["idle"] },
+  { id: "divider", interaction: ["idle"] },
 ];
 
 /** Anything an app is forbidden to build for itself. The boundary, as a list. */

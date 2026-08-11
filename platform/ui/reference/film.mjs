@@ -22,6 +22,15 @@ await p.goto("file://" + file);
   shipped sheet free of a debug switch that would eventually ship set to 2.
 */
 const SLOW = Number(process.env.SLOW ?? 8);
+const step = Number(ms), n = Number(frames);
+/*
+  ⚠️ THE ENTRANCE RUNS ON LOAD, so the harness RELOADS rather than pressing
+  anything. An earlier version clicked a replay button after stripping the page
+  chrome — which had already removed the button, so the click missed, `.catch`
+  swallowed it, and every frame was the finished state. That reads as "the
+  animation does not run" rather than as "the harness pressed nothing".
+*/
+await p.reload();
 await p.evaluate((slow) => {
   const read = (n) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(n));
   const css = ["--t-tap", "--t-move", "--t-enter", "--t-entrance", "--t-exit", "--stagger"]
@@ -30,23 +39,11 @@ await p.evaluate((slow) => {
   el.textContent = `:root{${css}}`;
   document.head.append(el);
 }, SLOW);
-const step = Number(ms), n = Number(frames);
-/*
-  ⚠️ THE REPLAY IS CLICKED BEFORE THE CHROME IS STRIPPED. Removing the controls
-  first deleted the button, the click missed, `.catch` swallowed it, and every
-  frame was the finished state — which reads as "the animation does not run"
-  rather than as "the harness pressed nothing".
-*/
-await p.click("button[data-act='replay']");
-await p.evaluate(() => {
-  document.querySelector(".wrap").style.padding = "0";
-  document.querySelectorAll(".controls,h1,.sub,.cap,.note").forEach((e) => e.remove());
-});
 const shots = [];
 const t0 = Date.now();
 for (let i = 0; i < n; i++) {
   const at = Date.now() - t0;
-  shots.push({ at: Math.round(at / SLOW), data: (await p.locator(".rail .slot").first().screenshot()).toString("base64") });
+  shots.push({ at: Math.round(at / SLOW), data: (await p.locator("[data-one='page']").first().screenshot()).toString("base64") });
   await p.waitForTimeout(step);
 }
 const strip = await b.newPage({ viewport: { width: 200 * n, height: 900 } });

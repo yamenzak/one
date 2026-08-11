@@ -119,6 +119,29 @@ for (const file of interfaceFiles.concat(walk(join(ROOT, "ui", "reference")).fil
 }
 ok(`no backtick in a sheet: ${sheets} CSS template literal(s)`);
 
+/* ------------------------------------------------ 1c. TYPES, NOT GLOBALS --- */
+
+/*
+  ⚠️ THE PACKAGE HAS DOM *TYPES* AND MUST NEVER TOUCH A DOM *GLOBAL*. A component
+  that renders a form control cannot be typed without `HTMLInputElement`, so the
+  lib is on — and the moment it is on, `document.querySelector` typechecks and
+  then throws on the server, where half of this package runs. The types are a
+  build-time convenience; the globals are a runtime dependency, and only one of
+  those is safe here.
+*/
+let globals = 0;
+for (const file of walk(join(ROOT, "ui", "src"))) {
+  stripComments(readFileSync(file, "utf8")).split("\n").forEach((line, i) => {
+    const hit = /\b(document|window|navigator|localStorage)\s*\./.exec(line);
+    if (!hit) return;
+    globals++;
+    fail(`${rel(file)}:${i + 1}: \`${hit[1]}\` at runtime.\n` +
+         `       This package is rendered on the server. A DOM type is a build-time\n` +
+         `       convenience; a DOM global is a crash in a worker.`);
+  });
+}
+ok(`no dom global: ${globals} in ui/src`);
+
 /* ------------------------------------------------------- 2. NO MOTION --- */
 
 /*
@@ -152,6 +175,37 @@ ok(`no literal motion: ${motion} outside ${CHOREOGRAPHER}`);
 const registry = readFileSync(join(ROOT, "ui/src/registry.ts"), "utf8");
 const owned = [...(/RENDERER_OWNS[^=]*=\s*\[([\s\S]*?)\]/.exec(registry)?.[1] ?? "").matchAll(/"([a-z-]+)"/g)].map((m) => m[1]);
 if (owned.length < 10) fail(`ui/src/registry.ts: RENDERER_OWNS looks empty — the boundary is a list, and this is it.`);
+
+/*
+  ⚠️ A BOUNDARY IS A PROMISE IN BOTH DIRECTIONS. Forbidding an app to build its
+  own dialog is only defensible if the package HAS one — otherwise the rule reads
+  as "you may not have this", the first product that needs it breaks the boundary
+  with a good reason, and the boundary is over.
+
+  This half went unchecked for four stages: `RENDERER_OWNS` promised a
+  breadcrumb, a toast, a form, a field, a select, a checkbox, a pagination, a
+  save bar and bulk actions, and the package contained none of them. Nothing
+  failed, because nothing asked.
+
+  ⚠️ A FEW ENTRIES ARE PLACEMENTS RATHER THAN COMPONENTS — `dialog`, `sheet`,
+  `drawer` and `popover` are `Overlay`'s five kinds, which is the design (two
+  components would be where "the mobile version looks different" comes from), so
+  they are satisfied by `overlay` and that mapping is written here rather than
+  inferred.
+*/
+/* ⚠️ `tabs` is what the boundary calls it and `segmented` is what we built —
+   one indicator that travels rather than two pills cross-fading. Registering
+   both ids would be two components with one implementation. */
+const SATISFIED_BY = { dialog: "overlay", sheet: "overlay", drawer: "overlay", popover: "overlay", confirm: "overlay", tabs: "segmented" };
+const registered = new Set([...registry.matchAll(/\{\s*id:\s*"([a-z-]+)"/g)].map((m) => m[1]));
+for (const promise of owned) {
+  const behind = SATISFIED_BY[promise] ?? promise;
+  if (registered.has(behind)) continue;
+  fail(`ui/src/registry.ts: RENDERER_OWNS promises "${promise}" and no component provides it.\n` +
+       `       An app may not build its own, so the package owes one. A boundary that\n` +
+       `       forbids without providing is a boundary the first real product breaks.`);
+}
+ok(`boundary kept: ${owned.length} owned surface(s), every one provided`);
 
 /**
  * ⚠️ AN APP MAY NOT DEFINE CHROME, AND MAY NOT REACH A RAW CONTROL. A bare

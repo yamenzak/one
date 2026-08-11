@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   DECLARABLE, DERIVED, LAWS, declarationProblems, litFor, sceneFor,
 } from "../src/index.js";
-import { DEFAULT_BRAND, RANGE, type Brand } from "../src/brand.js";
+import { DEFAULT_BRAND, RANGE, tokensFor, type Brand } from "../src/brand.js";
 import { FLOOR } from "../src/ground.js";
 
 describe("an app says what a thing is, never how it looks", () => {
@@ -102,14 +102,33 @@ describe("the light falls, and nothing is painted", () => {
   });
 
   /* Depth is a step toward the light, so no two depths land on one surface. */
-  it("keeps every depth distinguishable from its neighbour", () => {
-    for (const theme of ["light", "dark"] as const) {
-      const scene = sceneFor(DEFAULT_BRAND, theme);
-      const ls = ([0, 1, 2, 3] as const).map((d) => litFor(scene, d).surface.l);
-      for (let i = 1; i < ls.length; i++) {
-        expect(Math.abs(ls[i]! - ls[i - 1]!), `${theme} ${i - 1}→${i}`).toBeGreaterThan(0.008);
-      }
+  /*
+    ⚠️ DEPTH IS READ FROM LIGHTNESS IN DARK AND FROM SHADOW IN LIGHT, and the
+    first version of this asserted lightness for both. It could only be satisfied
+    by grey cards on a white page — the dusty look that makes a light theme read
+    as cheap — because a near-white ground has no room above it for four steps.
+    A bright room tells things apart by what they cast; a dark one by what they
+    catch. So the check is theme-aware, which is the physics rather than a
+    concession to it.
+  */
+  it("separates depth by lightness in dark and by elevation in light", () => {
+    const dark = ([0, 1, 2, 3] as const).map((d) => litFor(sceneFor(DEFAULT_BRAND, "dark"), d).surface.l);
+    for (let i = 1; i < dark.length; i++) {
+      expect(Math.abs(dark[i]! - dark[i - 1]!), `dark ${i - 1}→${i}`).toBeGreaterThan(0.008);
     }
+
+    /* In light the page-to-card step is the one that carries the design. */
+    const light = ([0, 1, 2, 3] as const).map((d) => litFor(sceneFor(DEFAULT_BRAND, "light"), d).surface.l);
+    expect(light[1]! - light[0]!, "page → card").toBeGreaterThan(0.03);
+    /* ⚠️ And the card is NEAR-WHITE, which is the whole point of lowering the page. */
+    expect(light[1]!, "a card that is not near-white is a dusty card").toBeGreaterThan(0.97);
+
+    /* Above it, the shadow is what differs — and it must actually grow. */
+    const shadows = ([1, 2, 3] as const).map((d) => tokensFor(DEFAULT_BRAND, "light")[`--elevation-${d}`]!);
+    expect(new Set(shadows).size, "three depths, three shadows").toBe(3);
+    for (const s of shadows) expect(s).not.toBe("none");
+    /* ⚠️ And none in dark: a shadow on near-black is a pixel that clarifies nothing. */
+    for (const d of [1, 2, 3]) expect(tokensFor(DEFAULT_BRAND, "dark")[`--elevation-${d}`]).toBe("none");
   });
 });
 

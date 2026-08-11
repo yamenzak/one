@@ -145,15 +145,27 @@ describe("the ladder never collapses", () => {
     input inside a card inside a sheet is one flat rectangle. Choosing the
     direction with headroom per step is what stops that at both ends.
   */
-  it("keeps every step visibly apart from the one below it", () => {
+  /*
+    ⚠️ THE STEP THAT HAS TO SURVIVE EVERY BRAND IS PAGE TO CARD. Above it, a dark
+    ground keeps climbing and a light one is already at the ceiling — where depth
+    is carried by `--elevation-1..3` rather than by lightness, because a bright
+    room tells things apart by what they cast. Asserting a lightness gap for all
+    four in both themes is only satisfiable with grey cards on a white page.
+  */
+  it("keeps the page and the card visibly apart, for every brand in range", () => {
     const collapsed: string[] = [];
     for (const theme of THEMES) {
       for (const hue of HUES) {
         for (const intensity of INTENSITIES) {
           const ladder = surfaces(groundFor(brandAt(hue, hue, intensity), theme), 3);
-          for (let i = 1; i < ladder.length; i++) {
-            const ratio = contrast(oklchToRgb(ladder[i]!), oklchToRgb(ladder[i - 1]!));
-            if (ratio < 1.05) collapsed.push(`${theme} hue ${hue} intensity ${intensity} step ${i}: ${ratio.toFixed(3)}`);
+          const ratio = contrast(oklchToRgb(ladder[1]!), oklchToRgb(ladder[0]!));
+          if (ratio < 1.05) collapsed.push(`${theme} hue ${hue} intensity ${intensity}: ${ratio.toFixed(3)}`);
+          /* And in dark, every step above it too — there is room, so it is used. */
+          if (theme === "dark") {
+            for (let i = 2; i < ladder.length; i++) {
+              const r = contrast(oklchToRgb(ladder[i]!), oklchToRgb(ladder[i - 1]!));
+              if (r < 1.05) collapsed.push(`dark hue ${hue} intensity ${intensity} step ${i}: ${r.toFixed(3)}`);
+            }
           }
         }
       }

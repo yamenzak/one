@@ -13,6 +13,8 @@
 
 import { ICONS, type IconName } from "../icons.js";
 
+export type { IconName };
+
 export interface IconProps {
   readonly name: IconName;
   /**

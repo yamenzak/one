@@ -557,11 +557,11 @@
     {
       "id": "ladder-never-collapses",
       "group": "interface",
-      "fails": "a surface step that saturates against the end of its range, leaving nested surfaces indistinguishable",
+      "fails": "a page and a card that collapse into one surface for some brand in range — and in dark, any step above it too. It used to assert a lightness gap for all four in both themes, which is only satisfiable with grey cards on a white page: a light ground has no room above it, so depth there is carried by elevation instead",
       "stage": "4",
       "status": "live",
       "impl": "ui/test/contrast.test.ts",
-      "proves": "keeps every step visibly apart from the one below it"
+      "proves": "keeps the page and the card visibly apart, for every brand in range"
     },
     {
       "id": "one-clock",
@@ -3559,6 +3559,96 @@
       "impl": "ui/test/motion.test.ts",
       "proves": "presses with a damped curve and releases with the spring",
       "fails": "a control that overshoots on the way down — the finger is still on it, and nothing physical overshoots under a thumb"
+    },
+    {
+      "id": "depth-is-lightness-in-dark-and-shadow-in-light",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/scene.test.ts",
+      "proves": "separates depth by lightness in dark and by elevation in light",
+      "fails": "a light theme whose card is not near-white, or whose three depths share one shadow, or a dark theme that draws shadows at all — a bright room tells things apart by what they cast and a dark one by what they catch, and asserting one rule for both forces grey cards or invisible shadows"
+    },
+    {
+      "id": "the-boundary-provides-what-it-forbids",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/interface.test.mjs",
+      "proves": "boundary kept",
+      "fails": "a surface on RENDERER_OWNS with no component behind it — forbidding an app to build its own dialog is only defensible if the package HAS one, and nine of them were promised and absent for four stages because nothing asked"
+    },
+    {
+      "id": "dom-types-never-dom-globals",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/interface.test.mjs",
+      "proves": "no dom global",
+      "fails": "a DOM global in a package that renders on the server — the types are a build-time convenience and the globals are a crash in a worker, and the moment the lib is on the first one typechecks"
+    },
+    {
+      "id": "every-component-has-been-drawn",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/specimens.test.ts",
+      "proves": "covers every registered component with at least one specimen",
+      "fails": "a registered component nobody has drawn — a declared state that was considered on paper and shipped unexamined is indistinguishable, in the registry, from one that was designed"
+    },
+    {
+      "id": "nothing-is-drawn-that-is-not-declared",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/specimens.test.ts",
+      "proves": "draws nothing the registry does not declare",
+      "fails": "a specimen for a component the registry does not have — that is how one gets built, drawn, reviewed and shipped with no state matrix and outside the boundary"
+    },
+    {
+      "id": "the-refusals-are-drawn-too",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/specimens.test.ts",
+      "proves": "draws the states that only appear when something is wrong",
+      "fails": "a gallery that shows only the happy path — locked, disabled, busy, invalid, empty, unknown and error are the states a product ships most often and reviews least"
+    },
+    {
+      "id": "every-group-states-its-rule",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/specimens.test.ts",
+      "proves": "gives every group a stated rule",
+      "fails": "a gallery of components with no reasons — a picture book, where the next person picks by appearance, which is the decision the language exists to have already made"
+    },
+    {
+      "id": "a-field-is-described-by-its-own-fault",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/form.test.tsx",
+      "proves": "describes the control by its hint and its fault together",
+      "fails": "a field that drops its hint when it fails, or a label that is adjacent rather than attached — both render a form that looks finished and is unusable by voice control and by anybody whose first attempt failed validation"
+    },
+    {
+      "id": "a-trend-takes-its-tone-from-meaning",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/data.test.tsx",
+      "proves": "takes a trend's tone from whether it is good, not from its direction",
+      "fails": "an up arrow rendered as good news — spend up and weight down are both bad, and this is the thing every trend indicator gets wrong"
+    },
+    {
+      "id": "a-failure-in-a-toast-does-not-vanish",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/data.test.tsx",
+      "proves": "makes a failure persistent and assertive, and everything else polite",
+      "fails": "a failure announced politely and timed out — a message that disappears cannot be how somebody learns something they needed"
     }
   ]
 }

@@ -147,6 +147,38 @@ open token map cannot.
 
 ### 1.2 Furniture is lit, not painted — relative surface stepping
 
+⚠️ **ELEVATION IS TOWARD THE LIGHT IN BOTH THEMES, AND THE TWO THEMES USE
+DIFFERENT ARITHMETIC BECAUSE THE PHYSICS DIFFER.** The first version stepped in
+whichever direction had more headroom, which on a near-white page means *down* —
+so a light theme's cards came out grey on a white page. That is the dusty look
+that makes a light theme read as cheap, and it was the rule rather than an
+accident.
+
+| | page | card | above it | what separates them |
+|---|---|---|---|---|
+| **dark** | `l 0.17` | `+0.045` | `+0.045` each | **lightness** — there is unlimited room above |
+| **light** | `l 0.93` | near-white | near-white | **elevation** — there is almost none |
+
+⚠️ **A BRIGHT ROOM TELLS THINGS APART BY WHAT THEY CAST; A DARK ONE BY WHAT THEY
+CATCH.** So `--elevation-1..3` is a graded shadow in light and `none` in dark, and
+the light ladder spends most of its remaining room on the *page-to-card* step —
+the one that carries the design. Asserting a lightness gap for all four depths in
+both themes, which the tests used to, is only satisfiable with grey cards.
+
+⚠️ **AND THE LIGHT PAGE CARRIES LESS OF THE TINT AT THE SAME SETTING.** The same
+chroma reads roughly twice as strong at `l 0.93` as at `0.975`, and the ambience
+slot promises "a hue, and how much of it" — a promise about what somebody *sees*,
+not about the number in the file. Dropping the page to make the cards white would
+otherwise have tripled every tenant's tint at an unchanged setting.
+
+⚠️ **TRANSLUCENCY WAS CONSIDERED AND REFUSED, AGAIN.** A frosted surface needs a
+backdrop filter, which is a full-screen GPU composite on every scroll frame —
+paid for by the cheapest device in the fleet, permanently, on a rule that only
+looks good on top of a photograph. §1.5 is the long form. The whiter cards are
+what was actually wanted, and they cost nothing.
+
+### 1.2a The step, as arithmetic
+
 A component does not ask for `surface-2`. It asks for **one step from its
 parent**, and the step is computed in a perceptual colour space from the ground.
 
@@ -1029,6 +1061,36 @@ class, and it flagged our own registry — which legitimately has components cal
 `tabs`, `skeleton` and `input`, because those are the names of the things, and a
 library choosing the same words does not make them the library's.
 
+### 9d1. The boundary provides what it forbids
+
+⚠️ **A BOUNDARY IS A PROMISE IN BOTH DIRECTIONS.** `RENDERER_OWNS` forbids an app
+to build its own shell, dialog, toast, form, field, select, checkbox, pagination,
+save bar or bulk-action bar. That is only defensible if the package **has** them
+— otherwise the rule reads as "you may not have this", the first product that
+needs one breaks the boundary with a good reason, and the boundary is over.
+
+**Nine of those were promised and absent for four stages.** Nothing failed,
+because nothing asked. `scripts/interface.test.mjs` asks now: a surface on the
+list with no component behind it fails `one lint`. Four entries are *placements*
+rather than components — `dialog`, `sheet`, `drawer` and `popover` are `Overlay`'s
+five kinds, which is the design — and that mapping is written in the guard rather
+than inferred.
+
+**The package is complete against its own list**, and the component set that
+closed it is the form (`Field`, `Input`, `Textarea`, `Select`, `Switch`, `Check`,
+`Choose`, `Dial`, `Form`, `SaveBar`, `BulkActions`) and the reading surfaces
+(`PageHeader`, `Breadcrumbs`, `Steps`, `Pagination`, `Table`, `Stat`, `Progress`,
+`Disclosure`, `Menu`, `Toast`, `Tooltip`, `Spinner`, `Divider`).
+
+⚠️ **`Dial`, NOT `Slider`** — `slide` is another product's core noun, and the
+kernel's vocabulary guard refuses it in shared code precisely so a shared control
+and a product's own object cannot end up one letter apart in the same file.
+
+⚠️ **THE PACKAGE HAS DOM *TYPES* AND TOUCHES NO DOM *GLOBAL*.** A component that
+renders a form control cannot be typed without `HTMLInputElement`; the moment
+that lib is on, `document.querySelector` typechecks and then throws on the server,
+where half of this package runs. A second guard closes that.
+
 ### 9e. What we kept, and why — `OURS`
 
 ⚠️ **"WE WROTE OUR OWN" DECAYS INTO "SOMEBODY DID NOT KNOW THE LIBRARY HAD ONE."**
@@ -1074,6 +1136,30 @@ accent are in what it returns.
 
 ---
 
+## 9g. The gallery is the deliverable, not a demo screen
+
+⚠️ **DEMO SCREENS PHOTOGRAPH A PRODUCT THAT DOES NOT EXIST.** They look finished,
+they agree to nothing, and they hide every component that was never built — which
+is exactly how nine surfaces the boundary *forbids* an app to build sat
+unimplemented while five very convincing screens were being reviewed.
+
+`reference/specimens.tsx` is the other half of `registry.ts`: that file declares
+what exists and what states each thing has been designed in, and this one is the
+proof that somebody drew every one of them. `test/specimens.test.ts` fails on
+
+- a **registered component with no specimen** — a declared state nobody has looked
+  at is indistinguishable, in the registry, from one that was designed;
+- a **specimen for something the registry does not declare** — that is how a
+  component gets built, drawn and shipped without a state matrix or a boundary;
+- a **group with no stated rule** — a gallery of components with no reasons is a
+  picture book, and the next person picks by appearance, which is the decision the
+  language exists to have already made;
+- and a **refusal that is never drawn**: `locked`, `disabled`, `busy`, `invalid`,
+  `empty`, `unknown` and `error` are the states a product ships most often and
+  reviews least.
+
+---
+
 ## 10. The guards
 
 Each fails `one lint`, and each covers something that produces no error at
@@ -1104,7 +1190,7 @@ and is expensive to disprove, so it survives review indefinitely.
 | `reduced-motion` | a layout that depends on an animation having run | **live** |
 | `brand-closed` | a brand slot outside its declared range being clamped instead of refused, or a token emitted outside the closed set | **live** |
 | `accent-relit` | a screen recomputing the accent instead of re-lighting it — a brand that is a different colour on every surface | **live** |
-| `ladder-never-collapses` | a surface step that saturates against the end of its range, leaving nested surfaces indistinguishable | **live** |
+| `ladder-never-collapses` | a page and a card that collapse into one surface for some brand in range — and in dark, any step above it too. It used to assert a lightness gap for all four in both themes, which is only satisfiable with grey cards on a white page: a light ground has no room above it, so depth there is carried by elevation instead | **live** |
 | `one-clock` | a component holding its own duration, or a scene whose stagger grows without a budget | **live** |
 | `state-declared` | a component registered with no resting state, or a container declaring `empty` without `unknown` | **live** |
 | `overlay-ladder` | a third overlay layer, a non-dialog covering another overlay, two drawers, or a destructive confirm that does not name its object | **live** |
@@ -1150,6 +1236,16 @@ and is expensive to disprove, so it survives review indefinitely.
 | `the-durations-are-ordered-by-event` | a screen composing itself timed like an object arriving on one, or anything leaving as slowly as it arrived — the first makes the page cheap or the sheet slow, the second is the commonest reason an interface feels sluggish | **live** |
 | `an-entrance-travels-far-enough-to-see` | a rise short enough to be a fade wearing a transform, or a stagger under about 60ms — which the eye registers as a smear rather than as an order | **live** |
 | `the-press-is-damped-and-the-release-springs` | a control that overshoots on the way down — the finger is still on it, and nothing physical overshoots under a thumb | **live** |
+| `depth-is-lightness-in-dark-and-shadow-in-light` | a light theme whose card is not near-white, or whose three depths share one shadow, or a dark theme that draws shadows at all — a bright room tells things apart by what they cast and a dark one by what they catch, and asserting one rule for both forces grey cards or invisible shadows | **live** |
+| `the-boundary-provides-what-it-forbids` | a surface on RENDERER_OWNS with no component behind it — forbidding an app to build its own dialog is only defensible if the package HAS one, and nine of them were promised and absent for four stages because nothing asked | **live** |
+| `dom-types-never-dom-globals` | a DOM global in a package that renders on the server — the types are a build-time convenience and the globals are a crash in a worker, and the moment the lib is on the first one typechecks | **live** |
+| `every-component-has-been-drawn` | a registered component nobody has drawn — a declared state that was considered on paper and shipped unexamined is indistinguishable, in the registry, from one that was designed | **live** |
+| `nothing-is-drawn-that-is-not-declared` | a specimen for a component the registry does not have — that is how one gets built, drawn, reviewed and shipped with no state matrix and outside the boundary | **live** |
+| `the-refusals-are-drawn-too` | a gallery that shows only the happy path — locked, disabled, busy, invalid, empty, unknown and error are the states a product ships most often and reviews least | **live** |
+| `every-group-states-its-rule` | a gallery of components with no reasons — a picture book, where the next person picks by appearance, which is the decision the language exists to have already made | **live** |
+| `a-field-is-described-by-its-own-fault` | a field that drops its hint when it fails, or a label that is adjacent rather than attached — both render a form that looks finished and is unusable by voice control and by anybody whose first attempt failed validation | **live** |
+| `a-trend-takes-its-tone-from-meaning` | an up arrow rendered as good news — spend up and weight down are both bad, and this is the thing every trend indicator gets wrong | **live** |
+| `a-failure-in-a-toast-does-not-vanish` | a failure announced politely and timed out — a message that disappears cannot be how somebody learns something they needed | **live** |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder

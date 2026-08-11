@@ -1,52 +1,52 @@
 /**
- * THE LIVE PREVIEW — the five archetypes, in a page somebody can press.
+ * THE LANGUAGE, AS A PAGE — tokens, then every component in every state.
  *
- * ⚠️ NOT SHIPPED CODE, AND NOTHING MAY IMPORT IT. Like `screens.tsx` beside it,
- * this renders `@one/ui`'s real components through `@one/ui`'s real stylesheet.
- * The difference is only that it emits ONE self-contained page with the tenant
- * and the theme as controls, so the thing being reviewed is the switch between
- * them rather than two photographs somebody has to hold up side by side.
+ * ⚠️ NOT SHIPPED CODE, AND NOTHING IN `src` MAY IMPORT IT. It renders `@one/ui`'s
+ * real components through `@one/ui`'s real stylesheet, so a defect in the picture
+ * is a defect in the product.
  *
- * ⚠️ AND IT BORROWS SIX FILES, NOT THE LIBRARY. `daisyui.css` is 1.1 MB because
- * it carries sixty-one components and every stock theme. We use six objects, so
- * six component files are inlined — about 120 kB — and the boundary is visible in
- * the page's own weight rather than only in a document.
+ * ⚠️ IT REPLACED FIVE DEMO SCREENS, DELIBERATELY. Demo screens photograph a
+ * product that does not exist: they look finished, they agree to nothing, and
+ * they hide every component that was never built — which is how nine surfaces
+ * the boundary FORBIDS an app to build sat unimplemented for four stages. A
+ * gallery driven by the registry cannot hide one, because the conformance test
+ * fails on a component with no specimen.
+ *
+ * ⚠️ AND IT BORROWS FILES, NOT THE LIBRARY. `daisyui.css` is 1.1 MB of sixty-one
+ * components and every stock theme; the ones we actually borrow are inlined, so
+ * the boundary is visible in the page's own weight.
  */
 
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { writeFileSync, readFileSync } from "node:fs";
 import {
-  daisyTheme, skyVars, tokensFor, CLOCK, SCALE, STRUCTURE, SKY, CHOREOGRAPHY,
-  DEFAULT_BRAND, type Brand, type Theme,
+  BORROWED, CLOCK, CHOREOGRAPHY, DEFAULT_BRAND, SCALE, SKY, STRUCTURE,
+  daisyTheme, skyVars, tokensFor, type Brand, type Theme,
 } from "../src/index.js";
-import { SCREENS } from "./stage.js";
+import { GROUPS } from "./specimens.js";
 
 const TENANTS: { readonly name: string; readonly brand: Brand }[] = [
   { name: "Northlight", brand: DEFAULT_BRAND },
   { name: "Pine", brand: { ...DEFAULT_BRAND, accent: "#0b7a5a", ambience: { hue: 155, intensity: 0.045 } } },
   { name: "Ember", brand: { ...DEFAULT_BRAND, accent: "#e8590c", ambience: { hue: 32, intensity: 0.05 } } },
-  { name: "Slate", brand: { ...DEFAULT_BRAND, accent: "#6b7280", ambience: { hue: 250, intensity: 0.01 }, radius: 8, edge: "defined", elevation: "flat" } },
+  { name: "Slate", brand: { ...DEFAULT_BRAND, accent: "#6b7280", ambience: { hue: 250, intensity: 0.01 }, radius: 8, edge: "defined" } },
+  { name: "Dense", brand: { ...DEFAULT_BRAND, accent: "#7048e8", ambience: { hue: 280, intensity: 0.04 }, radius: 24, density: "compact", elevation: "flat" } },
 ];
 
 /*
-  ⚠️ SCOPED BY ATTRIBUTE RATHER THAN BY `:root`, and only here. The package emits
-  `:root` blocks because a product has one tenant and one theme at a time; a
-  preview has four and two, so the same values are re-scoped for the switch. The
-  DERIVATION is untouched — this reads the same three functions the sheet does.
+  ⚠️ SCOPED BY ATTRIBUTE RATHER THAN BY `:root`, and only here. A product has one
+  tenant and one theme at a time; a gallery has five and two. The DERIVATION is
+  untouched — this calls the same three functions the sheet does.
+
+  ⚠️ AND THE SCALE COMES INSIDE THE SCOPE. `--gap: calc(22px * var(--density))`
+  is substituted where it is DECLARED, so leaving it at `:root` while `--density`
+  sits on a descendant makes it invalid at computed-value time and it inherits
+  down as EMPTY — every padding naming it silently dropped.
 */
 const scoped = (brand: Brand, theme: Theme, i: number): string => {
   const decl = (o: Readonly<Record<string, string>>) =>
     Object.entries(o).map(([k, v]) => `  ${k}: ${v};`).join("\n");
-  /*
-    ⚠️ THE SCALE COMES INSIDE THE SCOPE TOO, AND THE REASON IS A PROPERTY OF CSS
-    WORTH KNOWING. `--gap: calc(22px * var(--density))` is substituted where it is
-    DECLARED, not where it is used — so leaving it at `:root` while `--density`
-    sits on a descendant makes it invalid at computed-value time, and it inherits
-    down as EMPTY. Every padding naming it is then dropped, which renders as a
-    section header sitting on top of the hero above it. The product ships both at
-    `:root` and is unaffected; a preview with four tenants at once is not.
-  */
   return [
     `[data-tenant='${i}'][data-theme='${theme}'] {`,
     decl(tokensFor(brand, theme)), decl(daisyTheme(brand, theme)), decl(skyVars(brand, theme)),
@@ -55,96 +55,111 @@ const scoped = (brand: Brand, theme: Theme, i: number): string => {
   ].join("\n");
 };
 
-const daisy = ["button", "card", "badge", "alert", "skeleton", "input"]
-  .map((c) => readFileSync(`node_modules/daisyui/components/${c}.css`, "utf8"))
+const daisy = [...new Set(Object.values(BORROWED))]
+  .map((c) => `node_modules/daisyui/components/${c === "list-row" ? "list" : c}.css`)
+  .map((f) => { try { return readFileSync(f, "utf8"); } catch { return ""; } })
   .join("\n");
 
-/*
-  ⚠️ THE PAGE'S OWN CHROME IS NOT THE DESIGN SYSTEM, and it is deliberately
-  plain: a preview whose frame competes with what it frames is a preview nobody
-  can judge. It also carries the three-state theme pattern of its own, because
-  the viewer's theme and the tenant's theme are different questions.
-*/
+/* ------------------------------------------------------------ the tokens --- */
+
+/**
+ * ⚠️ THE TOKENS ARE PART OF THE LANGUAGE, so they are shown rather than
+ * described. A palette nobody has seen at every tenant is a palette that is
+ * correct in the one screenshot somebody took.
+ */
+const tokenBoard = (i: number): string => {
+  const swatch = (name: string, label: string) =>
+    `<figure class="sw"><span class="chip" style="background:var(${name})"></span><figcaption>${label}<br><code>${name}</code></figcaption></figure>`;
+  return `
+<section class="group">
+  <h2>Tokens</h2>
+  <p class="note">Everything below is derived from one accent, one ambience hue and four bounded slots. No value here was picked.</p>
+  <div class="board">
+    ${["--canvas", "--surface-1", "--surface-2", "--surface-3"].map((n) => swatch(n, n.replace("--", ""))).join("")}
+    ${["--canvas-accent", "--surface-1-accent", "--surface-2-accent"].map((n) => swatch(n, "accent, re-lit")).join("")}
+    ${["--tone-success", "--tone-warning", "--tone-danger", "--tone-info"].map((n) => swatch(n, n.replace("--tone-", ""))).join("")}
+  </div>
+  <div class="board">
+    <figure class="sw wide"><span class="ramp"></span><figcaption>the type ladder — hero 34 · page 26 · body 14 · sub 12 · meta 10</figcaption></figure>
+  </div>
+  <p class="note">Ink is measured against the exact surface it lands on, so a tenant cannot pair a colour with text that fails on it. Semantic hues are the platform's and never a brand slot: a tenant who could move <code>danger</code> could make a delete confirmation read as a success. <span class="hidden">${i}</span></p>
+</section>`;
+};
+
+/* -------------------------------------------------------------- the page --- */
+
 const CHROME = `
 :root { color-scheme: light dark; --ink: #16181d; --dim: #6b7280; --bg: #f4f5f7; --line: #e3e5ea; --chip: #ffffff; }
 @media (prefers-color-scheme: dark) { :root:not([data-page='light']) { --ink: #e8eaef; --dim: #9096a3; --bg: #0e0f12; --line: #24262c; --chip: #191b20; } }
-:root[data-page='dark'] { --ink: #e8eaef; --dim: #9096a3; --bg: #0e0f12; --line: #24262c; --chip: #191b20; }
-/* ⚠️ THE PACKAGE ASSUMES A RESET, AND ONLY SIX daisyUI FILES ARE INLINED — its
-   base layer, which carries one, is not among them. Without this a heading keeps
-   its user-agent margin and a padded row is wider than the card it is in. */
+/* ⚠️ THE PACKAGE ASSUMES A RESET and only the borrowed daisyUI files are
+   inlined — its base layer, which carries one, is not among them. */
 *, *::before, *::after { box-sizing: border-box; }
-h1, h2, h3, p, figure { margin: 0; }
+h1, h2, h3, p, figure, figcaption, ol, ul { margin: 0; padding: 0; }
 body { margin: 0; background: var(--bg); color: var(--ink);
-  font: 400 15px/1.5 ui-sans-serif, -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
+  font: 400 15px/1.55 ui-sans-serif, -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased; }
-.wrap { max-inline-size: 1400px; margin: 0 auto; padding: 32px 20px 64px; }
-h1 { font-size: 22px; font-weight: 650; letter-spacing: -0.02em; margin: 0 0 4px; }
-.sub { color: var(--dim); font-size: 14px; margin: 0 0 24px; max-inline-size: 62ch; }
-.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 26px;
-  position: sticky; top: 0; z-index: 9; padding: 12px 0; background: var(--bg); }
-.group { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--chip); }
+.wrap { max-inline-size: 1180px; margin: 0 auto; padding: 34px 20px 80px; }
+.lede h1 { font-size: 26px; font-weight: 650; letter-spacing: -0.025em; margin-block-end: 6px; }
+.lede p { color: var(--dim); max-inline-size: 66ch; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 24px 0 30px;
+  position: sticky; top: 0; z-index: 20; padding: 12px 0; background: var(--bg); }
+.pill { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--chip); }
 .controls button { appearance: none; border: 0; background: none; color: var(--dim); cursor: pointer;
-  font: inherit; font-size: 13px; font-weight: 500; padding: 6px 13px; border-radius: 999px;
-  transition: background-color .18s ease, color .18s ease; }
+  font: inherit; font-size: 13px; font-weight: 500; padding: 6px 13px; border-radius: 999px; }
 .controls button[aria-pressed='true'] { background: var(--ink); color: var(--bg); }
-.controls .swatch { inline-size: 9px; block-size: 9px; border-radius: 999px; display: inline-block;
-  margin-inline-end: 7px; vertical-align: -1px; }
-/* ⚠️ A CLASS BEATS THE hidden ATTRIBUTE. The user-agent rule for it is the
-   lowest specificity there is, so .rail with a display of its own silently
-   overrides it and every hidden tenant stays on screen — stacked, with the first
-   still at the top, so the switch appears to do nothing at all. */
-.rail[hidden] { display: none; }
-.rail { display: flex; gap: 26px; overflow-x: auto; padding-block-end: 14px; scrollbar-width: thin; }
-.slot { flex: none; }
-.cap { color: var(--dim); font: 500 11px/1 ui-monospace, monospace; letter-spacing: .09em;
-  text-transform: uppercase; padding: 0 0 9px 3px; }
-.phone { inline-size: 390px; block-size: 812px; overflow: hidden; position: relative; border-radius: 30px;
-  display: flex; flex-direction: column; border: 1px solid var(--line);
+.dot { inline-size: 9px; block-size: 9px; border-radius: 999px; display: inline-block; margin-inline-end: 7px; vertical-align: -1px; }
+.stage { display: none; }
+.stage[data-live] { display: block; }
+.group { margin-block-end: 40px; }
+.group h2 { font-size: 12px; font-weight: 650; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); margin-block-end: 6px; }
+.note { color: var(--dim); font-size: 13.5px; max-inline-size: 74ch; margin-block-end: 16px; }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px;
+  padding: 20px; border-radius: 18px; border: 1px solid var(--line);
   background: var(--canvas); color: var(--canvas-ink); }
-.phone > [data-one='page'] { flex: 1; min-block-size: 0; overflow-y: auto; }
-.chrome-clock { flex: none; display: flex; justify-content: space-between; padding: 15px 24px 4px;
-  font: 600 14px/1 system-ui; position: relative; z-index: 2; color: var(--canvas-ink); }
-.note { margin: 30px 0 0; padding: 15px 17px; border: 1px solid var(--line); border-radius: 12px;
-  background: var(--chip); color: var(--dim); font-size: 13.5px; max-inline-size: 74ch; }
-.note b { color: var(--ink); font-weight: 600; }
+.sw { display: flex; flex-direction: column; gap: 8px; }
+.sw.wide, .sw[data-wide] { grid-column: 1 / -1; }
+.sw figcaption { font: 500 11px/1.5 ui-monospace, monospace; color: var(--canvas-ink); opacity: 0.55; }
+.sw code { opacity: 0.75; }
+.chip { display: block; block-size: 46px; border-radius: 10px; box-shadow: inset 0 0 0 1px rgb(128 128 128 / 0.18); }
+.ramp { display: block; block-size: 2px; background: currentColor; opacity: 0.2; }
+.hidden { display: none; }
 [data-one='scroller-item'] { display: block; }
-@media (max-width: 700px) { .wrap { padding: 20px 14px 48px; } .rail { gap: 18px; } }
+[data-one='overlay'] { position: static; border-radius: var(--radius-lg); background: var(--surface-2); color: var(--surface-2-ink); padding: var(--row-pad); box-shadow: var(--elevation-3); }
+[data-one='shell'] { min-block-size: 0; border-radius: 14px; overflow: hidden; }
+@media (max-width: 720px) { .wrap { padding: 20px 14px 60px; } .board { padding: 14px; } }
 `;
 
-const body = TENANTS.map((_, i) => `
-<div class="rail" data-tenant="${i}" data-theme="dark" ${i ? 'hidden' : ""}>
-${SCREENS.map(([cap, node]: readonly [string, React.ReactNode]) =>
-  `<div class="slot"><div class="cap">${cap}</div><div class="phone"><div class="chrome-clock"><span>9:41</span><span>5G</span></div>${renderToStaticMarkup(node as never)}</div></div>`).join("\n")}
-</div>`).join("\n");
+const cell = (caption: string, body: string, wide?: boolean) =>
+  `<figure class="sw"${wide ? " data-wide" : ""}>${body}<figcaption>${caption}</figcaption></figure>`;
 
-/*
-  ⚠️ THE REPLAY BUTTON EXISTS BECAUSE MOTION CANNOT BE REVIEWED FROM A STILL.
-  The entrance runs once on load and is then invisible forever, which is how a
-  stagger landing on the wrong elements survives every review — it is only ever
-  seen by somebody who happened to be looking at the moment the page painted.
-*/
+const groupHtml = (): string =>
+  GROUPS.map((g) => `
+<section class="group">
+  <h2>${g.title}</h2>
+  <p class="note">${g.note}</p>
+  <div class="board">
+    ${g.items.map((i) => cell(i.caption, renderToStaticMarkup(i.node as never), i.wide)).join("\n")}
+  </div>
+</section>`).join("\n");
+
 const SCRIPT = `
-const rails = [...document.querySelectorAll('.rail')];
-const show = (i) => rails.forEach((r, n) => { r.hidden = n !== +i; });
-const setTheme = (t) => rails.forEach((r) => r.dataset.theme = t);
-const replay = () => rails.forEach((r) => {
-  const p = r.querySelectorAll("[data-one='page']");
-  p.forEach((el) => { const c = el.cloneNode(true); el.replaceWith(c); });
-});
+const stages = [...document.querySelectorAll('.stage')];
 document.addEventListener('click', (e) => {
   const b = e.target.closest('button[data-act]');
   if (!b) return;
-  const group = b.parentElement;
-  if (b.dataset.act !== 'replay') {
-    [...group.children].forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-  }
-  if (b.dataset.act === 'tenant') show(b.dataset.value);
-  if (b.dataset.act === 'theme') setTheme(b.dataset.value);
-  if (b.dataset.act === 'replay') replay();
+  [...b.parentElement.children].forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  if (b.dataset.act === 'tenant') stages.forEach((s, n) => s.toggleAttribute('data-live', n === +b.dataset.value));
+  if (b.dataset.act === 'theme') stages.forEach((s) => { s.dataset.theme = b.dataset.value; });
 });
 `;
 
-const page = `<title>Northlight — the five page archetypes</title>
+const body = TENANTS.map((_, i) => `
+<div class="stage" data-tenant="${i}" data-theme="dark"${i === 0 ? " data-live" : ""}>
+${tokenBoard(i)}
+${groupHtml()}
+</div>`).join("\n");
+
+const page = `<title>Northlight — the interface language</title>
 <style>${daisy}</style>
 <style>
 ${TENANTS.flatMap(({ brand }, i) => (["light", "dark"] as Theme[]).map((t) => scoped(brand, t, i))).join("\n")}
@@ -155,27 +170,24 @@ ${CHOREOGRAPHY}
 ${CHROME}
 </style>
 <div class="wrap">
-  <h1>Northlight — the five page archetypes</h1>
-  <p class="sub">Rendered from the shipped components through the shipped stylesheet. A screen declares
-  what it <em>is</em>; the top, the sky, the reach of the light, the rhythm and the timing are computed
-  from that. Switch the tenant: nothing below was re-authored.</p>
+  <div class="lede">
+    <h1>Northlight — the interface language</h1>
+    <p>Every component the language has, in every state it declares, rendered from the shipped
+    package through the shipped stylesheet. Change the tenant: nothing below was re-authored, and
+    no value in it was picked. Press anything — the motion is real.</p>
+  </div>
   <div class="controls">
-    <div class="group">
-      ${TENANTS.map(({ name, brand }, i) =>
-        `<button data-act="tenant" data-value="${i}" aria-pressed="${i === 0}"><span class="swatch" style="background:${brand.accent}"></span>${name}</button>`).join("")}
+    <div class="pill">
+      ${TENANTS.map(({ name, brand }, i) => `<button data-act="tenant" data-value="${i}" aria-pressed="${i === 0}"><span class="dot" style="background:${brand.accent}"></span>${name}</button>`).join("")}
     </div>
-    <div class="group">
+    <div class="pill">
       <button data-act="theme" data-value="dark" aria-pressed="true">Dark</button>
       <button data-act="theme" data-value="light" aria-pressed="false">Light</button>
     </div>
-    <div class="group"><button data-act="replay">Replay the entrance</button></div>
   </div>
   ${body}
-  <p class="note"><b>The wells are empty on purpose.</b> The language names five icon roles and ships
-  no set to fill them yet — stated here rather than faked in the preview, because a fix that exists in
-  the picture and not in the product is worse than the gap.</p>
 </div>
 <script>${SCRIPT}</script>`;
 
-writeFileSync(process.argv[2] ?? "northlight.html", page);
-console.log(`wrote ${process.argv[2] ?? "northlight.html"} — ${(page.length / 1024).toFixed(0)} kB`);
+writeFileSync(process.argv[2] ?? "gallery.html", page);
+console.log(`wrote ${process.argv[2] ?? "gallery.html"} — ${(page.length / 1024).toFixed(0)} kB`);

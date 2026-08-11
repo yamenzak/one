@@ -17,6 +17,7 @@
 
 import { fromHex, oklchToRgb, rgbToOklch, toHex, type Oklch } from "./colour.js";
 import { accentOn, inkOn, surfaces, type Ground, type Theme } from "./ground.js";
+import { SEMANTIC } from "./semantic.js";
 
 /* ----------------------------------------------------------------- slots --- */
 
@@ -114,7 +115,23 @@ export function groundFor(brand: Brand, theme: Theme): Ground {
     and the sweep proves a range the product does not actually offer.
   */
   const c = Math.max(0, Math.min(intensity, RANGE.ambienceIntensity.max));
-  const canvas: Oklch = theme === "dark" ? { l: 0.17, c, h: hue } : { l: 0.975, c, h: hue };
+  /*
+    ⚠️ THE SAME CHROMA READS ROUGHLY TWICE AS STRONG ON A LIGHT GROUND, so the
+    light canvas carries a fraction of it. The slot promises "a hue, and how much
+    of it" — which is a promise about what somebody SEES, not about what number
+    is in the file. Dropping the page from 0.975 to 0.93 to make the cards white
+    tripled the visible tint at an unchanged setting; this is that correction, in
+    one place, rather than every tenant re-tuning a value that did not move.
+  */
+  const LIGHT_TINT = 0.45;
+  /*
+    ⚠️ THE LIGHT PAGE IS NOT WHITE, AND THAT IS WHAT MAKES THE CARDS WHITE. At
+    0.975 the page was already at the ceiling, so every surface above it had to
+    step DOWN and a card came out grey — the dusty look that makes a light theme
+    read as cheap. The page sits low enough for the ladder to climb, and the card
+    is the near-white thing on it.
+  */
+  const canvas: Oklch = theme === "dark" ? { l: 0.17, c, h: hue } : { l: 0.93, c: c * LIGHT_TINT, h: hue };
   return { theme, canvas, accent: rgbToOklch(fromHex(brand.accent)) };
 }
 
@@ -148,6 +165,20 @@ export function tokensFor(brand: Brand, theme: Theme): Tokens {
     out[`--${name}-accent-ink`] = toHex(inkOn(lit).ink);
   });
 
+  /*
+    ⚠️ THE SEMANTIC TONES ARE TOKENS TOO, AND THEY ARE RE-LIT LIKE THE ACCENT.
+    A fixed danger red is legible on one of the two themes; the hue is the
+    platform's and never a brand slot, but WHERE it sits on the lightness axis is
+    still a question about the ground it lands on. Without these, every component
+    that needs a fault colour reaches for a literal — and one literal is all it
+    takes for the tenant sweep to stop being a proof.
+  */
+  for (const [name, hue] of Object.entries(SEMANTIC)) {
+    const lit = accentOn(hue, ground.canvas);
+    out[`--tone-${name}`] = toHex(oklchToRgb(lit));
+    out[`--tone-${name}-ink`] = toHex(inkOn(lit).ink);
+  }
+
   out["--radius"] = `${brand.radius}px`;
   out["--radius-sm"] = `${Math.max(4, brand.radius - 4)}px`;
   out["--radius-lg"] = `${brand.radius + 4}px`;
@@ -157,7 +188,22 @@ export function tokensFor(brand: Brand, theme: Theme): Tokens {
     screen it reaches.
   */
   out["--edge"] = brand.edge === "none" ? "0" : brand.edge === "hairline" ? "max(0.5px, 0.0625rem)" : "max(1px, 0.125rem)";
-  out["--elevation"] = brand.elevation === "flat" || theme === "dark" ? "none" : "0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.08)";
+  /*
+    ⚠️ ELEVATION IS GRADED, AND IN LIGHT IT IS WHAT CARRIES DEPTH AT ALL. A light
+    ground has almost no room above it, so surfaces 1 to 3 are all near-white and
+    the shadow is the only thing that tells them apart — which is how a bright
+    room works: everything is already lit, and things are read by what they cast.
+    A dark ground is the mirror image, so every one of these is `none` there and
+    the lightness ladder does the work. A shadow on near-black is invisible, and
+    every pixel spent drawing one is a pixel that makes nothing clearer.
+  */
+  const lifted = brand.elevation !== "flat" && theme === "light";
+  out["--elevation-1"] = lifted ? "0 1px 2px rgb(0 0 0 / 0.04), 0 2px 8px rgb(0 0 0 / 0.05)" : "none";
+  out["--elevation-2"] = lifted ? "0 2px 4px rgb(0 0 0 / 0.05), 0 8px 20px rgb(0 0 0 / 0.07)" : "none";
+  out["--elevation-3"] = lifted ? "0 4px 8px rgb(0 0 0 / 0.06), 0 18px 40px rgb(0 0 0 / 0.10)" : "none";
+  /* The unqualified one is depth 1, so a caller that does not know its depth is
+     still lit rather than flat. */
+  out["--elevation"] = out["--elevation-1"]!;
   out["--density"] = brand.density === "compact" ? "0.875" : "1";
   out["--type"] = brand.type;
   return out;

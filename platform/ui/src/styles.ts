@@ -81,8 +81,12 @@ export const STRUCTURE = `
 /* The content area is a container, so anything inside it can ask about IT. */
 [data-one='shell'] { display: grid; min-block-size: 100dvh; background: var(--canvas); color: var(--canvas-ink); }
 [data-one='pane'] { container-type: inline-size; container-name: pane; overflow-y: auto; }
-[data-one='surface'] { border-radius: var(--radius-lg); background: var(--surface-1); }
-[data-one='surface'][data-depth='0'] { background: var(--canvas); border-radius: 0; }
+/* ⚠️ THE SHADOW IS THE DEPTH IN LIGHT AND NOTHING AT ALL IN DARK — one token
+   per depth, so a surface never has to know which theme it is in. */
+[data-one='surface'] { border-radius: var(--radius-lg); background: var(--surface-1); box-shadow: var(--elevation-1); }
+[data-one='surface'][data-depth='2'] { background: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-2); }
+[data-one='surface'][data-depth='3'] { background: var(--surface-3); color: var(--surface-3-ink); box-shadow: var(--elevation-3); }
+[data-one='surface'][data-depth='0'] { background: var(--canvas); border-radius: 0; box-shadow: none; }
 
 /* ── TEXT. A role, never a size — and the ladder is the one in UI.md §5.1. */
 [data-one='text'] { display: block; }
@@ -154,7 +158,7 @@ export const STRUCTURE = `
 [data-one='section-header'] { display: flex; align-items: baseline; justify-content: space-between; gap: calc(0.5rem * var(--density)); padding: 0 calc(0.25rem * var(--density)) calc(0.5rem * var(--density)); }
 [data-one='section-header'][data-placement='inside'] { padding: var(--row-pad) var(--row-pad) calc(0.5rem * var(--density)); }
 [data-one='section-total'] { opacity: 0.62; font-size: var(--t-sub); font-variant-numeric: tabular-nums; }
-[data-one='section-card'] { border-radius: var(--radius-lg); background: var(--surface-1); color: var(--surface-1-ink); overflow: hidden; box-shadow: var(--elevation); }
+[data-one='section-card'] { border-radius: var(--radius-lg); background: var(--surface-1); color: var(--surface-1-ink); overflow: hidden; box-shadow: var(--elevation-1); }
 [data-one='section-more'] { inline-size: 100%; padding: calc(0.625rem * var(--density)) 0; background: none; border: 0; color: inherit; text-align: center; }
 /* ⚠️ A SCROLLER IS THE ONE THING THAT LEAVES THE PAGE INSET, so its first item
    lines up with everything above it and its last is cut — which is what says
@@ -193,13 +197,93 @@ export const STRUCTURE = `
 [data-one='segment'][aria-selected='true'] { opacity: 1; }
 
 /* ── PROMO. A lit card, and the only one on a screen. */
-[data-one='promo'] { display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: var(--row-pad); min-block-size: 6rem; padding: 0 calc(1.125rem * var(--density)); border-radius: var(--radius-lg); background: var(--surface-2); color: var(--surface-2-ink); }
+[data-one='promo'] { box-shadow: var(--elevation-2); display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: var(--row-pad); min-block-size: 6rem; padding: 0 calc(1.125rem * var(--density)); border-radius: var(--radius-lg); background: var(--surface-2); color: var(--surface-2-ink); }
+
+/* ── THE FORM. ⚠️ Label above, control, hint, then fault — always that order,
+      because it is the order somebody reads when the control has just failed. */
+[data-one='form'] { display: flex; flex-direction: column; gap: var(--gap); }
+[data-one='field'] { display: flex; flex-direction: column; gap: calc(0.375rem * var(--density)); }
+[data-one='field-label'] { display: flex; align-items: baseline; justify-content: space-between; gap: calc(0.5rem * var(--density)); }
+[data-one='field-fault'] { display: flex; align-items: center; gap: calc(0.375rem * var(--density)); color: var(--tone-danger); }
+[data-one='input'], [data-one='textarea'], [data-one='select'] { inline-size: 100%; min-block-size: 3rem; background: var(--surface-1); color: var(--surface-1-ink); }
+[data-one='textarea'] { min-block-size: 6rem; }
+/* ⚠️ THE INVALID EDGE IS NOT THE MESSAGE. It draws the eye; the words under it
+   are what say what to do, which is why a field renders both or neither. */
+[data-one='field'][data-invalid] [data-one='input'], [data-one='field'][data-invalid] [data-one='textarea'], [data-one='field'][data-invalid] [data-one='select'] { border-color: var(--tone-danger); }
+[data-one='switch'] { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: calc(0.75rem * var(--density)); min-block-size: 3rem; }
+[data-one='switch-reason'] { grid-column: 1 / -1; }
+[data-one='check'], [data-one='choose-option'] { display: flex; align-items: center; gap: calc(0.625rem * var(--density)); min-block-size: 3rem; }
+[data-one='choose'] { display: flex; flex-direction: column; }
+[data-one='dial'] { display: flex; align-items: center; gap: calc(0.75rem * var(--density)); }
+[data-one='dial-control'] { flex: 1; }
+[data-one='dial-value'] { min-inline-size: 3rem; text-align: end; }
+
+/* ── PINNED BARS. ⚠️ They appear only when there is something to say, and they
+      sit ABOVE the content rather than in it — a bar in the flow moves the page
+      as it appears, under whoever was already reading. */
+[data-one='save-bar'], [data-one='bulk-actions'] {
+  position: sticky; inset-block-end: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--row-pad);
+  padding: calc(0.75rem * var(--density)) var(--row-pad);
+  border-radius: var(--radius-lg); background: var(--surface-2); color: var(--surface-2-ink);
+  box-shadow: var(--elevation-3);
+}
+[data-one='save-bar-actions'], [data-one='bulk-actions-list'] { display: flex; align-items: center; gap: calc(0.5rem * var(--density)); }
+[data-one='save-bar-save'], [data-one='save-bar-discard'], [data-one='bulk-action'], [data-one='bulk-clear'] {
+  min-block-size: 2.5rem; padding: 0 calc(0.875rem * var(--density)); border: 0; border-radius: 999px; background: none; color: inherit;
+}
+[data-one='save-bar-save'] { background: var(--surface-2-accent); color: var(--surface-2-accent-ink); }
+[data-one='bulk-action'][data-tone='error'], [data-one='save-bar-discard'] { color: var(--tone-danger); }
+
+/* ── READING SURFACES. */
+[data-one='page-header'] { display: flex; flex-direction: column; gap: calc(0.5rem * var(--density)); }
+[data-one='page-header-row'] { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--row-pad); }
+[data-one='breadcrumbs'] ol { display: flex; align-items: center; gap: calc(0.375rem * var(--density)); list-style: none; padding: 0; margin: 0; }
+[data-one='crumb-link'] { background: none; border: 0; color: inherit; opacity: 0.62; padding: 0; }
+[data-one='steps'] { display: flex; gap: calc(0.5rem * var(--density)); list-style: none; padding: 0; margin: 0; }
+[data-one='step'] { flex: 1; padding-block-start: calc(0.5rem * var(--density)); border-block-start: calc(2 * var(--edge)) solid var(--surface-2); opacity: 0.5; }
+[data-one='step'][data-state='done'], [data-one='step'][data-state='current'] { border-block-start-color: var(--surface-1-accent); opacity: 1; }
+[data-one='pagination'] { display: flex; align-items: center; justify-content: center; gap: var(--row-pad); }
+[data-one='pagination-prev'], [data-one='pagination-next'] { min-block-size: 2.75rem; min-inline-size: 2.75rem; display: grid; place-items: center; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--surface-2-ink); }
+[data-one='pagination-prev']:disabled, [data-one='pagination-next']:disabled { opacity: 0.38; }
+/* ⚠️ A table scrolls in its OWN box, so the page body never scrolls sideways. */
+[data-one='table-scroll'] { overflow-x: auto; border-radius: var(--radius-lg); background: var(--surface-1); box-shadow: var(--elevation-1); }
+[data-one='table'] { inline-size: 100%; border-collapse: collapse; }
+[data-one='table-caption'] { text-align: start; padding: var(--row-pad) var(--row-pad) 0; font-size: var(--t-sub); opacity: 0.62; }
+[data-one='table'] th, [data-one='table'] td { padding: calc(0.625rem * var(--density)) var(--row-pad); text-align: start; }
+[data-one='table'] th[data-numeric], [data-one='table'] td[data-numeric] { text-align: end; font-variant-numeric: tabular-nums; }
+[data-one='table'] tbody tr + tr td { box-shadow: inset 0 var(--edge) 0 var(--surface-2); }
+[data-one='stat'] { display: flex; flex-direction: column; gap: calc(0.25rem * var(--density)); }
+[data-one='stat-value'] { font-size: var(--t-page); font-weight: var(--w-bold); line-height: 1.1; letter-spacing: -0.02em; }
+[data-one='stat-trend'][data-tone='success'] { color: var(--tone-success); }
+[data-one='stat-trend'][data-tone='error'] { color: var(--tone-danger); }
+[data-one='progress'] { display: flex; align-items: center; gap: calc(0.625rem * var(--density)); }
+[data-one='progress'] progress { flex: 1; }
+[data-one='disclosure-summary'] { display: flex; align-items: center; justify-content: space-between; gap: var(--row-pad); min-block-size: 3rem; }
+[data-one='menu'] { list-style: none; padding: calc(0.375rem * var(--density)); margin: 0; border-radius: var(--radius-lg); background: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-3); }
+[data-one='menu-item'] { display: flex; align-items: center; gap: calc(0.625rem * var(--density)); inline-size: 100%; min-block-size: 2.75rem; padding: 0 calc(0.625rem * var(--density)); border: 0; border-radius: var(--radius); background: none; color: inherit; text-align: start; }
+[data-one='menu-item'][data-tone='error'] { color: var(--tone-danger); }
+[data-one='toast'] { display: flex; align-items: center; gap: calc(0.625rem * var(--density)); padding: calc(0.75rem * var(--density)) var(--row-pad); border-radius: var(--radius-lg); box-shadow: var(--elevation-3); }
+[data-one='toast-undo'] { margin-inline-start: auto; padding: 0 calc(0.625rem * var(--density)); }
+[data-one='toast-undo'], [data-one='toast-dismiss'] { min-block-size: 2.5rem; border: 0; background: none; color: inherit; display: grid; place-items: center; }
+[data-one='toast-dismiss'] { min-inline-size: 2.5rem; }
+/* ⚠️ A TOOLTIP IS DECORATION. It is unreachable by touch, so it never carries
+   the only copy of anything — and it appears on FOCUS as well, or a keyboard
+   never sees it at all. The pointer half sits with the other hover rules. */
+[data-one='tooltip'] { position: relative; display: inline-flex; }
+[data-one='tooltip-text'] { position: absolute; inset-block-end: 100%; inset-inline-start: 50%; translate: -50% -0.5rem;
+  padding: calc(0.375rem * var(--density)) calc(0.625rem * var(--density)); border-radius: var(--radius-sm);
+  background: var(--surface-3); color: var(--surface-3-ink); font-size: var(--t-sub); white-space: nowrap;
+  opacity: 0; pointer-events: none; }
+[data-one='tooltip']:focus-within [data-one='tooltip-text'] { opacity: 1; }
+[data-one='divider'] { display: flex; align-items: center; gap: var(--row-pad); }
 
 /* ⚠️ Hover is an enhancement. A touch device must never inherit one that sticks. */
 @media (pointer: fine) {
   [data-one='row'][data-interactive]:hover { background: var(--surface-2); }
   [data-one='tile']:hover [data-one='tile-face'] { background: var(--surface-3); }
   [data-one='quick-action']:hover [data-one='quick-action-well'] { background: var(--surface-3); }
+  [data-one='tooltip']:hover [data-one='tooltip-text'] { opacity: 1; }
 }
 /* ⚠️ And a coarse pointer gets the roomy scale at ANY width: a tablet is not a small desktop. */
 @media (pointer: coarse) { :root { --density: 1; } }

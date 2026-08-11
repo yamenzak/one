@@ -25,5 +25,7 @@ export * from "./components/shell.js";
 export * from "./components/primitives.js";
 export * from "./components/icon.js";
 export * from "./components/layout.js";
+export * from "./components/form.js";
+export * from "./components/data.js";
 export * from "./components/container.js";
 export * from "./components/overlay.js";

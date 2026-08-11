@@ -31,14 +31,32 @@ export interface Ground {
   readonly accent: Oklch;
 }
 
+/** Nothing reaches pure white: an absolute ceiling has nowhere left to go. */
+const CEIL = 0.999;
 /**
- * One step away from a surface.
+ * ⚠️ IN LIGHT, A STEP SPENDS A FRACTION OF WHAT IS LEFT rather than a fixed
+ * amount. See `step` — the fraction is high on purpose, so the page-to-card step
+ * gets most of the room.
+ */
+const LIGHT_REACH = 0.83;
+
+/**
+ * One step away from a surface, ALWAYS TOWARD THE LIGHT.
  *
- * ⚠️ THE DIRECTION IS WHICHEVER HAS HEADROOM, and that is not a detail. Elevation
- * as "always lighter" saturates: a near-white light-mode page reaches white at
- * the first step and every surface after it is the same colour, so an input
- * inside a card inside a sheet is one flat rectangle. Choosing the direction per
- * step means the ladder never runs out at either end of either theme.
+ * ⚠️ ELEVATION IS TOWARD THE LIGHT IN BOTH THEMES, and the first version of this
+ * was not. It stepped in whichever direction had more headroom, which on a
+ * near-white page means DOWN — so a light theme's cards came out grey on a white
+ * page, which reads as dusty rather than as lit. That is the single most common
+ * way a light theme looks cheap, and it was the rule rather than an accident.
+ *
+ * ⚠️ THE TWO THEMES USE DIFFERENT ARITHMETIC BECAUSE THE PHYSICS DIFFER. A dark
+ * ground has unlimited room above it, so a step is a fixed perceptual distance.
+ * A light ground has almost none, so a step spends a FRACTION of what remains —
+ * which puts most of the room into the page-to-card step, the one that carries
+ * the design, and leaves the deeper levels to be separated by ELEVATION. That is
+ * not a compromise: it is how a bright room works. Everything is already lit, so
+ * things are told apart by the shadows they cast, which is exactly why
+ * `--elevation` is a shadow in light and nothing at all in dark.
  *
  * ⚠️ AND IT CARRIES THE GROUND'S HUE. A card on a branded ground is a tinted
  * card without anybody choosing one — which is the whole reason a per-page
@@ -47,11 +65,10 @@ export interface Ground {
 export function step(from: Oklch, ground: Oklch, n = 1): Oklch {
   let current = from;
   for (let i = 0; i < n; i++) {
-    const up = 1 - current.l;
-    const down = current.l;
-    const delta = up >= down ? STEP_L : -STEP_L;
+    /* Which theme this is, read off the ground rather than passed in. */
+    const l = ground.l > 0.5 ? current.l + (CEIL - current.l) * LIGHT_REACH : current.l + STEP_L;
     current = {
-      l: Math.min(0.995, Math.max(0.02, current.l + delta)),
+      l: Math.min(CEIL, Math.max(0.02, l)),
       c: Math.min(ground.c * TINT, 0.06),
       h: ground.h,
     };
@@ -59,7 +76,15 @@ export function step(from: Oklch, ground: Oklch, n = 1): Oklch {
   return current;
 }
 
-/** The surface ladder for a ground: canvas, then as many steps as asked for. */
+/**
+ * The surface ladder for a ground: canvas, then as many steps as asked for.
+ *
+ * ⚠️ IN LIGHT, ONLY THE FIRST STEP IS A LIGHTNESS STEP. Page to card takes most
+ * of the room, and everything above the card is near-white — told apart by
+ * `--elevation-1..3` instead. In dark it is the mirror image: four lightness
+ * steps and no shadow at all. Asserting one rule for both is what would force
+ * either grey cards in light or invisible shadows in dark.
+ */
 export function surfaces(ground: Ground, depth = 3): readonly Oklch[] {
   const out: Oklch[] = [ground.canvas];
   for (let i = 1; i <= depth; i++) out.push(step(out[i - 1]!, ground.canvas));
