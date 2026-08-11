@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ACCOUNT_CSS } from "../src/account/home.css.js";
 import { SKY_CSS } from "../src/sky.css.js";
@@ -27,10 +28,24 @@ const props: AccountHomeProps = {
 const markupFor = (over: Partial<AccountHomeProps> = {}) =>
   renderToStaticMarkup(<AccountHome {...props} {...over} /> as never);
 
-/** Every class the markup actually puts on an element, across every state. */
+/*
+  ⚠️ RENDERED **AND** READ, because rendering alone cannot see the whole app. A
+  dialog is in a portal and a portal needs a document, so the presentation renders
+  to nothing on a server — and every class it wears would read as styled-and-unworn
+  by a check that only looked at output. The source scan is what covers the parts
+  of the interface that only exist in a browser.
+*/
+const sources = readdirSync("src", { recursive: true, encoding: "utf8" })
+  .filter((f) => f.endsWith(".tsx"))
+  .map((f) => readFileSync(`src/${f}`, "utf8"));
+
+/** Every class the interface actually puts on an element, across every state. */
 const used = new Set(
-  [markupFor(), markupFor({ workspaces: null }), markupFor({ workspaces: [] }), markupFor({ person: { email: "x@y.com" } })]
-    .flatMap((html) => [...html.matchAll(/class="([^"]+)"/g)])
+  [
+    ...[markupFor(), markupFor({ workspaces: null }), markupFor({ workspaces: [] }), markupFor({ person: { email: "x@y.com" } })]
+      .flatMap((html) => [...html.matchAll(/class="([^"]+)"/g)]),
+    ...sources.flatMap((src) => [...src.matchAll(/className="([^"]+)"/g)]),
+  ]
     .flatMap((m) => m[1]!.split(/\s+/))
     .filter(Boolean),
 );

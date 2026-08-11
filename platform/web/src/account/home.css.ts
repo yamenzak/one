@@ -78,7 +78,32 @@ body { margin: 0; background: var(--page); color: var(--ink);
   font: 400 16px/1.45 var(--font-text); word-spacing: 0.08em;
   -webkit-font-smoothing: antialiased; }
 h1, h2, p { margin: 0; padding: 0; }
-h1, h2 { word-spacing: normal; }
+h2 { word-spacing: normal; }
+
+/* ------------------------------------------------------------ the overlay */
+
+/* ⚠️ THE PRESENTATION, NOT THE SCREEN. Everything here is about a surface laid
+   OVER an app; the screen inside it does not know it is in one. */
+/* ⚠️ IT CARRIES THE GROUND, WHICH IS WHY THERE IS NO OVERLAY UNDER IT. The sky
+   bleeds past the capped column on purpose, so on a wide window a dimmed layer
+   underneath showed either side of the column and the two greys did not meet.
+   Opaque, full viewport, one ground. */
+/* ⚠️ IT RISES; IT DOES NOT APPEAR. A surface that arrives at full size is a
+   screen replacing a screen, which is what a navigation looks like. Coming up
+   from below is what says this was laid over something still there. */
+.over-content { position: fixed; inset: 0; z-index: 40; overflow-y: auto;
+  background: var(--page);
+  animation: over-up 320ms cubic-bezier(0.2, 0, 0.1, 1); }
+/* ⚠️ FOCUS LANDS HERE ON OPEN AND MUST NOT DRAW A RING. It is the surface, not a
+   control — a ring round the whole screen is the browser announcing that
+   something went wrong. Every control inside it keeps its own. */
+.over-content:focus, .over-content:focus-visible { outline: none; }
+@keyframes over-up { from { opacity: 0; translate: 0 22px; } }
+/* ⚠️ REMOVED, NOT SHORTENED. Someone who has asked for less motion is not asking
+   for the same motion in less time. */
+@media (prefers-reduced-motion: reduce) {
+  .over-content { animation: none; }
+}
 
 /* ⚠️ THE PAGE IS THE WHOLE SURFACE, and it is presented over the app rather than
    inside it — no navigation, no tabs, no product chrome. One column, capped: an
@@ -100,8 +125,8 @@ h1, h2 { word-spacing: normal; }
    edge, and centring the two together would push the mark off centre by exactly
    the width of a button. */
 .page-top { display: flex; flex-direction: column; gap: 26px; padding-block-end: 10px; }
-.page-top h1 { align-self: center; font-size: 25px; line-height: 1;
-  margin-block: 12px 6px; }
+.page-title { align-self: center; font-size: 25px; line-height: 1;
+  margin-block: 12px 6px; word-spacing: normal; }
 
 /* ⚠️ ONE OBJECT, NOT A MARK WITH A CAPTION BESIDE IT. Everything below is in
    service of that: the same face as the mark's construction, the same weight as
@@ -188,7 +213,15 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    repeated what the row title already says, and two workspaces starting with the
    same letter were indistinguishable — while the one thing a cross-product list
    has to make scannable was readable only as text. */
-.mark { border-radius: 14px; color: #fff; font-size: 17px; font-weight: 600; }
+/* ⚠️ A ROUNDED SQUARE AMONG CIRCLES, ON PURPOSE. Round is a symbol or a person;
+   a rounded square is a thing with an identity of its own. It also has to hold an
+   uploaded logo one day, and a logo in a circle is a logo with its corners cut
+   off. The radius is a quarter of the box — far enough from the circles that it
+   reads as a decision rather than as a value somebody nearly got right. */
+.mark { border-radius: 11px; color: #fff; font-size: 17px; font-weight: 600;
+  overflow: hidden; }
+.mark-image { inline-size: 100%; block-size: 100%; object-fit: cover; }
+.mark-letter { display: grid; place-items: center; inline-size: 100%; block-size: 100%; }
 .mark[data-product='kova'] { background: var(--p-kova); }
 .mark[data-product='scena'] { background: var(--p-scena); }
 .mark[data-product='tessa'] { background: var(--p-tessa); }

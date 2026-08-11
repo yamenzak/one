@@ -1,5 +1,10 @@
 /**
- * THE LIVE PAGE — every screen `@one/web` has, rendered from the real source.
+ * THE LIVE PAGE — every screen `@one/web` has, bundled from the real source.
+ *
+ * ⚠️ IT WRITES A COMPLETE DOCUMENT, DOCTYPE INCLUDED. A page served without one
+ * renders in quirks mode — percentage heights resolve differently, inheritance
+ * changes — and every judgement made from the picture is made about a page nobody
+ * will ever see. That happened once and it invalidated a whole review.
  *
  * ⚠️ THE CONTROLS ARE IN A SPEED DIAL, NOT A BAR. A bar across the top is part of
  * the picture: it sets the page down by its own height, it puts a second visual
@@ -7,65 +12,37 @@
  * page that has something above it which the product never will. The dial is one
  * small round control in a corner; closed, the page is exactly the page.
  *
- * ⚠️ IT WRITES A COMPLETE DOCUMENT, DOCTYPE INCLUDED. A page served without one
- * renders in quirks mode — a table stops inheriting colour, percentage heights
- * resolve differently — and every judgement made from the picture is made about a
- * page nobody will ever see. That happened, and it invalidated a whole review.
+ * ⚠️ EVERYTHING IS INLINED — bundle, sheets, fonts. The published page blocks
+ * every external host, and a blocked reference there does not fail loudly: the
+ * script never runs, the face silently falls back, and the picture is of
+ * something else.
  *
  * ⚠️ NOT SHIPPED CODE. Nothing in `src` may import this.
  */
 
-import { renderToStaticMarkup } from "react-dom/server";
+import { build } from "esbuild";
 import { readFileSync, writeFileSync } from "node:fs";
-import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 import { ACCOUNT_CSS } from "../src/account/home.css.js";
 import { FONTS, TYPE_CSS, fontFace } from "../src/brand/type.css.js";
-import { SKIES, SKY_CSS } from "../src/sky.css.js";
+import { SKY_CSS } from "../src/sky.css.js";
 
-/* ⚠️ INLINED, BECAUSE A PREVIEW IS ONE FILE. There is nowhere beside a single
-   HTML document to put a font, and the page it is published to blocks every
-   external host — a linked webfont there does not fail loudly, it silently falls
-   back, and the whole point of looking at the page is lost. Real apps serve the
-   same file from a URL; that is why the src is a parameter. */
 const FONT = FONTS.map((f) =>
   fontFace(f, `data:font/woff2;base64,${readFileSync(f.file).toString("base64")}`),
 ).join("\n");
 
-const noop = () => undefined;
-
-/* ⚠️ ONE PERSON, PLAUSIBLE, WITH A REAL SPREAD ACROSS PRODUCTS. Lorem in a screen
-   review is a way of not looking at it: names are what overflows, roles are what
-   repeats, and a workspace in trouble is the row the layout exists to surface. */
-const FULL: AccountHomeProps = {
-  person: { name: "Nadia Haddad", email: "nadia@haddadstrength.com" },
-  workspaces: [
-    { tenantId: "t1", slug: "haddad", name: "Haddad Strength", product: "kova", role: "Owner" },
-    { tenantId: "t2", slug: "barre", name: "Beirut Barre Collective", product: "kova", role: "Coach" },
-    { tenantId: "t3", slug: "corniche", name: "Corniche Screens", product: "scena", role: "Owner", standing: { label: "Payment failed", urgent: true } },
-    { tenantId: "t4", slug: "clinic", name: "Haddad Clinic", product: "tessa", role: "Member", standing: { label: "Trial · 6 days", urgent: false } },
-  ],
-  onGo: noop,
-  onClose: noop,
-};
-
-/*
-  ⚠️ THE STATES ARE ON THE PAGE, NOT DESCRIBED BESIDE IT. Not-answered-yet and
-  answered-and-empty are different screens, and the second is the one a product
-  ships without ever looking at — it is what a new person sees first.
-*/
-const CASES: readonly { readonly id: string; readonly label: string; readonly props: AccountHomeProps }[] = [
-  { id: "full", label: "four", props: FULL },
-  { id: "empty", label: "none", props: { ...FULL, workspaces: [] } },
-  { id: "waiting", label: "waiting", props: { ...FULL, workspaces: null } },
-  { id: "bare", label: "new", props: { person: { email: "b.okonkwo@gmail.com" }, workspaces: [], onGo: noop, onClose: noop } },
-];
-
 /*
   ⚠️ THE DIAL'S OWN LOOK IS DELIBERATELY NOT THE PRODUCT'S. It borrows no token
   and shares no class with the screen: a control that dresses like the thing being
-  reviewed is a control that gets reviewed by mistake.
+  reviewed is a control that gets reviewed by mistake. The same goes for the host
+  behind the presentation — it is a grey rectangle saying what it is, because
+  anything better would start being judged.
 */
-const DIAL = `
+const DEV = `
+.host { min-block-size: 100dvh; display: grid; place-content: center; gap: 14px; justify-items: center;
+  background: #101014; color: #6c6c76;
+  font: 400 14px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.host button { appearance: none; border: 1px solid #303038; background: #1b1b21; color: #c9c9d2;
+  border-radius: 8px; padding: 9px 14px; font: inherit; cursor: pointer; }
 .dial { position: fixed; inset-block-end: 18px; inset-inline-end: 18px; z-index: 999;
   display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
   font: 500 13px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; }
@@ -83,49 +60,30 @@ const DIAL = `
   background: rgb(28 28 32 / 0.94); color: #f2f2f4; font-size: 19px;
   box-shadow: 0 6px 22px rgb(0 0 0 / 0.35); backdrop-filter: blur(12px); }
 .dial[data-open] .dial-toggle { background: #f2f2f4; color: #16161a; }
-.case { display: none; }
-.case[data-live] { display: block; }
 @media print { .dial { display: none; } }
 `;
 
-const SCRIPT = `
-const dial = document.querySelector('.dial');
-document.querySelector('.dial-toggle').addEventListener('click', () => dial.toggleAttribute('data-open'));
-document.addEventListener('click', (e) => {
-  const b = e.target.closest('.dial-panel button');
-  if (!b) return;
-  [...b.parentElement.querySelectorAll('button')].forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-  if (b.dataset.act === 'theme') document.documentElement.dataset.theme = b.dataset.value;
-  if (b.dataset.act === 'sky') document.querySelectorAll('.sky').forEach((s) => { s.dataset.sky = b.dataset.value; });
-  if (b.dataset.act === 'case') {
-    document.querySelectorAll('.case').forEach((c) => c.toggleAttribute('data-live', c.dataset.case === b.dataset.value));
-  }
+const bundled = await build({
+  entryPoints: ["dev/mount.tsx"],
+  bundle: true,
+  write: false,
+  format: "iife",
+  target: "es2022",
+  jsx: "automatic",
+  minify: true,
+  /* ⚠️ PRODUCTION, OR REACT SHIPS ITS DEVELOPMENT BUILD — which is several times
+     the size and prints warnings into a console nobody has open on a phone. */
+  define: { "process.env.NODE_ENV": '"production"' },
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dial.removeAttribute('data-open'); });
-`;
-
-const group = (act: string, label: string, options: readonly { readonly value: string; readonly label: string }[]) =>
-  `<div class="dial-group"><span>${label}</span>${options
-    .map((o, i) => `<button data-act="${act}" data-value="${o.value}" aria-pressed="${i === 0}">${o.label}</button>`)
-    .join("")}</div>`;
+const script = bundled.outputFiles[0]!.text;
 
 const html = `<!doctype html><html lang="en" data-theme="dark"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Account — @one/web</title>
-<style>${FONT}</style><style>${TYPE_CSS}</style><style>${ACCOUNT_CSS}</style><style>${SKY_CSS}</style><style>${DIAL}</style>
-</head><body>
-${CASES.map((c, i) => `<div class="case" data-case="${c.id}"${i === 0 ? " data-live" : ""}>${
-  renderToStaticMarkup(<AccountHome {...c.props} /> as never)
-}</div>`).join("\n")}
-<div class="dial">
-  <div class="dial-panel">
-    ${group("case", "state", CASES.map((c) => ({ value: c.id, label: c.label })))}
-    ${group("sky", "sky", SKIES.map((s) => ({ value: s, label: s })))}
-    ${group("theme", "theme", [{ value: "dark", label: "dark" }, { value: "light", label: "light" }])}
-  </div>
-  <button class="dial-toggle" type="button" aria-label="Preview controls">⚙</button>
-</div>
-<script>${SCRIPT}</script>
+<title>Account Center — @one/web</title>
+<style>${FONT}</style><style>${TYPE_CSS}</style><style>${ACCOUNT_CSS}</style>
+<style>${SKY_CSS}</style><style>${DEV}</style>
+</head><body><div id="root"></div>
+<script>${script}</script>
 </body></html>`;
 
 const out = process.argv[2] ?? "account.html";

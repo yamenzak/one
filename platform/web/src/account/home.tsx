@@ -17,7 +17,8 @@
  * tokens, rules and guards come after the screens are agreed, not before.
  */
 
-import type { ReactNode } from "react";
+import type { ElementType, ReactNode } from "react";
+import * as Avatar from "@radix-ui/react-avatar";
 import type { Sky } from "../sky.css.js";
 import { Lockup } from "../brand/mark.js";
 
@@ -41,6 +42,12 @@ export interface Workspace {
   /** What this person is here. The membership row's role. */
   readonly role: string;
   /**
+   * ⚠️ THE WORKSPACE'S OWN MARK, when it has uploaded one. Absent is the ordinary
+   * case and it falls back to the initial on the product's colour — which is why
+   * this is the one place on the screen that needs an avatar rather than a box.
+   */
+  readonly logo?: string;
+  /**
    * ⚠️ ONLY WHEN IT IS NOT FINE. A standing on every row is a column of green
    * nobody reads, and the one that matters stops standing out.
    */
@@ -55,13 +62,21 @@ export interface AccountHomeProps {
   readonly workspaces: readonly Workspace[] | null;
   readonly onGo: (to: string) => void;
   readonly onClose: () => void;
+  /**
+   * ⚠️ THE ELEMENT THAT NAMES THE SCREEN BELONGS TO WHOEVER PRESENTS IT. Standing
+   * on its own this is an `h1`; inside a dialog the title is what LABELS the
+   * dialog, so the presenter passes its own and the name exists once. The
+   * alternative — a visually hidden second copy — is a name written twice, and
+   * then changed in one place.
+   */
+  readonly Heading?: ElementType;
 }
 
 /* ------------------------------------------------------------------ view --- */
 
 const PRODUCT_NAME: Record<Product, string> = { kova: "Kova", scena: "Scena", tessa: "Tessa" };
 
-export function AccountHome({ person, workspaces, sky = "silk", onGo, onClose }: AccountHomeProps) {
+export function AccountHome({ person, workspaces, sky = "silk", onGo, onClose, Heading = "h1" }: AccountHomeProps) {
   return (
     <div className="page">
       {/* ⚠️ BEHIND THE TOP, NOT BEHIND THE PAGE. The light falls where the screen
@@ -79,7 +94,7 @@ export function AccountHome({ person, workspaces, sky = "silk", onGo, onClose }:
         {/* ⚠️ × AND NOT AN ARROW. This is the root of a presentation laid over the
             app, so the control dismisses it rather than walking back through it. */}
         <button type="button" className="round-button" aria-label="Close" onClick={onClose}><Close /></button>
-        <h1><Lockup word="Account Center" /></h1>
+        <Heading className="page-title"><Lockup word="Account Center" /></Heading>
       </header>
 
       <section>
@@ -116,7 +131,7 @@ export function AccountHome({ person, workspaces, sky = "silk", onGo, onClose }:
             {workspaces.map((w) => (
               <Item
                 key={w.tenantId}
-                mark={<span className="well mark" data-product={w.product} aria-hidden="true">{w.name.slice(0, 1)}</span>}
+                mark={<WorkspaceMark workspace={w} />}
                 title={w.name}
                 /* ⚠️ THE STANDING SITS ON THE SECOND LINE, WITH THE REST OF THE
                    METADATA. Beside the title it competed with the one thing that
@@ -162,6 +177,29 @@ export function AccountHome({ person, workspaces, sky = "silk", onGo, onClose }:
 
 /* ⚠️ Local on purpose. Used several times on ONE screen, which is not yet
    evidence that the platform needs them — a second SCREEN is. */
+
+/**
+ * ⚠️ A ROUNDED SQUARE WHERE EVERY OTHER MARK ON THIS SCREEN IS A CIRCLE, and the
+ * difference is the rule rather than an oversight: round is a SYMBOL or a PERSON,
+ * a rounded square is a THING WITH ITS OWN IDENTITY. A workspace is the second —
+ * it has a name its owner chose and, before long, a logo they uploaded, and a
+ * logo in a circle is a logo with its corners cut off. The icons above it will
+ * never hold an image, so they never face that.
+ *
+ * ⚠️ AND IT IS AN AVATAR RATHER THAN A BOX BECAUSE OF THAT IMAGE. A plain `<img>`
+ * with the initial behind it shows the initial for as long as the request takes
+ * and then swaps — on a list of four, four flashes. Radix's avatar holds the
+ * fallback until the image has actually decoded, and shows it forever if it
+ * never does.
+ */
+const WorkspaceMark = ({ workspace }: { readonly workspace: Workspace }): ReactNode => (
+  <Avatar.Root className="well mark" data-product={workspace.product}>
+    <Avatar.Image className="mark-image" src={workspace.logo} alt="" />
+    {/* ⚠️ NOT READ ALOUD. The row's title is the workspace's name; an initial
+        announced beside it is the same word twice, one letter of it. */}
+    <Avatar.Fallback className="mark-letter" aria-hidden="true">{workspace.name.slice(0, 1)}</Avatar.Fallback>
+  </Avatar.Root>
+);
 
 function Item({ icon, mark, title, detail, iconTone, onGo }: {
   readonly icon?: ReactNode;
