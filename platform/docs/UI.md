@@ -125,7 +125,95 @@ the attribute does not apply to the default. Getting this wrong renders one
 theme's text on the other theme's ground.
 *Checked: `web/test/css.test.tsx` — "defines every colour in all three theme scopings".*
 
-### 2.6 Looking
+### 2.6 Motion
+
+**Nobody invents a duration or a curve.** — Before the motion module one screen's
+stylesheet carried eight ad-hoc `cubic-bezier`s and eight ad-hoc millisecond
+values, each written by somebody reaching for a number that felt right at that
+moment and each slightly different from the rest. That is what an interface
+moving at eleven speeds is: not a decision, the absence of one. Four curves
+(`--enter` `--exit` `--move` `--spring`) and five durations (`--quick` `--swift`
+`--settle` `--arrive` `--step`).
+*Checked: `web/test/vocabulary.test.ts` — no curve and no sub-two-second duration
+outside `motion.css.ts`.*
+
+**Entering and leaving are not the same curve.** — A thing arriving is fastest at
+the start and settles, because it is coming to rest somewhere and the eye wants
+to see where. A thing leaving starts slowly and accelerates away, because it is
+already irrelevant and dwelling on it makes the next thing feel late. Symmetric
+easing on both is what makes motion read as *animated* rather than as physical.
+
+**Weight is travel and time together.** — 14 pixels over 320ms read as brisk
+rather than substantial: too little distance to see the deceleration, too little
+time for the eye to follow it. The same movement at 26 pixels over half a second
+has mass. Neither lever alone does it.
+
+**A press releases slowly and answers instantly.** — Down in 150ms so the control
+is under the finger before the finger notices; back over half a second on a
+spring that overshoots. Making the *release* longer is most of what separates a
+control that feels sprung from one that feels like a state change. `cubic-bezier`
+cannot overshoot at all — it is bounded by its endpoints — so the spring is
+sampled into `linear()`.
+
+**An icon moves the way its own parts would.** — Four generic verbs applied
+across a set makes every icon move like every other one, which is tidy and dead.
+A key turns about its *hole*, which is the one point a key does not move through;
+a download's arrow falls into a tray that stays, because arriving *into*
+something is the whole gesture. What stays shared is the timing.
+*Checked: `web/test/icon.test.tsx` — every icon's shape is pinned, because the
+movements address SVG children by position and Lucide redraws icons between
+versions. A redrawn icon does not fail; it animates the wrong part, quietly.*
+
+**Ambient motion is not on the interface scale.** — A sky drifting over
+fifty-four seconds and a face breathing over nine are weather: nothing is
+responding to anybody, and their rate *is* the effect. The line is two seconds,
+and it is a distinction rather than a convenience.
+
+**Reduced motion is removed, not shortened, and the rule is universal.** — A
+person who has turned motion down is not asking for the same motion faster. The
+rule uses `*` rather than a list of classes, because a rule that names what it
+knows about silently stops covering the next thing somebody writes.
+
+### 2.7 Shape
+
+**Round is a symbol or a person; a rounded square is a thing with an identity of
+its own.** — The workspace mark was 14px on a 44px box, close enough to the
+circles beside it to read as a value somebody nearly got right rather than a
+decision. A workspace has a name its owner chose and a logo they will upload, and
+a logo in a circle is a logo with its corners cut off.
+
+**A single row of interactive content is a pill; a container of rows is a card.**
+— A 15px rounded rectangle sat directly above a fully rounded action, in the same
+sheet, at the same width.
+
+**Dismissible is one property, not three.** — Dragging a sheet down, pressing
+outside it and pressing Escape are the same statement: *I am leaving without
+deciding.* A sheet that allows one allows all three; a sheet that allows none
+says so with an × and refuses the other two. Wiring them separately produces the
+sheet that cannot be dragged away but vanishes when a thumb brushes the ground
+behind it.
+
+**A grabber is a claim, so it appears only where it is true.** — A bar at the top
+of a sheet is the one piece of furniture that means *pull me*.
+
+### 2.8 Failure
+
+**A failure is a `Problem`, never a string.** — The platform already refuses to
+hand a provider's prose to a person, so what comes back is a title we wrote, a
+detail composed from structured values, per-field messages for a form to place in
+place, whether retrying could plausibly work, and a reference the person can
+quote to support. Rendering that as `String(err)` in a toast throws away all
+five. Per-field goes under its field; anything else sits with the action that
+caused it.
+
+**Working is not off.** — The saving state shared the disabled look — the same
+attribute, the opposite meaning — so a button mid-round-trip read as broken.
+
+**A disabled control says why.** — "Nothing has changed" is a different dead end
+from "that is not an email address", and a control that is off with no
+explanation is neither.
+
+### 2.9 Looking
 
 **The preview renders in the mode that ships.** — An HTML file opened directly
 has no doctype and puts the browser in quirks mode, where a table stops
@@ -140,16 +228,34 @@ ended this way.
 *Checked: `scripts/sheets.mjs`, run before the package's own tests. It scans raw
 text, so it reports the cause on a file that no longer parses.*
 
-## 3. What is not decided yet
+## 3. What was extracted, and when
+
+Two screens is what it took. `ui.css.ts` holds every shape both of them needed;
+`screen.tsx` and `list.tsx` hold the components; `account/account.css.ts` is four
+rules long, and its being short is the measure of whether this worked.
+
+| Moved out | Because |
+|---|---|
+| `Screen`, `Section`, `Title` | both screens; and the way OUT is a property of where a screen sits, which two got right by hand and the third would not have |
+| `Card`, `Item`, `Entry`, `Pill`, `Waiting`, `Blank` | `Item` six times, `Entry` three, the card in both |
+| `ui.css.ts` | the sheet was named for the account and held the sheet, the field and the action — all of which the platform's own `sheet.tsx` already used |
+| `mark.css.ts` | the lockup's spacing is a fact about the brand, not about a screen |
+| `Sheet`, `ValueEditor`, `Face`, `Icon`, `feedback` | each moved at its second use, before this |
+
+What stayed: the centred lockup title, the name-beside-a-face header, and the
+photo control — one use each. The next screen that wants a face beside its title
+is what moves them.
+
+## 4. What is not decided yet
 
 Named so that nobody assumes it was. Each becomes a rule when a screen needs it:
 
-- a type scale — the account home uses five sizes and has not had to justify them
-- spacing beyond `--gap` and `--pad`
+- a type scale — the two screens use six sizes and have not had to justify them
+- spacing beyond `--pad`, and the gaps in `.page` and `section`
 - how a tenant's own brand reaches a platform screen
-- motion of any kind: nothing on this screen moves
-- what a component is allowed to be before it is extracted
+- a second sheet, which is what will say whether `dismissible: false` was right
+- forms with more than one field: every editor so far edits exactly one value
 
-The three product colours in `web/src/account/home.css.ts` are **placeholders**,
-present only so a cross-product list can be scanned at all. They become a lookup
-the moment a product has a real mark.
+The three product colours in `web/src/ui.css.ts` are **placeholders**, present so
+a cross-product list can be scanned when a workspace has no face yet. They become
+a lookup the moment a product has a real mark.

@@ -164,6 +164,13 @@ export const MOTION_CSS = `
   0%, 100% { scale: 1; rotate: 0deg; }
   50% { scale: 1.035; rotate: 0.8deg; }
 }
+/* ⚠️ A WAIT HAS NO DURATION, WHICH IS WHY ITS RATE IS AMBIENT. Nothing is
+   responding — the ring turns for as long as the answer takes — so its period is
+   the effect rather than a response time, and it belongs here beside the
+   breathing rather than in the sheet of whichever screen happened to need it. */
+@keyframes spin { to { rotate: 360deg; } }
+.spin { animation: spin 2s linear infinite; }
+
 .alive { animation: breathe 9s ease-in-out infinite; }
 /* ⚠️ THE TICK DRAWS ITSELF, because a tick that fades in is a tick that was
    always there. The dash length is the path's own, so the stroke travels from the

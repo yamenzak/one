@@ -1,18 +1,27 @@
 /**
- * THE ACCOUNT CENTRE'S STYLESHEET.
+ * THE VOCABULARY — every shape the platform's screens are made of.
  *
- * ⚠️ IT FOLLOWS A REFERENCE, AND NOTHING IN IT IS A PLATFORM DECISION YET. The
- * values are written for these screens; tokens, rules and guards come out of
- * them once the screens are agreed, not before. What is here is a stylesheet for
- * one surface, and it is meant to be read as one.
+ * ⚠️ IT WAS EXTRACTED, NOT DESIGNED. Every rule here was written for a screen
+ * first and moved when a second screen needed it. That order is the whole method:
+ * a component library written in advance can only contain what its author already
+ * thought of, and the last attempt at this had four laws, five archetypes and
+ * ninety-one guards, and shipped a card with no padding, a menu with no trigger
+ * and a form with no button row.
  *
- * ⚠️ BOTH THEMES FROM THE FIRST LINE. The viewer has three states, not two: an
- * explicit choice stamps `data-theme`, and the default setting stamps nothing —
- * so the bare block is light, the media query handles the un-stamped default,
- * and the attribute wins in both directions.
+ * ⚠️ WHAT IS NOT HERE IS AS DELIBERATE AS WHAT IS. A shape with one use stays in
+ * the screen that uses it — see `account/account.css.ts`, which is four rules
+ * long. The moment a second screen wants one, it moves here, and the move is the
+ * evidence.
+ *
+ * ⚠️ NOTHING IN HERE NAMES A COLOUR, A DURATION OR A CURVE. They are declared once
+ * — the palette below, the motion in `motion.css.ts` — and everything else refers
+ * to them. `test/vocabulary.test.ts` fails on a literal, because a one-off
+ * `220ms` is how an interface comes to move at eleven different speeds without
+ * anybody deciding that.
  */
 
-export const ACCOUNT_CSS = `
+export const UI_CSS = `
+
 :root {
   --page: #f2f2f6;
   --card: #ffffff;
@@ -123,27 +132,7 @@ h2 { word-spacing: normal; }
    edge, and centring the two together would push the mark off centre by exactly
    the width of a button. */
 .page-top { display: flex; flex-direction: column; gap: 26px; padding-block-end: 10px; }
-.page-title { align-self: center; font-size: 25px; line-height: 1;
-  margin-block: 12px 6px; word-spacing: normal; }
 
-/* ⚠️ ONE OBJECT, NOT A MARK WITH A CAPTION BESIDE IT. Everything below is in
-   service of that: the same face as the mark's construction, the same weight as
-   its strokes, a gap measured against its own stem rather than against a word
-   space, and no second colour or opacity to tell the two halves apart. */
-/* ⚠️ THE GAP IS A STEM, NOT A SPACE. At a word space the pair reads as two
-   things that happen to be adjacent; at roughly the width of the mark's own
-   stroke it reads as the spacing INSIDE a piece of lettering, which is what a
-   lockup is. */
-.lockup { display: inline-flex; align-items: center; gap: 0.26em; }
-/* ⚠️ ALIGNED ON THE FOUR'S BASELINE, NOT ON THE BOX. The star hangs below the
-   figure and the degree sits above it, so the mark's box is taller than the mark
-   READS — centred by boxes, the four floats above the word it is set with. The
-   nudge is the overhang, and it is what makes the two share a footing. */
-.brand-mark { display: block; translate: 0 0.02em; }
-/* ⚠️ THE SAME WEIGHT AS THE MARK'S STROKES, AND THE SAME INK. A lighter or
-   greyed word is a caption; the mark and the name of the surface are one object
-   here, so neither is allowed to be the quiet one. */
-.lockup-word { font-family: var(--font-brand); font-weight: 600; letter-spacing: -0.035em; }
 /* ⚠️ A ROUND CONTROL ON ITS OWN LINE, above the title rather than beside it. It
    is a way OUT of a presentation, not a thing in the heading — putting it in the
    heading row makes the title jump left and right as the control changes. */
@@ -154,33 +143,6 @@ h2 { word-spacing: normal; }
 .round-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .lede { color: var(--ink-quiet); font-size: 15px; line-height: 1.45; }
-
-/* ⚠️ A SCREEN INSIDE THE PRESENTATION IS NAMED AT THE START OF THE LINE. The home
-   is named by the brand — a lockup, on the axis of the page, recognised rather
-   than read. Everything under it is named by what it is, and a heading that is
-   read belongs where reading starts. */
-.title-row { display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  margin-block-start: 8px; }
-.page-name { font-family: var(--font-brand); font-size: 32px; font-weight: 600;
-  letter-spacing: -0.03em; line-height: 1.05; word-spacing: normal; }
-
-/* ⚠️ THE FACE IS SHOWN, NOT DESCRIBED, and pressing it changes it. A row saying
-   "Profile photo ›" is the only thing on this screen that could have been read
-   off the screen it came from — the point of arriving here is seeing it. */
-.portrait { position: relative; flex: none; border: 0; padding: 0; background: none;
-  cursor: pointer; border-radius: var(--radius-well); }
-.portrait:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.portrait-face { inline-size: 62px; block-size: 62px; background: var(--well);
-  font-size: 24px; color: var(--ink-quiet); }
-/* ⚠️ A SHADOW, NOT A RING. It had a ring in the page's own colour, which is only
-   the right colour where the page is flat — over the light at the top of a screen
-   the ring was a black circle cut out of a blue field. A shadow separates it from
-   whatever is actually behind it, including a photograph. */
-.portrait-badge { position: absolute; inset-block-end: -1px; inset-inline-end: -1px;
-  inline-size: 26px; block-size: 26px; border-radius: var(--radius-well);
-  display: grid; place-items: center;
-  background: var(--ink); color: var(--page);
-  box-shadow: 0 1px 5px rgb(0 0 0 / 0.4); }
 
 /* ------------------------------------------------------------------ fields */
 
@@ -348,8 +310,6 @@ h2 { word-spacing: normal; }
 .primary[data-state='saved']:disabled { background: var(--ok); color: var(--card); }
 .primary-label { line-height: 1; }
 .primary-sign { flex: none; }
-.spin { animation: spin 800ms linear infinite; }
-@keyframes spin { to { rotate: 360deg; } }
 
 
 

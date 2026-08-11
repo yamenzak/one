@@ -10,7 +10,9 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ACCOUNT_CSS } from "../src/account/home.css.js";
+import { ACCOUNT_CSS } from "../src/account/account.css.js";
+import { MARK_CSS } from "../src/brand/mark.css.js";
+import { UI_CSS } from "../src/ui.css.js";
 import { SKY_CSS } from "../src/sky.css.js";
 import { TYPE_CSS } from "../src/brand/type.css.js";
 import { MOTION_CSS } from "../src/motion.css.js";
@@ -58,7 +60,7 @@ const used = new Set(
 );
 
 /* Comments state the rules and would match them. Only declarations are read. */
-const rules = [ACCOUNT_CSS, SKY_CSS, TYPE_CSS, MOTION_CSS].join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
+const rules = [UI_CSS, ACCOUNT_CSS, MARK_CSS, SKY_CSS, TYPE_CSS, MOTION_CSS].join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
 
 describe("the stylesheet and the markup are the same set of names", () => {
   /*
