@@ -31,14 +31,16 @@
 
 import type { ReactNode } from "react";
 import {
-  ArrowLeft, Camera, Check, ChevronRight, Download, HeartCrack, KeyRound, Mail,
-  MonitorSmartphone, Pencil, Plus, Shield, SlidersHorizontal, X, type LucideIcon,
+  ArrowLeft, Camera, Check, ChevronRight, Download, HeartCrack, KeyRound, Languages,
+  Mail, MonitorSmartphone, Pencil, Plus, Ruler, Shield, SlidersHorizontal, SunMoon,
+  Vibrate, Volume2, X, type LucideIcon,
 } from "lucide-react";
 
 /** The name the stylesheet animates by. Closed: a new icon adds a rule. */
 export type IconName =
   | "key" | "adjust" | "guard" | "save" | "heartbreak" | "letter" | "device"
-  | "edit" | "lens" | "onward" | "close" | "back" | "tick" | "add";
+  | "edit" | "lens" | "onward" | "close" | "back" | "tick" | "add"
+  | "light" | "tongue" | "measure" | "buzz" | "sound";
 
 export interface IconProps {
   readonly size?: number;
@@ -88,6 +90,16 @@ export const Back = draw(ArrowLeft, "back", 20);
 export const Tick = draw(Check, "tick", 19);
 export const Add = draw(Plus, "add", 18);
 
+/* Preferences — each one is the thing it sets, not a symbol borrowed from a
+   neighbour. Sliders for a theme, an envelope for a language and a shield for a
+   unit were all exactly that, and each of them means something else two screens
+   away. */
+export const Light = draw(SunMoon, "light", 21);
+export const Tongue = draw(Languages, "tongue", 21);
+export const Measure = draw(Ruler, "measure", 21);
+export const Buzz = draw(Vibrate, "buzz", 21);
+export const Sound = draw(Volume2, "sound", 21);
+
 /**
  * ⚠️ WHAT EACH ICON IS MADE OF, so a test can hold Lucide to it. The order is the
  * order the elements appear in, and the CSS addresses them by exactly that.
@@ -107,4 +119,9 @@ export const ICON_PARTS: Readonly<Record<IconName, readonly string[]>> = {
   back: ["path", "path"],
   tick: ["path"],
   add: ["path", "path"],
+  light: ["path", "path", "path", "path", "path"],
+  tongue: ["path", "path", "path", "path", "path", "path"],
+  measure: ["path", "path", "path", "path", "path"],
+  buzz: ["path", "path", "rect"],
+  sound: ["path", "path", "path"],
 };

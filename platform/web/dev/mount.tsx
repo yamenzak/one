@@ -28,8 +28,9 @@ import type { Problem } from "@one/kernel";
 import { AccountCenter } from "../src/account/center.js";
 import { AccountDetails } from "../src/account/details.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
+import { PreferencesScreen, type Preferences } from "../src/account/preferences.js";
 import { SignInMethods } from "../src/account/signin.js";
-import { configureFeedback, feel } from "../src/feedback.js";
+import { configureFeedback, feel, FEEDBACK_DEFAULT } from "../src/feedback.js";
 
 /* ⚠️ BAKED AT BUILD TIME BY `dev/page.tsx`, standing in for the route that will
    serve a generated face from a seed. Keyed the way the API will key it: a
@@ -88,26 +89,26 @@ const ROUND_TRIP_MS = 900;
 
 const asked = new URLSearchParams(location.hash.slice(1));
 
-const ON_OFF = ["on", "off"] as const;
-type OnOff = (typeof ON_OFF)[number];
-
 function Preview() {
   const [open, setOpen] = useState(true);
-  const [at, setAt] = useState<"home" | "details" | "signin">("home");
+  const [at, setAt] = useState<"home" | "details" | "signin" | "prefs">("home");
   const [which, setWhich] = useState((asked.get("state") ?? "four") as keyof typeof CASES);
   const [outcome, setOutcome] = useState((asked.get("save") ?? "ok") as keyof typeof OUTCOMES);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
-  /* ⚠️ SOUND ON HERE AND OFF EVERYWHERE ELSE. This is the one place the note is
-     meant to be heard rather than chosen — a preview whose job is showing what a
-     save feels like cannot ship with the quiet default. */
-  const [haptics, setHaptics] = useState<OnOff>("on");
-  const [sound, setSound] = useState<OnOff>("on");
+  const [prefs, setPrefs] = useState<Preferences>({
+    /* ⚠️ THE SHIPPED DEFAULTS, not a convenient pair. Sound on in the fixture
+       makes every screenshot a picture of a setting nobody chose. */
+    theme: "dark", units: "metric", language: "en", ...FEEDBACK_DEFAULT,
+  });
   const [dial, setDial] = useState(false);
 
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
+  /* ⚠️ THE DIAL AND THE SCREEN SET THE SAME THING, which is the point: the
+     preference screen is now the real surface, and the dial only survives so a
+     note can be played without saving anything. */
   useEffect(() => {
-    configureFeedback({ haptics: haptics === "on", sound: sound === "on" });
-  }, [haptics, sound]);
+    configureFeedback({ haptics: prefs.haptics, sound: prefs.sound });
+  }, [prefs.haptics, prefs.sound]);
 
   const save = async (): Promise<Problem | null> => {
     await new Promise((r) => setTimeout(r, ROUND_TRIP_MS));
@@ -129,7 +130,20 @@ function Preview() {
   ];
 
   const screen = ({ Heading }: { readonly Heading: ElementType }) =>
-    at === "signin" ? (
+    at === "prefs" ? (
+      <PreferencesScreen
+        prefs={prefs}
+        Heading={Heading}
+        onSet={async (key, value) => {
+          /* The preview applies what the real write would, so the screen shows
+             the value it will actually have rather than the one it was asked for. */
+          setPrefs((p) => ({ ...p, [key]: value }));
+          if (key === "theme") setTheme(value as "dark" | "light");
+          return save();
+        }}
+        onBack={() => setAt("home")}
+      />
+    ) : at === "signin" ? (
       <SignInMethods
         email={(CASES[which] ?? CASES.four).person.email}
         /* ⚠️ `#keys=one` IS ITS OWN KNOB because the LAST passkey is a different
@@ -151,6 +165,7 @@ function Preview() {
         onGo={(to) => {
           if (to === "account.profile") setAt("details");
           if (to === "account.security") setAt("signin");
+          if (to === "account.preferences") setAt("prefs");
         }}
         onClose={() => setOpen(false)}
       />
@@ -182,12 +197,10 @@ function Preview() {
 
       <div className="dial" data-open={dial ? "" : undefined} onPointerDown={(e) => e.stopPropagation()}>
         <div className="dial-panel">
-          <Group label="screen" value={at} options={["home", "details", "signin"] as const} onPick={setAt} />
+          <Group label="screen" value={at} options={["home", "details", "signin", "prefs"] as const} onPick={setAt} />
           <Group label="workspaces" value={which} options={Object.keys(CASES) as (keyof typeof CASES)[]} onPick={setWhich} />
           <Group label="save" value={outcome} options={Object.keys(OUTCOMES) as (keyof typeof OUTCOMES)[]} onPick={setOutcome} />
           <Group label="theme" value={theme} options={["dark", "light"] as const} onPick={setTheme} />
-          <Group label="haptics" value={haptics} options={ON_OFF} onPick={setHaptics} />
-          <Group label="sound" value={sound} options={ON_OFF} onPick={setSound} />
           {/* ⚠️ A NOTE YOU CANNOT HEAR WITHOUT SAVING SOMETHING IS A NOTE NOBODY
               REVIEWS. Both, side by side, because the whole question is whether
               they are distinguishable. */}

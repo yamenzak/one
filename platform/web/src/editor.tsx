@@ -25,12 +25,13 @@
  * the sheet closes itself on saved, after long enough to have been seen.
  */
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { Problem } from "@one/kernel";
 import { Button } from "./button.js";
 import { useCommit } from "./commit.js";
-import { Close, Tick } from "./icon.js";
+import { Field } from "./field.js";
+import { Tick } from "./icon.js";
 import { Sheet } from "./sheet.js";
 
 /** What a value is, which is all the sheet needs to draw the right control. */
@@ -193,8 +194,6 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
     () => onSave(field.name, value.trim()),
     onClose,
   );
-  const inputId = useId();
-  const noteId = useId();
   const trimmed = value.trim();
   const local = field.check?.(trimmed) ?? null;
   const unchanged = trimmed === field.value.trim();
@@ -217,42 +216,23 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
         {field.lede ? <p className="lede">{field.lede}</p> : null}
       </header>
 
-      <div className="field">
-        <label className="field-label" htmlFor={inputId}>{field.label}</label>
-        {/* ⚠️ THE CLEAR IS INSIDE THE FIELD AND ONLY WHEN THERE IS SOMETHING TO
-            CLEAR. A control that is always there but does nothing half the time
-            is one the person learns to distrust. */}
-        <div className="field-box" data-wrong={shown ? "" : undefined}>
-          <input
-            id={inputId}
-            className="field-input"
-            name={field.name}
-            type={field.kind === "email" ? "email" : "text"}
-            inputMode={field.kind === "email" ? "email" : undefined}
-            autoComplete={field.kind === "email" ? "email" : "name"}
-            autoCapitalize={field.kind === "email" ? "none" : "words"}
-            spellCheck={false}
-            maxLength={field.maxLength}
-            placeholder={field.placeholder}
-            value={value}
-            aria-invalid={shown ? true : undefined}
-            aria-describedby={shown ? noteId : undefined}
-            onChange={(e) => {
-              setValue(e.target.value);
-              /* A failure describes a value that no longer exists. */
-              reset();
-            }}
-            autoFocus
-          />
-          {value ? (
-            <button type="button" className="field-clear press" aria-label="Clear"
-              onClick={() => { setValue(""); reset(); }}>
-              <Close size={15} />
-            </button>
-          ) : null}
-        </div>
-        {shown ? <p className="note wrong" id={noteId}>{shown}</p> : null}
-      </div>
+      <Field
+        label={field.label}
+        name={field.name}
+        type={field.kind === "email" ? "email" : "text"}
+        inputMode={field.kind === "email" ? "email" : undefined}
+        autoComplete={field.kind === "email" ? "email" : "name"}
+        autoCapitalize={field.kind === "email" ? "none" : "words"}
+        spellCheck={false}
+        maxLength={field.maxLength}
+        placeholder={field.placeholder}
+        value={value}
+        wrong={shown}
+        clearable
+        autoFocus
+        /* A failure describes a value that no longer exists. */
+        onValue={(next) => { setValue(next); reset(); }}
+      />
 
       {/* ⚠️ A GENERAL FAILURE SITS WITH THE ACTION THAT CAUSED IT, not at the top
           of a screen the person has scrolled away from. `ref` is quiet and it is

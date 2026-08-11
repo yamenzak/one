@@ -45,8 +45,6 @@ export type Note = "done" | "wrong";
 */
 let settings: FeedbackSettings = FEEDBACK_DEFAULT;
 
-// DEFER(one-180) stage:7 — the switch for these on Preferences. Until it exists
-// the app can only configure them at boot, so nobody can turn the sound on.
 export const configureFeedback = (next: FeedbackSettings): void => { settings = next; };
 export const feedbackSettings = (): FeedbackSettings => settings;
 

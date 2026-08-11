@@ -22,10 +22,11 @@
  * wearing a question mark.
  */
 
-import { useId, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Problem } from "@one/kernel";
 import { Button } from "./button.js";
 import { useCommit } from "./commit.js";
+import { Field } from "./field.js";
 import { Tick } from "./icon.js";
 import { Sheet } from "./sheet.js";
 
@@ -75,7 +76,6 @@ export function Confirm({ open, title, lede, verb, gate, tone, onConfirm, onClos
 function Asking({ title, lede, verb, gate = { kind: "press" }, tone, onConfirm, onClose }: Omit<ConfirmProps, "open">) {
   const [typed, setTyped] = useState("");
   const [ticked, setTicked] = useState(false);
-  const inputId = useId();
   const { state, run, reset } = useCommit(onConfirm, onClose);
 
   const passed =
@@ -93,24 +93,19 @@ function Asking({ title, lede, verb, gate = { kind: "press" }, tone, onConfirm, 
       </header>
 
       {gate.kind === "type" ? (
-        <div className="field">
-          {/* ⚠️ THE PHRASE IS SHOWN. Hiding it makes this a memory test, which
-              fails the careful and passes the lucky — and somebody who genuinely
-              means to do this then has to leave to go and look it up. */}
-          <label className="field-label" htmlFor={inputId}>{gate.label}</label>
-          <div className="field-box">
-            <input
-              id={inputId}
-              className="field-input"
-              value={typed}
-              placeholder={gate.phrase}
-              autoComplete="off"
-              autoCorrect="off"
-              spellCheck={false}
-              onChange={(e) => { setTyped(e.target.value); reset(); }}
-            />
-          </div>
-        </div>
+        /* ⚠️ THE PHRASE IS SHOWN, as the placeholder. Hiding it makes this a
+            memory test, which fails the careful and passes the lucky — and
+            somebody who genuinely means to do this then has to leave to go and
+            look it up. */
+        <Field
+          label={gate.label}
+          value={typed}
+          placeholder={gate.phrase}
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          onValue={(next) => { setTyped(next); reset(); }}
+        />
       ) : null}
 
       {gate.kind === "tick" ? (

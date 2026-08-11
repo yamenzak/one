@@ -209,6 +209,14 @@ behind it.
 **A grabber is a claim, so it appears only where it is true.** — A bar at the top
 of a sheet is the one piece of furniture that means *pull me*.
 
+**A card inside a sheet bleeds to the sheet's edges.** — The sheet is already the
+card — same fill — so the element contributes no ground at all, and the only
+thing it was doing was insetting every row by its own padding while the title
+stayed at the sheet's edge: two left edges, eighteen pixels apart, for a reason
+no reader could name. Full-bleed also gives each row's press its whole width. The
+sheet's inline padding is a variable so the negation cannot drift out of step
+with it.
+
 **The bar is there from the first pixel and only its ground arrives.** — It holds
 the way out and the way on at every scroll position, so nothing moves into it and
 nothing has to be found again after scrolling. What changes is a surface, a name,
@@ -241,7 +249,15 @@ dangerous stops standing out. Destruction is confirmed, not coloured.
 **A row that carries a button has about half a phone for words.** — "Added 4
 March · last used 2 days ago" wrapped to two lines and pushed the standing pill
 onto a third; every row was half again as tall as it had reason to be. One short
-fact, and at that width a pill is a line by itself.
+fact, and at that width a pill is a line by itself. A switch is the same
+budget — measured, 212 pixels against a plain row's 243, which is about thirty
+characters — and both feedback rows wrapped until their copy was cut to fit.
+
+**A chevron is a promise of a next screen.** — An option in a picker is pressed
+and commits and closes, so it points at nothing; the tick on the one in effect is
+the only mark it ever carries. `Item` derives this rather than taking a third
+prop: a row only knows whether it is *current* when it is one of several, and a
+row that is one of several never goes anywhere.
 
 ### 2.8 Failure
 
@@ -286,13 +302,52 @@ and that screen is exactly where they will be.
 The email code row carried an "Always on" pill *and* a sentence saying the same
 thing, and the pill cost a third line.
 
-### 2.9 Looking
+### 2.9 Settings
+
+**A switch for what is on or off, a sheet for one of a few, and neither has a
+save button.** — In both, the choice *is* the action, so a confirm step asks
+somebody to agree with themselves. What that costs is a way to fail, which is why
+both apply optimistically, hand back a `Problem`, and put themselves back where
+they were.
+
+**The current value is the detail line.** — It is what makes a list of choices
+readable without opening any of them. A row that says only "Theme" is a row
+somebody has to press to learn anything.
+
+**A hub of categories, each its own screen — and every row says what is set.** —
+Preferences is the one surface that only ever grows, and it grows sideways:
+notifications, region, privacy and accessibility have nothing to do with each
+other and each arrives whole. A flat list absorbs the first two and then has to be
+split anyway, at which point every setting somebody had learned the position of
+has moved. What earns the extra tap is the summary: with the current values on
+the hub the whole configuration is readable without opening anything. A hub whose
+rows are only names is a menu, and a menu between somebody and five settings is a
+tax.
+
+**A control tells the truth about the device it is on.** — Safari implements no
+`navigator.vibrate` on any iOS version, so on an iPhone the vibration switch
+changed a stored value and did nothing anybody could feel — the same lie as a
+switch that silently fails. It is asked once, at module scope: whether a device
+can vibrate is a fact about the device, not about a render.
+
+**Each language is named in itself.** — "German" is only useful to somebody who
+already reads English, which is precisely not the person looking for it.
+
+**A summary names what is on, not how many things are.** — "2 of 3" is a count
+somebody would still have to open the screen to identify.
+
+### 2.10 Looking
 
 **The preview renders in the mode that ships.** — An HTML file opened directly
 has no doctype and puts the browser in quirks mode, where a table stops
 inheriting colour and percentage heights resolve differently. A whole review was
 made from such a preview and every judgement in it was about a page nobody would
 ever see. `web/dev/page.tsx` writes a complete document.
+
+**A fixture holds the shipped defaults.** — The preview had sound switched on
+because it was convenient to test, so every screenshot of the feedback screen was
+a picture of a setting nobody chose — and a screenshot is what a design decision
+is argued from.
 
 **A comment inside a CSS template literal may not contain a backtick.** — It
 closes the literal, and the compiler then reports a missing `,` or `;` hundreds
@@ -314,6 +369,8 @@ rules long, and its being short is the measure of whether this worked.
 | `ui.css.ts` | the sheet was named for the account and held the sheet, the field and the action — all of which the platform's own `sheet.tsx` already used |
 | `mark.css.ts` | the lockup's spacing is a fact about the brand, not about a screen |
 | `Sheet`, `ValueEditor`, `Face`, `Icon`, `feedback` | each moved at its second use, before this |
+| `Field` | the confirm sheet's typed gate wanted the editor's input, wrong-state and all |
+| `SwitchRow`, `Choose`, `Chip`, `Confirm`, `useCommit` | each at its second wanter; `Choose` then went back onto `Item` rather than keeping its own copy of a row's markup |
 
 What stayed: the centred lockup title, the name-beside-a-face header, and the
 photo control — one use each. The next screen that wants a face beside its title

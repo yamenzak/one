@@ -107,6 +107,11 @@ const DEV = `
   background: rgb(24 24 28 / 0.96); color: #f2f2f4; font-size: 19px;
   box-shadow: 0 6px 22px rgb(0 0 0 / 0.4); backdrop-filter: blur(12px); }
 .dial[data-open] .dial-toggle { background: #f2f2f4; color: #16161a; }
+/* IT STANDS ASIDE FOR A SHEET. A sheet is full-width and rises from the same
+   corner, so the toggle sat on top of the last option in every picker — which is
+   a preview artefact that reads exactly like a layout bug in the product. */
+body:has(.sheet) .dial { opacity: 0; pointer-events: none; }
+.dial { transition: opacity 200ms ease; }
 @media print { .dial { display: none; } }
 `;
 

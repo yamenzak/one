@@ -47,9 +47,27 @@ export interface ItemProps {
    */
   readonly onGo?: () => void;
   readonly action?: ReactNode;
+  /**
+   * ⚠️ A MARK AT THE END, NOT A CONTROL — which is why it may share a row with
+   * `onGo` where an `action` may not.
+   */
+  readonly sign?: ReactNode;
+  /**
+   * ⚠️ THIS ROW IS ONE OF A SET OF OPTIONS, and this is whether it is the one in
+   * effect. Setting it AT ALL — true or false — suppresses the chevron, because a
+   * chevron is a promise of a next screen and an option commits and closes. That
+   * is why it is derived here rather than being a third prop: a row only knows
+   * whether it is current when it is one of several, and a row that is one of
+   * several never goes anywhere.
+   *
+   * ⚠️ IT IS NOT "this row is about the thing in your hand". A passkey's own
+   * device is a fact about that row rather than a selection among the rows, and
+   * announcing it as `aria-current` tells a screen reader the wrong thing.
+   */
+  readonly current?: boolean;
 }
 
-export function Item({ icon, mark, title, detail, tone, onGo, action }: ItemProps): ReactNode {
+export function Item({ icon, mark, title, detail, tone, onGo, action, sign, current }: ItemProps): ReactNode {
   const body = (
     <>
       {/* ⚠️ THE WELL IS THE ICON'S GROUND, and it is what makes a column of glyphs
@@ -59,12 +77,21 @@ export function Item({ icon, mark, title, detail, tone, onGo, action }: ItemProp
         <span className="item-title">{title}</span>
         {detail ? <span className="item-detail">{detail}</span> : null}
       </span>
-      {onGo ? <Onward className="chevron" /> : action}
+      {onGo && current === undefined ? <Onward className="chevron" /> : (sign ?? action)}
     </>
   );
   return onGo
-    ? <button type="button" className="item press-flat" onClick={onGo}>{body}</button>
-    : <div className="item">{body}</div>;
+    ? (
+      <button
+        type="button"
+        className="item press-flat"
+        aria-current={current ? "true" : undefined}
+        onClick={onGo}
+      >
+        {body}
+      </button>
+    )
+    : <div className="item" aria-current={current ? "true" : undefined}>{body}</div>;
 }
 
 export interface EntryProps {

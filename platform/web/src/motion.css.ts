@@ -171,6 +171,25 @@ export const MOTION_CSS = `
 /* A plus turns towards being a cross, which is what adding then cancelling is. */
 .button:active [data-icon='add'] { rotate: 90deg; }
 
+/* ⚠️ THE MOON CROSSES THE SUN, which is the one gesture that means "the other
+   one". Rotating the whole glyph would spin a sun, and a spinning sun is a
+   loading indicator. */
+.item:active [data-icon='light'] > :nth-child(1) { translate: 2px -1px; }
+
+/* The second alphabet steps forward. */
+.item:active [data-icon='tongue'] > :nth-child(6) { translate: 1.5px 1.5px; }
+
+/* A rule measures: its ticks slide along it. */
+.item:active [data-icon='measure'] > :nth-child(3) { translate: 0 1.6px; }
+.item:active [data-icon='measure'] > :nth-child(4) { translate: 0 -1.6px; }
+
+/* ⚠️ THESE TWO ARE THE ONLY ICONS THAT MOVE ON A SWITCH ROW, because a switch row
+   has no press of its own to speak of — the whole row is the control. The wave
+   and the buzz are what the setting IS. */
+.switch-row:active [data-icon='buzz'] > :nth-child(1) { translate: -2px 0; }
+.switch-row:active [data-icon='buzz'] > :nth-child(2) { translate: 2px 0; }
+.switch-row:active [data-icon='sound'] > :nth-child(3) { scale: 1.2; }
+
 /* Furniture: it points where the press goes. */
 .item:active [data-icon='onward'], .item:active .chevron { translate: 3.5px 0; }
 
@@ -196,7 +215,7 @@ export const MOTION_CSS = `
    always there. The dash length is the path's own, so the stroke travels from the
    short arm to the long one exactly as a hand would. */
 @keyframes strike { from { stroke-dashoffset: 26; } }
-[data-icon='tick'] > * { stroke-dasharray: 26; animation: strike var(--settle) var(--enter) both; }
+[data-icon='tick'] > * { stroke-dasharray: 26; animation: strike var(--settle) var(--enter) backwards; }
 /* ⚠️ AND THE BADGE ARRIVES UNDER IT rather than with it, so the disc is there to
    be drawn on. Both together is a sticker being placed; this is a mark being
    made. The badge's own rule lives with its colour, in the screen's sheet — a

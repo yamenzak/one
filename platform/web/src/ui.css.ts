@@ -221,7 +221,7 @@ h2 { word-spacing: normal; }
    about the account rather than something that just went well. */
 .verified { flex: none; inline-size: 19px; block-size: 19px; border-radius: var(--radius-well);
   display: grid; place-items: center; background: var(--accent); color: #fff;
-  animation: stamp var(--swift) var(--enter) both; }
+  animation: stamp var(--swift) var(--enter) backwards; }
 
 /* ⚠️ "Not set" IS QUIET AND IT IS NOT AN ERROR. Nothing is wrong with an account
    that has no name on it yet. */
@@ -241,12 +241,16 @@ h2 { word-spacing: normal; }
    measured rather than assumed — useKeyboardInset, in editor.tsx, says why. Where
    the browser resizes the layout for a keyboard it comes out as zero, which is
    correct: there the sheet was already clear of it. */
-.sheet { position: fixed; z-index: 51; inset-inline: 0; inset-block-end: 0;
+/* ⚠️ THE INLINE PADDING IS A VARIABLE because a full-bleed child has to negate
+   it exactly, and a second hardcoded 20 is a number that drifts silently — the
+   rows would simply stop lining up with the title. */
+.sheet { --sheet-pad: 20px;
+  position: fixed; z-index: 51; inset-inline: 0; inset-block-end: 0;
   translate: 0 calc(var(--drag, 0px) - var(--keyboard, 0px));
   max-block-size: calc(100dvh - var(--keyboard, 0px) - 20px); overflow-y: auto;
   background: var(--card); color: var(--ink);
   border-start-start-radius: 26px; border-start-end-radius: 26px;
-  padding: 10px 20px calc(22px + env(safe-area-inset-bottom, 0px));
+  padding: 10px var(--sheet-pad) calc(22px + env(safe-area-inset-bottom, 0px));
   animation: sheet-up var(--settle) var(--enter);
   transition: translate var(--settle) var(--move); }
 .sheet:focus, .sheet:focus-visible { outline: none; }
@@ -294,6 +298,14 @@ h2 { word-spacing: normal; }
 @keyframes over-down { to { opacity: 0; translate: 0 30px; scale: 0.99; } }
 
 .sheet-body { display: flex; flex-direction: column; gap: 22px; }
+/* ⚠️ A CARD INSIDE A SHEET BLEEDS TO THE SHEET'S EDGES, because the sheet IS the
+   card — same fill — so the element contributes no ground at all and the only
+   thing it was doing was insetting every row by its own padding while the title
+   stayed at the sheet's edge. Two left edges eighteen pixels apart, for a reason
+   no reader could name. Full-bleed also gives each row's press its whole
+   width, which on a phone is the difference between a target and a guess. */
+.sheet .card { background: none; border-radius: 0;
+  margin-inline: calc(var(--sheet-pad) * -1); }
 .sheet-top { display: flex; flex-direction: column; gap: 8px; }
 .sheet-title { font-family: var(--font-brand); font-size: 25px; font-weight: 600;
   letter-spacing: -0.03em; line-height: 1.15; margin: 0; word-spacing: normal; }
@@ -470,6 +482,35 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .face[data-tone='kova'] { background: var(--p-kova); }
 .face[data-tone='scena'] { background: var(--p-scena); }
 .face[data-tone='tessa'] { background: var(--p-tessa); }
+
+/* ⚠️ THE WHOLE ROW IS THE TARGET. A 50-pixel control at the end of a full-width
+   row is the smallest thing on the screen, and the row is a label, so pressing
+   anywhere on it flips the switch. */
+.switch-row { cursor: pointer; }
+/* ⚠️ THE WHOLE ROW STANDS DOWN, not just the control. A full-strength title over
+   a dead switch reads as a switch that is broken rather than as a setting this
+   device cannot have. */
+.switch-row[data-off] { cursor: default; color: var(--ink-quiet); }
+.switch-row[data-off]:hover { background: none; }
+.switch-row:hover { background: color-mix(in oklab, var(--ink) 5%, transparent); }
+/* ⚠️ THE TRACK CARRIES THE STATE AND THE THUMB CARRIES THE MOVEMENT. Off is the
+   same well every other control sits in, so a column of them reads as a column of
+   the same thing rather than as a row of grey pills. */
+.switch { flex: none; inline-size: 50px; block-size: 30px; padding: 3px; border: 0;
+  border-radius: var(--radius-well); cursor: pointer; background: var(--well);
+  transition: background-color var(--swift) var(--move); }
+.switch[data-state='checked'] { background: var(--accent); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.switch:disabled { cursor: progress; }
+.switch-thumb { display: block; inline-size: 24px; block-size: 24px; border-radius: var(--radius-well);
+  background: #fff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+  transition: translate var(--swift) var(--spring); }
+.switch-thumb[data-state='checked'] { translate: 20px 0; }
+
+/* ⚠️ A TICK, NOT A HIGHLIGHTED ROW. A different ground reads as focus or as
+   hover; a tick says "this is what it is now" without implying that something is
+   about to happen to it. */
+.chosen { flex: none; color: var(--accent); }
 
 /* ⚠️ A FACE CARRIED INTO A LINE OF TEXT, and not a control. No border, no press,
    a ground barely told from the surface under it: anything more makes a sentence

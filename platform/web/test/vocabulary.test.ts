@@ -85,6 +85,28 @@ describe("the motion vocabulary is the only source of timing", () => {
   */
 
   /*
+    ⚠️ AND NO ANIMATION FILLS `both`. A fill of `both` keeps the animation's final
+    values applied FOREVER, and those silently beat the element's own
+    declarations — which is invisible until something else needs to compute one of
+    those properties. It cost a whole collapsing header: the scroll-driven opacity
+    and scale were pinned at whatever a finished entrance had left behind, and
+    nothing anywhere failed.
+
+    ⚠️ `backwards` IS WHAT EVERY ENTRANCE HERE ACTUALLY WANTS. Their `to` is
+    implicit — the element's own styles — so holding the from-state before the
+    animation and then getting out of the way is identical to watch and leaves the
+    element's future to the element.
+  */
+  it("lets no animation fill both", () => {
+    for (const [file, css] of [["motion.css.ts", MOTION_CSS] as const, ...sheets]) {
+      for (const [decl] of css.matchAll(/\banimation(?:-fill-mode)?\s*:[^;]+;/g)) {
+        expect(decl, `${file} fills both — use backwards, and see this test for why`)
+          .not.toMatch(/\bboth\b/);
+      }
+    }
+  });
+
+  /*
     ⚠️ EVERY DURATION THE VOCABULARY DECLARES IS USED. One that nothing names is
     a value somebody reserved for a case that never came — and the next person
     reads five as evidence that five are needed.
