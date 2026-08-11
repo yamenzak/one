@@ -76,9 +76,15 @@ h1, h2, p { margin: 0; padding: 0; }
 /* ⚠️ THE PAGE IS THE WHOLE SURFACE, and it is presented over the app rather than
    inside it — no navigation, no tabs, no product chrome. One column, capped: an
    account is read, not worked in. */
-.page { min-block-size: 100dvh; background: var(--page);
+/* ⚠️ AN ISOLATED STACK, SO THE LIGHT CANNOT ESCAPE IT. Without it the sky's
+   z-index is compared against everything on the document, and a fixed control
+   somewhere else in the page ends up behind it. */
+.page { position: relative; isolation: isolate; min-block-size: 100dvh; background: var(--page);
   max-inline-size: 560px; margin: 0 auto; padding: 14px 16px 72px;
   display: flex; flex-direction: column; gap: 26px; }
+/* ⚠️ EVERYTHING THE PERSON READS SITS ABOVE THE LIGHT. Stated once, here, rather
+   than as a z-index on each thing that turned out to need one. */
+.page > *:not(.sky) { position: relative; z-index: 1; }
 
 /* ------------------------------------------------------------------ the top */
 

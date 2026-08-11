@@ -19,6 +19,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { writeFileSync } from "node:fs";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 import { ACCOUNT_CSS } from "../src/account/home.css.js";
+import { SKIES, SKY_CSS } from "../src/sky.css.js";
 
 const noop = () => undefined;
 
@@ -85,6 +86,7 @@ document.addEventListener('click', (e) => {
   if (!b) return;
   [...b.parentElement.querySelectorAll('button')].forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
   if (b.dataset.act === 'theme') document.documentElement.dataset.theme = b.dataset.value;
+  if (b.dataset.act === 'sky') document.querySelectorAll('.sky').forEach((s) => { s.dataset.sky = b.dataset.value; });
   if (b.dataset.act === 'case') {
     document.querySelectorAll('.case').forEach((c) => c.toggleAttribute('data-live', c.dataset.case === b.dataset.value));
   }
@@ -100,7 +102,7 @@ const group = (act: string, label: string, options: readonly { readonly value: s
 const html = `<!doctype html><html lang="en" data-theme="dark"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Account — @one/web</title>
-<style>${ACCOUNT_CSS}</style><style>${DIAL}</style>
+<style>${ACCOUNT_CSS}</style><style>${SKY_CSS}</style><style>${DIAL}</style>
 </head><body>
 ${CASES.map((c, i) => `<div class="case" data-case="${c.id}"${i === 0 ? " data-live" : ""}>${
   renderToStaticMarkup(<AccountHome {...c.props} /> as never)
@@ -108,6 +110,7 @@ ${CASES.map((c, i) => `<div class="case" data-case="${c.id}"${i === 0 ? " data-l
 <div class="dial">
   <div class="dial-panel">
     ${group("case", "state", CASES.map((c) => ({ value: c.id, label: c.label })))}
+    ${group("sky", "sky", SKIES.map((s) => ({ value: s, label: s })))}
     ${group("theme", "theme", [{ value: "dark", label: "dark" }, { value: "light", label: "light" }])}
   </div>
   <button class="dial-toggle" type="button" aria-label="Preview controls">⚙</button>

@@ -18,6 +18,7 @@
  */
 
 import type { ReactNode } from "react";
+import type { Sky } from "../sky.css.js";
 
 /* ------------------------------------------------------------------ data --- */
 
@@ -47,6 +48,8 @@ export interface Workspace {
 
 export interface AccountHomeProps {
   readonly person: Person;
+  /** ⚠️ A WORD, NEVER A GRADIENT. The page names the light; it does not draw it. */
+  readonly sky?: Sky;
   /** ⚠️ `null` is NOT ANSWERED YET. `[]` is answered, and empty. */
   readonly workspaces: readonly Workspace[] | null;
   readonly onGo: (to: string) => void;
@@ -57,9 +60,13 @@ export interface AccountHomeProps {
 
 const PRODUCT_NAME: Record<Product, string> = { kova: "Kova", scena: "Scena", tessa: "Tessa" };
 
-export function AccountHome({ person, workspaces, onGo, onClose }: AccountHomeProps) {
+export function AccountHome({ person, workspaces, sky = "silk", onGo, onClose }: AccountHomeProps) {
   return (
     <div className="page">
+      {/* ⚠️ BEHIND THE TOP, NOT BEHIND THE PAGE. The light falls where the screen
+          announces itself and is gone by the first card — a field that carried on
+          under the content would be a tint, and a tint is paint. */}
+      <div className="sky" data-sky={sky} aria-hidden="true" />
       <header className="page-top">
         {/* ⚠️ × AND NOT AN ARROW. This is the root of a presentation laid over the
             app, so the control dismisses it rather than walking back through it. */}

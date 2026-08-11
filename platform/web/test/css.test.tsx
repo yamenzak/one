@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ACCOUNT_CSS } from "../src/account/home.css.js";
+import { SKY_CSS } from "../src/sky.css.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 
 const props: AccountHomeProps = {
@@ -34,7 +35,7 @@ const used = new Set(
 );
 
 /* Comments state the rules and would match them. Only declarations are read. */
-const rules = ACCOUNT_CSS.replace(/\/\*[\s\S]*?\*\//g, "");
+const rules = [ACCOUNT_CSS, SKY_CSS].join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
 
 describe("the stylesheet and the markup are the same set of names", () => {
   /*
