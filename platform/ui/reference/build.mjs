@@ -24,11 +24,11 @@ const SYS = `
   --t-hero:34px; --t-page:26px; --t-body:14px; --t-sub:12px; --t-meta:10px;
   --w-bold:700; --w-semi:600; --w-med:500;
   /* ── space: page inset, gap between cards, row inset. Three numbers. */
-  --pad:14px; --gap:12px; --row-pad:14px;
+  --pad:17px; --gap:22px; --row-pad:16px;
   /* ── radius: card, tile, pill. */
   --r-card:16px; --r-tile:14px; --r-pill:999px;
   /* ── ground: black page, lifted card, translucent well. */
-  --bg:#000; --card:#1b1b1e; --well:rgb(255 255 255/.10); --well-hi:rgb(255 255 255/.16);
+  --bg:#000; --card:rgb(255 255 255/.085); --well:rgb(255 255 255/.10); --well-hi:rgb(255 255 255/.16);
   --ink:#fff; --ink-2:rgb(255 255 255/.62); --ink-3:rgb(255 255 255/.38);
   --up:#3ddc84; --down:#ff5a5a;
 }
@@ -39,18 +39,28 @@ body{background:var(--bg);color:var(--ink);font:400 var(--t-body)/1.35 -apple-sy
 .status{display:flex;justify-content:space-between;padding:14px 22px 0;font:600 15px/1 system-ui;color:var(--ink)}
 
 /* ── HERO: full-bleed, never a card. Two grounds: a pattern, or a photograph. */
-.hero{position:relative;padding:0 var(--pad) 28px;overflow:hidden}
-.hero.pattern::before{content:"";position:absolute;inset:-20% -10% 0;
+.scroll{position:relative}
+/* The backdrop spans the whole scrolled height and is masked out, so nothing has
+   an edge. --reach is how far down it survives: a photograph carries the whole
+   screen, a pattern gives out just past the hero. */
+.backdrop{position:absolute;inset:0;z-index:0;pointer-events:none;
+  -webkit-mask-image:linear-gradient(to bottom,#000 var(--solid,28%),transparent var(--reach,60%));
+  mask-image:linear-gradient(to bottom,#000 var(--solid,28%),transparent var(--reach,60%))}
+/* One stated order: backdrop 0 · content 1 · floating chrome 3. */
+.hero,.body{position:relative;z-index:1}
+.dock{z-index:3}
+.hero{padding:0 var(--pad) 28px}
+.backdrop.pattern::before{content:"";position:absolute;inset:-6% -10% 0;
   background:radial-gradient(circle at 50% 30%,rgb(45 212 191/.55),transparent 62%);
   -webkit-mask-image:radial-gradient(circle,#000 1.1px,transparent 1.2px);mask-image:radial-gradient(circle,#000 1.1px,transparent 1.2px);
   -webkit-mask-size:9px 9px;mask-size:9px 9px;transform:rotate(-8deg) scale(1.25)}
-.hero.photo::before{content:"";position:absolute;inset:0;
+.backdrop.photo::before{content:"";position:absolute;inset:0;
   background:
     radial-gradient(120% 80% at 20% 0%,#0b1c33,transparent 60%),
     radial-gradient(90% 60% at 85% 25%,#4a6f96,transparent 55%),
     radial-gradient(70% 50% at 40% 55%,#cfd8e3,transparent 60%),
     linear-gradient(160deg,#0a1420,#25405c 45%,#7d93ab 70%,#1a2735)}
-.hero>*{position:relative}
+
 /* ⚠️ Back/close is a circle in the corner, not a bar. The hero owns the top. */
 .nav{display:flex;justify-content:space-between;align-items:center;padding:8px 0 0}
 .circ{width:40px;height:40px;border-radius:var(--r-pill);background:var(--well);color:var(--ink);display:grid;place-items:center;border:0;cursor:pointer}
@@ -71,16 +81,17 @@ body{background:var(--bg);color:var(--ink);font:400 var(--t-body)/1.35 -apple-sy
 .quick span{white-space:nowrap;font-weight:var(--w-med);font-size:var(--t-sub);line-height:1}
 
 /* ── SECTION + CARD: the card is a LIFT, never an outline. */
-.body{padding:0 var(--pad) 24px;display:flex;flex-direction:column;gap:var(--gap)}
+.body{padding:0 var(--pad) calc(76px + var(--pad));display:flex;flex-direction:column;gap:var(--gap)}
 .sec-head{display:flex;align-items:baseline;justify-content:space-between;padding:0 4px 8px}
 .sec-head h2{font-weight:var(--w-semi);font-size:var(--t-body);line-height:1}
 .sec-head .sum{font-weight:400;font-size:var(--t-sub);line-height:1;color:var(--ink-2)}
 .page-title{font-weight:var(--w-bold);font-size:var(--t-page);line-height:1.1;letter-spacing:-.02em;padding:24px 4px 16px}
+.card,.notice{backdrop-filter:blur(24px) saturate(1.1);-webkit-backdrop-filter:blur(24px) saturate(1.1)}
 .card{background:var(--card);border-radius:var(--r-card);overflow:hidden}
 
 /* ── ROW: 64px, three columns. Two lead treatments, and the rule is the row's JOB. */
 .row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:16px;
-  min-height:50px;padding:9px var(--row-pad);width:100%;background:none;border:0;color:inherit;text-align:left;cursor:pointer;font:inherit}
+  min-height:52px;padding:11px var(--row-pad);width:100%;background:none;border:0;color:inherit;text-align:left;cursor:pointer;font:inherit}
 .row + .row{box-shadow:inset 0 1px 0 rgb(255 255 255/.06)}
 /* a SETTING → bare outline glyph */
 .row .bare{color:var(--ink);display:grid;place-items:center;width:24px}
@@ -96,7 +107,7 @@ body{background:var(--bg);color:var(--ink);font:400 var(--t-body)/1.35 -apple-sy
 .count{min-width:26px;height:26px;padding:0 8px;border-radius:var(--r-pill);background:#fff;color:#000;font-weight:var(--w-semi);font-size:var(--t-meta);line-height:26px;text-align:center}
 
 /* ── NOTICE: an icon WELL, a title, a line, and a way to dismiss it. */
-.notice{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:start;padding:16px;background:var(--card);border-radius:var(--r-card)}
+.notice{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:start;padding:16px 16px 18px;background:var(--card);border-radius:var(--r-card)}
 .notice .w{width:40px;height:40px;border-radius:var(--r-pill);background:var(--well);display:grid;place-items:center}
 .notice h3{font-weight:var(--w-semi);font-size:var(--t-body);line-height:1.3}
 .notice p{font-weight:400;font-size:var(--t-sub);line-height:1.35;color:var(--ink-2);margin-top:2px}
@@ -111,8 +122,8 @@ body{background:var(--bg);color:var(--ink);font:400 var(--t-body)/1.35 -apple-sy
 .field{display:flex;align-items:center;gap:12px;height:52px;padding:0 16px;border-radius:var(--r-pill);background:var(--card);color:var(--ink-2);font-weight:400;font-size:var(--t-body);line-height:1}
 
 /* ── TAB BAR: a floating island. The page runs under it. */
-.dock{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;width:calc(100% - 32px);
-  display:flex;background:rgb(38 38 42/.92);backdrop-filter:blur(20px);border-radius:var(--r-pill);padding:6px}
+.dock{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;width:calc(100% - 2*var(--pad));
+  display:flex;background:rgb(28 28 32/.86);backdrop-filter:blur(28px) saturate(1.2);-webkit-backdrop-filter:blur(28px) saturate(1.2);border-radius:var(--r-pill);padding:6px}
 .dock button{flex:1;background:none;border:0;color:var(--ink-3);display:flex;flex-direction:column;align-items:center;gap:3px;
   padding:8px 0;border-radius:var(--r-pill);cursor:pointer;font:inherit;position:relative}
 .dock button[aria-current]{background:rgb(255 255 255/.10);color:var(--ink)}
@@ -146,7 +157,8 @@ const row = (o) => `<button class="row">
 
 /* ══ SCREEN 1 — a pattern hero over a menu. */
 const security = `<div class="phone" data-enter><div class="status"><span>12:52</span><span>5G ▪▪▪ 53</span></div><div class="scroll">
-  <div class="hero pattern">
+  <div class="backdrop pattern" style="--solid:22%;--reach:52%"></div>
+  <div class="hero">
     <div class="nav"><button class="circ">${svg("back",20)}</button><span></span></div>
     <div class="hero-title">${svg("shield",24)}<span>Security</span></div>
     <div class="quick">
@@ -181,7 +193,8 @@ const security = `<div class="phone" data-enter><div class="status"><span>12:52<
 
 /* ══ SCREEN 2 — a photo hero over accounts. */
 const home = `<div class="phone" data-enter><div class="status"><span>12:52</span><span>5G ▪▪▪ 53</span></div><div class="scroll">
-  <div class="hero photo" style="padding-bottom:24px">
+  <div class="backdrop photo" style="--solid:34%;--reach:100%"></div>
+  <div class="hero" style="padding-bottom:24px">
     <div class="nav" style="gap:10px">
       <span class="circ" style="background:#4ade80;color:#000;font-weight:700;font-size:17px;line-height:1">AL</span>
       <span class="field" style="flex:1;height:48px;background:rgb(255 255 255/.14)">${svg("search",20)} Search</span>
@@ -221,7 +234,7 @@ const home = `<div class="phone" data-enter><div class="status"><span>12:52</spa
       <button class="tile"><span class="sq">${svg("card",21)}</span><span>Card</span></button>
       <button class="tile"><span class="sq">${svg("more",21)}</span><span>More</span></button>
     </div>
-    <div style="height:110px"></div>
+    
   </div>
   </div>
   <div class="scrim" data-sheet hidden></div>
@@ -238,9 +251,11 @@ const home = `<div class="phone" data-enter><div class="status"><span>12:52</spa
   </nav>
 </div>`;
 
-writeFileSync("/tmp/rep/out.html",`<!doctype html><meta charset="utf8"><style>${SYS}${MOTION}</style>
+/* ⚠️ Beside itself. It wrote to an absolute /tmp path while it lived in /tmp,
+   which is a file that only works from the machine it was written on. */
+writeFileSync(new URL("out.html", import.meta.url),`<!doctype html><meta charset="utf8"><style>${SYS}${MOTION}</style>
 <body><div class="stage">
 <div><div class="cap">pattern hero · menu</div>${security}</div>
 <div><div class="cap">photo hero · accounts</div>${home}</div>
 </div></body>`);
-console.log("ok");
+console.log("wrote out.html");

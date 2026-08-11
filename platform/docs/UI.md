@@ -403,6 +403,50 @@ refusal in code, because a limit in a document is a sentence nobody has read.
 settings page throughout. A crown holding a count is a heading pretending to be a
 fact.
 
+
+### 5.4 The hero has no bottom edge
+
+⚠️ **THE BACKDROP RUNS BEHIND THE CONTENT AND FADES; IT IS NEVER A BAND.** This
+is the single thing that most separates the reference from a stack of cards, and
+it is invisible until you look for it: in the reference the promo card, the
+transaction card and the tab bar are all translucent **over** the photograph, and
+the photograph never stops — it gives out. A hero with a hard bottom edge makes
+every screen read as two pages stacked.
+
+The backdrop spans the whole scrolled height and is masked out, so two numbers
+describe it and nothing has an edge:
+
+```
+--solid   how far down it is at full strength
+--reach   where it has gone entirely
+
+photo hero    --solid 34%  --reach 100%   carries the whole screen
+pattern hero  --solid 22%  --reach  52%   gives out just past the hero
+```
+
+⚠️ **AND THE CARD IS WHITE-ALPHA, NOT A COLOUR.** One value —
+`rgb(255 255 255 / .085)` with a backdrop blur — explains both screens: over
+black it reads as `#1b1b1e`, over a photograph the photograph reads through it.
+A card with a literal colour cannot do the second thing, which is why the first
+attempt needed a hard edge to hide behind.
+
+**One stated stacking order, because fixing one overlap creates another:**
+
+```
+0  backdrop
+1  content
+3  floating chrome — the tab bar
+```
+
+Giving the content a stacking context so it sits on the backdrop also put it
+above the floating bar, so a list showed *through* a bar that is 86% opaque.
+
+⚠️ **THE INSET THAT CLEARS THE FLOATING BAR IS THE SCREEN'S, DECLARED ONCE.** As
+a spacer at the end of one list it is the thing everybody forgets, and the
+symptom is the last row of every long screen sitting under the bar where it
+cannot be tapped. It has been written down twice in this repository and
+reintroduced both times, which is the argument for it being structural.
+
 ---
 
 ## 6. Navigation, and the overlay ladder
