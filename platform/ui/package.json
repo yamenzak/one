@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Northlight \u2014 the interface language. The ground is painted, the furniture is lit by it, and ink is measured.",
+  "description": "Northlight — the interface language. The ground is painted, the furniture is lit by it, and ink is measured.",
   "exports": {
     ".": "./src/index.ts"
   },
@@ -15,12 +15,13 @@
     "clean": "rm -rf .turbo *.tsbuildinfo"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
-    "vitest": "^3.2.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.0",
+    "daisyui": "5.7.16",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.0"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   },
   "peerDependencies": {
     "react": ">=19"

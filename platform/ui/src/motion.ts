@@ -206,3 +206,101 @@ export function moment(id: keyof typeof MOMENT_HOLD, sound: string, options: Mom
  * the last, long after the thing that caused them.
  */
 export const supersede = <T>(current: T | null, next: T | null): T | null => next ?? current;
+
+/* ═══════════════════════════════════════════════════════ the css clock ═══ */
+
+/**
+ * THE CLOCK, AS TOKENS — and it lives here for the same reason `scene` does.
+ *
+ * ⚠️ A SHEET THAT SPELLS A DURATION IS THE JUNGLE WITH EXTRA STEPS. `styles.ts`
+ * held these for one increment and it was already a second copy of a clock this
+ * file defines — a rule somewhere would have been re-tuned and the two would
+ * have parted without anything failing. The choreographer emits every timing the
+ * product has, in both forms: `scene` for anything React animates, and this for
+ * anything CSS does.
+ *
+ * ⚠️ AND THE TWO SETS BELOW ARE NOT DUPLICATES OF EACH OTHER. `SCORE` is what a
+ * ROLE does on entrance; this is what an INTERACTION costs. They are kept
+ * adjacent so the relationship is visible rather than inferred.
+ */
+export const CLOCK = `
+:root {
+  /* ⚠️ Leaving is always faster than arriving. Nobody waits to watch something go. */
+  --t-tap: 120ms;
+  --t-move: 220ms;
+  --t-enter: 320ms;
+  --t-exit: 170ms;
+  --e-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --e-in: cubic-bezier(0.4, 0, 1, 1);
+  /* ⚠️ A real overshoot in pure CSS. It is the one place easing is not enough:
+     the overshoot is what makes a press feel physical rather than merely fast. */
+  --e-spring: linear(0, 0.402 7.4%, 0.711 15.3%, 0.929 23.4%, 1.008 28.5%, 1.057 34.6%, 1.062 41.6%, 1.031 55.9%, 0.995 79.5%, 1);
+  --stagger: 40ms;
+}
+`.trim();
+
+/**
+ * THE CHOREOGRAPHY — every animation and transition the sheet applies.
+ *
+ * ⚠️ THE SKY'S WEATHER IS HERE TOO, AND IT IS DELIBERATELY OFF THE INTERACTION
+ * CLOCK. Drift is 52 seconds because under about 30 it reads as an animation
+ * somebody added and past about 45 it reads as light changing in a room. It is
+ * the one timing in the product that is not a response to anything a person did,
+ * which is exactly why it needed a token of its own rather than a number in a
+ * stylesheet somewhere.
+ */
+export const WEATHER = { drift: 52, breathe: { dots: 26, waves: 32, rings: 38 } } as const;
+
+export const CHOREOGRAPHY = `
+/* ⚠️ PRESS IS THE ONE UNIVERSAL: everything pressable, the same answer. */
+[data-one='button'], [data-one='row'][data-interactive], [data-one='tile'], [data-one='quick-action'], [data-one='app-bar-leading'], [data-one='section-more'] {
+  transition: transform var(--t-tap) var(--e-spring), background-color var(--t-move) var(--e-out);
+}
+[data-one='button']:active, [data-one='row'][data-interactive]:active, [data-one='tile']:active, [data-one='quick-action']:active, [data-one='app-bar-leading']:active { transform: scale(0.97); }
+[data-one='segment'] { transition: opacity var(--t-move) var(--e-out); }
+/* ⚠️ ONE INDICATOR THAT TRAVELS, rather than two pills cross-fading — which
+   reads as two things happening instead of one thing moving. */
+[data-one='segmented']::before { transition: transform var(--t-move) var(--e-spring); }
+
+/* ⚠️ ARRIVING IS STAGGERED; LEAVING IS NOT — and the count is nth-CHILD on the
+   body, not nth-of-type on the card. A section may be a wrapper around a card,
+   so counting by TYPE lands the delays on the wrong elements and the stagger
+   silently does nothing. It renders as "the animation is too subtle", which is
+   the wrong diagnosis and leads to making the distance bigger. */
+@keyframes one-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes one-lift { from { opacity: 0; transform: translateY(-8px) scale(1.02); } to { opacity: 1; transform: none; } }
+[data-one='body'] > * { animation: one-rise var(--t-enter) var(--e-out) both; }
+[data-one='body'] > *:nth-child(1) { animation-delay: calc(var(--stagger) * 1); }
+[data-one='body'] > *:nth-child(2) { animation-delay: calc(var(--stagger) * 2); }
+[data-one='body'] > *:nth-child(3) { animation-delay: calc(var(--stagger) * 3); }
+[data-one='body'] > *:nth-child(4) { animation-delay: calc(var(--stagger) * 4); }
+/* ⚠️ Capped at five: past that a stagger stops reading as choreography and
+   starts reading as the list being slow to arrive. */
+[data-one='body'] > *:nth-child(n+5) { animation-delay: calc(var(--stagger) * 5); }
+/* ⚠️ THE HERO LEADS. It is what the screen is about, so it arrives first and
+   from further away — the only element allowed a longer distance. */
+[data-one='hero'] { animation: one-lift var(--t-enter) var(--e-out) both; }
+
+/* ⚠️ THE WEATHER. Transform, never background-position: one is composited on the
+   GPU and one repaints the whole layer every frame — at 52s nobody sees the
+   difference in motion and every device sees it in battery. */
+@keyframes sky-drift {
+  from { transform: translate3d(-2.5%, -1.5%, 0) scale(1.06); }
+  to { transform: translate3d(2.5%, 1.5%, 0) scale(1.13); }
+}
+/* ⚠️ THE PATTERN BREATHES; IT DOES NOT TRAVEL. A moving pattern is a texture
+   somebody is dragging past the screen. Scaling the mask a few percent reads as
+   the light moving over a surface that is standing still. */
+@keyframes sky-breathe {
+  0%, 100% { -webkit-mask-size: 9px 9px; mask-size: 9px 9px; }
+  50% { -webkit-mask-size: 9.7px 9.7px; mask-size: 9.7px 9.7px; }
+}
+[data-one='sky']::before { animation: sky-drift ${WEATHER.drift}s var(--e-out) infinite alternate; will-change: transform; }
+[data-one='sky'][data-sky='dots']::before { animation: sky-drift ${WEATHER.drift}s var(--e-out) infinite alternate, sky-breathe ${WEATHER.breathe.dots}s ease-in-out infinite; }
+[data-one='sky'][data-sky='waves']::before { animation: sky-drift ${WEATHER.drift}s var(--e-out) infinite alternate, sky-breathe ${WEATHER.breathe.waves}s ease-in-out infinite; }
+[data-one='sky'][data-sky='rings']::before { animation: sky-drift ${WEATHER.drift}s var(--e-out) infinite alternate, sky-breathe ${WEATHER.breathe.rings}s ease-in-out infinite; }
+
+/* ⚠️ REMOVED, NOT REDUCED. Layout may never depend on an animation having run,
+   and information survives: the fade stays, the travel goes. */
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+`.trim();

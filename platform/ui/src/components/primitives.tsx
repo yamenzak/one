@@ -175,7 +175,7 @@ export interface RowProps {
 export function Row({ lead, title, detail, value, onOpen }: RowProps) {
   const Tag = onOpen ? "button" : "div";
   return (
-    <Tag data-one="row" className={borrow("row")} data-interactive={onOpen ? "" : undefined} {...(onOpen ? { type: "button" as const, onClick: onOpen } : {})}>
+    <Tag data-one="row" data-interactive={onOpen ? "" : undefined} {...(onOpen ? { type: "button" as const, onClick: onOpen } : {})}>
       {lead ? <span data-one="row-lead">{lead}</span> : null}
       <span data-one="row-body">
         <Text role="body">{title}</Text>

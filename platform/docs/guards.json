@@ -3343,6 +3343,141 @@
       "impl": "ui/test/borrowed.test.ts",
       "proves": "maps all five tones",
       "fails": "a tone the language declares and the bridge never maps — it renders in the library's default, which is grey, on the one component whose whole job is to say something is wrong"
+    },
+    {
+      "id": "a-top-belongs-to-its-archetype",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/layout.test.tsx",
+      "proves": "refuses a top that belongs to another archetype",
+      "fails": "a crown on a list page, or any other mismatched top — it renders perfectly well and is only wrong beside the four screens it was supposed to match, which is the one place nobody looks while building one"
+    },
+    {
+      "id": "a-feed-keeps-its-app-bar",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/layout.test.tsx",
+      "proves": "refuses a hero on a feed, and keeps its app bar",
+      "fails": "refusing every top on a feed — the first version did, which made the one archetype whose top IS an app bar unable to have one"
+    },
+    {
+      "id": "the-header-is-inside-only-on-a-feed",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/layout.test.tsx",
+      "proves": "refuses a header inside the card on a page that is not a feed",
+      "fails": "a section header inside its card anywhere but a feed — the title becomes an item in the list it names, and the component cannot see what page it is on, which is why the rule kept being broken"
+    },
+    {
+      "id": "a-page-may-name-a-mask-not-a-ground",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/layout.test.tsx",
+      "proves": "refuses a ground a page is not entitled to choose",
+      "fails": "a list page declaring a photo sky — its top third is unreadable, and the author who set it has no way to see that from the call site"
+    },
+    {
+      "id": "the-counts-that-change-what-a-pattern-is",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/layout.test.tsx",
+      "proves": "refuses a fifth quick action and a fifth tile across",
+      "fails": "a fifth quick action (that is a toolbar) or a fifth tile across (that is smaller than the hit-area floor) — both read as a rendering fault rather than as the limit they are"
+    },
+    {
+      "id": "the-stagger-counts-by-position",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/layout.test.tsx",
+      "proves": "staggers by position in the body rather than by element type",
+      "fails": "nth-of-type where nth-child is meant — every delay lands on the wrong element and the stagger silently does nothing, which renders as \"the animation is too subtle\" and leads to making the distance bigger"
+    },
+    {
+      "id": "no-duration-outside-the-clock",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/layout.test.tsx",
+      "proves": "spells no duration outside the clock",
+      "fails": "a millisecond written where it is used — two things moving at once then disagree, which is the whole difference between an interface that feels built and one that feels assembled"
+    },
+    {
+      "id": "the-sky-drifts-on-a-transform",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/sky.test.ts",
+      "proves": "drifts on a transform and never on a background position",
+      "fails": "a backdrop animated on background-position — it repaints the whole layer every frame, and at 52s nobody sees the difference in motion while every device sees it in battery"
+    },
+    {
+      "id": "the-mask-correction-follows-the-ground",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/sky.test.ts",
+      "proves": "corrects a masked sky in one direction per theme",
+      "fails": "brightening a masked pattern on a pale ground as well as a dark one — it blows the pattern out to white, which is the same defect with the opposite sign"
+    },
+    {
+      "id": "every-bloom-is-the-tenants-hue",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/sky.test.ts",
+      "proves": "keeps every bloom on the tenant's own hue",
+      "fails": "a sky colour picked rather than derived — the ambience slot then does nothing again, which is the state it was in for the whole of stages 0 to 6"
+    },
+    {
+      "id": "the-bridge-is-in-the-sheet",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/shell.test.tsx",
+      "proves": "hands daisyUI its variables in the same sheet as ours",
+      "fails": "a sheet without the bridge — nothing breaks, the library falls back to its stock theme, and every borrowed object renders in somebody else's brand beside components of ours that are correct"
+    },
+    {
+      "id": "the-borrow-map-is-not-a-wishlist",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/borrowed.test.ts",
+      "proves": "borrows nothing it does not use",
+      "fails": "a borrowed name with no component behind it — it reads as coverage the package does not have, and six of them sat here claiming the library's tabs, dock and stat were in use after all three had been replaced"
+    },
+    {
+      "id": "what-we-kept-says-why",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/borrowed.test.ts",
+      "proves": "gives every object we kept a reason, and never borrows one of them",
+      "fails": "an object written in place of the library's with no reason recorded — \"we wrote our own\" decays into \"somebody did not know the library had one\""
+    },
+    {
+      "id": "a-sky-literal-is-a-masks-opacity",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/sky.test.ts",
+      "proves": "carries no literal that is not a mask's opacity",
+      "fails": "a colour picked in sky.ts — it sits on the interface guard's token layer because a mask is an alpha channel written in colour syntax, and that exemption is only safe while every literal in the file is inside a mask"
+    },
+    {
+      "id": "the-sky-holds-no-timing",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/sky.test.ts",
+      "proves": "keeps no duration in the sky",
+      "fails": "a duration in the sky — the weather is the choreographer's like every other timing, and a component that held one could drift from everything else moving at the same moment"
     }
   ]
 }

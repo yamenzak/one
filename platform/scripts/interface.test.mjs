@@ -46,12 +46,18 @@ const packages = readdirSync(ROOT, { withFileTypes: true })
 const rel = (f) => relative(ROOT, f);
 
 /**
- * ⚠️ THE TOKEN LAYER IS TWO FILES, NAMED. Widening this list is a visible edit
+ * ⚠️ THE TOKEN LAYER IS FOUR FILES, NAMED. Widening this list is a visible edit
  * to this line, which is the entire value of a chokepoint: the question stops
  * being "is this colour reasonable" and becomes "is this file allowed to have
  * one at all".
+ *
+ * ⚠️ `sky.ts` IS HERE BECAUSE A MASK IS AN ALPHA CHANNEL IN COLOUR SYNTAX. Its
+ * `#000` mean "opaque", never black, and every colour it actually emits is
+ * derived from the brand — which `ui/test/sky.test.ts` proves by sweeping the
+ * hue and the chroma ceiling, and which it keeps honest by refusing any literal
+ * in that file that is not inside a mask.
  */
-const TOKEN_LAYER = ["ui/src/colour.ts", "ui/src/ground.ts", "ui/src/brand.ts"];
+const TOKEN_LAYER = ["ui/src/colour.ts", "ui/src/ground.ts", "ui/src/brand.ts", "ui/src/sky.ts"];
 const CHOREOGRAPHER = "ui/src/motion.ts";
 
 const interfaceFiles = walk(join(ROOT, "ui", "src")).concat(

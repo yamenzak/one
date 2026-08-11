@@ -376,6 +376,20 @@ physical rather than merely fast.
 survive; transforms do not. Somebody who turns it on must still be able to see
 that something happened.
 
+⚠️ **AND ALL OF IT LIVES IN `motion.ts` — INCLUDING THE CSS.** The choreographer
+emits the clock as tokens and every animation and transition the sheet applies,
+so `styles.ts` contains no timing at all. It held the clock for one increment and
+that was already a *second* definition of durations `motion.ts` defines: nothing
+would have failed when one of them was re-tuned, which is precisely how two
+things moving at once come to disagree. The interface guard enforces it — a
+duration, a curve or a transition anywhere else in the package fails `one lint`.
+
+⚠️ **THE WEATHER IS ON THE SAME CLOCK AND OFF THE SAME SCALE.** The sky's drift
+is 52 seconds and its breath 26–38, deliberately far from every interaction
+timing: it is the one motion in the product that is not a response to anything a
+person did. It is a token in `motion.ts` all the same, because "somewhere else"
+is where a second clock starts.
+
 ⚠️ **MOTION IS REVIEWED AS A FILMSTRIP, NOT AS A SCREENSHOT.** A still cannot
 show choreography, so the suite films each transition at 4× and labels frames in
 real time. Two defects found that way and by no other means: a stagger whose
@@ -600,6 +614,60 @@ lines up with everything above it and its last is cut — which is what says the
 is more. A scroller that fits inside the inset looks like a row that failed to
 fill.
 
+### 5.8 The archetypes, as code
+
+`archetype.ts` is the table above with nothing added: per archetype a top, a sky,
+how far the light reaches, and whether a section header sits inside its card.
+`<Page archetype="crown">` is the entire declaration — an app never names a
+backdrop, a padding or a title size.
+
+| | top | sky | solid → reach | header |
+|---|---|---|---|---|
+| **crown** | photo hero | `photo` | 34% → 82% | outside |
+| **topic** | pattern hero | `dots` | 26% → 58% | outside |
+| **title** | big left title | `aurora` | 14% → 40% | outside |
+| **identity** | portrait | `rings` | 30% → 62% | outside |
+| **feed** | app bar | `aurora` | 10% → 34% | **inside** |
+
+**Five things are refused rather than written down**, because each of them
+renders perfectly well and is only wrong beside the four screens it was meant to
+match:
+
+- a **top that belongs to another archetype** — a crown on a list page is a
+  screen about one number that has no number;
+- a **hero on a feed** — ⚠️ but *not* its app bar. Refusing every top was the
+  first version and it was wrong in the direction that matters: it made the one
+  archetype whose top **is** an app bar unable to have one;
+- a **header inside the card** anywhere but a feed. The component cannot see what
+  page it is on, which is exactly why this rule kept being broken — so the
+  archetype travels down a context and the section reads it;
+- a **fifth quick action** (that is a toolbar) and a **fifth tile across** (that
+  is smaller than the hit-area floor);
+- a **sky a page is not entitled to choose.** A page may name a *mask*; the
+  *ground* belongs to the shape. Naming the shape's own ground is refused too —
+  it reads as a choice, and the next edit to the shape leaves it behind as one.
+
+⚠️ **THE VALUE IS PUSHED TO THE EDGE AND THE BODY TAKES THE SLACK.** Without it a
+row's value sits against its title and a column of them does not line up, which
+is what makes a list read as a paragraph with numbers in it. The separator
+between rows is drawn from the surface ladder — a rule *inside* the card is not
+an outline *around* it, and §5.1 forbids the second while needing the first.
+
+⚠️ **THE EDGE BELONGS TO THE ONE KIND WITH NO FILL.** Drawn on all four kinds, a
+ghost button is an outlined button and the hierarchy between them is gone.
+
+**Photographed from the shipped code**, not from the prototype:
+[`reference/screens.tsx`](../ui/reference/screens.tsx) renders the real
+components through the real stylesheet, three tenants × both themes. `build.mjs`
+beside it is the prototype the numbers were measured from, and a prototype that
+keeps being photographed is one the shipped code is free to drift from.
+
+⚠️ **THE ONE THING THOSE PHOTOGRAPHS SHOW MISSING IS ICONS.** Every `data-icon`
+is an empty well: the language names five icon *roles* (§5.2) and ships no set to
+fill them. It is the next increment, and it is stated here rather than papered
+over in the harness — a fix that exists in the photograph and not in the product
+is worse than the gap.
+
 ---
 
 ## 6. Navigation, and the overlay ladder
@@ -803,7 +871,7 @@ enumerating a closed space.
   `react-remove-scroll`'s deep ESM subpaths. A stylesheet cannot do that.
 - **Its theme variables are OKLCH and its `--color-*-content` is measured ink on
   the fill** — which is exactly what `ground.ts` computes. Our colour engine
-  drives it directly; 27 variables, a near 1:1 map.
+  drives it directly; 28 variables, a near 1:1 map.
 - **It needs no Tailwind and no build step.** The docs say Tailwind is required;
   that is about `@plugin "daisyui"` generating a customised bundle. `daisyui.css`
   contains **no Tailwind utility class at all** — verified — so components are
@@ -829,7 +897,7 @@ had written.
 
 ### 9c. The bridge
 
-`daisy.ts` is the whole integration: twenty-seven CSS variables, handed over
+`daisy.ts` is the whole integration: twenty-eight CSS variables, handed over
 once. No plugin, no Tailwind, no build step — sixty-one components then draw
 themselves in a tenant's light without knowing a tenant exists.
 
@@ -885,6 +953,48 @@ class, and it flagged our own registry — which legitimately has components cal
 `tabs`, `skeleton` and `input`, because those are the names of the things, and a
 library choosing the same words does not make them the library's.
 
+### 9e. What we kept, and why — `OURS`
+
+⚠️ **"WE WROTE OUR OWN" DECAYS INTO "SOMEBODY DID NOT KNOW THE LIBRARY HAD ONE."**
+So the objects daisyUI ships and we deliberately do not use are a list with a
+reason each, beside the map of what we borrow, and the two cannot overlap.
+
+| kept | because |
+|---|---|
+| **row** | `list-row` distributes its columns only inside a `.list`, and needs a `list-col-grow` modifier on a **child** to know which one stretches |
+| **amount** | the cents are smaller and the figures tabular — a balance is read as a magnitude |
+| **segmented** | one indicator that **travels**. `tab-active` cross-fades two pills, which reads as two things happening |
+| **overlay** | five placements, one component. `modal` is one placement with its own open/close mechanics |
+| **face / medallion** | the §5.2 icon roles are a rule about *rows*, which no avatar component has |
+| **tile · quick-action** | the label is not optional and the count is capped — both refusals in code |
+| **nav** | one navigation surface at a time. `dock` plus a rail is two answers to "where am I" |
+| **sky · section** | no library has an ambience slot, or can see what archetype a section is on |
+
+**Six objects are borrowed** — `btn`, `card`, `badge`, `alert`, `skeleton`,
+`input` — and the map is held to **zero unused entries**, so it grows with a
+component and never before one. It carried six speculative names for a while,
+claiming the library's `tabs`, `dock` and `stat` were in use when every one of
+them had already been replaced by something of ours.
+
+⚠️ **AND A NAME COLLIDES WITH THEIRS EVENTUALLY.** The review harness called its
+phone-frame clock `.status`, which is one of daisyUI's own component classes, and
+the clock rendered as an 8px dot. Nothing in the package can prevent that for
+code outside it; it is the reason ours is `data-one` rather than a class at all.
+
+### 9f. The bridge has to be IN the sheet
+
+⚠️ **`sheetFor` EMITS `daisySheet`, AND ITS ABSENCE BREAKS NOTHING.** That is the
+whole danger. With the variables missing, daisyUI does not fail — it falls back
+to its own stock theme, and every borrowed object on the page renders in somebody
+else's brand *beside* components of ours that are correct, so the screen reads as
+a design disagreement rather than as a missing import.
+
+It shipped that way. The bridge, its twenty-eight variables and its exhaustive
+completeness sweep all existed and passed, and nothing put the result in the
+stylesheet — found by photographing an orange tenant and seeing a violet badge.
+The sheet is one call now, and a test asserts every variable and the tenant's own
+accent are in what it returns.
+
 ---
 
 ## 10. The guards
@@ -939,6 +1049,21 @@ and is expensive to disprove, so it survives review indefinitely.
 | `a-class-reaches-the-dom-through-one-door` | a library class name written at a call site — the failure is gradual and every step of it is reasonable, and the finished shape is the legacy tree's 3,275 class literals in one app with 942 of them written exactly once | **live** |
 | `no-component-accepts-a-look` | a className or style prop, or a spread of unknown props — a passthrough is an arbitrary look with a friendly name, and one of them turns the exhaustive tenant sweep into a sample | **live** |
 | `every-tone-is-mapped` | a tone the language declares and the bridge never maps — it renders in the library's default, which is grey, on the one component whose whole job is to say something is wrong | **live** |
+| `a-top-belongs-to-its-archetype` | a crown on a list page, or any other mismatched top — it renders perfectly well and is only wrong beside the four screens it was supposed to match, which is the one place nobody looks while building one | **live** |
+| `a-feed-keeps-its-app-bar` | refusing every top on a feed — the first version did, which made the one archetype whose top IS an app bar unable to have one | **live** |
+| `the-header-is-inside-only-on-a-feed` | a section header inside its card anywhere but a feed — the title becomes an item in the list it names, and the component cannot see what page it is on, which is why the rule kept being broken | **live** |
+| `a-page-may-name-a-mask-not-a-ground` | a list page declaring a photo sky — its top third is unreadable, and the author who set it has no way to see that from the call site | **live** |
+| `the-counts-that-change-what-a-pattern-is` | a fifth quick action (that is a toolbar) or a fifth tile across (that is smaller than the hit-area floor) — both read as a rendering fault rather than as the limit they are | **live** |
+| `the-stagger-counts-by-position` | nth-of-type where nth-child is meant — every delay lands on the wrong element and the stagger silently does nothing, which renders as "the animation is too subtle" and leads to making the distance bigger | **live** |
+| `no-duration-outside-the-clock` | a millisecond written where it is used — two things moving at once then disagree, which is the whole difference between an interface that feels built and one that feels assembled | **live** |
+| `the-sky-drifts-on-a-transform` | a backdrop animated on background-position — it repaints the whole layer every frame, and at 52s nobody sees the difference in motion while every device sees it in battery | **live** |
+| `the-mask-correction-follows-the-ground` | brightening a masked pattern on a pale ground as well as a dark one — it blows the pattern out to white, which is the same defect with the opposite sign | **live** |
+| `every-bloom-is-the-tenants-hue` | a sky colour picked rather than derived — the ambience slot then does nothing again, which is the state it was in for the whole of stages 0 to 6 | **live** |
+| `the-bridge-is-in-the-sheet` | a sheet without the bridge — nothing breaks, the library falls back to its stock theme, and every borrowed object renders in somebody else's brand beside components of ours that are correct | **live** |
+| `the-borrow-map-is-not-a-wishlist` | a borrowed name with no component behind it — it reads as coverage the package does not have, and six of them sat here claiming the library's tabs, dock and stat were in use after all three had been replaced | **live** |
+| `what-we-kept-says-why` | an object written in place of the library's with no reason recorded — "we wrote our own" decays into "somebody did not know the library had one" | **live** |
+| `a-sky-literal-is-a-masks-opacity` | a colour picked in sky.ts — it sits on the interface guard's token layer because a mask is an alpha channel written in colour syntax, and that exemption is only safe while every literal in the file is inside a mask | **live** |
+| `the-sky-holds-no-timing` | a duration in the sky — the weather is the choreographer's like every other timing, and a component that held one could drift from everything else moving at the same moment | **live** |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder

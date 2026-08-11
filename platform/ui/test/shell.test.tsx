@@ -5,7 +5,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
-  DEFAULT_BRAND, IDLE, live, Shell, sheetFor, STRUCTURE, themeSheet, warnsBeforeLeaving,
+  DAISY_VARS, daisyTheme, DEFAULT_BRAND, IDLE, live, Shell, sheetFor, STRUCTURE, themeSheet, warnsBeforeLeaving,
   dockedTitle, PRESENTATIONS, type Destination, type LiveState, type LiveSurface, type Width,
 } from "../src/index.js";
 
@@ -52,6 +52,22 @@ describe("the stylesheet asks the right box", () => {
     expect(sheet).toContain(":root[data-theme='dark']");
   });
 
+  /*
+    ⚠️ THE BRIDGE IS IN THE SHEET, AND ITS ABSENCE BREAKS NOTHING. That is the
+    whole danger: with the variables missing, daisyUI falls back to its own stock
+    theme and every borrowed object renders in somebody else's brand — beside
+    components of ours that are correct, so the screen looks like a design
+    disagreement rather than like a missing import. It took a photograph of an
+    orange tenant with a violet badge to find it, and no test failed.
+  */
+  it("hands daisyUI its variables in the same sheet as ours", () => {
+    const sheet = sheetFor(DEFAULT_BRAND);
+    for (const name of DAISY_VARS) expect(sheet, name).toContain(`${name}:`);
+    /* And the tenant's, not the stock theme's: the accent has to arrive. */
+    const accent = daisyTheme(DEFAULT_BRAND, "light")["--color-primary"]!;
+    expect(sheet).toContain(accent);
+  });
+
   it("hides hover behind a fine pointer and gives a coarse one the roomy scale", () => {
     expect(STRUCTURE).toContain("@media (pointer: fine)");
     expect(STRUCTURE).toMatch(/@media \(pointer: coarse\)[^}]*--density: 1/);
@@ -64,11 +80,24 @@ describe("the stylesheet asks the right box", () => {
   it("carries no colour of its own — every one is a token reference", () => {
     expect(STRUCTURE).not.toMatch(/#[0-9a-f]{3,8}\b/i);
     for (const value of STRUCTURE.matchAll(/(?:background|color)\s*:\s*([^;]+)/g)) {
-      expect(value[1]!.trim(), value[0]).toMatch(/^(var\(--|currentColor)/);
+      /*
+        ⚠️ `none` AND `inherit` ARE NOT COLOURS, and refusing them would push a
+        button reset into naming one. Everything that IS a colour is a token, so
+        the sweep still reaches every pixel a tenant can move.
+      */
+      expect(value[1]!.trim(), value[0]).toMatch(/^(var\(--|currentColor|none|inherit)/);
     }
     // The whole sheet resolves: the brand half supplies what the structure names.
     const sheet = sheetFor(DEFAULT_BRAND);
     for (const token of [...STRUCTURE.matchAll(/var\((--[a-z0-9-]+)\)/g)].map((m) => m[1]!)) {
+      expect(sheet, token).toContain(`${token}:`);
+    }
+    /*
+      ⚠️ AND THE SKY RESOLVES TOO. It is emitted by the same call, so a variable
+      it names and nothing writes is a gradient stop the browser drops — which
+      renders as a bloom that is simply missing, on one theme, for one tenant.
+    */
+    for (const token of [...sheetFor(DEFAULT_BRAND).matchAll(/var\((--[a-z0-9-]+)\)/g)].map((m) => m[1]!)) {
       expect(sheet, token).toContain(`${token}:`);
     }
   });

@@ -2,7 +2,7 @@
  * THE BRIDGE — our light, in daisyUI's variable names.
  *
  * ⚠️ THIS IS THE WHOLE INTEGRATION. daisyUI is a stylesheet driven entirely by
- * CSS variables, so handing it these twenty-seven values is the entire wiring:
+ * CSS variables, so handing it these twenty-eight values is the entire wiring:
  * no plugin, no Tailwind, no build step. Sixty-one components then draw
  * themselves in a tenant's light without knowing a tenant exists.
  *

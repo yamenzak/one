@@ -27,6 +27,29 @@ export const COMPONENTS: readonly ComponentStates[] = [
   { id: "skeleton", interaction: ["idle"] },
   { id: "collection", interaction: ["idle"], data: ["unknown", "empty", "partial", "error", "ready"] },
   { id: "overlay", interaction: ["idle", "focus"] },
+
+  /*
+    ── THE LAYOUT. ⚠️ REGISTERED FOR THE SAME REASON THE PRIMITIVES ARE: an
+    archetype is part of the language, so a screen may not invent a sixth one —
+    and what is not on this list is what the boundary guard refuses.
+  */
+  { id: "page", interaction: ["idle"] },
+  { id: "sky", interaction: ["idle"] },
+  { id: "app-bar", interaction: ["idle", "focus"] },
+  { id: "crown", interaction: ["idle"] },
+  { id: "topic", interaction: ["idle"] },
+  { id: "page-title", interaction: ["idle"] },
+  { id: "identity", interaction: ["idle"] },
+  { id: "amount", interaction: ["idle"] },
+  { id: "quick-action", interaction: ["idle", "hover", "pressed", "focus"] },
+  { id: "section", interaction: ["idle"] },
+  { id: "tile", interaction: ["idle", "hover", "pressed", "focus"] },
+  { id: "segmented", interaction: ["idle", "focus"] },
+  { id: "scroller", interaction: ["idle"] },
+  { id: "promo", interaction: ["idle"] },
+  { id: "badge", interaction: ["idle"] },
+  { id: "medallion", interaction: ["idle"] },
+  { id: "glyph", interaction: ["idle"] },
 ];
 
 /** Anything an app is forbidden to build for itself. The boundary, as a list. */

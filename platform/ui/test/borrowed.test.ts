@@ -15,7 +15,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { BORROWED, SIZE, TONE, borrow } from "../src/borrowed.js";
+import { BORROWED, OURS, SIZE, TONE, borrow } from "../src/borrowed.js";
 
 const SRC = new URL("../src/", import.meta.url).pathname;
 
@@ -54,12 +54,32 @@ describe("only one file knows the library's names", () => {
     expect(offenders, "a class assigned without going through the one door").toEqual([]);
   });
 
-  /* And the map is not decorative: every entry is reachable. */
+  /*
+    ⚠️ AND THE MAP IS NOT A WISHLIST. A name declared "for later" is one nobody
+    has checked against a render, and it reads as coverage the package does not
+    have — so the map grows with a component and never before one. Zero slack, on
+    purpose: the slack is what let six speculative entries sit here claiming the
+    library's tabs, dock and stat were in use when every one of them had been
+    replaced by something of ours.
+  */
   it("borrows nothing it does not use", () => {
     const used = files(SRC).filter((f) => !f.endsWith("borrowed.ts"))
       .map((f) => code(readFileSync(f, "utf8"))).join("");
     const unused = Object.keys(BORROWED).filter((k) => !used.includes(`borrow("${k}"`));
-    expect(unused.length, `declared and never borrowed: ${unused.join(", ")}`).toBeLessThanOrEqual(12);
+    expect(unused, "declared and never borrowed").toEqual([]);
+  });
+
+  /*
+    ⚠️ AND WHAT IS *NOT* BORROWED SAYS WHY. "We wrote our own" is a decision that
+    decays into "somebody did not know the library had one" — so every object we
+    ship in place of theirs carries its reason, and the two lists cannot overlap.
+  */
+  it("gives every object we kept a reason, and never borrows one of them", () => {
+    expect(Object.keys(OURS).length).toBeGreaterThan(0);
+    for (const [name, why] of Object.entries(OURS)) {
+      expect(BORROWED, `${name} is on both lists`).not.toHaveProperty(name);
+      expect(why.length, `${name} has no reason`).toBeGreaterThan(20);
+    }
   });
 
   /*

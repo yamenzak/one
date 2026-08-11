@@ -19,26 +19,41 @@
  * mapped from OUR vocabulary rather than exposed as theirs.
  */
 
-/** ⚠️ The object each component borrows. One entry, one component. */
+/**
+ * ⚠️ THE OBJECT EACH COMPONENT BORROWS, AND NOTHING SPECULATIVE. One entry, one
+ * component that uses it — a name declared "for later" is a name nobody has
+ * checked against a render, and it reads as coverage the package does not have.
+ * The test holds this to zero slack, so the map grows with a component and never
+ * before one.
+ */
 export const BORROWED = {
   button: "btn",
   card: "card",
-  list: "list",
-  row: "list-row",
   badge: "badge",
-  avatar: "avatar",
   alert: "alert",
-  toggle: "toggle",
-  tabs: "tabs",
-  tab: "tab",
-  dock: "dock",
-  dockLabel: "dock-label",
-  modal: "modal",
   skeleton: "skeleton",
-  stat: "stat-value",
   field: "input",
-  progress: "progress",
 } as const;
+
+/**
+ * ⚠️ WHAT IS NOT BORROWED, AND WHY — because "we wrote our own" is a decision
+ * that decays into "somebody did not know the library had one". Each of these is
+ * an object daisyUI ships and we deliberately do not use, and the reason is
+ * always the same shape: the language makes a rule about it that the library's
+ * version does not implement, so borrowing would mean fighting it.
+ */
+export const OURS: Readonly<Record<string, string>> = {
+  "row": "`list-row` distributes its columns only inside a `.list`, and needs a `list-col-grow` modifier on a CHILD to know which one stretches — while the hit-area floor, the two lead treatments and the value slot are ours already",
+  "amount": "the cents are smaller and the figures are tabular — a balance is read as a magnitude",
+  "segmented": "one indicator that TRAVELS. `tab-active` cross-fades two pills, which reads as two things happening",
+  "overlay": "five placements, one component. `modal` is one placement with its own open/close mechanics",
+  "face": "the §5.2 icon roles — a medallion is a lead for a thing WITH A VALUE, which is a rule about rows",
+  "tile": "a destination in a fixed set of four, sized against the hit-area floor rather than its content",
+  "quick-action": "the label is not optional, and there are at most four. Both are refusals in code",
+  "nav": "one navigation surface at a time — `dock` plus a rail is two answers to 'where am I'",
+  "sky": "the tenant's light. There is nothing to borrow: no library has an ambience slot",
+  "section": "where the header sits depends on the ARCHETYPE, which no component can see",
+};
 
 /**
  * ⚠️ OUR FIVE TONES, IN THEIR NAMES. The mapping is here rather than at a call
