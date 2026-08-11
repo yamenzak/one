@@ -80,7 +80,7 @@ const base = {
            through somebody's mail lane. `disclosureProblems` refuses a manifest
            that reaches one of these and does not name it. */
         { id: "cloudflare", name: "Cloudflare, Inc.", role: "Runs it.", receives: ["identity", "usage"] as const, where: "Its network.", safeguard: "dpf" as const, terms: "https://example.test/dpa" },
-        { id: "resend", name: "Resend", role: "Sends the sign-in code.", receives: ["contact"] as const, where: "Its network.", safeguard: "dpf" as const, terms: "https://example.test/dpa" },
+        { id: "cloudflare-email", name: "Cloudflare Email", role: "Sends the sign-in code.", receives: ["contact"] as const, where: "Its network.", safeguard: "dpf" as const, terms: "https://example.test/dpa" },
       ],
     },
     impersonation: { maxMinutes: 30, announce: true },

@@ -1087,7 +1087,7 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `unbound-changes-nothing` | a single-app deployment broken by a sharing mechanism it does not use | **live** |
 | `nothing-leaves-while-anything-is-missing` | a best-effort send to nobody, or a queued retry — either way a person waiting for a code that was never addressed to anybody | **live** |
 | `the-recorded-provider-is-a-choice` | a fallback reachable by getting config wrong — a production deployment recording its sign-in codes in a map and answering as though the mail went out | **live** |
-| `a-sender-is-split-the-way-the-provider-wants` | a sender handed to the mail API in the wrong shape — a message that arrives from nobody or is refused outright, on the one lane a person is waiting on | **live** |
+| `a-sender-is-split-the-way-the-provider-wants` | a MIME message the send binding rejects outright — bare newlines, a missing Message-ID, or a Content-Transfer-Encoding header that disagrees with the body, which shows the person the base64 of their own sign-in code | **live** |
 | `a-code-that-could-not-be-sent-is-not-a-code` | telling somebody to check their inbox for a message that was never addressed to anybody | **live** |
 | `a-rule-sees-whose-row-it-is` | a rule that narrows by customer handed a row belonging to nobody, taking its 'not enough to judge' branch and passing every update | **live** |
 | `reading-what-was-prescribed-is-not-prescribing` | a coaching record turned self-service by one line, because `supplement:write` sat next to `dose:write` in a list | **live** |
@@ -1206,6 +1206,7 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `self-registration-records-its-own-consent` | a self-registered person on the roster whose every log, measurement and check-in is refused, with no screen anywhere explaining why | **live** |
 | `the-transfer-register-is-a-join` | a transfer register written from what recipients CLAIM to receive rather than from what the product holds — over-disclosure in the direction nobody checks, making a transfer look larger than it is | **live** |
 | `every-recipient-appears-in-the-transfers` | a sub-processor disclosed in one place and absent from the transfer register — the artefact every questionnaire asks for, answerable only by joining what is held to who receives it, and wrong by the next feature in every company that writes it by hand | **live** |
+| `a-missing-send-binding-has-its-own-name` | a deployment configured to send through Cloudflare on a worker with no send_email binding, reported as a refused send — which sends an operator to look at DNS for one line of wrangler.jsonc | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

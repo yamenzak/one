@@ -124,13 +124,12 @@ export const PLATFORM_CONFIG = declareConfig({
   "turnstile.secret_key": { shared: true, secret: true },
   "email.provider": { shared: true, secret: false },
   /*
-    ⚠️ ONE KEY BECAUSE THERE IS ONE LANE. `email.brevo.key` was here and its
-    provider is gone: a config key nothing reads is a secret an operator pastes,
-    a console renders, and a rotation policy covers, for a lane that cannot send.
-    The set of `email.*.key` entries is the provider registry seen from the
-    console, and the two have to shrink together.
+    ⚠️ NO `email.*.key` AT ALL, AND THAT IS THE LANE RATHER THAN AN OMISSION.
+    Cloudflare Email Sending is a WORKER BINDING: the credential is the
+    deployment's own binding, so there is no secret in this store, none in a
+    settings screen, nothing to rotate and nothing a console can leak. Every API
+    key that used to be here belonged to a provider that is gone.
   */
-  "email.resend.key": { shared: true, secret: true },
   "email.from": {
     shared: false, secret: false,
     why: "One verified address serves the platform, but the display name in front of it is the product's. Shared, the last app to save renames the sender for all of them.",

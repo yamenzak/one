@@ -9,25 +9,25 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { MAIL_HANDED_TO, addressOf, chooseProvider, recorded, send, senderOf, type Post } from "../src/mail.js";
+import { MAIL_HANDED_TO, addressOf, chooseProvider, mimeFor, recorded, send, senderOf, type Deliver } from "../src/mail.js";
 import { MAIL_LANES } from "@one/kernel";
 import type { Instant } from "@one/kernel";
 
 const AT = "2026-01-10T00:00:00.000Z" as Instant;
 const NOTE = { to: "ro@example.test", subject: "Hello", body: "Your code is 123456." };
 
-const working = { "email.provider": "resend", "email.from": "Kova <noreply@4dl.app>", "email.resend.key": "re_1" };
+const working = { "email.provider": "cloudflare", "email.from": "Kova <noreply@4dl.app>" };
 
 const spy = (ok = true) => {
-  const calls: { url: string; headers: Record<string, string>; body: string }[] = [];
-  const post: Post = async (url, init) => {
-    calls.push({ url, headers: init.headers, body: init.body });
+  const calls: { from: string; to: string; mime: string }[] = [];
+  const deliver: Deliver = async (from, to, mime) => {
+    calls.push({ from, to, mime });
     return { ok };
   };
-  return { calls, post };
+  return { calls, deliver };
 };
 
-const never: Post = async () => {
+const never: Deliver = async () => {
   throw new Error("this must not be called");
 };
 
@@ -35,7 +35,10 @@ const never: Post = async () => {
 
 describe("what a deployment sends with", () => {
   it("takes the provider, the sender and the key it was given", () => {
-    expect(chooseProvider(working)).toEqual({ ok: true, provider: "resend", from: "Kova <noreply@4dl.app>", key: "re_1" });
+        /* ⚠️ NO KEY, and that is this lane rather than an omission: Cloudflare Email
+       Sending is a WORKER BINDING, so the credential is the deployment's own
+       binding — nothing to rotate, leak from a console, or store in a database. */
+    expect(chooseProvider(working)).toEqual({ ok: true, provider: "cloudflare", from: "Kova <noreply@4dl.app>" });
   });
 
   /*
@@ -47,8 +50,7 @@ describe("what a deployment sends with", () => {
   it("says which part is missing, not merely that something is", () => {
     expect(chooseProvider({})).toMatchObject({ why: "no_provider" });
     expect(chooseProvider({ "email.provider": "pigeon" })).toMatchObject({ why: "unknown_provider" });
-    expect(chooseProvider({ "email.provider": "resend" })).toMatchObject({ why: "no_sender" });
-    expect(chooseProvider({ "email.provider": "resend", "email.from": "a@b" })).toMatchObject({ why: "no_key" });
+    expect(chooseProvider({ "email.provider": "cloudflare" })).toMatchObject({ why: "no_sender" });
   });
 
   /*
@@ -78,23 +80,41 @@ describe("sending", () => {
     that was never addressed to anybody.
   */
   it("does not call a provider when the deployment is not configured", async () => {
-    const partial: Record<string, string>[] = [{}, { "email.provider": "resend" }, { "email.provider": "resend", "email.from": "a@b" }];
+    const partial: Record<string, string>[] = [{}, { "email.provider": "cloudflare" }, { "email.provider": "pigeon", "email.from": "a@b" }];
     for (const values of partial) {
       expect(await send(values, NOTE, never, AT)).toMatchObject({ ok: false });
     }
   });
 
-  it("sends what the provider expects, with the sender whole", async () => {
+  it("hands the sender a MIME message the binding will accept", async () => {
     const s = spy();
-    expect(await send(working, NOTE, s.post, AT)).toEqual({ ok: true, provider: "resend" });
+    expect(await send(working, NOTE, s.deliver, AT)).toEqual({ ok: true, provider: "cloudflare" });
     expect(s.calls).toHaveLength(1);
-    expect(s.calls[0]!.url).toContain("resend");
-    expect(s.calls[0]!.headers.authorization).toBe("Bearer re_1");
+    const { mime } = s.calls[0]!;
+    /* ⚠️ CRLF, because a MIME message with bare newlines is rejected outright
+       rather than delivered oddly. */
+    expect(mime).toContain("\r\n");
+    expect(mime).toContain("From: Kova <noreply@4dl.app>");
+    expect(mime).toContain("To: ro@example.test");
+    expect(mime).toMatch(/Message-ID: <[^>]+@4dl\.app>/);
+    expect(mime).toContain('Content-Type: text/plain; charset="utf-8"');
+    /* ⚠️ THE HEADER HAS TO MATCH THE BODY. A message declaring `8bit` and
+       carrying base64 is not a formatting nit — every client renders the
+       encoded blob verbatim, so the person is shown the base64 of their code. */
+    expect(mime).toContain("Content-Transfer-Encoding: base64");
+    expect(mime.split("\r\n\r\n")[1]).toMatch(/^[A-Za-z0-9+/=\r\n]+$/);
+    /* ⚠️ The body is base64 — the header says so, and a raw body under that
+       header is a message every client renders as gibberish. */
+    expect(atob(mime.split("\r\n\r\n")[1]!)).toContain("123456");
+  });
 
-    const body = JSON.parse(s.calls[0]!.body) as { from: string; to: string[]; text: string };
-    expect(body.from).toBe("Kova <noreply@4dl.app>");
-    expect(body.to).toEqual(["ro@example.test"]);
-    expect(body.text).toContain("123456");
+  /*
+    ⚠️ NO BINDING IS ITS OWN REFUSAL. A deployment set to send through Cloudflare
+    on a worker with no `send_email` binding is an ordinary mistake, and calling
+    it "refused" sends an operator to look at DNS for one line of config.
+  */
+  it("says the binding is missing rather than reporting a refusal", async () => {
+    expect(await send(working, NOTE, null, AT)).toEqual({ ok: false, why: "no_binding" });
   });
 
   /*
@@ -106,7 +126,7 @@ describe("sending", () => {
     worst combination available.
   */
   it("refuses a provider that no longer exists rather than picking one", async () => {
-    const gone = { "email.provider": "brevo", "email.from": "a@b", "email.brevo.key": "x" };
+    const gone = { "email.provider": "resend", "email.from": "a@b", "email.resend.key": "re_1" };
     expect(await send(gone, NOTE, never, AT)).toEqual({ ok: false, why: "unknown_provider" });
   });
 
@@ -116,14 +136,14 @@ describe("sending", () => {
     to catch, because a caller that catches would catch the misconfigurations too.
   */
   it("reports a refusal rather than throwing, however the provider failed", async () => {
-    expect(await send(working, NOTE, spy(false).post, AT)).toEqual({ ok: false, why: "refused" });
+    expect(await send(working, NOTE, spy(false).deliver, AT)).toEqual({ ok: false, why: "refused" });
     expect(await send(working, NOTE, async () => { throw new Error("down"); }, AT)).toEqual({ ok: false, why: "refused" });
   });
 
   it("records rather than sending when that is what was chosen", async () => {
     const s = spy();
     const values = { "email.provider": "recorded", "email.from": "Kova <noreply@4dl.app>" };
-    expect(await send(values, NOTE, s.post, AT)).toEqual({ ok: true, provider: "recorded" });
+    expect(await send(values, NOTE, s.deliver, AT)).toEqual({ ok: true, provider: "recorded" });
     expect(s.calls).toHaveLength(0);
     expect(recorded.get("ro@example.test")!.body).toContain("123456");
   });

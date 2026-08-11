@@ -12,7 +12,7 @@
 import type { AnyOperation, AppSpec, BindingSpec, ConfigRegistry, Instant, SqlHandle } from "@one/kernel";
 import { modelFor, operation, s } from "@one/kernel";
 import { lines, readAll, readRates, refuseRate, refuseWrite, writeOne, writeRate } from "./config.js";
-import { chooseProvider, send, type Post } from "./mail.js";
+import { chooseProvider, send, type Deliver } from "./mail.js";
 import { OPERATE } from "./operator-ops.js";
 
 /** ⚠️ A symbol, so an app cannot reach the secret store by writing a property name. */
@@ -22,7 +22,7 @@ export interface ConfigDeps {
   /** This app's own store. Always present. */
   readonly own: SqlHandle;
   /** ⚠️ Injected, so the one file that reaches the network is the one that sends. */
-  readonly post: Post;
+  readonly deliver: Deliver | null;
   /** ⚠️ Null where a deployment binds no shared store, which is most of them. */
   readonly shared: SqlHandle | null;
   readonly registry: ConfigRegistry;
@@ -223,7 +223,7 @@ export function configOperations<B extends BindingSpec>(app: AppSpec<B>): readon
         to: input.to,
         subject: "Test message",
         body: "This is a test from your deployment's configuration screen. If you are reading it, mail is working.",
-      }, d.post, ctx.now() as Instant);
+      }, d.deliver, ctx.now() as Instant);
 
       /*
         ⚠️ A FAILURE IS AN ANSWER, NOT A PROBLEM. Refusing the request with a 503

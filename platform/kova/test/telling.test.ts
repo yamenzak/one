@@ -258,9 +258,12 @@ describe("what this product discloses about where data goes", () => {
        Gemini-only and came back with the models — which is the check working in
        both directions rather than a list somebody edited twice. */
     expect(ids).toContain("workers-ai");
-    /* ⚠️ And nothing that receives nothing: a name here that is not true is a
-       false disclosure in the direction that looks careful. */
-    expect(ids).not.toContain("cloudflare-email");
+    /* ⚠️ And the mail lane, which is a WORKER BINDING rather than an API key —
+       so there is no credential in a database, none in a settings screen, and
+       nothing to rotate. The entry moved from `resend` to this the day the
+       transport did, because `MAIL_LANES` is what the check reads. */
+    expect(ids).toContain("cloudflare-email");
+    expect(ids).not.toContain("resend");
   });
 
   it("says where the data is and who to ask about it", async () => {

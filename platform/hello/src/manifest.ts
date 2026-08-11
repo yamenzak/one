@@ -285,14 +285,14 @@ export const hello = defineApp({
         },
         {
           /* ⚠️ The id is the mail LANE, and it must match `MAIL_LANES`. */
-          id: "resend",
-          name: "Resend, Inc.",
+          id: "cloudflare-email",
+          name: "Cloudflare Email Routing and Email Sending",
           role: "Sends the messages this product sends: a sign-in code, an invitation, a notification somebody asked to be emailed.",
           receives: ["identity", "contact"],
-          where: "United States, on infrastructure in the customer's chosen region.",
+          where: "Cloudflare's network.",
           safeguard: "dpf",
-          terms: "https://resend.com/legal/dpa",
-          trust: "https://resend.com/legal/security",
+          terms: "https://www.cloudflare.com/cloudflare-customer-dpa/",
+          trust: "https://www.cloudflare.com/trust-hub/compliance-resources/",
         },
         {
           id: "stripe",

@@ -36,9 +36,9 @@ export const senderOf = (values: Values): string => values["email.from"] ?? "";
 
 /* ------------------------------------------------------------- providers --- */
 
-export type ProviderId = "recorded" | "resend";
+export type ProviderId = "recorded" | "cloudflare";
 
-const PROVIDERS: readonly ProviderId[] = ["recorded", "resend"];
+const PROVIDERS: readonly ProviderId[] = ["recorded", "cloudflare"];
 
 /**
  * ⚠️ WHICH COMPANY EACH LANE HANDS THE MESSAGE TO, and `null` means nobody.
@@ -59,11 +59,11 @@ const PROVIDERS: readonly ProviderId[] = ["recorded", "resend"];
  */
 export const MAIL_HANDED_TO: Readonly<Record<ProviderId, string | null>> = {
   recorded: null,
-  resend: "resend",
+  cloudflare: "cloudflare-email",
 };
 
 export type Chosen =
-  | { readonly ok: true; readonly provider: ProviderId; readonly from: string; readonly key: string }
+  | { readonly ok: true; readonly provider: ProviderId; readonly from: string }
   | { readonly ok: false; readonly why: Unconfigured };
 
 /**
@@ -72,7 +72,7 @@ export type Chosen =
  * verified address nobody has entered; no key is a provider that will refuse
  * every call. An operator reading one word cannot tell which.
  */
-export type Unconfigured = "no_provider" | "unknown_provider" | "no_sender" | "no_key";
+export type Unconfigured = "no_provider" | "unknown_provider" | "no_sender" | "no_binding";
 
 /**
  * What this deployment sends with, from what it has been told.
@@ -95,11 +95,17 @@ export function chooseProvider(values: Values): Chosen {
     misconfiguration a person made, which is visible on the console's own screen
     rather than being a branch nobody can see.
   */
-  if (id === "recorded") return { ok: true, provider: "recorded", from, key: "" };
+  if (id === "recorded") return { ok: true, provider: "recorded", from };
 
-  const key = (values[`email.${id}.key`] ?? "").trim();
-  if (key === "") return { ok: false, why: "no_key" };
-  return { ok: true, provider: id as ProviderId, from, key };
+  /*
+    ⚠️ THERE IS NO API KEY, AND THAT IS THE POINT OF THIS LANE. Cloudflare Email
+    Sending is a WORKER BINDING: the credential is the deployment's own binding
+    rather than a secret pasted into a settings screen, so there is nothing to
+    rotate, nothing to leak from a console, and nothing to store in a database.
+    What can be missing is the binding, and that is answered at send time by
+    whoever holds the environment — not here.
+  */
+  return { ok: true, provider: id as ProviderId, from };
 }
 
 /* --------------------------------------------------------------- sending --- */
@@ -108,8 +114,16 @@ export type Sent =
   | { readonly ok: true; readonly provider: ProviderId }
   | { readonly ok: false; readonly why: Unconfigured | "refused" };
 
-export interface Post {
-  (url: string, init: { method: string; headers: Record<string, string>; body: string }): Promise<{ ok: boolean }>;
+/**
+ * HANDING ONE MESSAGE TO THE DEPLOYMENT'S OWN SENDER.
+ *
+ * ⚠️ A FUNCTION RATHER THAN THE BINDING ITSELF, so this module builds MIME and
+ * knows nothing about `cloudflare:email`. The import is dynamic and lives in the
+ * one place that holds the environment — which is what keeps this file testable
+ * with no binding at all, and what makes `recorded` a lane rather than a mock.
+ */
+export interface Deliver {
+  (from: string, to: string, mime: string): Promise<{ ok: boolean }>;
 }
 
 /**
@@ -131,7 +145,7 @@ export const recorded = new Map<string, Message>();
  * problem response is the same disclosure question as one from a database, read
  * by somebody who wanted a name they can act on rather than a stack trace.
  */
-export async function send(values: Values, message: Message, post: Post, at: Instant): Promise<Sent> {
+export async function send(values: Values, message: Message, deliver: Deliver | null, at: Instant): Promise<Sent> {
   const chosen = chooseProvider(values);
   if (!chosen.ok) return { ok: false, why: chosen.why };
 
@@ -141,27 +155,65 @@ export async function send(values: Values, message: Message, post: Post, at: Ins
   }
 
   /*
-    ⚠️ ONE LANE THAT LEAVES THE PROCESS, and the shape is kept as a value rather
-    than inlined because the second one is what the mail provider question is
-    about. Adding it means adding a branch here AND an entry in `MAIL_HANDED_TO`
-    AND one in the kernel's `MAIL_LANES` — the last of which is what makes it
-    appear on the sub-processor list a customer reads.
+    ⚠️ NO BINDING IS A REFUSAL WITH ITS OWN NAME. A deployment configured to send
+    through Cloudflare on a worker with no `send_email` binding is a real and
+    ordinary mistake — and reporting it as "refused" would send an operator
+    looking at DNS for something that is one line of `wrangler.jsonc`.
   */
-  const request = {
-    url: "https://api.resend.com/emails",
-    headers: { authorization: `Bearer ${chosen.key}`, "content-type": "application/json" },
-    body: JSON.stringify({ from: chosen.from, to: [message.to], subject: message.subject, text: message.body }),
-  };
+  if (!deliver) return { ok: false, why: "no_binding" };
 
   /*
-    ⚠️ A THROW IS A REFUSAL TOO. A provider that is unreachable and one that says
+    ⚠️ A THROW IS A REFUSAL TOO. A sender that is unreachable and one that says
     no are the same thing to whoever was waiting for a code, and the difference
     belongs in a log rather than in a control flow every caller has to handle.
   */
-  const answered = await post(request.url, { method: "POST", headers: request.headers, body: request.body })
+  const answered = await deliver(chosen.from, message.to, mimeFor(chosen.from, message, at))
     .catch(() => ({ ok: false }));
-  void at;
   return answered.ok ? { ok: true, provider: chosen.provider } : { ok: false, why: "refused" };
+}
+
+/* ------------------------------------------------------------------ mime --- */
+
+/**
+ * ⚠️ THE BINDING TAKES A RAW MIME MESSAGE, NOT AN OBJECT, and getting that wrong
+ * is not a formatting problem — the send is rejected outright.
+ *
+ * Everything this platform sends is one sentence and one link, so this is
+ * `text/plain` and nothing else: no multipart, no HTML alternative, no
+ * attachments. That is the half of an email that renders differently in every
+ * client and gets a message filed as marketing.
+ */
+export function mimeFor(from: string, message: Message, at: Instant): string {
+  const domain = addressOf(from).email.split("@")[1] ?? "localhost";
+  return [
+    `From: ${from}`,
+    `To: ${message.to}`,
+    `Subject: ${encodeHeader(message.subject)}`,
+    /* ⚠️ A Message-ID is not decoration: without one, several receivers treat
+       the message as malformed and some file it as spam on that alone. */
+    `Message-ID: <${crypto.randomUUID()}@${domain}>`,
+    `Date: ${new Date(Date.parse(at)).toUTCString()}`,
+    `MIME-Version: 1.0`,
+    `Content-Type: text/plain; charset="utf-8"`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    base64Utf8(message.body),
+  ].join("\r\n");
+}
+
+/** ⚠️ RFC 2047 where the subject is not ASCII — a brand name with an accent in
+ *  a bare header is a subject line that arrives as mojibake. */
+function encodeHeader(s: string): string {
+  // eslint-disable-next-line no-control-regex
+  return /^[\x00-\x7F]*$/.test(s) ? s : `=?UTF-8?B?${base64Utf8(s)}?=`;
+}
+
+/** ⚠️ `btoa` is latin1-only, so UTF-8 has to be encoded first or it throws. */
+function base64Utf8(s: string): string {
+  const bytes = new TextEncoder().encode(s);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/(.{76})/g, "$1\r\n");
 }
 
 /**

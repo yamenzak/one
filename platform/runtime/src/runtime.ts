@@ -37,7 +37,45 @@ import { readSettings, wordingFor } from "./settings.js";
 import { remember, replayed, replayKeyOf, REPLAY_HEADER } from "./replay.js";
 import { LOOKUP, type Fetcher, type LookupCarrier } from "./lookup.js";
 import { chargeableFrom, readAll, readRates } from "./config.js";
-import { send, type Post } from "./mail.js";
+import { send, type Deliver } from "./mail.js";
+
+/**
+ * THE ONE PLACE THAT KNOWS ABOUT `cloudflare:email`.
+ *
+ * ⚠️ THE IMPORT IS DYNAMIC AND INSIDE THE CALL, deliberately. `cloudflare:email`
+ * does not resolve outside a Worker, so a static import at module scope would
+ * make every Node-side test and every tool that merely LOADS this file fail on
+ * an import it never needed — including the ones for apps that send nothing.
+ *
+ * ⚠️ AND A MISSING BINDING RESOLVES TO NULL RATHER THAN THROWING. `send` reports
+ * `no_binding`, which is a different thing for an operator to go and fix than a
+ * refused send: one is a line of `wrangler.jsonc`, the other is DNS.
+ */
+function deliverVia(env: RawEnv, binding: string | undefined): Deliver | null {
+  const raw = binding ? (env as Record<string, unknown>)[binding] : undefined;
+  if (!raw) return null;
+  return async (from, to, mime) => {
+    try {
+      /* ⚠️ The specifier is built rather than written literally: TypeScript
+         resolves `cloudflare:email` only with the Workers types loaded, and this
+         package is also compiled for a Node-side test runner that has no reason
+         to know about it. The module is still resolved at runtime, inside a
+         Worker, which is the only place it exists. */
+      const { EmailMessage } = (await import(/* @vite-ignore */ ["cloudflare", "email"].join(":"))) as {
+        EmailMessage: new (from: string, to: string, raw: string) => unknown;
+      };
+      /* ⚠️ The BARE address, never the display name — `Kova <a@b>` as an
+         envelope sender is rejected by the binding outright. */
+      const bare = /<([^>]+)>/.exec(from)?.[1] ?? from;
+      await (raw as { send(m: unknown): Promise<void> }).send(new EmailMessage(bare.trim(), to, mime));
+      return { ok: true };
+    } catch {
+      /* ⚠️ The sender's own words never travel — same disclosure question as a
+         database error, read by somebody who wanted a name they can act on. */
+      return { ok: false };
+    }
+  };
+}
 import { SHARED_MODULES } from "./modules.js";
 import { GUIDE, guideOperations, type GuideCarrier } from "./guide-ops.js";
 import { MILESTONES, milestoneOperations, type MilestoneCarrier } from "./milestone-ops.js";
@@ -185,7 +223,14 @@ export interface RuntimeOptions<B extends BindingSpec> {
    * that stubs the mailer, which leaves the request a provider actually receives
    * — the one place a wrong sender or a wrong field lives — asserted by nothing.
    */
-  readonly post?: Post;
+  readonly deliver?: Deliver;
+  /**
+   * ⚠️ THE BINDING NAME CLOUDFLARE EMAIL SENDING IS BOUND UNDER, because a
+   * worker may bind several senders and the platform must not guess which. A
+   * deployment that binds none sends nothing and says `no_binding` — which is a
+   * different thing to go and fix than a refused send.
+   */
+  readonly sendEmailBinding?: string;
   /**
    * ⚠️ THE OUTBOUND LANE FOR DECLARED SERVICES, injected for the same reason the
    * mailer is: a suite must not be able to reach a real third party by accident,
@@ -670,7 +715,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             to: email,
             subject: `${app.name}: your sign-in code`,
             body: `Your code is ${code}. It is good for a few minutes and can be used once.`,
-          }, opts.post ?? ((url, init) => fetch(url, init as RequestInit).then((r) => ({ ok: r.ok }))), new Date().toISOString() as Instant);
+          }, opts.deliver ?? deliverVia(env, opts.sendEmailBinding), new Date().toISOString() as Instant);
           if (!out.ok) throw new Error(`mail:${out.why}`);
         }),
       };
@@ -704,7 +749,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           /* ⚠️ A message with no body is its own title. An email whose whole
              content is a subject line reads as a truncated one. */
           body: delivery.body ?? delivery.title,
-        }, opts.post ?? ((url, init) => fetch(url, init as RequestInit).then((r) => ({ ok: r.ok }))),
+        }, opts.deliver ?? deliverVia(env, opts.sendEmailBinding),
           new Date().toISOString() as Instant).catch(() => undefined);
       });
 
@@ -1221,7 +1266,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
             its own — so nothing in a suite can reach a real provider by
             accident, and the send path is exercised rather than stubbed out.
           */
-          post: opts.post ?? ((url, init) => fetch(url, init as RequestInit).then((r) => ({ ok: r.ok }))),
+          deliver: opts.deliver ?? deliverVia(env, opts.sendEmailBinding),
         },
         [OPERATOR]: {
           global: directoryDb,

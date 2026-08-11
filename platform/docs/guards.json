@@ -2189,8 +2189,8 @@
       "stage": "7",
       "status": "live",
       "impl": "runtime/test/mail.test.ts",
-      "proves": "sends what the provider expects, with the sender whole",
-      "fails": "a sender handed to the mail API in the wrong shape — a message that arrives from nobody or is refused outright, on the one lane a person is waiting on"
+      "proves": "hands the sender a MIME message the binding will accept",
+      "fails": "a MIME message the send binding rejects outright — bare newlines, a missing Message-ID, or a Content-Transfer-Encoding header that disagrees with the body, which shows the person the base64 of their own sign-in code"
     },
     {
       "id": "a-code-that-could-not-be-sent-is-not-a-code",
@@ -3253,6 +3253,15 @@
       "impl": "kova/test/telling.test.ts",
       "proves": "covers every declared sub-processor, so nothing is silently left off",
       "fails": "a sub-processor disclosed in one place and absent from the transfer register — the artefact every questionnaire asks for, answerable only by joining what is held to who receives it, and wrong by the next feature in every company that writes it by hand"
+    },
+    {
+      "id": "a-missing-send-binding-has-its-own-name",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "runtime/test/mail.test.ts",
+      "proves": "says the binding is missing rather than reporting a refusal",
+      "fails": "a deployment configured to send through Cloudflare on a worker with no send_email binding, reported as a refused send — which sends an operator to look at DNS for one line of wrangler.jsonc"
     }
   ]
 }

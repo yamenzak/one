@@ -68,6 +68,19 @@ const runtime = createRuntime(hello, {
     with, and this is the reference app for exactly that shape. Kova binds it.
     Unbound resolves this app's own values and falls through to nothing.
   */
+  /*
+    ⚠️ THE MAIL LANE IS A BINDING, NOT A KEY. Cloudflare Email Sending is bound
+    to the worker in `wrangler.jsonc` as a `send_email` entry, so the credential
+    is the deployment's own binding: there is no secret in the database, none in
+    a settings screen, nothing to rotate and nothing a console can leak.
+
+    ⚠️ AND IT IS NAMED RATHER THAN GUESSED. A worker may bind several senders,
+    and a platform that picked the first one it found would send a product's mail
+    from another product's address. A deployment that binds none sends nothing
+    and reports `no_binding` — one line of config to fix, and distinguishable
+    from a refused send, which is DNS.
+  */
+  sendEmailBinding: "SEND_EMAIL",
   identityBinding: "DIRECTORY",
   sessionsBinding: "db",
   objectsBinding: "media",

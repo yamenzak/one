@@ -3182,7 +3182,7 @@ export const kova = defineApp({
   id: "kova",
   name: "Kova",
   stripeMetadataPrefix: "kova",
-  manifestVersion: "0.31.0",
+  manifestVersion: "0.32.0",
   bindings,
 
   identity: {
@@ -3578,23 +3578,24 @@ export const kova = defineApp({
         },
         {
           /*
-            ⚠️ THE ONLY MAILER, AND THE ID IS THE LANE RATHER THAN THE INTENTION.
-            This entry said `cloudflare-email` while the runtime could be
-            configured with two other providers, so the disclosure named a
-            company that would not have received the message and did not name the
-            one that would. `MAIL_LANES` in `@one/kernel` is now what this must
-            match, and `runtime/test/mail.test.ts` pins that constant to the
-            provider registry — so a second mailer cannot be added without
-            appearing here.
+            ⚠️ THE ONLY MAILER, AND THE ID IS THE LANE. `MAIL_LANES` in
+            `@one/kernel` is what this must match, and `runtime/test/mail.test.ts`
+            pins that constant to the provider registry — so a second mailer
+            cannot be added without appearing here.
+
+            ⚠️ IT IS A WORKER BINDING RATHER THAN AN API KEY, which is the reason
+            to prefer it beyond the count: no credential in a database, none in a
+            settings screen, nothing to rotate and nothing a console can leak.
+            What can go wrong is a missing binding, reported as exactly that.
           */
-          id: "resend",
-          name: "Resend, Inc.",
+          id: "cloudflare-email",
+          name: "Cloudflare Email Routing and Email Sending",
           role: "Sends the messages this product sends: a sign-in code, an invitation, a notification somebody asked to be emailed.",
           receives: ["identity", "contact"],
-          where: "United States, on infrastructure in the customer's chosen region.",
+          where: "Cloudflare's network.",
           safeguard: "dpf",
-          terms: "https://resend.com/legal/dpa",
-          trust: "https://resend.com/legal/security",
+          terms: "https://www.cloudflare.com/cloudflare-customer-dpa/",
+          trust: "https://www.cloudflare.com/trust-hub/compliance-resources/",
         },
         {
           id: "workers-ai",
@@ -4011,6 +4012,13 @@ export const kova = defineApp({
   },
 
   releases: [
+    {
+      version: "0.32.0",
+      at: "2026-08-10",
+      notes: [
+        "Email now goes out through Cloudflare, the same company that already runs everything else here — one fewer outside company touching your clients' addresses, and one fewer key that could ever leak.",
+      ],
+    },
     {
       version: "0.31.0",
       at: "2026-08-10",

@@ -3770,3 +3770,33 @@ gone; `senderName` — the half of that request anybody actually made — stays.
 ⚠️ AND A STORED `brevo` FALLS BACK TO THE PLATFORM RATHER THAN TO `off`. Mapping
 it to `off` would silently stop every invitation and notification a studio sends,
 which is a worse outcome than the thing being fixed.
+
+## 277. The mailer nobody had heard of
+
+The platform's mail lane shipped with Resend as the only provider that actually
+sends. It was disclosed correctly and it worked — and the person who owns the
+company did not know the name when he read his own sub-processor list.
+
+⚠️ THAT IS THE DISCLOSURE MECHANISM WORKING ON ITS REAL TARGET. Every check in
+`protection.ts` is aimed at a future reviewer; the first thing it actually caught
+was the operator's own surprise at a company receiving his users' addresses.
+
+The lane is Cloudflare Email Sending now — a WORKER BINDING rather than an API
+key, which is the reason to prefer it beyond removing a recipient: no credential
+in the database, none in a settings screen, nothing to rotate, and nothing a
+console can leak. `email.*.key` is gone from the config registry entirely,
+because every provider that needed one is gone.
+
+Three things the shape forced, each of which is a test:
+
+⚠️ THE BINDING IS NAMED RATHER THAN FOUND. A worker may bind several senders, and
+a platform picking the first would send one product's mail from another's address.
+
+⚠️ A MISSING BINDING IS ITS OWN REFUSAL. `no_binding`, not `refused` — one is a
+line of `wrangler.jsonc` and the other is DNS, and an operator told the wrong one
+looks in the wrong place for an afternoon.
+
+⚠️ AND THE IMPORT IS DYNAMIC, WITH THE SPECIFIER BUILT. `cloudflare:email`
+resolves only inside a Worker, so a static import would break every Node-side
+test and every tool that merely LOADS the runtime — including for apps that send
+nothing at all.

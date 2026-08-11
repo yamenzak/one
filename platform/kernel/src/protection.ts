@@ -399,7 +399,7 @@ export const PLATFORM_PAYMENTS = "stripe";
  * sub-processor is declared in a file about the law, which is exactly the pair
  * that drifts.
  */
-export const MAIL_LANES: readonly string[] = ["resend"];
+export const MAIL_LANES: readonly string[] = ["cloudflare-email"];
 
 /**
  * What a manifest structurally REACHES — read off its own declarations rather
