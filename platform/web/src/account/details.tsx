@@ -77,6 +77,7 @@ export function AccountDetails({
     <Screen
       leave="up"
       onLeave={onBack}
+      name="Your details"
       /* ⚠️ THE TITLE AND THE FACE SHARE A LINE, and the face is the one thing on
          this screen that is not a row — it is what the person looks like, so it is
          shown rather than described. */

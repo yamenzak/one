@@ -122,8 +122,14 @@ h2 { word-spacing: normal; }
   max-inline-size: 560px; margin: 0 auto; padding: 14px 16px 72px;
   display: flex; flex-direction: column; gap: 26px; }
 /* ⚠️ EVERYTHING THE PERSON READS SITS ABOVE THE LIGHT. Stated once, here, rather
-   than as a z-index on each thing that turned out to need one. */
-.page > *:not(.sky) { position: relative; z-index: 1; }
+   than as a z-index on each thing that turned out to need one.
+
+   ⚠️ AND IT SETS NO POSITION, WHICH IS THE WHOLE POINT OF THE RULE BEING THIS
+   NARROW. It used to declare position relative as well, and at two classes to the
+   bar's one it won — so the sticky bar was quietly a relative one and scrolled
+   away with the page, on every screen, while the rule that broke it read as
+   harmless boilerplate. A flex item takes a z-index without being positioned. */
+.page > *:not(.sky) { z-index: 1; }
 
 /* ------------------------------------------------------------------ the top */
 
@@ -131,13 +137,50 @@ h2 { word-spacing: normal; }
    is called, so it sits on the axis of the page; the close is a control on the
    edge, and centring the two together would push the mark off centre by exactly
    the width of a button. */
-.page-top { display: flex; flex-direction: column; gap: 26px; padding-block-end: 10px; }
-/* ⚠️ THE CONTROLS SHARE A LINE AND THE TITLE SITS UNDER THEM. In the heading row
-   the title shifts left and right as the action changes from screen to screen —
-   and on a narrow phone a long title and a button fight for the same forty
-   millimetres. */
-.page-controls { display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; margin-block-end: -14px; }
+/* ⚠️ THE BAR IS STICKY FROM THE FIRST PIXEL AND ONLY ITS GROUND ARRIVES. The way
+   out and the way on are in it at every scroll position, so nothing moves into it
+   and nothing has to be found again after scrolling. Everything below interpolates
+   on --scrolled, which is written by the frame at 0 through 1 over the height of
+   the title it is replacing. */
+.topbar { position: sticky; inset-block-start: 0; z-index: 3;
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
+  margin-inline: -16px; padding: 10px 16px;
+  background: color-mix(in oklab, var(--page) calc(var(--scrolled, 0) * 94%), transparent);
+  backdrop-filter: blur(calc(var(--scrolled, 0) * 20px)); }
+/* ⚠️ A HAIRLINE ONLY ONCE THERE IS SOMETHING UNDER IT. Drawn at rest it is a rule
+   across the top of every screen; drawn as the ground arrives it is the edge of a
+   surface that now has content behind it. */
+.topbar::after { content: ""; position: absolute; inset-block-end: 0; inset-inline: 0;
+  block-size: 1px; background: color-mix(in oklab, var(--ink) 12%, transparent);
+  opacity: var(--scrolled, 0); }
+/* ⚠️ IT RISES INTO PLACE RATHER THAN FADING. A name that appears at its final
+   position is a label being switched on; coming up as the large one goes up is
+   one movement handing over to another. */
+.topbar-name { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-brand); font-size: 17px; font-weight: 600;
+  letter-spacing: -0.02em; word-spacing: normal;
+  opacity: calc((var(--scrolled, 0) - 0.55) * 2.2);
+  translate: 0 calc((1 - var(--scrolled, 0)) * 8px); }
+/* ⚠️ THE ACTION LOSES ITS WORDS, NOT ITS PLACE. Collapsing to the symbol is what
+   makes room for the name; moving or removing it would be a control that is
+   somewhere else depending on how far somebody has scrolled. */
+/* ⚠️ IT CLIPS, IT DOES NOT WRAP. Narrowing the label made "Add passkey" break
+   across two lines inside a pill, which is a button coming apart rather than a
+   label giving way. */
+.topbar .button-label { display: inline-block; overflow: hidden; white-space: nowrap;
+  max-inline-size: calc((1 - var(--scrolled, 0)) * 9em);
+  opacity: calc(1 - var(--scrolled, 0) * 1.6); }
+.topbar .button { padding-inline: calc(12px + (1 - var(--scrolled, 0)) * 4px); gap: calc((1 - var(--scrolled, 0)) * 7px); }
+
+/* ⚠️ THE LARGE TITLE LEAVES UPWARDS AND SHRINKS INTO THE ONE IN THE BAR. It is
+   still in flow, so the content under it does not jump — what changes is only
+   what it looks like on the way past. */
+.page-head { display: flex; flex-direction: column; gap: 10px;
+  padding-block: 10px 12px;
+  opacity: calc(1 - var(--scrolled, 0) * 1.5);
+  translate: 0 calc(var(--scrolled, 0) * -10px);
+  scale: calc(1 - var(--scrolled, 0) * 0.06);
+  transform-origin: 0 50%; }
 
 /* ⚠️ A ROUND CONTROL ON ITS OWN LINE, above the title rather than beside it. It
    is a way OUT of a presentation, not a thing in the heading — putting it in the
@@ -315,11 +358,29 @@ h2 { word-spacing: normal; }
    button is refusing a second press for the length of a round trip — which is the
    same attribute and the opposite meaning — so it keeps its own ground and the
    pointer says wait rather than no. */
-.button[data-state='saving']:disabled { background: var(--ink); color: var(--card); cursor: progress; }
+.button[data-state='working']:disabled { background: var(--ink); color: var(--card); cursor: progress; }
 /* ⚠️ SAVED IS THE ONE STATE THAT GETS A COLOUR, and it keeps the disabled ground's
    job of refusing a second press. Green for a moment is the clearest possible
    answer to "did that work"; green forever is decoration. */
-.button[data-state='saved']:disabled { background: var(--ok); color: var(--card); }
+.button[data-state='done']:disabled { background: var(--ok); color: var(--card); }
+/* ⚠️ THE ALARM IS ON THE ACTION AND NOWHERE ELSE. A confirm sheet is already the
+   product asking whether somebody means it; painting the whole surface red says
+   the same thing again, louder, to somebody who has already understood. */
+.button[data-tone-alarm] { background: var(--alarm); color: #fff; }
+.button[data-tone-alarm]:disabled { background: var(--well); color: var(--ink-faint); }
+
+/* ⚠️ THE LABEL IS THE TARGET, not a caption beside one. A 20-pixel box next to
+   words that are not part of the control is the smallest hit area in the product,
+   placed on the one question that most deserves a large one. */
+.check { display: flex; align-items: center; gap: 12px; cursor: pointer;
+  font-size: 15.5px; line-height: 1.4; }
+.check input { position: absolute; opacity: 0; inline-size: 0; block-size: 0; }
+.check-box { flex: none; inline-size: 24px; block-size: 24px; border-radius: 8px;
+  display: grid; place-items: center; color: transparent;
+  background: var(--well);
+  transition: background-color var(--swift) var(--move), color var(--swift) var(--move); }
+.check input:checked + .check-box { background: var(--accent); color: #fff; }
+.check input:focus-visible + .check-box { outline: 2px solid var(--accent); outline-offset: 2px; }
 .button-label { line-height: 1; }
 .button-sign { flex: none; }
 
@@ -396,6 +457,18 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .face[data-tone='kova'] { background: var(--p-kova); }
 .face[data-tone='scena'] { background: var(--p-scena); }
 .face[data-tone='tessa'] { background: var(--p-tessa); }
+
+/* ⚠️ THE BADGE SITS ON THE FACE AND THE FACE STANDS DOWN FOR IT. A planet at full
+   strength is the most colourful thing on the row and a symbol laid over it
+   disappears; dimmed, it is still unmistakably which workspace. */
+.marked { position: relative; flex: none; display: block;
+  inline-size: 44px; block-size: 44px; }
+.marked .face { inline-size: 100%; block-size: 100%; opacity: 0.62; }
+.marked-badge { position: absolute; inset-block-end: -3px; inset-inline-end: -3px;
+  inline-size: 24px; block-size: 24px; border-radius: var(--radius-well);
+  display: grid; place-items: center;
+  background: var(--card); color: var(--ink);
+  box-shadow: 0 0 0 2px var(--card); }
 
 /* ⚠️ ONLY ON A ROW THAT HAS ONE. A standing on every row is a column of green
    nobody reads, and the one that needs attention stops standing out. */

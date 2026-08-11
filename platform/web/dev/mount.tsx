@@ -122,20 +122,26 @@ function Preview() {
     { id: "k2", label: "iPhone 15", added: "12 May" },
   ];
   const DEVICES = [
-    { id: "d1", app: "Kova · Haddad Strength", since: "4 March", current: true },
-    { id: "d2", app: "Scena · Corniche Screens", since: "28 July" },
+    { id: "d1", app: "Kova · Haddad Strength", since: "4 March", current: true,
+      workspaceFace: face("t1"), workspaceName: "Haddad Strength", product: "kova" },
+    { id: "d2", app: "Scena · Corniche Screens", since: "28 July",
+      workspaceFace: face("t3"), workspaceName: "Corniche Screens", product: "scena" },
   ];
 
   const screen = ({ Heading }: { readonly Heading: ElementType }) =>
     at === "signin" ? (
       <SignInMethods
         email={(CASES[which] ?? CASES.four).person.email}
-        passkeys={which === "waiting" ? null : which === "new" ? [] : KEYS}
+        /* ⚠️ `#keys=one` IS ITS OWN KNOB because the LAST passkey is a different
+           screen: removing it is the only action here that asks for a tick. A
+           state that only exists at a list length of exactly one is a state
+           nobody reaches by accident while reviewing. */
+        passkeys={which === "waiting" ? null : which === "new" ? [] : asked.get("keys") === "one" ? KEYS.slice(0, 1) : KEYS}
         devices={which === "waiting" ? null : DEVICES}
         Heading={Heading}
         onAddPasskey={() => undefined}
-        onRemovePasskey={() => undefined}
-        onSignOut={() => undefined}
+        onRemovePasskey={save}
+        onSignOut={save}
         onBack={() => setAt("home")}
       />
     ) : at === "home" ? (

@@ -169,6 +169,19 @@ fifty-four seconds and a face breathing over nine are weather: nothing is
 responding to anybody, and their rate *is* the effect. The line is two seconds,
 and it is a distinction rather than a convenience.
 
+**An entrance fills `backwards`, never `both`.** — `both` keeps the animation's
+final values applied forever and they silently win over the element's own
+declarations. A collapsing header whose opacity and scale are computed from scroll
+position was pinned at whatever a finished entrance had left behind, and did
+nothing at all. The entrance looks identical either way; only the element's future
+differs.
+
+**A blanket rule sets no `position`.** — `.page > *:not(.sky)` declared
+`position: relative` to lift content above the sky, and at two classes to the
+bar's one it won: the sticky header was quietly a relative one and scrolled away
+with the page, on every screen, while the rule that broke it read as harmless
+boilerplate. A flex item takes a `z-index` without being positioned.
+
 **Reduced motion is removed, not shortened, and the rule is universal.** — A
 person who has turned motion down is not asking for the same motion faster. The
 rule uses `*` rather than a list of classes, because a rule that names what it
@@ -195,6 +208,24 @@ behind it.
 
 **A grabber is a claim, so it appears only where it is true.** — A bar at the top
 of a sheet is the one piece of furniture that means *pull me*.
+
+**The bar is there from the first pixel and only its ground arrives.** — It holds
+the way out and the way on at every scroll position, so nothing moves into it and
+nothing has to be found again after scrolling. What changes is a surface, a name,
+and the action's words collapsing into its symbol. A bar that slides in carrying
+controls that were somewhere else a moment ago is two sets of the same buttons.
+
+**A gate on a confirm is chosen by consequence.** — A press for what can be done
+again; a tick for what cannot be undone but takes nothing with it; the thing's own
+name typed for what destroys something that has a name. Friction cannot make an
+action reversible and cannot make anybody read — what it buys is stopping the
+press that was already in flight when the sheet appeared, which is why the
+default is a plain press and why a gate on *every* removal trains people to tick
+without reading.
+
+**A confirm is dismissible.** — Leaving without deciding is a decision, and the
+only one available for free. A confirm you cannot escape is a trap with a
+question mark on it.
 
 **A row either goes somewhere or does something, never both.** — Two targets on
 one line means the finger that meant "Remove" and landed a millimetre left opens

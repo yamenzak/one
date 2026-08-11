@@ -90,6 +90,26 @@ export function Entry({ label, children, onEdit, affordance }: EntryProps): Reac
     : <div className="entry" data-fixed="">{body}</div>;
 }
 
+/**
+ * A face with a symbol over it — the workspace a thing belongs to, and what kind
+ * of thing it is.
+ *
+ * ⚠️ THE FACE IS DIMMED SO THE SYMBOL CAN BE READ. A planet at full strength is
+ * the most colourful thing on the row and the badge on it disappears; at
+ * two-thirds it is still unmistakably which workspace, and the symbol is legible
+ * on top. Identity first, then kind — which is the order somebody scanning a list
+ * of sessions actually asks them in.
+ */
+export const Marked = ({ face, badge }: {
+  readonly face: ReactNode;
+  readonly badge: ReactNode;
+}): ReactNode => (
+  <span className="marked">
+    {face}
+    <span className="marked-badge" aria-hidden="true">{badge}</span>
+  </span>
+);
+
 /** A value the person has not given yet. Quiet, and not an error. */
 export const Unset = ({ children }: { readonly children: ReactNode }): ReactNode =>
   <span className="entry-unset">{children}</span>;

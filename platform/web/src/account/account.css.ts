@@ -37,5 +37,5 @@ export const ACCOUNT_CSS = `
   box-shadow: 0 1px 5px rgb(0 0 0 / 0.4); }
 
 .page-title { align-self: center; font-size: 25px; line-height: 1;
-  margin-block: 12px 6px; word-spacing: normal; }
+  margin-block: 10px 4px; word-spacing: normal; }
 `.trim();

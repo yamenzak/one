@@ -28,8 +28,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { Problem } from "@one/kernel";
-import { feel } from "./feedback.js";
 import { Button } from "./button.js";
+import { useCommit } from "./commit.js";
 import { Close, Tick } from "./icon.js";
 import { Sheet } from "./sheet.js";
 
@@ -61,15 +61,6 @@ export interface ValueEditorProps {
   readonly onSave: (name: string, value: string) => Promise<Problem | null>;
   readonly onClose: () => void;
 }
-
-type Saving =
-  | { readonly at: "idle" }
-  | { readonly at: "saving" }
-  | { readonly at: "saved" }
-  | { readonly at: "failed"; readonly problem: Problem };
-
-/** Long enough to register as an answer, short enough not to be a wait. */
-const SEEN_MS = 850;
 
 /**
  * ⚠️ A SHEET SITS ON THE BOTTOM EDGE, AND ON A PHONE THE KEYBOARD IS THE BOTTOM
@@ -197,13 +188,13 @@ export function ValueEditor({ field, onSave, onClose }: ValueEditorProps): React
 
 function Editing({ field, onSave, onClose }: { readonly field: EditableField } & Omit<ValueEditorProps, "field">) {
   const [value, setValue] = useState(field.value);
-  const [state, setState] = useState<Saving>({ at: "idle" });
+  /* ⚠️ THE SAME LIFECYCLE THE CONFIRM SHEET USES, not one that resembles it. */
+  const { state, run, reset } = useCommit(
+    () => onSave(field.name, value.trim()),
+    onClose,
+  );
   const inputId = useId();
   const noteId = useId();
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => () => clearTimeout(timer.current), []);
-
   const trimmed = value.trim();
   const local = field.check?.(trimmed) ?? null;
   const unchanged = trimmed === field.value.trim();
@@ -213,15 +204,10 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
   const shown = state.at === "failed" ? (state.problem.fields?.[field.name] ?? null) : null;
   const general = state.at === "failed" && !shown ? state.problem : null;
 
-  const submit = async (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (unchanged || local || state.at === "saving") return;
-    setState({ at: "saving" });
-    const problem = await onSave(field.name, trimmed);
-    if (problem) { setState({ at: "failed", problem }); feel("wrong"); return; }
-    setState({ at: "saved" });
-    feel("done");
-    timer.current = setTimeout(onClose, SEEN_MS);
+    if (unchanged || local) return;
+    void run();
   };
 
   return (
@@ -254,13 +240,13 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
             onChange={(e) => {
               setValue(e.target.value);
               /* A failure describes a value that no longer exists. */
-              if (state.at !== "idle") setState({ at: "idle" });
+              reset();
             }}
             autoFocus
           />
           {value ? (
             <button type="button" className="field-clear press" aria-label="Clear"
-              onClick={() => { setValue(""); setState({ at: "idle" }); }}>
+              onClick={() => { setValue(""); reset(); }}>
               <Close size={15} />
             </button>
           ) : null}
@@ -282,10 +268,10 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
 
       <div className="sheet-actions">
         <Button tone="loud" wide type="submit" data-state={state.at}
-          disabled={unchanged || local !== null || state.at === "saving" || state.at === "saved"}>
-          {state.at === "saving" ? "Saving" : state.at === "saved" ? "Saved" : general?.retryable ? "Try again" : "Save"}
-          {state.at === "saving" ? <Spinner /> : null}
-          {state.at === "saved" ? <Tick className="button-sign" /> : null}
+          disabled={unchanged || local !== null || state.at === "working" || state.at === "done"}>
+          {state.at === "working" ? "Saving" : state.at === "done" ? "Saved" : general?.retryable ? "Try again" : "Save"}
+          {state.at === "working" ? <Spinner /> : null}
+          {state.at === "done" ? <Tick className="button-sign" /> : null}
         </Button>
         {/* ⚠️ THE REASON THE ACTION IS OFF IS WRITTEN DOWN. A disabled button with
             no explanation is a dead end, and "nothing has changed" is a different

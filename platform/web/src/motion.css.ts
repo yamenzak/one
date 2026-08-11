@@ -71,7 +71,15 @@ export const MOTION_CSS = `
    feel composed rather than switched on. It is done with nth-child rather than an
    index prop because a delay is a fact about POSITION, and threading a number
    through every list that ever needs one is how half of them end up without it. */
-.stagger > * { animation: rise var(--settle) var(--enter) both; }
+/* ⚠️ BACKWARDS, NOT BOTH, AND THE DIFFERENCE IS INVISIBLE UNTIL IT IS NOT. A
+   fill mode of BOTH keeps the animation's final values applied FOREVER, and those
+   silently win over the element's own declarations — so a screen's collapsing
+   header, whose opacity and scale are computed from how far it has scrolled, was
+   pinned at whatever a finished entrance left behind and did nothing at all.
+   BACKWARDS holds the from-state before the animation and then gets out of the
+   way. The entrance looks identical either way; only the element's future
+   differs. */
+.stagger > * { animation: rise var(--settle) var(--enter) backwards; }
 .stagger > *:nth-child(1) { animation-delay: 0ms; }
 .stagger > *:nth-child(2) { animation-delay: var(--step); }
 .stagger > *:nth-child(3) { animation-delay: calc(var(--step) * 2); }

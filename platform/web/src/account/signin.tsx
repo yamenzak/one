@@ -20,10 +20,13 @@
  * so first.
  */
 
-import type { ElementType, ReactNode } from "react";
+import { useState, type ElementType, type ReactNode } from "react";
+import type { Problem } from "@one/kernel";
 import { Add, Device, Key, Letter } from "../icon.js";
 import { Button } from "../button.js";
-import { Blank, Card, Item, Pill, Waiting } from "../list.js";
+import { Face } from "../avatar.js";
+import { Blank, Card, Item, Marked, Pill, Waiting } from "../list.js";
+import { Confirm } from "../confirm.js";
 import { Screen, Section, Title } from "../screen.js";
 
 /** A registered credential. `credentials` in the identity store. */
@@ -45,6 +48,15 @@ export interface Device {
   readonly app: string;
   readonly since: string;
   readonly current?: boolean;
+  /**
+   * ⚠️ A SESSION IS ALWAYS SOMEBODY'S WORKSPACE, which is what makes its face the
+   * right mark for the row. `sessions.origin` is a tenant's door, so the identity
+   * is known — and a column of identical monitors tells nobody which of four
+   * workspaces they are about to sign out of.
+   */
+  readonly workspaceFace?: string;
+  readonly workspaceName?: string;
+  readonly product?: string;
 }
 
 export interface SignInMethodsProps {
@@ -53,8 +65,9 @@ export interface SignInMethodsProps {
   readonly passkeys: readonly Passkey[] | null;
   readonly devices: readonly Device[] | null;
   readonly onAddPasskey: () => void;
-  readonly onRemovePasskey: (id: string) => void;
-  readonly onSignOut: (id: string) => void;
+  /** ⚠️ RESOLVES TO A `Problem` OR TO NULL. Never throws, never a string. */
+  readonly onRemovePasskey: (id: string) => Promise<Problem | null>;
+  readonly onSignOut: (id: string) => Promise<Problem | null>;
   readonly onBack: () => void;
   readonly Heading?: ElementType;
 }
@@ -62,10 +75,21 @@ export interface SignInMethodsProps {
 export function SignInMethods({
   email, passkeys, devices, onAddPasskey, onRemovePasskey, onSignOut, onBack, Heading = "h1",
 }: SignInMethodsProps): ReactNode {
+  /* ⚠️ ONE ASK AT A TIME, HELD AS WHAT IS BEING ASKED rather than as a boolean
+     plus an id. A flag and an id kept apart is how a sheet comes to be open with
+     nothing selected — or worse, open about the row somebody closed it on. */
+  const [asking, setAsking] = useState<
+    | { readonly kind: "passkey"; readonly it: Passkey }
+    | { readonly kind: "device"; readonly it: Device }
+    | null
+  >(null);
+  const last = passkeys !== null && passkeys.length === 1;
+
   return (
     <Screen
       leave="up"
       onLeave={onBack}
+      name="Sign-in methods"
       title={<Title as={Heading}>Sign-in methods</Title>}
       /* ⚠️ THE SENTENCE IS HERE BECAUSE THE SCREEN HOLDS THREE UNRELATED THINGS.
          "Your details" needed none — its title is the whole content. */
@@ -110,7 +134,7 @@ export function SignInMethods({
                 /* ⚠️ AN ACTION, SO THE ROW ITSELF DOES NOT GO ANYWHERE. Two
                    targets on one line means a finger that meant "remove" and
                    landed a millimetre left opens something instead. */
-                action={<Button tone="quiet" onClick={() => onRemovePasskey(k.id)}>Remove</Button>}
+                action={<Button tone="quiet" onClick={() => setAsking({ kind: "passkey", it: k })}>Remove</Button>}
               />
             ))}
           </Card>
@@ -144,7 +168,12 @@ export function SignInMethods({
             {devices.map((d) => (
               <Item
                 key={d.id}
-                icon={<Device />}
+                mark={
+                  <Marked
+                    face={<Face kind="workspace" src={d.workspaceFace} name={d.workspaceName ?? d.app} tone={d.product} />}
+                    badge={<Device size={14} />}
+                  />
+                }
                 title={d.app}
                 detail={
                   <>
@@ -155,12 +184,38 @@ export function SignInMethods({
                 /* ⚠️ THE ONE YOU ARE ON HAS NO BUTTON. Signing yourself out from a
                    list of devices is a control that closes the screen it is on,
                    which reads as a crash. Leaving is the avatar menu's job. */
-                action={d.current ? undefined : <Button tone="quiet" onClick={() => onSignOut(d.id)}>Sign out</Button>}
+                action={d.current ? undefined : <Button tone="quiet" onClick={() => setAsking({ kind: "device", it: d })}>Sign out</Button>}
               />
             ))}
           </Card>
         )}
       </Section>
+
+      {/* ⚠️ TWO CONSEQUENCES, TWO GATES, FROM THE SAME SHEET. Signing a browser
+          out can be undone by signing in again, so it asks and no more. Removing
+          the LAST passkey leaves the account on the email code alone — recoverable,
+          but only through an inbox — so that one asks for a tick, and only that
+          one: a gate on every removal would train people to tick without
+          reading, which is what makes the gate on the row that matters useless. */}
+      <Confirm
+        open={asking !== null}
+        title={asking?.kind === "device" ? "Sign out of this workspace?" : "Remove this passkey?"}
+        lede={
+          asking?.kind === "device"
+            ? `Whoever is using ${asking.it.app} will be signed out. You can sign in again at any time.`
+            : last
+              ? "This is your last passkey. You will sign in with a code sent to your email until you add another."
+              : `${asking?.kind === "passkey" ? asking.it.label : "This device"} will no longer sign you in. You can add it again later.`
+        }
+        verb={asking?.kind === "device" ? "Sign out" : "Remove"}
+        gate={asking?.kind === "passkey" && last ? { kind: "tick", label: "I understand I will sign in by email until I add another passkey." } : undefined}
+        tone={asking?.kind === "passkey" && last ? "alarm" : undefined}
+        onConfirm={async () =>
+          asking === null ? null
+            : asking.kind === "device" ? onSignOut(asking.it.id) : onRemovePasskey(asking.it.id)
+        }
+        onClose={() => setAsking(null)}
+      />
     </Screen>
   );
 }
