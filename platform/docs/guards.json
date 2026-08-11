@@ -3667,6 +3667,15 @@
       "impl": "ui/test/borrowed.test.ts",
       "proves": "names a file for every borrowed object",
       "fails": "a consumer assembling a bundle by class name — daisyUI ships `btn` in `button.css`, so the most-used object in the language silently gets no styles and every button falls back to the library's un-themed default"
+    },
+    {
+      "id": "a-colour-is-never-a-literal-anywhere-in-a-value",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/shell.test.tsx",
+      "proves": "carries no colour of its own",
+      "fails": "a literal in any colour-bearing property, INCLUDING the border and box-shadow shorthands — the first version read three property names and a value's prefix, so `border: var(--edge) solid rebeccapurple` passed the mutation that proved it"
     }
   ]
 }

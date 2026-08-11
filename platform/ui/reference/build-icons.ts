@@ -41,9 +41,20 @@ export const FROM_LUCIDE: Readonly<Record<string, string>> = {
   image: "image",
   list: "list",
   back: "arrow-left",
+  /* ⚠️ A MATCHED PAIR. Previous as an arrow and next as a chevron is two
+     different promises about the same control, and it reads as a rendering
+     mistake rather than as a choice — which it was. */
+  forward: "arrow-right",
   close: "x",
   chevron: "chevron-right",
   bell: "bell",
+  /* ⚠️ ONE PER SEMANTIC TONE. Never colour alone, at any saturation: a
+     greyscale screenshot and a person with deuteranopia read the same screen
+     only if the tone carries a shape as well as a hue. */
+  success: "circle-check",
+  warning: "triangle-alert",
+  danger: "circle-x",
+  info: "info",
 };
 
 /**

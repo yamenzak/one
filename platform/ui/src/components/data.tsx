@@ -98,8 +98,10 @@ export const Pagination = ({ page, pages, onGo }: PaginationProps) => (
       <Icon name="back" />
     </button>
     <Text role="caption" numeric>{`${page} of ${pages}`}</Text>
+    {/* ⚠️ A MATCHED PAIR. An arrow one way and a chevron the other is two
+        different promises about one control. */}
     <button type="button" data-one="pagination-next" disabled={page >= pages} aria-label="Next page" onClick={() => onGo?.(page + 1)}>
-      <Icon name="chevron" />
+      <Icon name="forward" />
     </button>
   </nav>
 );
@@ -265,7 +267,7 @@ export const Toast = ({ tone, title, undo, onDismiss }: ToastProps) => (
     role={tone === "danger" ? "alert" : "status"}
     aria-live={tone === "danger" ? "assertive" : "polite"}
   >
-    <span data-one="toast-icon" aria-hidden="true" data-tone={tone} />
+    <span data-one="toast-icon" data-tone={tone}><Icon name={tone} /></span>
     <Text role="body">{title}</Text>
     {undo ? <button type="button" data-one="toast-undo" onClick={undo.onUndo}><Text role="body">{undo.label}</Text></button> : null}
     <button type="button" data-one="toast-dismiss" aria-label="Dismiss" onClick={onDismiss}><Icon name="close" /></button>

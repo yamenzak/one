@@ -131,8 +131,18 @@ body { margin: 0; background: var(--bg); color: var(--ink);
 .ramp { display: block; block-size: 2px; background: currentColor; opacity: 0.2; }
 .hidden { display: none; }
 [data-one='scroller-item'] { display: block; }
-[data-one='overlay'] { position: static; border-radius: var(--radius-lg); background: var(--surface-2); color: var(--surface-2-ink); padding: var(--row-pad); box-shadow: var(--elevation-3); }
-[data-one='shell'] { min-block-size: 0; border-radius: 14px; overflow: hidden; }
+/* ⚠️ AN OVERLAY HAS A PLACEMENT, so a specimen of one needs a box to be placed
+   in. Shown loose it reads as a card that happens to contain a question, which
+   is the one thing an overlay must never look like. */
+.sw[data-stage] { position: relative; min-block-size: 190px; border-radius: 14px; overflow: hidden;
+  background: var(--canvas); box-shadow: inset 0 0 0 1px rgb(128 128 128 / 0.18); }
+.sw[data-stage] [data-one='overlay'] { position: absolute; inset-inline: 0; inset-block-end: 0; }
+.sw[data-stage] [data-one='overlay'][data-kind='dialog'] { inset: 50% 12px auto; translate: 0 -50%; }
+[data-one='shell'] { min-block-size: 300px; border-radius: 14px; overflow: hidden; }
+[data-one='shell'] [data-one='page'] { min-block-size: 0; }
+[data-one='sky-swatch'] { position: relative; display: block; block-size: 92px; border-radius: 12px;
+  overflow: hidden; background: var(--canvas); box-shadow: inset 0 0 0 1px rgb(128 128 128 / 0.18); }
+[data-one='sky-swatch'] [data-one='sky'] { --solid: 100%; --reach: 100%; }
 /* ⚠️ A shadow needs room to be seen. In light the deeper surfaces are all
    near-white and the elevation IS the difference, so a flush specimen reads as
    three identical rectangles — which is the design being invisible rather than
@@ -142,7 +152,9 @@ body { margin: 0; background: var(--bg); color: var(--ink);
 `;
 
 const cell = (caption: string, body: string, wide?: boolean) =>
-  `<figure class="sw"${wide ? " data-wide" : ""}>${body}<figcaption>${caption}</figcaption></figure>`;
+  /* An overlay specimen gets a stage, because a placement needs something to be
+     placed against. Everything else is shown as it falls. */
+  `<figure class="sw"${wide ? " data-wide" : ""}${body.includes(`data-one="overlay"`) ? " data-stage" : ""}>${body}<figcaption>${caption}</figcaption></figure>`;
 
 const groupHtml = (): string =>
   GROUPS.map((g) => `

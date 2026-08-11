@@ -119,10 +119,36 @@ export const STRUCTURE = `
 [data-one='reason'] { font-size: var(--t-sub); line-height: 1.3; opacity: 0.62; text-align: center; }
 [data-one='control'][data-state='locked'] [data-one='reason'] { opacity: 1; }
 [data-one='button'] { display: inline-flex; align-items: center; justify-content: center; min-block-size: 3rem; min-inline-size: 3rem; border-radius: 999px; }
-/* ⚠️ THE EDGE BELONGS TO THE ONE KIND THAT HAS NO FILL. Drawn on all four, a
-   ghost button is an outlined button and the hierarchy between them is gone. */
-[data-one='button'][data-kind='tonal'] { border: var(--edge) solid currentColor; }
+/* ⚠️ THE EDGE BELONGS TO THE ONE KIND THAT HAS NO FILL, and it is a HAIRLINE OF
+   THE INK rather than full-strength currentColor — which draws a black outline
+   on a white pill and reads as a different component rather than as a quieter
+   one. Every other kind is explicitly edgeless, because the library draws its
+   own border and a button that inherits one at random looks like a mistake. */
+[data-one='button'] { border: 0; }
+[data-one='button'][data-kind='tonal'] { border: var(--edge) solid color-mix(in oklab, currentColor 24%, transparent); }
 [data-one='button'][data-kind='primary'] { background: var(--surface-1-accent); color: var(--surface-1-accent-ink); }
+
+/* ── THE NAVIGATION SURFACE. ⚠️ IT HAD NO RULES AT ALL, so the one thing the
+      boundary most insists an app must not build rendered as three bare browser
+      buttons. An island at a phone width and a rail above it — the same list,
+      never both, because a rail AND a bar is two answers to "where am I". */
+[data-one='nav'] { display: flex; gap: calc(0.25rem * var(--density)); }
+[data-one='nav-item'] { display: flex; flex-direction: column; align-items: center; gap: calc(0.1875rem * var(--density));
+  flex: 1; min-block-size: 3.25rem; padding: calc(0.375rem * var(--density)) calc(0.5rem * var(--density));
+  border: 0; border-radius: var(--radius); background: none; color: inherit; opacity: 0.55; }
+[data-one='nav-item'][data-active] { opacity: 1; background: var(--surface-2); color: var(--surface-2-ink); }
+[data-one='nav-icon'] { display: grid; place-items: center; }
+/* ⚠️ The label travels with the icon — an icon-only rail item is unnamed to
+   voice control and ambiguous to everybody else. */
+[data-one='nav-label'] { font-size: var(--t-meta); font-weight: var(--w-med); line-height: 1; }
+/* The island floats over the page; the page runs under it. */
+[data-one='nav'][data-placement='island'] { position: sticky; inset-block-end: calc(0.75rem * var(--density)); z-index: 3;
+  margin: 0 var(--pad); padding: calc(0.25rem * var(--density)); border-radius: 999px;
+  background: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-3); }
+[data-one='nav'][data-placement='island'] [data-one='nav-item'] { border-radius: 999px; }
+[data-one='nav'][data-placement='rail'] { flex-direction: column; gap: calc(0.5rem * var(--density));
+  padding: var(--pad) calc(0.5rem * var(--density)); }
+[data-one='nav'][data-placement='rail'] [data-one='nav-item'] { flex: none; }
 
 /* ── THE PAGE. One stated order: sky 0 · content 1 · floating chrome 3. */
 [data-one='page'] { position: relative; isolation: isolate; min-block-size: 100%; }
@@ -135,7 +161,14 @@ export const STRUCTURE = `
 [data-one='sky'] + [data-one='body'] { padding-block-start: var(--gap); }
 
 /* ── THE TOPS. Each archetype's, and nothing shared but the inset. */
-[data-one='app-bar'] { display: flex; align-items: center; justify-content: space-between; gap: calc(0.5rem * var(--density)); padding-block-start: calc(0.5rem * var(--density)); }
+/* ⚠️ THREE COLUMNS, NOT SPACE-BETWEEN. With a leading circle, a title and an
+   action, space-between puts the title wherever the other two leave it — which
+   reads as a padding bug rather than as a centring one. The outer columns are
+   equal so the middle is centred against the BAR, not against its neighbours. */
+[data-one='app-bar'] { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: calc(0.5rem * var(--density)); padding-block-start: calc(0.5rem * var(--density)); min-block-size: 3rem; }
+[data-one='app-bar'] > :last-child { justify-self: end; }
+[data-one='app-bar'] > :first-child { justify-self: start; }
+[data-one='app-bar-spacer'] { display: block; }
 [data-one='app-bar-leading'] { inline-size: 2.5rem; block-size: 2.5rem; border-radius: 999px; background: var(--surface-2); color: var(--surface-2-ink); border: 0; }
 [data-one='crown'] { display: flex; flex-direction: column; align-items: center; gap: calc(0.375rem * var(--density)); margin-block-start: calc(2.125rem * var(--density)); text-align: center; }
 [data-one='amount'] { font-size: var(--t-hero); font-weight: var(--w-bold); line-height: 1; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
@@ -211,7 +244,20 @@ export const STRUCTURE = `
 [data-one='field'] { display: flex; flex-direction: column; gap: calc(0.375rem * var(--density)); }
 [data-one='field-label'] { display: flex; align-items: baseline; justify-content: space-between; gap: calc(0.5rem * var(--density)); }
 [data-one='field-fault'] { display: flex; align-items: center; gap: calc(0.375rem * var(--density)); color: var(--tone-danger); }
-[data-one='input'], [data-one='textarea'], [data-one='select'] { inline-size: 100%; min-block-size: 3rem; background: var(--surface-1); color: var(--surface-1-ink); }
+/* ⚠️ EVERY CONTROL CARRIES THE SAME EDGE, INCLUDING WHEN IT REFUSES. The library
+   drops the border on a disabled control, so a form came out with three bordered
+   boxes and one without — which reads as a rendering fault rather than as a
+   state. A refusing control keeps its shape and loses its CONTRAST, because the
+   thing that changed is whether it can be used, not what it is. */
+[data-one='input'], [data-one='textarea'], [data-one='select'] {
+  inline-size: 100%; min-block-size: 3rem;
+  background: var(--surface-1); color: var(--surface-1-ink);
+  border: var(--edge) solid color-mix(in oklab, currentColor 20%, transparent);
+}
+[data-one='input']:disabled, [data-one='textarea']:disabled, [data-one='select']:disabled {
+  background: var(--surface-1); color: var(--surface-1-ink); opacity: 0.5;
+  border-color: color-mix(in oklab, currentColor 20%, transparent);
+}
 [data-one='textarea'] { min-block-size: 6rem; }
 /* ⚠️ THE INVALID EDGE IS NOT THE MESSAGE. It draws the eye; the words under it
    are what say what to do, which is why a field renders both or neither. */
@@ -244,7 +290,24 @@ export const STRUCTURE = `
 /* ── OVERLAYS. ⚠️ The action is PINNED and only the body scrolls, so it never
       falls below the fold — and the parts had no rules at all until a photograph
       showed a dialog as three unstyled words and two grey boxes. */
-[data-one='overlay'] { display: flex; flex-direction: column; gap: calc(0.75rem * var(--density)); max-block-size: 100%; }
+/* ⚠️ AN OVERLAY HAS A PLACEMENT, AND WITHOUT ONE IT IS A CARD. A sheet is
+   attached to the edge it came from and carries the handle that says it can be
+   dragged away; a dialog is centred and demands an answer. Rendered with neither,
+   both read as an ordinary panel that happens to contain a question. */
+[data-one='overlay'] { display: flex; flex-direction: column; gap: calc(0.75rem * var(--density));
+  max-block-size: 100%; padding: var(--row-pad);
+  background: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-3); }
+[data-one='overlay'][data-kind='sheet'], [data-one='overlay'][data-kind='drawer'] {
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding-block-start: calc(0.5rem * var(--density));
+}
+/* The grab handle: it is what says a sheet can be pushed away. */
+[data-one='overlay'][data-kind='sheet']::before, [data-one='overlay'][data-kind='drawer']::before {
+  content: ""; inline-size: 2.25rem; block-size: 0.25rem; border-radius: 999px;
+  background: var(--surface-3); align-self: center; margin-block-end: calc(0.25rem * var(--density));
+}
+[data-one='overlay'][data-kind='dialog'] { border-radius: var(--radius-lg); text-align: center; }
+[data-one='overlay'][data-kind='dialog'] [data-one='overlay-footer'] { margin-block-start: calc(0.25rem * var(--density)); }
+[data-one='overlay'][data-kind='menu'], [data-one='overlay'][data-kind='popover'] { border-radius: var(--radius-lg); }
 [data-one='overlay-title'] { font-size: var(--t-page); font-weight: var(--w-bold); line-height: 1.15; letter-spacing: -0.02em; }
 [data-one='overlay-body'] { flex: 1; min-block-size: 0; overflow-y: auto; }
 [data-one='overlay-footer'] { display: flex; gap: calc(0.5rem * var(--density)); }
@@ -301,6 +364,15 @@ export const STRUCTURE = `
   opacity: 0; pointer-events: none; }
 [data-one='tooltip']:focus-within [data-one='tooltip-text'] { opacity: 1; }
 [data-one='divider'] { display: flex; align-items: center; gap: var(--row-pad); }
+
+/* ⚠️ A SKELETON WITH NO GEOMETRY IS AN EMPTY BOX, which is worse than a spinner:
+   it promises a shape and shows nothing at all. The rows are the row height, and
+   the last one is short, because a paragraph does not end flush. */
+[data-one='skeleton'] { display: flex; flex-direction: column; gap: calc(0.5rem * var(--density)); }
+[data-one='skeleton-row'] { display: block; block-size: 1.25rem; border-radius: var(--radius-sm); }
+[data-one='skeleton-row']:last-child { inline-size: 62%; }
+/* ⚠️ And a spinner needs a size, or the library draws a 1rem arc nobody sees. */
+[data-one='spinner'] { inline-size: 1.75rem; block-size: 1.75rem; }
 
 /* ⚠️ Hover is an enhancement. A touch device must never inherit one that sticks. */
 @media (pointer: fine) {

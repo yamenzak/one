@@ -11,9 +11,9 @@ import {
 
 const html = (node: React.ReactNode) => renderToStaticMarkup(node as never);
 const destinations: readonly Destination[] = [
-  { id: "home", label: "Home", icon: "home", kind: "overview" },
-  { id: "notes", label: "Notes", icon: "note", kind: "collection" },
-  { id: "player", label: "Player", icon: "play", kind: "task" },
+  { id: "home", label: "Home", icon: "chart", kind: "overview" },
+  { id: "notes", label: "Notes", icon: "list", kind: "collection" },
+  { id: "player", label: "Player", icon: "camera", kind: "task" },
 ];
 
 /* ----------------------------------------------------------- stylesheet --- */
@@ -79,13 +79,34 @@ describe("the stylesheet asks the right box", () => {
 
   it("carries no colour of its own — every one is a token reference", () => {
     expect(STRUCTURE).not.toMatch(/#[0-9a-f]{3,8}\b/i);
-    for (const value of STRUCTURE.matchAll(/(?:background|color)\s*:\s*([^;]+)/g)) {
+    /* ⚠️ THE SHORTHAND COUNTS. `border: var(--edge) solid rebeccapurple` carries
+       a literal in a property the first version of this did not read, and it
+       survived the mutation that proved it. */
+    for (const value of STRUCTURE.matchAll(/(?:background|color|border-color|border|box-shadow|outline)\s*:\s*([^;]+)/g)) {
       /*
-        ⚠️ `none` AND `inherit` ARE NOT COLOURS, and refusing them would push a
-        button reset into naming one. Everything that IS a colour is a token, so
-        the sweep still reaches every pixel a tenant can move.
+        ⚠️ THE RULE IS "NAMES NO COLOUR", NOT "STARTS WITH var(". `none` and
+        `inherit` are not colours, and a `color-mix` whose only inputs are
+        `currentColor` and `transparent` is a transparency of the MEASURED ink —
+        which adapts to whatever surface it lands on, and is therefore more
+        correct than a token would be, not less. What must never appear is a
+        literal, in any position.
       */
-      expect(value[1]!.trim(), value[0]).toMatch(/^(var\(--|currentColor|none|inherit)/);
+      const v = value[1]!.trim();
+      expect(v, value[0]).not.toMatch(/#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla|oklch|oklab)\s*\(/i);
+      /* ⚠️ Token references are removed FIRST — `var(--canvas)` contains the word
+         "canvas", and a scan that reads it as a named colour flags every correct
+         line in the sheet. What is left must be one of the few keywords that
+         name no colour at all. */
+      const bare = v.replace(/var\(--[a-z0-9-]+\)/g, " ").replace(/[(),%]/g, " ");
+      const ALLOWED = new Set([
+        "in", "oklab", "srgb", "transparent", "currentColor", "none", "inherit", "calc", "color-mix",
+        /* border and shadow shorthands carry keywords that are not colours */
+        "solid", "dashed", "inset", "max", "min", "px", "rem",
+      ]);
+      for (const word of bare.split(/\s+/).filter(Boolean)) {
+        if (/^-?[\d.]+(px|rem|em|%)?$/.test(word)) continue;
+        expect(ALLOWED, `${value[0]} — "${word}" names a colour`).toContain(word);
+      }
     }
     // The whole sheet resolves: the brand half supplies what the structure names.
     const sheet = sheetFor(DEFAULT_BRAND);

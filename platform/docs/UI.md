@@ -1277,6 +1277,7 @@ and is expensive to disprove, so it survives review indefinitely.
 | `a-failure-in-a-toast-does-not-vanish` | a failure announced politely and timed out — a message that disappears cannot be how somebody learns something they needed | **live** |
 | `a-refusals-reason-is-a-caption` | a refusal's reason rendered inside the pill — it concatenates with the label into "PublishNot in your plan", because a pill is a one-line inline box. Every accessibility assertion passed: they ask what the tree MEANS, and the meaning was right; only the shape was wrong, and only a photograph showed it | **live** |
 | `every-borrowed-object-names-its-file` | a consumer assembling a bundle by class name — daisyUI ships `btn` in `button.css`, so the most-used object in the language silently gets no styles and every button falls back to the library's un-themed default | **live** |
+| `a-colour-is-never-a-literal-anywhere-in-a-value` | a literal in any colour-bearing property, INCLUDING the border and box-shadow shorthands — the first version read three property names and a value's prefix, so `border: var(--edge) solid rebeccapurple` passed the mutation that proved it | **live** |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder

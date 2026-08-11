@@ -20,13 +20,18 @@ import {
   Input, Medallion, Menu, NoData, Overlay, Page, PageHeader, PageTitle, Pagination, Progress,
   Promo, QuickActions, Row, SaveBar, Scroller, Section, Segmented, Select, Skeleton, Spinner,
   Stat, Steps, Surface, Switch, Table, Text, TileGrid, Toast, Tooltip, Topic, Textarea,
-  BulkActions, Shell,
+  BulkActions, Shell, SKIES, MASKED,
   type BoundControl,
 } from "../src/index.js";
 
 const bound: BoundControl = { id: "spec", describedBy: undefined, invalid: false };
 const options = [{ value: "a", label: "Monthly" }, { value: "b", label: "Yearly" }];
 const noop = () => undefined;
+const DESTINATIONS = [
+  { id: "home", label: "Home", icon: "chart", kind: "overview" },
+  { id: "clients", label: "Clients", icon: "users", kind: "collection" },
+  { id: "plans", label: "Plans", icon: "list", kind: "collection" },
+] as const;
 
 export interface Specimen {
   /** ⚠️ The registry id this proves. The test matches on it. */
@@ -222,6 +227,18 @@ export const GROUPS: readonly Group[] = [
     ],
   },
   {
+    title: "The sky",
+    note: "One lit layer, masked six ways. The colour is the tenant's and the mask is the page's — so a pattern is never a colour decision, and a page declares a mask rather than a ground.",
+    items: SKIES.map((sky): Specimen => ({
+      of: "sky", caption: sky,
+      node: (
+        <span data-one="sky-swatch">
+          <span data-one="sky" data-sky={sky} {...(MASKED.includes(sky) ? { "data-masked": "" } : {})} aria-hidden="true" />
+        </span>
+      ),
+    })),
+  },
+  {
     title: "Assembling",
     note: "A section's header sits outside its card everywhere except a feed, where the card IS the section rather than a list the section contains.",
     items: [
@@ -242,25 +259,36 @@ export const GROUPS: readonly Group[] = [
         ),
       },
       {
-        of: "shell", caption: "the shell — one navigation surface", wide: true,
+        of: "shell", caption: "the shell at a phone width — an island", wide: true,
         node: (
-          <Shell
-            width="phone"
-            at="home"
-            destinations={[
-              { id: "home", label: "Home", icon: "chart", kind: "overview" },
-              { id: "clients", label: "Clients", icon: "users", kind: "collection" },
-              { id: "plans", label: "Plans", icon: "list", kind: "collection" },
-            ]}
-          >
-            <Text role="body">The pane the shell holds.</Text>
+          <Shell width="phone" at="home" destinations={DESTINATIONS}>
+            <Page archetype="feed" top={<AppBar title="Home" />}>
+              <Section title="Today"><Row lead={<Medallion initials="MK" />} title="Marion Keller" value="9:12" onOpen={noop} /></Section>
+            </Page>
           </Shell>
         ),
       },
-      { of: "nav", caption: "nav item", node: <Text role="micro">rail at ≥48rem, island below</Text> },
-      { of: "sky", caption: "the sky is behind every page", node: <Text role="micro">aurora · photo · dots · waves · grid · rings</Text> },
+      {
+        of: "nav", caption: "the same list at a desktop width — a rail", wide: true,
+        node: (
+          <Shell width="desktop" at="clients" destinations={DESTINATIONS}>
+            <Page archetype="title" top={<PageTitle title="Clients" />}>
+              <Section title="Active" total="18"><Row lead={<Medallion initials="AT" />} title="Aya Tanaka" value="Week 2" onOpen={noop} /></Section>
+            </Page>
+          </Shell>
+        ),
+      },
       { of: "section", caption: "section", wide: true, node: <Section title="This week" total="4 of 5"><Row title="Lower body" detail="Yesterday" value="Done" /></Section> },
-      { of: "scroller", caption: "the one thing that leaves the inset", node: <Text role="micro">first item aligned, last item cut</Text> },
+      {
+        of: "scroller", caption: "a scroller — first item aligned, last item cut", wide: true,
+        node: (
+          <Section title="Coaches" bleed>
+            <Scroller label="Coaches">
+              {["AL", "MK", "RS", "JD", "AT", "PL", "NK"].map((w) => <span key={w} data-one="scroller-item"><Medallion initials={w} /></span>)}
+            </Scroller>
+          </Section>
+        ),
+      },
     ],
   },
 ];

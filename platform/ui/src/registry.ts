@@ -8,6 +8,7 @@
  */
 
 import type { ComponentStates } from "./state.js";
+import type { IconName } from "./icons.js";
 
 export const COMPONENTS: readonly ComponentStates[] = [
   /* ⚠️ The shell and its one navigation surface are components like any other:
@@ -114,7 +115,9 @@ export const RENDERER_OWNS: readonly string[] = [
 export interface Destination {
   readonly id: string;
   readonly label: string;
-  readonly icon: string;
+  /** ⚠️ A NAME FROM THE CLOSED SET, so the shell can DRAW it. It was a free
+      string, and the shell rendered an empty span beside every label. */
+  readonly icon: IconName;
   /** What shape this destination takes at every width. A screen does not choose. */
   readonly kind: "overview" | "collection" | "task";
 }

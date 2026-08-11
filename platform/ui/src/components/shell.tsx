@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 import type { Destination, Width } from "../registry.js";
 import { shapeFor } from "../registry.js";
 import type { LiveState, Presentation } from "../live.js";
+import { Icon } from "./icon.js";
 
 export interface ShellProps {
   readonly destinations: readonly Destination[];
@@ -48,7 +49,7 @@ export function Shell({ destinations, at, width, children, detail, aside, liveSt
             aria-current={d.id === current?.id ? "page" : undefined}
             onClick={() => onGo?.(d.id)}
           >
-            <span data-one="nav-icon" data-icon={d.icon} aria-hidden="true" />
+            <span data-one="nav-icon"><Icon name={d.icon} /></span>
             {/* ⚠️ The label travels with the icon. Icon-only is unnamed to voice control. */}
             <span data-one="nav-label">{d.label}</span>
           </button>

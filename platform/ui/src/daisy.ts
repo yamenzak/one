@@ -21,7 +21,7 @@
 
 import type { Brand } from "./brand.js";
 import { sceneFor, litFor } from "./scene.js";
-import { inkOn } from "./ground.js";
+import { accentOn, inkOn } from "./ground.js";
 import { oklchToRgb, toHex, type Oklch } from "./colour.js";
 import { SEMANTIC } from "./semantic.js";
 import type { Theme } from "./ground.js";
@@ -48,7 +48,17 @@ export const DAISY_VARS = [
 ] as const;
 
 const hex = (c: Oklch): string => toHex(oklchToRgb(c));
-const pair = (c: Oklch): readonly [string, string] => [hex(c), toHex(inkOn(c).ink)];
+/*
+  ⚠️ THE SEMANTIC TONES ARE RE-LIT AGAINST THE GROUND, EXACTLY AS `tokensFor`
+  DOES IT. They were not, and the consequence was two greens: a callout filled
+  from the library's `--color-success` and an icon coloured from our
+  `--tone-success`, side by side, one step apart. One derivation or the tones
+  disagree with themselves.
+*/
+const pair = (c: Oklch, ground: Oklch): readonly [string, string] => {
+  const lit = accentOn(c, ground);
+  return [hex(lit), toHex(inkOn(lit).ink)];
+};
 
 /**
  * A brand and a theme become every variable daisyUI reads.
@@ -67,10 +77,10 @@ export function daisyTheme(brand: Brand, theme: Theme): Readonly<Record<string, 
   const card = litFor(scene, 1);
   const deep = litFor(scene, 2);
 
-  const [success, successInk] = pair(SEMANTIC.success);
-  const [warning, warningInk] = pair(SEMANTIC.warning);
-  const [danger, dangerInk] = pair(SEMANTIC.danger);
-  const [info, infoInk] = pair(SEMANTIC.info);
+  const [success, successInk] = pair(SEMANTIC.success, scene.ground.canvas);
+  const [warning, warningInk] = pair(SEMANTIC.warning, scene.ground.canvas);
+  const [danger, dangerInk] = pair(SEMANTIC.danger, scene.ground.canvas);
+  const [info, infoInk] = pair(SEMANTIC.info, scene.ground.canvas);
 
   return {
     /* The ladder. base-100 is the page, and everything above it is a step in. */

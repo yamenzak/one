@@ -67,12 +67,26 @@ const interfaceFiles = walk(join(ROOT, "ui", "src")).concat(
 /* ------------------------------------------------------- 1. NO COLOUR --- */
 
 const COLOUR = /#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla|oklch|oklab|color-mix)\s*\(/i;
+/*
+  ⚠️ A `color-mix` OF TOKENS IS A TOKEN, and refusing it pushes a hairline into
+  naming a colour. `color-mix(in oklab, currentColor 20%, transparent)` is a
+  transparency of the MEASURED ink — it adapts to whatever surface it lands on,
+  which is more correct than a fixed token, not less. What is refused is a mix
+  with a LITERAL in it, which this still catches because the literal itself
+  matches the pattern above.
+*/
+const derivedMix = (line) =>
+  /color-mix\(/.test(line) &&
+  !/#[0-9a-f]{3,8}\b/i.test(line) &&
+  !/\b(?:rgb|rgba|hsl|hsla|oklch|oklab)\s*\(/i.test(line);
+
 let colours = 0;
 for (const file of interfaceFiles) {
   const r = rel(file);
   if (TOKEN_LAYER.includes(r)) continue;
   stripComments(readFileSync(file, "utf8")).split("\n").forEach((line, i) => {
     if (!COLOUR.test(line)) return;
+    if (derivedMix(line)) return;
     colours++;
     fail(`${r}:${i + 1}: a literal colour outside the token layer.\n` +
          `       Every value in every brand slot is provably safe BECAUSE nothing outside\n` +

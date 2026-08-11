@@ -249,7 +249,7 @@ describe("the overlay ladder", () => {
 
 describe("one navigation surface, three levels", () => {
   const destination = (id: string, kind: Destination["kind"] = "overview"): Destination =>
-    ({ id, label: id, icon: "dot", kind });
+    ({ id, label: id, icon: "plus", kind });
 
   it("refuses more than five destinations and fewer than three", () => {
     expect(navProblems(["a", "b", "c"].map((i) => destination(i)))).toEqual([]);

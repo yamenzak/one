@@ -17,6 +17,7 @@ import { semanticForm } from "../ground.js";
 import type { Oklch } from "../colour.js";
 import { SEMANTIC } from "../semantic.js";
 import { borrow, SIZE, TONE } from "../borrowed.js";
+import { Icon } from "./icon.js";
 
 /* ---------------------------------------------------------------- surface --- */
 
@@ -234,7 +235,9 @@ export function Callout({ tone, ground, title, children }: CalloutProps) {
   const form = ground ? semanticForm(SEMANTIC[tone], ground) : "tone";
   return (
     <div data-one="callout" className={borrow("alert", [`-${TONE[tone]}`])} data-tone={tone} data-form={form} role={tone === "danger" ? "alert" : "status"}>
-      <span data-one="callout-icon" aria-hidden="true" data-tone={tone} />
+      {/* ⚠️ NEVER COLOUR ALONE. The icon is one of the four axes, and it is the
+          one that survives a greyscale screenshot and deuteranopia. */}
+      <span data-one="callout-icon" data-tone={tone}><Icon name={tone} /></span>
       <Text role="subtitle">{title}</Text>
       {children ? <Text role="body">{children}</Text> : null}
     </div>
