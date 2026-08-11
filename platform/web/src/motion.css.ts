@@ -42,27 +42,29 @@ export const MOTION_CSS = `
 
   /* ⚠️ THE DURATIONS, and there are no others. Each is named for the SIZE of the
      thing that moves: a bigger object needs longer to be believed. */
-  --quick: 120ms;   /* a press, a tick, a colour */
-  --swift: 200ms;   /* one control changing state */
-  --settle: 320ms;  /* a surface arriving */
-  --arrive: 460ms;  /* a whole screen */
-  /* ⚠️ THE GAP BETWEEN STAGGERED THINGS. Under about 25ms a stagger reads as one
-     block with soft edges; over about 60ms it reads as a queue and the last row
-     is late. */
-  --step: 38ms;
+  --quick: 150ms;   /* a press, a tick, a colour */
+  --swift: 300ms;   /* one control changing state */
+  --settle: 500ms;  /* a surface arriving */
+  --arrive: 760ms;  /* a whole screen */
+  /* ⚠️ THE GAP BETWEEN STAGGERED THINGS. Under about 40ms a stagger reads as one
+     block with soft edges rather than as a sequence; past about 90ms the last row
+     is visibly waiting its turn. */
+  --step: 66ms;
 }
 
 /* ---------------------------------------------------------------- arriving */
 
-/* ⚠️ ONE MOVEMENT, USED EVERYWHERE, RATHER THAN A DIFFERENT IDEA PER SURFACE.
-   Up and in. It is small — 14 pixels — because a large travel is a thing being
-   thrown onto the screen, and the eye reads distance as force. */
+/* ⚠️ WEIGHT COMES FROM TRAVEL AND TIME TOGETHER, NOT FROM EITHER ALONE. The
+   first version moved 14 pixels in 320ms and read as brisk rather than
+   substantial: too little distance to see the deceleration, too little time for
+   the eye to follow it. 26 pixels over half a second, arriving from very slightly
+   under full size, is the same movement with mass. */
 /* ⚠️ ONE ENTRANCE, AND IT IS ONLY DECLARED BECAUSE SOMETHING USES IT. There were
    three — rise, appear and swell — and the stagger used one; the other two were a
    guess about what a later screen would want, which is the exact thing this whole
    approach exists to avoid. The next screen that needs a different entrance adds
    it, with a use. */
-@keyframes rise { from { opacity: 0; translate: 0 14px; } }
+@keyframes rise { from { opacity: 0; translate: 0 26px; scale: 0.975; } }
 
 /* ⚠️ THE STAGGER IS THE POLISH. Six things arriving together is one event; six
    things arriving 38ms apart is a sequence, and a sequence is what makes a screen
@@ -85,34 +87,68 @@ export const MOTION_CSS = `
 /* --------------------------------------------------------------- reacting */
 
 /* ⚠️ A PRESS ANSWERS IMMEDIATELY AND RELEASES SLOWLY. The whole feeling of a
-   physical control is that asymmetry: 120ms down on a linear-ish curve so it is
-   under the finger before the finger notices, and a spring back so it overshoots
-   a little on the way out. */
-.press { transition: scale var(--swift) var(--spring); }
-.press:active { scale: 0.972; transition-duration: var(--quick); transition-timing-function: var(--exit); }
+   physical control is that asymmetry: down fast enough to be under the finger
+   before the finger notices, and a long spring back that overshoots. Making the
+   release LONGER is most of what separates a control that feels sprung from one
+   that feels like a state change. */
+.press { transition: scale var(--settle) var(--spring); }
+.press:active { scale: 0.965; transition-duration: var(--quick); transition-timing-function: var(--exit); }
 
 /* ⚠️ AND A ROW PRESSES BY ITS GROUND, NOT BY ITS SIZE. Scaling a full-width row
    makes its text shear against the row above; the ground is what the finger is
    on, so the ground is what responds. */
 .press-flat { transition: background-color var(--swift) var(--move); }
 
-/* ⚠️ THE ICON MOVES, AND IT MOVES THE WAY THE WORD BESIDE IT MEANS. Four named
-   movements, assigned per icon, rather than a bespoke animation each: a set of
-   four is a language, and a set of twenty is decoration nobody can keep in step.
-   They play on the ROW's press, not on the icon's, because the row is the target
-   and an icon that only reacts to being hit exactly is an icon that never
-   reacts. */
-[data-move] { transition: translate var(--swift) var(--spring), rotate var(--swift) var(--spring), scale var(--swift) var(--spring); }
-.item:active [data-move='down'], .entry:active [data-move='down'] { translate: 0 3px; }
-.item:active [data-move='right'], .entry:active [data-move='right'] { translate: 3px 0; }
-.item:active [data-move='tilt'], .entry:active [data-move='tilt'] { rotate: -12deg; }
-.item:active [data-move='swell'], .entry:active [data-move='swell'] { scale: 1.16; }
+/* ⚠️ EACH ICON MOVES THE WAY ITS OWN PARTS WOULD, and the shared thing is the
+   TIMING rather than the movement. Four generic verbs across a set makes every
+   icon move like every other one — tidy, and dead. A key turns about its hole; a
+   download's arrow falls into a tray that stays; a lens closes. That is where an
+   icon says what it is.
 
-/* ⚠️ THE CHEVRON LEANS INTO THE PRESS. It is the one piece of furniture on a row
-   that points at what happens next, so it is the one that should move first. Its
-   base rule lives with its colour, in the screen's own sheet — a class may be
-   declared once, and refined anywhere. */
-.item:active .chevron { translate: 3px 0; }
+   ⚠️ THEY PLAY ON THE ROW'S PRESS, not the icon's. The row is the target, and an
+   icon that reacts only to being hit exactly is an icon that never reacts.
+
+   ⚠️ AND THEY ADDRESS CHILDREN BY POSITION, which is the fragile part and is
+   guarded: test/icon.test.tsx pins every icon's shape, because Lucide redraws
+   icons between versions and a redrawn one does not fail — it animates the wrong
+   part, quietly, forever. */
+[data-icon] { transition: rotate var(--swift) var(--spring), scale var(--swift) var(--spring), translate var(--swift) var(--spring); }
+[data-icon] > * { transition: inherit; transform-box: fill-box; transform-origin: center; }
+
+/* The head lifts and the shoulders take the weight. */
+.item:active [data-icon='portrait'] > :nth-child(2) { translate: 0 -1.4px; }
+.item:active [data-icon='portrait'] > :nth-child(1) { scale: 1.06 1; }
+
+/* ⚠️ ABOUT THE HOLE, WHICH IS THE ONE POINT A KEY DOES NOT MOVE THROUGH. The
+   origin is that circle's centre in the 24-unit box — turning about the middle of
+   the icon is a key being waved rather than turned. */
+.item:active [data-icon='key'] { rotate: -28deg; transform-origin: 68.75% 31.25%; }
+
+/* The three uprights are the knobs; the rails they sit on do not move. */
+.item:active [data-icon='adjust'] > :nth-child(3) { translate: -3px 0; }
+.item:active [data-icon='adjust'] > :nth-child(4) { translate: 3px 0; }
+.item:active [data-icon='adjust'] > :nth-child(8) { translate: 3.5px 0; }
+
+/* A shield seals: it settles onto its own point rather than growing. */
+.item:active [data-icon='guard'] { scale: 0.94 1.08; transform-origin: 50% 100%; }
+
+/* ⚠️ THE TRAY STAYS. That is the whole gesture — something arriving INTO
+   something. Moving both is a picture sliding. */
+.item:active [data-icon='save'] > :nth-child(1) { translate: 0 2.5px; }
+.item:active [data-icon='save'] > :nth-child(3) { translate: 0 2.5px; }
+
+/* The two halves part along the crack. */
+.item:active [data-icon='heartbreak'] > :nth-child(1) { translate: 1.4px 0; rotate: 4deg; }
+.item:active [data-icon='heartbreak'] > :nth-child(2) { translate: -1px 0; rotate: -3deg; }
+
+/* It lifts off the page, along its own axis. */
+.entry:active [data-icon='edit'] { translate: 1.6px -1.6px; }
+
+/* The shutter closes. */
+.portrait:active [data-icon='lens'] > :nth-child(2) { scale: 0.45; }
+
+/* Furniture: it points where the press goes. */
+.item:active [data-icon='onward'], .item:active .chevron { translate: 3.5px 0; }
 
 /* ------------------------------------------------------------------ alive */
 
@@ -124,12 +160,17 @@ export const MOTION_CSS = `
   0%, 100% { scale: 1; rotate: 0deg; }
   50% { scale: 1.035; rotate: 0.8deg; }
 }
-.alive { animation: breathe 7s ease-in-out infinite; }
+.alive { animation: breathe 9s ease-in-out infinite; }
+/* ⚠️ THE TICK DRAWS ITSELF, because a tick that fades in is a tick that was
+   always there. The dash length is the path's own, so the stroke travels from the
+   short arm to the long one exactly as a hand would. */
+@keyframes strike { from { stroke-dashoffset: 26; } }
+[data-icon='tick'] > * { stroke-dasharray: 26; animation: strike var(--settle) var(--enter) both; }
 /* ⚠️ OUT OF STEP WITH EACH OTHER. A column of avatars breathing in unison is a
    heartbeat, which is alarming; the same movement at different offsets is a room
    with people in it. */
-.alive:nth-child(2n) { animation-delay: -2.3s; animation-duration: 8s; }
-.alive:nth-child(3n) { animation-delay: -4.1s; animation-duration: 6.4s; }
+.alive:nth-child(2n) { animation-delay: -2.9s; animation-duration: 10.5s; }
+.alive:nth-child(3n) { animation-delay: -5.2s; animation-duration: 8.2s; }
 
 /* ⚠️ EVERY ANIMATION IN THE PLATFORM STOPS HERE, INCLUDING ONES ADDED LATER.
    The universal selector is deliberate: a rule that lists the classes it knows

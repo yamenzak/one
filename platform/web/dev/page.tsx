@@ -20,6 +20,7 @@
  * ⚠️ NOT SHIPPED CODE. Nothing in `src` may import this.
  */
 
+import { Avatar, Style } from "@dicebear/core";
 import { build } from "esbuild";
 import { readFileSync, writeFileSync } from "node:fs";
 import { ACCOUNT_CSS } from "../src/account/home.css.js";
@@ -30,6 +31,38 @@ import { SKY_CSS } from "../src/sky.css.js";
 const FONT = FONTS.map((f) =>
   fontFace(f, `data:font/woff2;base64,${readFileSync(f.file).toString("base64")}`),
 ).join("\n");
+
+/*
+  ⚠️ THE FACES ARE MADE HERE, NOT IN THE BROWSER. DiceBear's generator plus two
+  style definitions is about 40 kB gzipped, shipped to every device, to redraw the
+  same picture from the same seed every time the page loads. A seed is stable, so
+  the picture is stable, so it belongs behind a URL that can be cached forever —
+  which is what the API will serve. The preview has no API, so it bakes them.
+
+  ⚠️ `animationVariant` IS THE OPTION, and without it every style renders its
+  `none` variant. The other variants carry weight 0, so they are never picked at
+  random — asking is the only way to get one. The animation itself is a `<style>`
+  element inside the SVG, which is why it survives being used as an image.
+*/
+const styleOf = (name: string) =>
+  new Style(JSON.parse(readFileSync(
+    `node_modules/@dicebear/styles/dist/${name}.min.json`, "utf8")));
+const SPROUTS = styleOf("sprouts");
+const PLANETS = styleOf("planets");
+/* ⚠️ SPROUTS IS COMPOSED FOR A SQUARE and a person is drawn in a circle, so the
+   pot it stands in is exactly what a circular crop takes off. Scaling it down
+   inside its own canvas is the fix; moving the crop is not, because the shape is
+   what says person. */
+const faceOf = (kind: "person" | "workspace", seed: string) =>
+  new Avatar(kind === "person" ? SPROUTS : PLANETS, {
+    seed, size: 128, animationVariant: ["slow"],
+    ...(kind === "person" ? { scale: 0.82 } : {}),
+  }).toDataUri();
+
+const FACES = Object.fromEntries([
+  ...["Nadia Haddad", "b.okonkwo@gmail.com"].map((s) => [s, faceOf("person", s)]),
+  ...["t1", "t2", "t3", "t4"].map((s) => [s, faceOf("workspace", s)]),
+]);
 
 /*
   ⚠️ THE DIAL AND THE HOST LOOK DELIBERATELY UNLIKE THE PRODUCT. They borrow no
@@ -85,7 +118,11 @@ const bundled = await build({
   minify: true,
   /* ⚠️ PRODUCTION, OR REACT SHIPS ITS DEVELOPMENT BUILD — which is several times
      the size and prints warnings into a console nobody has open on a phone. */
-  define: { "process.env.NODE_ENV": '"production"' },
+  define: {
+    "process.env.NODE_ENV": '"production"',
+    /* The preview's stand-in for the route that will serve these. */
+    __FACES__: JSON.stringify(FACES),
+  },
 });
 const script = bundled.outputFiles[0]!.text;
 

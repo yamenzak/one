@@ -27,8 +27,8 @@
  */
 
 import { useState, type ReactNode } from "react";
-import * as Avatar from "@radix-ui/react-avatar";
 import type { Problem } from "@one/kernel";
+import { Face } from "../avatar.js";
 import { Back, Edit, Lens } from "../icon.js";
 import { ValueEditor, type EditableField } from "./editor.js";
 import type { Person } from "./home.js";
@@ -89,12 +89,7 @@ export function AccountDetails({
         <div className="title-row">
           <Heading className="page-name">Your details</Heading>
           <button type="button" className="portrait press" onClick={onPickPhoto} aria-label="Change your photo">
-            <Avatar.Root className="portrait-face alive">
-              <Avatar.Image className="portrait-image" src={person.avatarUrl} alt="" />
-              <Avatar.Fallback className="portrait-letter" aria-hidden="true">
-                {(person.name ?? person.email).slice(0, 1).toUpperCase()}
-              </Avatar.Fallback>
-            </Avatar.Root>
+            <Face kind="person" src={person.avatarUrl} name={person.name ?? person.email} className="portrait-face alive" />
             <span className="portrait-badge" aria-hidden="true"><Lens /></span>
           </button>
         </div>

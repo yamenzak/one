@@ -30,16 +30,22 @@ import { AccountDetails } from "../src/account/details.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 import { configureFeedback, feel } from "../src/feedback.js";
 
+/* ⚠️ BAKED AT BUILD TIME BY `dev/page.tsx`, standing in for the route that will
+   serve a generated face from a seed. Keyed the way the API will key it: a
+   workspace by its id, a person by the name they are known here by. */
+declare const __FACES__: Readonly<Record<string, string>>;
+const face = (seed: string): string | undefined => __FACES__[seed];
+
 /* ⚠️ ONE PERSON, PLAUSIBLE, WITH A REAL SPREAD ACROSS PRODUCTS. Lorem in a screen
    review is a way of not looking at it: names are what overflows, roles are what
    repeats, and a workspace in trouble is the row the layout exists to surface. */
 const FULL = {
-  person: { name: "Nadia Haddad", email: "nadia@haddadstrength.com" },
+  person: { name: "Nadia Haddad", email: "nadia@haddadstrength.com", avatarUrl: face("Nadia Haddad") },
   workspaces: [
-    { tenantId: "t1", slug: "haddad", name: "Haddad Strength", product: "kova", role: "Owner" },
-    { tenantId: "t2", slug: "barre", name: "Beirut Barre Collective", product: "kova", role: "Coach" },
-    { tenantId: "t3", slug: "corniche", name: "Corniche Screens", product: "scena", role: "Owner", standing: { label: "Payment failed", urgent: true } },
-    { tenantId: "t4", slug: "clinic", name: "Haddad Clinic", product: "tessa", role: "Member", standing: { label: "Trial · 6 days", urgent: false } },
+    { tenantId: "t1", slug: "haddad", name: "Haddad Strength", product: "kova", role: "Owner", face: face("t1") },
+    { tenantId: "t2", slug: "barre", name: "Beirut Barre Collective", product: "kova", role: "Coach", face: face("t2") },
+    { tenantId: "t3", slug: "corniche", name: "Corniche Screens", product: "scena", role: "Owner", face: face("t3"), standing: { label: "Payment failed", urgent: true } },
+    { tenantId: "t4", slug: "clinic", name: "Haddad Clinic", product: "tessa", role: "Member", face: face("t4"), standing: { label: "Trial · 6 days", urgent: false } },
   ],
 } satisfies Pick<AccountHomeProps, "person" | "workspaces">;
 
@@ -53,7 +59,7 @@ const CASES = {
   four: FULL,
   none: { ...FULL, workspaces: [] },
   waiting: { ...FULL, workspaces: null },
-  new: { person: { email: "b.okonkwo@gmail.com" }, workspaces: [] },
+  new: { person: { email: "b.okonkwo@gmail.com", avatarUrl: face("b.okonkwo@gmail.com") }, workspaces: [] },
 } satisfies Record<string, Pick<AccountHomeProps, "person" | "workspaces">>;
 
 /*

@@ -1,28 +1,32 @@
 /**
- * ICONS — Lucide's shapes, our movement.
+ * ICONS — Lucide's shapes, moved one at a time.
  *
  * ⚠️ THE SHAPES ARE LUCIDE'S BECAUSE DRAWING THEM IS NOT THE JOB. Six hand-drawn
  * glyphs were fine; sixty will not be, and the twentieth one somebody draws will
  * have a different stroke weight and a different optical size and nobody will be
  * able to say which is wrong.
  *
- * ⚠️ THE MOVEMENT IS OURS, AND THAT WAS A MEASURED DECISION RATHER THAN A
- * PREFERENCE. `lucide-animated` bundles as one module: one icon costs 79 kB
- * gzipped, six icons cost 79 kB gzipped — it does not tree-shake, and it needs
- * `motion` on top of that. Twelve icons from `lucide-react` cost 2.2 kB gzipped
- * together, because each is its own module of about two hundred bytes. It also
- * carries 441 of Lucide's icons rather than all of them, and four of the six this
- * screen needs are not among them.
+ * ⚠️ THE MOVEMENT IS OURS, AND THAT WAS MEASURED RATHER THAN PREFERRED.
+ * `lucide-animated` bundles as one module: one icon costs 79 kB gzipped, six
+ * icons cost 79 kB gzipped — it does not tree-shake — and it needs `motion` on
+ * top. Twelve icons from `lucide-react` cost 2.2 kB gzipped together, because each
+ * is its own two-hundred-byte module. It also carries 441 of Lucide's icons, and
+ * four of the six this screen needs are not among them.
  *
- * ⚠️ AND A SECOND MOTION LIBRARY WOULD BE A SECOND MOTION VOCABULARY. The
- * durations and curves are declared once in `motion.css.ts`; an icon set with its
- * own timing is a set of things on the screen moving to a rhythm nothing else
- * shares, which is the failure the motion module exists to prevent.
+ * ⚠️ EACH ICON MOVES THE WAY ITS OWN PARTS WOULD. A key turns about its hole. A
+ * download's arrow falls while the tray it falls into stays. A camera's lens
+ * closes. A shield seals. Four generic verbs applied across a set is a rule that
+ * makes every icon move like every other one, which is tidy and dead; the
+ * movement is where an icon says what it is. The vocabulary that stays shared is
+ * the TIMING — every one of them uses the same durations and curves, declared
+ * once in `motion.css.ts`.
  *
- * ⚠️ THE MOVEMENT IS ONE OF FOUR, NOT ONE PER ICON. A download falls, a chevron
- * goes right, a key turns, a heart swells. Four verbs assigned across a set is a
- * language; twenty bespoke animations is decoration nobody can keep in step, and
- * it is what the last attempt at this shipped.
+ * ⚠️ THE MOVEMENT LIVES IN CSS AND ADDRESSES CHILDREN BY POSITION, which is the
+ * one fragile thing here and is guarded rather than hoped about. `test/icon.test.tsx`
+ * pins the shape of every icon — how many children and in what order — because
+ * Lucide redraws icons between versions and a redrawn one does not fail: it moves
+ * the wrong part, quietly, forever. Both `KeyRound` and `SlidersHorizontal` have
+ * already been redrawn once since this file was written.
  */
 
 import type { ReactNode } from "react";
@@ -31,8 +35,10 @@ import {
   Pencil, Shield, SlidersHorizontal, User, X, type LucideIcon,
 } from "lucide-react";
 
-/** How an icon answers a press. Assigned per icon, from a closed set of four. */
-export type Move = "down" | "right" | "tilt" | "swell";
+/** The name the stylesheet animates by. Closed: a new icon adds a rule. */
+export type IconName =
+  | "portrait" | "key" | "adjust" | "guard" | "save" | "heartbreak"
+  | "edit" | "lens" | "onward" | "close" | "back" | "tick";
 
 export interface IconProps {
   readonly size?: number;
@@ -40,6 +46,22 @@ export interface IconProps {
   readonly label?: string;
   readonly className?: string;
 }
+
+const draw = (Glyph: LucideIcon, name: IconName, defaultSize: number) =>
+  function Drawn({ size = defaultSize, label, className }: IconProps): ReactNode {
+    return (
+      <Glyph
+        size={size}
+        strokeWidth={1.9}
+        absoluteStrokeWidth
+        className={className}
+        data-icon={name}
+        role={label ? "img" : undefined}
+        aria-label={label}
+        aria-hidden={label ? undefined : true}
+      />
+    );
+  };
 
 /*
   ⚠️ NAMED FOR WHAT THEY MEAN HERE, NOT FOR WHAT LUCIDE CALLS THEM. `Adjust`
@@ -49,35 +71,36 @@ export interface IconProps {
   file. Renaming at the boundary is also what makes swapping a shape later a
   one-line change instead of a find-and-replace across every screen.
 */
-const draw = (Glyph: LucideIcon, move: Move, defaultSize: number) =>
-  function Drawn({ size = defaultSize, label, className }: IconProps): ReactNode {
-    return (
-      <Glyph
-        size={size}
-        strokeWidth={1.9}
-        absoluteStrokeWidth
-        className={className}
-        data-move={move}
-        role={label ? "img" : undefined}
-        aria-label={label}
-        aria-hidden={label ? undefined : true}
-      />
-    );
-  };
+export const Portrait = draw(User, "portrait", 21);
+export const Key = draw(KeyRound, "key", 21);
+export const Adjust = draw(SlidersHorizontal, "adjust", 21);
+export const Guard = draw(Shield, "guard", 21);
+export const Save = draw(Download, "save", 21);
+export const Heartbreak = draw(HeartCrack, "heartbreak", 21);
+export const Edit = draw(Pencil, "edit", 17);
+export const Lens = draw(Camera, "lens", 14);
 
-/* The account's own set. Each one appears exactly where its word does. */
-export const Portrait = draw(User, "swell", 21);
-export const Key = draw(KeyRound, "tilt", 21);
-export const Adjust = draw(SlidersHorizontal, "right", 21);
-export const Guard = draw(Shield, "swell", 21);
-export const Save = draw(Download, "down", 21);
-export const Heartbreak = draw(HeartCrack, "tilt", 21);
-export const Edit = draw(Pencil, "tilt", 17);
-export const Lens = draw(Camera, "swell", 14);
+/* Furniture — the parts of a row rather than a meaning in it. */
+export const Onward = draw(ChevronRight, "onward", 19);
+export const Close = draw(X, "close", 20);
+export const Back = draw(ArrowLeft, "back", 20);
+export const Tick = draw(Check, "tick", 19);
 
-/* Furniture. The chevron has its own rule in `motion.css.ts` because it belongs
-   to the row rather than to a meaning, and it moves on every row alike. */
-export const Onward = draw(ChevronRight, "right", 19);
-export const Close = draw(X, "swell", 20);
-export const Back = draw(ArrowLeft, "right", 20);
-export const Tick = draw(Check, "swell", 19);
+/**
+ * ⚠️ WHAT EACH ICON IS MADE OF, so a test can hold Lucide to it. The order is the
+ * order the elements appear in, and the CSS addresses them by exactly that.
+ */
+export const ICON_PARTS: Readonly<Record<IconName, readonly string[]>> = {
+  portrait: ["path", "circle"],
+  key: ["path", "circle"],
+  adjust: ["path", "path", "path", "path", "path", "path", "path", "path", "path"],
+  guard: ["path"],
+  save: ["path", "path", "path"],
+  heartbreak: ["path", "path"],
+  edit: ["path", "path"],
+  lens: ["path", "circle"],
+  onward: ["path"],
+  close: ["path", "path"],
+  back: ["path", "path"],
+  tick: ["path"],
+};

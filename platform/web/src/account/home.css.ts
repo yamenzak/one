@@ -101,7 +101,7 @@ h2 { word-spacing: normal; }
    control — a ring round the whole screen is the browser announcing that
    something went wrong. Every control inside it keeps its own. */
 .over-content:focus, .over-content:focus-visible { outline: none; }
-@keyframes over-up { from { opacity: 0; translate: 0 22px; } }
+@keyframes over-up { from { opacity: 0; translate: 0 40px; scale: 0.985; } }
 
 /* ⚠️ THE PAGE IS THE WHOLE SURFACE, and it is presented over the app rather than
    inside it — no navigation, no tabs, no product chrome. One column, capped: an
@@ -170,11 +170,8 @@ h2 { word-spacing: normal; }
 .portrait { position: relative; flex: none; border: 0; padding: 0; background: none;
   cursor: pointer; border-radius: var(--radius-well); }
 .portrait:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.portrait-face { display: block; inline-size: 62px; block-size: 62px; overflow: hidden;
-  border-radius: var(--radius-well); background: var(--well); }
-.portrait-image { inline-size: 100%; block-size: 100%; object-fit: cover; }
-.portrait-letter { display: grid; place-items: center; inline-size: 100%; block-size: 100%;
-  font-family: var(--font-brand); font-size: 24px; font-weight: 600; color: var(--ink-quiet); }
+.portrait-face { inline-size: 62px; block-size: 62px; background: var(--well);
+  font-size: 24px; color: var(--ink-quiet); }
 /* ⚠️ A SHADOW, NOT A RING. It had a ring in the page's own colour, which is only
    the right colour where the page is flat — over the light at the top of a screen
    the ring was a black circle cut out of a blue field. A shadow separates it from
@@ -280,7 +277,7 @@ h2 { word-spacing: normal; }
 @keyframes sheet-up { from { translate: 0 100%; } }
 @keyframes sheet-down { to { translate: 0 100%; } }
 @keyframes sheet-in { from { opacity: 0; scale: 0.97; } }
-@keyframes over-down { to { opacity: 0; translate: 0 22px; } }
+@keyframes over-down { to { opacity: 0; translate: 0 30px; scale: 0.99; } }
 
 .sheet-body { display: flex; flex-direction: column; gap: 22px; }
 .sheet-top { display: flex; flex-direction: column; gap: 8px; }
@@ -408,16 +405,18 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    has to make scannable was readable only as text. */
 /* ⚠️ A ROUNDED SQUARE AMONG CIRCLES, ON PURPOSE. Round is a symbol or a person;
    a rounded square is a thing with an identity of its own. It also has to hold an
-   uploaded logo one day, and a logo in a circle is a logo with its corners cut
-   off. The radius is a quarter of the box — far enough from the circles that it
-   reads as a decision rather than as a value somebody nearly got right. */
-.mark { border-radius: 11px; color: #fff; font-size: 17px; font-weight: 600;
-  overflow: hidden; }
-.mark-image { inline-size: 100%; block-size: 100%; object-fit: cover; }
-.mark-letter { display: grid; place-items: center; inline-size: 100%; block-size: 100%; }
-.mark[data-product='kova'] { background: var(--p-kova); }
-.mark[data-product='scena'] { background: var(--p-scena); }
-.mark[data-product='tessa'] { background: var(--p-tessa); }
+   uploaded logo, and a logo in a circle is a logo with its corners cut off. The
+   radius is a quarter of the box — far enough from the circles that it reads as a
+   decision rather than as a value somebody nearly got right. */
+.face { display: block; overflow: hidden; color: #fff;
+  font-family: var(--font-brand); font-size: 17px; font-weight: 600; }
+.face[data-kind='workspace'] { border-radius: 11px; }
+.face[data-kind='person'] { border-radius: var(--radius-well); }
+.face-image { inline-size: 100%; block-size: 100%; object-fit: cover; display: block; }
+.face-letter { display: grid; place-items: center; inline-size: 100%; block-size: 100%; }
+.face[data-tone='kova'] { background: var(--p-kova); }
+.face[data-tone='scena'] { background: var(--p-scena); }
+.face[data-tone='tessa'] { background: var(--p-tessa); }
 
 /* ⚠️ ONLY ON A ROW THAT HAS ONE. A standing on every row is a column of green
    nobody reads, and the one that needs attention stops standing out. */

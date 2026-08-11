@@ -18,7 +18,7 @@
  */
 
 import type { ElementType, ReactNode } from "react";
-import * as Avatar from "@radix-ui/react-avatar";
+import { Face } from "../avatar.js";
 import { Lockup } from "../brand/mark.js";
 import { Adjust, Close, Guard, Heartbreak, Key, Onward, Portrait, Save } from "../icon.js";
 
@@ -42,11 +42,11 @@ export interface Workspace {
   /** What this person is here. The membership row's role. */
   readonly role: string;
   /**
-   * ⚠️ THE WORKSPACE'S OWN MARK, when it has uploaded one. Absent is the ordinary
-   * case and it falls back to the initial on the product's colour — which is why
-   * this is the one place on the screen that needs an avatar rather than a box.
+   * ⚠️ THE WORKSPACE'S OWN MARK. When it has uploaded one that is what it looks
+   * like; otherwise this is the generated face, which the API produces from the
+   * workspace id and serves from a URL that can be cached forever.
    */
-  readonly logo?: string;
+  readonly face?: string;
   /**
    * ⚠️ ONLY WHEN IT IS NOT FINE. A standing on every row is a column of green
    * nobody reads, and the one that matters stops standing out.
@@ -133,7 +133,7 @@ export function AccountHome({ person, workspaces, onGo, onClose, Heading = "h1" 
             {workspaces.map((w) => (
               <Item
                 key={w.tenantId}
-                mark={<WorkspaceMark workspace={w} />}
+                mark={<Face kind="workspace" src={w.face} name={w.name} tone={w.product} className="well alive" />}
                 title={w.name}
                 /* ⚠️ THE STANDING SITS ON THE SECOND LINE, WITH THE REST OF THE
                    METADATA. Beside the title it competed with the one thing that
@@ -179,29 +179,6 @@ export function AccountHome({ person, workspaces, onGo, onClose, Heading = "h1" 
 
 /* ⚠️ Local on purpose. Used several times on ONE screen, which is not yet
    evidence that the platform needs them — a second SCREEN is. */
-
-/**
- * ⚠️ A ROUNDED SQUARE WHERE EVERY OTHER MARK ON THIS SCREEN IS A CIRCLE, and the
- * difference is the rule rather than an oversight: round is a SYMBOL or a PERSON,
- * a rounded square is a THING WITH ITS OWN IDENTITY. A workspace is the second —
- * it has a name its owner chose and, before long, a logo they uploaded, and a
- * logo in a circle is a logo with its corners cut off. The icons above it will
- * never hold an image, so they never face that.
- *
- * ⚠️ AND IT IS AN AVATAR RATHER THAN A BOX BECAUSE OF THAT IMAGE. A plain `<img>`
- * with the initial behind it shows the initial for as long as the request takes
- * and then swaps — on a list of four, four flashes. Radix's avatar holds the
- * fallback until the image has actually decoded, and shows it forever if it
- * never does.
- */
-const WorkspaceMark = ({ workspace }: { readonly workspace: Workspace }): ReactNode => (
-  <Avatar.Root className="well mark alive" data-product={workspace.product}>
-    <Avatar.Image className="mark-image" src={workspace.logo} alt="" />
-    {/* ⚠️ NOT READ ALOUD. The row's title is the workspace's name; an initial
-        announced beside it is the same word twice, one letter of it. */}
-    <Avatar.Fallback className="mark-letter" aria-hidden="true">{workspace.name.slice(0, 1)}</Avatar.Fallback>
-  </Avatar.Root>
-);
 
 function Item({ icon, mark, title, detail, iconTone, onGo }: {
   readonly icon?: ReactNode;
