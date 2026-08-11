@@ -497,6 +497,51 @@ their own weather without anybody choosing a gradient. Swept across three
 deliberately awkward accents — a blue, a green whose hue collides with the
 success tone, and a mid-lightness saturated orange — in both themes.
 
+
+### 5.6 The five page archetypes
+
+⚠️ **A PRODUCT HAS FIVE PAGE SHAPES, NOT ONE PER SCREEN.** Extracted from eight
+reference screens, which collapse into these without remainder. A new screen
+picks one; it does not invent a sixth.
+
+| | top | when |
+|---|---|---|
+| **A · crown** | photo sky, centred number, quick actions | the screen is about **one number** |
+| **B · topic** | pattern sky, centred title + glyph, quick actions | the screen is about **one subject** |
+| **C · title** | back, big **left** title, optional search | the screen is a **list** |
+| **D · identity** | close + one action, centred face and name | the screen is about **one person** |
+| **E · feed** | app bar only | the screen is **independent sections** |
+
+⚠️ **THE TOP IS DECIDED BY WHAT THE SCREEN IS, NEVER BY TASTE.** Giving every
+screen the same top is what makes a product read as a settings page throughout —
+and giving each screen its own is what makes it read as four products.
+
+### 5.7 The section patterns
+
+The archetypes are assembled from these and nothing else.
+
+| pattern | shape |
+|---|---|
+| **menu group** | bare glyph · label · chevron. Groups separated by space, never a rule |
+| **record list** | medallion · title + detail · value |
+| **header outside** | title left, **total right**, then the card. The default |
+| **header inside** | title + chevron inside the card, `See all` at its foot. **Feed only** |
+| **quick actions** | 3–4 circles in a well, label always beneath |
+| **tile grid** | 4 across, label beneath the tile |
+| **segmented** | a track with a sliding indicator, inside a card |
+| **scroller** | horizontal, and the one place content leaves the page inset |
+| **trailing action** | a row ending in a pill button rather than a chevron |
+| **promo** | a lit card, art bleeding off the right edge |
+
+⚠️ **THE HEADER IS INSIDE THE CARD ONLY ON A FEED**, because there the card *is*
+the section rather than a list the section contains. Everywhere else it sits
+outside: put inside, the title becomes an item in the list it names.
+
+⚠️ **A SCROLLER IS THE ONE THING THAT LEAVES THE PAGE INSET**, so its first item
+lines up with everything above it and its last is cut — which is what says there
+is more. A scroller that fits inside the inset looks like a row that failed to
+fill.
+
 ---
 
 ## 6. Navigation, and the overlay ladder

@@ -100,7 +100,7 @@ body{background:var(--bg);color:var(--ink);font:400 var(--t-body)/1.35 -apple-sy
 /* a SETTING → bare outline glyph */
 .row .bare{color:var(--ink);display:grid;place-items:center;width:24px}
 /* a THING with a value → filled colour medallion */
-.row .med{width:36px;height:36px;border-radius:var(--r-pill);display:grid;place-items:center;color:#fff}
+.med{width:36px;height:36px;border-radius:var(--r-pill);display:grid;place-items:center;color:#fff}
 .row .txt{min-width:0}
 .row .t{display:block;font-weight:var(--w-med);font-size:var(--t-body);line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .d{display:block;font-weight:400;font-size:var(--t-sub);line-height:1.3;color:var(--ink-2);margin-top:2px}
@@ -124,6 +124,29 @@ body{background:var(--bg);color:var(--ink);font:400 var(--t-body)/1.35 -apple-sy
 .tile span{font-weight:var(--w-med);font-size:var(--t-sub);line-height:1}
 
 .field{display:flex;align-items:center;gap:12px;height:52px;padding:0 16px;border-radius:var(--r-pill);background:var(--card);color:var(--ink-2);font-weight:400;font-size:var(--t-body);line-height:1}
+
+
+/* ── the section patterns the archetypes are assembled from */
+.face{display:grid;place-items:center;width:96px;height:96px;border-radius:var(--r-pill);
+  background:#4ade80;color:#000;font-weight:700;font-size:34px}
+.promo{display:flex;align-items:center;min-height:96px;padding:0 18px;
+  background:linear-gradient(105deg,rgb(255 255 255/.14),rgb(255 255 255/.05))}
+/* ⚠️ THE HEADER IS INSIDE ONLY ON A FEED, where the card IS the section rather
+   than a list the section contains. Everywhere else it sits outside. */
+.card.inset{padding:14px 0 4px}
+.card-head{display:flex;align-items:center;gap:6px;padding:0 var(--row-pad) 8px}
+.card-head h2{font-weight:600;font-size:var(--t-body)}
+.card-head svg{opacity:.45}
+.card-more{padding:10px 0 12px;text-align:center;font-weight:500;font-size:var(--t-body)}
+.seg{display:flex;gap:4px;margin:2px var(--row-pad) 12px;padding:3px;border-radius:var(--r-pill);background:var(--well)}
+.seg button{flex:1;border:0;background:none;color:var(--ink-2);font:inherit;font-size:var(--t-sub);
+  font-weight:500;padding:7px 0;border-radius:var(--r-pill);cursor:pointer;
+  transition:background var(--t-move) var(--e-out),color var(--t-move) var(--e-out)}
+.seg button[aria-current]{background:var(--well-hi);color:var(--ink)}
+/* ⚠️ A horizontal scroller is the ONE place content leaves the page inset, so the
+   first item lines up with everything above it and the last hints at more. */
+.scroller{display:flex;gap:14px;overflow-x:auto;padding:0 var(--row-pad) 14px;scrollbar-width:none}
+.scroll-item{display:flex;flex-direction:column;align-items:center;gap:7px;flex:none;font-size:var(--t-sub);font-weight:500}
 
 /* ── TAB BAR: a floating island. The page runs under it. */
 .dock{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;width:calc(100% - 2*var(--pad));
@@ -152,7 +175,7 @@ body{background:var(--bg);color:var(--ink);font:400 var(--t-body)/1.35 -apple-sy
 .s78 .circ{width:40px;height:40px}
 .s78 .quick .glyph{width:48px;height:48px}
 .s78 .row{min-height:50px;padding:9px 14px}
-.s78 .row .med{width:36px;height:36px}
+.s78 .med{width:36px;height:36px}
 .s78 .notice .w{width:40px;height:40px}
 .cap{color:#8b8d95;font:500 12px/1 ui-monospace,monospace;padding:0 0 10px 2px;letter-spacing:.06em;text-transform:uppercase}
 `;
@@ -294,10 +317,96 @@ const home = `<div class="phone" data-enter><div class="status"><span>12:52</spa
 
 /* ⚠️ Beside itself. It wrote to an absolute /tmp path while it lived in /tmp,
    which is a file that only works from the machine it was written on. */
+
+/* ══ ARCHETYPE C — A TITLE PAGE. No hero: there is no one number and no topic,
+      so the title is large, LEFT, and the page starts immediately. Search when
+      the list is long enough to hunt through. Group headers sit OUTSIDE the card
+      and carry the group's total. */
+const ledger = `<div class="phone"><div class="status"><span>12:52</span><span>5G ▪▪▪ 53</span></div><div class="scroll">
+  <div class="backdrop" data-sky="aurora" style="--solid:8%;--reach:38%"></div>
+  <div class="hero" style="padding-bottom:6px">
+    <div class="nav"><button class="circ">${svg("back",20)}</button><span></span></div>
+    <h1 class="page-title">Transactions</h1>
+    <div class="field">${svg("search",20)} Search</div>
+  </div>
+  <div class="body" style="padding-top:18px">
+    ${[["Yesterday","+12,01 points",[["Uber Eats","22:02","+4,11","#16a34a"],["Thu Ha Duong","16:35","+6,37","#f97316"],["Rewe","12:06","+1,53","#dc2626"]]],
+       ["8 Aug","+33,45 points",[["REWE.de","23:06","+3,49","#dc2626"],["Anthropic","22:53","+25,87","#111"],["Tropical Islands","19:04","+4,08","#0ea5e9"]]]]
+      .map(([when,sum,rows]) => `<div>
+        <div class="sec-head"><h2>${when}</h2><span class="sum">${sum}</span></div>
+        <div class="card">${rows.map(([t,d,v,c]) => row({icon:"card",med:c,t,d,v:`${v} points`})).join("")}</div>
+      </div>`).join("")}
+  </div>
+</div></div>`;
+
+/* ══ ARCHETYPE D — AN IDENTITY PAGE. Centred, because it is about one person
+      rather than a list. A close and one action, the face at LARGE, the name,
+      the handle — then the same grouped menu as any other settings surface. */
+const identity = `<div class="phone"><div class="status"><span>12:52</span><span>5G ▪▪▪ 53</span></div><div class="scroll">
+  <div class="backdrop" data-sky="aurora" style="--solid:14%;--reach:62%"></div>
+  <div class="hero" style="padding-bottom:10px">
+    <div class="nav"><button class="circ">${svg("close",20)}</button>
+      <button class="pill-btn">${svg("hex",18)} Upgrade</button></div>
+    <div class="hero-stack" style="margin-top:22px;gap:4px">
+      <span class="face">AL</span>
+      <span style="font-weight:700;font-size:26px;letter-spacing:-.02em;padding-top:10px">Ada Lovelace</span>
+      <span class="under">@ada ${svg("hex",14)}</span>
+    </div>
+  </div>
+  <div class="body" style="padding-top:16px">
+    <div class="card promo"><div><div style="font-weight:700;font-size:20px">Premium</div>
+      <div style="opacity:.7;font-size:var(--t-sub);padding-top:2px">View plan benefits ›</div></div></div>
+    <div class="card">
+      ${row({icon:"payees",t:"Invite friends",d:"Earn €70 or more"})}
+      ${row({icon:"megaphone",t:"Inbox",count:5})}
+      ${row({icon:"bank",t:"Account details"})}
+      ${row({icon:"shield",t:"Security",count:1})}
+      ${row({icon:"privacy",t:"Privacy"})}
+    </div>
+  </div>
+</div></div>`;
+
+/* ══ ARCHETYPE E — A FEED PAGE. No hero at all: it is a stack of independent
+      sections, each carded with its own header INSIDE and its own way in. This is
+      the one layout where a header sits inside the card, because the card IS the
+      section rather than a list the section contains. */
+const feed = `<div class="phone"><div class="status"><span>12:52</span><span>5G ▪▪▪ 53</span></div><div class="scroll">
+  <div class="backdrop" data-sky="grid" style="--solid:6%;--reach:30%"></div>
+  <div class="hero" style="padding-bottom:0">
+    <div class="nav" style="gap:10px">
+      <span class="circ" style="background:#4ade80;color:#000;font-weight:700;font-size:15px">AL</span>
+      <span class="field" style="flex:1;height:44px">${svg("search",18)} Search</span>
+      <button class="circ" style="width:40px;height:40px">${svg("chart",20)}</button>
+    </div>
+  </div>
+  <div class="body" style="padding-top:18px">
+    <div class="card inset">
+      <div class="card-head"><h2>Recommended</h2>${svg("chevron",16)}</div>
+      ${row({icon:"invest",med:"#111",t:"NVIDIA",d:"41,25% expected return",v:'$218.78<small class="down">▾ 2,32%</small>'})}
+      ${row({icon:"invest",med:"#2563eb",t:"Microsoft",d:"27,69% expected return",v:'$504.05<small class="up">▴ 0,81%</small>'})}
+      <div class="card-more">See all</div>
+    </div>
+    <div class="card inset">
+      <div class="card-head"><h2>Watchlist</h2>${svg("chevron",16)}</div>
+      ${row({icon:"invest",med:"#111",t:"NVIDIA",d:"NVDA",v:'$218.78<small class="down">▾ 2,31%</small>'})}
+      ${row({icon:"invest",med:"#7f1d1d",t:"Vanguard S&P 500",d:"VUAA",v:'€129.78<small class="up">▴ 0,03%</small>'})}
+    </div>
+    <div class="card inset">
+      <div class="card-head"><h2>Top movers</h2>${svg("chevron",16)}</div>
+      <div class="seg"><button aria-current="page">Gainers</button><button>Losers</button></div>
+      <div class="scroller">${[["BWMN","#065f46"],["MTEN","#1d4ed8"],["VREX","#0e7490"],["HZO","#b91c1c"]]
+        .map(([t,c]) => `<div class="scroll-item"><span class="med" style="background:${c};width:52px;height:52px">${svg("chart",22)}</span><span>${t}</span></div>`).join("")}</div>
+    </div>
+  </div>
+</div></div>`;
+
 writeFileSync(new URL("out.html", import.meta.url),`<!doctype html><meta charset="utf8"><style>${SYS}${MOTION}${SKY_CSS}\n${TENANTS.map((b,i)=>["dark","light"].map((th)=>skyFor(b,th,`sky-${i}-${th}`)).join("\n")).join("\n")}\n${skyFor(TENANTS[0],"dark","phone")}</style>
 <body><div class="stage">
-<div><div class="cap">pattern hero · menu</div>${security}</div>
-<div><div class="cap">photo hero · accounts</div>${home}</div>
+<div><div class="cap">B · topic</div>${security}</div>
+<div><div class="cap">A · crown</div>${home}</div>
+<div><div class="cap">C · title</div>${ledger}</div>
+<div><div class="cap">D · identity</div>${identity}</div>
+<div><div class="cap">E · feed</div>${feed}</div>
 </div>
 <div class="stage" style="flex-direction:column;gap:18px">
 ${TENANTS.map((t, ti) => `
