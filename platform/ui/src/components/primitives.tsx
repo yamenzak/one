@@ -16,6 +16,7 @@ import type { Role } from "../motion.js";
 import { semanticForm } from "../ground.js";
 import type { Oklch } from "../colour.js";
 import { SEMANTIC } from "../semantic.js";
+import { borrow, SIZE, TONE } from "../borrowed.js";
 
 /* ---------------------------------------------------------------- surface --- */
 
@@ -40,6 +41,9 @@ export function Surface({ depth = 1, role = "content", tone, children, as: Tag =
   return (
     <Tag
       data-one="surface"
+      /* ⚠️ Depth stays OURS: the library has one card, and how far a card is
+         from the light is the thing this language computes. */
+      className={depth === 0 ? undefined : borrow("card")}
       data-depth={depth}
       data-role={role}
       {...(tone ? { "data-tone": tone } : {})}
@@ -115,6 +119,16 @@ export function Button({ kind = "tonal", size = "md", state = "idle", reason, re
     <button
       type="button"
       data-one="button"
+      /*
+        ⚠️ THE LIBRARY DRAWS THE PILL; THE SHEET PLACES IT. `kind` and `size` are
+        OUR words, mapped in `borrowed.ts` — a component that knew the library's
+        names is a component where somebody eventually writes one inline, and
+        then a sixth kind exists that the language never declared.
+      */
+      className={borrow("button", [
+        kind === "primary" ? "-primary" : kind === "quiet" ? "-ghost" : kind === "destructive" ? `-${TONE.danger}` : "-neutral",
+        SIZE[size],
+      ])}
       data-kind={kind}
       data-size={size}
       data-state={state}
@@ -161,7 +175,7 @@ export interface RowProps {
 export function Row({ lead, title, detail, value, onOpen }: RowProps) {
   const Tag = onOpen ? "button" : "div";
   return (
-    <Tag data-one="row" data-interactive={onOpen ? "" : undefined} {...(onOpen ? { type: "button" as const, onClick: onOpen } : {})}>
+    <Tag data-one="row" className={borrow("row")} data-interactive={onOpen ? "" : undefined} {...(onOpen ? { type: "button" as const, onClick: onOpen } : {})}>
       {lead ? <span data-one="row-lead">{lead}</span> : null}
       <span data-one="row-body">
         <Text role="body">{title}</Text>
@@ -205,7 +219,7 @@ export function Callout({ tone, ground, title, children }: CalloutProps) {
   */
   const form = ground ? semanticForm(SEMANTIC[tone], ground) : "tone";
   return (
-    <div data-one="callout" data-tone={tone} data-form={form} role={tone === "danger" ? "alert" : "status"}>
+    <div data-one="callout" className={borrow("alert", [`-${TONE[tone]}`])} data-tone={tone} data-form={form} role={tone === "danger" ? "alert" : "status"}>
       <span data-one="callout-icon" aria-hidden="true" data-tone={tone} />
       <Text role="subtitle">{title}</Text>
       {children ? <Text role="body">{children}</Text> : null}
@@ -234,6 +248,6 @@ export const EmptyState = ({ title, detail, action }: EmptyStateProps) => (
  */
 export const Skeleton = ({ rows = 3 }: { readonly rows?: number }) => (
   <div data-one="skeleton" aria-hidden="true" data-rows={rows}>
-    {Array.from({ length: rows }, (_, i) => <span key={i} data-one="skeleton-row" />)}
+    {Array.from({ length: rows }, (_, i) => <span key={i} data-one="skeleton-row" className={borrow("skeleton")} />)}
   </div>
 );

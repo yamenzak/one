@@ -857,6 +857,34 @@ handing back a colour that measured 3.68, so the engine looked correct and only
 the pixels were wrong. Two implementations of one conversion is the same defect
 as two implementations of "what colour is this", one layer down.
 
+
+### 9d. The one door
+
+⚠️ **A CLASS REACHES THE DOM ONLY THROUGH `borrow`.** `borrowed.ts` is the single
+file that knows the library's names; a component asks for an *object* and gets
+the class back. The library draws the object — the pill, the card, the track —
+and our sheet places it with `data-one`, because layout is the half a component
+library cannot have an opinion about: it does not know what screen it is on.
+
+⚠️ **THE FAILURE IS GRADUAL AND EVERY STEP OF IT IS REASONABLE.** One component
+spells `btn-primary` inline because it is right there; the next needs a variant
+the mapping lacks, so it spells that too; six months later the library's names
+are load-bearing in forty files and swapping it is a rewrite. `packages/ui` is
+what that looks like finished — 3,275 class literals in one app, 942 written
+exactly once.
+
+⚠️ **`danger` IS OURS AND `error` IS THEIRS**, which is the whole reason `TONE`
+exists rather than the words being shared. A component that knew both names is a
+component where somebody eventually writes theirs, and then a sixth tone exists
+that the language never declared.
+
+⚠️ **AND THE CHECK STANDS AT THE DOOR RATHER THAN SEARCHING FOR WORDS.** The
+first version searched the package for the class names and was wrong twice: it
+flagged `borrow("card")`, where the string is a key into the map rather than a
+class, and it flagged our own registry — which legitimately has components called
+`tabs`, `skeleton` and `input`, because those are the names of the things, and a
+library choosing the same words does not make them the library's.
+
 ---
 
 ## 10. The guards
@@ -908,6 +936,9 @@ and is expensive to disprove, so it survives review indefinitely.
 | `every-borrowed-variable-is-written` | a variable the component library reads and the bridge never writes — which does not throw and does not look broken: that ONE component falls back to the library's stock theme and renders in somebody else's brand, beside components that are correct | **live** |
 | `the-light-survives-the-crossing` | a fill-and-ink pair handed to the library under the floor — proving contrast in our own tokens proves nothing about what the library renders, and what it renders is these pairs | **live** |
 | `one-accent-survives-three-slots` | an invented hue in the library's secondary or accent slot — which hands every author a second and third brand colour to reach for, and the restraint that makes one accent read as expensive is gone in a week | **live** |
+| `a-class-reaches-the-dom-through-one-door` | a library class name written at a call site — the failure is gradual and every step of it is reasonable, and the finished shape is the legacy tree's 3,275 class literals in one app with 942 of them written exactly once | **live** |
+| `no-component-accepts-a-look` | a className or style prop, or a spread of unknown props — a passthrough is an arbitrary look with a friendly name, and one of them turns the exhaustive tenant sweep into a sample | **live** |
+| `every-tone-is-mapped` | a tone the language declares and the bridge never maps — it renders in the library's default, which is grey, on the one component whose whole job is to say something is wrong | **live** |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder

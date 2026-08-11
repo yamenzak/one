@@ -3316,6 +3316,33 @@
       "impl": "ui/test/daisy.test.ts",
       "proves": "keeps the three accent slots on the tenant's one hue",
       "fails": "an invented hue in the library's secondary or accent slot — which hands every author a second and third brand colour to reach for, and the restraint that makes one accent read as expensive is gone in a week"
+    },
+    {
+      "id": "a-class-reaches-the-dom-through-one-door",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/borrowed.test.ts",
+      "proves": "lets a class reach the DOM only through borrow",
+      "fails": "a library class name written at a call site — the failure is gradual and every step of it is reasonable, and the finished shape is the legacy tree's 3,275 class literals in one app with 942 of them written exactly once"
+    },
+    {
+      "id": "no-component-accepts-a-look",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/borrowed.test.ts",
+      "proves": "accepts no className or style from a caller",
+      "fails": "a className or style prop, or a spread of unknown props — a passthrough is an arbitrary look with a friendly name, and one of them turns the exhaustive tenant sweep into a sample"
+    },
+    {
+      "id": "every-tone-is-mapped",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/borrowed.test.ts",
+      "proves": "maps all five tones",
+      "fails": "a tone the language declares and the bridge never maps — it renders in the library's default, which is grey, on the one component whose whole job is to say something is wrong"
     }
   ]
 }
