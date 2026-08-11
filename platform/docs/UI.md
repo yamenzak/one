@@ -329,6 +329,10 @@ wrong fix), and a scrim arriving after its sheet.
 
 ## 5. The scale — verified against a reference, never chosen by eye
 
+> The prototype these numbers were measured from is
+> [](../ui/reference/) — plain HTML and CSS, no build.
+> It exists so they can be re-derived rather than trusted.
+
 ⚠️ **A TYPE SIZE IS MEANINGLESS WITHOUT THE FRAME IT SITS IN.** "17px body" is
 not a decision, it is half of one — the other half is the screen width. The first
 attempt at this used an iPhone body size on an iPhone frame while matching

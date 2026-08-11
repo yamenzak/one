@@ -1,3 +1,18 @@
+/**
+ * THE REFERENCE BUILD — the prototype the scale was measured from.
+ *
+ * ⚠️ NOT SHIPPED CODE, AND NOTHING MAY IMPORT IT. Plain HTML and CSS, no
+ * framework and no build step, kept beside the package so the numbers in
+ * `docs/UI.md` §4 and §5 can be RE-DERIVED rather than trusted.
+ *
+ *     node build.mjs      # writes out.html — two screens, both hero variants
+ *
+ * ⚠️ THE DOCUMENT IS AUTHORITATIVE AND THIS IS A PHOTOGRAPH. Where the two
+ * disagree, this is the stale one. It exists so the next person can see the
+ * target before writing a component — which is the step that was skipped the
+ * first time, and the reason fifteen commits of parts never became a screen.
+ */
+
 import { writeFileSync } from "node:fs";
 import { svg } from "./icons.mjs";
 import { MOTION } from "./motion.mjs";
