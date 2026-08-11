@@ -24,6 +24,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { Problem } from "@one/kernel";
 import { feel } from "../feedback.js";
+import { Close, Tick } from "../icon.js";
 import { Sheet } from "../sheet.js";
 
 /** What a value is, which is all the sheet needs to draw the right control. */
@@ -252,8 +253,8 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
             autoFocus
           />
           {value ? (
-            <button type="button" className="field-clear" aria-label="Clear" onClick={() => { setValue(""); setState({ at: "idle" }); }}>
-              <Cross />
+            <button type="button" className="field-clear press" aria-label="Clear" onClick={() => { setValue(""); setState({ at: "idle" }); }}>
+              <Close size={15} />
             </button>
           ) : null}
         </div>
@@ -273,13 +274,13 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
       ) : null}
 
       <div className="sheet-actions">
-        <button type="submit" className="primary" data-state={state.at}
+        <button type="submit" className="primary press" data-state={state.at}
           disabled={unchanged || local !== null || state.at === "saving" || state.at === "saved"}>
           <span className="primary-label">
             {state.at === "saving" ? "Saving" : state.at === "saved" ? "Saved" : general?.retryable ? "Try again" : "Save"}
           </span>
           {state.at === "saving" ? <Spinner /> : null}
-          {state.at === "saved" ? <Tick /> : null}
+          {state.at === "saved" ? <Tick className="primary-sign" /> : null}
         </button>
         {/* ⚠️ THE REASON THE ACTION IS OFF IS WRITTEN DOWN. A disabled button with
             no explanation is a dead end, and "nothing has changed" is a different
@@ -289,20 +290,6 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
     </form>
   );
 }
-
-const Cross = (): ReactNode => (
-  <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" fill="none"
-    stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-    <path d="M18 6 6 18M6 6l12 12" />
-  </svg>
-);
-
-const Tick = (): ReactNode => (
-  <svg className="primary-sign" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" fill="none"
-    stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m5 12.5 4.5 4.5L19 7" />
-  </svg>
-);
 
 /* ⚠️ A RING, NOT A LABEL THAT SAYS "…". It has to be visibly moving: a button
    that has changed its word and nothing else is one people press again. */

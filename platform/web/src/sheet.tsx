@@ -22,6 +22,7 @@
 
 import { useCallback, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { Close } from "./icon.js";
 
 export interface SheetProps {
   readonly open: boolean;
@@ -76,8 +77,8 @@ export function Sheet({ open, onClose, dismissible, label, children }: SheetProp
               <span className="grabber-bar" aria-hidden="true" />
             </div>
           ) : (
-            <button type="button" className="sheet-close" aria-label="Close" onClick={onClose}>
-              <Cross />
+            <button type="button" className="sheet-close press" aria-label="Close" onClick={onClose}>
+              <Close size={18} />
             </button>
           )}
           {children}
@@ -144,10 +145,3 @@ function useDragToClose(onClose: () => void) {
 
   return { ref, begin, move, end };
 }
-
-const Cross = (): ReactNode => (
-  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none"
-    stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-    <path d="M18 6 6 18M6 6l12 12" />
-  </svg>
-);

@@ -24,6 +24,7 @@ import { build } from "esbuild";
 import { readFileSync, writeFileSync } from "node:fs";
 import { ACCOUNT_CSS } from "../src/account/home.css.js";
 import { FONTS, TYPE_CSS, fontFace } from "../src/brand/type.css.js";
+import { MOTION_CSS } from "../src/motion.css.js";
 import { SKY_CSS } from "../src/sky.css.js";
 
 const FONT = FONTS.map((f) =>
@@ -91,7 +92,7 @@ const script = bundled.outputFiles[0]!.text;
 const html = `<!doctype html><html lang="en" data-theme="dark"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Account Center — @one/web</title>
-<style>${FONT}</style><style>${TYPE_CSS}</style><style>${ACCOUNT_CSS}</style>
+<style>${FONT}</style><style>${TYPE_CSS}</style><style>${MOTION_CSS}</style><style>${ACCOUNT_CSS}</style>
 <style>${SKY_CSS}</style><style>${DEV}</style>
 </head><body><div id="root"></div>
 <script>${script}</script>

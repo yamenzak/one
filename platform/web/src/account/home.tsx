@@ -20,6 +20,7 @@
 import type { ElementType, ReactNode } from "react";
 import * as Avatar from "@radix-ui/react-avatar";
 import { Lockup } from "../brand/mark.js";
+import { Adjust, Close, Guard, Heartbreak, Key, Onward, Portrait, Save } from "../icon.js";
 
 /* ------------------------------------------------------------------ data --- */
 
@@ -75,7 +76,7 @@ const PRODUCT_NAME: Record<Product, string> = { kova: "Kova", scena: "Scena", te
 
 export function AccountHome({ person, workspaces, onGo, onClose, Heading = "h1" }: AccountHomeProps) {
   return (
-    <div className="page">
+    <div className="page stagger">
       {/* ⚠️ BEHIND THE TOP, NOT BEHIND THE PAGE. The light falls where the screen
           announces itself and is gone by the first card — a field that carried on
           under the content would be a tint, and a tint is paint. */}
@@ -94,12 +95,12 @@ export function AccountHome({ person, workspaces, onGo, onClose, Heading = "h1" 
       <header className="page-top">
         {/* ⚠️ × AND NOT AN ARROW. This is the root of a presentation laid over the
             app, so the control dismisses it rather than walking back through it. */}
-        <button type="button" className="round-button" aria-label="Close" onClick={onClose}><Close /></button>
+        <button type="button" className="round-button press" aria-label="Close" onClick={onClose}><Close /></button>
         <Heading className="page-title"><Lockup word="Account Center" /></Heading>
       </header>
 
       <section>
-        <div className="card">
+        <div className="card stagger">
           <Item icon={<Portrait />} title="Your details" detail="Your name, photo and address" onGo={() => onGo("account.profile")} />
           <Item icon={<Key />} title="Sign-in methods" detail="Passkeys, codes and devices" onGo={() => onGo("account.security")} />
           <Item icon={<Adjust />} title="Preferences" detail="Units, language and dates" onGo={() => onGo("account.preferences")} />
@@ -128,7 +129,7 @@ export function AccountHome({ person, workspaces, onGo, onClose, Heading = "h1" 
             <p className="lede">An invitation arrives by email, at {person.email}.</p>
           </div>
         ) : (
-          <div className="card">
+          <div className="card stagger">
             {workspaces.map((w) => (
               <Item
                 key={w.tenantId}
@@ -153,9 +154,9 @@ export function AccountHome({ person, workspaces, onGo, onClose, Heading = "h1" 
 
       <section>
         <h2>Privacy</h2>
-        <div className="card">
-          <Item icon={<Shield />} title="Consent and legal" detail="What you have agreed to" onGo={() => onGo("account.privacy")} />
-          <Item icon={<Download />} title="Download your data" detail="Everything we hold about you" onGo={() => onGo("account.export")} />
+        <div className="card stagger">
+          <Item icon={<Guard />} title="Consent and legal" detail="What you have agreed to" onGo={() => onGo("account.privacy")} />
+          <Item icon={<Save />} title="Download your data" detail="Everything we hold about you" onGo={() => onGo("account.export")} />
         </div>
       </section>
 
@@ -194,7 +195,7 @@ export function AccountHome({ person, workspaces, onGo, onClose, Heading = "h1" 
  * never does.
  */
 const WorkspaceMark = ({ workspace }: { readonly workspace: Workspace }): ReactNode => (
-  <Avatar.Root className="well mark" data-product={workspace.product}>
+  <Avatar.Root className="well mark alive" data-product={workspace.product}>
     <Avatar.Image className="mark-image" src={workspace.logo} alt="" />
     {/* ⚠️ NOT READ ALOUD. The row's title is the workspace's name; an initial
         announced beside it is the same word twice, one letter of it. */}
@@ -211,49 +212,13 @@ function Item({ icon, mark, title, detail, iconTone, onGo }: {
   readonly onGo: () => void;
 }) {
   return (
-    <button type="button" className="item" onClick={onGo}>
+    <button type="button" className="item press-flat" onClick={onGo}>
       {mark ?? (icon ? <span className="well" data-tone={iconTone}>{icon}</span> : null)}
       <span className="item-body">
         <span className="item-title">{title}</span>
         {detail ? <span className="item-detail">{detail}</span> : null}
       </span>
-      <Chevron />
+      <Onward className="chevron" />
     </button>
   );
 }
-
-/* ⚠️ Drawn here rather than imported. Six glyphs is not a set worth a package,
-   and a set is a decision to make once there are screens to make it for. */
-
-const Glyph = ({ children }: { readonly children: ReactNode }) => (
-  <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true" fill="none"
-       stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-    {children}
-  </svg>
-);
-
-const Chevron = (): ReactNode => (
-  <svg className="chevron" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" fill="none"
-       stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
-    <path d="m9 18 6-6-6-6" />
-  </svg>
-);
-
-const Close = (): ReactNode => (
-  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none"
-       stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-    <path d="M18 6 6 18M6 6l12 12" />
-  </svg>
-);
-
-const Portrait = (): ReactNode => <Glyph><circle cx="12" cy="8" r="4" /><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" /></Glyph>;
-const Key = (): ReactNode => <Glyph><circle cx="8.6" cy="15.4" r="4.4" /><path d="M11.8 12.2 20 4" /><path d="m16.6 7.4 2.6 2.6" /><path d="m14.2 9.8 2.6 2.6" /></Glyph>;
-/* ⚠️ NOT `Sliders`. `slide` is another product's core noun, and the kernel's
-   vocabulary guard refuses it in platform code precisely so a shared control and
-   a product's own object cannot end up one letter apart in the same file. */
-const Adjust = (): ReactNode => <Glyph><path d="M4 8h9M19 8h1M4 16h4M14 16h6" /><circle cx="16" cy="8" r="2.2" /><circle cx="11" cy="16" r="2.2" /></Glyph>;
-const Shield = (): ReactNode => <Glyph><path d="M12 3.2 5 6v6c0 4.5 3 7.7 7 8.8 4-1.1 7-4.3 7-8.8V6z" /></Glyph>;
-const Download = (): ReactNode => <Glyph><path d="M12 3.5v11m0 0 4-4m-4 4-4-4M4.5 19.5h15" /></Glyph>;
-const Heartbreak = (): ReactNode => (
-  <Glyph><path d="M12 20.2s-7.2-4.5-7.2-9.4A3.9 3.9 0 0 1 12 8.1a3.9 3.9 0 0 1 7.2 2.7c0 4.9-7.2 9.4-7.2 9.4Z" /><path d="m12 8.1-2 3.6h4L12 15.4" /></Glyph>
-);

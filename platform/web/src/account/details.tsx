@@ -29,6 +29,7 @@
 import { useState, type ReactNode } from "react";
 import * as Avatar from "@radix-ui/react-avatar";
 import type { Problem } from "@one/kernel";
+import { Back, Edit, Lens } from "../icon.js";
 import { ValueEditor, type EditableField } from "./editor.js";
 import type { Person } from "./home.js";
 
@@ -79,22 +80,22 @@ export function AccountDetails({
   const fields = fieldsFor(person);
 
   return (
-    <div className="page">
+    <div className="page stagger">
       <header className="page-top">
-        <button type="button" className="round-button" aria-label="Back" onClick={onBack}><Arrow /></button>
+        <button type="button" className="round-button press" aria-label="Back" onClick={onBack}><Back /></button>
         {/* ⚠️ THE TITLE AND THE FACE SHARE A LINE, and the face is the one thing on
             this screen that is not a row — it is what the person looks like, so it
             is shown rather than described. */}
         <div className="title-row">
           <Heading className="page-name">Your details</Heading>
-          <button type="button" className="portrait" onClick={onPickPhoto} aria-label="Change your photo">
-            <Avatar.Root className="portrait-face">
+          <button type="button" className="portrait press" onClick={onPickPhoto} aria-label="Change your photo">
+            <Avatar.Root className="portrait-face alive">
               <Avatar.Image className="portrait-image" src={person.avatarUrl} alt="" />
               <Avatar.Fallback className="portrait-letter" aria-hidden="true">
                 {(person.name ?? person.email).slice(0, 1).toUpperCase()}
               </Avatar.Fallback>
             </Avatar.Root>
-            <span className="portrait-badge" aria-hidden="true"><Camera /></span>
+            <span className="portrait-badge" aria-hidden="true"><Lens /></span>
           </button>
         </div>
       </header>
@@ -104,10 +105,10 @@ export function AccountDetails({
         {/* ⚠️ ONE CARD, NOT ONE PER FIELD. These are all the same kind of thing
             about the same person; a card each turns a short list into a stack of
             boxes with more edge than content. */}
-        <div className="card entries">
+        <div className="card entries stagger">
           {fields.map((f) => (
-            <button type="button" className="entry" key={f.name} onClick={() => setEditing(f.name)}>
-              <span className="entry-label">{f.label}<Pencil /></span>
+            <button type="button" className="entry press-flat" key={f.name} onClick={() => setEditing(f.name)}>
+              <span className="entry-label">{f.label}<Edit className="pencil" /></span>
               <span className="entry-value">
                 {f.name === "email" ? person.email : person.name ?? <span className="entry-unset">Not set</span>}
                 {f.name === "email" && emailVerified ? <span className="pill">Verified</span> : null}
@@ -134,24 +135,3 @@ export function AccountDetails({
     </div>
   );
 }
-
-const Arrow = (): ReactNode => (
-  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none"
-    stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M19 12H5m0 0 6-6m-6 6 6 6" />
-  </svg>
-);
-
-const Pencil = (): ReactNode => (
-  <svg className="pencil" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z" /><path d="m14.5 6.5 3 3" />
-  </svg>
-);
-
-const Camera = (): ReactNode => (
-  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none"
-    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 8.5h3.5L8 6h8l1.5 2.5H21v11H3z" /><circle cx="12" cy="13.5" r="3.4" />
-  </svg>
-);

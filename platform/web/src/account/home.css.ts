@@ -96,17 +96,12 @@ h2 { word-spacing: normal; }
    from below is what says this was laid over something still there. */
 .over-content { position: fixed; inset: 0; z-index: 40; overflow-y: auto;
   background: var(--page);
-  animation: over-up 320ms cubic-bezier(0.2, 0, 0.1, 1); }
+  animation: over-up var(--arrive) var(--enter); }
 /* ⚠️ FOCUS LANDS HERE ON OPEN AND MUST NOT DRAW A RING. It is the surface, not a
    control — a ring round the whole screen is the browser announcing that
    something went wrong. Every control inside it keeps its own. */
 .over-content:focus, .over-content:focus-visible { outline: none; }
 @keyframes over-up { from { opacity: 0; translate: 0 22px; } }
-/* ⚠️ REMOVED, NOT SHORTENED. Someone who has asked for less motion is not asking
-   for the same motion in less time. */
-@media (prefers-reduced-motion: reduce) {
-  .over-content { animation: none; }
-}
 
 /* ⚠️ THE PAGE IS THE WHOLE SURFACE, and it is presented over the app rather than
    inside it — no navigation, no tabs, no product chrome. One column, capped: an
@@ -223,7 +218,7 @@ h2 { word-spacing: normal; }
    and the presentation above. Editing one value is not leaving the screen the
    value is on, and dimming rather than covering is what says so. */
 .scrim { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 0.62);
-  animation: scrim-in 200ms ease-out; }
+  animation: scrim-in var(--swift) var(--enter); }
 /* ⚠️ IT COMES FROM THE BOTTOM EDGE AND STAYS ATTACHED TO IT. A panel floating in
    the middle of a phone is a desktop dialog that was never re-thought; the thumb
    is at the bottom and so is the action. */
@@ -237,8 +232,8 @@ h2 { word-spacing: normal; }
   background: var(--card); color: var(--ink);
   border-start-start-radius: 26px; border-start-end-radius: 26px;
   padding: 10px 20px calc(22px + env(safe-area-inset-bottom, 0px));
-  animation: sheet-up 320ms cubic-bezier(0.2, 0, 0.1, 1);
-  transition: translate 260ms cubic-bezier(0.2, 0, 0.1, 1); }
+  animation: sheet-up var(--settle) var(--enter);
+  transition: translate var(--settle) var(--move); }
 .sheet:focus, .sheet:focus-visible { outline: none; }
 /* WHILE A THUMB IS ON IT, IT IS THE THUMB'S. A transition during a drag is the
    sheet arriving where the finger was a quarter of a second ago. */
@@ -249,9 +244,9 @@ h2 { word-spacing: normal; }
   max-block-size: calc(100dvh - 24px); }
 /* IT LEAVES THE WAY IT ARRIVED. Radix keeps the node until the animation ends,
    so a surface that rose does not have to vanish. */
-.sheet[data-state='closed'] { animation: sheet-down 220ms cubic-bezier(0.4, 0, 1, 1); }
-.scrim[data-state='closed'] { animation: scrim-out 220ms ease-in; }
-.over-content[data-state='closed'] { animation: over-down 240ms cubic-bezier(0.4, 0, 1, 1); }
+.sheet[data-state='closed'] { animation: sheet-down var(--swift) var(--exit); }
+.scrim[data-state='closed'] { animation: scrim-out var(--swift) var(--exit); }
+.over-content[data-state='closed'] { animation: over-down var(--settle) var(--exit); }
 
 /* THE GRABBER IS A CLAIM: it appears only on a sheet that can actually be pulled
    away. Its hit area is the full width and far taller than the bar, because a
@@ -286,9 +281,6 @@ h2 { word-spacing: normal; }
 @keyframes sheet-down { to { translate: 0 100%; } }
 @keyframes sheet-in { from { opacity: 0; scale: 0.97; } }
 @keyframes over-down { to { opacity: 0; translate: 0 22px; } }
-@media (prefers-reduced-motion: reduce) {
-  .scrim, .sheet { animation: none; }
-}
 
 .sheet-body { display: flex; flex-direction: column; gap: 22px; }
 .sheet-top { display: flex; flex-direction: column; gap: 8px; }
@@ -334,7 +326,7 @@ h2 { word-spacing: normal; }
   display: flex; align-items: center; justify-content: center; gap: 9px;
   background: var(--ink); color: var(--card); cursor: pointer;
   font: inherit; font-size: 17px; font-weight: 600; word-spacing: normal;
-  transition: background-color 180ms ease-out, color 180ms ease-out; }
+  transition: background-color var(--swift) var(--move), color var(--swift) var(--move); }
 .primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* ⚠️ OFF IS A DIFFERENT GROUND, NOT A FADED ONE. A translucent control on a card
    inherits whatever is behind it, and at 40% opacity the label falls under every
@@ -354,9 +346,8 @@ h2 { word-spacing: normal; }
 .primary-sign { flex: none; }
 .spin { animation: spin 800ms linear infinite; }
 @keyframes spin { to { rotate: 360deg; } }
-@media (prefers-reduced-motion: reduce) {
-  .spin { animation-duration: 2s; }
-}
+
+
 
 /* ---------------------------------------------------------------- sections */
 
@@ -402,7 +393,8 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 
 /* ⚠️ DIMMED, NOT COLOURED. It says there is more here; it is not a thing to aim
    at, and at full ink it competes with the row's own words. */
-.chevron { flex: none; color: var(--ink-faint); }
+.chevron { flex: none; color: var(--ink-faint);
+  transition: translate var(--swift) var(--spring); }
 
 /* ⚠️ THE WELL IS THE ICON'S GROUND, and it is what makes a column of glyphs read
    as a list rather than as loose marks at different optical weights. */

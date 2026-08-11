@@ -13,6 +13,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ACCOUNT_CSS } from "../src/account/home.css.js";
 import { SKY_CSS } from "../src/sky.css.js";
 import { TYPE_CSS } from "../src/brand/type.css.js";
+import { MOTION_CSS } from "../src/motion.css.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 
 const props: AccountHomeProps = {
@@ -47,11 +48,17 @@ const used = new Set(
     ...sources.flatMap((src) => [...src.matchAll(/className="([^"]+)"/g)]),
   ]
     .flatMap((m) => m[1]!.split(/\s+/))
-    .filter(Boolean),
+    /*
+      ⚠️ LUCIDE STAMPS ITS OWN, AND THEY ARE NOT OURS TO STYLE. Every icon it
+      draws carries `lucide lucide-user`; the question this file asks is whether
+      the names WE invented line up, and a library's are neither invented here nor
+      safe to write rules against — they are its API surface, not ours.
+    */
+    .filter((c) => c && !c.startsWith("lucide")),
 );
 
 /* Comments state the rules and would match them. Only declarations are read. */
-const rules = [ACCOUNT_CSS, SKY_CSS, TYPE_CSS].join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
+const rules = [ACCOUNT_CSS, SKY_CSS, TYPE_CSS, MOTION_CSS].join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
 
 describe("the stylesheet and the markup are the same set of names", () => {
   /*
