@@ -59,6 +59,7 @@ export function Sheet({ open, onClose, dismissible, label, children }: SheetProp
           ref={drag.ref}
           aria-label={label}
           aria-describedby={undefined}
+          onPointerDown={releaseField}
           onPointerDownOutside={(e) => { if (!dismissible) e.preventDefault(); }}
           onEscapeKeyDown={(e) => { if (!dismissible) e.preventDefault(); }}
           onOpenAutoFocus={(e) => {
@@ -85,6 +86,21 @@ export function Sheet({ open, onClose, dismissible, label, children }: SheetProp
     </Dialog.Root>
   );
 }
+
+/**
+ * ⚠️ PRESSING THE SHEET ITSELF GIVES UP THE FIELD, and it is the only way out of a
+ * state nothing reports. Dismissing a soft keyboard does not blur the input that
+ * summoned it — no event fires, no viewport changes, nothing resizes — so where
+ * the keyboard cannot be measured (a page inside a frame), a sheet that moved out
+ * of its way has no way of learning that it may come back. Pressing anything that
+ * is not a control is the gesture people already make to put a keyboard away, and
+ * here it does exactly that.
+ */
+const releaseField = (e: ReactPointerEvent): void => {
+  if ((e.target as HTMLElement).closest("input, textarea, select, button, a")) return;
+  const focused = document.activeElement;
+  if (focused instanceof HTMLElement && focused.matches("input, textarea")) focused.blur();
+};
 
 /**
  * ⚠️ IT WRITES A CUSTOM PROPERTY RATHER THAN REACT STATE. A drag is a frame-rate

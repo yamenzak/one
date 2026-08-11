@@ -61,12 +61,23 @@ describe("what the keyboard is standing on", () => {
  */
 describe("where a sheet has to sit", () => {
   it("glides by the amount whenever there is an amount", () => {
-    expect(liftFor(336, true, true)).toBe("measured");
-    expect(liftFor(336, false, true)).toBe("measured");
+    expect(liftFor(336, true, true, false)).toBe("measured");
+    expect(liftFor(336, false, true, false)).toBe("measured");
   });
 
   it("goes out of reach when a touchscreen is being typed into and nothing was measured", () => {
-    expect(liftFor(0, true, true)).toBe("top");
+    expect(liftFor(0, true, true, false)).toBe("top");
+  });
+
+  /*
+    ⚠️ THE ONE THAT WAS REPORTED. A keyboard DISMISSED while its field keeps focus
+    reports zero — the same zero as a device that could never measure one — so the
+    sheet lifted to the top at the moment it should have settled back down, and
+    stayed there. A device that has measured a keyboard once can measure the next
+    one, so from then on a zero means the keyboard is gone.
+  */
+  it("settles back down once this device has proved it can measure", () => {
+    expect(liftFor(0, true, true, true)).toBe("measured");
   });
 
   /*
@@ -75,10 +86,10 @@ describe("where a sheet has to sit", () => {
     the sheet to the top of the screen the moment anybody clicked into the field.
   */
   it("stays where it is on a fine pointer", () => {
-    expect(liftFor(0, true, false)).toBe("measured");
+    expect(liftFor(0, true, false, false)).toBe("measured");
   });
 
   it("stays where it is when nothing is being typed into", () => {
-    expect(liftFor(0, false, true)).toBe("measured");
+    expect(liftFor(0, false, true, false)).toBe("measured");
   });
 });

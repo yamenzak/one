@@ -89,6 +89,18 @@ const SEEN_MS = 850;
  * sheet holds the focus and nothing measured a keyboard, the sheet goes to the TOP
  * of the viewport — the one place a keyboard has never been. It is cruder than
  * gliding up by exactly the right amount, and it cannot be wrong.
+ *
+ * ⚠️ AND MEASUREMENT, ONCE PROVEN, IS TRUSTED FOREVER. Without that the fallback
+ * fires on the way BACK: a keyboard dismissed while its field still holds focus
+ * reports zero, which is indistinguishable from never having been able to measure
+ * — so the sheet lifted to the top at the exact moment it should have settled
+ * down, and stayed there. A device that measured a keyboard once can measure the
+ * next one, and a zero from it means the keyboard is gone.
+ *
+ * ⚠️ WHERE NOTHING CAN MEASURE, THERE IS NO SIGNAL FOR THE KEYBOARD CLOSING AT
+ * ALL. Dismissing it does not blur the field, no viewport changes, nothing
+ * resizes. Pressing the sheet itself is what gives the field up — which settles
+ * the sheet back down, and is the only honest way out of a state nothing reports.
  */
 /**
  * How much of the layout viewport the keyboard is standing on.
@@ -108,15 +120,21 @@ export const keyboardInset = (layoutHeight: number, viewHeight: number, viewTop:
 export type Lift = "measured" | "top";
 
 /**
- * ⚠️ THREE CONDITIONS, AND ALL THREE ARE NEEDED. A measured amount means the
- * glide is available and correct. Typing is the only evidence a keyboard exists
- * when nothing can measure one — but it is equally true of a laptop, where there
- * is no keyboard to clear and the sheet would jump to the top of a narrow window
- * for no reason. A coarse pointer is what separates the two: it is a touchscreen,
- * and a touchscreen is where a keyboard takes half the display.
+ * ⚠️ FOUR CONDITIONS, AND EVERY ONE OF THEM IS LOAD-BEARING. A measured amount
+ * means the glide is available and correct. Typing is the only evidence a keyboard
+ * exists when nothing can measure one — but it is equally true of a laptop, where
+ * there is no keyboard to clear. A coarse pointer separates the two. And `proven`
+ * is whether this device has ever reported a keyboard at all: without it, a
+ * keyboard DISMISSED while its field keeps focus reports the same zero as a device
+ * that cannot measure, so the sheet lifted exactly when it should have settled.
  */
-export const liftFor = (measured: number, typing: boolean, touch: boolean): Lift =>
-  measured === 0 && typing && touch ? "top" : "measured";
+export const liftFor = (measured: number, typing: boolean, touch: boolean, proven: boolean): Lift =>
+  !proven && measured === 0 && typing && touch ? "top" : "measured";
+
+/* ⚠️ THE SESSION, NOT THE SHEET. Whether this browser can see a keyboard is a
+   fact about the browser; re-learning it per sheet means the first field edited
+   after every open pays the wrong behaviour again. */
+let everMeasured = false;
 
 function useKeyboardInset(active: boolean): void {
   useEffect(() => {
@@ -126,13 +144,14 @@ function useKeyboardInset(active: boolean): void {
 
     const apply = () => {
       const hidden = view ? keyboardInset(window.innerHeight, view.height, view.offsetTop) : 0;
+      if (hidden > 0) everMeasured = true;
       root.style.setProperty("--keyboard", `${hidden}px`);
       const focused = document.activeElement;
       const typing = focused instanceof HTMLElement
         && focused.matches("input, textarea")
         && focused.closest(".sheet") !== null;
       const touch = window.matchMedia("(pointer: coarse)").matches;
-      const lift = liftFor(hidden, typing, touch);
+      const lift = liftFor(hidden, typing, touch, everMeasured);
       document.querySelectorAll<HTMLElement>(".sheet").forEach((sheet) => { sheet.dataset.lift = lift; });
     };
 
