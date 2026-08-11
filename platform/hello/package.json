@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "The smallest real app on ONE: a manifest, one collection, three operations. It exists to boot \u2014 every stage's exit criterion is asserted against it.",
+  "description": "The smallest real app on ONE: a manifest, one collection, three operations. It exists to boot — every stage's exit criterion is asserted against it.",
   "scripts": {
     "test": "vitest run && vitest run --config vitest.solo.config.ts && vitest run --config vitest.node.config.ts",
     "typecheck": "tsc --noEmit",
@@ -12,8 +12,7 @@
   },
   "dependencies": {
     "@one/kernel": "workspace:*",
-    "@one/runtime": "workspace:*",
-    "@one/ui": "workspace:*"
+    "@one/runtime": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.8.55",

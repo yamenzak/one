@@ -76,7 +76,7 @@ const packageJson = (id) => `${JSON.stringify({
     build: "tsc --noEmit",
     clean: "rm -rf .turbo *.tsbuildinfo",
   },
-  dependencies: { "@one/kernel": "workspace:*", "@one/runtime": "workspace:*", "@one/ui": "workspace:*" },
+  dependencies: { "@one/kernel": "workspace:*", "@one/runtime": "workspace:*" },
   devDependencies: {
     "@cloudflare/vitest-pool-workers": "0.8.55",
     typescript: "^5.9.3",
@@ -384,8 +384,7 @@ const worker = (id) => `/**
 
 import { deriveSchema } from "@one/kernel";
 import {
-  applySchema, createRuntime, DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, JOB_SCHEMA,
-  OTP_SCHEMA, PLATFORM_REGIONAL, PLATFORM_STATE_SCHEMA, PROVIDER_SCHEMA, type RawEnv,
+  applySchema, createRuntime, PLATFORM_GLOBAL, PLATFORM_REGIONAL, type RawEnv,
 } from "@one/runtime";
 import { ${id.replace(/-/g, "")}, records } from "./manifest.js";
 
@@ -395,7 +394,13 @@ if (derived.problems.length) throw new Error(\`${id}: \${derived.problems.map((p
 /* ⚠️ ORDER IS DEPENDENCY ORDER, DECLARED — the runner validates it rather than
    trusting the array, because a wrong order produces an ALTER against a table
    that does not exist yet, swallowed, leaving a column that never appeared. */
-const GLOBAL_MODULES = [DIRECTORY_SCHEMA, DOMAIN_SCHEMA, IDENTITY_SCHEMA, OTP_SCHEMA, PROVIDER_SCHEMA, PLATFORM_STATE_SCHEMA, JOB_SCHEMA];
+/* ⚠️ SPREAD, NEVER HAND-LISTED — the same reason the regional half is. This was
+   seven names typed out while the platform shipped thirteen, so a new app never
+   created the consent ledger, the impersonation record, the config store, the
+   domain claim or the catalogue: five tables absent, the routes over them
+   mounted, and every suite green because nothing drove a surface nobody could
+   reach. */
+const GLOBAL_MODULES = [...PLATFORM_GLOBAL];
 export const REGIONAL_MODULES = [...PLATFORM_REGIONAL, derived.module];
 
 

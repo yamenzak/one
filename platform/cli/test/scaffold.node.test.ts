@@ -102,13 +102,32 @@ describe("the generated worker composes what the platform exports", () => {
     const worker = files["src/worker.ts"]!;
     const arrays = [...worker.matchAll(/_MODULES = \[([^\]]*)\]/g)].map((m) => m[1]!).join(",");
     expect(arrays).not.toBe("");
-    const platform = arrays.includes("PLATFORM_REGIONAL")
-      ? [...read("runtime/src/modules.ts").matchAll(/^\s{2}(\w+_SCHEMA),$/gm)].map((m) => m[1]!)
+    /*
+      ⚠️ THE CAST COUNTS. The entries are written `X_SCHEMA as SchemaModule,`
+      where a module's own type is looser, and a pattern that required the comma
+      to follow the NAME skipped exactly those — so `DOMAIN_CLAIM_SCHEMA` read as
+      unmounted while five genuinely unmounted modules read as fine, because the
+      same loose extraction excused anything named anywhere in the file.
+    */
+    const platform = arrays.includes("PLATFORM_REGIONAL") || arrays.includes("PLATFORM_GLOBAL")
+      ? [...read("runtime/src/modules.ts").matchAll(/^\s{2}(\w+_SCHEMA)(?: as SchemaModule)?,$/gm)].map((m) => m[1]!)
       : [];
-    expect(platform.length, "PLATFORM_REGIONAL is spread but composes nothing").toBeGreaterThan(
-      arrays.includes("PLATFORM_REGIONAL") ? 5 : -1,
+    expect(platform.length, "a platform list is spread but composes nothing").toBeGreaterThan(
+      arrays.includes("PLATFORM_REGIONAL") || arrays.includes("PLATFORM_GLOBAL") ? 5 : -1,
     );
-    const mounted = [arrays, ...platform].join(",");
+    /*
+      ⚠️ AND A MODULE THE RUNTIME APPLIES ITSELF IS NOT THE APP'S TO MOUNT. The
+      shared-config database is the platform's — one namespace behind every
+      product — so `runtime.ts` applies `SHARED_MODULES` to it directly and an
+      app never sees it. Demanding the worker mount them would push a scaffolded
+      app to apply a schema against the WRONG database, which is a worse failure
+      than the one this check exists for. Read from the export rather than
+      listed, so a module added there is excused automatically and a module added
+      anywhere else is still caught.
+    */
+    const shared = read("runtime/src/modules.ts").match(/SHARED_MODULES[^=]*=\s*\[([^\]]*)\]/)?.[1] ?? "";
+    expect(shared, "SHARED_MODULES no longer parses — this exemption is now silent").not.toBe("");
+    const mounted = [arrays, shared, ...platform].join(",");
     expect(modules.filter((name) => !mounted.includes(name))).toEqual([]);
   });
 
