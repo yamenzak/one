@@ -38,6 +38,64 @@ it become load-bearing.
 
 ---
 
+## 0a. The one derivation — why an app declares nothing
+
+⚠️ **AN APP SAYS WHAT A THING IS. IT NEVER SAYS HOW A THING LOOKS.** That is the
+whole contract. Everything else in this document is machinery for keeping it
+true: a screen hands over a role, a position and some content, and the colour,
+elevation, spacing, timing and shape are computed from where that thing ended up
+standing.
+
+⚠️ **THIS IS A PHYSICS, NOT A THEME.** `scene.ts` holds the four laws, and every
+other rule here is a consequence of them — which is why there are no
+per-component decisions to keep in step. There is nothing to keep in step.
+
+| law | means | replaces |
+|---|---|---|
+| **There is one light** | a brand + theme is a light source; everything visible is that light falling on something | a palette — a list of colours somebody picked, which cannot answer what a **new** surface should be |
+| **Surfaces are lit, never painted** | a surface is one perceptual step from its parent, toward the headroom | named greys: `surface-2` is a decision at the call site, so nesting collides and nobody sees it coming |
+| **Ink is measured** | the on-colour of a fill is computed against that exact fill | a `*-foreground` token, which lets somebody pair a colour with ink that fails on it |
+| **Position decides, not the caller** | depth from nesting, spacing from the container, timing from the role, size from the frame | props — a `depth`, `margin`, `duration` or `size` prop is the same screen looking different in two places |
+
+### What an app may say
+
+Four questions, and none is answerable with a colour:
+
+```
+role        ground · anchor · content · chrome · overlay      what it IS
+archetype   crown · topic · title · identity · feed           what the SCREEN is        §5.6
+sky         aurora · photo · dots · waves · grid · rings      what it is ABOUT          §5.5
+state       idle · busy · locked · disabled ·
+            unknown · empty · partial · error · ready         what is TRUE right now    §3
+tone        accent · success · warning · danger · info        what it MEANS             §2
+```
+
+⚠️ **AND WHAT DECIDES INSTEAD**, kept beside it — because a prohibition with no
+replacement is a rule people route around, and with one it is a signpost.
+
+| an app cannot say | because it is derived from |
+|---|---|
+| `colour` · `background` | the light and the surface it lands on |
+| `foreground` | measurement against that exact fill |
+| `elevation` | depth, in the direction with more headroom |
+| `margin` | **nothing.** Spacing is the container's gap, never a child's margin |
+| `duration` · `easing` | the role, on one clock — §4 |
+| `fontSize` | the text role, on one ladder — §5.1 |
+| `width` | the container, asked with a container query and never the viewport |
+
+⚠️ **THE VALUE OF A CLOSED DECLARATION IS THAT IT CAN BE SWEPT.** The list is
+short on purpose: a surface small enough to enumerate is one that can be *proved*
+safe for every tenant, and that proof is the product feature. One escape hatch
+and the sweep stops being a guarantee and becomes a sample.
+
+`declarationProblems()` refuses anything off-list and names what decides instead;
+it reports **every** mistake rather than the first, because an author fixing six
+things one round trip at a time stops reading the messages. The sweep runs every
+depth × both themes × brands at each end of the declared range, and asserts the
+contrast floor — a range nobody walked is a range with a hole in the middle.
+
+---
+
 ## 1. What is themeable
 
 Three layers. Only the first is painted.
@@ -813,6 +871,9 @@ and is expensive to disprove, so it survives review indefinitely.
 | `moment-hold-survives-reduced-motion` | reduced motion shortening how long somebody has to read — the one adaptation that makes the setting worse for the people who turn it on | **live** |
 | `sound-needs-a-gesture` | a sound with no gesture behind it — every browser refuses it, so the design produces silence in production and a chime in every demo | **live** |
 | `one-moment-at-a-time` | a queue of moments — a batch of writes producing four celebrations in a row, each meaning less than the last, long after the thing that caused them | **live** |
+| `an-app-cannot-name-a-look` | a colour, background, margin, duration, font size or width declared by an app — the declaration surface is only provably safe for every tenant while it is closed, and one escape hatch turns the exhaustive sweep into a sample | **live** |
+| `the-light-clears-the-floor-everywhere` | a depth, theme or in-range brand whose measured ink falls under the contrast floor — swept rather than sampled, because a range nobody walked is a range with a hole in the middle of it | **live** |
+| `the-accent-is-re-lit-per-surface` | a brand computed once per theme, which is legible on the page and not on the card — and whose tempting fix, letting each screen pick its own primary, produces a product whose brand colour differs on every screen | **live** |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder

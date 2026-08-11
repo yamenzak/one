@@ -10,6 +10,7 @@ export * from "./colour.js";
 export * from "./ground.js";
 export * from "./semantic.js";
 export * from "./brand.js";
+export * from "./scene.js";
 export * from "./state.js";
 export * from "./motion.js";
 export * from "./registry.js";

@@ -3262,6 +3262,33 @@
       "impl": "runtime/test/mail.test.ts",
       "proves": "says the binding is missing rather than reporting a refusal",
       "fails": "a deployment configured to send through Cloudflare on a worker with no send_email binding, reported as a refused send — which sends an operator to look at DNS for one line of wrangler.jsonc"
+    },
+    {
+      "id": "an-app-cannot-name-a-look",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/scene.test.ts",
+      "proves": "refuses a look, and says what decides it",
+      "fails": "a colour, background, margin, duration, font size or width declared by an app — the declaration surface is only provably safe for every tenant while it is closed, and one escape hatch turns the exhaustive sweep into a sample"
+    },
+    {
+      "id": "the-light-clears-the-floor-everywhere",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/scene.test.ts",
+      "proves": "clears the floor at every depth, for every brand in range",
+      "fails": "a depth, theme or in-range brand whose measured ink falls under the contrast floor — swept rather than sampled, because a range nobody walked is a range with a hole in the middle of it"
+    },
+    {
+      "id": "the-accent-is-re-lit-per-surface",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/scene.test.ts",
+      "proves": "re-lights the accent per surface rather than once per theme",
+      "fails": "a brand computed once per theme, which is legible on the page and not on the card — and whose tempting fix, letting each screen pick its own primary, produces a product whose brand colour differs on every screen"
     }
   ]
 }
