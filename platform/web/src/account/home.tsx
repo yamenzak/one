@@ -1,29 +1,26 @@
 /**
  * THE ACCOUNT HOME — one person, everything they have, across every product.
  *
- * ⚠️ THIS IS THE FIRST SCREEN IN `platform/`, and nothing is extracted out of it
- * yet. There is no design system underneath it on purpose: the components come
- * out of screens once a second screen needs the same thing, and the rules get
- * written when a defect makes one necessary. Anything here that looks like it
- * wants to be a component probably does — it stays until something else asks.
+ * ⚠️ IT IS A MODAL ROUTE, NOT A TAB. The account centre is presented OVER
+ * whichever app the person is in and rendered outside that app's shell — so
+ * there is no navigation bar, no tabs and no product chrome on it, and the way
+ * out is a CLOSE rather than a back. That is why the top-left control is an ×
+ * here and an arrow on every screen below it: × dismisses the presentation, ←
+ * goes up inside it.
  *
  * ⚠️ IT LIVES AT `/account` IN EVERY APP rather than at a door of its own. The
  * session is per-app by design (PLAN §2.4), so a separate origin would mean
  * signing in again to manage the account you are already signed into — and it
- * would be a fourth product to brand. The screens are the platform's; the host
- * is whichever app the person happens to be in.
+ * would be a fourth product to brand.
+ *
+ * ⚠️ THE SHAPE FOLLOWS A REFERENCE AND NOTHING HERE IS EXTRACTED YET. Components,
+ * tokens, rules and guards come after the screens are agreed, not before.
  */
 
 import type { ReactNode } from "react";
 
 /* ------------------------------------------------------------------ data --- */
 
-/**
- * ⚠️ THE SHAPES MIRROR WHAT THE PLATFORM CAN ACTUALLY ANSWER TODAY, which is
- * how a screen stays honest about the operations behind it. Where a field has no
- * operation yet it is marked, rather than invented — a screen that renders a
- * number nothing can supply is a promise the product has to keep later.
- */
 export interface Person {
   readonly name?: string;
   readonly email: string;
@@ -42,8 +39,8 @@ export interface Workspace {
   /** What this person is here. The membership row's role. */
   readonly role: string;
   /**
-   * ⚠️ ONLY WHEN IT IS NOT FINE. A standing shown on every row is a row of
-   * green ticks nobody reads, and the one that matters stops standing out.
+   * ⚠️ ONLY WHEN IT IS NOT FINE. A standing on every row is a column of green
+   * nobody reads, and the one that matters stops standing out.
    */
   readonly standing?: { readonly label: string; readonly urgent: boolean };
 }
@@ -52,170 +49,158 @@ export interface AccountHomeProps {
   readonly person: Person;
   /** ⚠️ `null` is NOT ANSWERED YET. `[]` is answered, and empty. */
   readonly workspaces: readonly Workspace[] | null;
-  /** How many passkeys and live sessions — for the security row's summary. */
-  readonly security?: { readonly passkeys: number; readonly devices: number };
-  readonly units?: string;
-  readonly locale?: string;
   readonly onGo: (to: string) => void;
+  readonly onClose: () => void;
 }
 
 /* ------------------------------------------------------------------ view --- */
 
-const PRODUCT_NAME: Record<Product, string> = {
-  kova: "Kova",
-  scena: "Scena",
-  tessa: "Tessa",
-};
+const PRODUCT_NAME: Record<Product, string> = { kova: "Kova", scena: "Scena", tessa: "Tessa" };
 
-/** Initials from a name, falling back to the address. Never more than two. */
-export function initials(person: Person): string {
-  const source = person.name?.trim() || person.email;
-  const parts = source.split(/[\s@._-]+/).filter(Boolean);
-  return (parts.length > 1 ? `${parts[0]![0]}${parts[1]![0]}` : source.slice(0, 2)).toUpperCase();
-}
-
-export function AccountHome({ person, workspaces, security, units, locale, onGo }: AccountHomeProps) {
-  /* ⚠️ Owned, not joined: an export is of what somebody can take with them. */
-  const owned = (workspaces ?? []).filter((w) => w.role.toLowerCase() === "owner").length;
+export function AccountHome({ person, workspaces, onGo, onClose }: AccountHomeProps) {
   return (
-    <main className="account">
-      {/*
-        ⚠️ AN EMAIL IS NOT A DISPLAY NAME, AND IT MUST NOT BE SET LIKE ONE. Put
-        in the heading at heading size it wrapped mid-word — "b.okonkwo@gmail." /
-        "com" — because an address has no spaces to break at. With no name the
-        heading is the ADDRESS, set as an address; and the action is not "Edit",
-        it is the thing actually worth doing.
-      */}
-      <header className="you" data-unnamed={person.name ? undefined : ""}>
-        <span className="face" aria-hidden="true">{initials(person)}</span>
-        <div className="you-text">
-          <h1>{person.name || person.email}</h1>
-          {/* ⚠️ The address stays visible even when there is a name: it is what
-              every workspace invitation was sent to, and the thing somebody is
-              actually checking when they open this screen. */}
-          {person.name ? <p className="quiet">{person.email}</p> : null}
-        </div>
-        <button type="button" className="quiet-button" onClick={() => onGo("account.profile")}>
-          {person.name ? "Edit" : "Add your name"}
-        </button>
+    <div className="page">
+      <header className="page-top">
+        {/* ⚠️ × AND NOT AN ARROW. This is the root of a presentation laid over the
+            app, so the control dismisses it rather than walking back through it. */}
+        <button type="button" className="round-button" aria-label="Close" onClick={onClose}><Close /></button>
+        <h1>Account</h1>
+        <p className="lede">Your details, how you sign in, and everywhere you belong.</p>
       </header>
+
+      <section>
+        <div className="card">
+          <Item icon={<Portrait />} title="Your details" detail="Your name, photo and address" onGo={() => onGo("account.profile")} />
+          <Item icon={<Key />} title="Sign-in methods" detail="Passkeys, codes and devices" onGo={() => onGo("account.security")} />
+          <Item icon={<Adjust />} title="Preferences" detail="Units, language and dates" onGo={() => onGo("account.preferences")} />
+        </div>
+      </section>
 
       <section>
         <h2>Workspaces</h2>
         {workspaces === null ? (
-          /* ⚠️ IT HOLDS THE SHAPE THE ANSWER WILL TAKE. A sentence where a list
-             is about to be means the page jumps the moment it arrives, under
-             whoever had started reading. */
-          <ul className="rows" aria-busy="true">
+          /* ⚠️ It holds the shape of what is coming, or the page jumps under
+             whoever had started reading it. */
+          <div className="card" aria-busy="true">
             {[0, 1, 2].map((i) => (
-              <li key={i}><span className="row row-waiting"><span className="mark waiting" /><span className="row-text">
-                <span className="waiting line" /><span className="waiting line short" /></span></span></li>
+              <div className="item" key={i}>
+                <span className="well waiting" />
+                <span className="item-body">
+                  <span className="waiting line" />
+                  <span className="waiting line short" />
+                </span>
+              </div>
             ))}
-          </ul>
+          </div>
         ) : workspaces.length === 0 ? (
-          <div className="empty">
-            <p>You are not in any workspace yet.</p>
-            <p className="quiet">
-              An invitation arrives by email, at <strong>{person.email}</strong>.
-            </p>
+          <div className="card blank">
+            <p className="blank-title">You are not in any workspace yet</p>
+            <p className="lede">An invitation arrives by email, at {person.email}.</p>
           </div>
         ) : (
-          <ul className="rows">
+          <div className="card">
             {workspaces.map((w) => (
-              <li key={w.tenantId}>
-                <button type="button" className="row" onClick={() => onGo(`workspace:${w.tenantId}`)}>
-                  {/* ⚠️ THE COLOUR IS THE PRODUCT AND THE LETTER IS THE
-                      WORKSPACE. The letter alone repeated what the row title
-                      already said, and two workspaces starting with the same
-                      letter were indistinguishable — while the one thing a
-                      CROSS-PRODUCT list has to make scannable, which product a
-                      row belongs to, was readable only as text. */}
-                  <span className="mark" data-product={w.product} aria-hidden="true">{w.name.slice(0, 1)}</span>
-                  <span className="row-text">
-                    <span className="row-title">{w.name}</span>
-                    <span className="quiet">{PRODUCT_NAME[w.product]} · {w.role}</span>
-                  </span>
-                  {w.standing ? (
-                    <span className="pill" data-urgent={w.standing.urgent ? "" : undefined}>{w.standing.label}</span>
-                  ) : null}
-                  <Chevron />
-                </button>
-              </li>
+              <Item
+                key={w.tenantId}
+                mark={<span className="well mark" data-product={w.product} aria-hidden="true">{w.name.slice(0, 1)}</span>}
+                title={w.name}
+                /* ⚠️ THE STANDING SITS ON THE SECOND LINE, WITH THE REST OF THE
+                   METADATA. Beside the title it competed with the one thing that
+                   identifies the row, and a workspace called "Corniche Screens"
+                   was clipped to "Corniche Scre…" to make room for a pill. */
+                detail={
+                  <>
+                    {PRODUCT_NAME[w.product]} · {w.role}
+                    {w.standing ? <span className="pill" data-urgent={w.standing.urgent ? "" : undefined}>{w.standing.label}</span> : null}
+                  </>
+                }
+                onGo={() => onGo(`workspace:${w.tenantId}`)}
+              />
             ))}
-          </ul>
+          </div>
         )}
       </section>
 
       <section>
-        <h2>Your account</h2>
-        <ul className="rows">
-          <Link
-            to="account.security"
-            title="Security"
-            detail={security ? `${count(security.passkeys, "passkey")} · ${count(security.devices, "device")}` : "Passkeys and where you are signed in"}
-            onGo={onGo}
-          />
-          <Link
-            to="account.preferences"
-            title="Preferences"
-            detail={[units, locale].filter(Boolean).join(" · ") || "Units, language and how dates read"}
-            onGo={onGo}
-          />
-          <Link to="account.privacy" title="Privacy and consent" detail="What you have agreed to, and what we hold" onGo={onGo} />
-        </ul>
+        <h2>Privacy</h2>
+        <div className="card">
+          <Item icon={<Shield />} title="Consent and legal" detail="What you have agreed to" onGo={() => onGo("account.privacy")} />
+          <Item icon={<Download />} title="Download your data" detail="Everything we hold about you" onGo={() => onGo("account.export")} />
+        </div>
       </section>
 
+      {/*
+        ⚠️ THE IRREVERSIBLE ONE IS ITS OWN CARD, and it is not written in red. A
+        separate card is what says "this is not one of the settings above"; red
+        words in a list of settings read as an error somebody has to fix. The
+        colour goes on the SYMBOL, which is where a warning belongs.
+      */}
       <section>
-        <h2>Leaving</h2>
-        <ul className="rows">
-          {/* ⚠️ THE DETAIL IS A FACT ABOUT THIS PERSON, NOT A SLOGAN. "Every
-              workspace you own" was shown to somebody who owns none — a row
-              describing something that does not apply, which is how a screen
-              teaches people not to read the second line. */}
-          <Link
-            to="account.export"
-            title="Download everything"
-            detail={owned > 0 ? `${count(owned, "workspace")} you own, and everything in ${owned === 1 ? "it" : "them"}` : "Your account, and anything attached to it"}
-            onGo={onGo}
-          />
-          {/* ⚠️ THE IRREVERSIBLE ONE IS LAST, ALONE, AND NAMED PLAINLY. It is
-              not in the same group as the ordinary rows above, and it does not
-              share a row with anything somebody might be aiming at. */}
-          <Link to="account.delete" title="Delete your account" detail="Everything, everywhere, after thirty days" danger onGo={onGo} />
-        </ul>
+        <div className="card">
+          <Item icon={<Heartbreak />} iconTone="alarm" title="Close your account" onGo={() => onGo("account.delete")} />
+        </div>
       </section>
-    </main>
+    </div>
   );
 }
 
 /* ----------------------------------------------------------------- parts --- */
 
-/* ⚠️ These are local on purpose. They are used twice on ONE screen, which is not
-   yet evidence that the language needs them — the second SCREEN is. */
+/* ⚠️ Local on purpose. Used several times on ONE screen, which is not yet
+   evidence that the platform needs them — a second SCREEN is. */
 
-function Link({ to, title, detail, danger, onGo }: {
-  readonly to: string; readonly title: string; readonly detail: string;
-  readonly danger?: boolean; readonly onGo: (to: string) => void;
+function Item({ icon, mark, title, detail, iconTone, onGo }: {
+  readonly icon?: ReactNode;
+  readonly mark?: ReactNode;
+  readonly title: string;
+  readonly detail?: ReactNode;
+  readonly iconTone?: "alarm";
+  readonly onGo: () => void;
 }) {
   return (
-    <li>
-      <button type="button" className="row" data-destination="" data-danger={danger ? "" : undefined} onClick={() => onGo(to)}>
-        <span className="row-text">
-          <span className="row-title">{title}</span>
-          <span className="quiet">{detail}</span>
-        </span>
-        <Chevron />
-      </button>
-    </li>
+    <button type="button" className="item" onClick={onGo}>
+      {mark ?? (icon ? <span className="well" data-tone={iconTone}>{icon}</span> : null)}
+      <span className="item-body">
+        <span className="item-title">{title}</span>
+        {detail ? <span className="item-detail">{detail}</span> : null}
+      </span>
+      <Chevron />
+    </button>
   );
 }
 
+/* ⚠️ Drawn here rather than imported. Six glyphs is not a set worth a package,
+   and a set is a decision to make once there are screens to make it for. */
+
+const Glyph = ({ children }: { readonly children: ReactNode }) => (
+  <svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true" fill="none"
+       stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+    {children}
+  </svg>
+);
+
 const Chevron = (): ReactNode => (
-  <svg className="chevron" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"
-       fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg className="chevron" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" fill="none"
+       stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
     <path d="m9 18 6-6-6-6" />
   </svg>
 );
 
-/** "1 passkey" / "2 passkeys" — no library for one plural. */
-const count = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? "" : "s"}`;
+const Close = (): ReactNode => (
+  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none"
+       stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+    <path d="M18 6 6 18M6 6l12 12" />
+  </svg>
+);
+
+const Portrait = (): ReactNode => <Glyph><circle cx="12" cy="8" r="4" /><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0" /></Glyph>;
+const Key = (): ReactNode => <Glyph><circle cx="8.6" cy="15.4" r="4.4" /><path d="M11.8 12.2 20 4" /><path d="m16.6 7.4 2.6 2.6" /><path d="m14.2 9.8 2.6 2.6" /></Glyph>;
+/* ⚠️ NOT `Sliders`. `slide` is another product's core noun, and the kernel's
+   vocabulary guard refuses it in platform code precisely so a shared control and
+   a product's own object cannot end up one letter apart in the same file. */
+const Adjust = (): ReactNode => <Glyph><path d="M4 8h9M19 8h1M4 16h4M14 16h6" /><circle cx="16" cy="8" r="2.2" /><circle cx="11" cy="16" r="2.2" /></Glyph>;
+const Shield = (): ReactNode => <Glyph><path d="M12 3.2 5 6v6c0 4.5 3 7.7 7 8.8 4-1.1 7-4.3 7-8.8V6z" /></Glyph>;
+const Download = (): ReactNode => <Glyph><path d="M12 3.5v11m0 0 4-4m-4 4-4-4M4.5 19.5h15" /></Glyph>;
+const Heartbreak = (): ReactNode => (
+  <Glyph><path d="M12 20.2s-7.2-4.5-7.2-9.4A3.9 3.9 0 0 1 12 8.1a3.9 3.9 0 0 1 7.2 2.7c0 4.9-7.2 9.4-7.2 9.4Z" /><path d="m12 8.1-2 3.6h4L12 15.4" /></Glyph>
+);

@@ -1,198 +1,174 @@
 /**
- * THE ACCOUNT HOME'S OWN STYLESHEET.
+ * THE ACCOUNT CENTRE'S STYLESHEET.
  *
- * ⚠️ WRITTEN FOR ONE SCREEN, WITH LITERAL VALUES, ON PURPOSE. There is no token
- * system under this yet and there should not be one until a second screen wants
- * the same value — a scale invented before anything uses it is a set of numbers
- * chosen to look complete. What repeats HERE is already a variable, because that
- * is one screen's evidence; what repeats ACROSS screens becomes the platform's,
- * later, with a rule beside it.
+ * ⚠️ IT FOLLOWS A REFERENCE, AND NOTHING IN IT IS A PLATFORM DECISION YET. The
+ * values are written for these screens; tokens, rules and guards come out of
+ * them once the screens are agreed, not before. What is here is a stylesheet for
+ * one surface, and it is meant to be read as one.
  *
  * ⚠️ BOTH THEMES FROM THE FIRST LINE. The viewer has three states, not two: an
  * explicit choice stamps `data-theme`, and the default setting stamps nothing —
  * so the bare block is light, the media query handles the un-stamped default,
- * and the attribute wins in both directions. Retrofitting this is the classic
- * unreadable-page bug and it is cheaper to never have it.
+ * and the attribute wins in both directions.
  */
 
 export const ACCOUNT_CSS = `
 :root {
-  --ink: #16181d;
-  --ink-quiet: #61656e;
-  --page: #f4f5f7;
+  --page: #f2f2f6;
   --card: #ffffff;
-  --line: #e6e8ec;
-  --edge: #d7dae1;
-  --accent: #3d5afe;
-  --accent-ink: #ffffff;
-  --alarm: #c62828;
-  --warn-bg: #fdf1dc;
-  --warn-ink: #7a5300;
-  /* ⚠️ PLACEHOLDERS UNTIL THE PRODUCTS HAVE BRANDS. They exist so a
-     cross-product list is scannable at all; the values are chosen only to be
-     told apart, and the moment a product has a real mark this becomes a lookup
-     rather than three hexes in a stylesheet. */
-  --p-kova: #3d5afe;
-  --p-scena: #00897b;
+  --well: #ececed;
+  --ink: #0b0b0c;
+  --ink-quiet: #7a7a80;
+  --ink-faint: #b6b6bc;
+  --accent: #2f6bff;
+  --alarm: #e0362a;
+  --alarm-well: #fbe6e4;
+  --warn: #8a5a00;
+  --warn-well: #fdf0d5;
+  --p-kova: #2f6bff;
+  --p-scena: #00867a;
   --p-tessa: #c2185b;
-  --radius: 14px;
-  --gap: 20px;
-  --pad: 16px;
+  --radius-card: 22px;
+  --radius-well: 999px;
+  --pad: 18px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --ink: #e9ebef;
-    --ink-quiet: #969ba6;
-    --page: #101216;
-    --card: #191c22;
-    --line: #23262d;
-    --edge: #2c3038;
-    --accent: #7c8cff;
-    --accent-ink: #10131c;
-    --alarm: #ff6b6b;
-    --warn-bg: #3a2c10;
-    --warn-ink: #f0c064;
-    --p-kova: #7c8cff;
-    --p-scena: #26a69a;
-    --p-tessa: #f06292;
+    --page: #000000;
+    --card: #17181a;
+    --well: #2a2b2e;
+    --ink: #ffffff;
+    --ink-quiet: #8d8f96;
+    --ink-faint: #55575d;
+    --accent: #4d8bff;
+    --alarm: #ff5247;
+    --alarm-well: #3a1512;
+    --warn: #f2c25c;
+    --warn-well: #3a2c0f;
+    --p-kova: #4d8bff;
+    --p-scena: #14a598;
+    --p-tessa: #f0518a;
   }
 }
 :root[data-theme='dark'] {
-  --p-kova: #7c8cff;
-  --p-scena: #26a69a;
-  --p-tessa: #f06292;
-  --ink: #e9ebef;
-  --ink-quiet: #969ba6;
-  --page: #101216;
-  --card: #191c22;
-  --line: #23262d;
-  --edge: #2c3038;
-  --accent: #7c8cff;
-  --accent-ink: #10131c;
-  --alarm: #ff6b6b;
-  --warn-bg: #3a2c10;
-  --warn-ink: #f0c064;
+  --page: #000000;
+  --card: #17181a;
+  --well: #2a2b2e;
+  --ink: #ffffff;
+  --ink-quiet: #8d8f96;
+  --ink-faint: #55575d;
+  --accent: #4d8bff;
+  --alarm: #ff5247;
+  --alarm-well: #3a1512;
+  --warn: #f2c25c;
+  --warn-well: #3a2c0f;
+  --p-kova: #4d8bff;
+  --p-scena: #14a598;
+  --p-tessa: #f0518a;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
 body { margin: 0; background: var(--page); color: var(--ink);
-  font: 400 16px/1.5 ui-sans-serif, -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
+  font: 400 16px/1.45 ui-sans-serif, -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased; }
-h1, h2, p, ul { margin: 0; padding: 0; }
-ul { list-style: none; }
+h1, h2, p { margin: 0; padding: 0; }
 
-/* ⚠️ ONE COLUMN, CAPPED. An account screen is read, not worked in, and a list of
-   workspaces at monitor width is a row of names with a mile of nothing after
-   each one. */
-.account { max-inline-size: 640px; margin: 0 auto; padding: 32px 20px 64px;
-  display: flex; flex-direction: column; gap: var(--gap); }
+/* ⚠️ THE PAGE IS THE WHOLE SURFACE, and it is presented over the app rather than
+   inside it — no navigation, no tabs, no product chrome. One column, capped: an
+   account is read, not worked in. */
+.page { min-block-size: 100dvh; background: var(--page);
+  max-inline-size: 560px; margin: 0 auto; padding: 14px 16px 72px;
+  display: flex; flex-direction: column; gap: 26px; }
 
-/* --------------------------------------------------------------- who you are */
+/* ------------------------------------------------------------------ the top */
 
-.you { display: flex; align-items: center; gap: var(--pad); padding-block-end: 4px; }
-.you-text { flex: 1; min-inline-size: 0; }
-/* ⚠️ AN ADDRESS IS NOT SET LIKE A NAME. At heading size an email has no spaces
-   to break at, so it wrapped mid-word. With no name the heading IS the address,
-   and it is set as one: smaller, regular, allowed to break where it must. */
-.you h1 { font-size: 24px; font-weight: 620; letter-spacing: -0.02em; line-height: 1.2; }
-.you[data-unnamed] h1 { font-size: 17px; font-weight: 500; letter-spacing: 0;
-  overflow-wrap: anywhere; }
-.face { flex: none; inline-size: 56px; block-size: 56px; border-radius: 999px;
-  display: grid; place-items: center; background: var(--accent); color: var(--accent-ink);
-  font-size: 19px; font-weight: 600; letter-spacing: 0.02em; }
+.page-top { display: flex; flex-direction: column; gap: 6px; padding-block-end: 2px; }
+.page-top h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.028em; line-height: 1.1;
+  margin-block-start: 18px; }
+/* ⚠️ A ROUND CONTROL ON ITS OWN LINE, above the title rather than beside it. It
+   is a way OUT of a presentation, not a thing in the heading — putting it in the
+   heading row makes the title jump left and right as the control changes. */
+.round-button { inline-size: 44px; block-size: 44px; border-radius: var(--radius-well);
+  display: grid; place-items: center; align-self: flex-start;
+  border: 0; background: var(--card); color: var(--ink); cursor: pointer; }
+.round-button:hover { background: var(--well); }
+.round-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* ------------------------------------------------------------------ sections */
+.lede { color: var(--ink-quiet); font-size: 15px; line-height: 1.45; }
 
-section { display: flex; flex-direction: column; gap: 8px; }
-h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
-  color: var(--ink-quiet); padding-inline-start: 2px; }
+/* ---------------------------------------------------------------- sections */
 
-.quiet { color: var(--ink-quiet); font-size: 14px; }
+section { display: flex; flex-direction: column; gap: 10px; }
+/* ⚠️ A SECTION HEADING IS A HEADING. Small grey uppercase is a label on a form;
+   the sections here are places, and a place is named at full ink. */
+h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.018em; padding-inline-start: 4px; }
 
-/* ---------------------------------------------------------------------- rows */
+/* ------------------------------------------------------------------- cards */
 
-/* ⚠️ THE CARD IS THE LIST, NOT THE ROW. Separate cards per row is a stack of
-   floating tiles with no relationship; one card with hairlines between reads as
-   a list of things that belong together, which is what it is. */
-.rows { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-  overflow: hidden; }
-.rows > li + li { border-block-start: 1px solid var(--line); }
+/* ⚠️ A FILL, NOT A BORDER, AND NO RULES BETWEEN THE ROWS. The card is told from
+   the page by its own surface; a hairline round it and hairlines through it are
+   three lines doing one job, and they make a group of related things read as a
+   table. */
+.card { background: var(--card); border-radius: var(--radius-card); overflow: hidden;
+  display: flex; flex-direction: column; }
 
-.row { inline-size: 100%; display: flex; align-items: center; gap: 12px;
-  min-block-size: 60px; padding: 10px var(--pad); border: 0; background: none;
+.item { display: flex; align-items: center; gap: 14px; inline-size: 100%;
+  min-block-size: 64px; padding: 12px var(--pad); border: 0; background: none;
   color: inherit; font: inherit; text-align: start; cursor: pointer; }
-.row:hover { background: color-mix(in oklab, currentColor 4%, transparent); }
-.row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.row:active { background: color-mix(in oklab, currentColor 7%, transparent); }
-.row-text { flex: 1; min-inline-size: 0; display: flex; flex-direction: column; gap: 1px; }
-/* ⚠️ TRUNCATION BELONGS TO A ROW THAT HAS SOMETHING TO ITS RIGHT, and to no
-   other kind. In a list of THINGS the title is an identity and the line under it
-   is metadata, so a name that wrapped would push the standing pill off the scan
-   line it shares with every other row. A DESTINATION row has no pill and no scan
-   line: its second line is the whole content, and clipping it mid-sentence —
-   "everything in …" — withholds the only thing the row had to say. */
-.row-title { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row:not([data-destination]) .row-text .quiet { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item:hover { background: color-mix(in oklab, var(--ink) 5%, transparent); }
+.item:active { background: color-mix(in oklab, var(--ink) 8%, transparent); }
+.item:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 
-/* ⚠️ DIMMED, NOT COLOURED. It says "there is more here"; it is not a thing to
-   aim at, and at full ink it competes with the row's own value. */
-.chevron { flex: none; color: var(--ink-quiet); }
+.item-body { flex: 1; min-inline-size: 0; display: flex; flex-direction: column; gap: 2px; }
+/* ⚠️ A LONG NAME TRUNCATES: the title is an identity, and a row that grows to two
+   lines pushes everything to its right off the line it shares with every other
+   row. The DETAIL wraps, because on a row with nothing to its right the second
+   line is the whole content and clipping it mid-sentence withholds it. */
+.item-title { font-size: 17px; font-weight: 500; letter-spacing: -0.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ⚠️ THE DETAIL LINE CARRIES THE METADATA AND ANYTHING SAID ABOUT IT. Inline,
+   because a pill beside the title fights the one thing that identifies the row —
+   a workspace called "Corniche Screens" was clipped to "Corniche Scre…" to make
+   room for one. */
+.item-detail { display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  color: var(--ink-quiet); font-size: 14.5px; line-height: 1.35; }
 
-/* ⚠️ DESTRUCTIVE IS THE WORDS, NOT THE WHOLE ROW. A red bar in a list of
-   settings reads as an error somebody has to fix; red text on the one row that
-   cannot be undone reads as a warning about that row. */
-.row[data-danger] .row-title { color: var(--alarm); }
+/* ⚠️ DIMMED, NOT COLOURED. It says there is more here; it is not a thing to aim
+   at, and at full ink it competes with the row's own words. */
+.chevron { flex: none; color: var(--ink-faint); }
 
-/* ⚠️ THE COLOUR IS THE PRODUCT, THE LETTER IS THE WORKSPACE. One grey square
-   per row repeated the title's own first letter and told two workspaces starting
-   with the same letter apart not at all — while the product, the one thing a
-   cross-product list has to make scannable, was text only. */
-.mark { flex: none; inline-size: 36px; block-size: 36px; border-radius: 10px;
-  display: grid; place-items: center; font-size: 15px; font-weight: 600;
-  background: var(--mark, color-mix(in oklab, currentColor 10%, transparent));
-  color: #fff; }
-.mark[data-product='kova'] { --mark: var(--p-kova); }
-.mark[data-product='scena'] { --mark: var(--p-scena); }
-.mark[data-product='tessa'] { --mark: var(--p-tessa); }
+/* ⚠️ THE WELL IS THE ICON'S GROUND, and it is what makes a column of glyphs read
+   as a list rather than as loose marks at different optical weights. */
+.well { flex: none; inline-size: 44px; block-size: 44px; border-radius: var(--radius-well);
+  display: grid; place-items: center; background: var(--well); color: var(--ink); }
+.well[data-tone='alarm'] { background: var(--alarm-well); color: var(--alarm); }
 
-/* ⚠️ A STANDING PILL IS ONLY EVER ON A ROW THAT HAS ONE. Rendering "Active" on
-   every row is a column of green nobody reads, and the one that needs attention
-   stops being the thing that stands out. */
-.pill { flex: none; padding: 3px 9px; border-radius: 999px; font-size: 13px; font-weight: 500;
-  background: color-mix(in oklab, currentColor 9%, transparent); color: var(--ink-quiet); }
-.pill[data-urgent] { background: var(--warn-bg); color: var(--warn-ink); }
+/* ⚠️ THE COLOUR IS THE PRODUCT AND THE LETTER IS THE WORKSPACE. The letter alone
+   repeated what the row title already says, and two workspaces starting with the
+   same letter were indistinguishable — while the one thing a cross-product list
+   has to make scannable was readable only as text. */
+.mark { border-radius: 14px; color: #fff; font-size: 17px; font-weight: 600; }
+.mark[data-product='kova'] { background: var(--p-kova); }
+.mark[data-product='scena'] { background: var(--p-scena); }
+.mark[data-product='tessa'] { background: var(--p-tessa); }
 
-/* ⚠️ A PLACEHOLDER HOLDS THE GEOMETRY OF WHAT IS COMING, or the page jumps under
-   whoever had started reading it. It carries no text: a sentence is a thing to
-   read, and there is nothing here to read yet.
+/* ⚠️ ONLY ON A ROW THAT HAS ONE. A standing on every row is a column of green
+   nobody reads, and the one that needs attention stops standing out. */
+.pill { flex: none; padding: 2px 9px; border-radius: var(--radius-well);
+  font-size: 13px; font-weight: 500; background: var(--well); color: var(--ink-quiet); }
+.pill[data-urgent] { background: var(--warn-well); color: var(--warn); }
 
-   ⚠️ AND IT IS NOT CALLED GHOST. It was, and that was already the quiet button's
-   own name — so every placeholder bar silently inherited a 40px minimum height, a
-   border and a pill radius, and the loading state rendered as a stack of empty
-   outlined capsules. Nothing failed; the two rules simply merged. The name says what this is, and
-   a test now refuses any class declared twice. */
-/* ⚠️ DRAWN FROM THE PAGE'S INK, NEVER FROM currentColor. A placeholder stands
-   in for content on an element that may have set its own colour — the product
-   mark sets white text for its letter, so a currentColor-derived grey came out
-   white on a white card and the square was simply not there. The ink token flips
-   with the theme, which is the whole reason it can be named here. */
-.waiting { background: color-mix(in oklab, var(--ink) 9%, transparent); border-radius: 6px;
-  color: transparent; }
-.mark.waiting { border-radius: 10px; }
-.row-waiting { cursor: default; }
-.waiting.line { block-size: 11px; inline-size: 62%; }
-.waiting.line.short { inline-size: 34%; block-size: 9px; margin-block-start: 6px; }
+/* ------------------------------------------------------- waiting and blank */
 
-/* --------------------------------------------------------------------- empty */
+/* ⚠️ DRAWN FROM THE PAGE'S INK, NEVER FROM currentColor. A placeholder stands in
+   for content on an element that may have set its own colour — the product mark
+   sets white text for its letter, so a currentColor-derived grey came out white
+   on a white card and the square was simply not there. */
+.waiting { background: color-mix(in oklab, var(--ink) 9%, transparent);
+  border-radius: 7px; color: transparent; }
+.waiting.line { block-size: 12px; inline-size: 58%; }
+.waiting.line.short { inline-size: 32%; block-size: 10px; margin-block-start: 7px; }
 
-.empty { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-  padding: 32px var(--pad); text-align: center; display: flex; flex-direction: column; gap: 6px; }
-
-/* ------------------------------------------------------------------- buttons */
-
-.quiet-button { flex: none; min-block-size: 40px; padding: 0 16px; border-radius: 999px;
-  border: 1px solid var(--edge); background: none; color: inherit;
-  font: inherit; font-size: 15px; font-weight: 500; cursor: pointer; white-space: nowrap; }
-.quiet-button:hover { background: color-mix(in oklab, currentColor 6%, transparent); }
-.quiet-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.blank { padding: 30px var(--pad) 34px; gap: 6px; text-align: center; }
+.blank-title { font-size: 17px; font-weight: 500; }
 `.trim();

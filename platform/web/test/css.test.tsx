@@ -18,8 +18,8 @@ const props: AccountHomeProps = {
     { tenantId: "t1", slug: "a", name: "A", product: "kova", role: "Owner" },
     { tenantId: "t2", slug: "b", name: "B", product: "scena", role: "Coach", standing: { label: "Payment failed", urgent: true } },
   ],
-  security: { passkeys: 2, devices: 3 },
   onGo: () => undefined,
+  onClose: () => undefined,
 };
 
 const markupFor = (over: Partial<AccountHomeProps> = {}) =>
