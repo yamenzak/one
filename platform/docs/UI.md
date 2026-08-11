@@ -826,6 +826,37 @@ full size.
 every app's suite red with a module-resolution error naming a file nobody here
 had written.
 
+
+### 9c. The bridge
+
+`daisy.ts` is the whole integration: twenty-seven CSS variables, handed over
+once. No plugin, no Tailwind, no build step — sixty-one components then draw
+themselves in a tenant's light without knowing a tenant exists.
+
+⚠️ **NOTHING IN THE BRIDGE PICKS A COLOUR.** Every value is read off the scene.
+The single thing it decides is *naming* — which of our tokens answers to which of
+theirs — and that is checked exhaustively, because a name they read and we never
+write is **not** a missing colour: it is that one component falling back to the
+library's stock theme, on a tenant's screen, beside components that are correct.
+
+⚠️ **THE THREE ACCENT SLOTS ARE ONE HUE AT THREE DEPTHS.** The library offers
+`primary`, `secondary` and `accent`; this language has one accent, deliberately.
+Filling the other two with invented hues hands every author a second and third
+brand colour to reach for, and the restraint that makes one accent read as
+expensive is gone in a week.
+
+⚠️ **CONTRAST IS RE-PROVED ON THE OTHER SIDE.** Proving it in our own tokens
+proves nothing about what the library renders — what it renders is these pairs,
+so these pairs clear the floor, swept across brands at each end of the declared
+range in both themes.
+
+⚠️ **AND `toHex` IS IMPORTED, NEVER RE-WRITTEN.** A second one written during the
+bridge assumed 0–255 while `Rgb` here is 0–1, so it encoded white as `#010101` —
+a near-black. Nothing threw: `inkOn` reported its true ratio of 5.43 while
+handing back a colour that measured 3.68, so the engine looked correct and only
+the pixels were wrong. Two implementations of one conversion is the same defect
+as two implementations of "what colour is this", one layer down.
+
 ---
 
 ## 10. The guards
@@ -874,6 +905,9 @@ and is expensive to disprove, so it survives review indefinitely.
 | `an-app-cannot-name-a-look` | a colour, background, margin, duration, font size or width declared by an app — the declaration surface is only provably safe for every tenant while it is closed, and one escape hatch turns the exhaustive sweep into a sample | **live** |
 | `the-light-clears-the-floor-everywhere` | a depth, theme or in-range brand whose measured ink falls under the contrast floor — swept rather than sampled, because a range nobody walked is a range with a hole in the middle of it | **live** |
 | `the-accent-is-re-lit-per-surface` | a brand computed once per theme, which is legible on the page and not on the card — and whose tempting fix, letting each screen pick its own primary, produces a product whose brand colour differs on every screen | **live** |
+| `every-borrowed-variable-is-written` | a variable the component library reads and the bridge never writes — which does not throw and does not look broken: that ONE component falls back to the library's stock theme and renders in somebody else's brand, beside components that are correct | **live** |
+| `the-light-survives-the-crossing` | a fill-and-ink pair handed to the library under the floor — proving contrast in our own tokens proves nothing about what the library renders, and what it renders is these pairs | **live** |
+| `one-accent-survives-three-slots` | an invented hue in the library's secondary or accent slot — which hands every author a second and third brand colour to reach for, and the restraint that makes one accent read as expensive is gone in a week | **live** |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder

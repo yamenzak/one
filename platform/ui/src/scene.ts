@@ -23,7 +23,7 @@
 import type { Brand } from "./brand.js";
 import { groundFor } from "./brand.js";
 import { accentOn, inkOn, surfaces, type Ground, type Theme } from "./ground.js";
-import type { Oklch } from "./colour.js";
+import { toHex, type Oklch } from "./colour.js";
 import type { Depth } from "./components/primitives.js";
 
 /* ------------------------------------------------------------------ laws --- */
@@ -150,15 +150,24 @@ export function litFor(scene: Scene, depth: Depth): Lit {
   const accent = accentOn(scene.ground.accent, surface);
   return {
     surface,
-    ink: hex(measured.ink),
+    ink: toHex(measured.ink),
     accent,
-    accentInk: hex(inkOn(accent).ink),
+    accentInk: toHex(inkOn(accent).ink),
     ratio: measured.ratio,
   };
 }
 
-const hex = (c: { readonly r: number; readonly g: number; readonly b: number }): string =>
-  `#${[c.r, c.g, c.b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
+/*
+  ⚠️ `toHex` IS IMPORTED, NEVER RE-WRITTEN. There was a second one here that
+  assumed 0–255 while `Rgb` in this package is 0–1, so it encoded white as
+  `#010101` — a near-black. Nothing threw: `inkOn` reported its true ratio of
+  5.43 while handing back a colour that measured 3.68, so the engine looked
+  correct and only the pixels were wrong.
+
+  Two implementations of one conversion is the same defect as two
+  implementations of "what colour is this" — which is the thing this whole file
+  exists to prevent, written one layer down.
+*/
 
 /* -------------------------------------------------------------- problems --- */
 

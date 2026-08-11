@@ -3289,6 +3289,33 @@
       "impl": "ui/test/scene.test.ts",
       "proves": "re-lights the accent per surface rather than once per theme",
       "fails": "a brand computed once per theme, which is legible on the page and not on the card — and whose tempting fix, letting each screen pick its own primary, produces a product whose brand colour differs on every screen"
+    },
+    {
+      "id": "every-borrowed-variable-is-written",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/daisy.test.ts",
+      "proves": "emits all of them, for every brand and both themes",
+      "fails": "a variable the component library reads and the bridge never writes — which does not throw and does not look broken: that ONE component falls back to the library's stock theme and renders in somebody else's brand, beside components that are correct"
+    },
+    {
+      "id": "the-light-survives-the-crossing",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/daisy.test.ts",
+      "proves": "clears the contrast floor for every fill-and-ink pair it hands over",
+      "fails": "a fill-and-ink pair handed to the library under the floor — proving contrast in our own tokens proves nothing about what the library renders, and what it renders is these pairs"
+    },
+    {
+      "id": "one-accent-survives-three-slots",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/daisy.test.ts",
+      "proves": "keeps the three accent slots on the tenant's one hue",
+      "fails": "an invented hue in the library's secondary or accent slot — which hands every author a second and third brand colour to reach for, and the restraint that makes one accent read as expensive is gone in a week"
     }
   ]
 }
