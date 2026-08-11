@@ -32,7 +32,6 @@ export const BORROWED = {
   badge: "badge",
   alert: "alert",
   skeleton: "skeleton",
-  field: "input",
 } as const;
 
 /**
@@ -43,6 +42,7 @@ export const BORROWED = {
  * version does not implement, so borrowing would mean fighting it.
  */
 export const OURS: Readonly<Record<string, string>> = {
+  "field": "`input` clamps its own width at 20rem and draws its own border — two decisions the language already makes, one from the container and one from §5.1, where the card is a LIFT and there is not a single outline in the reference",
   "row": "`list-row` distributes its columns only inside a `.list`, and needs a `list-col-grow` modifier on a CHILD to know which one stretches — while the hit-area floor, the two lead treatments and the value slot are ours already",
   "amount": "the cents are smaller and the figures are tabular — a balance is read as a magnitude",
   "segmented": "one indicator that TRAVELS. `tab-active` cross-fades two pills, which reads as two things happening",

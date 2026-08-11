@@ -18,7 +18,7 @@ import {
 } from "../src/index.js";
 
 const html = (node: React.ReactNode): string => renderToStaticMarkup(node as never);
-const action = (id: string) => ({ id, icon: "dot", label: id });
+const action = (id: string) => ({ id, icon: "plus" as const, label: id });
 
 /* ------------------------------------------------------------ the shapes --- */
 
@@ -181,7 +181,7 @@ describe("the section patterns", () => {
     expect(() => html(<QuickActions actions={["a", "b", "c", "d", "e"].map(action)} />)).toThrow(/toolbar/);
     expect(html(<QuickActions actions={["a", "b", "c", "d"].map(action)} />)).toContain('data-count="4"');
 
-    const tiles = ["a", "b", "c", "d"].map((id) => ({ id, icon: "dot", label: id }));
+    const tiles = ["a", "b", "c", "d"].map((id) => ({ id, icon: "list" as const, label: id }));
     expect(() => html(<TileGrid tiles={tiles} across={LIMIT.tilesAcross + 1} />)).toThrow(/hit-area floor/);
     /* ⚠️ And the label is BELOW the tile, never inside it: a tile is a
        destination, and a destination people cannot name is one they avoid. */
@@ -215,7 +215,7 @@ describe("the section patterns", () => {
   });
 
   it("names the two row leads separately, because the row's job decides", () => {
-    expect(html(<Glyph icon="gear" />)).toContain('data-one="glyph"');
+    expect(html(<Glyph icon="lock" />)).toContain('data-one="glyph"');
     expect(html(<Medallion initials="MK" />)).toContain('data-one="medallion"');
   });
 

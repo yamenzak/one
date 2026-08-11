@@ -29,7 +29,7 @@ const crown = (
           { id: "invoice", icon: "plus", label: "Invoice" },
           { id: "payout", icon: "send", label: "Pay out" },
           { id: "packages", icon: "box", label: "Packages" },
-          { id: "more", icon: "dots", label: "More" },
+          { id: "more", icon: "dots" as const, label: "More" },
         ]}
       />
     }

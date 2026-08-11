@@ -136,7 +136,10 @@ export const STRUCTURE = `
 [data-one='topic'] { display: flex; align-items: center; justify-content: center; gap: calc(0.5rem * var(--density)); margin-block-start: calc(2.75rem * var(--density)); }
 [data-one='topic-title'] { font-size: var(--t-page); font-weight: var(--w-bold); line-height: 1.1; letter-spacing: -0.02em; }
 [data-one='page-title'] { font-size: var(--t-page); font-weight: var(--w-bold); line-height: 1.1; letter-spacing: -0.02em; padding: calc(1.5rem * var(--density)) 0 calc(1rem * var(--density)); }
-[data-one='search'] { display: flex; align-items: center; gap: calc(0.75rem * var(--density)); block-size: 3.25rem; padding: 0 var(--row-pad); border-radius: 999px; background: var(--surface-1); }
+/* ⚠️ THE WIDTH COMES FROM THE CONTAINER AND THERE IS NO EDGE. Both were the
+   library's opinion — its input clamps itself at 20rem and draws a border — and
+   both are decisions this language already makes. */
+[data-one='search'] { display: flex; align-items: center; gap: calc(0.75rem * var(--density)); inline-size: 100%; block-size: 3.25rem; padding: 0 var(--row-pad); border-radius: 999px; background: var(--surface-1); color: var(--surface-1-ink); }
 [data-one='identity'] { display: flex; flex-direction: column; align-items: center; gap: calc(0.5rem * var(--density)); margin-block-start: calc(1.5rem * var(--density)); text-align: center; }
 [data-one='face'] { display: grid; place-items: center; inline-size: 6rem; block-size: 6rem; border-radius: 999px; background: var(--surface-2-accent); color: var(--surface-2-accent-ink); font-size: var(--t-hero); font-weight: var(--w-bold); }
 [data-one='identity-name'] { font-size: var(--t-page); font-weight: var(--w-bold); line-height: 1.1; letter-spacing: -0.02em; }
@@ -161,6 +164,18 @@ export const STRUCTURE = `
 [data-one='section'][data-bleed] > [data-one='section-card'] { background: none; border-radius: 0; box-shadow: none; }
 [data-one='scroller'] { display: flex; gap: calc(0.875rem * var(--density)); overflow-x: auto; padding: 0 var(--pad) calc(0.875rem * var(--density)); scrollbar-width: none; }
 [data-one='scroller'] > * { flex: none; }
+
+/* ── THE ICON. ⚠️ Five sizes, and every one comes from the POSITION — §5.2.
+      An icon that carried its own size would be the same glyph at two sizes on
+      two screens, which is what makes a set look assembled rather than drawn. */
+[data-one='icon'] { inline-size: 1.25rem; block-size: 1.25rem; display: block; flex: none; }
+[data-one='quick-action-well'] [data-one='icon'] { inline-size: 1.3125rem; block-size: 1.3125rem; }
+[data-one='tile-face'] [data-one='icon'] { inline-size: 1.5rem; block-size: 1.5rem; }
+[data-one='topic-icon'] [data-one='icon'] { inline-size: 1.75rem; block-size: 1.75rem; }
+[data-one='row-chevron'] [data-one='icon'] { inline-size: 1rem; block-size: 1rem; }
+[data-one='medallion'] [data-one='icon'] { inline-size: 1.125rem; block-size: 1.125rem; }
+[data-one='search-icon'] { display: flex; opacity: 0.62; }
+[data-one='topic-icon'], [data-one='quick-action-well'], [data-one='tile-face'], [data-one='glyph'] { display: grid; place-items: center; }
 
 /* ── LEADS. The row's JOB decides which, and a list never mixes the two. */
 [data-one='glyph'] { display: grid; place-items: center; inline-size: 1.5rem; block-size: 1.5rem; color: inherit; }

@@ -262,6 +262,42 @@ export const CHOREOGRAPHY = `
    reads as two things happening instead of one thing moving. */
 [data-one='segmented']::before { transition: transform var(--t-move) var(--e-spring); }
 
+/* ── AN ICON PLAYS ON INTERACTION, AND ONLY ON INTERACTION.
+   ⚠️ NOT ON HOVER. The whole animated-icon genre is built on hover, which is a
+   capability half the devices this ships to do not have — so the animation is
+   invisible on a phone and the guard in one lint fails anything reachable that
+   way. Press and keyboard focus are what everybody has.
+   ⚠️ AND THE VOCABULARY IS CLOSED, like every other list here. Four motions,
+   assigned by what the icon MEANS: something that travels, something that rings,
+   something that appears, something that turns. Per-icon timelines would be
+   twenty-two decisions nobody could keep in step. */
+@keyframes icon-nudge { 50% { transform: translate(2px, -2px); } }
+@keyframes icon-swing { 25% { transform: rotate(-11deg); } 60% { transform: rotate(7deg); } }
+@keyframes icon-pop { 45% { transform: scale(1.22); } }
+@keyframes icon-turn { to { transform: rotate(360deg); } }
+[data-one='icon'] { transform-origin: 50% 50%; }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='send'],
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='back'],
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='chevron'] {
+  animation: icon-nudge var(--t-move) var(--e-out);
+}
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='bell'],
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='key'],
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='dumbbell'] {
+  animation: icon-swing var(--t-enter) var(--e-spring);
+}
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='plus'],
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='camera'],
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='box'],
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='dots'] {
+  animation: icon-pop var(--t-move) var(--e-spring);
+}
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='search'],
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='clock'],
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='close'] {
+  animation: icon-turn var(--t-enter) var(--e-out);
+}
+
 /* ⚠️ ARRIVING IS STAGGERED; LEAVING IS NOT — and the count is nth-CHILD on the
    body, not nth-of-type on the card. A section may be a wrapper around a card,
    so counting by TYPE lands the delays on the wrong elements and the stagger

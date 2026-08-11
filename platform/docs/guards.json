@@ -3478,6 +3478,51 @@
       "impl": "ui/test/sky.test.ts",
       "proves": "keeps no duration in the sky",
       "fails": "a duration in the sky — the weather is the choreographer's like every other timing, and a component that held one could drift from everything else moving at the same moment"
+    },
+    {
+      "id": "no-backtick-in-a-sheet",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/interface.test.mjs",
+      "proves": "a CSS template literal ending inside a comment",
+      "fails": "a backtick written inside a CSS template literal's comment — it closes the literal, the file then fails to parse hundreds of lines away, and the error names a semicolon. It has ended a work session eleven times; the first version of this check searched for the backtick, passed its own mutation, and was the false comfort it exists to prevent"
+    },
+    {
+      "id": "the-icon-set-is-lucides-and-closed",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/icons.test.ts",
+      "proves": "still equals what the generator produces",
+      "fails": "a hand-edited path in the generated icon file — the geometry is copied rather than imported, and a copy nothing re-derives drifts into a glyph that is subtly not the one every other product draws"
+    },
+    {
+      "id": "an-icon-carries-no-size-of-its-own",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/icons.test.ts",
+      "proves": "emits no size of its own — the sheet places it by position",
+      "fails": "an icon with its own width — the same glyph then appears at two sizes on two screens, which is what makes a set look assembled rather than drawn"
+    },
+    {
+      "id": "an-icon-plays-on-press-not-on-hover",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/icons.test.ts",
+      "proves": "triggers on press and on keyboard focus, never on hover",
+      "fails": "an icon animation behind hover — half the devices this ships to have no hover at all, so the animation is invisible on a phone and the interface guard would refuse it anyway"
+    },
+    {
+      "id": "every-icon-motion-is-defined",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/icons.test.ts",
+      "proves": "defines every motion it assigns",
+      "fails": "a motion an icon names and the choreographer never defines — that glyph stands still while its neighbours move, which reads as a broken icon rather than as a missing rule"
     }
   ]
 }

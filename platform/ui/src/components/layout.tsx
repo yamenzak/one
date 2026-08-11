@@ -19,6 +19,8 @@ import { LIMIT, SHAPE, type Archetype } from "../archetype.js";
 import { MASKED, type Sky } from "../sky.js";
 import { borrow, SIZE, TONE } from "../borrowed.js";
 import { Text } from "./primitives.js";
+import { Icon } from "./icon.js";
+import type { IconName } from "../icons.js";
 
 /* ------------------------------------------------------------------ page --- */
 
@@ -109,7 +111,11 @@ export interface AppBarProps {
 export const AppBar = ({ leading, onLeading, title, action }: AppBarProps) => (
   <div data-one="app-bar">
     {leading ? (
-      <button type="button" data-one="app-bar-leading" data-glyph={leading} onClick={onLeading} aria-label={leading === "back" ? "Back" : "Close"} />
+      <button type="button" data-one="app-bar-leading" onClick={onLeading}>
+        {/* ⚠️ The app bar is one of the two places an icon stands alone, so here
+            the icon IS the label rather than being hidden beside one. */}
+        <Icon name={leading} label={leading === "back" ? "Back" : "Close"} />
+      </button>
     ) : <span data-one="app-bar-spacer" />}
     {title ? <Text role="subtitle">{title}</Text> : <span data-one="app-bar-spacer" />}
     <span data-one="app-bar-action">{action}</span>
@@ -139,7 +145,7 @@ export const Amount = ({ whole, fraction, prefix }: AmountProps) => (
 
 export interface QuickAction {
   readonly id: string;
-  readonly icon: string;
+  readonly icon: IconName;
   /** ⚠️ Always beneath the circle. A quick action is never a bare glyph. */
   readonly label: string;
   readonly onPress?: () => void;
@@ -159,7 +165,7 @@ export function QuickActions({ actions }: { readonly actions: readonly QuickActi
     <div data-one="quick-actions" data-count={actions.length}>
       {actions.map((a) => (
         <button key={a.id} type="button" data-one="quick-action" onClick={a.onPress}>
-          <span data-one="quick-action-well" data-icon={a.icon} aria-hidden="true" />
+          <span data-one="quick-action-well"><Icon name={a.icon} /></span>
           <Text role="caption">{a.label}</Text>
         </button>
       ))}
@@ -194,7 +200,7 @@ export function Crown({ eyebrow, amount, under, actions, bar }: CrownProps) {
 Crown.forArchetype = "crown" as const;
 
 export interface TopicProps {
-  readonly icon?: string;
+  readonly icon?: IconName;
   readonly title: string;
   readonly actions?: readonly QuickAction[];
   readonly bar?: ReactNode;
@@ -206,7 +212,7 @@ export function Topic({ icon, title, actions, bar }: TopicProps) {
     <>
       {bar}
       <div data-one="topic">
-        {icon ? <span data-one="topic-icon" data-icon={icon} aria-hidden="true" /> : null}
+        {icon ? <span data-one="topic-icon"><Icon name={icon} /></span> : null}
         <h1 data-one="topic-title">{title}</h1>
       </div>
       {actions ? <QuickActions actions={actions} /> : null}
@@ -229,8 +235,8 @@ export function PageTitle({ title, search, bar }: PageTitleProps) {
       {bar}
       <h1 data-one="page-title">{title}</h1>
       {search ? (
-        <div data-one="search" className={borrow("field")}>
-          <span data-one="search-icon" data-icon="search" aria-hidden="true" />
+        <div data-one="search">
+          <span data-one="search-icon"><Icon name="search" /></span>
           <Text role="body" muted>{search}</Text>
         </div>
       ) : null}
@@ -316,13 +322,13 @@ export function Section({ title, total, inside, more, onMore, children, bleed }:
 /* -------------------------------------------------------------- patterns --- */
 
 /** ⚠️ A bare outline glyph — the lead for a SETTING, which has no value. */
-export const Glyph = ({ icon }: { readonly icon: string }) => (
-  <span data-one="glyph" data-icon={icon} aria-hidden="true" />
+export const Glyph = ({ icon }: { readonly icon: IconName }) => (
+  <span data-one="glyph"><Icon name={icon} /></span>
 );
 
 /** ⚠️ A filled medallion — the lead for a THING WITH A VALUE. Never both, per list. */
-export const Medallion = ({ icon, initials }: { readonly icon?: string; readonly initials?: string }) => (
-  <span data-one="medallion" data-icon={icon} aria-hidden="true">{initials}</span>
+export const Medallion = ({ icon, initials }: { readonly icon?: IconName; readonly initials?: string }) => (
+  <span data-one="medallion" aria-hidden="true">{icon ? <Icon name={icon} /> : initials}</span>
 );
 
 export interface BadgeProps {
@@ -339,7 +345,7 @@ export const Badge = ({ children, tone, size = "sm" }: BadgeProps) => (
 
 export interface TileProps {
   readonly id: string;
-  readonly icon: string;
+  readonly icon: IconName;
   readonly label: string;
   readonly onPress?: () => void;
 }
@@ -357,7 +363,7 @@ export function TileGrid({ tiles, across = LIMIT.tilesAcross }: { readonly tiles
     <div data-one="tile-grid" data-across={across} style={{ "--across": String(across) } as Record<string, string>}>
       {tiles.map((t) => (
         <button key={t.id} type="button" data-one="tile" onClick={t.onPress}>
-          <span data-one="tile-face" data-icon={t.icon} aria-hidden="true" />
+          <span data-one="tile-face"><Icon name={t.icon} /></span>
           <Text role="caption">{t.label}</Text>
         </button>
       ))}

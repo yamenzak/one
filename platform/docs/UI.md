@@ -662,11 +662,40 @@ components through the real stylesheet, three tenants × both themes. `build.mjs
 beside it is the prototype the numbers were measured from, and a prototype that
 keeps being photographed is one the shipped code is free to drift from.
 
-⚠️ **THE ONE THING THOSE PHOTOGRAPHS SHOW MISSING IS ICONS.** Every `data-icon`
-is an empty well: the language names five icon *roles* (§5.2) and ships no set to
-fill them. It is the next increment, and it is stated here rather than papered
-over in the harness — a fix that exists in the photograph and not in the product
-is worse than the gap.
+### 5.9 Icons — lucide's geometry, our names, and motion on interaction
+
+**Twenty-two icons, generated from `lucide-static` into `src/icons.ts`.** The
+geometry is **copied rather than imported**: this package is loaded by workers
+rendering on a server, and a runtime dependency for twenty-two shapes that never
+change is a dependency in every one of them. `test/icons.test.ts` re-derives the
+file from the package and compares, so a hand-edited path is a test failure
+rather than a glyph that is subtly not the one every other product draws.
+
+⚠️ **THE SET IS CLOSED, AND SMALL.** lucide ships two thousand icons; a product
+that can reach all of them has no icon language, it has a search box. Adding one
+is an edit to the map in the generator, on purpose, in review — the same shape as
+`borrowed.ts`, and for the same reason: one file knows the library's names.
+
+⚠️ **AN ICON NEVER CARRIES A SIZE OR A COLOUR.** Both come from where it is
+standing — 20px in a row's lead, 21 in a quick action, 24 in a tile, 16 as a
+chevron: the five roles of §5.2. A `size` prop is the same glyph at two sizes on
+two screens, which is exactly what makes a set look assembled rather than drawn.
+
+⚠️ **AN ICON BESIDE ITS OWN LABEL IS HIDDEN; ONE STANDING ALONE IS THE LABEL.**
+Getting that backwards reads "Back, Back" on every app bar, or nothing at all.
+
+**Motion plays on INTERACTION — press and keyboard focus — and never on hover.**
+
+⚠️ **THE WHOLE ANIMATED-ICON GENRE IS BUILT ON HOVER,** and hover is a capability
+half the devices this ships to do not have: the animation is invisible on a
+phone, and `one lint` fails anything reachable only that way. Press is what
+everybody has, and focus is what a keyboard has.
+
+⚠️ **FOUR MOTIONS, ASSIGNED BY WHAT THE ICON MEANS** — something that travels
+(`nudge`), something that rings (`swing`), something that appears (`pop`),
+something that turns (`turn`). Per-icon timelines would be twenty-two decisions
+nobody could keep in step, and they would each be a duration living outside the
+choreographer. All four are `@keyframes` in `motion.ts` on the shared clock.
 
 ---
 
@@ -961,6 +990,7 @@ reason each, beside the map of what we borrow, and the two cannot overlap.
 
 | kept | because |
 |---|---|
+| **field** | `input` clamps its own width at 20rem and draws its own border — one decision belongs to the container, the other to §5.1, where the card is a lift and there is not a single outline in the reference |
 | **row** | `list-row` distributes its columns only inside a `.list`, and needs a `list-col-grow` modifier on a **child** to know which one stretches |
 | **amount** | the cents are smaller and the figures tabular — a balance is read as a magnitude |
 | **segmented** | one indicator that **travels**. `tab-active` cross-fades two pills, which reads as two things happening |
@@ -970,8 +1000,8 @@ reason each, beside the map of what we borrow, and the two cannot overlap.
 | **nav** | one navigation surface at a time. `dock` plus a rail is two answers to "where am I" |
 | **sky · section** | no library has an ambience slot, or can see what archetype a section is on |
 
-**Six objects are borrowed** — `btn`, `card`, `badge`, `alert`, `skeleton`,
-`input` — and the map is held to **zero unused entries**, so it grows with a
+**Five objects are borrowed** — `btn`, `card`, `badge`, `alert`, `skeleton` — and
+the map is held to **zero unused entries**, so it grows with a
 component and never before one. It carried six speculative names for a while,
 claiming the library's `tabs`, `dock` and `stat` were in use when every one of
 them had already been replaced by something of ours.
@@ -1064,6 +1094,11 @@ and is expensive to disprove, so it survives review indefinitely.
 | `what-we-kept-says-why` | an object written in place of the library's with no reason recorded — "we wrote our own" decays into "somebody did not know the library had one" | **live** |
 | `a-sky-literal-is-a-masks-opacity` | a colour picked in sky.ts — it sits on the interface guard's token layer because a mask is an alpha channel written in colour syntax, and that exemption is only safe while every literal in the file is inside a mask | **live** |
 | `the-sky-holds-no-timing` | a duration in the sky — the weather is the choreographer's like every other timing, and a component that held one could drift from everything else moving at the same moment | **live** |
+| `no-backtick-in-a-sheet` | a backtick written inside a CSS template literal's comment — it closes the literal, the file then fails to parse hundreds of lines away, and the error names a semicolon. It has ended a work session eleven times; the first version of this check searched for the backtick, passed its own mutation, and was the false comfort it exists to prevent | **live** |
+| `the-icon-set-is-lucides-and-closed` | a hand-edited path in the generated icon file — the geometry is copied rather than imported, and a copy nothing re-derives drifts into a glyph that is subtly not the one every other product draws | **live** |
+| `an-icon-carries-no-size-of-its-own` | an icon with its own width — the same glyph then appears at two sizes on two screens, which is what makes a set look assembled rather than drawn | **live** |
+| `an-icon-plays-on-press-not-on-hover` | an icon animation behind hover — half the devices this ships to have no hover at all, so the animation is invisible on a phone and the interface guard would refuse it anyway | **live** |
+| `every-icon-motion-is-defined` | a motion an icon names and the choreographer never defines — that glyph stands still while its neighbours move, which reads as a broken icon rather than as a missing rule | **live** |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder

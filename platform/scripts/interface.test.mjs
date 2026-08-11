@@ -82,6 +82,43 @@ for (const file of interfaceFiles) {
 }
 ok(`no literal colour: ${interfaceFiles.length} file(s), ${colours} outside the token layer`);
 
+/* --------------------------------------------- 1b. A BACKTICK IN A SHEET --- */
+
+/*
+  ⚠️ THIS ONE IS EMPIRICAL. A backtick inside a CSS template literal has ended a
+  work session TEN times in this package, always the same way: the file stops
+  parsing, esbuild names a line hundreds of rows from the cause, and the message
+  is about a semicolon. The habit that causes it is good writing — quoting a
+  token in a comment the way every other comment in the repo does — so it is not
+  a habit anybody is going to break.
+
+  ⚠️ AND IT IS DETECTED BY THE WRECKAGE, NOT BY THE BACKTICK. Looking for one
+  inside a comment cannot work: by then the backtick has already CLOSED the
+  literal, so the comment straddles the boundary and no span contains it. The
+  signature that survives is an UNTERMINATED `/*` inside a sheet — a comment the
+  literal ended in the middle of. The first version of this check searched for
+  the backtick, passed its own mutation, and was exactly the false comfort it
+  exists to prevent.
+*/
+let sheets = 0;
+for (const file of interfaceFiles.concat(walk(join(ROOT, "ui", "reference")).filter((f) => /\.(tsx?|mjs)$/.test(f)))) {
+  const src = readFileSync(file, "utf8");
+  for (const m of src.matchAll(/`((?:[^`\\]|\\.)*)`/gs)) {
+    const body = m[1];
+    /* Only a CSS sheet: a declaration inside a rule block. */
+    if (!/\{[\s\S]*?[a-z-]+\s*:[\s\S]*?\}/.test(body)) continue;
+    sheets++;
+    const opened = (body.match(/\/\*/g) ?? []).length;
+    const closed = (body.match(/\*\//g) ?? []).length;
+    if (opened === closed) continue;
+    const line = src.slice(0, m.index).split("\n").length;
+    fail(`${rel(file)}:${line}: a CSS template literal ending inside a comment.\n` +
+         `       That is a backtick written in the comment: it CLOSES the literal, the file\n` +
+         `       then fails to parse somewhere else entirely, and the error names a semicolon.`);
+  }
+}
+ok(`no backtick in a sheet: ${sheets} CSS template literal(s)`);
+
 /* ------------------------------------------------------- 2. NO MOTION --- */
 
 /*
