@@ -24,6 +24,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { Problem } from "@one/kernel";
 import { feel } from "../feedback.js";
+import { Sheet } from "../sheet.js";
 
 /** What a value is, which is all the sheet needs to draw the right control. */
 export type FieldKind = "text" | "email";
@@ -70,14 +71,24 @@ const SEEN_MS = 850;
  * the defect that makes a bottom sheet on a phone unusable, and it does not
  * reproduce on any desktop, in any test, at any width.
  *
- * ⚠️ `visualViewport` IS THE ONLY THING THAT KNOWS. The keyboard is not a layout
- * box: on iOS, and in an in-app browser, the layout viewport does not change at
- * all when it opens, so `100dvh` and `position: fixed` are both still measuring a
- * viewport the person can no longer see the bottom of.
+ * ⚠️ MEASURING IS THE GOOD ANSWER AND IT IS NOT ALWAYS AVAILABLE. `visualViewport`
+ * is the only API that knows a keyboard is up — a keyboard is not a layout box, so
+ * on iOS `100dvh` and `position: fixed` are both still measuring a viewport whose
+ * bottom the person can no longer see. Where a browser resizes the layout instead,
+ * the same measurement comes out as zero, which is correct: there the sheet was
+ * already clear of it.
  *
- * ⚠️ AND WHERE THE PLATFORM DOES RESIZE THE LAYOUT, THIS COMES OUT AS ZERO —
- * which is correct, because there the sheet was already above the keyboard. One
- * measurement, no branch on which browser it is.
+ * ⚠️ AND INSIDE AN IFRAME NOTHING KNOWS. A frame's `visualViewport` describes the
+ * FRAME, and a frame does not change size when a keyboard opens over the page
+ * embedding it — so the measurement is a truthful zero about the wrong viewport
+ * and the sheet stays exactly where it was. No API fixes this and no measurement
+ * detects it, which is why an embedded preview of this page kept reporting the bug
+ * that the page itself no longer had.
+ *
+ * ⚠️ SO THE FALLBACK IS POSITIONAL RATHER THAN NUMERIC. If a field inside the
+ * sheet holds the focus and nothing measured a keyboard, the sheet goes to the TOP
+ * of the viewport — the one place a keyboard has never been. It is cruder than
+ * gliding up by exactly the right amount, and it cannot be wrong.
  */
 /**
  * How much of the layout viewport the keyboard is standing on.
@@ -93,21 +104,49 @@ const SEEN_MS = 850;
 export const keyboardInset = (layoutHeight: number, viewHeight: number, viewTop: number): number =>
   Math.max(0, Math.round(layoutHeight - viewHeight - Math.max(0, viewTop)));
 
+/** Where a sheet has to sit: gliding up by a measured amount, or out of reach. */
+export type Lift = "measured" | "top";
+
+/**
+ * ⚠️ THREE CONDITIONS, AND ALL THREE ARE NEEDED. A measured amount means the
+ * glide is available and correct. Typing is the only evidence a keyboard exists
+ * when nothing can measure one — but it is equally true of a laptop, where there
+ * is no keyboard to clear and the sheet would jump to the top of a narrow window
+ * for no reason. A coarse pointer is what separates the two: it is a touchscreen,
+ * and a touchscreen is where a keyboard takes half the display.
+ */
+export const liftFor = (measured: number, typing: boolean, touch: boolean): Lift =>
+  measured === 0 && typing && touch ? "top" : "measured";
+
 function useKeyboardInset(active: boolean): void {
   useEffect(() => {
+    if (!active) return;
     const view = typeof window === "undefined" ? undefined : window.visualViewport;
-    if (!active || !view) return;
     const root = document.documentElement;
+
     const apply = () => {
-      const hidden = keyboardInset(window.innerHeight, view.height, view.offsetTop);
+      const hidden = view ? keyboardInset(window.innerHeight, view.height, view.offsetTop) : 0;
       root.style.setProperty("--keyboard", `${hidden}px`);
+      const focused = document.activeElement;
+      const typing = focused instanceof HTMLElement
+        && focused.matches("input, textarea")
+        && focused.closest(".sheet") !== null;
+      const touch = window.matchMedia("(pointer: coarse)").matches;
+      const lift = liftFor(hidden, typing, touch);
+      document.querySelectorAll<HTMLElement>(".sheet").forEach((sheet) => { sheet.dataset.lift = lift; });
     };
+
     apply();
-    view.addEventListener("resize", apply);
-    view.addEventListener("scroll", apply);
+    view?.addEventListener("resize", apply);
+    view?.addEventListener("scroll", apply);
+    /* `focus` does not bubble; `focusin` does. */
+    document.addEventListener("focusin", apply);
+    document.addEventListener("focusout", apply);
     return () => {
-      view.removeEventListener("resize", apply);
-      view.removeEventListener("scroll", apply);
+      view?.removeEventListener("resize", apply);
+      view?.removeEventListener("scroll", apply);
+      document.removeEventListener("focusin", apply);
+      document.removeEventListener("focusout", apply);
       root.style.removeProperty("--keyboard");
     };
   }, [active]);
@@ -116,18 +155,17 @@ function useKeyboardInset(active: boolean): void {
 export function ValueEditor({ field, onSave, onClose }: ValueEditorProps): ReactNode {
   useKeyboardInset(field !== null);
   return (
-    <Dialog.Root open={field !== null} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="scrim" />
-        {/* ⚠️ KEYED ON THE FIELD, so opening a second editor is a new component
-            rather than the previous one with its value swapped underneath — which
-            is how a failure from the last field ends up displayed under the next
-            one's input. */}
-        <Dialog.Content className="sheet" aria-describedby={undefined}>
-          {field ? <Editing key={field.name} field={field} onSave={onSave} onClose={onClose} /> : null}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+    /* ⚠️ DISMISSIBLE, because leaving a value alone is a complete answer. The
+       sheet that refuses is for the small number of questions where not deciding
+       is itself a decision — and "I would rather not rename myself today" is not
+       one of them. */
+    <Sheet open={field !== null} onClose={onClose} dismissible label={field?.title}>
+      {/* ⚠️ KEYED ON THE FIELD, so opening a second editor is a new component
+          rather than the previous one with its value swapped underneath — which is
+          how a failure from the last field ends up displayed under the next one's
+          input. */}
+      {field ? <Editing key={field.name} field={field} onSave={onSave} onClose={onClose} /> : null}
+    </Sheet>
   );
 }
 

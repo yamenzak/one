@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { keyboardInset } from "../src/account/editor.js";
+import { keyboardInset, liftFor } from "../src/account/editor.js";
 
 describe("what the keyboard is standing on", () => {
   /*
@@ -48,5 +48,37 @@ describe("what the keyboard is standing on", () => {
   it("never pulls the sheet downwards", () => {
     expect(keyboardInset(844, 900, 0)).toBe(0);
     expect(keyboardInset(844, 844, -40)).toBe(0);
+  });
+});
+
+/**
+ * ⚠️ THE FALLBACK EXISTS BECAUSE A FRAME CANNOT SEE A KEYBOARD. A frame's
+ * `visualViewport` describes the frame, and the frame does not resize when a
+ * keyboard opens over the page embedding it — so the measurement is a truthful
+ * zero about the wrong viewport. That is not detectable, so it is not detected:
+ * the rule is about what is KNOWN, and zero-with-a-field-focused is the case
+ * where nothing is.
+ */
+describe("where a sheet has to sit", () => {
+  it("glides by the amount whenever there is an amount", () => {
+    expect(liftFor(336, true, true)).toBe("measured");
+    expect(liftFor(336, false, true)).toBe("measured");
+  });
+
+  it("goes out of reach when a touchscreen is being typed into and nothing was measured", () => {
+    expect(liftFor(0, true, true)).toBe("top");
+  });
+
+  /*
+    ⚠️ AND STAYS PUT ON A LAPTOP. Nothing is measured there because there is
+    nothing to measure, and a mouse pointer in a narrow window would otherwise send
+    the sheet to the top of the screen the moment anybody clicked into the field.
+  */
+  it("stays where it is on a fine pointer", () => {
+    expect(liftFor(0, true, false)).toBe("measured");
+  });
+
+  it("stays where it is when nothing is being typed into", () => {
+    expect(liftFor(0, false, true)).toBe("measured");
   });
 });

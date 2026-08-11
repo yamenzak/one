@@ -232,13 +232,43 @@ h2 { word-spacing: normal; }
    the browser resizes the layout for a keyboard it comes out as zero, which is
    correct: there the sheet was already clear of it. */
 .sheet { position: fixed; z-index: 51; inset-inline: 0; inset-block-end: 0;
-  translate: 0 calc(-1 * var(--keyboard, 0px));
+  translate: 0 calc(var(--drag, 0px) - var(--keyboard, 0px));
   max-block-size: calc(100dvh - var(--keyboard, 0px) - 20px); overflow-y: auto;
   background: var(--card); color: var(--ink);
   border-start-start-radius: 26px; border-start-end-radius: 26px;
-  padding: 26px 20px calc(22px + env(safe-area-inset-bottom, 0px));
-  animation: sheet-up 300ms cubic-bezier(0.2, 0, 0.1, 1); }
+  padding: 10px 20px calc(22px + env(safe-area-inset-bottom, 0px));
+  animation: sheet-up 320ms cubic-bezier(0.2, 0, 0.1, 1);
+  transition: translate 260ms cubic-bezier(0.2, 0, 0.1, 1); }
 .sheet:focus, .sheet:focus-visible { outline: none; }
+/* WHILE A THUMB IS ON IT, IT IS THE THUMB'S. A transition during a drag is the
+   sheet arriving where the finger was a quarter of a second ago. */
+.sheet[data-dragging] { transition: none; }
+/* THE FALLBACK, when no keyboard could be measured and a field has the focus —
+   see useKeyboardInset. Out of reach beats a guess at how far. */
+.sheet[data-lift='top'] { inset-block: 12px auto; border-radius: 26px;
+  max-block-size: calc(100dvh - 24px); }
+/* IT LEAVES THE WAY IT ARRIVED. Radix keeps the node until the animation ends,
+   so a surface that rose does not have to vanish. */
+.sheet[data-state='closed'] { animation: sheet-down 220ms cubic-bezier(0.4, 0, 1, 1); }
+.scrim[data-state='closed'] { animation: scrim-out 220ms ease-in; }
+.over-content[data-state='closed'] { animation: over-down 240ms cubic-bezier(0.4, 0, 1, 1); }
+
+/* THE GRABBER IS A CLAIM: it appears only on a sheet that can actually be pulled
+   away. Its hit area is the full width and far taller than the bar, because a
+   4-pixel target is a decoration with a gesture attached. */
+.grabber { display: block; inline-size: 100%; padding-block: 8px 14px;
+  cursor: grab; touch-action: none; }
+.grabber:active { cursor: grabbing; }
+.grabber-bar { display: block; inline-size: 42px; block-size: 4px; margin-inline: auto;
+  border-radius: var(--radius-well);
+  background: color-mix(in oklab, var(--ink) 22%, transparent); }
+/* AND WHERE THERE IS NO GRABBER THERE IS AN X, because a sheet that cannot be
+   dismissed by gesture still has to be leavable by control. */
+.sheet-close { position: absolute; inset-block-start: 14px; inset-inline-end: 14px;
+  inline-size: 34px; block-size: 34px; border: 0; border-radius: var(--radius-well);
+  display: grid; place-items: center; cursor: pointer;
+  background: var(--well); color: var(--ink); }
+.sheet-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* ⚠️ ON A WIDE WINDOW IT IS CENTRED, because a strip across the foot of a
    1400-pixel screen is a notification bar, and nobody reads a form in one. A
    tablet is wide AND has a keyboard, so the inset still applies — halved, because
@@ -246,12 +276,16 @@ h2 { word-spacing: normal; }
 @media (min-width: 640px) {
   .sheet { inset: 50% auto auto 50%;
     translate: -50% calc(-50% - var(--keyboard, 0px) / 2);
+    padding-block-start: 26px;
     inline-size: min(440px, calc(100vw - 40px)); border-radius: 26px;
     animation-name: sheet-in; }
 }
 @keyframes scrim-in { from { opacity: 0; } }
+@keyframes scrim-out { to { opacity: 0; } }
 @keyframes sheet-up { from { translate: 0 100%; } }
+@keyframes sheet-down { to { translate: 0 100%; } }
 @keyframes sheet-in { from { opacity: 0; scale: 0.97; } }
+@keyframes over-down { to { opacity: 0; translate: 0 22px; } }
 @media (prefers-reduced-motion: reduce) {
   .scrim, .sheet { animation: none; }
 }
@@ -267,7 +301,7 @@ h2 { word-spacing: normal; }
    field outlined at rest has nowhere left to go when it is wrong, which is how a
    form ends up saying "wrong" in red text under a field that looks unchanged. */
 .field-box { display: flex; align-items: center; gap: 6px; min-block-size: 56px;
-  padding-inline: 16px 8px; border-radius: 15px; background: var(--well);
+  padding-inline: 18px 8px; border-radius: var(--radius-well); background: var(--well);
   outline: 2px solid transparent; outline-offset: -2px; }
 .field-box:focus-within { outline-color: var(--accent); }
 .field-box[data-wrong] { outline-color: var(--alarm); }
