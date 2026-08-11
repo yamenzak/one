@@ -447,6 +447,56 @@ symptom is the last row of every long screen sitting under the bar where it
 cannot be tapped. It has been written down twice in this repository and
 reintroduced both times, which is the argument for it being structural.
 
+
+### 5.5 The sky — where the ambience slot finally lives
+
+⚠️ **THE BRAND CONTRACT HAS CARRIED A HUE AND AN INTENSITY SINCE §1.1 WAS
+WRITTEN, AND EVERY SCREEN SPENT IT ON A TINT NOBODY COULD SEE.** The backdrop is
+where it goes: a slow aurora behind the whole scroll, or a pattern lit by the
+same colour. This is the section that makes the language's name literal — the
+tenant's light, indirect, constant, behind everything.
+
+**A page declares a sky. The colour is never the page's decision.**
+
+| sky | what it is |
+|---|---|
+| `aurora` | three soft blooms, drifting |
+| `photo` | the same, reaching the whole screen — for a hero about one number |
+| `dots` · `waves` · `grid` · `rings` | the aurora, masked |
+
+⚠️ **IT IS BLOOMS, NEVER A WASH.** The colour arrives as three soft radial
+sources on a dark ground — low chroma, wide falloff — because a flat tint reads
+as a screen somebody coloured in, and blooms read as light in a room. That is the
+whole difference between ambience and paint.
+
+⚠️ **THE HUE NEVER CYCLES.** It is the tenant's, fixed. What moves is where the
+light falls, never what colour it is. A hue that animates is a screensaver.
+
+**Motion: drift and breath, on the same clock as everything else.**
+
+- **Drift** — 52s, `transform` on the lit layer. Slow enough to be weather: under
+  ~30s it reads as an animation somebody added; past ~45s it reads as light
+  changing in a room, which is the point.
+- **Breath** — the mask scales a few percent. ⚠️ A pattern **breathes, it does not
+  travel**: a moving pattern is a texture somebody is dragging past the screen.
+- ⚠️ **`transform`, never `background-position`.** One is composited on the GPU
+  and one repaints the whole layer every frame. At 52s nobody sees the difference
+  in motion and every device sees it in battery.
+
+⚠️ **A MASKED SKY NEEDS A DIFFERENT AMOUNT OF LIGHT, AND THE CORRECTION FOLLOWS
+THE GROUND.** Dots at 9px keep about 2% of their pixels, so at the gradient's own
+brightness the pattern is invisible — and the temptation is to raise the tenant's
+`ambience`, which washes every unmasked screen to fix one masked one. The light
+is corrected where the mask is: **brighter on a dark ground, darker on a pale
+one.** Raising it in both directions blows a light pattern out to white, which is
+the same defect with the opposite sign — a mask is legible by *distance* from its
+ground, not by absolute brightness.
+
+Every value is derived from `groundFor` and `accentOn`, so a new tenant gets
+their own weather without anybody choosing a gradient. Swept across three
+deliberately awkward accents — a blue, a green whose hue collides with the
+success tone, and a mid-lightness saturated orange — in both themes.
+
 ---
 
 ## 6. Navigation, and the overlay ladder

@@ -16,6 +16,10 @@
 import { writeFileSync } from "node:fs";
 import { svg } from "./icons.mjs";
 import { MOTION } from "./motion.mjs";
+import { SKY_CSS, SKIES } from "./sky.mjs";
+import { tokensFor, groundFor, DEFAULT_BRAND } from "../src/brand.js";
+import { accentOn, inkOn } from "../src/ground.js";
+import { oklchToRgb, toHex } from "../src/colour.js";
 
 /* ═══ THE SYSTEM, AS NUMBERS ═══ measured off the reference, at 390pt. */
 const SYS = `
@@ -130,6 +134,11 @@ body{background:var(--bg);color:var(--ink);font:400 var(--t-body)/1.35 -apple-sy
 .dock span{font-weight:var(--w-med);font-size:var(--t-meta);line-height:1}
 .dot{position:absolute;top:6px;right:26%;width:7px;height:7px;border-radius:var(--r-pill);background:var(--down)}
 .stage{display:flex;gap:28px;padding:28px;background:#0e0e10;align-items:flex-start}
+.swatch{position:relative;width:158px;height:104px;border-radius:14px;overflow:hidden;isolation:isolate}
+.swatch[data-theme='dark']{background:#000}
+.swatch[data-theme='light']{background:#f2f3f5}
+.swatch span{position:absolute;z-index:1;left:8px;bottom:6px;font:500 10px ui-monospace,monospace;
+  color:#fff;mix-blend-mode:difference;letter-spacing:.04em}
 /* ⚠️ SCALE THE TOKENS, NOT THE FRAME. Zooming the whole phone would shrink the
    viewport too and prove nothing; the question is how big the type and controls
    are RELATIVE to a 390pt screen. */
@@ -147,6 +156,38 @@ body{background:var(--bg);color:var(--ink);font:400 var(--t-body)/1.35 -apple-sy
 .s78 .notice .w{width:40px;height:40px}
 .cap{color:#8b8d95;font:500 12px/1 ui-monospace,monospace;padding:0 0 10px 2px;letter-spacing:.06em;text-transform:uppercase}
 `;
+
+
+/*
+  ⚠️ THE SKY'S COLOURS ARE DERIVED, NOT PICKED. Every value below comes from the
+  brand engine — the tenant's ambience hue and their accent, re-lit — so a new
+  tenant gets their own weather without anybody choosing a gradient.
+*/
+const skyVars = (brand, theme) => {
+  const g = groundFor(brand, theme);
+  const bloom = (l, c) => toHex(oklchToRgb({ l, c, h: brand.ambience.hue }));
+  const lit = accentOn(g.accent, g.canvas);
+  const a = (hex, alpha) => hex + Math.round(alpha * 255).toString(16).padStart(2, "0");
+  return theme === "dark"
+    ? { "--sky-deep": bloom(0.13, 0.03), "--sky-1": a(bloom(0.30, 0.06), .85),
+        "--sky-2": a(toHex(oklchToRgb({ ...lit, l: 0.34, c: lit.c * 0.55 })), .8),
+        "--sky-3": a(bloom(0.42, 0.05), .55), "--sky-bloom": bloom(0.62, 0.035) }
+    : { "--sky-deep": bloom(0.90, 0.02), "--sky-1": a(bloom(0.80, 0.05), .9),
+        "--sky-2": a(toHex(oklchToRgb({ ...lit, l: 0.74, c: lit.c * 0.45 })), .85),
+        "--sky-3": a(bloom(0.86, 0.04), .6), "--sky-bloom": bloom(0.97, 0.02) };
+};
+/* ⚠️ Three tenants chosen to be AWKWARD, not pretty: a blue, a green whose hue
+   collides with the success tone, and a mid-lightness saturated orange — the case
+   a hand-tuned palette fails, because it carries neither near-white nor near-dark
+   as a legible fill. */
+const TENANTS = [
+  DEFAULT_BRAND,
+  { ...DEFAULT_BRAND, accent: "#0b7a5a", ambience: { hue: 155, intensity: 0.045 } },
+  { ...DEFAULT_BRAND, accent: "#e8590c", ambience: { hue: 32, intensity: 0.05 } },
+];
+
+const skyFor = (brand, theme, cls) =>
+  `.${cls}{${Object.entries(skyVars(brand, theme)).map(([k, v]) => `${k}:${v}`).join(";")}}`;
 
 const bar = () => `<div class="status"><span>12:52</span><span>5G ▪▪▪ 53</span></div>`;
 const row = (o) => `<button class="row">
@@ -253,9 +294,20 @@ const home = `<div class="phone" data-enter><div class="status"><span>12:52</spa
 
 /* ⚠️ Beside itself. It wrote to an absolute /tmp path while it lived in /tmp,
    which is a file that only works from the machine it was written on. */
-writeFileSync(new URL("out.html", import.meta.url),`<!doctype html><meta charset="utf8"><style>${SYS}${MOTION}</style>
+writeFileSync(new URL("out.html", import.meta.url),`<!doctype html><meta charset="utf8"><style>${SYS}${MOTION}${SKY_CSS}\n${TENANTS.map((b,i)=>["dark","light"].map((th)=>skyFor(b,th,`sky-${i}-${th}`)).join("\n")).join("\n")}\n${skyFor(TENANTS[0],"dark","phone")}</style>
 <body><div class="stage">
 <div><div class="cap">pattern hero · menu</div>${security}</div>
 <div><div class="cap">photo hero · accounts</div>${home}</div>
+</div>
+<div class="stage" style="flex-direction:column;gap:18px">
+${TENANTS.map((t, ti) => `
+<div class="cap">tenant ${ti + 1} — every sky, both themes</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+${["dark","light"].flatMap((th) => SKIES.map((sky) => `
+  <div class="swatch sky-${ti}-${th}" data-theme="${th}">
+    <div class="backdrop" data-sky="${sky}" style="--solid:70%;--reach:100%"></div>
+    <span>${sky} · ${th}</span>
+  </div>`)).join("")}
+</div>`).join("")}
 </div></body>`);
 console.log("wrote out.html");
