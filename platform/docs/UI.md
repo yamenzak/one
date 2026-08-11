@@ -253,6 +253,24 @@ quote to support. Rendering that as `String(err)` in a toast throws away all
 five. Per-field goes under its field; anything else sits with the action that
 caused it.
 
+**A symbol after the words is its own child, not part of the label.** — Passed in
+with the text, the tick landed *inside* a label that sets `line-height: 1` and no
+gap, so a finished save read as "Done✓" with the mark touching the word.
+
+**Success is white ink on a deep green, not dark ink on a bright one.** — The
+bright green a success colour wants to be cannot carry white text, so the button
+was near-black lettering on neon: legible, and it reads as a browser alert from
+fifteen years ago rather than as the product answering. Deepen the green until
+white sits on it. And it arrives with a small overshoot on the same spring every
+control uses, because a ground that merely changes colour is a state being
+switched.
+
+**A thing with a face appears as itself inside a sentence.** — "Whoever is using
+Scena · Corniche Screens will be signed out" asks the reader to match a name they
+read to a planet they saw on the row behind the sheet. A chip is the same object
+in both places, so there is nothing to match. It is not a control and must not
+look like one, and it never wraps.
+
 **Working is not off.** — The saving state shared the disabled look — the same
 attribute, the opposite meaning — so a button mid-round-trip read as broken.
 

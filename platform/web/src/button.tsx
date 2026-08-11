@@ -32,12 +32,20 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
   readonly tone: ButtonTone;
   /** A symbol before the words. Never instead of them — this is not a toolbar. */
   readonly icon?: ReactNode;
+  /**
+   * ⚠️ A SYMBOL AFTER THE WORDS, AND IT IS ITS OWN CHILD RATHER THAN PART OF THE
+   * LABEL. Passed in with the text it landed INSIDE the label, which sets
+   * `line-height: 1` and no gap — so a finished save read as "Done✓", the tick
+   * touching the word. What comes after the words is a separate thing and is
+   * spaced like one.
+   */
+  readonly sign?: ReactNode;
   /** ⚠️ FULL WIDTH IS A PLACE, NOT A SIZE: it means the button owns the row. */
   readonly wide?: boolean;
   readonly children: ReactNode;
 }
 
-export function Button({ tone, icon, wide, children, ...rest }: ButtonProps): ReactNode {
+export function Button({ tone, icon, sign, wide, children, ...rest }: ButtonProps): ReactNode {
   return (
     <button
       type="button"
@@ -48,6 +56,7 @@ export function Button({ tone, icon, wide, children, ...rest }: ButtonProps): Re
     >
       {icon}
       <span className="button-label">{children}</span>
+      {sign}
     </button>
   );
 }

@@ -268,10 +268,9 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
 
       <div className="sheet-actions">
         <Button tone="loud" wide type="submit" data-state={state.at}
-          disabled={unchanged || local !== null || state.at === "working" || state.at === "done"}>
+          disabled={unchanged || local !== null || state.at === "working" || state.at === "done"}
+          sign={state.at === "working" ? <Spinner /> : state.at === "done" ? <Tick className="button-sign" size={21} /> : undefined}>
           {state.at === "working" ? "Saving" : state.at === "done" ? "Saved" : general?.retryable ? "Try again" : "Save"}
-          {state.at === "working" ? <Spinner /> : null}
-          {state.at === "done" ? <Tick className="button-sign" /> : null}
         </Button>
         {/* ⚠️ THE REASON THE ACTION IS OFF IS WRITTEN DOWN. A disabled button with
             no explanation is a dead end, and "nothing has changed" is a different

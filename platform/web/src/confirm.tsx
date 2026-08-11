@@ -43,8 +43,15 @@ export type Gate =
 export interface ConfirmProps {
   readonly open: boolean;
   readonly title: string;
-  /** What will actually happen. One sentence, in the future tense, concrete. */
-  readonly lede: string;
+  /**
+   * What will actually happen. One sentence, in the future tense, concrete.
+   *
+   * ⚠️ MARKUP RATHER THAN A STRING, so the thing being acted on can appear as
+   * itself — a chip with its face — instead of as its name in the middle of a
+   * sentence. That is the whole difference between "are you sure about Corniche
+   * Screens" and pointing at it.
+   */
+  readonly lede: ReactNode;
   /** The verb on the button. "Remove", never "OK" — a verb is a description. */
   readonly verb: string;
   readonly gate?: Gate;
@@ -131,9 +138,9 @@ function Asking({ title, lede, verb, gate = { kind: "press" }, tone, onConfirm, 
           data-state={state.at}
           disabled={!passed || state.at === "working" || state.at === "done"}
           onClick={() => void run()}
+          sign={state.at === "done" ? <Tick className="button-sign" size={21} /> : undefined}
         >
           {state.at === "working" ? "Working" : state.at === "done" ? "Done" : problem?.retryable ? "Try again" : verb}
-          {state.at === "done" ? <Tick className="button-sign" /> : null}
         </Button>
         {/* ⚠️ THE REASON THE ACTION IS OFF IS WRITTEN DOWN, because a gate nobody
             has satisfied looks exactly like a button that is broken. */}

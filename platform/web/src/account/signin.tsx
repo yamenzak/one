@@ -25,6 +25,7 @@ import type { Problem } from "@one/kernel";
 import { Add, Device, Key, Letter } from "../icon.js";
 import { Button } from "../button.js";
 import { Face } from "../avatar.js";
+import { Chip } from "../chip.js";
 import { Blank, Card, Item, Marked, Pill, Waiting } from "../list.js";
 import { Confirm } from "../confirm.js";
 import { Screen, Section, Title } from "../screen.js";
@@ -202,7 +203,18 @@ export function SignInMethods({
         title={asking?.kind === "device" ? "Sign out of this workspace?" : "Remove this passkey?"}
         lede={
           asking?.kind === "device"
-            ? `Whoever is using ${asking.it.app} will be signed out. You can sign in again at any time.`
+            ? (
+              <>
+                {/* ⚠️ THE WORKSPACE APPEARS AS ITSELF rather than as its name in
+                    the middle of a sentence — the same face that is on the row
+                    behind this sheet, so there is nothing to match up. */}
+                Whoever is using{" "}
+                <Chip face={<Face kind="workspace" src={asking.it.workspaceFace} name={asking.it.workspaceName ?? asking.it.app} tone={asking.it.product} />}>
+                  {asking.it.workspaceName ?? asking.it.app}
+                </Chip>{" "}
+                will be signed out. You can sign in again at any time.
+              </>
+            )
             : last
               ? "This is your last passkey. You will sign in with a code sent to your email until you add another."
               : `${asking?.kind === "passkey" ? asking.it.label : "This device"} will no longer sign you in. You can add it again later.`

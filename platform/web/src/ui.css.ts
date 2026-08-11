@@ -34,7 +34,7 @@ export const UI_CSS = `
   --alarm-well: #fbe6e4;
   --warn: #8a5a00;
   --warn-well: #fdf0d5;
-  --ok: #0e7a4d;
+  --ok: #0b6f45;
   --p-kova: #2f6bff;
   --p-scena: #00867a;
   --p-tessa: #c2185b;
@@ -55,7 +55,7 @@ export const UI_CSS = `
     --alarm-well: #3a1512;
     --warn: #f2c25c;
     --warn-well: #3a2c0f;
-    --ok: #2fcf7c;
+    --ok: #12a065;
     --p-kova: #4d8bff;
     --p-scena: #14a598;
     --p-tessa: #f0518a;
@@ -73,7 +73,7 @@ export const UI_CSS = `
   --alarm-well: #3a1512;
   --warn: #f2c25c;
   --warn-well: #3a2c0f;
-  --ok: #2fcf7c;
+  --ok: #12a065;
   --p-kova: #4d8bff;
   --p-scena: #14a598;
   --p-tessa: #f0518a;
@@ -359,10 +359,23 @@ h2 { word-spacing: normal; }
    same attribute and the opposite meaning — so it keeps its own ground and the
    pointer says wait rather than no. */
 .button[data-state='working']:disabled { background: var(--ink); color: var(--card); cursor: progress; }
-/* ⚠️ SAVED IS THE ONE STATE THAT GETS A COLOUR, and it keeps the disabled ground's
+/* ⚠️ DONE IS THE ONE STATE THAT GETS A COLOUR, and it keeps the disabled ground's
    job of refusing a second press. Green for a moment is the clearest possible
-   answer to "did that work"; green forever is decoration. */
-.button[data-state='done']:disabled { background: var(--ok); color: var(--card); }
+   answer to "did that work"; green forever is decoration.
+
+   ⚠️ WHITE INK ON A DEEP GREEN, NOT DARK INK ON A BRIGHT ONE. The bright green a
+   success colour wants to be cannot carry white text, so the button was
+   near-black lettering on neon — legible, and it reads as a browser alert from
+   fifteen years ago rather than as this product answering. Deepening the green
+   until white sits on it is the whole fix, and the tick then belongs to the same
+   object as the word.
+
+   ⚠️ AND IT ARRIVES WITH A PUSH. A ground that simply changes colour is a state
+   being switched; a small overshoot on the same spring every control uses is the
+   button answering. */
+.button[data-state='done']:disabled { background: var(--ok); color: #fff;
+  animation: answered var(--settle) var(--spring); }
+@keyframes answered { from { scale: 0.965; } 45% { scale: 1.018; } }
 /* ⚠️ THE ALARM IS ON THE ACTION AND NOWHERE ELSE. A confirm sheet is already the
    product asking whether somebody means it; painting the whole surface red says
    the same thing again, louder, to somebody who has already understood. */
@@ -457,6 +470,18 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
 .face[data-tone='kova'] { background: var(--p-kova); }
 .face[data-tone='scena'] { background: var(--p-scena); }
 .face[data-tone='tessa'] { background: var(--p-tessa); }
+
+/* ⚠️ A FACE CARRIED INTO A LINE OF TEXT, and not a control. No border, no press,
+   a ground barely told from the surface under it: anything more makes a sentence
+   look like a form. It never wraps, because a chip broken across two lines is a
+   face on one and a name on the next. */
+.chip { display: inline-flex; align-items: center; gap: 6px; vertical-align: -0.28em;
+  max-inline-size: 100%; padding: 3px 10px 3px 4px; border-radius: var(--radius-well);
+  background: color-mix(in oklab, var(--ink) 9%, transparent); color: var(--ink);
+  word-spacing: normal; }
+.chip .face { flex: none; inline-size: 22px; block-size: 22px; font-size: 11px; }
+.chip-name { min-inline-size: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 14.5px; font-weight: 500; }
 
 /* ⚠️ THE BADGE SITS ON THE FACE AND THE FACE STANDS DOWN FOR IT. A planet at full
    strength is the most colourful thing on the row and a symbol laid over it
