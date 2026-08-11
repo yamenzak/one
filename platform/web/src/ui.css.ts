@@ -132,6 +132,12 @@ h2 { word-spacing: normal; }
    edge, and centring the two together would push the mark off centre by exactly
    the width of a button. */
 .page-top { display: flex; flex-direction: column; gap: 26px; padding-block-end: 10px; }
+/* ⚠️ THE CONTROLS SHARE A LINE AND THE TITLE SITS UNDER THEM. In the heading row
+   the title shifts left and right as the action changes from screen to screen —
+   and on a narrow phone a long title and a button fight for the same forty
+   millimetres. */
+.page-controls { display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-block-end: -14px; }
 
 /* ⚠️ A ROUND CONTROL ON ITS OWN LINE, above the title rather than beside it. It
    is a way OUT of a presentation, not a thing in the heading — putting it in the
@@ -225,11 +231,7 @@ h2 { word-spacing: normal; }
   background: color-mix(in oklab, var(--ink) 22%, transparent); }
 /* AND WHERE THERE IS NO GRABBER THERE IS AN X, because a sheet that cannot be
    dismissed by gesture still has to be leavable by control. */
-.sheet-close { position: absolute; inset-block-start: 14px; inset-inline-end: 14px;
-  inline-size: 34px; block-size: 34px; border: 0; border-radius: var(--radius-well);
-  display: grid; place-items: center; cursor: pointer;
-  background: var(--well); color: var(--ink); }
-.sheet-close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sheet-close { position: absolute; inset-block-start: 14px; inset-inline-end: 14px; }
 /* ⚠️ ON A WIDE WINDOW IT IS CENTRED, because a strip across the foot of a
    1400-pixel screen is a notification bar, and nobody reads a form in one. A
    tablet is wide AND has a keyboard, so the inset still applies — halved, because
@@ -284,32 +286,42 @@ h2 { word-spacing: normal; }
   color: var(--ink-faint); word-spacing: normal; }
 
 .sheet-actions { display: flex; flex-direction: column; gap: 10px; }
-/* ⚠️ THE ACTION IS THE FULL WIDTH OF THE SHEET AND IT IS THE ONLY ONE. A cancel
-   beside it competes with the thing the person came here to do — the sheet is
-   dismissed by the scrim, by Escape and by the back gesture, all of which are
-   already there. */
-.primary { inline-size: 100%; min-block-size: 54px; border: 0; border-radius: var(--radius-well);
-  display: flex; align-items: center; justify-content: center; gap: 9px;
-  background: var(--ink); color: var(--card); cursor: pointer;
-  font: inherit; font-size: 17px; font-weight: 600; word-spacing: normal;
+/* ⚠️ ONE BUTTON, AND THE TONE SAYS WHAT IT IS RATHER THAN HOW IT LOOKS. LOUD
+   leads — one per surface, the thing the person came to do. QUIET sits on a row
+   beside something more important than itself, which is why removing a passkey is
+   not red: a red button per row makes a list of ordinary facts look like a list
+   of problems, and the one that really is dangerous stops standing out. */
+.button { display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  min-block-size: 40px; padding-inline: 16px; border: 0; border-radius: var(--radius-well);
+  cursor: pointer; font: inherit; font-size: 15px; font-weight: 600; word-spacing: normal;
   transition: background-color var(--swift) var(--move), color var(--swift) var(--move); }
-.primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.button[data-tone='loud'] { background: var(--ink); color: var(--card); }
+/* ⚠️ QUIET IS ALSO SMALLER, because where it appears there is something more
+   important on the line and the row's height is set by whichever is taller. At
+   the loud size it made every row in a list deeper for the sake of a word nobody
+   came to read. */
+.button[data-tone='quiet'] { background: var(--well); color: var(--ink);
+  min-block-size: 36px; padding-inline: 14px; font-size: 14.5px; }
+/* ⚠️ FULL WIDTH IS A PLACE, NOT A SIZE: it means the button owns the row, which
+   is what the action at the foot of a sheet does. */
+.button[data-wide] { inline-size: 100%; min-block-size: 54px; font-size: 17px; }
+.button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* ⚠️ OFF IS A DIFFERENT GROUND, NOT A FADED ONE. A translucent control on a card
    inherits whatever is behind it, and at 40% opacity the label falls under every
    contrast floor there is — so it looks broken to everyone and is unreadable to
    some. */
-.primary:disabled { background: var(--well); color: var(--ink-faint); cursor: default; }
+.button:disabled { background: var(--well); color: var(--ink-faint); cursor: default; }
 /* ⚠️ WORKING IS NOT OFF, and sharing one disabled look made it read as one. The
    button is refusing a second press for the length of a round trip — which is the
    same attribute and the opposite meaning — so it keeps its own ground and the
    pointer says wait rather than no. */
-.primary[data-state='saving']:disabled { background: var(--ink); color: var(--card); cursor: progress; }
+.button[data-state='saving']:disabled { background: var(--ink); color: var(--card); cursor: progress; }
 /* ⚠️ SAVED IS THE ONE STATE THAT GETS A COLOUR, and it keeps the disabled ground's
    job of refusing a second press. Green for a moment is the clearest possible
    answer to "did that work"; green forever is decoration. */
-.primary[data-state='saved']:disabled { background: var(--ok); color: var(--card); }
-.primary-label { line-height: 1; }
-.primary-sign { flex: none; }
+.button[data-state='saved']:disabled { background: var(--ok); color: var(--card); }
+.button-label { line-height: 1; }
+.button-sign { flex: none; }
 
 
 

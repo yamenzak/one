@@ -17,6 +17,7 @@
  */
 
 import type { ElementType, ReactNode } from "react";
+import { RoundButton } from "./button.js";
 import { Back, Close } from "./icon.js";
 import type { Sky } from "./sky.css.js";
 
@@ -31,25 +32,39 @@ export interface ScreenProps {
    */
   readonly sky?: Sky;
   readonly title: ReactNode;
+  /**
+   * ⚠️ ONE SENTENCE, AND ONLY WHERE THE TITLE IS NOT ENOUGH. "Your details" needs
+   * none; "Sign-in methods" does, because the screen holds three unrelated things
+   * and the sentence is what says they belong together.
+   */
+  readonly lede?: string;
+  /**
+   * ⚠️ THE ONE THING THE SCREEN IS FOR, IN THE HEADER, opposite the way out. A
+   * screen whose principal action is at the bottom of a list makes the person
+   * read the list to find out they could have skipped it.
+   */
+  readonly action?: ReactNode;
   readonly children: ReactNode;
 }
 
-export function Screen({ leave, onLeave, sky, title, children }: ScreenProps): ReactNode {
+export function Screen({ leave, onLeave, sky, title, lede, action, children }: ScreenProps): ReactNode {
   return (
     /* ⚠️ THE STAGGER IS ON THE FRAME, so every screen's sections arrive in
        sequence without anybody remembering to ask. */
     <div className="page stagger">
       {sky ? <div className="sky" data-sky={sky} aria-hidden="true" /> : null}
       <header className="page-top">
-        <button
-          type="button"
-          className="round-button press"
-          aria-label={leave === "dismiss" ? "Close" : "Back"}
-          onClick={onLeave}
-        >
-          {leave === "dismiss" ? <Close /> : <Back />}
-        </button>
+        {/* ⚠️ THE WAY OUT AND THE WAY ON SHARE A LINE, and the title sits under
+            both. Putting the action in the heading row makes the title shift left
+            and right as the action changes from screen to screen. */}
+        <div className="page-controls">
+          <RoundButton label={leave === "dismiss" ? "Close" : "Back"} onClick={onLeave}>
+            {leave === "dismiss" ? <Close /> : <Back />}
+          </RoundButton>
+          {action}
+        </div>
         {title}
+        {lede ? <p className="lede">{lede}</p> : null}
       </header>
       {children}
     </div>

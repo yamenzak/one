@@ -28,6 +28,7 @@ import type { Problem } from "@one/kernel";
 import { AccountCenter } from "../src/account/center.js";
 import { AccountDetails } from "../src/account/details.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
+import { SignInMethods } from "../src/account/signin.js";
 import { configureFeedback, feel } from "../src/feedback.js";
 
 /* ⚠️ BAKED AT BUILD TIME BY `dev/page.tsx`, standing in for the route that will
@@ -92,7 +93,7 @@ type OnOff = (typeof ON_OFF)[number];
 
 function Preview() {
   const [open, setOpen] = useState(true);
-  const [at, setAt] = useState<"home" | "details">("home");
+  const [at, setAt] = useState<"home" | "details" | "signin">("home");
   const [which, setWhich] = useState((asked.get("state") ?? "four") as keyof typeof CASES);
   const [outcome, setOutcome] = useState((asked.get("save") ?? "ok") as keyof typeof OUTCOMES);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
@@ -113,12 +114,38 @@ function Preview() {
     return OUTCOMES[outcome] ?? null;
   };
 
+  /* ⚠️ ONE ACCOUNT WITH TWO PASSKEYS AND TWO LIVE SESSIONS, one of each being the
+     one in your hand — which is the row that behaves differently and therefore
+     the row worth having in the fixture. */
+  const KEYS = [
+    { id: "k1", label: "MacBook Pro", added: "4 March", lastUsed: "2 days ago", current: true },
+    { id: "k2", label: "iPhone 15", added: "12 May" },
+  ];
+  const DEVICES = [
+    { id: "d1", app: "Kova · Haddad Strength", since: "4 March", current: true },
+    { id: "d2", app: "Scena · Corniche Screens", since: "28 July" },
+  ];
+
   const screen = ({ Heading }: { readonly Heading: ElementType }) =>
-    at === "home" ? (
+    at === "signin" ? (
+      <SignInMethods
+        email={(CASES[which] ?? CASES.four).person.email}
+        passkeys={which === "waiting" ? null : which === "new" ? [] : KEYS}
+        devices={which === "waiting" ? null : DEVICES}
+        Heading={Heading}
+        onAddPasskey={() => undefined}
+        onRemovePasskey={() => undefined}
+        onSignOut={() => undefined}
+        onBack={() => setAt("home")}
+      />
+    ) : at === "home" ? (
       <AccountHome
         {...CASES[which] ?? CASES.four}
         Heading={Heading}
-        onGo={(to) => { if (to === "account.profile") setAt("details"); }}
+        onGo={(to) => {
+          if (to === "account.profile") setAt("details");
+          if (to === "account.security") setAt("signin");
+        }}
         onClose={() => setOpen(false)}
       />
     ) : (
@@ -149,7 +176,7 @@ function Preview() {
 
       <div className="dial" data-open={dial ? "" : undefined} onPointerDown={(e) => e.stopPropagation()}>
         <div className="dial-panel">
-          <Group label="screen" value={at} options={["home", "details"] as const} onPick={setAt} />
+          <Group label="screen" value={at} options={["home", "details", "signin"] as const} onPick={setAt} />
           <Group label="workspaces" value={which} options={Object.keys(CASES) as (keyof typeof CASES)[]} onPick={setWhich} />
           <Group label="save" value={outcome} options={Object.keys(OUTCOMES) as (keyof typeof OUTCOMES)[]} onPick={setOutcome} />
           <Group label="theme" value={theme} options={["dark", "light"] as const} onPick={setTheme} />

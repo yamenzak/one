@@ -39,12 +39,19 @@ export interface ItemProps {
   readonly detail?: ReactNode;
   /** The one row on a card that is not like the others. */
   readonly tone?: "alarm";
-  readonly onGo: () => void;
+  /**
+   * ⚠️ A ROW EITHER GOES SOMEWHERE OR DOES SOMETHING, NEVER BOTH. With an action
+   * on the right the row itself is not pressable: two targets on one line means
+   * the finger that meant "remove" and landed a millimetre left opens a screen
+   * instead — and there is no chevron, because there is nowhere onward.
+   */
+  readonly onGo?: () => void;
+  readonly action?: ReactNode;
 }
 
-export function Item({ icon, mark, title, detail, tone, onGo }: ItemProps): ReactNode {
-  return (
-    <button type="button" className="item press-flat" onClick={onGo}>
+export function Item({ icon, mark, title, detail, tone, onGo, action }: ItemProps): ReactNode {
+  const body = (
+    <>
       {/* ⚠️ THE WELL IS THE ICON'S GROUND, and it is what makes a column of glyphs
           read as a list rather than as loose marks at different optical weights. */}
       {mark ?? (icon ? <span className="well" data-tone={tone}>{icon}</span> : null)}
@@ -52,9 +59,12 @@ export function Item({ icon, mark, title, detail, tone, onGo }: ItemProps): Reac
         <span className="item-title">{title}</span>
         {detail ? <span className="item-detail">{detail}</span> : null}
       </span>
-      <Onward className="chevron" />
-    </button>
+      {onGo ? <Onward className="chevron" /> : action}
+    </>
   );
+  return onGo
+    ? <button type="button" className="item press-flat" onClick={onGo}>{body}</button>
+    : <div className="item">{body}</div>;
 }
 
 export interface EntryProps {

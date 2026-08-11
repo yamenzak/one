@@ -22,6 +22,7 @@
 
 import { useCallback, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { RoundButton } from "./button.js";
 import { Close } from "./icon.js";
 
 export interface SheetProps {
@@ -77,9 +78,9 @@ export function Sheet({ open, onClose, dismissible, label, children }: SheetProp
               <span className="grabber-bar" aria-hidden="true" />
             </div>
           ) : (
-            <button type="button" className="sheet-close press" aria-label="Close" onClick={onClose}>
-              <Close size={18} />
-            </button>
+            <span className="sheet-close">
+              <RoundButton label="Close" onClick={onClose}><Close size={18} /></RoundButton>
+            </span>
           )}
           {children}
         </Dialog.Content>

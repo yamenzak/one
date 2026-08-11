@@ -31,14 +31,14 @@
 
 import type { ReactNode } from "react";
 import {
-  ArrowLeft, Camera, Check, ChevronRight, Download, HeartCrack, KeyRound,
-  Pencil, Shield, SlidersHorizontal, X, type LucideIcon,
+  ArrowLeft, Camera, Check, ChevronRight, Download, HeartCrack, KeyRound, Mail,
+  MonitorSmartphone, Pencil, Plus, Shield, SlidersHorizontal, X, type LucideIcon,
 } from "lucide-react";
 
 /** The name the stylesheet animates by. Closed: a new icon adds a rule. */
 export type IconName =
-  | "key" | "adjust" | "guard" | "save" | "heartbreak"
-  | "edit" | "lens" | "onward" | "close" | "back" | "tick";
+  | "key" | "adjust" | "guard" | "save" | "heartbreak" | "letter" | "device"
+  | "edit" | "lens" | "onward" | "close" | "back" | "tick" | "add";
 
 export interface IconProps {
   readonly size?: number;
@@ -78,12 +78,15 @@ export const Save = draw(Download, "save", 21);
 export const Heartbreak = draw(HeartCrack, "heartbreak", 21);
 export const Edit = draw(Pencil, "edit", 17);
 export const Lens = draw(Camera, "lens", 14);
+export const Letter = draw(Mail, "letter", 21);
+export const Device = draw(MonitorSmartphone, "device", 21);
 
 /* Furniture — the parts of a row rather than a meaning in it. */
 export const Onward = draw(ChevronRight, "onward", 19);
 export const Close = draw(X, "close", 20);
 export const Back = draw(ArrowLeft, "back", 20);
 export const Tick = draw(Check, "tick", 19);
+export const Add = draw(Plus, "add", 18);
 
 /**
  * ⚠️ WHAT EACH ICON IS MADE OF, so a test can hold Lucide to it. The order is the
@@ -97,8 +100,11 @@ export const ICON_PARTS: Readonly<Record<IconName, readonly string[]>> = {
   heartbreak: ["path", "path"],
   edit: ["path", "path"],
   lens: ["path", "circle"],
+  letter: ["path", "rect"],
+  device: ["path", "path", "path", "rect"],
   onward: ["path"],
   close: ["path", "path"],
   back: ["path", "path"],
   tick: ["path"],
+  add: ["path", "path"],
 };

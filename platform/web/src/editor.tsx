@@ -29,6 +29,7 @@ import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { Problem } from "@one/kernel";
 import { feel } from "./feedback.js";
+import { Button } from "./button.js";
 import { Close, Tick } from "./icon.js";
 import { Sheet } from "./sheet.js";
 
@@ -258,7 +259,8 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
             autoFocus
           />
           {value ? (
-            <button type="button" className="field-clear press" aria-label="Clear" onClick={() => { setValue(""); setState({ at: "idle" }); }}>
+            <button type="button" className="field-clear press" aria-label="Clear"
+              onClick={() => { setValue(""); setState({ at: "idle" }); }}>
               <Close size={15} />
             </button>
           ) : null}
@@ -279,14 +281,12 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
       ) : null}
 
       <div className="sheet-actions">
-        <button type="submit" className="primary press" data-state={state.at}
+        <Button tone="loud" wide type="submit" data-state={state.at}
           disabled={unchanged || local !== null || state.at === "saving" || state.at === "saved"}>
-          <span className="primary-label">
-            {state.at === "saving" ? "Saving" : state.at === "saved" ? "Saved" : general?.retryable ? "Try again" : "Save"}
-          </span>
+          {state.at === "saving" ? "Saving" : state.at === "saved" ? "Saved" : general?.retryable ? "Try again" : "Save"}
           {state.at === "saving" ? <Spinner /> : null}
-          {state.at === "saved" ? <Tick className="primary-sign" /> : null}
-        </button>
+          {state.at === "saved" ? <Tick className="button-sign" /> : null}
+        </Button>
         {/* ⚠️ THE REASON THE ACTION IS OFF IS WRITTEN DOWN. A disabled button with
             no explanation is a dead end, and "nothing has changed" is a different
             dead end from "that is not an email address". */}
@@ -299,7 +299,7 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
 /* ⚠️ A RING, NOT A LABEL THAT SAYS "…". It has to be visibly moving: a button
    that has changed its word and nothing else is one people press again. */
 const Spinner = (): ReactNode => (
-  <svg className="primary-sign spin" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" fill="none"
+  <svg className="button-sign spin" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" fill="none"
     stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
     <path d="M12 3a9 9 0 0 1 9 9" />
   </svg>

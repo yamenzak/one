@@ -151,6 +151,18 @@ export const MOTION_CSS = `
 /* The shutter closes. */
 .portrait:active [data-icon='lens'] > :nth-child(2) { scale: 0.45; }
 
+/* ⚠️ THE FLAP LIFTS AND THE ENVELOPE STAYS. The code arrives IN it, which is the
+   same gesture as the download's tray one card up — and it is the shape of the
+   thing, not a verb borrowed from a list of four. */
+.item:active [data-icon='letter'] > :nth-child(1) { translate: 0 -1.6px; }
+
+/* ⚠️ THE PHONE WAKES. It is the small screen beside the big one, and the small
+   one is the device somebody is signed in on. */
+.item:active [data-icon='device'] > :nth-child(4) { scale: 1.14; }
+
+/* A plus turns towards being a cross, which is what adding then cancelling is. */
+.button:active [data-icon='add'] { rotate: 90deg; }
+
 /* Furniture: it points where the press goes. */
 .item:active [data-icon='onward'], .item:active .chevron { translate: 3.5px 0; }
 

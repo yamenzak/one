@@ -196,6 +196,22 @@ behind it.
 **A grabber is a claim, so it appears only where it is true.** — A bar at the top
 of a sheet is the one piece of furniture that means *pull me*.
 
+**A row either goes somewhere or does something, never both.** — Two targets on
+one line means the finger that meant "Remove" and landed a millimetre left opens
+a screen instead. With an action on the right there is no chevron, because there
+is nowhere onward.
+
+**Destruction on a row is quiet, not red.** — Removing a passkey and signing a
+device out are both destructive and both sit beside the thing being removed,
+which is the more important half of the line. A red button per row makes a list
+of ordinary facts look like a list of problems, and the one that really is
+dangerous stops standing out. Destruction is confirmed, not coloured.
+
+**A row that carries a button has about half a phone for words.** — "Added 4
+March · last used 2 days ago" wrapped to two lines and pushed the standing pill
+onto a third; every row was half again as tall as it had reason to be. One short
+fact, and at that width a pill is a line by itself.
+
 ### 2.8 Failure
 
 **A failure is a `Problem`, never a string.** — The platform already refuses to
@@ -212,6 +228,14 @@ attribute, the opposite meaning — so a button mid-round-trip read as broken.
 **A disabled control says why.** — "Nothing has changed" is a different dead end
 from "that is not an email address", and a control that is off with no
 explanation is neither.
+
+**An empty list of something people have never deliberately made explains
+itself.** — "No passkeys" says nothing to somebody who does not know what one is,
+and that screen is exactly where they will be.
+
+**The absence of a control is a statement, so it does not need a badge too.** —
+The email code row carried an "Always on" pill *and* a sentence saying the same
+thing, and the pill cost a third line.
 
 ### 2.9 Looking
 
