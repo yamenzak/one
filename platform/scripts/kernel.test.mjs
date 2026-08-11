@@ -265,7 +265,18 @@ let anyHits = 0;
 for (const file of srcFiles) {
   const src = read(file);
   const code = stripStrings(stripComments(src));
-  for (const m of code.matchAll(/\bany\b/g)) {
+  /*
+    ⚠️ A TYPE POSITION, NOT THE WORD. `srcFiles` now includes `.tsx`, and JSX
+    text is not a string literal — so `stripStrings` leaves it alone and the
+    check read the product's own copy. "You are not in any workspace yet" is
+    English, and failing the build on it is a guard that has to be worked around,
+    which is the one thing a guard must never become.
+
+    Every real form is preceded by `:` `<` `|` `&` `,` `(` or the word `as`, or
+    is followed by `[]` — `x: any`, `as any`, `Record<string, any>`, `any[]`,
+    `(x: any) =>`, `Promise<any>`. Prose has a letter or a space on both sides.
+  */
+  for (const m of code.matchAll(/(?:[:<|&,(]\s*|\bas\s+)any\b|\bany\s*\[\]/g)) {
     const line = code.slice(0, m.index).split("\n").length;
     const above = src.split("\n").slice(Math.max(0, line - 3), line).join("\n");
     // A stated reason is a `--` justification on an eslint-disable, or the token.

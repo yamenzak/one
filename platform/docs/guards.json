@@ -3001,6 +3001,42 @@
       "impl": "runtime/test/mail.test.ts",
       "proves": "says the binding is missing rather than reporting a refusal",
       "fails": "a deployment configured to send through Cloudflare on a worker with no send_email binding, reported as a refused send — which sends an operator to look at DNS for one line of wrangler.jsonc"
+    },
+    {
+      "id": "a-class-is-declared-once",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/css.test.tsx",
+      "proves": "declares no class twice",
+      "fails": "two unrelated things sharing one class name. `ghost` was the quiet button AND the loading placeholder, so every placeholder bar inherited a 40px minimum height, a border and a pill radius — the loading state rendered as a stack of empty outlined capsules and nothing failed, because both rules were valid CSS"
+    },
+    {
+      "id": "the-sheet-and-the-markup-are-one-set-of-names",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/css.test.tsx",
+      "proves": "wears every class the sheet styles",
+      "fails": "a rule nothing wears — an affordance somebody designed, wrote and believed shipped — or a class the sheet never mentions, which renders as a bare box"
+    },
+    {
+      "id": "both-themes-in-all-three-scopings",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/css.test.tsx",
+      "proves": "defines every colour in all three theme scopings",
+      "fails": "a colour defined only under the media query or only under the attribute. The viewer has three states, not two, and the missing one renders one theme's text on the other theme's ground"
+    },
+    {
+      "id": "no-backtick-inside-a-sheet",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/sheets.mjs",
+      "proves": "a backtick inside a CSS template literal",
+      "fails": "a backtick in a comment inside a CSS template literal — it closes the literal, and the compiler reports a missing , or ; hundreds of lines away in a line that has nothing wrong with it. Scans raw text, so it reports the cause on a file that no longer parses"
     }
   ]
 }
