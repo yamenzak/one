@@ -68,10 +68,17 @@ export const ACCOUNT_CSS = `
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+/* ⚠️ THE TEXT FACE'S WORD SPACE IS TOO NARROW, AND THIS IS THE CORRECTION. Plus
+   Jakarta Sans sets wide letters against a narrow space, so at row sizes "Your
+   name, photo and address" closes up into "Yourname,photoandaddress" — legible,
+   and wrong in a way that reads as bad rendering rather than as a choice. It is
+   set once here rather than per element, and the brand face, whose spacing is
+   correct, takes it back below. */
 body { margin: 0; background: var(--page); color: var(--ink);
-  font: 400 16px/1.45 ui-sans-serif, -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
+  font: 400 16px/1.45 var(--font-text); word-spacing: 0.08em;
   -webkit-font-smoothing: antialiased; }
 h1, h2, p { margin: 0; padding: 0; }
+h1, h2 { word-spacing: normal; }
 
 /* ⚠️ THE PAGE IS THE WHOLE SURFACE, and it is presented over the app rather than
    inside it — no navigation, no tabs, no product chrome. One column, capped: an
@@ -93,19 +100,27 @@ h1, h2, p { margin: 0; padding: 0; }
    edge, and centring the two together would push the mark off centre by exactly
    the width of a button. */
 .page-top { display: flex; flex-direction: column; gap: 26px; padding-block-end: 10px; }
-.page-top h1 { align-self: center; font-size: 26px; line-height: 1;
+.page-top h1 { align-self: center; font-size: 25px; line-height: 1;
   margin-block: 12px 6px; }
 
-/* ⚠️ ONE OBJECT, NOT A BADGE WITH A CAPTION. The word is quieter than the mark:
-   the mark is whose this is, the word is which surface — a lockup where both
-   shout is two logos beside each other. */
-/* ⚠️ THE MARK SITS ON THE BASELINE OF THE WORD, not on the middle of the line
-   box. It is taller than the letters and centring the two by their boxes lifts
-   the word off the mark's own footing, which reads as a misalignment nobody can
-   name. */
-.brand-mark { display: block; }
-.lockup { display: inline-flex; align-items: center; gap: 0.34em; }
-.lockup-word { font-weight: 400; letter-spacing: 0.01em; opacity: 0.72; }
+/* ⚠️ ONE OBJECT, NOT A MARK WITH A CAPTION BESIDE IT. Everything below is in
+   service of that: the same face as the mark's construction, the same weight as
+   its strokes, a gap measured against its own stem rather than against a word
+   space, and no second colour or opacity to tell the two halves apart. */
+/* ⚠️ THE GAP IS A STEM, NOT A SPACE. At a word space the pair reads as two
+   things that happen to be adjacent; at roughly the width of the mark's own
+   stroke it reads as the spacing INSIDE a piece of lettering, which is what a
+   lockup is. */
+.lockup { display: inline-flex; align-items: center; gap: 0.26em; }
+/* ⚠️ ALIGNED ON THE FOUR'S BASELINE, NOT ON THE BOX. The star hangs below the
+   figure and the degree sits above it, so the mark's box is taller than the mark
+   READS — centred by boxes, the four floats above the word it is set with. The
+   nudge is the overhang, and it is what makes the two share a footing. */
+.brand-mark { display: block; translate: 0 0.02em; }
+/* ⚠️ THE SAME WEIGHT AS THE MARK'S STROKES, AND THE SAME INK. A lighter or
+   greyed word is a caption; the mark and the name of the surface are one object
+   here, so neither is allowed to be the quiet one. */
+.lockup-word { font-family: var(--font-brand); font-weight: 600; letter-spacing: -0.035em; }
 /* ⚠️ A ROUND CONTROL ON ITS OWN LINE, above the title rather than beside it. It
    is a way OUT of a presentation, not a thing in the heading — putting it in the
    heading row makes the title jump left and right as the control changes. */
@@ -122,7 +137,12 @@ h1, h2, p { margin: 0; padding: 0; }
 section { display: flex; flex-direction: column; gap: 10px; }
 /* ⚠️ A SECTION HEADING IS A HEADING. Small grey uppercase is a label on a form;
    the sections here are places, and a place is named at full ink. */
-h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.018em; padding-inline-start: 4px; }
+/* ⚠️ AND IT IS SET IN THE BRAND FACE, which is what makes a heading read as a
+   sign over a place rather than as the first row of the card under it. The rows
+   themselves stay in the reading face — the difference between the two is the
+   hierarchy, and it survives at a glance in a way a weight alone does not. */
+h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
+  letter-spacing: -0.025em; padding-inline-start: 4px; }
 
 /* ------------------------------------------------------------------- cards */
 

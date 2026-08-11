@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ACCOUNT_CSS } from "../src/account/home.css.js";
 import { SKY_CSS } from "../src/sky.css.js";
+import { TYPE_CSS } from "../src/brand/type.css.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 
 const props: AccountHomeProps = {
@@ -35,7 +36,7 @@ const used = new Set(
 );
 
 /* Comments state the rules and would match them. Only declarations are read. */
-const rules = [ACCOUNT_CSS, SKY_CSS].join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
+const rules = [ACCOUNT_CSS, SKY_CSS, TYPE_CSS].join("\n").replace(/\/\*[\s\S]*?\*\//g, "");
 
 describe("the stylesheet and the markup are the same set of names", () => {
   /*
@@ -91,8 +92,8 @@ describe("the stylesheet and the markup are the same set of names", () => {
     expect(light.length).toBeGreaterThan(8);
     const media = block(":root:not([data-theme='light']) {");
     const explicit = block(":root[data-theme='dark'] {");
-    /* Only the colours invert. A radius and a gap are the same in both. */
-    const colours = light.filter((n) => !/radius|gap|pad/.test(n));
+    /* Only the colours invert. A radius, a gap and a typeface are the same in both. */
+    const colours = light.filter((n) => !/radius|gap|pad|font/.test(n));
     for (const name of colours) {
       expect(media, `${name} has no dark value under prefers-color-scheme`).toContain(`${name}:`);
       expect(explicit, `${name} has no dark value under an explicit choice`).toContain(`${name}:`);

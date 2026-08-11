@@ -16,10 +16,20 @@
  */
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 import { ACCOUNT_CSS } from "../src/account/home.css.js";
+import { FONTS, TYPE_CSS, fontFace } from "../src/brand/type.css.js";
 import { SKIES, SKY_CSS } from "../src/sky.css.js";
+
+/* ⚠️ INLINED, BECAUSE A PREVIEW IS ONE FILE. There is nowhere beside a single
+   HTML document to put a font, and the page it is published to blocks every
+   external host — a linked webfont there does not fail loudly, it silently falls
+   back, and the whole point of looking at the page is lost. Real apps serve the
+   same file from a URL; that is why the src is a parameter. */
+const FONT = FONTS.map((f) =>
+  fontFace(f, `data:font/woff2;base64,${readFileSync(f.file).toString("base64")}`),
+).join("\n");
 
 const noop = () => undefined;
 
@@ -102,7 +112,7 @@ const group = (act: string, label: string, options: readonly { readonly value: s
 const html = `<!doctype html><html lang="en" data-theme="dark"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Account — @one/web</title>
-<style>${ACCOUNT_CSS}</style><style>${SKY_CSS}</style><style>${DIAL}</style>
+<style>${FONT}</style><style>${TYPE_CSS}</style><style>${ACCOUNT_CSS}</style><style>${SKY_CSS}</style><style>${DIAL}</style>
 </head><body>
 ${CASES.map((c, i) => `<div class="case" data-case="${c.id}"${i === 0 ? " data-live" : ""}>${
   renderToStaticMarkup(<AccountHome {...c.props} /> as never)

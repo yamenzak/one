@@ -68,16 +68,23 @@ export function Mark({ size = "1em", label }: MarkProps): ReactNode {
 }
 
 /**
- * The mark and a word, set as one thing.
+ * The mark and a name, set as one thing.
  *
- * ⚠️ THE WORD IS QUIETER THAN THE MARK. "ID" is what this surface is; the mark
- * is who it belongs to, and a lockup where both shout is two logos beside each
- * other. The reference sets the same relationship, and it is the reason the pair
- * reads as one object rather than as a badge with a caption.
+ * ⚠️ IT IS ONE OBJECT, WHICH IS A TYPOGRAPHIC CLAIM AND NOT A LAYOUT ONE. The
+ * mark is drawn from the same geometry the brand face is built on, set at the
+ * weight of that face, spaced by its own stem and sharing its ink — so the pair
+ * reads as lettering rather than as a logo with a label after it. Break any one
+ * of those and it becomes a badge with a caption.
+ *
+ * ⚠️ SIZED AGAINST THE CAP HEIGHT, NOT AGAINST THE FONT SIZE. An em is the whole
+ * line box, of which the capitals occupy roughly seven tenths; a mark set at 1em
+ * therefore stands about a third taller than the word beside it and reads as an
+ * icon that was dropped in. This is that ratio, plus the little a mark is
+ * allowed to overshoot by.
  */
 export const Lockup = ({ word }: { readonly word: string }): ReactNode => (
   <span className="lockup" role="img" aria-label={`4DL ${word}`}>
-    <Mark size="1.55em" />
+    <Mark size="1.15em" />
     <span className="lockup-word">{word}</span>
   </span>
 );

@@ -69,16 +69,17 @@ export function AccountHome({ person, workspaces, sky = "silk", onGo, onClose }:
           under the content would be a tint, and a tint is paint. */}
       <div className="sky" data-sky={sky} aria-hidden="true" />
       {/*
-        ⚠️ THE MARK IS THE TITLE. This surface belongs to the account rather than
-        to the product the person happens to be in, and the lockup is what says
-        so — a word like "Account" would be the name of a settings page, which is
-        exactly what this is not. Nothing else names the screen.
+        ⚠️ THE LOCKUP IS THE TITLE, MARK INCLUDED. This surface belongs to the
+        account rather than to the product the person happens to be in, and the
+        mark beside the name is what says so — "Account Center" on its own is the
+        name of a settings page, which is exactly what this is not. Nothing else
+        names the screen.
       */}
       <header className="page-top">
         {/* ⚠️ × AND NOT AN ARROW. This is the root of a presentation laid over the
             app, so the control dismisses it rather than walking back through it. */}
         <button type="button" className="round-button" aria-label="Close" onClick={onClose}><Close /></button>
-        <h1><Lockup word="ID" /></h1>
+        <h1><Lockup word="Account Center" /></h1>
       </header>
 
       <section>
