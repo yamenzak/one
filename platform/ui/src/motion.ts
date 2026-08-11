@@ -222,20 +222,45 @@ export const supersede = <T>(current: T | null, next: T | null): T | null => nex
  * ⚠️ AND THE TWO SETS BELOW ARE NOT DUPLICATES OF EACH OTHER. `SCORE` is what a
  * ROLE does on entrance; this is what an INTERACTION costs. They are kept
  * adjacent so the relationship is visible rather than inferred.
+ *
+ * ⚠️ THERE ARE FIVE DURATIONS, NOT FOUR, AND THE FIFTH WAS EARNED. A SCREEN
+ * COMPOSING ITSELF IS A DIFFERENT EVENT FROM AN OBJECT ARRIVING ON A COMPOSED
+ * ONE, and one number for both is a choice between a cheap page and a slow
+ * sheet. The first version used `--t-enter` for both at 320ms with a 10px rise:
+ * filmed, every frame was identical — the entrance had finished before the eye
+ * could find it, so it did not read as fast, it read as nothing having happened.
+ *
+ * ⚠️ WEIGHT IS DISTANCE × VISIBLE DURATION, AND "VISIBLE" IS THE WORD THAT WAS
+ * MISSING. All three of distance, duration and curve were wrong, but only the
+ * curve was wrong in a way that hides the other two: under an expo ease, raising
+ * the duration adds time in which nothing appears to move. See `--e-out`.
  */
 export const CLOCK = `
 :root {
   /* ⚠️ Leaving is always faster than arriving. Nobody waits to watch something go. */
-  --t-tap: 120ms;
-  --t-move: 220ms;
-  --t-enter: 320ms;
-  --t-exit: 170ms;
-  --e-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --t-tap: 140ms;
+  --t-move: 260ms;
+  --t-enter: 420ms;
+  /* ⚠️ A SCREEN COMPOSING ITSELF IS NOT AN OBJECT ARRIVING ON ONE. See the note
+     above: one number for both makes the page cheap or the sheet slow. */
+  --t-entrance: 600ms;
+  --t-exit: 220ms;
+  /* ⚠️ A TAIL BELOW THE PERCEPTUAL THRESHOLD IS LATENCY, NOT WEIGHT — and this
+     is measured rather than felt. An expo-out curve (0.16, 1, 0.3, 1) is at 95%
+     of its distance after 43% of its time, so a 600ms entrance visibly STOPS at
+     260ms and the remaining 340ms is a number in a stylesheet. Doubling the
+     duration under that curve changes nothing anybody can see, which is exactly
+     the trap: the fix looks applied and the screen still feels cheap.
+     This one reaches 95% at 64%, so most of the duration is motion somebody can
+     watch. Measured at 10/25/40/50/60/75% of the window: 27, 58, 78, 87, 93, 98. */
+  --e-out: cubic-bezier(0.33, 1, 0.68, 1);
   --e-in: cubic-bezier(0.4, 0, 1, 1);
   /* ⚠️ A real overshoot in pure CSS. It is the one place easing is not enough:
      the overshoot is what makes a press feel physical rather than merely fast. */
   --e-spring: linear(0, 0.402 7.4%, 0.711 15.3%, 0.929 23.4%, 1.008 28.5%, 1.057 34.6%, 1.062 41.6%, 1.031 55.9%, 0.995 79.5%, 1);
-  --stagger: 40ms;
+  /* ⚠️ Wide enough to READ as choreography. Under about 60ms a stagger is a
+     rendering artefact — the eye registers a smear rather than an order. */
+  --stagger: 85ms;
 }
 `.trim();
 
@@ -254,9 +279,17 @@ export const WEATHER = { drift: 52, breathe: { dots: 26, waves: 32, rings: 38 } 
 export const CHOREOGRAPHY = `
 /* ⚠️ PRESS IS THE ONE UNIVERSAL: everything pressable, the same answer. */
 [data-one='button'], [data-one='row'][data-interactive], [data-one='tile'], [data-one='quick-action'], [data-one='app-bar-leading'], [data-one='section-more'] {
-  transition: transform var(--t-tap) var(--e-spring), background-color var(--t-move) var(--e-out);
+  /* ⚠️ THE RELEASE SPRINGS; THE PRESS DOES NOT. A control that overshoots on the
+     way DOWN feels loose — the finger is still on it, so the overshoot happens
+     under the thumb where nothing physical would do that. Springing back on
+     release is the half that reads as mass, and it is why the two directions
+     carry different curves rather than one shared transition. */
+  transition: transform var(--t-move) var(--e-spring), background-color var(--t-move) var(--e-out);
 }
-[data-one='button']:active, [data-one='row'][data-interactive]:active, [data-one='tile']:active, [data-one='quick-action']:active, [data-one='app-bar-leading']:active { transform: scale(0.97); }
+[data-one='button']:active, [data-one='row'][data-interactive]:active, [data-one='tile']:active, [data-one='quick-action']:active, [data-one='app-bar-leading']:active {
+  transform: scale(0.96);
+  transition: transform var(--t-tap) var(--e-in);
+}
 [data-one='segment'] { transition: opacity var(--t-move) var(--e-out); }
 /* ⚠️ ONE INDICATOR THAT TRAVELS, rather than two pills cross-fading — which
    reads as two things happening instead of one thing moving. */
@@ -303,9 +336,14 @@ export const CHOREOGRAPHY = `
    so counting by TYPE lands the delays on the wrong elements and the stagger
    silently does nothing. It renders as "the animation is too subtle", which is
    the wrong diagnosis and leads to making the distance bigger. */
-@keyframes one-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-@keyframes one-lift { from { opacity: 0; transform: translateY(-8px) scale(1.02); } to { opacity: 1; transform: none; } }
-[data-one='body'] > * { animation: one-rise var(--t-enter) var(--e-out) both; }
+/* ⚠️ WEIGHT IS DISTANCE × DURATION × DECELERATION, and the first version had too
+   little of all three: 10px over 320ms on a shallow curve is finished before the
+   eye has found it. It moves further now, over longer, and settles rather than
+   stopping — and it does NOT bounce, because a bounce reads as playful, which is
+   the opposite of expensive. */
+@keyframes one-rise { from { opacity: 0; transform: translateY(24px) scale(0.975); } to { opacity: 1; transform: none; } }
+@keyframes one-lift { from { opacity: 0; transform: translateY(-16px) scale(1.035); } to { opacity: 1; transform: none; } }
+[data-one='body'] > * { animation: one-rise var(--t-entrance) var(--e-out) both; }
 [data-one='body'] > *:nth-child(1) { animation-delay: calc(var(--stagger) * 1); }
 [data-one='body'] > *:nth-child(2) { animation-delay: calc(var(--stagger) * 2); }
 [data-one='body'] > *:nth-child(3) { animation-delay: calc(var(--stagger) * 3); }
@@ -315,7 +353,10 @@ export const CHOREOGRAPHY = `
 [data-one='body'] > *:nth-child(n+5) { animation-delay: calc(var(--stagger) * 5); }
 /* ⚠️ THE HERO LEADS. It is what the screen is about, so it arrives first and
    from further away — the only element allowed a longer distance. */
-[data-one='hero'] { animation: one-lift var(--t-enter) var(--e-out) both; }
+/* ⚠️ AND THE HERO IS THE SLOWEST THING ON THE SCREEN. It is what the screen is
+   about, so it arrives first, from further, and takes longest to settle — the
+   one element allowed more than the shared entrance. */
+[data-one='hero'] { animation: one-lift calc(var(--t-entrance) * 1.15) var(--e-out) both; }
 
 /* ⚠️ THE WEATHER. Transform, never background-position: one is composited on the
    GPU and one repaints the whole layer every frame — at 52s nobody sees the

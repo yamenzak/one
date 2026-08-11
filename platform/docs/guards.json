@@ -3523,6 +3523,42 @@
       "impl": "ui/test/icons.test.ts",
       "proves": "defines every motion it assigns",
       "fails": "a motion an icon names and the choreographer never defines — that glyph stands still while its neighbours move, which reads as a broken icon rather than as a missing rule"
+    },
+    {
+      "id": "the-house-curve-spends-its-window-moving",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/motion.test.ts",
+      "proves": "spends most of its window moving",
+      "fails": "a timing function whose tail sits below the perceptual threshold — an expo ease is at 95% of its distance after 43% of its time, so raising the duration adds milliseconds in which nothing appears to move, and the screen still reads as cheap after the fix looks applied"
+    },
+    {
+      "id": "the-durations-are-ordered-by-event",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/motion.test.ts",
+      "proves": "orders the durations by what each event is",
+      "fails": "a screen composing itself timed like an object arriving on one, or anything leaving as slowly as it arrived — the first makes the page cheap or the sheet slow, the second is the commonest reason an interface feels sluggish"
+    },
+    {
+      "id": "an-entrance-travels-far-enough-to-see",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/motion.test.ts",
+      "proves": "moves far enough to be seen",
+      "fails": "a rise short enough to be a fade wearing a transform, or a stagger under about 60ms — which the eye registers as a smear rather than as an order"
+    },
+    {
+      "id": "the-press-is-damped-and-the-release-springs",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/motion.test.ts",
+      "proves": "presses with a damped curve and releases with the spring",
+      "fails": "a control that overshoots on the way down — the finger is still on it, and nothing physical overshoots under a thumb"
     }
   ]
 }

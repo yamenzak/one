@@ -335,15 +335,62 @@ component never holds a duration. Every timing is a token, so two things moving
 at once physically cannot disagree.
 
 ```
---t-tap    120ms   press. must read as instant
---t-move   220ms   a thing changing place or state on screen
---t-enter  320ms   something arriving
---t-exit   170ms   something leaving
+--t-tap       140ms   press. must read as instant
+--t-move      260ms   a thing changing place or state on screen
+--t-enter     420ms   something arriving on a screen that already exists
+--t-entrance  600ms   the screen itself, composing
+--t-exit      220ms   something leaving
+--stagger      85ms   between two members of one group
 
---e-out    cubic-bezier(.2,.8,.2,1)   decelerating — things arriving
+--e-out    cubic-bezier(.33,1,.68,1)  decelerating — things arriving
 --e-in     cubic-bezier(.4,0,1,1)     accelerating — things leaving
---e-spring linear(0,.402 7.4%,…,1)    a real spring, for press
+--e-spring linear(0,.402 7.4%,…,1)    a real spring, for the RELEASE of a press
 ```
+
+⚠️ **FIVE DURATIONS, AND THE FIFTH WAS EARNED.** A screen *composing itself* is a
+different event from an object *arriving on a composed screen*. One number for
+both is a choice between a cheap page and a slow sheet.
+
+### 4.1 Weight, and why the first version had none
+
+The first clock was 320ms and a 10px rise under `cubic-bezier(.16,1,.3,1)`.
+Every number looked reasonable and the result read as **cheap** — the reviewer's
+words were "no heavy premium feel". Filmed at 8×, the cause was not that the
+motion was fast. **Every frame was identical: it had finished before the eye
+could find it.**
+
+⚠️ **WEIGHT IS DISTANCE × *VISIBLE* DURATION, AND "VISIBLE" IS THE WORD THAT WAS
+MISSING.** A timing function's tail below the perceptual threshold is latency,
+not motion — and it hides every other fix, because raising the duration under
+that curve adds time in which nothing appears to happen. Measured, as a
+percentage of the window at which each curve reaches 95% of its distance:
+
+| curve | 10% | 25% | 40% | 50% | 60% | reaches 95% at |
+|---|---|---|---|---|---|---|
+| expo `(.16,1,.3,1)` | 49 | 83 | 94 | 97 | 99 | **43%** |
+| old `(.2,.8,.2,1)` | 40 | 77 | 90 | 95 | 97 | **52%** |
+| **cubic `(.33,1,.68,1)`** | 27 | 58 | 78 | 87 | 93 | **64%** |
+| quad `(.25,.46,.45,.94)` | 19 | 45 | 67 | 77 | 85 | 79% |
+
+Under expo, a 600ms entrance visibly **stops at 260ms** and the remaining 340ms
+is a number in a stylesheet. The house curve is the cubic: decisive at the start,
+and still moving through two thirds of its window.
+
+⚠️ **AND THE RELEASE SPRINGS WHILE THE PRESS DOES NOT.** A control that
+overshoots on the way *down* feels loose — the finger is still on it, and nothing
+physical overshoots under a thumb. Press is `--t-tap` on `--e-in`; release is
+`--t-move` on `--e-spring`. Two directions, two curves, which is why they are not
+one shared transition.
+
+⚠️ **A BOUNCE ON AN ENTRANCE READS AS PLAYFUL, WHICH IS THE OPPOSITE OF
+EXPENSIVE.** The spring is for a press and for a travelling indicator. Things
+arriving settle; they do not land twice.
+
+**`ui/test/motion.test.ts` solves the bezier and asserts all of it** — that the
+house curve spends at least 55% of its window moving, that the durations are
+ordered by what each event is, that the rise travels at least 16px, and that the
+press is damped while the release springs. All five mutation-tested, because
+every one of them is a number that looks fine and reads wrong.
 
 ⚠️ **LEAVING IS ALWAYS FASTER THAN ARRIVING.** Nobody waits to watch something
 go. Symmetric durations are the single most common reason an interface feels
@@ -1099,6 +1146,10 @@ and is expensive to disprove, so it survives review indefinitely.
 | `an-icon-carries-no-size-of-its-own` | an icon with its own width — the same glyph then appears at two sizes on two screens, which is what makes a set look assembled rather than drawn | **live** |
 | `an-icon-plays-on-press-not-on-hover` | an icon animation behind hover — half the devices this ships to have no hover at all, so the animation is invisible on a phone and the interface guard would refuse it anyway | **live** |
 | `every-icon-motion-is-defined` | a motion an icon names and the choreographer never defines — that glyph stands still while its neighbours move, which reads as a broken icon rather than as a missing rule | **live** |
+| `the-house-curve-spends-its-window-moving` | a timing function whose tail sits below the perceptual threshold — an expo ease is at 95% of its distance after 43% of its time, so raising the duration adds milliseconds in which nothing appears to move, and the screen still reads as cheap after the fix looks applied | **live** |
+| `the-durations-are-ordered-by-event` | a screen composing itself timed like an object arriving on one, or anything leaving as slowly as it arrived — the first makes the page cheap or the sheet slow, the second is the commonest reason an interface feels sluggish | **live** |
+| `an-entrance-travels-far-enough-to-see` | a rise short enough to be a fade wearing a transform, or a stagger under about 60ms — which the eye registers as a smear rather than as an order | **live** |
+| `the-press-is-damped-and-the-release-springs` | a control that overshoots on the way down — the finger is still on it, and nothing physical overshoots under a thumb | **live** |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder
