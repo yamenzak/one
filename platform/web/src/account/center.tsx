@@ -1,31 +1,40 @@
 /**
- * THE ACCOUNT CENTRE — the account home, PRESENTED.
+ * THE ACCOUNT CENTRE — the presentation, and only the presentation.
  *
- * ⚠️ THE SCREEN AND THE PRESENTATION ARE TWO FILES, and this is the seam. A
- * screen laid over an app has to trap focus, lock the scroll behind it, close on
- * Escape, and announce itself to a reader as a thing that has taken over — none
- * of which is a fact about the account, and all of which is the same for every
- * screen presented this way. `home.tsx` knows none of it.
+ * ⚠️ THE SCREENS AND THE PRESENTATION ARE SEPARATE FILES, and this is the seam. A
+ * surface laid over an app has to trap focus, lock the scroll behind it, close on
+ * Escape and announce itself to a reader as a thing that has taken over — none of
+ * which is a fact about an account, and all of which is the same for every screen
+ * inside. `home.tsx` and `details.tsx` know none of it.
  *
  * ⚠️ RADIX SUPPLIES BEHAVIOUR AND NOT ONE DECLARATION OF APPEARANCE, which is the
- * whole reason it is the dependency we take. The trade a component library
- * offers is the opposite one — it styles a dialog and leaves the focus trap to
- * you — and appearance is the half we have opinions about.
+ * whole reason it is the dependency we take. The trade a component library offers
+ * is the opposite one — it styles a dialog and leaves the focus trap to you — and
+ * appearance is the half we have opinions about.
  *
  * ⚠️ IT IS A ROUTE, NOT A POPUP. `/account` in every app: the person can link to
- * it, land on it, and reload it. `open` is therefore the router's state and this
- * component never owns it.
+ * it, land on it and reload it. `open` is therefore the router's state and this
+ * component never owns it. So is which screen is showing, which is why the screen
+ * is passed in rather than chosen here.
  */
 
-import type { ReactNode } from "react";
+import type { ElementType, ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { AccountHome, type AccountHomeProps } from "./home.js";
 
-export interface AccountCenterProps extends Omit<AccountHomeProps, "Heading"> {
+export interface AccountCenterProps {
   readonly open: boolean;
+  readonly onClose: () => void;
+  /**
+   * ⚠️ THE SCREEN IS HANDED THE ELEMENT THAT NAMES IT. Inside a presentation the
+   * title is what LABELS the presentation, so it has to be the presenter's — and
+   * passing it down means the name exists once. The alternative is a visually
+   * hidden second copy, which is a name written twice and then changed in one
+   * place, with nothing anywhere failing.
+   */
+  readonly children: (props: { readonly Heading: ElementType }) => ReactNode;
 }
 
-export function AccountCenter({ open, onClose, ...screen }: AccountCenterProps): ReactNode {
+export function AccountCenter({ open, onClose, children }: AccountCenterProps): ReactNode {
   return (
     <Dialog.Root open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <Dialog.Portal>
@@ -39,10 +48,10 @@ export function AccountCenter({ open, onClose, ...screen }: AccountCenterProps):
             fix is not to invent a sentence — a screen with a title and a list of
             named rows has nothing left for a description to add that is not
             already read aloud. */}
-        {/* ⚠️ FOCUS LANDS ON THE SURFACE, NOT ON ITS FIRST CONTROL. Left alone,
-            the focus scope takes the first tabbable thing — which here is the
-            close button, so the screen opens with a ring drawn round the way OUT
-            of it, and a reader is told "Close" before it is told where it is. */}
+        {/* ⚠️ FOCUS LANDS ON THE SURFACE, NOT ON ITS FIRST CONTROL. Left alone, the
+            focus scope takes the first tabbable thing — which here is the close
+            button, so the screen opens with a ring drawn round the way OUT of it,
+            and a reader is told "Close" before it is told where it is. */}
         <Dialog.Content
           className="over-content"
           aria-describedby={undefined}
@@ -51,16 +60,9 @@ export function AccountCenter({ open, onClose, ...screen }: AccountCenterProps):
             (e.currentTarget as HTMLElement | null)?.focus();
           }}
         >
-          {/*
-            ⚠️ THE SCREEN'S OWN TITLE IS THE DIALOG'S TITLE, passed in rather than
-            duplicated. A hidden second copy is the ordinary way this is done and
-            it means the name is written twice — so the visible one gets changed
-            and the announced one does not, and nothing anywhere fails.
-          */}
-          <AccountHome {...screen} onClose={onClose} Heading={Dialog.Title} />
+          {children({ Heading: Dialog.Title })}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
   );
 }
-

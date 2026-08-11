@@ -43,8 +43,11 @@ const DEV = `
   font: 400 14px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .host button { appearance: none; border: 1px solid #303038; background: #1b1b21; color: #c9c9d2;
   border-radius: 8px; padding: 9px 14px; font: inherit; cursor: pointer; }
-.dial { position: fixed; inset-block-end: 18px; inset-inline-end: 18px; z-index: 999;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+/* Bottom-LEFT: the designs put their action at the bottom-right of a sheet,
+   and a control sitting on top of the thing being judged is not a control. */
+.dial { position: fixed; inset-block-end: 18px; inset-inline-start: 18px; z-index: 999;
+  pointer-events: auto;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
   font: 500 13px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .dial-panel { display: none; flex-direction: column; gap: 12px; padding: 14px;
   border-radius: 16px; background: rgb(28 28 32 / 0.94); color: #f2f2f4;

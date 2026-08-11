@@ -25,6 +25,7 @@ export const ACCOUNT_CSS = `
   --alarm-well: #fbe6e4;
   --warn: #8a5a00;
   --warn-well: #fdf0d5;
+  --ok: #0e7a4d;
   --p-kova: #2f6bff;
   --p-scena: #00867a;
   --p-tessa: #c2185b;
@@ -45,6 +46,7 @@ export const ACCOUNT_CSS = `
     --alarm-well: #3a1512;
     --warn: #f2c25c;
     --warn-well: #3a2c0f;
+    --ok: #2fcf7c;
     --p-kova: #4d8bff;
     --p-scena: #14a598;
     --p-tessa: #f0518a;
@@ -62,6 +64,7 @@ export const ACCOUNT_CSS = `
   --alarm-well: #3a1512;
   --warn: #f2c25c;
   --warn-well: #3a2c0f;
+  --ok: #2fcf7c;
   --p-kova: #4d8bff;
   --p-scena: #14a598;
   --p-tessa: #f0518a;
@@ -156,6 +159,161 @@ h2 { word-spacing: normal; }
 .round-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .lede { color: var(--ink-quiet); font-size: 15px; line-height: 1.45; }
+
+/* ⚠️ A SCREEN INSIDE THE PRESENTATION IS NAMED AT THE START OF THE LINE. The home
+   is named by the brand — a lockup, on the axis of the page, recognised rather
+   than read. Everything under it is named by what it is, and a heading that is
+   read belongs where reading starts. */
+.title-row { display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  margin-block-start: 8px; }
+.page-name { font-family: var(--font-brand); font-size: 32px; font-weight: 600;
+  letter-spacing: -0.03em; line-height: 1.05; word-spacing: normal; }
+
+/* ⚠️ THE FACE IS SHOWN, NOT DESCRIBED, and pressing it changes it. A row saying
+   "Profile photo ›" is the only thing on this screen that could have been read
+   off the screen it came from — the point of arriving here is seeing it. */
+.portrait { position: relative; flex: none; border: 0; padding: 0; background: none;
+  cursor: pointer; border-radius: var(--radius-well); }
+.portrait:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.portrait-face { display: block; inline-size: 62px; block-size: 62px; overflow: hidden;
+  border-radius: var(--radius-well); background: var(--well); }
+.portrait-image { inline-size: 100%; block-size: 100%; object-fit: cover; }
+.portrait-letter { display: grid; place-items: center; inline-size: 100%; block-size: 100%;
+  font-family: var(--font-brand); font-size: 24px; font-weight: 600; color: var(--ink-quiet); }
+/* ⚠️ A SHADOW, NOT A RING. It had a ring in the page's own colour, which is only
+   the right colour where the page is flat — over the light at the top of a screen
+   the ring was a black circle cut out of a blue field. A shadow separates it from
+   whatever is actually behind it, including a photograph. */
+.portrait-badge { position: absolute; inset-block-end: -1px; inset-inline-end: -1px;
+  inline-size: 26px; block-size: 26px; border-radius: var(--radius-well);
+  display: grid; place-items: center;
+  background: var(--ink); color: var(--page);
+  box-shadow: 0 1px 5px rgb(0 0 0 / 0.4); }
+
+/* ------------------------------------------------------------------ fields */
+
+/* ⚠️ A FIELD IS A LABEL WITH A VALUE UNDER IT, not a row with the value on the
+   right. A value is the content — an address, a full name, a list — and the
+   right-hand column that fits a chevron does not fit any of them. */
+.entries { padding-block: 6px; }
+.entry { display: flex; flex-direction: column; align-items: stretch; gap: 5px;
+  inline-size: 100%; padding: 13px var(--pad); border: 0; background: none;
+  color: inherit; font: inherit; text-align: start; cursor: pointer; }
+.entry:hover { background: color-mix(in oklab, var(--ink) 5%, transparent); }
+.entry:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+/* ⚠️ NOT A BUTTON, SO IT MUST NOT BEHAVE LIKE ONE. A read-only fact that lights
+   up under the finger is a control that does nothing. */
+.entry[data-fixed] { cursor: default; }
+.entry[data-fixed]:hover { background: none; }
+.entry-label { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  color: var(--ink-quiet); font-size: 15px; }
+/* ⚠️ THE PENCIL IS THE ONLY ACCENT ON THE SCREEN, which is what makes it read as
+   the thing to press. Put it on the value as well and there is no longer an
+   answer to "what can I change here". */
+.pencil { flex: none; color: var(--accent); }
+.entry-value { font-size: 17px; line-height: 1.4;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
+/* ⚠️ "Not set" IS QUIET AND IT IS NOT AN ERROR. Nothing is wrong with an account
+   that has no name on it yet. */
+.entry-unset { color: var(--ink-faint); }
+
+/* ------------------------------------------------------------- the editor */
+
+/* ⚠️ THE SCREEN BEHIND STAYS VISIBLE, which is the whole difference between this
+   and the presentation above. Editing one value is not leaving the screen the
+   value is on, and dimming rather than covering is what says so. */
+.scrim { position: fixed; inset: 0; z-index: 50; background: rgb(0 0 0 / 0.62);
+  animation: scrim-in 200ms ease-out; }
+/* ⚠️ IT COMES FROM THE BOTTOM EDGE AND STAYS ATTACHED TO IT. A panel floating in
+   the middle of a phone is a desktop dialog that was never re-thought; the thumb
+   is at the bottom and so is the action. */
+.sheet { position: fixed; z-index: 51; inset-inline: 0; inset-block-end: 0;
+  background: var(--card); color: var(--ink);
+  border-start-start-radius: 26px; border-start-end-radius: 26px;
+  padding: 26px 20px calc(22px + env(safe-area-inset-bottom, 0px));
+  animation: sheet-up 300ms cubic-bezier(0.2, 0, 0.1, 1); }
+.sheet:focus, .sheet:focus-visible { outline: none; }
+/* ⚠️ ON A WIDE WINDOW IT IS CENTRED, because a strip across the foot of a
+   1400-pixel screen is a notification bar, and nobody reads a form in one. */
+@media (min-width: 640px) {
+  .sheet { inset: 50% auto auto 50%; translate: -50% -50%;
+    inline-size: min(440px, calc(100vw - 40px)); border-radius: 26px;
+    animation-name: sheet-in; }
+}
+@keyframes scrim-in { from { opacity: 0; } }
+@keyframes sheet-up { from { translate: 0 100%; } }
+@keyframes sheet-in { from { opacity: 0; scale: 0.97; } }
+@media (prefers-reduced-motion: reduce) {
+  .scrim, .sheet { animation: none; }
+}
+
+.sheet-body { display: flex; flex-direction: column; gap: 22px; }
+.sheet-top { display: flex; flex-direction: column; gap: 8px; }
+.sheet-title { font-family: var(--font-brand); font-size: 25px; font-weight: 600;
+  letter-spacing: -0.03em; line-height: 1.15; margin: 0; word-spacing: normal; }
+
+.field { display: flex; flex-direction: column; gap: 8px; }
+.field-label { color: var(--ink-quiet); font-size: 14px; }
+/* ⚠️ A FILL, AND THE ONLY BORDER IT EVER HAS IS THE ONE THAT MEANS SOMETHING. A
+   field outlined at rest has nowhere left to go when it is wrong, which is how a
+   form ends up saying "wrong" in red text under a field that looks unchanged. */
+.field-box { display: flex; align-items: center; gap: 6px; min-block-size: 56px;
+  padding-inline: 16px 8px; border-radius: 15px; background: var(--well);
+  outline: 2px solid transparent; outline-offset: -2px; }
+.field-box:focus-within { outline-color: var(--accent); }
+.field-box[data-wrong] { outline-color: var(--alarm); }
+.field-input { flex: 1; min-inline-size: 0; border: 0; background: none; color: inherit;
+  font: inherit; font-size: 17px; padding: 0; }
+.field-input:focus { outline: none; }
+.field-input::placeholder { color: var(--ink-faint); }
+/* ⚠️ ONLY WHEN THERE IS SOMETHING TO CLEAR. A control that is always there and
+   does nothing half the time is one people learn to distrust. */
+.field-clear { flex: none; inline-size: 30px; block-size: 30px; border: 0; cursor: pointer;
+  border-radius: var(--radius-well); display: grid; place-items: center;
+  background: color-mix(in oklab, var(--ink) 14%, transparent); color: var(--ink-quiet); }
+.field-clear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.note { color: var(--ink-quiet); font-size: 14px; line-height: 1.45; }
+.wrong { color: var(--alarm); }
+/* ⚠️ THE REFERENCE IS QUIET AND IT IS ALWAYS THERE. It is what somebody quotes to
+   support, and a failure that withholds the provider's words without offering it
+   is simply an unhelpful message. */
+.note-ref { display: block; margin-block-start: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px;
+  color: var(--ink-faint); word-spacing: normal; }
+
+.sheet-actions { display: flex; flex-direction: column; gap: 10px; }
+/* ⚠️ THE ACTION IS THE FULL WIDTH OF THE SHEET AND IT IS THE ONLY ONE. A cancel
+   beside it competes with the thing the person came here to do — the sheet is
+   dismissed by the scrim, by Escape and by the back gesture, all of which are
+   already there. */
+.primary { inline-size: 100%; min-block-size: 54px; border: 0; border-radius: var(--radius-well);
+  display: flex; align-items: center; justify-content: center; gap: 9px;
+  background: var(--ink); color: var(--card); cursor: pointer;
+  font: inherit; font-size: 17px; font-weight: 600; word-spacing: normal;
+  transition: background-color 180ms ease-out, color 180ms ease-out; }
+.primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* ⚠️ OFF IS A DIFFERENT GROUND, NOT A FADED ONE. A translucent control on a card
+   inherits whatever is behind it, and at 40% opacity the label falls under every
+   contrast floor there is — so it looks broken to everyone and is unreadable to
+   some. */
+.primary:disabled { background: var(--well); color: var(--ink-faint); cursor: default; }
+/* ⚠️ WORKING IS NOT OFF, and sharing one disabled look made it read as one. The
+   button is refusing a second press for the length of a round trip — which is the
+   same attribute and the opposite meaning — so it keeps its own ground and the
+   pointer says wait rather than no. */
+.primary[data-state='saving']:disabled { background: var(--ink); color: var(--card); cursor: progress; }
+/* ⚠️ SAVED IS THE ONE STATE THAT GETS A COLOUR, and it keeps the disabled ground's
+   job of refusing a second press. Green for a moment is the clearest possible
+   answer to "did that work"; green forever is decoration. */
+.primary[data-state='saved']:disabled { background: var(--ok); color: var(--card); }
+.primary-label { line-height: 1; }
+.primary-sign { flex: none; }
+.spin { animation: spin 800ms linear infinite; }
+@keyframes spin { to { rotate: 360deg; } }
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation-duration: 2s; }
+}
 
 /* ---------------------------------------------------------------- sections */
 
