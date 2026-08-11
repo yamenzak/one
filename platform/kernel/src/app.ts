@@ -10,6 +10,7 @@
  * that has tenants on it.
  */
 
+import type { AliasRoot } from "./doors.js";
 import type { BindingSpec } from "./bindings.js";
 import type { CollectionSpec } from "./collection.js";
 import type { Shape } from "./validate.js";
@@ -30,6 +31,8 @@ import { marketProblems } from "./market.js";
 import { MILESTONE_EARNED, milestoneProblems } from "./milestone.js";
 import { danglingHelp, helpProblems } from "./help.js";
 import { agreementProblems, disclosureProblems, holdingProblems, protectionProblems, ropaOf, type ProtectionSpec, type Record30 } from "./protection.js";
+import type { VaultSpec } from "./vault.js";
+import { shadowProblems, vaultActivities, wantProblems } from "./vault.js";
 import type { NotificationRegistry } from "./notify.js";
 import type { Release, Retired } from "./release.js";
 import { releaseProblems } from "./release.js";
@@ -142,7 +145,16 @@ export interface TenancySpec {
    * invalidates every credential.
    */
   readonly appRoot: string;
-  readonly doors: readonly ("root" | "setup" | "admin" | "slug" | "custom" | "device")[];
+  readonly doors: readonly ("root" | "setup" | "admin" | "identity" | "slug" | "custom" | "device")[];
+  /**
+   * OTHER DOMAINS OF OURS THAT ANSWER HERE.
+   *
+   * ⚠️ DECLARED SO THEY ARE NOT RESOLVED AS SOMEBODY'S CUSTOM DOMAIN. A hostname
+   * the classifier does not recognise falls through to the custom-domain lookup,
+   * which asks which TENANT registered it — so a domain we own and did not
+   * declare is one a tenant's claim can be served at.
+   */
+  readonly aliases?: readonly AliasRoot[];
   readonly regions: readonly RegionId[];
   readonly defaultRegion: RegionId;
   /** Labels a tenant may not take — other doors, mail autoconfig, ACME, money words. */
@@ -360,6 +372,23 @@ export interface AppSpec<B extends BindingSpec, P extends ProblemCatalog = Probl
   readonly governance: GovernanceSpec;
 
   readonly collections: readonly CollectionSpec[];
+  /**
+   * WHAT THIS APP ASKS TO SEE OF SOMEBODY'S OWN FACTS.
+   *
+   * ⚠️ ASKS. It does not hold them — the vault does, once, for the account, and
+   * an app is granted a VIEW at an audience the person chose. So this list is
+   * not a schema: it is the consent sheet, written by whoever wants the data, in
+   * the words they would have to justify to the person deciding.
+   *
+   * ⚠️ AND DECLARING A WANT IS WHAT MAKES THE FACT UNAVAILABLE ANY OTHER WAY.
+   * `shadowProblems` refuses a collection field that shadows a vault fact, so an
+   * app cannot ask politely here and quietly keep its own column — which is
+   * exactly what an app would do, because a column is easier than a grant.
+   *
+   * Absent means this app wants none of it, and the whole surface is absent
+   * rather than present and refusing.
+   */
+  readonly vault?: VaultSpec;
   /**
    * ⚠️ WHAT THIS APP CAN TELL SOMEBODY, DECLARED. An operation may only `emit`
    * something named here, and a notification may only link to a collection this
@@ -693,6 +722,8 @@ export function assertComposable(spec: {
   readonly filePurposes?: Readonly<Record<string, FilePurpose>>;
   readonly ai?: AiSpec;
   readonly collections: readonly CollectionSpec[];
+  /** ⚠️ Optional to declare, and the shadow check runs either way — see below. */
+  readonly vault?: VaultSpec;
   readonly notifications: NotificationRegistry;
   readonly help: HelpRegistry;
   readonly releases: readonly Release[];
@@ -862,8 +893,28 @@ export function assertComposable(spec: {
     collections: spec.collections,
     assessment: spec.governance.protection.assessment,
   });
-  if (held.length || declared.length || disclosure.length || agreements.length) {
-    const all = [...held, ...declared, ...disclosure, ...agreements];
+  /*
+    ⚠️ AND WHAT THE APP ASKS TO SEE OF SOMEBODY'S OWN FACTS. Two checks, and the
+    second is the one that makes the vault a mechanism rather than a courtesy:
+
+      `wantProblems`   the consent sheet is answerable — every fact exists, every
+                       ask has a reason a person can weigh, and no app argues for
+                       more exposure than the fact's own registry entry does.
+      `shadowProblems` the app has not ALSO given itself a column. Asking politely
+                       here and keeping a private copy is what an app would do,
+                       because a column is easier than a grant — and the copy is a
+                       disclosure that outlives every grant over it, with nothing
+                       anywhere that could take it back.
+
+    ⚠️ THE SHADOW CHECK RUNS WHETHER OR NOT THE APP DECLARES A VAULT. An app that
+    wants none of this and holds `height` on its own table is precisely the case
+    the rule is for; making the check conditional on asking would mean the way to
+    avoid it is to not ask.
+  */
+  const wants = wantProblems(spec.vault, spec.id);
+  const shadows = shadowProblems(spec.collections);
+  if (held.length || declared.length || disclosure.length || agreements.length || wants.length || shadows.length) {
+    const all = [...held, ...declared, ...disclosure, ...agreements, ...wants, ...shadows];
     throw new Error(`${spec.id}: data protection — ${all.map((p) => `"${p.at}" ${p.why}`).join("; ")}.`);
   }
 

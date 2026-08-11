@@ -146,7 +146,7 @@ describe("the door taxonomy", () => {
     wrong branch. `EVERY_DOOR` is exhaustive by compile error, so the assertion
     below cannot pass by being out of date itself.
   */
-  const EVERY_DOOR = ["root", "setup", "admin", "tenant", "custom", "device", "unclaimed", "invalid"] as const;
+  const EVERY_DOOR = ["root", "setup", "admin", "identity", "tenant", "custom", "device", "unclaimed", "invalid"] as const;
   type Unlisted = Exclude<Door, (typeof EVERY_DOOR)[number]>;
   const _exhaustive: Unlisted extends never ? true : never = true;
   void _exhaustive;

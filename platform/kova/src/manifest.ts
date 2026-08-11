@@ -686,6 +686,80 @@ export const mealChoices = collection({
  * product that stored it in the same column as a caliper measurement would be
  * one where nobody can tell a photograph from a clinic.
  */
+/* ----------------------------------------------------------------- vault --- */
+
+/**
+ * WHAT KOVA ASKS TO SEE OF SOMEBODY'S OWN BODY, AND WHY.
+ *
+ * ⚠️ NOTHING HERE IS STORED BY KOVA. Every one of these is a fact in the
+ * person's own vault; a studio is granted a VIEW at the rung the person chose,
+ * for as long as they chose, and withdrawing it takes effect on the next read.
+ * That is why the coaching collections carry no height, no weight and no birth
+ * date — a column here would be a copy that outlives every grant over it.
+ *
+ * ⚠️ AND THE ARITHMETIC DOES NOT NEED THE DISCLOSURE. An energy target needs a
+ * mass, a height, an age and a sex; a coach needs the target. So Kova asks to
+ * COMPUTE with four facts and to be SHOWN none of them — which is a smaller ask
+ * than any coaching product has ever made, and it is the whole reason the
+ * `compute` need exists.
+ *
+ * ⚠️ ONE FACT IS RECOMMENDED FOR A COACH TO READ, AND ONLY ONE. Nobody can write
+ * a training plan against a goal they have not been told; everything else is
+ * either derivable or genuinely optional. The recommendation is still a
+ * recommendation — the sheet pre-highlights it and every rung remains the
+ * person's to pick.
+ */
+export const KOVA_VAULT = {
+  wants: [
+    {
+      fact: "goal.training",
+      need: "raw",
+      recommend: "staff",
+      required: false,
+      why: "Your coach writes your programme against this. It is the one thing they genuinely cannot work around, and it is still yours to withhold.",
+    },
+    {
+      fact: "goal.nutrition",
+      need: "raw",
+      recommend: "staff",
+      why: "So a week of meals is one you would actually eat, rather than one you have to keep declining.",
+    },
+    {
+      fact: "health.injuries",
+      need: "raw",
+      recommend: "staff",
+      why: "A coach who does not know cannot program around it, and the first they hear otherwise is when something hurts.",
+    },
+    {
+      fact: "health.allergies",
+      need: "raw",
+      recommend: "staff",
+      why: "Whoever plans your meals cannot avoid what they have not been told about.",
+    },
+    /*
+      ⚠️ THE FOUR THE ARITHMETIC NEEDS AND NOBODY IS SHOWN. `compute` is the
+      smallest of the three needs: Kova works out an energy target and a
+      body-mass index from these and displays the ANSWERS, which is what a coach
+      was ever going to act on.
+    */
+    {
+      fact: "body.mass",
+      /*
+        ⚠️ ONE ASK, AT THE LARGEST NEED. Kova both computes an energy target from
+        this and shows a coach which way it is going — and those are one decision
+        about one fact, not two. Two rows in a consent sheet for one fact is
+        somebody answering the same question twice.
+      */
+      need: "derived",
+      readings: ["body.mass.trend", "body.mass.progress"],
+      why: "Used to work out your energy target, and to show your coach which way things are going and how fast. Neither of those is the weight itself, and nobody is shown that unless you say so.",
+    },
+    { fact: "body.height", need: "compute", why: "Used with your weight to work out an energy target and a body-mass index. Nobody is shown it." },
+    { fact: "person.sex", need: "compute", why: "Every energy formula needs it. None of them needs anybody to be told." },
+    { fact: "person.birthDate", need: "compute", why: "Used for the age an energy formula needs. Your coach sees a decade at most." },
+  ],
+} as const;
+
 export const scans = collection({
   id: "scan",
   label: { one: "Body scan", many: "Body scans" },
@@ -697,8 +771,15 @@ export const scans = collection({
   onDelete: { on: "purge" },
   fields: {
     day: field.plainDate({ required: true, label: "Day" }),
-    bodyFat: field.number({ min: 1, max: 70, label: "Body fat (%)" }),
-    /* ⚠️ The model's own confidence, kept beside the number it qualifies. */
+    /*
+      ⚠️ THE ESTIMATE ITSELF IS NOT HERE — IT IS `body.fat` IN THE VAULT, and the
+      split is the whole point of a scan being a scan. What this row holds is the
+      EVIDENCE: two photographs, what the model thought of them, and the day it
+      looked. What it produced is a fact about the person's body, which belongs
+      to the person, travels with them, and is disclosed to a coach only if they
+      say so.
+    */
+    /* ⚠️ The model's own confidence, kept beside the estimate it qualifies. */
     confident: field.bool({ label: "Confident" }),
     front: field.media({ accept: ["image/jpeg", "image/png"], maxBytes: 12_000_000 }),
     side: field.media({ accept: ["image/jpeg", "image/png"], maxBytes: 12_000_000 }),
@@ -3236,6 +3317,14 @@ export const kova = defineApp({
         business doing the first.
       */
       "consent:read", "consent:manage",
+      /*
+        ⚠️ BEING A PARTY TO A VAULT GRANT IS NOT THE SAME AS READING ANYTHING.
+        Every read still resolves the person's own grant; this key only says
+        which roles may be on the other end of one. The front desk is
+        deliberately absent — they book people in, and a body composition is
+        nothing they were ever going to act on.
+      */
+      "vault:read",
     ],
     roles: {
       /*
@@ -3246,7 +3335,7 @@ export const kova = defineApp({
       */
       /* ⚠️ `ai:read` is the OWNER's alone — what the studio's credits went on is
          a question about the bill, and the bill is theirs. */
-      owner: [...STAFF, "workspace:create", "workspace:close", "workspace:settings", "billing:manage", "commerce:manage", "member:read", "member:manage", "ai:read", "consent:read", "consent:manage"],
+      owner: [...STAFF, "workspace:create", "workspace:close", "workspace:settings", "billing:manage", "commerce:manage", "member:read", "member:manage", "ai:read", "consent:read", "consent:manage", "vault:read"],
       /* ⚠️ A coach SEES the team and cannot change it — hiring is the owner's. */
       /*
         ⚠️ A COACH MAY SET HOW THE STUDIO COACHES. The check-in cadence and what
@@ -3257,7 +3346,7 @@ export const kova = defineApp({
       /* ⚠️ A COACH RECORDS AND WITHDRAWS IT, because they are the one in the room
          when it is given — an owner-only control means consent is asked for by
          somebody who is not there and recorded later from memory. */
-      trainer: [...STAFF, "workspace:create", "member:read", "workspace:settings", "consent:read", "consent:manage"],
+      trainer: [...STAFF, "workspace:create", "member:read", "workspace:settings", "consent:read", "consent:manage", "vault:read"],
       /* ⚠️ The front desk sees people and bookings, and prescribes nothing. */
       /* ⚠️ The front desk sees people and BOOKINGS, and prescribes nothing —
          which is why `session:write` is here and nothing else new is. */
@@ -3705,6 +3794,8 @@ export const kova = defineApp({
   settings: KOVA_SETTINGS,
   collections: [clients, movements, programmes, workouts, sets, foods, portions, entries, checkins, goals, bookings, articles, supplements, doses, labs, assignments, alternatives, swaps,
     fasts, photos, mealChoices, scans, releases],
+
+  vault: KOVA_VAULT,
 
   notifications: {
     "workspace.created": {

@@ -36,6 +36,12 @@ const LAYER: Record<string, number> = {
   "schema.ts": 2,
   "protection.ts": 1,
   "collection.ts": 2,
+  /* ⚠️ Above protection because it IMPORTS it: a fact declares what it is
+     under the law, so the vault cannot sit level with the vocabulary for
+     that. Beside collection rather than above it — neither knows the other,
+     and the shadow check takes a shape rather than a `CollectionSpec` for
+     exactly that reason. */
+  "vault.ts": 2,
   "entitlement.ts": 2,
   "customer.ts": 2,
   "job.ts": 2,

@@ -22,7 +22,7 @@
  */
 
 import type { AnyOperation, AppSpec, BindingSpec, Instant, LegalDoc, SchemaModule, Session, SqlHandle } from "@one/kernel";
-import { PUBLIC, operation, ropaOf, s, transfersOf } from "@one/kernel";
+import { PUBLIC, operation, ropaOf, s, transfersOf, vaultActivities } from "@one/kernel";
 
 /** ⚠️ A symbol, so an app cannot reach the ledger by writing a property name. */
 export const REFERENCE = Symbol.for("one.runtime.reference");
@@ -314,6 +314,12 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
           collections: app.collections,
           protection: app.governance.protection,
           regions: app.tenancy.regions,
+          /* ⚠️ WHAT THIS APP READS THROUGH THE VAULT AND STORES NOWHERE. Invisible
+             to the collections by construction, so without this line an app whose
+             only health data is read through a grant produces a record saying it
+             holds none — true, and the most misleading thing the document could
+             say. */
+          disclosed: vaultActivities(app.vault),
         }),
       };
     },

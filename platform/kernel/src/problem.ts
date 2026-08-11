@@ -153,6 +153,25 @@ export const PLATFORM_PROBLEMS = declareProblems({
     detail: (m) => `Your plan includes ${m.limit}, and ${m.used} are in use.`,
     retryable: false,
   },
+  /*
+    ⚠️ ITS OWN CODE, AND IT IS NOT A 403. A vault fact is withheld because the
+    PERSON IT IS ABOUT has not shared it — which is not a lack of permission, is
+    not something an administrator can fix, and is not a failure of the app.
+    Answering 403 puts it beside "you are not allowed here" and produces copy
+    that blames the reader for a decision somebody else made and is entitled to.
+
+    ⚠️ AND THE DETAIL NEVER SAYS WHETHER THERE IS ANYTHING THERE. `mayRead`
+    distinguishes "never granted" from "nothing recorded" so a SCREEN can say the
+    right thing to somebody who holds a grant; this sentence reaches a reader who
+    may hold none, and telling them the person has recorded nothing is itself a
+    disclosure nobody made.
+  */
+  "platform.not_shared": {
+    status: 409,
+    title: "That is not shared with you",
+    detail: (m) => `${m.fact} belongs to the person it is about, and they have not shared it here.`,
+    retryable: false,
+  },
 });
 
 /**

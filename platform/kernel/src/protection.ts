@@ -502,7 +502,45 @@ export function ropaOf(input: {
   readonly collections: readonly Held[];
   readonly protection: ProtectionSpec;
   readonly regions: readonly string[];
+  /**
+   * ⚠️ WHAT THE APP READS THROUGH THE VAULT, WHICH IS INVISIBLE TO THE
+   * COLLECTIONS. A fact the app never stores appears in no collection — so an
+   * app reading somebody's health data through a grant would produce a record
+   * of processing saying it holds no health data. True, and completely
+   * misleading, which is the worst kind of compliance document there is.
+   *
+   * Handed in rather than imported, for the same reason `Held` is a shape: this
+   * module defines the vocabulary the vault's declarations are written in, and
+   * importing back the other way would be a cycle.
+   */
+  readonly disclosed?: readonly {
+    readonly fact: string;
+    readonly purpose: string;
+    readonly categories: readonly DataCategory[];
+    readonly basis: LawfulBasis;
+    readonly condition?: SpecialCondition;
+    readonly subjects?: readonly SubjectKind[];
+  }[];
 }): Record30 {
+  const fromVault = (input.disclosed ?? []).map((d): Activity => ({
+    /* ⚠️ Named as a vault read rather than as a table, because it is not one —
+       and a reader who cannot tell the two apart will go looking for a column. */
+    collection: `vault:${d.fact}`,
+    purpose: d.purpose,
+    categories: d.categories,
+    /* A fact belongs to the person whose account holds it, and that person is
+       the workspace's customer wherever a workspace is reading it. */
+    subjects: d.subjects ?? ["customer"],
+    basis: d.basis,
+    ...(d.condition ? { condition: d.condition } : {}),
+    special: d.categories.some((k) => SPECIAL_CATEGORIES.includes(k)),
+    /* ⚠️ NOT KEPT AT ALL — this app stores none of it. `0` rather than `null`,
+       because null here means "until the workspace leaves" and that is the
+       opposite claim. */
+    keptForDays: 0,
+    onClose: "purge",
+  }));
+
   const activities = input.collections.flatMap((c): Activity[] => {
     const h = c.holding;
     if (h.kind === "none") return [];
@@ -518,14 +556,15 @@ export function ropaOf(input: {
       onClose: c.retention.onTenantClose,
     }];
   });
+  const all = [...activities, ...fromVault];
   return {
     controller: input.protection.controller,
     contact: input.protection.contact,
-    activities,
+    activities: all,
     subprocessors: input.protection.subprocessors,
     regions: input.regions,
     assessment: input.protection.assessment,
-    special: activities.some((a) => a.special),
+    special: all.some((a) => a.special),
   };
 }
 

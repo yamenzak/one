@@ -175,10 +175,32 @@ export const hello = defineApp({
   },
   tenancy: {
     appRoot: "hello.4dl.app",
-    doors: ["root", "setup", "admin", "slug", "custom"],
+    /* ⚠️ `identity` IS THE ACCOUNT CENTRE'S OWN DOOR, at `id.4dl.app` — under
+       the PLATFORM root rather than this app's, which is what makes it reachable
+       by somebody who belongs to no workspace at all. */
+    doors: ["root", "setup", "admin", "identity", "slug", "custom"],
+    /* ⚠️ ANOTHER DOMAIN OF OURS, DECLARED SO IT IS NOT RESOLVED AS SOMEBODY'S
+       CUSTOM DOMAIN. `redirect` because a second serving origin cannot share a
+       passkey with the first — WebAuthn binds a credential to one registrable
+       domain — so it would cost every person a second credential to buy a nicer
+       URL. */
+    aliases: [{ root: "fourdegreelabs.com", mode: "redirect" }],
     regions: ["auto", "eu"] as RegionId[],
     defaultRegion: "auto" as RegionId,
     reservedSlugs: ["hello"],
+  },
+  /*
+    ⚠️ WHAT THIS APP ASKS TO SEE OF SOMEBODY'S OWN FACTS, and it asks for one of
+    each need on purpose: this is the app every stage's exit criterion is
+    asserted against, so a need with no app exercising it is a need with no
+    integration test behind it.
+  */
+  vault: {
+    wants: [
+      { fact: "goal.training", need: "raw", recommend: "staff", why: "So whoever is helping you knows what you are working towards." },
+      { fact: "body.mass", need: "derived", readings: ["body.mass.trend"], why: "So a direction can be shown without a weight." },
+      { fact: "body.height", need: "compute", why: "Used in a calculation whose answer is shown. Nobody is shown the height." },
+    ],
   },
   format: {
     currency: "EUR" as Currency,
@@ -188,13 +210,13 @@ export const hello = defineApp({
     weekStart: 1,
   },
   access: {
-    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "inbox:read", "workspace:close", "workspace:settings", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage", "platform:operate"],
+    permissions: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "inbox:read", "workspace:close", "workspace:settings", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage", "platform:operate", "vault:read"],
     /*
       Anybody signed in may open a workspace — this is a self-serve product, and
       `workspace:create` is checked on a door that has no tenant to be a member
       of, so a role is the only place it could come from.
     */
-    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "inbox:read", "workspace:close", "workspace:settings", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage"], reader: ["note:read", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read"],
+    roles: { owner: ["note:read", "note:write", "receipt:read", "receipt:write", "workspace:create", "billing:manage", "commerce:read", "commerce:manage", "inbox:read", "workspace:close", "workspace:settings", "file:read", "file:write", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read", "member:manage", "vault:read"], reader: ["note:read", "guide:read", "milestone:read", "entry:read", "entry:write", "member:read"],
       /* ⚠️ WHAT SOMEBODY MAY DO ON THE OPERATOR DOOR, where there is no
          workspace to be a member of. The door is the control; this says what it
          opens onto. Deliberately narrow: the deployment's own checklist and the

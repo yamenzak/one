@@ -33,6 +33,7 @@ import { DOMAIN_CLAIM_SCHEMA } from "./settings-ops.js";
 import { CATALOGUE_SCHEMA } from "./operator-ops.js";
 import { CONFIG_SCHEMA, MODEL_SCHEMA } from "./config.js";
 import { DIRECTORY_SCHEMA, DOMAIN_SCHEMA } from "./directory.js";
+import { VAULT_SCHEMA } from "./vault.js";
 import { IDENTITY_SCHEMA } from "./identity.js";
 import { OTP_SCHEMA } from "./identity-ops.js";
 import { PROVIDER_SCHEMA } from "./provider.js";
@@ -78,6 +79,14 @@ export const PLATFORM_GLOBAL: readonly SchemaModule[] = [
   /* ⚠️ After identity: a consent belongs to an account, and the ledger is only
      meaningful beside the record of who that is. */
   CONSENT_SCHEMA,
+  /*
+    ⚠️ GLOBAL, AND THAT IS THE WHOLE DESIGN. A vault fact belongs to the person
+    rather than to a workspace, so it outlives every app they use and every
+    workspace they leave. A regional copy would be taken away by leaving the
+    workspace that happened to ask for it first — which is the opposite of what
+    a vault is for.
+  */
+  VAULT_SCHEMA,
   /* ⚠️ Global, and NOT tenant-scoped: a workspace closing must not delete the
      record of the support sessions that happened inside it. */
   IMPERSONATION_SCHEMA,

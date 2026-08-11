@@ -22,6 +22,7 @@
     "platform:operate",
     "receipt:read",
     "receipt:write",
+    "vault:read",
     "workspace:close",
     "workspace:create",
     "workspace:settings"

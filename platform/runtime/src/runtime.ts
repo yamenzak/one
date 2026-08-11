@@ -94,6 +94,7 @@ import { DIRECTORY, FOUNDER, TOOLS, foundingRole, platformOperations, toolOperat
 import { identityOperations, PLATFORM, type PlatformCarrier, type PlatformDeps } from "./identity-ops.js";
 import { identityStore, readCookie, SESSION_COOKIE, sessionStore } from "./identity.js";
 import { REFERENCE, referenceOperations, type ReferenceCarrier } from "./reference-ops.js";
+import { VAULT, vaultOperations, type VaultCarrier } from "./vault-ops.js";
 import { keptBy, retentionJob } from "./data.js";
 import { auditJob, recordAudit } from "./audit.js";
 import { countRequest, limitJob } from "./limit.js";
@@ -349,7 +350,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
     rather than caught by a guard afterwards.
   */
   const byPath = new Map<string, AnyOperation>();
-  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...operatorOperations(app), ...configOperations(app), ...settingsOperations(app), ...domainAdminOperations(OPERATE), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...referenceOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
+  for (const op of [...platformOperations(app), ...identityOperations(app), ...commerceOperations(app), ...customerOperations(app), ...providerOperations(app), ...inboxOperations(app), ...dataOperations(app), ...fileOperations(app), ...generationOperations(app), ...operatorOperations(app), ...configOperations(app), ...settingsOperations(app), ...domainAdminOperations(OPERATE), ...guideOperations(app), ...milestoneOperations(app), ...membershipOperations(app), ...referenceOperations(app), ...vaultOperations(app), ...toolOperations()]) byPath.set(routeFor(op).path, op);
 
   /*
     ⚠️ A COLLECTION'S OPERATIONS ARE DERIVED HERE, NOT BY THE APP. Leaving it to
@@ -1251,7 +1252,7 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
       };
       const audit: AuditEntry[] = [];
 
-      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & LookupCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier & ReferenceCarrier = {
+      const ctx: Ctx<B> & DirectoryCarrier & PlatformCarrier & ToolCarrier & CommerceCarrier & InboxCarrier & DataCarrier & FilesCarrier & GenerationCarrier & OperatorCarrier & ConfigCarrier & SettingsCarrier & LookupCarrier & GuideCarrier & MilestoneCarrier & MemberCarrier & FounderCarrier & ReferenceCarrier & VaultCarrier = {
         [CONFIG]: {
           own: directoryDb,
           /*
@@ -1359,6 +1360,25 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
           depends on what they are acting as here rather than on who they are.
         */
         [REFERENCE]: { directory: directoryDb, regional: regionalDb, tenantId: at.tenant?.tenantId ?? "", session, role: personRole },
+        /*
+          ⚠️ THE DIRECTORY, NEVER THE REGIONAL STORE. A vault fact belongs to
+          the ACCOUNT — it outlives every workspace the person is in — and a
+          regional copy would be taken away by leaving the workspace that
+          happened to ask for it first.
+
+          ⚠️ AND `tenantId` IS NULL RATHER THAN "" ON A TENANTLESS DOOR. The
+          empty string is a real workspace id to a grant lookup, so an
+          app-wide grant (`tenantId: null`) and a request from the account
+          centre would resolve as two different scopes.
+        */
+        [VAULT]: {
+          directory: directoryDb,
+          session,
+          appId: app.id,
+          tenantId: at.tenant?.tenantId ?? null,
+          now: new Date().toISOString() as Instant,
+          today: dayIn(new Date().toISOString() as Instant, zone),
+        },
         [SETTINGS]: {
           db: regionalDb,
           /* ⚠️ The branding copy and the domain claims are looked up before a

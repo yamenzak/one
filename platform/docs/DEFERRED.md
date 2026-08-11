@@ -11,6 +11,6 @@ kind: index
 ## Stage 7 — Kova migration
 
 - `one-172` — the operator door admits any signed-in  
-  <sub>runtime/src/runtime.ts:830</sub>
+  <sub>runtime/src/runtime.ts:831</sub>
 - `one-181` — `accounts` has locale, units and layout but no theme  
   <sub>web/src/account/preferences.tsx:35</sub>

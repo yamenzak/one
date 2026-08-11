@@ -46,6 +46,8 @@ export * from "./mail.js";
 export * from "./commerce-ops.js";
 export * from "./relocate.js";
 export * from "./reference-ops.js";
+export * from "./vault.js";
+export * from "./vault-ops.js";
 export * from "./audit.js";
 export * from "./limit.js";
 export * from "./impersonation.js";

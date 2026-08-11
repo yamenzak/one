@@ -87,6 +87,7 @@
     "supplement:write",
     "swap:read",
     "swap:write",
+    "vault:read",
     "workout:read",
     "workout:write",
     "workspace:close",
