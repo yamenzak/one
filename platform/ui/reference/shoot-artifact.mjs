@@ -1,0 +1,14 @@
+import { chromium } from "/home/user/one/apps/e2e/node_modules/@playwright/test/index.mjs";
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1400, height: 1100 }, deviceScaleFactor: 1.5 });
+await p.goto("file://" + process.argv[2]);
+await p.waitForTimeout(600);
+await p.screenshot({ path: process.argv[3] });
+const errors = [];
+p.on("pageerror", (e) => errors.push(String(e)));
+await p.click("button[data-value='2']");
+await p.click("button[data-value='light']");
+await p.waitForTimeout(400);
+await p.screenshot({ path: process.argv[4] });
+console.log("errors:", errors.length ? errors : "none");
+await b.close();
