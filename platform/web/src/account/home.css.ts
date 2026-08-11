@@ -205,6 +205,13 @@ h2 { word-spacing: normal; }
 .pencil { flex: none; color: var(--accent); }
 .entry-value { font-size: 17px; line-height: 1.4;
   display: flex; align-items: center; flex-wrap: wrap; gap: 9px; }
+/* ⚠️ THE BADGE IS THE STATEMENT AND THE TICK IS DRAWN ON IT. Blue rather than
+   green: green is an outcome somebody caused, and a verified address is a fact
+   about the account rather than something that just went well. */
+.verified { flex: none; inline-size: 19px; block-size: 19px; border-radius: var(--radius-well);
+  display: grid; place-items: center; background: var(--accent); color: #fff;
+  animation: stamp var(--swift) var(--enter) both; }
+
 /* ⚠️ "Not set" IS QUIET AND IT IS NOT AN ERROR. Nothing is wrong with an account
    that has no name on it yet. */
 .entry-unset { color: var(--ink-faint); }

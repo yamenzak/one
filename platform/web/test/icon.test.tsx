@@ -21,7 +21,7 @@ import { MOTION_CSS } from "../src/motion.css.js";
 
 /** Every drawing component this package exports, by the name it stamps. */
 const drawn: Readonly<Record<IconName, (p: Icons.IconProps) => unknown>> = {
-  portrait: Icons.Portrait, key: Icons.Key, adjust: Icons.Adjust, guard: Icons.Guard,
+  key: Icons.Key, adjust: Icons.Adjust, guard: Icons.Guard,
   save: Icons.Save, heartbreak: Icons.Heartbreak, edit: Icons.Edit, lens: Icons.Lens,
   onward: Icons.Onward, close: Icons.Close, back: Icons.Back, tick: Icons.Tick,
 };

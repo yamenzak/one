@@ -29,7 +29,7 @@
 import { useState, type ReactNode } from "react";
 import type { Problem } from "@one/kernel";
 import { Face } from "../avatar.js";
-import { Back, Edit, Lens } from "../icon.js";
+import { Back, Edit, Lens, Tick } from "../icon.js";
 import { ValueEditor, type EditableField } from "./editor.js";
 import type { Person } from "./home.js";
 
@@ -106,7 +106,13 @@ export function AccountDetails({
               <span className="entry-label">{f.label}<Edit className="pencil" /></span>
               <span className="entry-value">
                 {f.name === "email" ? person.email : person.name ?? <span className="entry-unset">Not set</span>}
-                {f.name === "email" && emailVerified ? <span className="pill">Verified</span> : null}
+                {/* ⚠️ A MARK RATHER THAN THE WORD. "Verified" beside an address is
+                    a label explaining a state that has one universally understood
+                    symbol — and the word is wider than the thing it qualifies at
+                    small sizes. The tick still SAYS it, to a reader. */}
+                {f.name === "email" && emailVerified
+                  ? <span className="verified"><Tick size={12} label="Verified" /></span>
+                  : null}
               </span>
             </button>
           ))}

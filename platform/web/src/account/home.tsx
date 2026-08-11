@@ -20,7 +20,7 @@
 import type { ElementType, ReactNode } from "react";
 import { Face } from "../avatar.js";
 import { Lockup } from "../brand/mark.js";
-import { Adjust, Close, Guard, Heartbreak, Key, Onward, Portrait, Save } from "../icon.js";
+import { Adjust, Close, Guard, Heartbreak, Key, Onward, Save } from "../icon.js";
 
 /* ------------------------------------------------------------------ data --- */
 
@@ -101,7 +101,15 @@ export function AccountHome({ person, workspaces, onGo, onClose, Heading = "h1" 
 
       <section>
         <div className="card stagger">
-          <Item icon={<Portrait />} title="Your details" detail="Your name, photo and address" onGo={() => onGo("account.profile")} />
+          {/* ⚠️ THEIR OWN FACE, NOT A DRAWING OF A PERSON. Every other row on this
+              card is named by a symbol because it is about a KIND of thing; this
+              one is about them, and the same generated face they will see on the
+              screen it opens is what says so. It is also the only row whose mark
+              is different every time somebody else looks at it. */}
+          <Item
+            mark={<Face kind="person" src={person.avatarUrl} name={person.name ?? person.email} className="well alive" />}
+            title="Your details" detail="Your name, photo and address" onGo={() => onGo("account.profile")}
+          />
           <Item icon={<Key />} title="Sign-in methods" detail="Passkeys, codes and devices" onGo={() => onGo("account.security")} />
           <Item icon={<Adjust />} title="Preferences" detail="Units, language and dates" onGo={() => onGo("account.preferences")} />
         </div>

@@ -32,12 +32,12 @@
 import type { ReactNode } from "react";
 import {
   ArrowLeft, Camera, Check, ChevronRight, Download, HeartCrack, KeyRound,
-  Pencil, Shield, SlidersHorizontal, User, X, type LucideIcon,
+  Pencil, Shield, SlidersHorizontal, X, type LucideIcon,
 } from "lucide-react";
 
 /** The name the stylesheet animates by. Closed: a new icon adds a rule. */
 export type IconName =
-  | "portrait" | "key" | "adjust" | "guard" | "save" | "heartbreak"
+  | "key" | "adjust" | "guard" | "save" | "heartbreak"
   | "edit" | "lens" | "onward" | "close" | "back" | "tick";
 
 export interface IconProps {
@@ -71,7 +71,6 @@ const draw = (Glyph: LucideIcon, name: IconName, defaultSize: number) =>
   file. Renaming at the boundary is also what makes swapping a shape later a
   one-line change instead of a find-and-replace across every screen.
 */
-export const Portrait = draw(User, "portrait", 21);
 export const Key = draw(KeyRound, "key", 21);
 export const Adjust = draw(SlidersHorizontal, "adjust", 21);
 export const Guard = draw(Shield, "guard", 21);
@@ -91,7 +90,6 @@ export const Tick = draw(Check, "tick", 19);
  * order the elements appear in, and the CSS addresses them by exactly that.
  */
 export const ICON_PARTS: Readonly<Record<IconName, readonly string[]>> = {
-  portrait: ["path", "circle"],
   key: ["path", "circle"],
   adjust: ["path", "path", "path", "path", "path", "path", "path", "path", "path"],
   guard: ["path"],

@@ -115,14 +115,18 @@ export const MOTION_CSS = `
 [data-icon] { transition: rotate var(--swift) var(--spring), scale var(--swift) var(--spring), translate var(--swift) var(--spring); }
 [data-icon] > * { transition: inherit; transform-box: fill-box; transform-origin: center; }
 
-/* The head lifts and the shoulders take the weight. */
-.item:active [data-icon='portrait'] > :nth-child(2) { translate: 0 -1.4px; }
-.item:active [data-icon='portrait'] > :nth-child(1) { scale: 1.06 1; }
-
 /* ⚠️ ABOUT THE HOLE, WHICH IS THE ONE POINT A KEY DOES NOT MOVE THROUGH. The
    origin is that circle's centre in the 24-unit box — turning about the middle of
-   the icon is a key being waved rather than turned. */
-.item:active [data-icon='key'] { rotate: -28deg; transform-origin: 68.75% 31.25%; }
+   the icon is a key being waved rather than turned.
+
+   ⚠️ AND IT DOES NOT SPRING. This was 28 degrees on the shared spring and it was
+   the one movement that read as clunky: the blade is long and its far end is the
+   whole length of the icon from the hole, so a big angle throws it across the
+   well, and an overshoot on a rotation is a wobble rather than a bounce. A key
+   turning in a lock stops where it stops. Small angle, no overshoot — the only
+   movement here that opts out of the spring, and this is why. */
+.item:active [data-icon='key'] { rotate: -15deg; transform-origin: 68.75% 31.25%; }
+[data-icon='key'] { transition: rotate var(--swift) var(--move); }
 
 /* The three uprights are the knobs; the rails they sit on do not move. */
 .item:active [data-icon='adjust'] > :nth-child(3) { translate: -3px 0; }
@@ -166,6 +170,12 @@ export const MOTION_CSS = `
    short arm to the long one exactly as a hand would. */
 @keyframes strike { from { stroke-dashoffset: 26; } }
 [data-icon='tick'] > * { stroke-dasharray: 26; animation: strike var(--settle) var(--enter) both; }
+/* ⚠️ AND THE BADGE ARRIVES UNDER IT rather than with it, so the disc is there to
+   be drawn on. Both together is a sticker being placed; this is a mark being
+   made. The badge's own rule lives with its colour, in the screen's sheet — a
+   class may be declared once, and refined anywhere. */
+@keyframes stamp { from { opacity: 0; scale: 0.4; } }
+.verified [data-icon='tick'] > * { animation-delay: var(--swift); }
 /* ⚠️ OUT OF STEP WITH EACH OTHER. A column of avatars breathing in unison is a
    heartbeat, which is alarming; the same movement at different offsets is a room
    with people in it. */
