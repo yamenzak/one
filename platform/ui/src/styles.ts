@@ -112,7 +112,13 @@ export const STRUCTURE = `
    second and needs the first: without it two rows of two lines each read as one
    row of four. It is drawn from the ladder, so it moves with the surface. */
 [data-one='row'] + [data-one='row'] { box-shadow: inset 0 var(--edge) 0 var(--surface-2); }
-[data-one='button'] { min-block-size: 3rem; min-inline-size: 3rem; border-radius: 999px; }
+/* ⚠️ THE REASON IS A CAPTION UNDER THE CONTROL. Inside the pill it concatenates
+   with the label — "PublishNot in your plan" — because a pill is a one-line
+   inline box and nothing in the markup said otherwise. */
+[data-one='control'] { display: inline-flex; flex-direction: column; align-items: stretch; gap: calc(0.375rem * var(--density)); }
+[data-one='reason'] { font-size: var(--t-sub); line-height: 1.3; opacity: 0.62; text-align: center; }
+[data-one='control'][data-state='locked'] [data-one='reason'] { opacity: 1; }
+[data-one='button'] { display: inline-flex; align-items: center; justify-content: center; min-block-size: 3rem; min-inline-size: 3rem; border-radius: 999px; }
 /* ⚠️ THE EDGE BELONGS TO THE ONE KIND THAT HAS NO FILL. Drawn on all four, a
    ghost button is an outlined button and the hierarchy between them is gone. */
 [data-one='button'][data-kind='tonal'] { border: var(--edge) solid currentColor; }
@@ -234,6 +240,24 @@ export const STRUCTURE = `
 }
 [data-one='save-bar-save'] { background: var(--surface-2-accent); color: var(--surface-2-accent-ink); }
 [data-one='bulk-action'][data-tone='error'], [data-one='save-bar-discard'] { color: var(--tone-danger); }
+
+/* ── OVERLAYS. ⚠️ The action is PINNED and only the body scrolls, so it never
+      falls below the fold — and the parts had no rules at all until a photograph
+      showed a dialog as three unstyled words and two grey boxes. */
+[data-one='overlay'] { display: flex; flex-direction: column; gap: calc(0.75rem * var(--density)); max-block-size: 100%; }
+[data-one='overlay-title'] { font-size: var(--t-page); font-weight: var(--w-bold); line-height: 1.15; letter-spacing: -0.02em; }
+[data-one='overlay-body'] { flex: 1; min-block-size: 0; overflow-y: auto; }
+[data-one='overlay-footer'] { display: flex; gap: calc(0.5rem * var(--density)); }
+[data-one='overlay-footer'] > * { flex: 1; }
+[data-one='overlay-dismiss'], [data-one='confirm-cancel'], [data-one='confirm-go'] {
+  min-block-size: 3rem; padding: 0 calc(1.125rem * var(--density)); border: 0; border-radius: 999px;
+  background: var(--surface-3); color: var(--surface-3-ink); font: inherit; font-weight: var(--w-semi);
+}
+/* ⚠️ THE DESTRUCTIVE HALF IS THE ONE THAT LOOKS DESTRUCTIVE, and it is not the
+   default focus: a confirmation whose dangerous answer is the easy one is a
+   confirmation that has stopped confirming anything. */
+[data-one='confirm-go'] { background: var(--tone-danger); color: var(--tone-danger-ink); }
+[data-one='overlay-dismiss'] { align-self: flex-start; }
 
 /* ── READING SURFACES. */
 [data-one='page-header'] { display: flex; flex-direction: column; gap: calc(0.5rem * var(--density)); }

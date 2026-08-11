@@ -21,7 +21,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { writeFileSync, readFileSync } from "node:fs";
 import {
-  BORROWED, CLOCK, CHOREOGRAPHY, DEFAULT_BRAND, SCALE, SKY, STRUCTURE,
+  BORROWED_FILES, CLOCK, CHOREOGRAPHY, DEFAULT_BRAND, SCALE, SKY, STRUCTURE,
   daisyTheme, skyVars, tokensFor, type Brand, type Theme,
 } from "../src/index.js";
 import { GROUPS } from "./specimens.js";
@@ -55,9 +55,16 @@ const scoped = (brand: Brand, theme: Theme, i: number): string => {
   ].join("\n");
 };
 
-const daisy = [...new Set(Object.values(BORROWED))]
-  .map((c) => `node_modules/daisyui/components/${c === "list-row" ? "list" : c}.css`)
-  .map((f) => { try { return readFileSync(f, "utf8"); } catch { return ""; } })
+/*
+  ⚠️ BY FILE NAME, FROM THE PACKAGE, AND IT THROWS ON A MISSING ONE. The file
+  names are not the class names — daisyUI ships `btn` in `button.css` — and the
+  first version guessed from the class and swallowed the miss with a `catch`.
+  The result was no button CSS at all: four kinds of button rendered as one grey
+  pill in the library's un-themed default, and nothing anywhere failed, because a
+  missing file had been read as "no styles needed".
+*/
+const daisy = [...new Set(Object.values(BORROWED_FILES))]
+  .map((f) => readFileSync(`node_modules/daisyui/components/${f}.css`, "utf8"))
   .join("\n");
 
 /* ------------------------------------------------------------ the tokens --- */
@@ -113,7 +120,7 @@ body { margin: 0; background: var(--bg); color: var(--ink);
 .group { margin-block-end: 40px; }
 .group h2 { font-size: 12px; font-weight: 650; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); margin-block-end: 6px; }
 .note { color: var(--dim); font-size: 13.5px; max-inline-size: 74ch; margin-block-end: 16px; }
-.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px;
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 22px;
   padding: 20px; border-radius: 18px; border: 1px solid var(--line);
   background: var(--canvas); color: var(--canvas-ink); }
 .sw { display: flex; flex-direction: column; gap: 8px; }
@@ -126,6 +133,11 @@ body { margin: 0; background: var(--bg); color: var(--ink);
 [data-one='scroller-item'] { display: block; }
 [data-one='overlay'] { position: static; border-radius: var(--radius-lg); background: var(--surface-2); color: var(--surface-2-ink); padding: var(--row-pad); box-shadow: var(--elevation-3); }
 [data-one='shell'] { min-block-size: 0; border-radius: 14px; overflow: hidden; }
+/* ⚠️ A shadow needs room to be seen. In light the deeper surfaces are all
+   near-white and the elevation IS the difference, so a flush specimen reads as
+   three identical rectangles — which is the design being invisible rather than
+   absent. */
+[data-one='surface'] { display: block; padding: 16px; min-block-size: 74px; }
 @media (max-width: 720px) { .wrap { padding: 20px 14px 60px; } .board { padding: 14px; } }
 `;
 

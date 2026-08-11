@@ -52,6 +52,26 @@ export const BORROWED = {
 } as const;
 
 /**
+ * ⚠️ AND THE STYLESHEET EACH ONE LIVES IN, because the file names are NOT the
+ * class names and guessing costs an evening. daisyUI ships `btn` in
+ * `button.css`; a consumer that assembles its own bundle by class name gets an
+ * empty string for the single most-used object in the language and every button
+ * falls back to the library's un-themed default. That is what the gallery showed
+ * — four kinds of button rendering as one grey pill — and nothing failed,
+ * because a missing file had been read as "no styles needed".
+ *
+ * ⚠️ AND IT IS HERE RATHER THAN IN THE HARNESS. An app importing this package
+ * needs exactly this list; keeping it beside the class names is what stops the
+ * two drifting.
+ */
+export const BORROWED_FILES: Readonly<Record<keyof typeof BORROWED, string>> = {
+  button: "button", card: "card", badge: "badge", alert: "alert", skeleton: "skeleton",
+  input: "input", textarea: "textarea", select: "select", checkbox: "checkbox", radio: "radio",
+  toggle: "toggle", range: "range", table: "table", progress: "progress", steps: "steps",
+  breadcrumbs: "breadcrumbs", menu: "menu", collapse: "collapse", divider: "divider", loading: "loading",
+};
+
+/**
  * ⚠️ WHAT IS NOT BORROWED, AND WHY — because "we wrote our own" is a decision
  * that decays into "somebody did not know the library had one". Each of these is
  * an object daisyUI ships and we deliberately do not use, and the reason is

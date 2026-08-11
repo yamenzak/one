@@ -131,6 +131,24 @@ describe("a refusal explains itself, and a locked one stays reachable", () => {
     expect(disabled).toContain('aria-disabled="true"');
   });
 
+  /*
+    ⚠️ THE REASON IS A CAPTION UNDER THE CONTROL, NOT TEXT INSIDE THE PILL. As a
+    child of the button it simply concatenates — "PublishNot in your plan" —
+    because a pill is a one-line inline box and nothing in the markup said
+    otherwise. EVERY accessibility assertion above still passed: they ask what
+    the tree MEANS, and the meaning was right. Only the shape was wrong, and only
+    a photograph showed it, which is why this check is about STRUCTURE.
+  */
+  it("keeps the reason outside the button rather than inside its label", () => {
+    const out = html(<Button state="locked" reason="Not in your plan">Publish</Button>);
+    const button = out.slice(out.indexOf("<button"), out.indexOf("</button>"));
+    expect(button, "the reason is inside the pill and runs into the label").not.toContain("Not in your plan");
+    expect(out).toContain("Not in your plan");
+    /* And it is still what describes the control, or it is decoration. */
+    const said = /aria-describedby="([^"]+)"/.exec(out)![1];
+    expect(out).toContain(`id="${said}"`);
+  });
+
   it("marks a busy control busy rather than merely stuck", () => {
     expect(html(<Button state="busy">Saving</Button>)).toContain('aria-busy="true"');
   });

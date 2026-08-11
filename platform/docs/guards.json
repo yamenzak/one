@@ -3649,6 +3649,24 @@
       "impl": "ui/test/data.test.tsx",
       "proves": "makes a failure persistent and assertive, and everything else polite",
       "fails": "a failure announced politely and timed out — a message that disappears cannot be how somebody learns something they needed"
+    },
+    {
+      "id": "a-refusals-reason-is-a-caption",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/components.test.tsx",
+      "proves": "keeps the reason outside the button rather than inside its label",
+      "fails": "a refusal's reason rendered inside the pill — it concatenates with the label into \"PublishNot in your plan\", because a pill is a one-line inline box. Every accessibility assertion passed: they ask what the tree MEANS, and the meaning was right; only the shape was wrong, and only a photograph showed it"
+    },
+    {
+      "id": "every-borrowed-object-names-its-file",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/borrowed.test.ts",
+      "proves": "names a file for every borrowed object",
+      "fails": "a consumer assembling a bundle by class name — daisyUI ships `btn` in `button.css`, so the most-used object in the language silently gets no styles and every button falls back to the library's un-themed default"
     }
   ]
 }

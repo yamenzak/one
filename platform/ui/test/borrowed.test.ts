@@ -15,7 +15,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { BORROWED, OURS, SIZE, TONE, borrow } from "../src/borrowed.js";
+import { BORROWED, BORROWED_FILES, OURS, SIZE, TONE, borrow } from "../src/borrowed.js";
+import { existsSync } from "node:fs";
 
 const SRC = new URL("../src/", import.meta.url).pathname;
 
@@ -96,6 +97,27 @@ describe("only one file knows the library's names", () => {
       if (/\{\s*\.\.\.(props|rest)\s*\}/.test(src)) offenders.push(`${file.replace(SRC, "")}: spreads unknown props`);
     }
     expect(offenders, "a passthrough is an arbitrary look with a friendly name").toEqual([]);
+  });
+});
+
+describe("the stylesheet each borrowed object lives in", () => {
+  /*
+    ⚠️ THE FILE NAMES ARE NOT THE CLASS NAMES, and guessing costs an evening.
+    daisyUI ships `btn` in `button.css`, so a consumer assembling its own bundle
+    by class name gets nothing for the most-used object in the language and every
+    button falls back to the library's un-themed default. Four kinds rendered as
+    one grey pill, and nothing failed — a missing file had been read as "no
+    styles needed".
+  */
+  it("names a file for every borrowed object", () => {
+    expect(Object.keys(BORROWED_FILES).sort()).toEqual(Object.keys(BORROWED).sort());
+  });
+
+  /* And where the package is installed, every one of those files is real. */
+  it("names files that exist", () => {
+    if (!existsSync("node_modules/daisyui/components/button.css")) return;
+    const missing = Object.values(BORROWED_FILES).filter((f) => !existsSync(`node_modules/daisyui/components/${f}.css`));
+    expect(missing, "named and not there").toEqual([]);
   });
 });
 

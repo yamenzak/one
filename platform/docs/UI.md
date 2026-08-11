@@ -1136,6 +1136,35 @@ accent are in what it returns.
 
 ---
 
+### 9f1. Three defects a photograph found and no test did
+
+⚠️ **THE REFUSAL'S REASON WAS INSIDE THE PILL, AND IT CONCATENATED.** A locked
+button rendered `PublishNot in your plan`, because a pill is a one-line inline
+box and nothing in the markup said otherwise. **Every accessibility assertion
+passed** — `aria-describedby` pointed at the right id, the control stayed
+focusable, the words were present — because those tests ask what the tree
+*means*, and the meaning was right. The reason is a caption under the control
+now, and the new check is about STRUCTURE: it fails if the text is a descendant
+of the `<button>`.
+
+⚠️ **THE OVERLAY'S OWN PARTS HAD NO RULES AT ALL.** Header, body, footer, dismiss,
+confirm-cancel and confirm-go were `data-one` attributes the sheet never
+mentioned, so a dialog rendered as three unstyled words and two grey boxes.
+Nothing failed, because every test asserted the tree and none of them looked.
+
+⚠️ **AND THE HARNESS INLINED NO BUTTON CSS.** daisyUI's file names are not its
+class names — `btn` lives in `button.css` — and the first version guessed from
+the class and swallowed the miss with a `catch`. Four kinds of button rendered as
+one grey pill in the library's un-themed default. `BORROWED_FILES` sits beside
+`BORROWED` now, because an app assembling its own bundle needs exactly that list,
+and the harness throws on a file that is not there.
+
+**The pattern in all three: a test that asks what the markup MEANS cannot see
+what it LOOKS LIKE.** That is the whole reason the gallery exists, and the reason
+its conformance test insists every declared state appears in it.
+
+---
+
 ## 9g. The gallery is the deliverable, not a demo screen
 
 ⚠️ **DEMO SCREENS PHOTOGRAPH A PRODUCT THAT DOES NOT EXIST.** They look finished,
@@ -1246,6 +1275,8 @@ and is expensive to disprove, so it survives review indefinitely.
 | `a-field-is-described-by-its-own-fault` | a field that drops its hint when it fails, or a label that is adjacent rather than attached — both render a form that looks finished and is unusable by voice control and by anybody whose first attempt failed validation | **live** |
 | `a-trend-takes-its-tone-from-meaning` | an up arrow rendered as good news — spend up and weight down are both bad, and this is the thing every trend indicator gets wrong | **live** |
 | `a-failure-in-a-toast-does-not-vanish` | a failure announced politely and timed out — a message that disappears cannot be how somebody learns something they needed | **live** |
+| `a-refusals-reason-is-a-caption` | a refusal's reason rendered inside the pill — it concatenates with the label into "PublishNot in your plan", because a pill is a one-line inline box. Every accessibility assertion passed: they ask what the tree MEANS, and the meaning was right; only the shape was wrong, and only a photograph showed it | **live** |
+| `every-borrowed-object-names-its-file` | a consumer assembling a bundle by class name — daisyUI ships `btn` in `button.css`, so the most-used object in the language silently gets no styles and every button falls back to the library's un-themed default | **live** |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder

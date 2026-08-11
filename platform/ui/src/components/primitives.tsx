@@ -10,7 +10,7 @@
  * two components physically cannot run competing timelines.
  */
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import type { Interaction } from "../state.js";
 import type { Role } from "../motion.js";
 import { semanticForm } from "../ground.js";
@@ -115,44 +115,58 @@ export function Button({ kind = "tonal", size = "md", state = "idle", reason, re
     */
     throw new Error("Button: `disabled` and `locked` require a `reason`");
   }
+  const said = useId();
   return (
-    <button
-      type="button"
-      data-one="button"
-      /*
-        ⚠️ THE LIBRARY DRAWS THE PILL; THE SHEET PLACES IT. `kind` and `size` are
-        OUR words, mapped in `borrowed.ts` — a component that knew the library's
-        names is a component where somebody eventually writes one inline, and
-        then a sixth kind exists that the language never declared.
-      */
-      className={borrow("button", [
-        kind === "primary" ? "-primary" : kind === "quiet" ? "-ghost" : kind === "destructive" ? `-${TONE.danger}` : "-neutral",
-        SIZE[size],
-      ])}
-      data-kind={kind}
-      data-size={size}
-      data-state={state}
-      /*
-        ⚠️ LOCKED IS NOT DISABLED. A locked control stays focusable and readable
-        so it can explain itself and offer the way out; only a genuinely
-        inapplicable one is removed from the tab order.
-      */
-      disabled={state === "disabled" || state === "busy"}
-      /*
-        ⚠️ A LOCKED CONTROL IS NOT DISABLED, INCLUDING TO ASSISTIVE TECHNOLOGY.
-        It is actionable — pressing it is how somebody reaches the plan that
-        would unlock it — so marking it unavailable announces the opposite of
-        what it does and removes the one route out of the state.
-      */
-      aria-disabled={state === "disabled" || state === "busy" ? true : undefined}
-      aria-busy={state === "busy" ? true : undefined}
-      aria-describedby={reason ? "reason" : undefined}
-      {...(resolve ? { "data-resolve": resolve } : {})}
-      onClick={onPress}
-    >
-      <span data-one="button-label">{children}</span>
-      {reason ? <span data-one="reason" id="reason">{reason}</span> : null}
-    </button>
+    /*
+      ⚠️ THE REASON IS A CAPTION UNDER THE CONTROL, NOT TEXT INSIDE THE PILL.
+      Rendered as a child of the button it simply concatenates — "PublishNot in
+      your plan" — because a pill is a one-line inline box and nothing about the
+      markup says otherwise. Every accessibility check still passed: they ask
+      what the tree MEANS, and the meaning was right. Only the shape was wrong,
+      and only a photograph showed it.
+    */
+    <span data-one="control" data-kind={kind} data-state={state}>
+      <button
+        type="button"
+        data-one="button"
+        /*
+          ⚠️ THE LIBRARY DRAWS THE PILL; THE SHEET PLACES IT. `kind` and `size` are
+          OUR words, mapped in `borrowed.ts` — a component that knew the library's
+          names is a component where somebody eventually writes one inline, and
+          then a sixth kind exists that the language never declared.
+        */
+        className={borrow("button", [
+          kind === "primary" ? "-primary" : kind === "quiet" ? "-ghost" : kind === "destructive" ? `-${TONE.danger}` : "-neutral",
+          SIZE[size],
+        ])}
+        data-kind={kind}
+        data-size={size}
+        data-state={state}
+        /*
+          ⚠️ LOCKED IS NOT DISABLED. A locked control stays focusable and readable
+          so it can explain itself and offer the way out; only a genuinely
+          inapplicable one is removed from the tab order.
+        */
+        disabled={state === "disabled" || state === "busy"}
+        /*
+          ⚠️ A LOCKED CONTROL IS NOT DISABLED, INCLUDING TO ASSISTIVE TECHNOLOGY.
+          It is actionable — pressing it is how somebody reaches the plan that
+          would unlock it — so marking it unavailable announces the opposite of
+          what it does and removes the one route out of the state.
+        */
+        aria-disabled={state === "disabled" || state === "busy" ? true : undefined}
+        aria-busy={state === "busy" ? true : undefined}
+        /* ⚠️ A GENERATED ID, NEVER A LITERAL. Two refusing controls on one screen
+           shared the id `reason` once, and every one of them was described by the
+           first. */
+        aria-describedby={reason ? said : undefined}
+        {...(resolve ? { "data-resolve": resolve } : {})}
+        onClick={onPress}
+      >
+        <span data-one="button-label">{children}</span>
+      </button>
+      {reason ? <span data-one="reason" id={said}>{reason}</span> : null}
+    </span>
   );
 }
 
