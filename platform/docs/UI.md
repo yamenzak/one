@@ -1165,6 +1165,55 @@ its conformance test insists every declared state appears in it.
 
 ---
 
+### 9f2. What the second review found — chrome nobody had styled
+
+Six more, all from photographs, and the shape of every one is the same: a
+`data-one` attribute the sheet never mentioned.
+
+⚠️ **THE NAVIGATION SURFACE HAD NO RULES AT ALL** — the single thing the boundary
+most insists an app must not build rendered as three bare browser buttons, and
+its icons were an empty span, because `Destination.icon` was a free string
+nothing drew. It is an `IconName` now, so the shell can draw it, and the island
+and the rail are the same list at two widths.
+
+⚠️ **AN OVERLAY WITHOUT A PLACEMENT IS A CARD.** A sheet attaches to the edge it
+came from and carries the handle that says it can be pushed away; a dialog is
+centred and demands an answer. With neither, both read as an ordinary panel that
+happens to contain a question.
+
+⚠️ **THE SEMANTIC TONES WERE TWO COLOURS.** `daisyTheme` filled a callout from
+the raw hue while `tokensFor` coloured its icon from the re-lit one — one step
+apart, side by side, in the same component. One derivation, or the tones disagree
+with themselves. Every tone carries an **icon** now, too: "never colour alone, at
+any saturation" needs a shape to be true.
+
+⚠️ **A SKELETON WITH NO GEOMETRY IS AN EMPTY BOX**, which is worse than a
+spinner: it promises a shape and shows nothing. The spinner had no size either,
+so the library drew a 1rem arc.
+
+⚠️ **THE EDGE WAS FULL-STRENGTH `currentColor`** — a black outline on a white
+pill, which reads as a different component rather than as a quieter one. And a
+disabled input lost its border entirely, so a form came out with three bordered
+boxes and one without. **A refusing control keeps its shape and loses its
+*contrast*:** what changed is whether it can be used, not what it is.
+
+⚠️ **AND PREVIOUS WAS AN ARROW WHILE NEXT WAS A CHEVRON** — two different
+promises about one control.
+
+⚠️ **TWO OF THE SIX WERE CHEATS IN THE GALLERY ITSELF.** `nav` and `sky` were
+"drawn" as sentences describing them — exactly what the coverage test exists to
+prevent, written by the person who wrote the test. They are real drawings now.
+
+**The colour guard grew twice, and the mutation is why.** It read three property
+names and a value's *prefix*, so `border: var(--edge) solid rebeccapurple` passed
+the mutation that was meant to prove it. It reads the shorthands now and judges
+every token in the value — while accepting a `color-mix` whose only inputs are
+`currentColor` and `transparent`, because that is a transparency of the *measured*
+ink: it adapts to the surface it lands on, which is more correct than a fixed
+token rather than less.
+
+---
+
 ## 9g. The gallery is the deliverable, not a demo screen
 
 ⚠️ **DEMO SCREENS PHOTOGRAPH A PRODUCT THAT DOES NOT EXIST.** They look finished,
