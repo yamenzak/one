@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { keyboardInset, liftFor } from "../src/account/editor.js";
+import { keyboardInset, liftFor } from "../src/editor.js";
 
 describe("what the keyboard is standing on", () => {
   /*

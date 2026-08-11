@@ -14,6 +14,11 @@
  * reference the person can quote. Rendering that as `String(err)` in a toast
  * throws away every one of those and puts a stack trace on a phone.
  *
+ * ⚠️ IT IS NOT THE ACCOUNT'S, AND IT WAS FILED THERE BY ACCIDENT OF BIRTH. It
+ * names no account concept and imports none — a field, a save that resolves to a
+ * `Problem` or to null, and a sheet. It was written for the account centre and
+ * lived in its folder for exactly that long.
+ *
  * ⚠️ THE ACTION HOLDS ITS OWN STATE. A button that is submitted twice because it
  * looked idle is a duplicate write; a button that says "Save" after saving is a
  * person wondering whether it took. Idle, disabled, saving, saved, failed — and
@@ -23,9 +28,9 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { Problem } from "@one/kernel";
-import { feel } from "../feedback.js";
-import { Close, Tick } from "../icon.js";
-import { Sheet } from "../sheet.js";
+import { feel } from "./feedback.js";
+import { Close, Tick } from "./icon.js";
+import { Sheet } from "./sheet.js";
 
 /** What a value is, which is all the sheet needs to draw the right control. */
 export type FieldKind = "text" | "email";

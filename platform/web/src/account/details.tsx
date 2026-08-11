@@ -24,7 +24,7 @@ import { Face } from "../avatar.js";
 import { Edit, Lens, Tick } from "../icon.js";
 import { Card, Entry, Unset } from "../list.js";
 import { Screen, Section, Title } from "../screen.js";
-import { ValueEditor, type EditableField } from "./editor.js";
+import { ValueEditor, type EditableField } from "../editor.js";
 import type { Person } from "./home.js";
 
 export interface AccountDetailsProps {
