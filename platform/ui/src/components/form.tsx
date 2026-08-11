@@ -240,14 +240,28 @@ export const Dial = ({ bound, min, max, step = 1, value, format, onChange, disab
 /* ------------------------------------------------------------------- form --- */
 
 export interface FormProps {
+  /** ⚠️ The row at the end. Buttons placed among the fields stretch and stack. */
+  readonly actions?: ReactNode;
   readonly title?: string;
   readonly children: ReactNode;
   readonly onSubmit?: () => void;
 }
 
-export const Form = ({ title, children, onSubmit }: FormProps) => (
+export const Form = ({ title, children, actions, onSubmit }: FormProps) => (
   <form data-one="form" aria-label={title} onSubmit={(e) => { e.preventDefault(); onSubmit?.(); }}>
+    {/* ⚠️ DRAWN, not merely announced. The title went to the accessible name and
+        nowhere else, so a form was a stack of fields with no name on every screen
+        that had one — named to a screen reader and anonymous to everybody. */}
+    <span data-one="form-title">{title}</span>
     {children}
+    {/*
+      ⚠️ A FORM'S BUTTONS ARE A ROW, AND WITHOUT THIS SLOT THEY WERE NOT. The
+      form is a flex column that stretches its children, so every button placed
+      in one came out full-width and stacked — three of them read as three
+      primary actions, and seven read as a wall of pills. Where the buttons go is
+      a decision the language makes once, not one every screen re-derives.
+    */}
+    {actions ? <div data-one="form-actions">{actions}</div> : null}
   </form>
 );
 

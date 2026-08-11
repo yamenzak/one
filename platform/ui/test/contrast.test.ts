@@ -277,9 +277,22 @@ describe("the brand surface is closed, and out of range is refused", () => {
     for (const required of ["--canvas", "--canvas-ink", "--surface-1", "--surface-1-accent-ink", "--radius", "--edge"]) {
       expect(tokens[required], required).toBeTruthy();
     }
-    // ⚠️ Shadows exist only in light mode, and only on a `soft` elevation.
-    expect(tokensFor({ ...DEFAULT_BRAND, elevation: "soft" }, "dark")["--elevation"]).toBe("none");
-    expect(tokensFor({ ...DEFAULT_BRAND, elevation: "flat" }, "light")["--elevation"]).toBe("none");
-    expect(tokensFor({ ...DEFAULT_BRAND, elevation: "soft" }, "light")["--elevation"]).not.toBe("none");
+    /*
+      ⚠️ A SHADOW IS LIGHT-ONLY, AND `flat` MEANS NO SHADOW — NEVER NO BOUNDARY.
+      This test used to assert flat-in-light was `none`, which is what let the
+      hole ship: in light the shadow is the only separator, so a flat tenant got
+      surfaces 1 to 3 all within a rounding error of white with nothing telling
+      them apart — cards with no edge, a segmented indicator that WAS the bar it
+      sat in, a confirm whose two buttons were the card behind them. A hairline
+      is the same token doing the same job in a way flat permits.
+    */
+    expect(tokensFor({ ...DEFAULT_BRAND, elevation: "soft" }, "dark")["--elevation"], "a shadow on near-black is spent for nothing").toBe("none");
+    expect(tokensFor({ ...DEFAULT_BRAND, elevation: "flat" }, "dark")["--elevation"]).toBe("none");
+    const flatLight = tokensFor({ ...DEFAULT_BRAND, elevation: "flat" }, "light")["--elevation"]!;
+    expect(flatLight, "flat in light must still separate, or nothing does").not.toBe("none");
+    expect(flatLight, "and it separates by an edge rather than by a shadow").toContain("inset");
+    const softLight = tokensFor({ ...DEFAULT_BRAND, elevation: "soft" }, "light")["--elevation"]!;
+    expect(softLight).not.toBe("none");
+    expect(softLight, "soft casts, it does not outline").not.toContain("inset");
   });
 });

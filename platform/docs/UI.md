@@ -1341,6 +1341,8 @@ and is expensive to disprove, so it survives review indefinitely.
 | `an-app-navigates-the-way-the-language-says` | a reference app breaking the one rule the registry runs on every app — three to five destinations, each labelled, each answering to a screen | **live** |
 | `a-refusal-in-the-sample-app-says-why` | a locked or disabled control whose reason is the shortest string that satisfies the type. The components make a reason mandatory; only this checks one was written | **live** |
 | `every-forbidden-surface-is-used-by-the-app` | a surface the boundary forbids an app to build that the reference app never uses — which is how nine of them sat unimplemented for four stages, forbidden to everybody and provided to nobody | **live** |
+| `a-surface-declares-its-ink` | a rule that changes the ground and lets the colour inherit — the second law, as a check. The table did exactly that and every cell inherited the page's ink, which came out near-black on a dark card while the header, which the library colours, looked fine | **live** |
+| `nothing-borrowed-is-painted-with-the-shorthand` | a background shorthand on an object the library also draws. It resets every longhand it does not mention, which is how the select lost the background-IMAGE daisyUI draws its chevron with and became a text input with no affordance on every tenant and both themes | **live** |
 <!-- /generated -->
 
 ⚠️ **A widened guard finds bugs in itself first**, and the ones here are harder

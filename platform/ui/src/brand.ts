@@ -201,10 +201,22 @@ export function tokensFor(brand: Brand, theme: Theme): Tokens {
     the lightness ladder does the work. A shadow on near-black is invisible, and
     every pixel spent drawing one is a pixel that makes nothing clearer.
   */
-  const lifted = brand.elevation !== "flat" && theme === "light";
-  out["--elevation-1"] = lifted ? "0 1px 2px rgb(0 0 0 / 0.04), 0 2px 8px rgb(0 0 0 / 0.05)" : "none";
-  out["--elevation-2"] = lifted ? "0 2px 4px rgb(0 0 0 / 0.05), 0 8px 20px rgb(0 0 0 / 0.07)" : "none";
-  out["--elevation-3"] = lifted ? "0 4px 8px rgb(0 0 0 / 0.06), 0 18px 40px rgb(0 0 0 / 0.10)" : "none";
+  /*
+    ⚠️ AND `flat` MEANS NO SHADOW, NEVER NO BOUNDARY. This is the hole under the
+    rule above: in light the shadow is the ONLY separator, so a tenant who chose
+    flat got surfaces 1 to 3 all within a rounding error of white and nothing at
+    all telling them apart — cards with no edge, a segmented indicator that was
+    the bar it sat in, a confirm whose two buttons were the card behind them.
+    Every one of those reads as broken rather than as a style. A flat tenant gets
+    a HAIRLINE instead: the same token, still one declaration at every call site,
+    and the separation survives the choice.
+  */
+  const ring = `inset 0 0 0 1px color-mix(in oklab, ${toHex(inkOn(ground.canvas).ink)} 10%, transparent)`;
+  const lifted = theme === "light" && brand.elevation !== "flat";
+  const flatLight = theme === "light" && brand.elevation === "flat";
+  out["--elevation-1"] = lifted ? "0 1px 2px rgb(0 0 0 / 0.04), 0 2px 8px rgb(0 0 0 / 0.05)" : flatLight ? ring : "none";
+  out["--elevation-2"] = lifted ? "0 2px 4px rgb(0 0 0 / 0.05), 0 8px 20px rgb(0 0 0 / 0.07)" : flatLight ? ring : "none";
+  out["--elevation-3"] = lifted ? "0 4px 8px rgb(0 0 0 / 0.06), 0 18px 40px rgb(0 0 0 / 0.10)" : flatLight ? ring : "none";
   /* The unqualified one is depth 1, so a caller that does not know its depth is
      still lit rather than flat. */
   out["--elevation"] = out["--elevation-1"]!;

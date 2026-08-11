@@ -228,16 +228,22 @@ export interface MenuItem {
  * am I", which is the failure the whole navigation section exists to prevent.
  */
 export const Menu = ({ label, items }: { readonly label: string; readonly items: readonly MenuItem[] }) => (
-  <ul data-one="menu" className={borrow("menu")} role="menu" aria-label={label}>
-    {items.map((i) => (
-      <li key={i.id} role="none">
-        <button type="button" role="menuitem" data-one="menu-item" data-tone={i.destructive ? TONE.danger : undefined} onClick={i.onRun}>
-          {i.icon ? <Icon name={i.icon} /> : null}
-          <Text role="body">{i.label}</Text>
-        </button>
-      </li>
-    ))}
-  </ul>
+  <details data-one="menu-host">
+    {/* ⚠️ A TRIGGER, because a menu that is always open is a panel. It was a bare
+        list with a card's shadow, so in the one place a menu belongs — a
+        header's action slot — it covered the title it sat beside. */}
+    <summary data-one="menu-trigger" aria-label={label}><Icon name="dots" /></summary>
+    <ul data-one="menu" className={borrow("menu")} role="menu" aria-label={label}>
+      {items.map((i) => (
+        <li key={i.id} role="none">
+          <button type="button" role="menuitem" data-one="menu-item" data-tone={i.destructive ? TONE.danger : undefined} onClick={i.onRun}>
+            {i.icon ? <Icon name={i.icon} /> : null}
+            <Text role="body">{i.label}</Text>
+          </button>
+        </li>
+      ))}
+    </ul>
+  </details>
 );
 
 /* --------------------------------------------------------------- feedback --- */

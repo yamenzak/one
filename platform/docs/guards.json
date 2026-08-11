@@ -3802,6 +3802,24 @@
       "impl": "ui/test/app.test.tsx",
       "proves": "uses every surface an app is forbidden to build for itself",
       "fails": "a surface the boundary forbids an app to build that the reference app never uses — which is how nine of them sat unimplemented for four stages, forbidden to everybody and provided to nobody"
+    },
+    {
+      "id": "a-surface-declares-its-ink",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/audit.test.tsx",
+      "proves": "declares an ink wherever it declares a ground",
+      "fails": "a rule that changes the ground and lets the colour inherit — the second law, as a check. The table did exactly that and every cell inherited the page's ink, which came out near-black on a dark card while the header, which the library colours, looked fine"
+    },
+    {
+      "id": "nothing-borrowed-is-painted-with-the-shorthand",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/audit.test.tsx",
+      "proves": "never paints a borrowed object with the background shorthand",
+      "fails": "a background shorthand on an object the library also draws. It resets every longhand it does not mention, which is how the select lost the background-IMAGE daisyUI draws its chevron with and became a text input with no affordance on every tenant and both themes"
     }
   ]
 }

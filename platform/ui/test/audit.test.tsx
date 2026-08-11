@@ -43,10 +43,8 @@ const styled = new Set([...SHEET.matchAll(/\[data-one='([a-z-]+)'\]/g)].map((m) 
  * borrows — checked below, so an entry cannot survive the borrow being dropped.
  */
 const DRESSED_BY_BORROWING: Readonly<Record<string, keyof typeof BORROWED>> = {
-  badge: "badge",
   "checkbox-control": "checkbox",
   "radio-control": "radio",
-  "switch-control": "toggle",
   "breadcrumb-item": "breadcrumbs",
 };
 
@@ -127,6 +125,54 @@ describe("every part the markup emits is a part the sheet draws", () => {
     for (const rule of SHEET.split("}")) {
       if (!rule.includes("background: var(--surface-3)")) continue;
       expect(rule, "surface-3 with no elevation is invisible on every light tenant").toContain("box-shadow");
+    }
+  });
+
+  /*
+    ⚠️ AND NOTHING BORROWED IS PAINTED WITH THE SHORTHAND. `background` resets
+    every longhand it does not mention, so setting it on an object the library
+    also draws silently erases whatever the library put there. That is how the
+    select lost its chevron: our rule set a colour, the shorthand dropped the
+    background-IMAGE daisyUI draws the arrow with, and a select became a text
+    input with no affordance on every tenant and both themes.
+
+    ⚠️ THE PAIRS ARE DERIVED, not listed. A part counts as borrowed when the
+    markup puts a borrowed class on the same element, so this cannot rot as
+    components gain or drop a borrow.
+  */
+  it("never paints a borrowed object with the background shorthand", () => {
+    const borrowed = new Set(
+      [...SOURCE.matchAll(/data-one="([a-z-]+)"[^>]*?className=\{borrow\(/g)].map((m) => m[1]!),
+    );
+    expect(borrowed.size, "no borrowed part found — the pattern stopped matching").toBeGreaterThan(5);
+    for (const rule of SHEET.split("}")) {
+      /* ⚠️ `background: none` is the one honest shorthand: it is a RESET, and
+         clearing every longhand is exactly what it is for — a bare button that
+         must carry none of the library's chrome. Painting is the defect. */
+      if (!/background:\s/.test(rule) || /background:\s*none/.test(rule)) continue;
+      for (const part of borrowed) {
+        expect(rule.includes(`[data-one='${part}']`), `${part} is borrowed and painted with the shorthand`).toBe(false);
+      }
+    }
+  });
+
+  /*
+    ⚠️ A SURFACE DECLARES ITS INK. This is the second law as a check: ink is
+    measured against the surface it lands on, so a rule that changes the ground
+    and leaves the colour to inherit is a rule that hands its text to whatever
+    was behind it. The table did exactly that — a card of its own, and every cell
+    inheriting the page's ink, which came out near-black on a dark card and was
+    simply unreadable.
+
+    ⚠️ THE TOKENS COME IN PAIRS FOR THIS REASON. `--surface-2` has a
+    `--surface-2-ink`, and naming one without the other is the mistake the
+    pairing exists to make obvious.
+  */
+  it("declares an ink wherever it declares a ground", () => {
+    for (const rule of SHEET.split("}")) {
+      const ground = rule.match(/background(?:-color)?:\s*var\(--(canvas|surface-[123])\)/);
+      if (!ground) continue;
+      expect(rule, `a ground of --${ground[1]} with no ink of its own`).toMatch(/color:\s*var\(--[a-z0-9-]*ink\)/);
     }
   });
 

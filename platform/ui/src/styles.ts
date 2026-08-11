@@ -79,14 +79,22 @@ export const SCALE = `
  */
 export const STRUCTURE = `
 /* The content area is a container, so anything inside it can ask about IT. */
-[data-one='shell'] { position: relative; display: grid; min-block-size: 100dvh; background: var(--canvas); color: var(--canvas-ink); }
+[data-one='shell'] { position: relative; display: grid; min-block-size: 100dvh; background-color: var(--canvas); color: var(--canvas-ink); }
 [data-one='pane'] { container-type: inline-size; container-name: pane; overflow-y: auto; }
 /* ⚠️ THE SHADOW IS THE DEPTH IN LIGHT AND NOTHING AT ALL IN DARK — one token
    per depth, so a surface never has to know which theme it is in. */
-[data-one='surface'] { border-radius: var(--radius-lg); background: var(--surface-1); box-shadow: var(--elevation-1); }
-[data-one='surface'][data-depth='2'] { background: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-2); }
-[data-one='surface'][data-depth='3'] { background: var(--surface-3); color: var(--surface-3-ink); box-shadow: var(--elevation-3); }
-[data-one='surface'][data-depth='0'] { background: var(--canvas); border-radius: 0; box-shadow: none; }
+/* ⚠️ A SURFACE IS PADDED, and the absence of this line was hidden for four
+   stages by the gallery, which set its own padding on the specimen and so
+   photographed a card the product never rendered. Anything placed directly in
+   one — a stat, a progress bar, a paragraph — sat flush against the edge, which
+   does not read as tight, it reads as broken. A section CARD stays flush on
+   purpose: what goes in one is a Row, and a row carries its own. */
+[data-one='surface'] { display: flex; flex-direction: column; align-items: flex-start; gap: calc(0.75rem * var(--density)); padding: var(--row-pad); border-radius: var(--radius-lg); background-color: var(--surface-1); color: var(--surface-1-ink); box-shadow: var(--elevation-1); }
+[data-one='surface'] > [data-one='progress'], [data-one='surface'] > [data-one='stat'], [data-one='surface'] > [data-one='divider'] { align-self: stretch; }
+[data-one='surface'][data-depth='0'] { padding: 0; }
+[data-one='surface'][data-depth='2'] { background-color: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-2); }
+[data-one='surface'][data-depth='3'] { background-color: var(--surface-3); color: var(--surface-3-ink); box-shadow: var(--elevation-3); }
+[data-one='surface'][data-depth='0'] { background-color: var(--canvas); color: var(--canvas-ink); border-radius: 0; box-shadow: none; }
 
 /* ── TEXT. A role, never a size — and the ladder is the one in UI.md §5.1. */
 [data-one='text'] { display: block; }
@@ -119,7 +127,12 @@ export const STRUCTURE = `
    with the label — "PublishNot in your plan" — because a pill is a one-line
    inline box and nothing in the markup said otherwise. */
 [data-one='control'] { display: inline-flex; flex-direction: column; align-items: stretch; gap: calc(0.375rem * var(--density)); }
-[data-one='reason'] { font-size: var(--t-sub); line-height: 1.3; opacity: 0.62; text-align: center; }
+/* ⚠️ THE CAPTION FOLLOWS ITS CONTROL. Centred, it read as body copy under a
+   full-width pill rather than as an explanation bound to the button — and now
+   that a form's buttons are a row rather than a stack, centring would put the
+   sentence under nothing in particular. */
+[data-one='control'] { display: inline-flex; flex-direction: column; align-items: flex-start; gap: calc(0.25rem * var(--density)); }
+[data-one='reason'] { font-size: var(--t-sub); line-height: 1.3; opacity: 0.62; text-align: start; }
 [data-one='control'][data-state='locked'] [data-one='reason'] { opacity: 1; }
 
 /* ⚠️ BUSY IS A STATE THE LANGUAGE DECLARES, AND IT DREW NOTHING. The markup set
@@ -128,10 +141,15 @@ export const STRUCTURE = `
    at all, which is the exact moment somebody presses again. The label STAYS:
    replacing it with a spinner loses what is being waited for. */
 [data-one='button'][data-state='busy'] { position: relative; }
-[data-one='button'][data-state='busy'] [data-one='button-label'] { opacity: 0.35; }
+/* ⚠️ THE RING SITS BESIDE THE LABEL, NOT ON IT. Centred, it printed over the
+   middle of the word and the label was dimmed far enough to be unreadable —
+   which loses exactly the thing a busy control must still say, which is what is
+   being waited for. */
+[data-one='button'][data-state='busy'] { padding-inline-end: 2.25em; }
+[data-one='button'][data-state='busy'] [data-one='button-label'] { opacity: 0.75; }
 [data-one='button'][data-state='busy']::after {
-  content: ""; position: absolute; inset-block-start: 50%; inset-inline-start: 50%;
-  inline-size: 1.05em; block-size: 1.05em; margin: -0.525em 0 0 -0.525em;
+  content: ""; position: absolute; inset-block-start: 50%; inset-inline-end: 0.9em;
+  inline-size: 1.05em; block-size: 1.05em; margin-block-start: -0.525em;
   border-radius: 999px; border: var(--edge) solid currentColor; border-block-start-color: transparent;
 }
 [data-one='button'] { display: inline-flex; align-items: center; justify-content: center; min-block-size: 3rem; min-inline-size: 3rem; border-radius: 999px; }
@@ -142,7 +160,12 @@ export const STRUCTURE = `
    own border and a button that inherits one at random looks like a mistake. */
 [data-one='button'] { border: 0; }
 [data-one='button'][data-kind='tonal'] { border: var(--edge) solid color-mix(in oklab, currentColor 24%, transparent); }
-[data-one='button'][data-kind='primary'] { background: var(--surface-1-accent); color: var(--surface-1-accent-ink); }
+[data-one='button'][data-kind='primary'] { background-color: var(--surface-1-accent); color: var(--surface-1-accent-ink); }
+/* ⚠️ QUIET IS QUIET, NOT ABSENT. The borrowed ghost has no ground at all until a
+   pointer is over it, so on a pale tenant it was a word in a paragraph — three
+   of them in a row read as a sentence rather than as three things to press. A
+   sixth of the ink is enough to be a control and not enough to compete. */
+[data-one='button'][data-kind='quiet'] { background-color: color-mix(in oklab, currentColor 7%, transparent); }
 
 /* ── THE NAVIGATION SURFACE. ⚠️ IT HAD NO RULES AT ALL, so the one thing the
       boundary most insists an app must not build rendered as three bare browser
@@ -152,12 +175,12 @@ export const STRUCTURE = `
 [data-one='nav-item'] { display: flex; flex-direction: column; align-items: center; gap: calc(0.1875rem * var(--density));
   flex: 1; min-block-size: 3.25rem; padding: calc(0.375rem * var(--density)) calc(0.5rem * var(--density));
   border: 0; border-radius: var(--radius); background: none; color: inherit; opacity: 0.55; }
-[data-one='nav-item'][data-active] { opacity: 1; background: var(--surface-2); color: var(--surface-2-ink); }
+[data-one='nav-item'][data-active] { opacity: 1; background-color: var(--surface-2); color: var(--surface-2-ink); }
 /* ⚠️ ON AN ISLAND THE ACTIVE ITEM IS A STEP ABOVE THE ISLAND, NOT THE SAME STEP.
    The island is already surface-2, so the pill was the ground it sat on and the
    current destination was marked by opacity alone — which is exactly as visible
    as not being marked. */
-[data-one='nav'][data-placement='island'] [data-one='nav-item'][data-active] { background: var(--surface-3); color: var(--surface-3-ink); box-shadow: var(--elevation-1); }
+[data-one='nav'][data-placement='island'] [data-one='nav-item'][data-active] { background-color: var(--surface-3); color: var(--surface-3-ink); box-shadow: var(--elevation-1); }
 [data-one='nav-icon'] { display: grid; place-items: center; }
 /* ⚠️ The label travels with the icon — an icon-only rail item is unnamed to
    voice control and ambiguous to everybody else. */
@@ -169,7 +192,7 @@ export const STRUCTURE = `
    the pane below reserves room so the last row of a list is not under it. */
 [data-one='nav'][data-placement='island'] { position: absolute; inset-block-end: calc(0.75rem * var(--density)); inset-inline: var(--pad); z-index: 3;
   padding: calc(0.25rem * var(--density)); border-radius: 999px;
-  background: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-3); }
+  background-color: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-3); }
 [data-one='shell'][data-width='phone'] [data-one='pane'] { padding-block-end: calc(5.5rem * var(--density)); }
 [data-one='nav'][data-placement='island'] [data-one='nav-item'] { border-radius: 999px; }
 [data-one='nav'][data-placement='rail'] { flex-direction: column; gap: calc(0.5rem * var(--density));
@@ -189,7 +212,7 @@ export const STRUCTURE = `
 [data-one='live'] { position: relative; z-index: 4; }
 [data-one='live'][data-presentation='full'] {
   position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column;
-  background: var(--canvas); color: var(--canvas-ink);
+  background-color: var(--canvas); color: var(--canvas-ink);
 }
 /* ⚠️ THE DOCK CLEARS THE NAVIGATION rather than sitting under it. A bar that a
    nav island covers is a control somebody can see and cannot press. */
@@ -197,7 +220,7 @@ export const STRUCTURE = `
   position: fixed; inset-inline: calc(0.75rem * var(--density)); inset-block-end: calc(5rem * var(--density)); z-index: 5;
   display: flex; align-items: center; gap: var(--row-pad); min-block-size: 3.5rem;
   padding: 0 calc(1rem * var(--density)); border-radius: var(--radius-lg);
-  background: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-3);
+  background-color: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-3);
 }
 /* ⚠️ IN A PANE IT IS ORDINARY CONTENT. This is the presentation with no chrome
    of its own, and that is the point: at a width with room for it, a live surface
@@ -209,7 +232,7 @@ export const STRUCTURE = `
 [data-one='live'][data-presentation='detached'] {
   position: fixed; inset-inline-end: calc(0.75rem * var(--density)); inset-block-end: calc(5rem * var(--density)); z-index: 6;
   inline-size: min(16rem, 42vw); border-radius: var(--radius-lg); overflow: hidden;
-  background: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-3);
+  background-color: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-3);
 }
 [data-one='live'][data-presentation='none'] { display: contents; }
 [data-one='hero'] { padding: 0 var(--pad) calc(1.75 * var(--gap)); }
@@ -231,7 +254,7 @@ export const STRUCTURE = `
 [data-one='app-bar'] > :last-child { justify-self: end; }
 [data-one='app-bar'] > :first-child { justify-self: start; }
 [data-one='app-bar-spacer'] { display: block; }
-[data-one='app-bar-leading'] { inline-size: 2.5rem; block-size: 2.5rem; border-radius: 999px; background: var(--surface-2); color: var(--surface-2-ink); border: 0; }
+[data-one='app-bar-leading'] { inline-size: 2.5rem; block-size: 2.5rem; border-radius: 999px; background-color: var(--surface-2); color: var(--surface-2-ink); border: 0; }
 [data-one='crown'] { display: flex; flex-direction: column; align-items: center; gap: calc(0.375rem * var(--density)); margin-block-start: calc(2.125rem * var(--density)); text-align: center; }
 /* ⚠️ A CURRENCY MARK IS NOT PART OF THE NUMBER. Inheriting the hero size makes
    the symbol as loud as the figure, which is the one thing the crown exists to
@@ -248,24 +271,24 @@ export const STRUCTURE = `
 /* ⚠️ THE WIDTH COMES FROM THE CONTAINER AND THERE IS NO EDGE. Both were the
    library's opinion — its input clamps itself at 20rem and draws a border — and
    both are decisions this language already makes. */
-[data-one='page-title-search'] { display: flex; align-items: center; gap: calc(0.75rem * var(--density)); inline-size: 100%; block-size: 3.25rem; padding: 0 var(--row-pad); border-radius: 999px; background: var(--surface-1); color: var(--surface-1-ink); }
+[data-one='page-title-search'] { display: flex; align-items: center; gap: calc(0.75rem * var(--density)); inline-size: 100%; block-size: 3.25rem; padding: 0 var(--row-pad); border-radius: 999px; background-color: var(--surface-1); color: var(--surface-1-ink); }
 [data-one='identity-action'] { margin-block-start: calc(0.5rem * var(--density)); }
 [data-one='app-bar-action'] { display: inline-flex; align-items: center; gap: calc(0.25rem * var(--density)); }
 [data-one='identity'] { display: flex; flex-direction: column; align-items: center; gap: calc(0.5rem * var(--density)); margin-block-start: calc(1.5rem * var(--density)); text-align: center; }
-[data-one='face'] { display: grid; place-items: center; inline-size: 6rem; block-size: 6rem; border-radius: 999px; background: var(--surface-2-accent); color: var(--surface-2-accent-ink); font-size: var(--t-hero); font-weight: var(--w-bold); }
+[data-one='face'] { display: grid; place-items: center; inline-size: 6rem; block-size: 6rem; border-radius: 999px; background-color: var(--surface-2-accent); color: var(--surface-2-accent-ink); font-size: var(--t-hero); font-weight: var(--w-bold); }
 [data-one='identity-name'] { font-size: var(--t-page); font-weight: var(--w-bold); line-height: 1.1; letter-spacing: -0.02em; }
 
 /* ── QUICK ACTIONS. A circle in a well, and the label is never optional. */
 [data-one='quick-action-list'] { display: flex; justify-content: center; gap: calc(1.125rem * var(--density)); margin-block-start: calc(1.625rem * var(--density)); }
 [data-one='quick-action'] { flex: 1; display: flex; flex-direction: column; align-items: center; gap: calc(0.625rem * var(--density)); background: none; border: 0; color: inherit; }
-[data-one='quick-action-well'] { display: grid; place-items: center; inline-size: 3rem; block-size: 3rem; border-radius: 999px; background: var(--surface-2); color: var(--surface-2-ink); }
+[data-one='quick-action-well'] { display: grid; place-items: center; inline-size: 3rem; block-size: 3rem; border-radius: 999px; background-color: var(--surface-2); color: var(--surface-2-ink); }
 
 /* ── SECTIONS. ⚠️ The header sits OUTSIDE the card unless the page is a feed. */
 [data-one='section'] { display: flex; flex-direction: column; }
 [data-one='section-header'] { display: flex; align-items: baseline; justify-content: space-between; gap: calc(0.5rem * var(--density)); padding: 0 calc(0.25rem * var(--density)) calc(0.5rem * var(--density)); }
 [data-one='section-header'][data-placement='inside'] { padding: var(--row-pad) var(--row-pad) calc(0.5rem * var(--density)); }
 [data-one='section-total'] { opacity: 0.62; font-size: var(--t-sub); font-variant-numeric: tabular-nums; }
-[data-one='section-card'] { border-radius: var(--radius-lg); background: var(--surface-1); color: var(--surface-1-ink); overflow: hidden; box-shadow: var(--elevation-1); }
+[data-one='section-card'] { border-radius: var(--radius-lg); background-color: var(--surface-1); color: var(--surface-1-ink); overflow: hidden; box-shadow: var(--elevation-1); }
 [data-one='section-more'] { inline-size: 100%; padding: calc(0.625rem * var(--density)) 0; background: none; border: 0; color: inherit; text-align: center; }
 /* ⚠️ A SCROLLER IS THE ONE THING THAT LEAVES THE PAGE INSET, so its first item
    lines up with everything above it and its last is cut — which is what says
@@ -301,21 +324,27 @@ export const STRUCTURE = `
 /* ⚠️ A MISSING VALUE OCCUPIES THE SLOT IT IS MISSING FROM. Left to shrink, a row
    whose value is absent closes up and the column of values stops being a column. */
 [data-one='no-data'] { display: inline-flex; align-items: center; min-inline-size: 2ch; }
+/* ⚠️ A BADGE WITH NO TONE IS STILL A BADGE. The borrowed object falls back to
+   the library's own neutral pair, which our bridge does not own — so an untoned
+   badge came out near-black on a dark card and near-white on a pale one, i.e.
+   the one colouring in the language that is not derived from the tenant. It
+   takes the surface above the one it sits on, like everything else. */
+[data-one='badge']:not([data-tone]) { background-color: var(--surface-2); color: var(--surface-2-ink); border-color: color-mix(in oklab, currentColor 16%, transparent); }
 [data-one='medallion'] [data-one='icon'] { inline-size: 1.125rem; block-size: 1.125rem; }
 [data-one='page-title-search-icon'] { display: flex; opacity: 0.62; }
 [data-one='topic-icon'], [data-one='quick-action-well'], [data-one='tile-face'], [data-one='glyph'] { display: grid; place-items: center; }
 
 /* ── LEADS. The row's JOB decides which, and a list never mixes the two. */
 [data-one='glyph'] { display: grid; place-items: center; inline-size: 1.5rem; block-size: 1.5rem; color: inherit; }
-[data-one='medallion'] { display: grid; place-items: center; inline-size: 2.25rem; block-size: 2.25rem; border-radius: 999px; background: var(--surface-2-accent); color: var(--surface-2-accent-ink); font-size: var(--t-sub); font-weight: var(--w-semi); }
+[data-one='medallion'] { display: grid; place-items: center; inline-size: 2.25rem; block-size: 2.25rem; border-radius: 999px; background-color: var(--surface-2-accent); color: var(--surface-2-accent-ink); font-size: var(--t-sub); font-weight: var(--w-semi); }
 
 /* ── TILES. A small fixed set of destinations, label BELOW the tile. */
 [data-one='tile-grid'] { display: grid; grid-template-columns: repeat(var(--across, 4), 1fr); gap: calc(0.75rem * var(--density)) calc(0.625rem * var(--density)); }
 [data-one='tile'] { display: flex; flex-direction: column; align-items: center; gap: calc(0.5rem * var(--density)); background: none; border: 0; color: inherit; }
-[data-one='tile-face'] { inline-size: 100%; aspect-ratio: 1; border-radius: var(--radius); background: var(--surface-2); color: var(--surface-2-ink); }
+[data-one='tile-face'] { inline-size: 100%; aspect-ratio: 1; border-radius: var(--radius); background-color: var(--surface-2); color: var(--surface-2-ink); }
 
 /* ── SEGMENTED. ⚠️ One indicator that travels, drawn behind the row. */
-[data-one='segmented'] { position: relative; isolation: isolate; display: flex; gap: calc(0.25rem * var(--density)); margin: 0 var(--row-pad) calc(0.75rem * var(--density)); padding: calc(0.1875rem * var(--density)); border-radius: 999px; background: var(--surface-2); }
+[data-one='segmented'] { position: relative; isolation: isolate; display: flex; gap: calc(0.25rem * var(--density)); margin: 0 var(--row-pad) calc(0.75rem * var(--density)); padding: calc(0.1875rem * var(--density)); border-radius: 999px; background-color: var(--surface-2); color: var(--surface-2-ink); }
 /* ⚠️ THE INDICATOR CARRIES AN ELEVATION, AND IN LIGHT THAT IS THE WHOLE
    SEPARATION. The pale ladder saturates: from a canvas at l 0.93 the third
    surface is a rounding error away from the second, so an indicator that told
@@ -323,17 +352,25 @@ export const STRUCTURE = `
    control read as one solid bar. That is not a bug in the ladder — light tells
    things apart by what they CAST, which is the stated design — it is a
    component that forgot to cast anything. */
-[data-one='segmented']::before { content: ""; position: absolute; z-index: -1; inset-block: calc(0.1875rem * var(--density)); inset-inline-start: calc(0.1875rem * var(--density)); inline-size: calc((100% - 0.375rem * var(--density)) / var(--of, 2)); border-radius: 999px; background: var(--surface-3); box-shadow: var(--elevation-1); transform: translateX(calc(var(--at, 0) * 100%)); }
+[data-one='segmented']::before { content: ""; position: absolute; z-index: -1; inset-block: calc(0.1875rem * var(--density)); inset-inline-start: calc(0.1875rem * var(--density)); inline-size: calc((100% - 0.375rem * var(--density)) / var(--of, 2)); border-radius: 999px; background-color: var(--surface-3); color: var(--surface-3-ink); box-shadow: var(--elevation-1); transform: translateX(calc(var(--at, 0) * 100%)); }
 [data-one='segment'] { flex: 1; padding: calc(0.4375rem * var(--density)) 0; background: none; border: 0; color: inherit; opacity: 0.62; font-size: var(--t-sub); font-weight: var(--w-med); border-radius: 999px; }
 [data-one='segment'][aria-selected='true'] { opacity: 1; }
 
 /* ── PROMO. A lit card, and the only one on a screen. */
 [data-one='promo-body'] { display: flex; flex-direction: column; gap: calc(0.25rem * var(--density)); min-inline-size: 0; }
-[data-one='promo'] { box-shadow: var(--elevation-2); display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: var(--row-pad); min-block-size: 6rem; padding: 0 calc(1.125rem * var(--density)); border-radius: var(--radius-lg); background: var(--surface-2); color: var(--surface-2-ink); }
+[data-one='promo'] { box-shadow: var(--elevation-2); display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: var(--row-pad); min-block-size: 6rem; padding: 0 calc(1.125rem * var(--density)); border-radius: var(--radius-lg); background-color: var(--surface-2); color: var(--surface-2-ink); }
 
 /* ── THE FORM. ⚠️ Label above, control, hint, then fault — always that order,
       because it is the order somebody reads when the control has just failed. */
 [data-one='form'] { display: flex; flex-direction: column; gap: var(--gap); }
+/* ⚠️ THE BUTTONS ARE A ROW AT THE END, and the primary is the widest thing in
+   it. Before this slot existed a form stretched every button it contained to
+   full width and stacked them, so three buttons read as three primary actions. */
+[data-one='form-actions'] { display: flex; flex-wrap: wrap; align-items: center; gap: calc(0.5rem * var(--density)); }
+/* ⚠️ THEY SIT TOGETHER. Growing the primary pushed the secondary to the far
+   edge, which reads as two opposed choices rather than as an action and the way
+   out of it. */
+[data-one='form-actions'] { justify-content: flex-start; }
 [data-one='field'] { display: flex; flex-direction: column; gap: calc(0.375rem * var(--density)); }
 [data-one='field-label'] { display: flex; align-items: baseline; justify-content: space-between; gap: calc(0.5rem * var(--density)); }
 [data-one='field-fault'] { display: flex; align-items: center; gap: calc(0.375rem * var(--density)); color: var(--tone-danger); }
@@ -342,13 +379,18 @@ export const STRUCTURE = `
    boxes and one without — which reads as a rendering fault rather than as a
    state. A refusing control keeps its shape and loses its CONTRAST, because the
    thing that changed is whether it can be used, not what it is. */
+/* ⚠️ background-color, NEVER THE SHORTHAND, ON A BORROWED OBJECT. The shorthand
+   resets every background longhand it does not mention — including the
+   background-IMAGE the library draws the select's chevron with. So a select had
+   no chevron at all, on every tenant and both themes, and was indistinguishable
+   from a text input until somebody pressed it. */
 [data-one='input'], [data-one='textarea'], [data-one='select'] {
   inline-size: 100%; min-block-size: 3rem;
-  background: var(--surface-1); color: var(--surface-1-ink);
+  background-color: var(--surface-1); color: var(--surface-1-ink);
   border: var(--edge) solid color-mix(in oklab, currentColor 20%, transparent);
 }
 [data-one='input']:disabled, [data-one='textarea']:disabled, [data-one='select']:disabled {
-  background: var(--surface-1); color: var(--surface-1-ink); opacity: 0.5;
+  background-color: var(--surface-1); color: var(--surface-1-ink); opacity: 0.5;
   border-color: color-mix(in oklab, currentColor 20%, transparent);
 }
 [data-one='textarea'] { min-block-size: 6rem; }
@@ -360,7 +402,13 @@ export const STRUCTURE = `
 [data-one='checkbox'], [data-one='radio-option'] { display: flex; align-items: center; gap: calc(0.625rem * var(--density)); min-block-size: 3rem; }
 [data-one='radio'] { display: flex; flex-direction: column; }
 [data-one='dial'] { display: flex; align-items: center; gap: calc(0.75rem * var(--density)); }
-[data-one='dial-control'] { flex: 1; }
+/* ⚠️ A CONTROL THAT IS SET SHOWS THE TENANT'S COLOUR. The borrowed range and
+   toggle both draw from currentColor, so with no tone passed they came out
+   near-black on a pale ground and near-white on a dark one — the same defect the
+   progress bar had, on the two controls somebody actually operates. The accent
+   is re-lit for the surface, like every other accent in the language. */
+[data-one='dial-control'] { flex: 1; color: var(--surface-1-accent); }
+[data-one='switch-control']:checked { background-color: var(--surface-1-accent); color: var(--surface-1-accent-ink); }
 [data-one='dial-value'] { min-inline-size: 3rem; text-align: end; }
 
 /* ── PINNED BARS. ⚠️ They appear only when there is something to say, and they
@@ -370,15 +418,20 @@ export const STRUCTURE = `
   position: sticky; inset-block-end: 0; z-index: 2;
   display: flex; align-items: center; justify-content: space-between; gap: var(--row-pad);
   padding: calc(0.75rem * var(--density)) var(--row-pad);
-  border-radius: var(--radius-lg); background: var(--surface-2); color: var(--surface-2-ink);
+  border-radius: var(--radius-lg); background-color: var(--surface-2); color: var(--surface-2-ink);
   box-shadow: var(--elevation-3);
 }
 [data-one='save-bar-actions'], [data-one='bulk-actions-list'] { display: flex; align-items: center; gap: calc(0.5rem * var(--density)); }
 [data-one='save-bar-save'], [data-one='save-bar-discard'], [data-one='bulk-actions-item'], [data-one='bulk-actions-clear'] {
   min-block-size: 2.5rem; padding: 0 calc(0.875rem * var(--density)); border: 0; border-radius: 999px; background: none; color: inherit;
 }
-[data-one='save-bar-save'] { background: var(--surface-2-accent); color: var(--surface-2-accent-ink); }
-[data-one='bulk-actions-item'][data-tone='error'], [data-one='save-bar-discard'] { color: var(--tone-danger); }
+[data-one='save-bar-save'] { background-color: var(--surface-2-accent); color: var(--surface-2-accent-ink); }
+[data-one='bulk-actions-item'][data-tone='error'] { color: var(--tone-danger); }
+/* ⚠️ DISCARDING IS NOT DESTROYING, and it was drawn in the danger tone — so the
+   quiet way out of an edit read as the same kind of act as deleting a person.
+   The tone is reserved for something that cannot be undone; abandoning changes
+   nobody has saved is the most ordinary thing on the bar. */
+[data-one='save-bar-discard'] { opacity: 0.7; }
 
 /* ── OVERLAYS. ⚠️ The action is PINNED and only the body scrolls, so it never
       falls below the fold — and the parts had no rules at all until a photograph
@@ -389,7 +442,7 @@ export const STRUCTURE = `
    both read as an ordinary panel that happens to contain a question. */
 [data-one='overlay'] { display: flex; flex-direction: column; gap: calc(0.75rem * var(--density));
   max-block-size: 100%; padding: var(--row-pad);
-  background: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-3); }
+  background-color: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-3); }
 [data-one='overlay'][data-kind='sheet'], [data-one='overlay'][data-kind='drawer'] {
   border-radius: var(--radius-lg) var(--radius-lg) 0 0; padding-block-start: calc(0.5rem * var(--density));
 }
@@ -401,7 +454,7 @@ export const STRUCTURE = `
    be seen by CONTRASTING with its ground, so it is a fraction of the ink. */
 [data-one='overlay'][data-kind='sheet']::before, [data-one='overlay'][data-kind='drawer']::before {
   content: ""; inline-size: 2.25rem; block-size: 0.25rem; border-radius: 999px;
-  background: color-mix(in oklab, currentColor 26%, transparent); align-self: center; margin-block-end: calc(0.25rem * var(--density));
+  background-color: color-mix(in oklab, currentColor 26%, transparent); align-self: center; margin-block-end: calc(0.25rem * var(--density));
 }
 [data-one='overlay'][data-kind='dialog'] { border-radius: var(--radius-lg); text-align: center; }
 [data-one='overlay'][data-kind='dialog'] [data-one='overlay-footer'] { margin-block-start: calc(0.25rem * var(--density)); }
@@ -411,24 +464,41 @@ export const STRUCTURE = `
 [data-one='overlay-title'] { font-size: var(--t-page); font-weight: var(--w-bold); line-height: 1.15; letter-spacing: -0.02em; }
 [data-one='overlay-body'] { flex: 1; min-block-size: 0; overflow-y: auto; }
 [data-one='overlay-footer'] { display: flex; gap: calc(0.5rem * var(--density)); }
+/* ⚠️ THE FOOTER'S BUTTONS FILL IT. The control wrapper that carries a refusal's
+   caption is a column sized to its content, so stretching the WRAPPER left the
+   button inside it at its own width — an overlay's primary action came out as a
+   small pill in the corner of a full-width row. */
 [data-one='overlay-footer'] > * { flex: 1; }
+[data-one='overlay-footer'] > [data-one='control'] { align-items: stretch; }
 /* ⚠️ AN OVERLAY'S OWN BUTTONS SIT ON THE OVERLAY, so they take the step above it
    AND the elevation that step needs in light — the fourth place in this sheet
    that separated itself by reaching the top of a ladder with no headroom left.
    A confirm whose two buttons are the same colour as the card behind them is a
    question with no visible answers. */
-[data-one='overlay-dismiss'], [data-one='confirm-cancel'], [data-one='confirm-go'] {
+[data-one='confirm-cancel'], [data-one='confirm-go'] {
   min-block-size: 3rem; padding: 0 calc(1.125rem * var(--density)); border: 0; border-radius: 999px;
-  background: var(--surface-3); color: var(--surface-3-ink); box-shadow: var(--elevation-1); font: inherit; font-weight: var(--w-semi);
+  background-color: var(--surface-3); color: var(--surface-3-ink); box-shadow: var(--elevation-1); font: inherit; font-weight: var(--w-semi);
 }
+/* ⚠️ THE WAY OUT IS A QUIET GLYPH BESIDE THE TITLE, not a pill competing with
+   the action. It is the second most important control on the surface and it must
+   look it — an overlay whose dismiss is as loud as its verb is one somebody
+   leaves by accident. */
+[data-one='overlay-dismiss'] { display: inline-flex; align-items: center; justify-content: center; flex: none;
+  min-block-size: 2.5rem; min-inline-size: 2.5rem; padding: 0; border: 0; border-radius: 999px;
+  background: none; color: inherit; opacity: 0.55; }
 /* ⚠️ THE DESTRUCTIVE HALF IS THE ONE THAT LOOKS DESTRUCTIVE, and it is not the
    default focus: a confirmation whose dangerous answer is the easy one is a
    confirmation that has stopped confirming anything. */
-[data-one='confirm-go'] { background: var(--tone-danger); color: var(--tone-danger-ink); }
-[data-one='overlay-dismiss'] { align-self: flex-start; }
+[data-one='confirm-go'] { background-color: var(--tone-danger); color: var(--tone-danger-ink); }
+
 
 /* ── READING SURFACES. */
-[data-one='page-header'] { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--row-pad); }
+/* ⚠️ A GRID, BECAUSE THE HEADER HAS THREE CHILDREN AND NOT TWO. Making it a row
+   to put the action beside the title put the BREADCRUMB there too — so the trail,
+   the title and the action became three columns and the trail was overprinted by
+   the title it belongs above. The trail spans; the other two share a line. */
+[data-one='page-header'] { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: calc(0.5rem * var(--density)) var(--row-pad); }
+[data-one='page-header'] > [data-one='breadcrumb'] { grid-column: 1 / -1; }
 /* ⚠️ A HEADER'S ACTION SITS BESIDE ITS TITLE, NOT UNDER IT. The header was a
    column and the action was a child, so every page-level action stacked below
    the description — which reads as a stray button rather than as this page's
@@ -442,10 +512,14 @@ export const STRUCTURE = `
 [data-one='step'] { flex: 1; padding-block-start: calc(0.5rem * var(--density)); border-block-start: calc(2 * var(--edge)) solid var(--surface-2); opacity: 0.5; }
 [data-one='step'][data-state='done'], [data-one='step'][data-state='current'] { border-block-start-color: var(--surface-1-accent); opacity: 1; }
 [data-one='pagination'] { display: flex; align-items: center; justify-content: center; gap: var(--row-pad); }
-[data-one='pagination-prev'], [data-one='pagination-next'] { min-block-size: 2.75rem; min-inline-size: 2.75rem; display: grid; place-items: center; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--surface-2-ink); }
+[data-one='pagination-prev'], [data-one='pagination-next'] { min-block-size: 2.75rem; min-inline-size: 2.75rem; display: grid; place-items: center; border: 0; border-radius: 999px; background-color: var(--surface-2); color: var(--surface-2-ink); }
 [data-one='pagination-prev']:disabled, [data-one='pagination-next']:disabled { opacity: 0.38; }
 /* ⚠️ A table scrolls in its OWN box, so the page body never scrolls sideways. */
-[data-one='table-scroll'] { overflow-x: auto; border-radius: var(--radius-lg); background: var(--surface-1); box-shadow: var(--elevation-1); }
+/* ⚠️ A CARD OF ITS OWN, SO IT DECLARES ITS OWN INK. Setting the ground and
+   letting the colour inherit handed every cell to whatever was behind the table
+   — which on a dark card was the page's near-black, so the whole body of the
+   table was unreadable while its header, which the library colours, was fine. */
+[data-one='table-scroll'] { overflow-x: auto; border-radius: var(--radius-lg); background-color: var(--surface-1); color: var(--surface-1-ink); box-shadow: var(--elevation-1); }
 [data-one='table'] { inline-size: 100%; border-collapse: collapse; }
 [data-one='table-caption'] { text-align: start; padding: var(--row-pad) var(--row-pad) 0; font-size: var(--t-sub); opacity: 0.62; }
 [data-one='table'] th, [data-one='table'] td { padding: calc(0.625rem * var(--density)) var(--row-pad); text-align: start; }
@@ -456,13 +530,32 @@ export const STRUCTURE = `
 [data-one='stat-trend'][data-tone='success'] { color: var(--tone-success); }
 [data-one='stat-trend'][data-tone='error'] { color: var(--tone-danger); }
 [data-one='progress'] { display: flex; align-items: center; gap: calc(0.625rem * var(--density)); }
-[data-one='progress'] progress { flex: 1; }
+/* ⚠️ THE BAR IS THE ACCENT, NOT THE INK. The library colours it with
+   currentColor and draws the track from the same value at 20% — so with no
+   tone passed it rendered a NEAR-BLACK bar on every light tenant, which reads as
+   a rendering fault rather than as progress. The colour is re-lit for the
+   surface it lands on, like every other accent in the language. */
+[data-one='progress'] progress { flex: 1; color: var(--surface-1-accent); }
+[data-one='surface'][data-depth='2'] [data-one='progress'] progress { color: var(--surface-2-accent); }
 [data-one='disclosure-summary'] { display: flex; align-items: center; justify-content: space-between; gap: var(--row-pad); min-block-size: 3rem; cursor: pointer; list-style: none; }
 [data-one='disclosure-summary']::-webkit-details-marker { display: none; }
 /* ⚠️ THE OPEN PANEL IS INSET FROM ITS SUMMARY. Flush, the two read as one block
    and nothing says which part was revealed. */
 [data-one='disclosure-body'] { padding-block: calc(0.25rem * var(--density)) calc(0.875rem * var(--density)); }
-[data-one='menu'] { list-style: none; padding: calc(0.375rem * var(--density)); margin: 0; border-radius: var(--radius-lg); background: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-3); }
+/* ⚠️ A MENU HAS A TRIGGER, AND IT USED TO HAVE NONE. It was a bare list with a
+   card's background and the deepest shadow in the language, so anywhere a menu
+   actually belongs — a header's action slot — it rendered as a permanently open
+   panel pasted over whatever was behind it. Nothing in the package could open or
+   close it, which means nothing in any app could use it as a menu.
+
+   ⚠️ AND IT OPENS WITHOUT SCRIPT. A details element gives a real disclosure with real
+   keyboard behaviour; a div and a click handler gives neither, and this package
+   ships no JavaScript at all. */
+[data-one='menu-host'] { position: relative; display: inline-flex; }
+[data-one='menu-trigger'] { display: inline-flex; align-items: center; justify-content: center; min-block-size: 2.75rem; min-inline-size: 2.75rem; border: 0; border-radius: 999px; background: none; color: inherit; list-style: none; }
+[data-one='menu-trigger']::-webkit-details-marker { display: none; }
+[data-one='menu-host'][open] [data-one='menu-trigger'] { background-color: var(--surface-2); color: var(--surface-2-ink); }
+[data-one='menu'] { position: absolute; inset-block-start: calc(100% + 0.25rem); inset-inline-end: 0; z-index: 8; min-inline-size: 12rem; list-style: none; padding: calc(0.375rem * var(--density)); margin: 0; border-radius: var(--radius-lg); background-color: var(--surface-2); color: var(--surface-2-ink); box-shadow: var(--elevation-3); }
 [data-one='menu-item'] { display: flex; align-items: center; gap: calc(0.625rem * var(--density)); inline-size: 100%; min-block-size: 2.75rem; padding: 0 calc(0.625rem * var(--density)); border: 0; border-radius: var(--radius); background: none; color: inherit; text-align: start; }
 [data-one='menu-item'][data-tone='error'] { color: var(--tone-danger); }
 /* ── FEEDBACK. ⚠️ ONE GRID: mark, message, then whatever can be done about it.
@@ -473,6 +566,12 @@ export const STRUCTURE = `
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center; gap: calc(0.75rem * var(--density));
   padding: calc(0.75rem * var(--density)) var(--row-pad); border-radius: var(--radius-lg);
+  /* ⚠️ THE EDGE IS THE SOFT INK, NOT THE FULL TONE. The borrowed object draws
+     its own border at full saturation, and around a SOFT fill that is two
+     intensities of one signal on the same object — which is what made a warning
+     read as an alarm and a soft blue read as a link. A hairline of the ink the
+     surface already carries gives the definition without the second voice. */
+  border: var(--edge) solid color-mix(in oklab, currentColor 18%, transparent);
 }
 [data-one='callout-body'] { grid-column: 2; display: flex; flex-direction: column; gap: calc(0.125rem * var(--density)); }
 [data-one='callout-icon'], [data-one='toast-icon'] { display: grid; place-items: center; }
@@ -488,13 +587,13 @@ export const STRUCTURE = `
    fill is for something that interrupts; a callout in the middle of a page is
    not interrupting anything, and one volume for both is a product where
    everything shouts and therefore nothing does. */
-[data-one='callout'][data-tone='success'] { background: var(--tone-success-soft); color: var(--tone-success-soft-ink); }
-[data-one='callout'][data-tone='warning'] { background: var(--tone-warning-soft); color: var(--tone-warning-soft-ink); }
-[data-one='callout'][data-tone='danger'] { background: var(--tone-danger-soft); color: var(--tone-danger-soft-ink); }
-[data-one='callout'][data-tone='info'] { background: var(--tone-info-soft); color: var(--tone-info-soft-ink); }
+[data-one='callout'][data-tone='success'] { background-color: var(--tone-success-soft); color: var(--tone-success-soft-ink); }
+[data-one='callout'][data-tone='warning'] { background-color: var(--tone-warning-soft); color: var(--tone-warning-soft-ink); }
+[data-one='callout'][data-tone='danger'] { background-color: var(--tone-danger-soft); color: var(--tone-danger-soft-ink); }
+[data-one='callout'][data-tone='info'] { background-color: var(--tone-info-soft); color: var(--tone-info-soft-ink); }
 /* ⚠️ The CONTAINED form is what a tone takes when it would collide with its ground: the
    colour demotes to an edge and an icon, and the word and the shape carry it. */
-[data-one='callout'][data-form='contained'] { background: var(--surface-1); color: var(--surface-1-ink); box-shadow: inset calc(3 * var(--edge)) 0 0 currentColor; }
+[data-one='callout'][data-form='contained'] { background-color: var(--surface-1); color: var(--surface-1-ink); box-shadow: inset calc(3 * var(--edge)) 0 0 currentColor; }
 /* ⚠️ A TOOLTIP IS DECORATION. It is unreachable by touch, so it never carries
    the only copy of anything — and it appears on FOCUS as well, or a keyboard
    never sees it at all. The pointer half sits with the other hover rules. */
@@ -505,10 +604,19 @@ export const STRUCTURE = `
      that cannot know its ground — which makes the elevation load-bearing rather
      than decorative. Without it a tooltip over a card in light is an unbounded
      block of text. */
-  background: var(--surface-3); color: var(--surface-3-ink); box-shadow: var(--elevation-2); font-size: var(--t-sub); white-space: nowrap;
+  background-color: var(--surface-3); color: var(--surface-3-ink); box-shadow: var(--elevation-2); font-size: var(--t-sub); white-space: nowrap;
   opacity: 0; pointer-events: none; }
 [data-one='tooltip']:focus-within [data-one='tooltip-text'] { opacity: 1; }
+/* ⚠️ WITH NO LABEL IT IS ONE RULE. The borrowed object draws a line, a gap for
+   the words and another line — so a plain separator came out as two dashes with
+   a hole in the middle, which reads as a rendering fault. */
 [data-one='divider'] { display: flex; align-items: center; gap: var(--row-pad); }
+[data-one='divider']:empty::before, [data-one='divider']:empty::after { content: none; }
+[data-one='divider']:empty { display: block; block-size: var(--edge); background-color: color-mix(in oklab, currentColor 18%, transparent); margin-block: calc(0.5rem * var(--density)); }
+/* ⚠️ AND A FORM'S TITLE IS DRAWN. It was passed to the accessible name and
+   rendered nowhere, so every form in the language was a stack of fields with no
+   name — announced to a screen reader and invisible to everybody else. */
+[data-one='form-title'] { display: block; font-size: var(--t-body); font-weight: var(--w-semi); margin-block-end: calc(0.75rem * var(--density)); }
 
 /* ⚠️ A SKELETON WITH NO GEOMETRY IS AN EMPTY BOX, which is worse than a spinner:
    it promises a shape and shows nothing at all. The rows are the row height, and
@@ -521,13 +629,13 @@ export const STRUCTURE = `
 
 /* ⚠️ Hover is an enhancement. A touch device must never inherit one that sticks. */
 @media (pointer: fine) {
-  [data-one='row'][data-interactive]:hover { background: var(--surface-2); }
+  [data-one='row'][data-interactive]:hover { background-color: var(--surface-2); color: var(--surface-2-ink); }
   /* ⚠️ HOVER FEEDBACK THAT IS INVISIBLE IS NOT FEEDBACK. Both of these lifted to
      the top of the ladder, which in light is where the ladder has stopped — so
      on every pale tenant, pointing at a tile did nothing at all. It LIFTS now,
      which is the same statement in the language a bright room actually reads. */
-  [data-one='tile']:hover [data-one='tile-face'] { background: var(--surface-3); box-shadow: var(--elevation-1); }
-  [data-one='quick-action']:hover [data-one='quick-action-well'] { background: var(--surface-3); box-shadow: var(--elevation-1); }
+  [data-one='tile']:hover [data-one='tile-face'] { background-color: var(--surface-3); color: var(--surface-3-ink); box-shadow: var(--elevation-1); }
+  [data-one='quick-action']:hover [data-one='quick-action-well'] { background-color: var(--surface-3); color: var(--surface-3-ink); box-shadow: var(--elevation-1); }
   [data-one='tooltip']:hover [data-one='tooltip-text'] { opacity: 1; }
 }
 /* ⚠️ And a coarse pointer gets the roomy scale at ANY width: a tablet is not a small desktop. */

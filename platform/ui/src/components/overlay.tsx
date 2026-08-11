@@ -10,6 +10,7 @@
  */
 
 import type { ReactNode } from "react";
+import { Icon } from "./icon.js";
 
 export type OverlayKind = "sheet" | "dialog" | "menu" | "popover" | "drawer";
 
@@ -57,15 +58,24 @@ export function Overlay({ kind, title, children, action, onDismiss }: OverlayPro
       aria-label={title}
     >
       {/* Pinned. Only the body scrolls, so the action never falls below the fold. */}
-      <div data-one="overlay-header"><span data-one="overlay-title">{title}</span></div>
+      <div data-one="overlay-header">
+        <span data-one="overlay-title">{title}</span>
+        {/*
+          ⚠️ EVERYTHING BUT A DIALOG IS DISMISSIBLE BY GESTURE AND BY ESCAPE. A
+          dialog is not, because a decision needs an answer — and an overlay that
+          can be dismissed accidentally is one that loses the work in it.
+
+          ⚠️ AND THE WAY OUT IS IN THE HEADER, which is what that row exists for.
+          It used to be a word rendered loose AFTER the footer, so a sheet ended
+          with its primary action and then, below and to the left of it, the
+          string "Close" — which reads as a leftover rather than as a control.
+        */}
+        {!blocking && onDismiss ? (
+          <button type="button" data-one="overlay-dismiss" aria-label="Close" onClick={onDismiss}><Icon name="close" /></button>
+        ) : null}
+      </div>
       <div data-one="overlay-body">{children}</div>
       {action ? <div data-one="overlay-footer">{action}</div> : null}
-      {/*
-        ⚠️ EVERYTHING BUT A DIALOG IS DISMISSIBLE BY GESTURE AND BY ESCAPE. A
-        dialog is not, because a decision needs an answer — and an overlay that
-        can be dismissed accidentally is one that loses the work in it.
-      */}
-      {!blocking && onDismiss ? <button type="button" data-one="overlay-dismiss" onClick={onDismiss}>Close</button> : null}
     </div>
   );
 }

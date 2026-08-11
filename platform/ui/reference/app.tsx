@@ -88,6 +88,17 @@ export const Today = () => (
       <Row lead={<Medallion icon="users" />} title="Bouldering social" detail="Cave" value="20:00" onOpen={noop} />
     </Section>
 
+    <Section title="Guest passes" total="2 left">
+      <Surface depth={1}>
+        <Text role="body">Bring somebody who has never climbed here. They get an induction and a two-hour session.</Text>
+        {/* ⚠️ BUSY AND LOCKED, where a person would actually meet them: one
+            control waiting on the wall's availability, and one the plan withholds
+            with the way out named. */}
+        <Button kind="primary" state="busy">Checking Wall 3</Button>
+        <Button kind="tonal" state="locked" reason="A second guest pass is on the Peak plan.">Add another guest</Button>
+      </Surface>
+    </Section>
+
     <Promo
       title="Bring a friend in August"
       detail="Your plan includes two guest passes a month."
@@ -215,7 +226,7 @@ export const MemberRecord = () => (
 
     <Section title="Recent climbs">
       <Table
-        caption="Recent climbs"
+        caption="Rafael's last three climbs"
         keyOf={(r: { id: string }) => r.id}
         columns={[
           { id: "route", label: "Route", cell: (r: { route: string }) => r.route },
@@ -300,7 +311,22 @@ export const Account = () => (
 
     <Steps steps={[{ id: "who", label: "Details" }, { id: "plan", label: "Plan" }, { id: "pay", label: "Payment" }]} at="plan" />
 
-    <Form title="Your details">
+    {/*
+      ⚠️ THE BUTTON KINDS AND STATES ARE SPREAD ACROSS THE PRODUCT, NOT LINED UP
+      HERE. A row of seven buttons is a specimen grid smuggled into a screen, and
+      it produces exactly the picture a grid produces: a wall of identical pills
+      that answers "does this exist" and nothing about whether three kinds sitting
+      together read as three kinds. Each one below is where it would really be.
+    */}
+    <Form
+      title="Your details"
+      actions={
+        <>
+          <Button kind="primary" onPress={noop}>Save changes</Button>
+          <Button kind="quiet" onPress={noop}>Cancel</Button>
+        </>
+      }
+    >
       <Field label="Full name" hint="As it appears on your certificate.">
         {(b) => <Input bound={b} value="Rafael Souza" onChange={noop} />}
       </Field>
@@ -315,27 +341,35 @@ export const Account = () => (
       </Field>
       <Check label="Send me a reminder the day before a booking" checked onCheck={noop} />
       <Choose name="Billing" value="year" onChoose={noop} options={[{ value: "month", label: "Monthly — $54" }, { value: "year", label: "Yearly — $540" }]} />
-      <Dial min={0} max={48} step={6} value="24" onChange={noop} bound={bound()} format={(h) => `${h} hours before`} />
+      <Field label="Remind me before a booking">
+        {(b) => <Dial bound={b} min={0} max={48} step={6} value="24" onChange={noop} format={(h) => `${h}h before`} />}
+      </Field>
       <Switch label="Show my climbs on the club board" on onToggle={noop} />
       {/* ⚠️ DISABLED IS NOT LOCKED, and the difference is whether there is a way
           out. A locked control stays focusable and says what would unlock it. */}
       <Switch label="Share my grade history with coaches" on={false} disabled reason="Coaching is not part of the Base plan." />
-
-      <Divider label="then" />
-
-      <Button kind="primary" onPress={noop}>Save changes</Button>
-      <Button kind="tonal" onPress={noop}>Preview</Button>
-      <Button kind="quiet" onPress={noop}>Cancel</Button>
-      <Button kind="primary" state="busy">Checking availability</Button>
-      <Button kind="tonal" state="locked" reason="Guest passes are on the Peak plan.">Add a guest</Button>
-      <Button kind="quiet" state="disabled" reason="Nothing has changed yet.">Revert</Button>
-      <Button kind="destructive" onPress={noop}>Cancel membership</Button>
     </Form>
 
     <Section title="Sessions">
       <Row lead={<Glyph icon="phone" />} title="This phone" detail="Signed in 4 August" value={<Badge tone="success">Now</Badge>} />
-      <Row lead={<Glyph icon="lock" />} title="Front desk tablet" detail="Signed in 2 August" value={<Icon name="forward" />} onOpen={noop} />
+      <Row lead={<Glyph icon="lock" />} title="Front desk tablet" detail="Signed in 2 August" value="Sign out" onOpen={noop} />
     </Section>
+
+    <Divider />
+
+    {/*
+      ⚠️ THE IRREVERSIBLE THING IS BEHIND A DISCLOSURE AND AT THE END. A
+      destructive button in the same row as Save is a mis-tap away from being the
+      last thing somebody does here.
+    */}
+    <Disclosure title="Close your membership">
+      <Text role="body">Your climbs, grades and photos are deleted after thirty days. Any credit left is refunded to the card that paid.</Text>
+      <Button kind="destructive" onPress={noop}>Close membership</Button>
+    </Disclosure>
+
+    {/* ⚠️ DISABLED, not locked: nothing has changed, so there is nothing this
+        control could do — and no plan or permission would change that. */}
+    <Button kind="quiet" state="disabled" reason="Nothing has changed yet.">Revert to last saved</Button>
 
     <SaveBar dirty count={3} onSave={noop} onDiscard={noop} />
   </Page>
@@ -356,7 +390,6 @@ export const OVERLAYS: readonly { readonly id: string; readonly caption: string;
     node: (
       <Overlay kind="sheet" title="Book a session" onDismiss={noop} action={<Button kind="primary" size="sm">Book</Button>}>
         <Row lead={<Medallion icon="clock" />} title="Lead climbing" detail="Wall 3 · 18:30" value="45 min" />
-        <Row lead={<Medallion icon="users" />} title="With" detail="Marion Keller" value={<Badge>Lead</Badge>} />
       </Overlay>
     ),
   },

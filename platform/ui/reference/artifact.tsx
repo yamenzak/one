@@ -160,7 +160,7 @@ body { margin: 0; background: var(--bg); color: var(--ink);
    what it covers, and one shown loose reads as a card that happens to contain a
    question — the single thing an overlay must never look like. */
 .overlays { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
-.over { position: relative; min-block-size: 270px; border-radius: 16px; overflow: hidden;
+.over { position: relative; min-block-size: 320px; border-radius: 16px; overflow: hidden;
   background: var(--canvas); color: var(--canvas-ink); box-shadow: inset 0 0 0 1px rgb(128 128 128 / 0.18); }
 .over [data-one='overlay'] { position: absolute; inset-inline: 0; inset-block-end: 0; }
 .over [data-one='overlay'][data-kind='dialog'] { inset: 50% 14px auto; translate: 0 -50%; }
