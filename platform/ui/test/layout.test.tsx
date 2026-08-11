@@ -105,7 +105,12 @@ describe("the page draws what the screen IS", () => {
     const out = html(<Page archetype="crown" top={<Crown amount={<Amount whole="1,240" fraction=".50" />} />} />);
     expect(out).toContain('data-archetype="crown"');
     expect(out).toContain('data-sky="photo"');
-    expect(out).toContain(`--solid:${SHAPE.crown.solid}%`);
+    /* ⚠️ A LENGTH, NEVER A PERCENTAGE. As a percentage these measured the
+       CONTENT rather than the screen: the same archetype washed a long page end
+       to end and barely tinted a short one, and at a desktop width every screen
+       came out tinted throughout. */
+    expect(out).toContain(`--solid:${SHAPE.crown.solid}rem`);
+    expect(out, "a percentage makes the backdrop a fact about how much content there is").not.toMatch(/--solid:\d+%/);
     expect(out).toContain('data-top="photo-hero"');
   });
 

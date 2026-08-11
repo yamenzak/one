@@ -103,15 +103,32 @@ describe("the motion plays on interaction, and never on hover", () => {
   });
 
   /*
-    ⚠️ FOUR MOTIONS, AND EVERY ANIMATED ICON IS ASSIGNED ONE. Per-icon timelines
-    would be twenty-two decisions nobody could keep in step; a motion an icon
-    names and the sheet never defines is a glyph that stands still while its
-    neighbours move, which reads as a broken icon rather than as a missing rule.
+    ⚠️ EVERY ICON MOVES, AND THE MOTION IS ITS OWN. A shared motion applied to
+    everything was the first version, and four of them across twenty-seven icons
+    is a page effect rather than either object behaving: a bell that scales and a
+    key that scales are the same animation wearing two glyphs. An icon the sheet
+    never names stands still while its neighbours move, which reads as a broken
+    icon rather than as a missing rule — so the check is COVERAGE, by name.
   */
-  it("defines every motion it assigns", () => {
-    const assigned = [...CHOREOGRAPHY.matchAll(/animation: (icon-[a-z]+)/g)].map((m) => m[1]!);
-    expect(new Set(assigned).size).toBe(4);
-    for (const motion of new Set(assigned)) expect(CHOREOGRAPHY, motion).toContain(`@keyframes ${motion}`);
+  it("gives every icon a motion, and defines every motion it names", () => {
+    const named = new Set([...CHOREOGRAPHY.matchAll(/\[data-icon='([a-z-]+)'\]/g)].map((m) => m[1]!));
+    for (const name of ICON_NAMES) expect(named, `${name} has no motion`).toContain(name);
+    const assigned = new Set([...CHOREOGRAPHY.matchAll(/animation: (icon-[a-z]+)/g)].map((m) => m[1]!));
+    for (const motion of assigned) expect(CHOREOGRAPHY, motion).toContain(`@keyframes ${motion}`);
+  });
+
+  /*
+    ⚠️ AND A PART-LEVEL RULE COUNTS CHILDREN, which is only safe because the
+    geometry is GENERATED and re-derived above. A hand-edited path would move a
+    part out from under its rule — the check draws its own tail, the shutter
+    closes the wrong circle — so this test asserts the two halves are in the same
+    file for a reason, and that no positional rule outruns its icon's parts.
+  */
+  it("never addresses a part its icon does not have", () => {
+    for (const m of CHOREOGRAPHY.matchAll(/\[data-icon='([a-z-]+)'\] > :nth-child\((\d+)\)/g)) {
+      const parts = (ICONS[m[1] as IconName].match(/<(path|circle|rect|polyline|line)/g) ?? []).length;
+      expect(Number(m[2]), `${m[1]} has ${parts} parts`).toBeLessThanOrEqual(parts);
+    }
   });
 
   /* ⚠️ And it holds no duration: the motions are on the same clock as everything. */

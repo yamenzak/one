@@ -1,18 +1,26 @@
 /**
- * THE LANGUAGE, AS A PAGE — tokens, then every component in every state.
+ * THE LANGUAGE, AS A PRODUCT — Ridgeline, running.
  *
  * ⚠️ NOT SHIPPED CODE, AND NOTHING IN `src` MAY IMPORT IT. It renders `@one/ui`'s
  * real components through `@one/ui`'s real stylesheet, so a defect in the picture
  * is a defect in the product.
  *
- * ⚠️ IT REPLACED FIVE DEMO SCREENS, DELIBERATELY. Demo screens photograph a
- * product that does not exist: they look finished, they agree to nothing, and
- * they hide every component that was never built — which is how nine surfaces
- * the boundary FORBIDS an app to build sat unimplemented for four stages. A
- * gallery driven by the registry cannot hide one, because the conformance test
- * fails on a component with no specimen.
+ * ⚠️ IT IS AN APP AND NOT A BOARD, AND THAT WAS A CORRECTION. A specimen grid
+ * answers "does this component exist"; it cannot answer the questions that have
+ * actually gone wrong here, every one of which was compositional — a page action
+ * landing under its title instead of beside it, a tappable row with no
+ * affordance, four kinds of button reading as one. A component photographed
+ * alone is composed with nothing.
  *
- * ⚠️ AND IT BORROWS FILES, NOT THE LIBRARY. `daisyui.css` is 1.1 MB of sixty-one
+ * ⚠️ AND IT CANNOT HIDE A COMPONENT, which is the property a demo screen normally
+ * destroys. `test/app.test.tsx` renders these screens and reads the `data-one`
+ * attributes back out, so a registered component no screen uses is a test
+ * failure. The switchers change a tenant, a theme and a WIDTH — the third is not
+ * a convenience: the shell is a rail or an island by width, a collection is one
+ * pane or two, and half of what this page exists to show is what changes between
+ * them.
+ *
+ * ⚠️ IT BORROWS FILES, NOT THE LIBRARY. `daisyui.css` is 1.1 MB of sixty-one
  * components and every stock theme; the ones we actually borrow are inlined, so
  * the boundary is visible in the page's own weight.
  */
@@ -21,23 +29,25 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { writeFileSync, readFileSync } from "node:fs";
 import {
-  BORROWED_FILES, CLOCK, CHOREOGRAPHY, DEFAULT_BRAND, SCALE, SKY, STRUCTURE,
-  daisyTheme, skyVars, tokensFor, type Brand, type Theme,
+  BORROWED_FILES, CLOCK, CHOREOGRAPHY, DEFAULT_BRAND, SCALE, SKY, STRUCTURE, SKIES,
+  Shell, daisyTheme, maskWeight, skyVars, tokensFor, type Brand, type Theme, type Width,
 } from "../src/index.js";
-import { GROUPS } from "./specimens.js";
+import { SCREENS, OVERLAYS, DESTINATIONS } from "./app.js";
 
 const TENANTS: { readonly name: string; readonly brand: Brand }[] = [
-  { name: "Northlight", brand: DEFAULT_BRAND },
+  { name: "Ridgeline", brand: DEFAULT_BRAND },
   { name: "Pine", brand: { ...DEFAULT_BRAND, accent: "#0b7a5a", ambience: { hue: 155, intensity: 0.045 } } },
   { name: "Ember", brand: { ...DEFAULT_BRAND, accent: "#e8590c", ambience: { hue: 32, intensity: 0.05 } } },
   { name: "Slate", brand: { ...DEFAULT_BRAND, accent: "#6b7280", ambience: { hue: 250, intensity: 0.01 }, radius: 8, edge: "defined" } },
   { name: "Dense", brand: { ...DEFAULT_BRAND, accent: "#7048e8", ambience: { hue: 280, intensity: 0.04 }, radius: 24, density: "compact", elevation: "flat" } },
 ];
 
+const WIDTHS: readonly Width[] = ["phone", "desktop"];
+
 /*
   ⚠️ SCOPED BY ATTRIBUTE RATHER THAN BY `:root`, and only here. A product has one
-  tenant and one theme at a time; a gallery has five and two. The DERIVATION is
-  untouched — this calls the same three functions the sheet does.
+  tenant and one theme at a time; this page has five and two. The DERIVATION is
+  untouched — this calls the same three functions the shipped sheet does.
 
   ⚠️ AND THE SCALE COMES INSIDE THE SCOPE. `--gap: calc(22px * var(--density))`
   is substituted where it is DECLARED, so leaving it at `:root` while `--density`
@@ -67,33 +77,40 @@ const daisy = [...new Set(Object.values(BORROWED_FILES))]
   .map((f) => readFileSync(`node_modules/daisyui/components/${f}.css`, "utf8"))
   .join("\n");
 
-/* ------------------------------------------------------------ the tokens --- */
+/* --------------------------------------------------------------- the app --- */
 
 /**
- * ⚠️ THE TOKENS ARE PART OF THE LANGUAGE, so they are shown rather than
- * described. A palette nobody has seen at every tenant is a palette that is
- * correct in the one screenshot somebody took.
+ * ⚠️ THE SHELL IS RENDERED PER WIDTH, AND EVERY SCREEN LIVES INSIDE IT. Only one
+ * is shown at a time. Rendering per width is not padding: a shell at a phone
+ * width and the same shell at a desktop width are different markup — an island
+ * against a rail, one pane against two — so a page claiming to show both from one
+ * render would be showing one of them wrongly.
  */
-const tokenBoard = (i: number): string => {
-  const swatch = (name: string, label: string) =>
-    `<figure class="sw"><span class="chip" style="background:var(${name})"></span><figcaption>${label}<br><code>${name}</code></figcaption></figure>`;
-  return `
-<section class="group">
-  <h2>Tokens</h2>
-  <p class="note">Everything below is derived from one accent, one ambience hue and four bounded slots. No value here was picked.</p>
-  <div class="board">
-    ${["--canvas", "--surface-1", "--surface-2", "--surface-3"].map((n) => swatch(n, n.replace("--", ""))).join("")}
-    ${["--canvas-accent", "--surface-1-accent", "--surface-2-accent"].map((n) => swatch(n, "accent, re-lit")).join("")}
-    ${["--tone-success", "--tone-warning", "--tone-danger", "--tone-info"].map((n) => swatch(n, n.replace("--tone-", ""))).join("")}
-  </div>
-  <div class="board">
-    <figure class="sw wide"><span class="ramp"></span><figcaption>the type ladder — hero 34 · page 26 · body 14 · sub 12 · meta 10</figcaption></figure>
-  </div>
-  <p class="note">Ink is measured against the exact surface it lands on, so a tenant cannot pair a colour with text that fails on it. Semantic hues are the platform's and never a brand slot: a tenant who could move <code>danger</code> could make a delete confirmation read as a success. <span class="hidden">${i}</span></p>
-</section>`;
-};
+const app = (width: Width, live: boolean): string =>
+  renderToStaticMarkup(
+    <div className="device" data-width={width} {...(live ? { "data-live": "" } : {})}>
+      <Shell width={width} at="today" destinations={DESTINATIONS}>
+        {SCREENS.map((s) => (
+          <div key={s.id} className="screen" data-screen={s.id} data-at={s.at} {...(s.id === "today" ? { "data-live": "" } : {})}>
+            {s.node}
+          </div>
+        ))}
+      </Shell>
+    </div> as never,
+  );
 
-/* -------------------------------------------------------------- the page --- */
+const overlays = (): string =>
+  OVERLAYS.map(
+    (o) => `<div class="over" data-over="${o.id}">${renderToStaticMarkup(o.node as never)}<p class="cap">${o.caption}</p></div>`,
+  ).join("\n");
+
+const skyBoard = (): string =>
+  `<div class="skies">${SKIES.map((s) => {
+    const w = maskWeight(s);
+    return `<figure class="sky"><span data-one="sky-swatch"><span data-one="sky" data-sky="${s}"${w ? ` data-masked="${w}"` : ""} aria-hidden="true"></span></span><figcaption>${s}</figcaption></figure>`;
+  }).join("")}</div>`;
+
+/* ------------------------------------------------------------- the chrome --- */
 
 const CHROME = `
 :root { color-scheme: light dark; --ink: #16181d; --dim: #6b7280; --bg: #f4f5f7; --line: #e3e5ea; --chip: #ffffff; }
@@ -105,83 +122,96 @@ h1, h2, h3, p, figure, figcaption, ol, ul { margin: 0; padding: 0; }
 body { margin: 0; background: var(--bg); color: var(--ink);
   font: 400 15px/1.55 ui-sans-serif, -apple-system, "SF Pro Text", Inter, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased; }
-.wrap { max-inline-size: 1180px; margin: 0 auto; padding: 34px 20px 80px; }
-.lede h1 { font-size: 26px; font-weight: 650; letter-spacing: -0.025em; margin-block-end: 6px; }
-.lede p { color: var(--dim); max-inline-size: 66ch; }
-.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 24px 0 30px;
-  position: sticky; top: 0; z-index: 20; padding: 12px 0; background: var(--bg); }
+.wrap { max-inline-size: 1240px; margin: 0 auto; padding: 30px 20px 70px; }
+.lede h1 { font-size: 25px; font-weight: 650; letter-spacing: -0.025em; margin-block-end: 6px; }
+.lede p { color: var(--dim); max-inline-size: 68ch; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 22px 0 20px;
+  position: sticky; top: 0; z-index: 30; padding: 12px 0; background: var(--bg); }
 .pill { display: flex; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--chip); }
 .controls button { appearance: none; border: 0; background: none; color: var(--dim); cursor: pointer;
   font: inherit; font-size: 13px; font-weight: 500; padding: 6px 13px; border-radius: 999px; }
 .controls button[aria-pressed='true'] { background: var(--ink); color: var(--bg); }
 .dot { inline-size: 9px; block-size: 9px; border-radius: 999px; display: inline-block; margin-inline-end: 7px; vertical-align: -1px; }
-.stage { display: none; }
-.stage[data-live] { display: block; }
-.group { margin-block-end: 40px; }
-.group h2 { font-size: 12px; font-weight: 650; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); margin-block-end: 6px; }
-.note { color: var(--dim); font-size: 13.5px; max-inline-size: 74ch; margin-block-end: 16px; }
-.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 22px;
-  padding: 20px; border-radius: 18px; border: 1px solid var(--line);
-  background: var(--canvas); color: var(--canvas-ink); }
-.sw { display: flex; flex-direction: column; gap: 8px; }
-.sw.wide, .sw[data-wide] { grid-column: 1 / -1; }
-.sw figcaption { font: 500 11px/1.5 ui-monospace, monospace; color: var(--canvas-ink); opacity: 0.55; }
-.sw code { opacity: 0.75; }
-.chip { display: block; block-size: 46px; border-radius: 10px; box-shadow: inset 0 0 0 1px rgb(128 128 128 / 0.18); }
-.ramp { display: block; block-size: 2px; background: currentColor; opacity: 0.2; }
-.hidden { display: none; }
-[data-one='scroller-item'] { display: block; }
-/* ⚠️ AN OVERLAY HAS A PLACEMENT, so a specimen of one needs a box to be placed
-   in. Shown loose it reads as a card that happens to contain a question, which
-   is the one thing an overlay must never look like. */
-.sw[data-stage] { position: relative; min-block-size: 190px; border-radius: 14px; overflow: hidden;
-  background: var(--canvas); box-shadow: inset 0 0 0 1px rgb(128 128 128 / 0.18); }
-.sw[data-stage] [data-one='overlay'] { position: absolute; inset-inline: 0; inset-block-end: 0; }
-.sw[data-stage] [data-one='overlay'][data-kind='dialog'] { inset: 50% 12px auto; translate: 0 -50%; }
-[data-one='shell'] { min-block-size: 300px; border-radius: 14px; overflow: hidden; }
-[data-one='shell'] [data-one='page'] { min-block-size: 0; }
-[data-one='sky-swatch'] { position: relative; display: block; block-size: 92px; border-radius: 12px;
+.caption { color: var(--dim); font-size: 13px; margin: 0 0 14px; max-inline-size: 82ch; }
+
+/* ⚠️ A DEVICE, BECAUSE A PHONE LAYOUT SHOWN AT 1200px IS NOT THE LAYOUT. The
+   frame is the viewport the shell was rendered for; without it the island
+   stretches across a monitor and every judgement made from the picture is made
+   about a screen nobody has. */
+.device { display: none; margin: 0 auto; border-radius: 26px; overflow: hidden;
+  border: 1px solid var(--line); background: var(--canvas); box-shadow: 0 24px 60px rgb(0 0 0 / 0.14); }
+.device[data-live] { display: block; }
+.device[data-width='phone'] { inline-size: 402px; block-size: 800px; }
+.device[data-width='desktop'] { inline-size: 100%; block-size: 800px; }
+/* ⚠️ THE SHELL IS THE VIEWPORT IN A REAL APP, so it stands at 100dvh; inside a
+   frame that must be the frame instead, or the island pins itself to the bottom
+   of the monitor and is simply not in the picture. */
+.device [data-one='shell'] { block-size: 100%; min-block-size: 0; }
+.screen { display: none; }
+.screen[data-live] { display: contents; }
+
+.skies { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 14px; }
+.sky figcaption { font: 500 11px/1.6 ui-monospace, monospace; color: var(--dim); }
+[data-one='sky-swatch'] { position: relative; display: block; block-size: 86px; border-radius: 12px;
   overflow: hidden; background: var(--canvas); box-shadow: inset 0 0 0 1px rgb(128 128 128 / 0.18); }
 [data-one='sky-swatch'] [data-one='sky'] { --solid: 100%; --reach: 100%; }
-/* ⚠️ A shadow needs room to be seen. In light the deeper surfaces are all
-   near-white and the elevation IS the difference, so a flush specimen reads as
-   three identical rectangles — which is the design being invisible rather than
-   absent. */
-[data-one='surface'] { display: block; padding: 16px; min-block-size: 74px; }
-@media (max-width: 720px) { .wrap { padding: 20px 14px 60px; } .board { padding: 14px; } }
+
+/* ⚠️ AN OVERLAY IS SHOWN OVER SOMETHING. Its whole job is its relationship to
+   what it covers, and one shown loose reads as a card that happens to contain a
+   question — the single thing an overlay must never look like. */
+.overlays { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.over { position: relative; min-block-size: 270px; border-radius: 16px; overflow: hidden;
+  background: var(--canvas); color: var(--canvas-ink); box-shadow: inset 0 0 0 1px rgb(128 128 128 / 0.18); }
+.over [data-one='overlay'] { position: absolute; inset-inline: 0; inset-block-end: 0; }
+.over [data-one='overlay'][data-kind='dialog'] { inset: 50% 14px auto; translate: 0 -50%; }
+.over .cap { position: absolute; inset-block-start: 12px; inset-inline: 14px; color: var(--canvas-ink);
+  opacity: 0.55; font-size: 12px; line-height: 1.45; }
+
+.section { margin-block-start: 46px; }
+.section h2 { font-size: 12px; font-weight: 650; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); margin-block-end: 6px; }
+[data-one='scroller-item'] { display: block; }
+@media (max-width: 720px) { .wrap { padding: 18px 12px 50px; } .device[data-width='phone'] { inline-size: 100%; } }
 `;
 
-const cell = (caption: string, body: string, wide?: boolean) =>
-  /* An overlay specimen gets a stage, because a placement needs something to be
-     placed against. Everything else is shown as it falls. */
-  `<figure class="sw"${wide ? " data-wide" : ""}${body.includes(`data-one="overlay"`) ? " data-stage" : ""}>${body}<figcaption>${caption}</figcaption></figure>`;
-
-const groupHtml = (): string =>
-  GROUPS.map((g) => `
-<section class="group">
-  <h2>${g.title}</h2>
-  <p class="note">${g.note}</p>
-  <div class="board">
-    ${g.items.map((i) => cell(i.caption, renderToStaticMarkup(i.node as never), i.wide)).join("\n")}
-  </div>
-</section>`).join("\n");
-
+/*
+  ⚠️ THE NAVIGATION IS REAL. Pressing a rail item changes the screen, because a
+  navigation surface that does not navigate is a photograph of one — and what is
+  most worth judging about a rail is what it feels like to move through.
+*/
 const SCRIPT = `
-const stages = [...document.querySelectorAll('.stage')];
+const stage = document.querySelector('.stage');
+const screens = [...document.querySelectorAll('.screen')];
+const devices = [...document.querySelectorAll('.device')];
+const NOTES = ${JSON.stringify(Object.fromEntries(SCREENS.map((s) => [s.id, s.note])))};
+const go = (id) => {
+  const at = screens.find((s) => s.dataset.screen === id)?.dataset.at;
+  screens.forEach((s) => s.toggleAttribute('data-live', s.dataset.screen === id));
+  document.querySelectorAll("[data-one='nav-item']").forEach((n) => {
+    const label = n.querySelector("[data-one='nav-label']");
+    const mine = label && label.textContent.toLowerCase() === at;
+    n.toggleAttribute('data-active', Boolean(mine));
+    if (mine) n.setAttribute('aria-current', 'page'); else n.removeAttribute('aria-current');
+  });
+  document.querySelectorAll('button[data-act="screen"]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === id)));
+  document.querySelector('.note').textContent = NOTES[id] || '';
+};
 document.addEventListener('click', (e) => {
+  const nav = e.target.closest("[data-one='nav-item']");
+  if (nav) {
+    const at = nav.querySelector("[data-one='nav-label']").textContent.toLowerCase();
+    const first = screens.find((s) => s.dataset.at === at);
+    if (first) go(first.dataset.screen);
+    return;
+  }
   const b = e.target.closest('button[data-act]');
   if (!b) return;
   [...b.parentElement.children].forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-  if (b.dataset.act === 'tenant') stages.forEach((s, n) => s.toggleAttribute('data-live', n === +b.dataset.value));
-  if (b.dataset.act === 'theme') stages.forEach((s) => { s.dataset.theme = b.dataset.value; });
+  if (b.dataset.act === 'tenant') stage.dataset.tenant = b.dataset.value;
+  if (b.dataset.act === 'theme') stage.dataset.theme = b.dataset.value;
+  if (b.dataset.act === 'width') devices.forEach((d) => d.toggleAttribute('data-live', d.dataset.width === b.dataset.value));
+  if (b.dataset.act === 'screen') go(b.dataset.value);
 });
 `;
-
-const body = TENANTS.map((_, i) => `
-<div class="stage" data-tenant="${i}" data-theme="dark"${i === 0 ? " data-live" : ""}>
-${tokenBoard(i)}
-${groupHtml()}
-</div>`).join("\n");
 
 const page = `<title>Northlight — the interface language</title>
 <style>${daisy}</style>
@@ -196,9 +226,10 @@ ${CHROME}
 <div class="wrap">
   <div class="lede">
     <h1>Northlight — the interface language</h1>
-    <p>Every component the language has, in every state it declares, rendered from the shipped
-    package through the shipped stylesheet. Change the tenant: nothing below was re-authored, and
-    no value in it was picked. Press anything — the motion is real.</p>
+    <p>One product, built only from the language, using every component it has. Change the tenant and
+    nothing below was re-authored; change the width and the shell becomes a different shell. Press
+    anything — the motion is real, and it plays on the press rather than on a hover half the devices
+    this ships to do not have.</p>
   </div>
   <div class="controls">
     <div class="pill">
@@ -208,8 +239,31 @@ ${CHROME}
       <button data-act="theme" data-value="dark" aria-pressed="true">Dark</button>
       <button data-act="theme" data-value="light" aria-pressed="false">Light</button>
     </div>
+    <div class="pill">
+      ${WIDTHS.map((w, i) => `<button data-act="width" data-value="${w}" aria-pressed="${i === 0}">${w[0]!.toUpperCase()}${w.slice(1)}</button>`).join("")}
+    </div>
+    <div class="pill">
+      ${SCREENS.map((s, i) => `<button data-act="screen" data-value="${s.id}" aria-pressed="${i === 0}">${s.title}</button>`).join("")}
+    </div>
   </div>
-  ${body}
+
+  <p class="caption note">${SCREENS[0]!.note}</p>
+
+  <div class="stage" data-tenant="0" data-theme="dark">
+    ${WIDTHS.map((w, i) => app(w, i === 0)).join("\n")}
+
+    <section class="section">
+      <h2>Overlays</h2>
+      <p class="caption">Two depths and no more. A sheet over a sheet is a stack somebody has to unwind, and the way out of the second one is never where it was for the first.</p>
+      <div class="overlays">${overlays()}</div>
+    </section>
+
+    <section class="section">
+      <h2>The sky</h2>
+      <p class="caption">One lit layer, masked ten ways. The colour is the tenant's and the mask is the page's — so a pattern is never a colour decision — and every masked one breathes on a period of its own.</p>
+      ${skyBoard()}
+    </section>
+  </div>
 </div>
 <script>${SCRIPT}</script>`;
 

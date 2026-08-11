@@ -16,7 +16,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { LIMIT, SHAPE, type Archetype } from "../archetype.js";
-import { MASKED, type Sky } from "../sky.js";
+import { maskWeight, type Sky } from "../sky.js";
 import { borrow, SIZE, TONE } from "../borrowed.js";
 import { Text } from "./primitives.js";
 import { Icon } from "./icon.js";
@@ -67,7 +67,7 @@ export function Page({ archetype, sky, top, children }: PageProps) {
 
   /* ⚠️ A page may name a MASK; the ground belongs to the shape. */
   const drawn = sky ?? shape.sky;
-  const masked = MASKED.includes(drawn);
+  const weight = maskWeight(drawn);
 
   return (
     <PageContext.Provider value={archetype}>
@@ -80,9 +80,9 @@ export function Page({ archetype, sky, top, children }: PageProps) {
         <div
           data-one="sky"
           data-sky={drawn}
-          {...(masked ? { "data-masked": "" } : {})}
+          {...(weight ? { "data-masked": weight } : {})}
           aria-hidden="true"
-          style={{ "--solid": `${shape.solid}%`, "--reach": `${shape.reach}%` } as Record<string, string>}
+          style={{ "--solid": `${shape.solid}rem`, "--reach": `${shape.reach}rem` } as Record<string, string>}
         />
         {top ? <div data-one="hero" data-top={shape.top}>{top}</div> : null}
         {/* ⚠️ `body` is the stagger's parent — the entering children are counted
@@ -162,7 +162,7 @@ export function QuickActions({ actions }: { readonly actions: readonly QuickActi
     throw new Error(`QuickActions: ${actions.length} — past ${LIMIT.quickActions} a row of quick actions is a toolbar`);
   }
   return (
-    <div data-one="quick-actions" data-count={actions.length}>
+    <div data-one="quick-action-list" data-count={actions.length}>
       {actions.map((a) => (
         <button key={a.id} type="button" data-one="quick-action" onClick={a.onPress}>
           <span data-one="quick-action-well"><Icon name={a.icon} /></span>
@@ -235,8 +235,8 @@ export function PageTitle({ title, search, bar }: PageTitleProps) {
       {bar}
       <h1 data-one="page-title">{title}</h1>
       {search ? (
-        <div data-one="search">
-          <span data-one="search-icon"><Icon name="search" /></span>
+        <div data-one="page-title-search">
+          <span data-one="page-title-search-icon"><Icon name="search" /></span>
           <Text role="body" muted>{search}</Text>
         </div>
       ) : null}

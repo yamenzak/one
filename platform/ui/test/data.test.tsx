@@ -29,7 +29,7 @@ describe("where somebody is", () => {
   it("makes the last crumb the page rather than a link", () => {
     const out = html(<Breadcrumbs trail={trail} />);
     expect(out).toContain('aria-current="page"');
-    expect([...out.matchAll(/data-one="crumb-link"/g)]).toHaveLength(trail.length - 1);
+    expect([...out.matchAll(/data-one="breadcrumb-link"/g)]).toHaveLength(trail.length - 1);
   });
 
   it("gives a page header one title and at most one action", () => {

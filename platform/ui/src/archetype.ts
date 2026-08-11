@@ -28,11 +28,18 @@ export interface Shape {
   /** The sky this shape is drawn on, unless the page names another masked one. */
   readonly sky: Sky;
   /**
-   * How far the light survives, as a percentage of the scroll.
+   * How far the light survives, in REM FROM THE TOP OF THE SCREEN.
    *
    * ⚠️ A PHOTOGRAPH CARRIES A WHOLE SCREEN AND A PATTERN GIVES OUT PAST THE
    * HERO. `solid` is where the fade begins and `reach` is where it is gone —
    * both on the light itself, so nothing ever gets a bottom EDGE (§5.4).
+   *
+   * ⚠️ A LENGTH, NOT A PERCENTAGE, AND THAT WAS A CORRECTION. As a percentage of
+   * the page these were a fact about how much CONTENT a screen happened to have:
+   * the same archetype gave a short list a modest backdrop and a long one a wash
+   * over the entire scroll, and at a desktop width — where the page is far
+   * taller — every screen came out tinted end to end. How far the light survives
+   * is a fact about the screen's TOP, so it is measured from there.
    */
   readonly solid: number;
   readonly reach: number;
@@ -47,11 +54,11 @@ export interface Shape {
 }
 
 export const SHAPE: Readonly<Record<Archetype, Shape>> = {
-  crown: { top: "photo-hero", sky: "photo", solid: 34, reach: 82, title: "centred", headerInside: false },
-  topic: { top: "pattern-hero", sky: "dots", solid: 26, reach: 58, title: "centred", headerInside: false },
-  title: { top: "big-title", sky: "aurora", solid: 14, reach: 40, title: "left", headerInside: false },
-  identity: { top: "portrait", sky: "rings", solid: 30, reach: 62, title: "centred", headerInside: false },
-  feed: { top: "app-bar", sky: "aurora", solid: 10, reach: 34, title: "none", headerInside: true },
+  crown: { top: "photo-hero", sky: "photo", solid: 16, reach: 40, title: "centred", headerInside: false },
+  topic: { top: "pattern-hero", sky: "dots", solid: 10, reach: 26, title: "centred", headerInside: false },
+  title: { top: "big-title", sky: "aurora", solid: 7, reach: 20, title: "left", headerInside: false },
+  identity: { top: "portrait", sky: "rings", solid: 13, reach: 30, title: "centred", headerInside: false },
+  feed: { top: "app-bar", sky: "aurora", solid: 5, reach: 17, title: "none", headerInside: true },
 };
 
 /* ------------------------------------------------------------- patterns --- */

@@ -16,7 +16,7 @@
  */
 
 import { fromHex, oklchToRgb, rgbToOklch, toHex, type Oklch } from "./colour.js";
-import { accentOn, inkOn, surfaces, type Ground, type Theme } from "./ground.js";
+import { accentOn, inkOn, surfaces, toneOn, type Ground, type Theme } from "./ground.js";
 import { SEMANTIC } from "./semantic.js";
 
 /* ----------------------------------------------------------------- slots --- */
@@ -174,9 +174,13 @@ export function tokensFor(brand: Brand, theme: Theme): Tokens {
     takes for the tenant sweep to stop being a proof.
   */
   for (const [name, hue] of Object.entries(SEMANTIC)) {
-    const lit = accentOn(hue, ground.canvas);
-    out[`--tone-${name}`] = toHex(oklchToRgb(lit));
-    out[`--tone-${name}-ink`] = toHex(inkOn(lit).ink);
+    const tone = toneOn(hue, ground.canvas);
+    out[`--tone-${name}`] = toHex(oklchToRgb(tone.fill));
+    out[`--tone-${name}-ink`] = toHex(oklchToRgb(tone.ink));
+    /* ⚠️ The quiet form. A note inside content must not shout across a page it
+       is only a paragraph of — one form makes every message the same volume. */
+    out[`--tone-${name}-soft`] = toHex(oklchToRgb(tone.soft));
+    out[`--tone-${name}-soft-ink`] = toHex(oklchToRgb(tone.softInk));
   }
 
   out["--radius"] = `${brand.radius}px`;

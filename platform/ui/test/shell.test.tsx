@@ -25,13 +25,27 @@ describe("the stylesheet asks the right box", () => {
     answering yes — nothing on it is wrong, it is answering a question about the
     wrong box.
   */
-  it("uses container queries for content and viewport queries only for the shell", () => {
-    const media = [...STRUCTURE.matchAll(/@media \(min-width[^)]*\)\s*\{([^@]*)/g)].map((m) => m[1]!);
-    expect(media.length).toBeGreaterThan(0);
-    for (const block of media) {
-      expect(block, "a viewport query may only shape the shell itself").toContain("[data-one='shell']");
-    }
+  /*
+    ⚠️ NO VIEWPORT QUERY ANYWHERE, and this rule got STRONGER rather than being
+    relaxed. It used to allow one exemption — the shell's own columns, "the one
+    genuine question about the device" — and the exemption was wrong: a shell
+    KNOWS its width, because it is a prop, and `shapeFor` has already turned it
+    into a shape. Asking the monitor as well meant the two could disagree, and
+    they did: a phone-width shell in a narrow container on a wide screen was
+    given a rail column and a bottom island in the top row.
+
+    ⚠️ AND THE SYMPTOM IS NEVER "the breakpoint is wrong". It is a layout that is
+    correct in a browser somebody resized and wrong in the pane, the frame or the
+    embed where it actually ships — which is why this is checked structurally
+    rather than looked at.
+  */
+  it("asks the box and never the monitor", () => {
+    const media = [...STRUCTURE.matchAll(/@media \(min-width[^)]*\)/g)];
+    expect(media, "a viewport query decides a layout somebody can resize into being wrong").toEqual([]);
     expect(STRUCTURE).toContain("@container pane");
+    /* ⚠️ And the shell's own columns come from its attributes, which is what
+       replaced them — a check that would fail if they were simply deleted. */
+    expect(STRUCTURE).toMatch(/\[data-one='shell'\][^{]*\{[^}]*grid-template-columns/);
   });
 
   it("makes every pane a container, so what is inside can ask it", () => {
@@ -97,11 +111,15 @@ describe("the stylesheet asks the right box", () => {
          "canvas", and a scan that reads it as a named colour flags every correct
          line in the sheet. What is left must be one of the few keywords that
          name no colour at all. */
+      /* ⚠️ Hyphens are NOT punctuation here — stripping them splits `color-mix`
+         into two words and the check reports "color" as a named colour. */
       const bare = v.replace(/var\(--[a-z0-9-]+\)/g, " ").replace(/[(),%]/g, " ");
       const ALLOWED = new Set([
         "in", "oklab", "srgb", "transparent", "currentColor", "none", "inherit", "calc", "color-mix",
         /* border and shadow shorthands carry keywords that are not colours */
         "solid", "dashed", "inset", "max", "min", "px", "rem",
+        /* calc's operators, which survive the split above */
+        "*", "/", "+", "-",
       ]);
       for (const word of bare.split(/\s+/).filter(Boolean)) {
         if (/^-?[\d.]+(px|rem|em|%)?$/.test(word)) continue;

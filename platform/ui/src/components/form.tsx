@@ -177,9 +177,9 @@ export interface CheckProps {
 export const Check = ({ label, checked, onCheck, disabled }: CheckProps) => {
   const id = useId();
   return (
-    <div data-one="check">
-      <input data-one="check-control" className={borrow("checkbox")} id={id} type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onCheck?.(e.currentTarget.checked)} />
-      <label data-one="check-label" htmlFor={id}><Text role="body">{label}</Text></label>
+    <div data-one="checkbox">
+      <input data-one="checkbox-control" className={borrow("checkbox")} id={id} type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onCheck?.(e.currentTarget.checked)} />
+      <label data-one="checkbox-label" htmlFor={id}><Text role="body">{label}</Text></label>
     </div>
   );
 };
@@ -193,10 +193,10 @@ export interface ChooseProps {
 
 /** ⚠️ One of a few, all visible. Past about five this is a `Select`. */
 export const Choose = ({ name, options, value, onChoose }: ChooseProps) => (
-  <div data-one="choose" role="radiogroup" aria-label={name}>
+  <div data-one="radio" role="radiogroup" aria-label={name}>
     {options.map((o) => (
-      <label key={o.value} data-one="choose-option" data-chosen={o.value === value ? "" : undefined}>
-        <input data-one="choose-control" className={borrow("radio")} type="radio" name={name} value={o.value} checked={o.value === value} onChange={() => onChoose?.(o.value)} />
+      <label key={o.value} data-one="radio-option" data-chosen={o.value === value ? "" : undefined}>
+        <input data-one="radio-control" className={borrow("radio")} type="radio" name={name} value={o.value} checked={o.value === value} onChange={() => onChoose?.(o.value)} />
         <Text role="body">{o.label}</Text>
       </label>
     ))}
@@ -300,11 +300,11 @@ export function BulkActions({ selected, actions, onClear }: BulkActionsProps) {
       <Text role="body">{selected === 1 ? "1 selected" : `${selected} selected`}</Text>
       <span data-one="bulk-actions-list">
         {actions.map((a) => (
-          <button key={a.id} type="button" data-one="bulk-action" data-tone={a.destructive ? TONE.danger : undefined} onClick={a.onRun}>
+          <button key={a.id} type="button" data-one="bulk-actions-item" data-tone={a.destructive ? TONE.danger : undefined} onClick={a.onRun}>
             <Text role="body">{a.label}</Text>
           </button>
         ))}
-        <button type="button" data-one="bulk-clear" onClick={onClear} aria-label="Clear selection"><Icon name="close" /></button>
+        <button type="button" data-one="bulk-actions-clear" onClick={onClear} aria-label="Clear selection"><Icon name="close" /></button>
       </span>
     </div>
   );

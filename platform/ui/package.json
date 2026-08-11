@@ -9,7 +9,7 @@
   },
   "types": "./src/index.ts",
   "scripts": {
-    "test": "vitest run --passWithNoTests",
+    "test": "node ../scripts/sheets.mjs src reference && vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit",
     "clean": "rm -rf .turbo *.tsbuildinfo"

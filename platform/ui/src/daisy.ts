@@ -21,7 +21,7 @@
 
 import type { Brand } from "./brand.js";
 import { sceneFor, litFor } from "./scene.js";
-import { accentOn, inkOn } from "./ground.js";
+import { inkOn, toneOn } from "./ground.js";
 import { oklchToRgb, toHex, type Oklch } from "./colour.js";
 import { SEMANTIC } from "./semantic.js";
 import type { Theme } from "./ground.js";
@@ -55,9 +55,15 @@ const hex = (c: Oklch): string => toHex(oklchToRgb(c));
   `--tone-success`, side by side, one step apart. One derivation or the tones
   disagree with themselves.
 */
+/*
+  ⚠️ ONE DERIVATION FOR A TONE, AND ITS INK IS THE SAME HUE. Two were running: a
+  callout filled from the raw hue here and its icon coloured from the re-lit one
+  in `tokensFor` — one step apart, side by side. And the ink was neutral, so a
+  green pill carried black text, which reads as a sticker rather than a message.
+*/
 const pair = (c: Oklch, ground: Oklch): readonly [string, string] => {
-  const lit = accentOn(c, ground);
-  return [hex(lit), toHex(inkOn(lit).ink)];
+  const tone = toneOn(c, ground);
+  return [hex(tone.fill), hex(tone.ink)];
 };
 
 /**

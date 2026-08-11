@@ -368,11 +368,11 @@
     {
       "id": "pane-container-queries",
       "group": "interface",
-      "fails": "a pane-capable surface sized by viewport breakpoints rather than by its container — every breakpoint answers yes about the wrong box",
+      "fails": "a viewport query anywhere in the structure. It used to allow ONE — the shell's own columns — and the exemption was the bug: a shell knows its width, so asking the monitor as well let the two disagree, and a phone-width shell in a narrow container took a rail column and put its bottom island in the top row",
       "stage": "4",
       "status": "live",
       "impl": "ui/test/shell.test.tsx",
-      "proves": "uses container queries for content and viewport queries only for the shell"
+      "proves": "asks the box and never the monitor"
     },
     {
       "id": "one-navigation-surface",
@@ -3422,7 +3422,7 @@
       "stage": "7",
       "status": "live",
       "impl": "ui/test/sky.test.ts",
-      "proves": "corrects a masked sky in one direction per theme",
+      "proves": "corrects every mask weight, in one direction, in all three scopings",
       "fails": "brightening a masked pattern on a pale ground as well as a dark one — it blows the pattern out to white, which is the same defect with the opposite sign"
     },
     {
@@ -3521,7 +3521,7 @@
       "stage": "7",
       "status": "live",
       "impl": "ui/test/icons.test.ts",
-      "proves": "defines every motion it assigns",
+      "proves": "gives every icon a motion, and defines every motion it names",
       "fails": "a motion an icon names and the choreographer never defines — that glyph stands still while its neighbours move, which reads as a broken icon rather than as a missing rule"
     },
     {
@@ -3592,36 +3592,36 @@
       "group": "interface",
       "stage": "7",
       "status": "live",
-      "impl": "ui/test/specimens.test.ts",
-      "proves": "covers every registered component with at least one specimen",
-      "fails": "a registered component nobody has drawn — a declared state that was considered on paper and shipped unexamined is indistinguishable, in the registry, from one that was designed"
+      "impl": "ui/test/app.test.tsx",
+      "proves": "renders every registered component somewhere in the product",
+      "fails": "a registered component no screen in the sample app uses. Read back out of the RENDERED markup rather than from a list each specimen declared itself into, so it proves a component was drawn rather than that somebody wrote its name"
     },
     {
       "id": "nothing-is-drawn-that-is-not-declared",
       "group": "interface",
       "stage": "7",
       "status": "live",
-      "impl": "ui/test/specimens.test.ts",
-      "proves": "draws nothing the registry does not declare",
-      "fails": "a specimen for a component the registry does not have — that is how one gets built, drawn, reviewed and shipped with no state matrix and outside the boundary"
+      "impl": "ui/test/app.test.tsx",
+      "proves": "roots every part in a component the registry declares",
+      "fails": "a family of parts with no component at its root — an unregistered component wearing an established one's clothes, so it has no state matrix and the boundary does not know it exists"
     },
     {
       "id": "the-refusals-are-drawn-too",
       "group": "interface",
       "stage": "7",
       "status": "live",
-      "impl": "ui/test/specimens.test.ts",
-      "proves": "draws the states that only appear when something is wrong",
-      "fails": "a gallery that shows only the happy path — locked, disabled, busy, invalid, empty, unknown and error are the states a product ships most often and reviews least"
+      "impl": "ui/test/app.test.tsx",
+      "proves": "shows every state that only appears when something is wrong",
+      "fails": "a state the language declares that the sample app never reaches — locked, busy, invalid, or a container that failed. These are what a product ships most and reviews least, and their COPY can only be judged where the state occurs"
     },
     {
       "id": "every-group-states-its-rule",
       "group": "interface",
       "stage": "7",
       "status": "live",
-      "impl": "ui/test/specimens.test.ts",
-      "proves": "gives every group a stated rule",
-      "fails": "a gallery of components with no reasons — a picture book, where the next person picks by appearance, which is the decision the language exists to have already made"
+      "impl": "ui/test/app.test.tsx",
+      "proves": "states the rule behind every screen",
+      "fails": "a screen with no stated reason for its archetype, or an archetype no screen demonstrates. A sample app whose screens have no reasons is a picture book, and the next person copies by appearance"
     },
     {
       "id": "a-field-is-described-by-its-own-fault",
@@ -3676,6 +3676,132 @@
       "impl": "ui/test/shell.test.tsx",
       "proves": "carries no colour of its own",
       "fails": "a literal in any colour-bearing property, INCLUDING the border and box-shadow shorthands — the first version read three property names and a value's prefix, so `border: var(--edge) solid rebeccapurple` passed the mutation that proved it"
+    },
+    {
+      "id": "every-registered-component-is-drawn",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/audit.test.tsx",
+      "proves": "draws every registered component",
+      "fails": "a component on the registry that no renderer emits, or that the sheet never addresses — the defect every other test in the package structurally cannot see, because they ask what the markup MEANS and an unstyled element means the right thing"
+    },
+    {
+      "id": "every-emitted-part-is-drawn",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/audit.test.tsx",
+      "proves": "draws every part any component emits",
+      "fails": "a data-one attribute the stylesheet never mentions — it renders as a bare box in normal flow, which is how the overlay, the navigation and the skeleton each shipped unstyled with a green suite"
+    },
+    {
+      "id": "no-rule-for-a-part-nothing-emits",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/audit.test.tsx",
+      "proves": "draws no part that nothing emits",
+      "fails": "an affordance that was designed, written and never rendered — the row's disclosure chevron had a rule for four stages and no element, so every tappable row looked identical to every inert one"
+    },
+    {
+      "id": "a-drawing-exemption-is-checked",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/audit.test.tsx",
+      "proves": "holds no exemption that has stopped being true",
+      "fails": "a part excused because a borrowed class dresses it, where the borrow is gone or the sheet draws it after all — an exemption that outlives its reason is worse than no exemption, because it reads as a decision"
+    },
+    {
+      "id": "every-declared-state-is-drawn",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/audit.test.tsx",
+      "proves": "draws every interaction state that is not the browser's own",
+      "fails": "a state the registry declares and no rule renders — busy set the native disabled flag and drew nothing, so a control mid-request was pixel-identical to one that is simply unavailable"
+    },
+    {
+      "id": "every-masked-sky-breathes-on-its-own-period",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/sky.test.ts",
+      "proves": "gives every masked sky its own breath",
+      "fails": "a mask with no weather, which is the one visibly still thing on a screen, or two skies on one period, which is visibly one animation"
+    },
+    {
+      "id": "every-sky-offered-is-a-sky-drawn",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/sky.test.ts",
+      "proves": "draws every sky it offers, and weights every mask",
+      "fails": "a word in the closed set with no rule — the attribute lands, nothing matches it, and the page renders no light at all"
+    },
+    {
+      "id": "a-part-rule-never-outruns-its-icon",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/icons.test.ts",
+      "proves": "never addresses a part its icon does not have",
+      "fails": "a positional rule counting past the parts a generated glyph has, which animates the wrong stroke or nothing at all"
+    },
+    {
+      "id": "no-backtick-inside-a-sheet-named-where-it-is",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "scripts/sheets.mjs",
+      "proves": "a backtick inside a CSS template literal",
+      "fails": "a backtick written in a comment inside a CSS template literal — it closes the sheet, and the compiler then reports a missing , or ; hundreds of lines away in a line that has nothing wrong with it. Scans raw text, so it reports the cause on a file that no longer parses"
+    },
+    {
+      "id": "the-top-of-the-ladder-casts-a-shadow",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/audit.test.tsx",
+      "proves": "never separates by the top surface step without casting a shadow",
+      "fails": "a rule reaching the deepest surface with no elevation beside it. A light ground starts at l 0.93 and the ladder saturates, so surface-3 and surface-2 come out one unit apart on every pale tenant — this one check found six components that were invisible in light and correct in dark, including the segmented indicator and the current destination on a nav island"
+    },
+    {
+      "id": "the-backdrop-is-a-length-not-a-proportion",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/layout.test.tsx",
+      "proves": "takes its sky, its reach and its top from the archetype",
+      "fails": "a solid/reach emitted as a percentage. As a proportion of the page these measured how much CONTENT a screen happened to have — the same archetype washed a long scroll end to end and barely tinted a short one, and at a desktop width every screen came out tinted throughout"
+    },
+    {
+      "id": "an-app-navigates-the-way-the-language-says",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/app.test.tsx",
+      "proves": "navigates the way the language says an app must",
+      "fails": "a reference app breaking the one rule the registry runs on every app — three to five destinations, each labelled, each answering to a screen"
+    },
+    {
+      "id": "a-refusal-in-the-sample-app-says-why",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/app.test.tsx",
+      "proves": "gives every refusal a reason somebody wrote",
+      "fails": "a locked or disabled control whose reason is the shortest string that satisfies the type. The components make a reason mandatory; only this checks one was written"
+    },
+    {
+      "id": "every-forbidden-surface-is-used-by-the-app",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "ui/test/app.test.tsx",
+      "proves": "uses every surface an app is forbidden to build for itself",
+      "fails": "a surface the boundary forbids an app to build that the reference app never uses — which is how nine of them sat unimplemented for four stages, forbidden to everybody and provided to nobody"
     }
   ]
 }

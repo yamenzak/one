@@ -188,3 +188,72 @@ export const semanticForm = (tone: Oklch, ground: Oklch): SemanticForm =>
   collides(tone, ground) ? "contained" : "tone";
 
 export { rgbToOklch };
+
+/* ------------------------------------------------------------------ tone --- */
+
+export interface Tone {
+  /** The saturated fill, for anything that must interrupt. */
+  readonly fill: Oklch;
+  /** ⚠️ Ink of the SAME HUE, never neutral. See below. */
+  readonly ink: Oklch;
+  /** A tint of the tone, close to the ground — for a message inside content. */
+  readonly soft: Oklch;
+  readonly softInk: Oklch;
+}
+
+/**
+ * A semantic hue, lit for one surface, in the two forms a product needs.
+ *
+ * ⚠️ INK ON A SEMANTIC FILL IS THE SAME HUE, NOT BLACK OR WHITE. `inkOn` picks
+ * the winner of near-white and near-dark, which is right for a neutral surface
+ * and wrong here: black text on a green pill reads as a sticker rather than as a
+ * message, and the two colours have no relationship at all. Deep green on the
+ * same green does, and it is what every considered palette does — the hue is
+ * held and only the lightness moves until it clears the floor.
+ *
+ * ⚠️ AND THERE ARE TWO FORMS BECAUSE THERE ARE TWO JOBS. A failure that must
+ * interrupt gets the saturated `fill`; a note that sits INSIDE content gets
+ * `soft` — a tint of the same hue, which does not shout across a page it is only
+ * a paragraph of. Shipping one form makes every message the same volume, and a
+ * product where everything shouts is one where nothing does.
+ */
+export function toneOn(tone: Oklch, surface: Oklch): Tone {
+  const fill = accentOn(tone, surface, FLOOR.nonText);
+  /*
+    The tint: the tone's hue at the surface's own lightness, nudged away from it
+    so the shape is visible, with the chroma well under the ambience ceiling so a
+    soft callout can never be mistaken for the page.
+  */
+  const away = surface.l > 0.5 ? -0.06 : 0.09;
+  const soft: Oklch = { l: Math.min(0.97, Math.max(0.14, surface.l + away)), c: 0.045, h: tone.h };
+  return { fill, ink: sameHueInk(tone.h, fill), soft, softInk: sameHueInk(tone.h, soft) };
+}
+
+/**
+ * ⚠️ THE HUE IS HELD AND ONLY THE LIGHTNESS MOVES. Walking both ends and keeping
+ * whichever clears the floor first is what stops a mid-lightness tone (an amber,
+ * say) from having no legible same-hue ink at all — it takes the dark end there
+ * and the light end on a deep blue, without either being written down.
+ */
+function sameHueInk(hue: number, on: Oklch): Oklch {
+  const bg = oklchToRgb(on);
+  let best: Oklch | null = null;
+  let bestRatio = 0;
+  for (const direction of [-1, 1]) {
+    for (let step = 0.04; step <= 0.9; step += 0.02) {
+      const l = on.l + direction * step;
+      if (l <= 0.04 || l >= 0.99) break;
+      /* Chroma falls away at the extremes, or the ink reads as a second fill. */
+      const candidate: Oklch = { l, c: Math.min(0.14, 0.5 - Math.abs(l - 0.5)), h: hue };
+      const ratio = contrast(oklchToRgb(candidate), bg);
+      if (ratio >= FLOOR.text) return candidate;
+      if (ratio > bestRatio) { bestRatio = ratio; best = candidate; }
+    }
+  }
+  /*
+    ⚠️ NOTHING OF THIS HUE CLEARS THE FLOOR — so the measured neutral wins. It is
+    the only correct answer: legible beats on-brand, every time, and the fallback
+    is stated rather than being an accident of the loop running out.
+  */
+  return best && bestRatio >= FLOOR.text ? best : rgbToOklch(inkOn(on).ink);
+}

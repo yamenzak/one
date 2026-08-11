@@ -77,18 +77,29 @@ export function Overlay({ kind, title, children, action, onDismiss }: OverlayPro
 export interface ConfirmProps {
   readonly verb: string;
   readonly object: string;
+  /**
+   * ⚠️ THE BUTTON'S OWN WORDS, WHEN THE OBJECT IS LONG. The question names the
+   * thing in full because that is what makes a mistake catchable; the BUTTON
+   * repeating it in full is a four-line pill, which is what the whole object
+   * produced before this existed. Defaults to the object, so the short form is
+   * something a caller opts into rather than something they must remember.
+   */
+  readonly short?: string;
   readonly onConfirm: () => void;
   readonly onCancel: () => void;
 }
 
-export const Confirm = ({ verb, object, onConfirm, onCancel }: ConfirmProps) => (
+export const Confirm = ({ verb, object, short, onConfirm, onCancel }: ConfirmProps) => (
   <Overlay
     kind="dialog"
     title={`${verb} ${object}?`}
     action={
       <>
         <button type="button" data-one="confirm-cancel" onClick={onCancel}>Keep</button>
-        <button type="button" data-one="confirm-go" data-kind="destructive" onClick={onConfirm}>{`${verb} ${object}`}</button>
+        {/* ⚠️ NEVER JUST THE VERB EITHER. "Cancel" beside "Keep" is a question
+            about the dialog rather than about the booking, and it is the exact
+            ambiguity a destructive confirm exists to remove. */}
+        <button type="button" data-one="confirm-go" data-kind="destructive" onClick={onConfirm}>{`${verb} ${short ?? object}`}</button>
       </>
     }
   />

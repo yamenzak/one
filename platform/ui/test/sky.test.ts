@@ -10,8 +10,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { SKIES, SKY, SKY_VARS, MASKED, skyVars, skySheet } from "../src/sky.js";
-import { CHOREOGRAPHY } from "../src/motion.js";
+import { SKIES, SKY, SKY_VARS, MASKED, MASK_WEIGHT, maskWeight, skyVars, skySheet } from "../src/sky.js";
+import { CHOREOGRAPHY, WEATHER } from "../src/motion.js";
 import { DEFAULT_BRAND, RANGE, type Brand } from "../src/brand.js";
 import { fromHex, rgbToOklch } from "../src/colour.js";
 
@@ -158,11 +158,26 @@ describe("the layer fades, and the weather is slow", () => {
     for (const s of seconds) expect(s, `${s}s reads as an animation rather than as weather`).toBeGreaterThanOrEqual(26);
   });
 
-  /* ⚠️ A pattern BREATHES; it does not travel. */
-  it("scales the mask rather than moving it", () => {
-    const breathe = CHOREOGRAPHY.split("@keyframes sky-breathe")[1]?.split("}\n}")[0] ?? "";
-    expect(breathe).toContain("mask-size");
+  /*
+    ⚠️ A PATTERN BREATHES; IT DOES NOT TRAVEL — and it breathes by PROPORTION.
+    The keyframe animates one registered factor that every mask multiplies its
+    own geometry by, rather than a mask-size shared across seven patterns: a
+    single size tiles a repeating gradient into a box smaller than its own
+    period, which puts a seam through the pattern and reads as a rendering fault
+    rather than as a wrong number.
+  */
+  it("scales each pattern by its own proportion rather than moving it", () => {
+    const breathe = CHOREOGRAPHY.split("@keyframes sky-breathe")[1]?.split("}")[0] ?? "";
+    expect(breathe).toContain("--breath");
     expect(breathe).not.toContain("translate");
+    /* ⚠️ Registered, or it is a string and does not animate at all. */
+    expect(SKY).toMatch(/@property --breath \{[^}]*syntax: "<number>"/);
+    /* ⚠️ And every mask multiplies BY it — one that does not simply stands still. */
+    for (const rule of SKY.split("[data-one='sky'][data-sky=").slice(1)) {
+      if (!rule.includes("mask-image")) continue;
+      const sky = rule.slice(1, rule.indexOf("'", 1));
+      expect(rule, `${sky} has a mask and never breathes`).toContain("var(--breath)");
+    }
   });
 
   /*
@@ -170,24 +185,68 @@ describe("the layer fades, and the weather is slow", () => {
     Correcting in both directions is the same defect with the opposite sign — it
     blows a light pattern out to white, and a mask is legible by DISTANCE from
     its ground rather than by absolute brightness.
+
+    ⚠️ AND IT FOLLOWS THE MASK'S WEIGHT TOO. A hairline grid keeps a few percent
+    of its pixels and a light shaft keeps a quarter of them, so one correction
+    for both means the fine patterns are invisible or the broad ones are white
+    bars. Every weight is corrected in every scoping, or one of them renders
+    uncorrected on whichever theme the root did not stamp.
   */
-  it("corrects a masked sky in one direction per theme", () => {
-    const corrections = [...SKY.matchAll(/\[data-masked\]::before \{ filter: brightness\(([\d.]+)\)/g)].map((m) => Number(m[1]));
+  it("corrects every mask weight, in one direction, in all three scopings", () => {
     /*
-      ⚠️ ONE BRIGHTENING AND TWO DARKENINGS, and the count is the point: the pale
-      correction is written twice — once for the explicit attribute and once for
-      the un-stamped default under `prefers-color-scheme` — because a rule that
-      exists only inside a media query does not apply when the root carries an
-      explicit choice, and vice versa.
+      ⚠️ THE SHEET'S WEIGHTS AND THE DECLARED WEIGHTS ARE THE SAME SET, checked
+      in both directions. One direction alone passes the collapse this exists to
+      prevent: move every sky to one weight and the loop below runs over one
+      weight, finds its rules, and reports green while the sheet still carries
+      three orphaned rules that nothing can ever match.
     */
-    expect(corrections.filter((v) => v > 1).length, "the dark ground is brightened, once").toBe(1);
-    expect(corrections.filter((v) => v < 1).length, "the pale ground is darkened, in both scopings").toBe(2);
+    const corrected = new Set([...SKY.matchAll(/\[data-masked='([a-z]+)'\]/g)].map((m) => m[1]!));
+    expect([...corrected].sort(), "a weight is corrected and never declared").toEqual([...new Set(Object.values(MASK_WEIGHT))].sort());
+    for (const weight of new Set(Object.values(MASK_WEIGHT))) {
+      const found = [...SKY.matchAll(new RegExp(`\\[data-masked='${weight}'\\]::before \\{ filter: brightness\\(([\\d.]+)\\)`, "g"))].map((m) => Number(m[1]));
+      /*
+        ⚠️ ONE BRIGHTENING AND TWO DARKENINGS PER WEIGHT, and the count is the
+        point: the pale correction is written twice — once for the explicit
+        attribute and once for the un-stamped default under
+        `prefers-color-scheme` — because a rule that exists only inside a media
+        query does not apply when the root carries an explicit choice.
+      */
+      expect(found.filter((v) => v > 1).length, `${weight} on a dark ground, brightened once`).toBe(1);
+      expect(found.filter((v) => v < 1).length, `${weight} on a pale ground, darkened in both scopings`).toBe(2);
+    }
   });
 
-  it("marks exactly the four masked skies as masked", () => {
-    expect([...MASKED].sort()).toEqual(["dots", "grid", "rings", "waves"]);
+  /*
+    ⚠️ EVERY SKY IS DRAWN, AND EVERY MASKED ONE DECLARES ITS WEIGHT. A word in
+    `SKIES` with no rule is a page that renders no light at all — the attribute
+    lands, nothing matches it, and the screen is simply flat. That is the failure
+    this list exists to make impossible, so it is checked by NAME rather than by
+    count: a count passes the moment a new sky replaces an old one.
+  */
+  it("draws every sky it offers, and weights every mask", () => {
+    for (const sky of SKIES) {
+      const drawn = SKY.includes(`data-sky='${sky}'`);
+      /* Only the default needs no rule of its own: it IS the unmasked layer. */
+      expect(drawn || sky === "aurora", `${sky} is offered and never drawn`).toBe(true);
+      if (drawn && SKY.includes(`data-sky='${sky}']::before {\n  -webkit-mask-image`)) {
+        expect(maskWeight(sky), `${sky} carries a mask and no weight`).toBeTruthy();
+      }
+    }
     for (const sky of MASKED) expect(SKY, sky).toContain(`data-sky='${sky}'`);
-    for (const sky of SKIES) expect(SKIES, sky).toContain(sky);
+  });
+
+  /*
+    ⚠️ AND EVERY MASKED SKY BREATHES, ON A PERIOD OF ITS OWN. A mask with no
+    weather is the one sky on the screen that is visibly a still image; two on
+    the same period are visibly one animation.
+  */
+  it("gives every masked sky its own breath", () => {
+    for (const sky of MASKED) {
+      expect(Object.keys(WEATHER.breathe), `${sky} never breathes`).toContain(sky);
+      expect(CHOREOGRAPHY, sky).toContain(`data-sky='${sky}']::before { animation: sky-drift`);
+    }
+    const periods = Object.values(WEATHER.breathe);
+    expect(new Set(periods).size, "two skies breathing on one period are one animation").toBe(periods.length);
   });
 
   /* ⚠️ Removed, not slowed. The light stays; only the weather stops. */

@@ -197,6 +197,11 @@ export function Row({ lead, title, detail, value, onOpen }: RowProps) {
         {detail ? <Text role="caption" muted>{detail}</Text> : null}
       </span>
       <span data-one="row-value">{value === null ? <NoData /> : value}</span>
+      {/* ⚠️ A ROW THAT OPENS SOMETHING SAYS SO. The rule for this existed and
+          nothing ever emitted it, so every tappable row in the language looked
+          exactly like every inert one — the affordance was a stylesheet nobody
+          could reach. */}
+      {onOpen ? <span data-one="row-chevron" aria-hidden="true"><Icon name="forward" /></span> : null}
     </Tag>
   );
 }
@@ -238,8 +243,10 @@ export function Callout({ tone, ground, title, children }: CalloutProps) {
       {/* ⚠️ NEVER COLOUR ALONE. The icon is one of the four axes, and it is the
           one that survives a greyscale screenshot and deuteranopia. */}
       <span data-one="callout-icon" data-tone={tone}><Icon name={tone} /></span>
-      <Text role="subtitle">{title}</Text>
-      {children ? <Text role="body">{children}</Text> : null}
+      <span data-one="callout-body">
+        <Text role="subtitle">{title}</Text>
+        {children ? <Text role="body">{children}</Text> : null}
+      </span>
     </div>
   );
 }

@@ -274,7 +274,17 @@ export const CLOCK = `
  * which is exactly why it needed a token of its own rather than a number in a
  * stylesheet somewhere.
  */
-export const WEATHER = { drift: 52, breathe: { dots: 26, waves: 32, rings: 38 } } as const;
+export const WEATHER = {
+  drift: 52,
+  /* ⚠️ EVERY MASKED SKY BREATHES, AND NO TWO ON THE SAME PERIOD. Sharing one
+     would make two patterns visibly the same animation; the periods are also
+     mutually prime with the drift so the two motions never lock into a beat. */
+  breathe: { dots: 26, grain: 29, waves: 32, grid: 35, rings: 38, beams: 41, halo: 47 },
+  /* ⚠️ THE SWELL IS OPACITY, WHICH IS WHY IT MAY RUN BESIDE THE DRIFT. Two
+     animations on one element must not both write `transform` — the second wins
+     outright and the drift silently stops. */
+  swell: 44,
+} as const;
 
 export const CHOREOGRAPHY = `
 /* ⚠️ PRESS IS THE ONE UNIVERSAL: everything pressable, the same answer. */
@@ -296,40 +306,92 @@ export const CHOREOGRAPHY = `
 [data-one='segmented']::before { transition: transform var(--t-move) var(--e-spring); }
 
 /* ── AN ICON PLAYS ON INTERACTION, AND ONLY ON INTERACTION.
+
    ⚠️ NOT ON HOVER. The whole animated-icon genre is built on hover, which is a
    capability half the devices this ships to do not have — so the animation is
    invisible on a phone and the guard in one lint fails anything reachable that
    way. Press and keyboard focus are what everybody has.
-   ⚠️ AND THE VOCABULARY IS CLOSED, like every other list here. Four motions,
-   assigned by what the icon MEANS: something that travels, something that rings,
-   something that appears, something that turns. Per-icon timelines would be
-   twenty-two decisions nobody could keep in step. */
-@keyframes icon-nudge { 50% { transform: translate(2px, -2px); } }
-@keyframes icon-swing { 25% { transform: rotate(-11deg); } 60% { transform: rotate(7deg); } }
-@keyframes icon-pop { 45% { transform: scale(1.22); } }
-@keyframes icon-turn { to { transform: rotate(360deg); } }
-[data-one='icon'] { transform-origin: 50% 50%; }
-:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='send'],
-:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='back'],
-:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='chevron'] {
-  animation: icon-nudge var(--t-move) var(--e-out);
-}
-:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='bell'],
-:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='key'],
-:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='dumbbell'] {
-  animation: icon-swing var(--t-enter) var(--e-spring);
-}
-:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='plus'],
-:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='camera'],
-:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='box'],
-:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='dots'] {
-  animation: icon-pop var(--t-move) var(--e-spring);
-}
-:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='search'],
-:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='clock'],
-:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='close'] {
-  animation: icon-turn var(--t-enter) var(--e-out);
-}
+
+   ⚠️ AND THE MOTION IS THE ICON'S OWN, NOT A GENERIC ONE APPLIED TO IT. Four
+   shared motions was the first version and it was the cheap answer: a bell that
+   scales and a key that scales are two icons doing the same thing, which reads
+   as a page effect rather than as either object behaving. A bell RINGS, a check
+   DRAWS ITSELF, a search sweeps, a chart's bars grow in turn. The published
+   animated-icon libraries do this with React plus a runtime animation engine,
+   which is megabytes of dependency in a package that renders on a server. The
+   idea is worth taking; the dependency is not.
+
+   ⚠️ THE PARTS ARE ADDRESSED BY POSITION, which is only safe because the
+   geometry is GENERATED and re-derived by a test. A hand-edited path would move
+   a part out from under its rule and the icon would animate the wrong stroke. */
+@keyframes icon-ring { 20% { transform: rotate(-13deg); } 45% { transform: rotate(9deg); } 70% { transform: rotate(-4deg); } }
+@keyframes icon-draw { from { stroke-dasharray: 28; stroke-dashoffset: 28; } to { stroke-dasharray: 28; stroke-dashoffset: 0; } }
+@keyframes icon-sweep { 35% { transform: translate(1.4px, -1.4px) scale(1.08); } }
+@keyframes icon-fly { 40% { transform: translate(3px, -3px); opacity: 0.55; } 41% { transform: translate(-3px, 3px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes icon-pop { 45% { transform: scale(1.25); } }
+@keyframes icon-rise { from { transform: scaleY(0.2); } }
+@keyframes icon-tick { 30% { transform: rotate(30deg); } }
+@keyframes icon-shutter { 40% { transform: scale(0.7); opacity: 0.4; } }
+@keyframes icon-nudge { 50% { transform: translateX(3px); } }
+@keyframes icon-back { 50% { transform: translateX(-3px); } }
+@keyframes icon-turn { to { transform: rotate(90deg); } }
+@keyframes icon-lift { 45% { transform: translateY(-2.5px); } }
+
+[data-one='icon'] { transform-origin: 50% 50%; overflow: visible; }
+[data-one='icon'] > * { transform-origin: 50% 50%; transform-box: fill-box; }
+
+/* ⚠️ ONE SELECTOR, WRITTEN ONCE. Every rule below scopes to a pressed or focused
+   control, so an icon sitting in text never moves and one inside a button always
+   does — without either being decided at a call site. */
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='bell'] { animation: icon-ring var(--t-enter) var(--e-spring); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='send'] { animation: icon-fly var(--t-enter) var(--e-out); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='search'] { animation: icon-sweep var(--t-move) var(--e-out); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='plus'] { animation: icon-turn var(--t-move) var(--e-spring); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='close'] { animation: icon-turn var(--t-move) var(--e-out); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='chevron'] { animation: icon-nudge var(--t-move) var(--e-out); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='forward'] { animation: icon-nudge var(--t-move) var(--e-out); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='back'] { animation: icon-back var(--t-move) var(--e-out); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='camera'] { animation: icon-lift var(--t-move) var(--e-out); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='box'] { animation: icon-lift var(--t-move) var(--e-spring); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='key'] { animation: icon-tick var(--t-enter) var(--e-spring); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='lock'] { animation: icon-tick var(--t-move) var(--e-spring); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='dumbbell'] { animation: icon-tick var(--t-enter) var(--e-spring); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='mail'] { animation: icon-lift var(--t-move) var(--e-out); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='clock'] { animation: icon-pop var(--t-move) var(--e-spring); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='shield'] { animation: icon-pop var(--t-move) var(--e-spring); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='apple'] { animation: icon-pop var(--t-move) var(--e-spring); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='image'] { animation: icon-pop var(--t-move) var(--e-spring); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='phone'] { animation: icon-tick var(--t-move) var(--e-spring); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='info'] { animation: icon-pop var(--t-move) var(--e-spring); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='warning'] { animation: icon-ring var(--t-enter) var(--e-spring); }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='danger'] { animation: icon-turn var(--t-move) var(--e-out); }
+
+/* ── AND THE PARTS THAT MOVE ON THEIR OWN. This is the half a shared motion
+      cannot express, and the half that makes an icon look like the thing it is. */
+/* A check DRAWS ITSELF, which is the one motion everybody recognises. */
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='success'] > :last-child { animation: icon-draw var(--t-enter) var(--e-out); }
+/* Three dots arrive in order rather than together. */
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='dots'] > :nth-child(3) { animation: icon-pop var(--t-move) var(--e-spring) 0ms; }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='dots'] > :nth-child(1) { animation: icon-pop var(--t-move) var(--e-spring) 60ms; }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='dots'] > :nth-child(2) { animation: icon-pop var(--t-move) var(--e-spring) 120ms; }
+/* A chart's bars grow, shortest first. */
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='chart'] > * { transform-origin: 50% 100%; }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='chart'] > :nth-child(2) { animation: icon-rise var(--t-move) var(--e-out) 0ms; }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='chart'] > :nth-child(3) { animation: icon-rise var(--t-move) var(--e-out) 70ms; }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='chart'] > :nth-child(4) { animation: icon-rise var(--t-move) var(--e-out) 140ms; }
+/* A list's rules arrive top to bottom. */
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='list'] > :nth-child(1) { animation: icon-nudge var(--t-move) var(--e-out) 0ms; }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='list'] > :nth-child(2) { animation: icon-nudge var(--t-move) var(--e-out) 60ms; }
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='list'] > :nth-child(3) { animation: icon-nudge var(--t-move) var(--e-out) 120ms; }
+/* The second person in the pair steps forward. */
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='users'] > :nth-child(2) { animation: icon-nudge var(--t-move) var(--e-out); }
+/* The shutter closes and opens. */
+:is(button, [data-interactive]):is(:active, :focus-visible) [data-icon='camera'] > :last-child { animation: icon-shutter var(--t-move) var(--e-out); }
+
+/* ⚠️ AND A DISCLOSURE'S CHEVRON TURNS WITH THE DISCLOSURE. An indicator that
+   does not move is an indicator that has to be re-read every time. */
+[data-one='disclosure-summary'] [data-one='icon'] { transition: rotate var(--t-move) var(--e-out); }
+[data-one='disclosure'][open] > [data-one='disclosure-summary'] [data-one='icon'] { rotate: 90deg; }
 
 /* ⚠️ ARRIVING IS STAGGERED; LEAVING IS NOT — and the count is nth-CHILD on the
    body, not nth-of-type on the card. A section may be a wrapper around a card,
@@ -341,6 +403,14 @@ export const CHOREOGRAPHY = `
    eye has found it. It moves further now, over longer, and settles rather than
    stopping — and it does NOT bounce, because a bounce reads as playful, which is
    the opposite of expensive. */
+/* ⚠️ THE ONE ANIMATION THAT IS NOT CHOREOGRAPHY. A busy control spins for as
+   long as the wait lasts, which is not a duration this file can know — so it
+   borrows the longest one it has and repeats it, rather than inventing a number. */
+@keyframes one-spin { to { rotate: 360deg; } }
+/* ⚠️ AND THE TIMING LIVES HERE LIKE EVERY OTHER TIMING. The busy ring's geometry
+   is the sheet's; how fast it turns is not, or the next one somebody adds turns
+   at a different speed and both look deliberate. */
+[data-one='button'][data-state='busy']::after { animation: one-spin var(--t-entrance) linear infinite; }
 @keyframes one-rise { from { opacity: 0; transform: translateY(24px) scale(0.975); } to { opacity: 1; transform: none; } }
 @keyframes one-lift { from { opacity: 0; transform: translateY(-16px) scale(1.035); } to { opacity: 1; transform: none; } }
 [data-one='body'] > * { animation: one-rise var(--t-entrance) var(--e-out) both; }
@@ -366,16 +436,26 @@ export const CHOREOGRAPHY = `
   to { transform: translate3d(2.5%, 1.5%, 0) scale(1.13); }
 }
 /* ⚠️ THE PATTERN BREATHES; IT DOES NOT TRAVEL. A moving pattern is a texture
-   somebody is dragging past the screen. Scaling the mask a few percent reads as
-   the light moving over a surface that is standing still. */
-@keyframes sky-breathe {
-  0%, 100% { -webkit-mask-size: 9px 9px; mask-size: 9px 9px; }
-  50% { -webkit-mask-size: 9.7px 9.7px; mask-size: 9.7px 9.7px; }
-}
+   somebody is dragging past the screen. Scaling it a few percent reads as the
+   light moving over a surface that is standing still.
+
+   ⚠️ ONE KEYFRAME FOR SEVEN GEOMETRIES. It animates the registered factor each
+   mask multiplies its own numbers by, so a hairline grid and a light shaft
+   breathe by the same PROPORTION rather than by the same number of pixels —
+   which is what a shared mask-size keyframe got wrong, and it got it wrong
+   invisibly, by tiling a repeating gradient into a box smaller than its period. */
+@keyframes sky-breathe { 0%, 100% { --breath: 1; } 50% { --breath: 1.075; } }
+/* ⚠️ AND THE SWELL IS THE LIGHT ITSELF RISING AND FALLING, for the two skies
+   with no pattern to breathe. Opacity, so it composites beside the drift. */
+@keyframes sky-swell { 0%, 100% { opacity: 0.8; } 50% { opacity: 1; } }
 [data-one='sky']::before { animation: sky-drift ${WEATHER.drift}s var(--e-out) infinite alternate; will-change: transform; }
-[data-one='sky'][data-sky='dots']::before { animation: sky-drift ${WEATHER.drift}s var(--e-out) infinite alternate, sky-breathe ${WEATHER.breathe.dots}s ease-in-out infinite; }
-[data-one='sky'][data-sky='waves']::before { animation: sky-drift ${WEATHER.drift}s var(--e-out) infinite alternate, sky-breathe ${WEATHER.breathe.waves}s ease-in-out infinite; }
-[data-one='sky'][data-sky='rings']::before { animation: sky-drift ${WEATHER.drift}s var(--e-out) infinite alternate, sky-breathe ${WEATHER.breathe.rings}s ease-in-out infinite; }
+${Object.entries(WEATHER.breathe)
+  .map(
+    ([sky, period]) =>
+      `[data-one='sky'][data-sky='${sky}']::before { animation: sky-drift ${WEATHER.drift}s var(--e-out) infinite alternate, sky-breathe ${period}s ease-in-out infinite; }`,
+  )
+  .join("\n")}
+[data-one='sky'][data-sky='mesh']::before { animation: sky-drift ${WEATHER.drift}s var(--e-out) infinite alternate, sky-swell ${WEATHER.swell}s ease-in-out infinite; }
 
 /* ⚠️ REMOVED, NOT REDUCED. Layout may never depend on an animation having run,
    and information survives: the fade stays, the travel goes. */

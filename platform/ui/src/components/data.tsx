@@ -22,13 +22,13 @@ export interface Crumb { readonly id: string; readonly label: string; readonly o
  * been is the back button, and it already exists.
  */
 export const Breadcrumbs = ({ trail }: { readonly trail: readonly Crumb[] }) => (
-  <nav data-one="breadcrumbs" className={borrow("breadcrumbs")} aria-label="Breadcrumb">
+  <nav data-one="breadcrumb" className={borrow("breadcrumbs")} aria-label="Breadcrumb">
     <ol>
       {trail.map((c, i) => (
-        <li key={c.id} data-one="crumb" {...(i === trail.length - 1 ? { "aria-current": "page" as const } : {})}>
+        <li key={c.id} data-one="breadcrumb-item" {...(i === trail.length - 1 ? { "aria-current": "page" as const } : {})}>
           {i === trail.length - 1
             ? <Text role="body">{c.label}</Text>
-            : <button type="button" data-one="crumb-link" onClick={c.onGo}><Text role="body">{c.label}</Text></button>}
+            : <button type="button" data-one="breadcrumb-link" onClick={c.onGo}><Text role="body">{c.label}</Text></button>}
         </li>
       ))}
     </ol>
@@ -269,8 +269,13 @@ export const Toast = ({ tone, title, undo, onDismiss }: ToastProps) => (
   >
     <span data-one="toast-icon" data-tone={tone}><Icon name={tone} /></span>
     <Text role="body">{title}</Text>
-    {undo ? <button type="button" data-one="toast-undo" onClick={undo.onUndo}><Text role="body">{undo.label}</Text></button> : null}
-    <button type="button" data-one="toast-dismiss" aria-label="Dismiss" onClick={onDismiss}><Icon name="close" /></button>
+    {/* ⚠️ ONE COLUMN FOR WHAT CAN BE DONE, ALWAYS PRESENT. Floating each action
+        to the end put them wherever the message length left them, so two toasts
+        in a row had their buttons in different places. */}
+    <span data-one="toast-actions">
+      {undo ? <button type="button" data-one="toast-undo" onClick={undo.onUndo}><Text role="body">{undo.label}</Text></button> : null}
+      <button type="button" data-one="toast-dismiss" aria-label="Dismiss" onClick={onDismiss}><Icon name="close" /></button>
+    </span>
   </div>
 );
 
