@@ -19,6 +19,7 @@
 
 import type { ReactNode } from "react";
 import type { Sky } from "../sky.css.js";
+import { Lockup } from "../brand/mark.js";
 
 /* ------------------------------------------------------------------ data --- */
 
@@ -67,12 +68,17 @@ export function AccountHome({ person, workspaces, sky = "silk", onGo, onClose }:
           announces itself and is gone by the first card — a field that carried on
           under the content would be a tint, and a tint is paint. */}
       <div className="sky" data-sky={sky} aria-hidden="true" />
+      {/*
+        ⚠️ THE MARK IS THE TITLE. This surface belongs to the account rather than
+        to the product the person happens to be in, and the lockup is what says
+        so — a word like "Account" would be the name of a settings page, which is
+        exactly what this is not. Nothing else names the screen.
+      */}
       <header className="page-top">
         {/* ⚠️ × AND NOT AN ARROW. This is the root of a presentation laid over the
             app, so the control dismisses it rather than walking back through it. */}
         <button type="button" className="round-button" aria-label="Close" onClick={onClose}><Close /></button>
-        <h1>Account</h1>
-        <p className="lede">Your details, how you sign in, and everywhere you belong.</p>
+        <h1><Lockup word="ID" /></h1>
       </header>
 
       <section>

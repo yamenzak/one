@@ -88,9 +88,24 @@ h1, h2, p { margin: 0; padding: 0; }
 
 /* ------------------------------------------------------------------ the top */
 
-.page-top { display: flex; flex-direction: column; gap: 6px; padding-block-end: 2px; }
-.page-top h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.028em; line-height: 1.1;
-  margin-block-start: 18px; }
+/* ⚠️ THE LOCKUP IS CENTRED AND THE WAY OUT IS NOT. The mark is what the screen
+   is called, so it sits on the axis of the page; the close is a control on the
+   edge, and centring the two together would push the mark off centre by exactly
+   the width of a button. */
+.page-top { display: flex; flex-direction: column; gap: 26px; padding-block-end: 10px; }
+.page-top h1 { align-self: center; font-size: 26px; line-height: 1;
+  margin-block: 12px 6px; }
+
+/* ⚠️ ONE OBJECT, NOT A BADGE WITH A CAPTION. The word is quieter than the mark:
+   the mark is whose this is, the word is which surface — a lockup where both
+   shout is two logos beside each other. */
+/* ⚠️ THE MARK SITS ON THE BASELINE OF THE WORD, not on the middle of the line
+   box. It is taller than the letters and centring the two by their boxes lifts
+   the word off the mark's own footing, which reads as a misalignment nobody can
+   name. */
+.brand-mark { display: block; }
+.lockup { display: inline-flex; align-items: center; gap: 0.34em; }
+.lockup-word { font-weight: 400; letter-spacing: 0.01em; opacity: 0.72; }
 /* ⚠️ A ROUND CONTROL ON ITS OWN LINE, above the title rather than beside it. It
    is a way OUT of a presentation, not a thing in the heading — putting it in the
    heading row makes the title jump left and right as the control changes. */
