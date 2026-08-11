@@ -268,132 +268,136 @@ which is what keeps them honest.
 
 ---
 
-## 4. Motion — one choreographer, and components do not animate
+## 4. Motion — one clock, four durations, three curves
 
 ⚠️ **The failure to design out is a jungle: forty elements each running their own
 tasteful 240ms animation, arriving at forty different times.** No individual
-animation is wrong and the screen is chaos. The fix is not taste. It is that
-**timing is not a component's to own.**
+animation is wrong and the screen is chaos. The fix is not taste — it is that a
+component never holds a duration. Every timing is a token, so two things moving
+at once physically cannot disagree.
 
-**Components declare a role in a scene. They never declare a duration or a
-curve.**
+```
+--t-tap    120ms   press. must read as instant
+--t-move   220ms   a thing changing place or state on screen
+--t-enter  320ms   something arriving
+--t-exit   170ms   something leaving
 
-| role | what it is |
-|---|---|
-| `ground` | the atmosphere and the canvas |
-| `anchor` | the one thing the surface is about |
-| `content` | groups, rows, tiles, charts |
-| `chrome` | app bar, rail, tab island — always last |
-| `overlay` | sheets, dialogs, popovers |
+--e-out    cubic-bezier(.2,.8,.2,1)   decelerating — things arriving
+--e-in     cubic-bezier(.4,0,1,1)     accelerating — things leaving
+--e-spring linear(0,.402 7.4%,…,1)    a real spring, for press
+```
 
-The **choreographer** owns one timeline per surface transition and derives every
-offset from role and document order. Two components physically cannot run
-competing timelines, because neither of them holds one.
+⚠️ **LEAVING IS ALWAYS FASTER THAN ARRIVING.** Nobody waits to watch something
+go. Symmetric durations are the single most common reason an interface feels
+sluggish, and it is invisible in review because each half looks correct.
 
-### The invariants
+⚠️ **THE SPRING IS THE ONE PLACE EASING IS NOT ENOUGH.** `linear()` expresses a
+real overshoot in pure CSS, and the overshoot is what makes a press feel
+physical rather than merely fast.
 
-- **One clock per transition.** Everything entering a surface enters on the same
-  timeline. Everything leaving leaves on one.
-- **Exit is enter, reversed, at 60%.** Not a second animation to design and get
-  out of step — the same named endpoints traversed the other way. Leaving should
-  feel decisive.
-- **Enter by settling down, never by growing up.** Content arrives fractionally
-  too large and comes to rest. This one detail is the difference between "an app
-  opened" and "an app was assembled in front of me".
-- **No overshoot, ever.** Springs are critically damped. Bounce reads as toy.
-- **Motion is a budget, not a property.** A surface has a maximum number of
-  simultaneously moving groups. Past it the choreographer collapses the stagger
-  rather than animating a hundred rows — so a long list gets shorter motion
-  automatically instead of a slow-network impression.
-- **Continuity beats transition.** A record that appears in two places is one
-  shared element with one identity, not a fade-out and a fade-in. The renderer
-  can do this because it owns both surfaces and the record has an id; an app
-  could not, which is most of why this lives here.
-- **Entrance is first-paint only, keyed by identity.** Nothing re-animates on a
-  re-render. A value that ticks counts up once.
-- **Reduced motion removes transforms.** Not "reduces" — removes, leaving
-  opacity. ⚠️ Layout may never depend on an animation having run, and the
-  reduced-motion pass is where that is proved rather than hoped.
+**The rules, in order of how often they apply:**
 
-### Moments — punctuation, and the only thing above a scene
+1. **Press is the one universal.** Everything pressable scales to `.97` over
+   `--t-tap`. One answer, everywhere, no exceptions.
+2. **Arriving is staggered; leaving is not.** Sections enter at `--stagger` 40ms
+   intervals, **capped at six** — past that a stagger stops reading as
+   choreography and starts reading as the list being slow to load.
+3. **The hero leads.** It is what the screen is about, so it arrives first and
+   from further away. It is the only element allowed a longer distance.
+4. **A moving indicator travels; the things it points at do not.** One element
+   behind the tab row, positioned by index — not one pill fading out while
+   another fades in.
+5. **A sheet and its scrim land together.** Two elements, one duration, or the
+   sheet appears to drag the scrim behind it.
+6. **A number that changes rolls**, because there the movement IS the
+   information. It is the only content worth animating.
+7. **Nothing animates that the person did not cause**, except a screen's first
+   paint.
 
-**An outcome says what happened; a moment says that it mattered.** Most writes
-deserve neither a sound nor an animation — a row appearing is its own feedback,
-and a product that celebrates a saved field has nothing left to celebrate
-anything else with.
+⚠️ **REDUCED MOTION REMOVES MOVEMENT, NEVER INFORMATION.** Opacity and colour
+survive; transforms do not. Somebody who turns it on must still be able to see
+that something happened.
 
-The vocabulary is four words, and a fifth would be a shade of one of them:
-
-| moment | what it marks | sound |
-|---|---|---|
-| `acknowledge` | a write the person cannot see happen | `commit` |
-| `welcome` | an arrival — a workspace made, somebody changing their mind about leaving | `arrive` |
-| `farewell` | a deliberate ending | `depart` |
-| `celebrate` | ⚠️ a milestone, and **never an app's to declare** | `earn` |
-
-The invariants:
-
-- **The sound is derived from the moment, never chosen beside it.** An app that
-  picked both could pair a celebration with the error chime, and would, the first
-  time somebody copied a declaration and edited half of it.
-- **A moment never reports a failure.** A failure is a `Problem`: a code, copy, a
-  status and a way out. `error` and `alert` are unreachable from this vocabulary,
-  and a `danger` outcome may not carry a moment at all — the tone already says
-  this is the destructive one, so punctuating it is the product being pleased
-  about somebody's lost work.
-- **`celebrate` belongs to a milestone**, which is a rule over a declared event,
-  earned once per person for the rest of their account. An operation that could
-  celebrate on every call is the leaderboard problem arriving through another
-  door, and the first one written would be on whatever the product most wants
-  people to do. Composition refuses it.
-- **One at a time, and a second replaces rather than queues.** A queue is how a
-  batch of writes produces four celebrations in a row, each meaning less than the
-  last. When two land together the heavier wins *and brings its own words* —
-  "saved" is not news standing next to "you earned something".
-- **A moment is a scene with a hold**, not a second animation system. Same clock,
-  same reduced-motion pass.
-- ⚠️ **Reduced motion removes the transform and never shortens the hold.** It is
-  about movement, not reading speed; cutting the time somebody has to read the
-  words is the one adaptation that makes the setting worse for the people who
-  turn it on.
-- ⚠️ **A sound needs a gesture and a surface that asked for one.** Every browser
-  refuses audio no gesture caused, so a design that ignores it produces silence
-  in production and a chime in every demo. Sound is declared **per surface** —
-  a station in a gym is audible, a dashboard in an office is not — and an app
-  that declares none is silent.
-
-**The structural guard: no file outside the choreographer may contain a
-duration, an easing curve, a `@keyframes`, or a transition property.** Without
-it this decays back into per-component animation one reasonable exception at a
-time, and the symptom is invisible in every diff and obvious in the product.
-
+⚠️ **MOTION IS REVIEWED AS A FILMSTRIP, NOT AS A SCREENSHOT.** A still cannot
+show choreography, so the suite films each transition at 4× and labels frames in
+real time. Two defects found that way and by no other means: a stagger whose
+delays landed on the wrong elements (`nth-of-type` counting every div rather than
+`nth-child` on the section list — it renders as "too subtle", which leads to the
+wrong fix), and a scrim arriving after its sheet.
 
 ---
 
-## 5. Touch, reach and density
+## 5. The scale — verified against a reference, never chosen by eye
 
-The interface is designed for a thumb and adapted for a mouse, not the reverse.
+⚠️ **A TYPE SIZE IS MEANINGLESS WITHOUT THE FRAME IT SITS IN.** "17px body" is
+not a decision, it is half of one — the other half is the screen width. The first
+attempt at this used an iPhone body size on an iPhone frame while matching
+screenshots from a ~412dp Android device, and every element came out **1.28×**
+too large. Nothing in the design was wrong. The check was missing.
 
-- **48×48 minimum, and the target is the row, not the glyph.** Hit area is
-  declared by the interactive component and expanded invisibly past its visual
-  bounds. A 24px icon in a 56px row is a 56px target.
-- **Reach is a layout constraint.** A phone's primary action lives in the lower
-  third; a desktop's lives in the header. The app declares *which action is
-  primary* — never where it goes. That is the renderer's, per shape, which is
-  also what stops the two widths drifting into two designs.
-- **Density follows the pointer, not the width.** `pointer: coarse` gets the
-  comfortable scale at any viewport. A tablet is not a small desktop.
-- **Hover is an enhancement and never a requirement.** Anything reachable by
-  hover is reachable by tap and by keyboard. Hover styles live behind
-  `pointer: fine` so a tap never leaves one stuck.
-- **Press feedback inside 100ms, always**, decoupled from the network. The
-  response to a touch is a local fact.
-- **No fixed viewport heights.** Mobile browser chrome changes the viewport
-  while you scroll; a layout pinned to it moves under the user's finger.
-- **Airy is measurable**: the 40% ink rule, a 4px grid with no exceptions, and
-  section separation at the widest step on the scale. Anything cramped is wrong
-  even when it fits.
-- **Everything focusable has a visible ring**, one token, never removed.
+**The check: measure each element as a percentage of screen width, and compare
+against the reference.** It is mechanical, it takes one run, and it is the only
+way an eye is not the instrument.
+
+| | reference | ours |
+|---|---|---|
+| page title | 6.9% | 6.67% |
+| row label | 3.5% | 3.59% |
+| quick-action label | 3.0% | 3.08% |
+| back circle | 10.7% | 10.3% |
+| quick-action circle | 12.1% | 12.3% |
+| row height | 13.2% | 13.6% |
+
+⚠️ **THE RATIO IS A VERIFICATION TOOL, NOT AN IMPLEMENTATION.** Shipping type
+that scales with the viewport breaks Dynamic Type and reads wrong on a tablet.
+Fixed values, *verified* by ratio.
+
+### 5.1 The values, at a 390pt frame
+
+```
+type     hero 34 · page 26 · body 14 · secondary 12 · meta 10
+weight   700 titles · 600 section heads · 500 row titles · 400 detail
+space    page inset 14 · between sections 12 · row inset 14
+radius   card 16 · tile 14 · pill and circle 999
+round    back/close 40 · quick action 48 · medallion 36 · notice well 40
+glyph    nav 20 · quick 21 · row lead 20 · chevron 16
+row      50 minimum, and the whole row is the target — never the glyph
+ground   page #000 · card #1b1b1e · ink 100% / 62% / 38%
+```
+
+⚠️ **FIVE TYPE SIZES AND NO MORE.** The calm in the reference is not the
+typeface; it is that a screen contains four sizes and one big number. A sixth
+size is a decision somebody made on one screen.
+
+⚠️ **THE CARD IS A LIFT, NEVER AN OUTLINE.** There is not one border anywhere in
+the reference. A hairline is what a design reaches for when its surfaces are not
+actually different, and drawing it removes the pressure to fix that.
+
+### 5.2 Icons — five roles, and the row's JOB decides which
+
+| treatment | when |
+|---|---|
+| **bare outline glyph**, 20px, no circle | a **setting** in a menu list |
+| **filled colour medallion**, 36px | a **thing with a value** — an account, a merchant |
+| **translucent well**, 40–48px | a **quick action** on a hero, or a notice's icon |
+| **rounded-square tile**, label beneath | a **destination** in a small fixed set |
+| **status glyph** beside a word | never the only carrier — a label is required |
+
+An icon appears alone only in the app bar and the tab bar, where the target is
+fixed and learned. **Four quick actions, five tabs, four tiles across** — each a
+refusal in code, because a limit in a document is a sentence nobody has read.
+
+### 5.3 The top of a screen is decided by what the screen IS
+
+| | when |
+|---|---|
+| **photo hero**, full-bleed, centred | the screen is about **one number** |
+| **pattern hero**, full-bleed, centred title | the screen is about a **topic** |
+| **no hero**, big left-aligned title | the screen is a **list** |
+
+⚠️ Giving every screen the same top is what made the first attempt read as a
+settings page throughout. A crown holding a count is a heading pretending to be a
+fact.
 
 ---
 
@@ -578,6 +582,48 @@ uses the platform's chrome, states, motion and data access.
 ⚠️ **This decision only survives if it is enforced rather than documented.**
 The failure is gradual and each individual step is reasonable: one bespoke
 dialog, one hand-rolled empty state, one `<button>`. §10 is what stops it.
+
+### 9a. What is borrowed, and what is never borrowed
+
+**Behaviour and components are borrowed. Styling and layout are not.**
+
+`packages/ui` in the legacy tree already ran the other experiment — shadcn:
+Radix, `cva`, Tailwind, ~11k lines, three apps, a conformance test. On top of it
+one app carries **3,275 `className` literals, 942 of them used exactly once**, and
+**88 distinct spacing values against a scale of 8**. That is not a discipline
+failure — the same people wrote the guard file. It is structural: `className` is
+an open string, so it cannot be swept, and every guard in §10 works by
+enumerating a closed space.
+
+**The decision is daisyUI**, and the deciding facts are measurable:
+
+- **It is CSS. There is no JavaScript to fail.** `@one/ui` is imported by workers
+  that render on the server; Radix broke every app's suite through
+  `react-remove-scroll`'s deep ESM subpaths. A stylesheet cannot do that.
+- **Its theme variables are OKLCH and its `--color-*-content` is measured ink on
+  the fill** — which is exactly what `ground.ts` computes. Our colour engine
+  drives it directly; 27 variables, a near 1:1 map.
+- **It needs no Tailwind and no build step.** The docs say Tailwind is required;
+  that is about `@plugin "daisyui"` generating a customised bundle. `daisyui.css`
+  contains **no Tailwind utility class at all** — verified — so components are
+  imported individually. Sixteen of them is **22.6 kB gzipped**.
+
+| | owner |
+|---|---|
+| components — btn, card, list, modal, dock, badge, toggle, tab… | **daisyUI** |
+| theme variables — OKLCH, measured ink, bounded slots, the sweep | **ours** |
+| layout, spacing, the scale, the hero — what utilities would do | **ours** |
+| React wrappers, so no call site ever writes a class string | **ours** |
+
+⚠️ **WITHOUT TAILWIND YOU GET daisyUI'S COMPONENTS AND NONE OF ITS UTILITIES.**
+That is the correct boundary and it is worth stating because it is invisible
+until something silently does nothing: `class="text-xs opacity-60"` renders at
+full size.
+
+⚠️ **A BORROWED PRIMITIVE THAT NEEDS A BROWSER IS IMPORTED FROM
+`@one/ui/browser`, NEVER FROM THE INDEX.** One re-export from the index turned
+every app's suite red with a module-resolution error naming a file nobody here
+had written.
 
 ---
 
