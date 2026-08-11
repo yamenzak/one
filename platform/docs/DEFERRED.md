@@ -12,3 +12,5 @@ kind: index
 
 - `one-172` — the operator door admits any signed-in  
   <sub>runtime/src/runtime.ts:830</sub>
+- `one-180` — the switch for these on Preferences. Until it exists  
+  <sub>web/src/feedback.ts:48</sub>

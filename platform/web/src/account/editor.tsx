@@ -23,6 +23,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import type { Problem } from "@one/kernel";
+import { feel } from "../feedback.js";
 
 /** What a value is, which is all the sheet needs to draw the right control. */
 export type FieldKind = "text" | "email";
@@ -62,7 +63,58 @@ type Saving =
 /** Long enough to register as an answer, short enough not to be a wait. */
 const SEEN_MS = 850;
 
+/**
+ * ⚠️ A SHEET SITS ON THE BOTTOM EDGE, AND ON A PHONE THE KEYBOARD IS THE BOTTOM
+ * EDGE. Focusing the input opens a keyboard over the whole sheet — the field, the
+ * message and the action all behind it, with no way to know they are there. It is
+ * the defect that makes a bottom sheet on a phone unusable, and it does not
+ * reproduce on any desktop, in any test, at any width.
+ *
+ * ⚠️ `visualViewport` IS THE ONLY THING THAT KNOWS. The keyboard is not a layout
+ * box: on iOS, and in an in-app browser, the layout viewport does not change at
+ * all when it opens, so `100dvh` and `position: fixed` are both still measuring a
+ * viewport the person can no longer see the bottom of.
+ *
+ * ⚠️ AND WHERE THE PLATFORM DOES RESIZE THE LAYOUT, THIS COMES OUT AS ZERO —
+ * which is correct, because there the sheet was already above the keyboard. One
+ * measurement, no branch on which browser it is.
+ */
+/**
+ * How much of the layout viewport the keyboard is standing on.
+ *
+ * ⚠️ PURE, SO IT CAN BE CHECKED. A soft keyboard cannot be opened in any headless
+ * browser, so the one part of this that can be wrong — a sign, a missing clamp, a
+ * forgotten scroll offset — is the one part no test could otherwise reach.
+ */
+/* ⚠️ BOTH CLAMPS, AND THE INNER ONE IS NOT OBVIOUS. `offsetTop` goes NEGATIVE
+   during a rubber-band over-scroll on iOS — no keyboard involved — and subtracting
+   a negative ADDS, so the sheet would jump upwards by the over-scroll for as long
+   as the finger was moving. */
+export const keyboardInset = (layoutHeight: number, viewHeight: number, viewTop: number): number =>
+  Math.max(0, Math.round(layoutHeight - viewHeight - Math.max(0, viewTop)));
+
+function useKeyboardInset(active: boolean): void {
+  useEffect(() => {
+    const view = typeof window === "undefined" ? undefined : window.visualViewport;
+    if (!active || !view) return;
+    const root = document.documentElement;
+    const apply = () => {
+      const hidden = keyboardInset(window.innerHeight, view.height, view.offsetTop);
+      root.style.setProperty("--keyboard", `${hidden}px`);
+    };
+    apply();
+    view.addEventListener("resize", apply);
+    view.addEventListener("scroll", apply);
+    return () => {
+      view.removeEventListener("resize", apply);
+      view.removeEventListener("scroll", apply);
+      root.style.removeProperty("--keyboard");
+    };
+  }, [active]);
+}
+
 export function ValueEditor({ field, onSave, onClose }: ValueEditorProps): ReactNode {
+  useKeyboardInset(field !== null);
   return (
     <Dialog.Root open={field !== null} onOpenChange={(next) => { if (!next) onClose(); }}>
       <Dialog.Portal>
@@ -102,8 +154,9 @@ function Editing({ field, onSave, onClose }: { readonly field: EditableField } &
     if (unchanged || local || state.at === "saving") return;
     setState({ at: "saving" });
     const problem = await onSave(field.name, trimmed);
-    if (problem) { setState({ at: "failed", problem }); return; }
+    if (problem) { setState({ at: "failed", problem }); feel("wrong"); return; }
     setState({ at: "saved" });
+    feel("done");
     timer.current = setTimeout(onClose, SEEN_MS);
   };
 

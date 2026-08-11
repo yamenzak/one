@@ -19,7 +19,6 @@
 
 import type { ElementType, ReactNode } from "react";
 import * as Avatar from "@radix-ui/react-avatar";
-import type { Sky } from "../sky.css.js";
 import { Lockup } from "../brand/mark.js";
 
 /* ------------------------------------------------------------------ data --- */
@@ -56,8 +55,6 @@ export interface Workspace {
 
 export interface AccountHomeProps {
   readonly person: Person;
-  /** ⚠️ A WORD, NEVER A GRADIENT. The page names the light; it does not draw it. */
-  readonly sky?: Sky;
   /** ⚠️ `null` is NOT ANSWERED YET. `[]` is answered, and empty. */
   readonly workspaces: readonly Workspace[] | null;
   readonly onGo: (to: string) => void;
@@ -76,13 +73,17 @@ export interface AccountHomeProps {
 
 const PRODUCT_NAME: Record<Product, string> = { kova: "Kova", scena: "Scena", tessa: "Tessa" };
 
-export function AccountHome({ person, workspaces, sky = "silk", onGo, onClose, Heading = "h1" }: AccountHomeProps) {
+export function AccountHome({ person, workspaces, onGo, onClose, Heading = "h1" }: AccountHomeProps) {
   return (
     <div className="page">
       {/* ⚠️ BEHIND THE TOP, NOT BEHIND THE PAGE. The light falls where the screen
           announces itself and is gone by the first card — a field that carried on
           under the content would be a tint, and a tint is paint. */}
-      <div className="sky" data-sky={sky} aria-hidden="true" />
+      {/* ⚠️ NAMED HERE, NOT PASSED IN. The account centre is silk and it is not a
+          choice a caller gets to make: the light is part of what this surface IS,
+          the same way the lockup is, and a prop would let one app's account centre
+          look like a different product's. */}
+      <div className="sky" data-sky="silk" aria-hidden="true" />
       {/*
         ⚠️ THE LOCKUP IS THE TITLE, MARK INCLUDED. This surface belongs to the
         account rather than to the product the person happens to be in, and the

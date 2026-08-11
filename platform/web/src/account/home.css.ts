@@ -227,16 +227,25 @@ h2 { word-spacing: normal; }
 /* ⚠️ IT COMES FROM THE BOTTOM EDGE AND STAYS ATTACHED TO IT. A panel floating in
    the middle of a phone is a desktop dialog that was never re-thought; the thumb
    is at the bottom and so is the action. */
+/* ⚠️ THE KEYBOARD CUSTOM PROPERTY IS WHAT KEEPS IT ABOVE THE KEYBOARD, and it is
+   measured rather than assumed — useKeyboardInset, in editor.tsx, says why. Where
+   the browser resizes the layout for a keyboard it comes out as zero, which is
+   correct: there the sheet was already clear of it. */
 .sheet { position: fixed; z-index: 51; inset-inline: 0; inset-block-end: 0;
+  translate: 0 calc(-1 * var(--keyboard, 0px));
+  max-block-size: calc(100dvh - var(--keyboard, 0px) - 20px); overflow-y: auto;
   background: var(--card); color: var(--ink);
   border-start-start-radius: 26px; border-start-end-radius: 26px;
   padding: 26px 20px calc(22px + env(safe-area-inset-bottom, 0px));
   animation: sheet-up 300ms cubic-bezier(0.2, 0, 0.1, 1); }
 .sheet:focus, .sheet:focus-visible { outline: none; }
 /* ⚠️ ON A WIDE WINDOW IT IS CENTRED, because a strip across the foot of a
-   1400-pixel screen is a notification bar, and nobody reads a form in one. */
+   1400-pixel screen is a notification bar, and nobody reads a form in one. A
+   tablet is wide AND has a keyboard, so the inset still applies — halved, because
+   a centred thing moves half as far to clear the same edge. */
 @media (min-width: 640px) {
-  .sheet { inset: 50% auto auto 50%; translate: -50% -50%;
+  .sheet { inset: 50% auto auto 50%;
+    translate: -50% calc(-50% - var(--keyboard, 0px) / 2);
     inline-size: min(440px, calc(100vw - 40px)); border-radius: 26px;
     animation-name: sheet-in; }
 }

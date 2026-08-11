@@ -31,11 +31,11 @@ const FONT = FONTS.map((f) =>
 ).join("\n");
 
 /*
-  ⚠️ THE DIAL'S OWN LOOK IS DELIBERATELY NOT THE PRODUCT'S. It borrows no token
-  and shares no class with the screen: a control that dresses like the thing being
-  reviewed is a control that gets reviewed by mistake. The same goes for the host
-  behind the presentation — it is a grey rectangle saying what it is, because
-  anything better would start being judged.
+  ⚠️ THE HOST'S LOOK IS DELIBERATELY NOT THE PRODUCT'S. It is a grey rectangle
+  saying what it is, in a monospace nothing in the design uses, because anything
+  better would start being judged — and what is being judged is what is laid over
+  it. There is nothing else here: the controls that used to float in the corner
+  are in the URL now.
 */
 const DEV = `
 .host { min-block-size: 100dvh; display: grid; place-content: center; gap: 14px; justify-items: center;
@@ -43,27 +43,6 @@ const DEV = `
   font: 400 14px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .host button { appearance: none; border: 1px solid #303038; background: #1b1b21; color: #c9c9d2;
   border-radius: 8px; padding: 9px 14px; font: inherit; cursor: pointer; }
-/* Bottom-LEFT: the designs put their action at the bottom-right of a sheet,
-   and a control sitting on top of the thing being judged is not a control. */
-.dial { position: fixed; inset-block-end: 18px; inset-inline-start: 18px; z-index: 999;
-  pointer-events: auto;
-  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
-  font: 500 13px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; }
-.dial-panel { display: none; flex-direction: column; gap: 12px; padding: 14px;
-  border-radius: 16px; background: rgb(28 28 32 / 0.94); color: #f2f2f4;
-  box-shadow: 0 10px 40px rgb(0 0 0 / 0.4); backdrop-filter: blur(12px);
-  min-inline-size: 190px; }
-.dial[data-open] .dial-panel { display: flex; }
-.dial-group { display: flex; flex-direction: column; gap: 6px; }
-.dial-group > span { color: #8a8a92; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
-.dial-panel button { appearance: none; text-align: start; border: 0; border-radius: 9px;
-  padding: 7px 10px; background: rgb(255 255 255 / 0.07); color: inherit; font: inherit; cursor: pointer; }
-.dial-panel button[aria-pressed='true'] { background: #f2f2f4; color: #16161a; }
-.dial-toggle { inline-size: 46px; block-size: 46px; border-radius: 999px; border: 0; cursor: pointer;
-  background: rgb(28 28 32 / 0.94); color: #f2f2f4; font-size: 19px;
-  box-shadow: 0 6px 22px rgb(0 0 0 / 0.35); backdrop-filter: blur(12px); }
-.dial[data-open] .dial-toggle { background: #f2f2f4; color: #16161a; }
-@media print { .dial { display: none; } }
 `;
 
 const bundled = await build({
