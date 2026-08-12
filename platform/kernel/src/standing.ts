@@ -55,6 +55,19 @@ export const ALWAYS_ALLOWED: readonly string[] = [
   "billing",    // pay, so the ladder is escapable
   "webhook",    // or suspension becomes unrecoverable
   "health",
+  /*
+    ⚠️ AGREEING IS A WAY OUT TOO, AND IT WAS THE ONE RUNG NOBODY COULD CLIMB.
+    `legal` is exempt from the CONSENT gate — so an outstanding document does not
+    block the act of accepting it — and it was not exempt from this one, which is
+    a different gate with the same effect: a workspace held read-only cannot
+    write, accepting is a write, and the document it must accept is the thing
+    standing between it and being able to act. A studio that never chose a plan
+    could not accept the terms that let it choose one.
+
+    Reading the documents was never gated; only agreeing was, which is the half
+    that has to happen for anything else to.
+  */
+  "legal",
 ];
 
 export function gateFor(state: StandingState): StandingGate {

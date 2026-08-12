@@ -1266,6 +1266,9 @@ one names the stage that owes it — which a **shipped** stage may not do.
 | `a-person-can-take-their-own-data` | the only export in the product being the WORKSPACE's — `exit.export` wants `workspace:close`, so an ordinary member may not ask for it, and what it returns is mostly not theirs | **live** |
 | `an-export-includes-who-read-the-vault` | an export missing the only part somebody cannot reconstruct. Their own facts they know; who looked at them, and when, exists nowhere else | **live** |
 | `an-export-is-nobody-elses-to-ask-for` | an export keyed by an id in the input, where the access check is a line somebody has to remember. Keyed by the session there is nothing to forget | **live** |
+| `no-membership-is-no-role` | calling every signed-in person an owner on a door with no workspace. The consent gate believed it: a Kova client opening the account centre was told they owed the Terms of service and the data processing agreement — both `mustAccept: ["owner"]` — and answered 451 on their own preferences until they agreed to a contract between the platform and a studio | **live** |
+| `a-person-owing-nothing-can-use-their-account` | 451 `platform.consent_required` on the account door — not a permission failure, does not read like one, and about a document that was never theirs | **live** |
+| `agreeing-survives-a-closed-gate` | a deadlock: `legal` was exempt from the CONSENT gate and not from the STANDING one. A workspace held read-only cannot write, accepting is a write, and the document is what stands between it and being able to act — so a studio that never chose a plan could not accept the terms that would let it choose one, and the refusal said nothing about documents | **live** |
 | `shot-id-resolves` | a screenshot id the suite does not produce. RE-TARGETED to stage 7: a screenshot suite needs screens worth photographing, and the only app on the platform has one | stage 7 |
 <!-- /generated -->
 

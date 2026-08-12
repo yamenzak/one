@@ -1023,7 +1023,39 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
         are acting AS, and the same person is an owner in one workspace and
         somebody's customer in another.
       */
-      const personRole = membership?.role ?? opts.roleOf?.(permissions) ?? (session ? "owner" : "guest");
+      /*
+        ⚠️ NO MEMBERSHIP IS NO ROLE — IT IS NOT "OWNER". Falling back to owner for
+        anybody signed in made every person on a door with no workspace an owner
+        of nothing, and the consent gate believed it: a Kova client opening the
+        account centre was told they owed the Terms of service and the data
+        processing agreement — both `mustAccept: ["owner"]` — and was answered 451
+        on `me.preferences.set` until they agreed to a contract between the
+        platform and a studio. Measured, not reasoned about.
+
+        ⚠️ THE OPERATOR DOOR KEEPS "OWNER", AND THAT IS A DEFERRAL RATHER THAN A
+        DECISION. It is the other no-membership case, and it is a lie of the same
+        kind — but both apps declare their DEPLOYMENT checklists as
+        `roles: ["owner"]` on the strength of it, so correcting the runtime alone
+        empties the operator's list. The manifests have to move with it.
+        // DEFER(one-189) stage:7 — an operator is called `owner` on their own
+        //   door, so deployment checklists and any `mustAccept` are resolved
+        //   against a role they do not hold. Needs the manifests changed with it.
+
+        Everybody else with no membership is a guest of this workspace, which is
+        what they are.
+
+        ⚠️ THIS NEVER GRANTS ANYTHING. Permission comes from `permissionsOf` and
+        the membership row; the role decides which DOCUMENTS are owed and what an
+        audit row says somebody was acting as. Both were wrong.
+      */
+      const personRole = membership?.role
+        ?? opts.roleOf?.(permissions)
+        /* ⚠️ THE DOOR, NOT `actor.kind`. The default `resolveCaller` never sets
+             `operator` — it writes `user` or `system` — so testing the kind is a
+             branch that is never taken, which is how this first read as fixed and
+             emptied the operator's own checklist instead. `at.door === "admin"` is
+             what the permission block twenty lines up already uses. */
+        ?? (at.door === "admin" ? "owner" : "guest");
 
       /*
         ⚠️ THE GATE RUNS ONCE, FOR EVERY TRANSPORT, FROM HERE. A per-route check

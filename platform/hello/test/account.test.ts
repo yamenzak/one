@@ -12,6 +12,8 @@ import { env } from "cloudflare:test";
 import { beforeAll, describe, expect, it } from "vitest";
 import worker from "../src/worker.js";
 import { post, SETUP, signIn } from "./session.js";
+import { sql, type ResolvedRegion } from "@one/kernel";
+import { bindingsFor } from "@one/runtime";
 
 const SLUG = `acct${Math.random().toString(36).slice(2, 8)}`;
 const ORIGIN = `https://${SLUG}.hello.4dl.app`;
@@ -206,5 +208,55 @@ describe("passkeys", () => {
   it("refuses to remove one that is not yours", async () => {
     const r = await send(ORIGIN, "/api/me.passkey.remove", here, { id: "someone-elses" });
     expect(r.status).toBe(403);
+  });
+});
+
+/* ------------------------------------------------------- what you owe --- */
+
+describe("what a person is asked to agree to", () => {
+  /*
+    ⚠️ AN OBLIGATION FOLLOWS A ROLE, AND NO MEMBERSHIP IS NO ROLE. The account
+    door has no workspace, so nobody has a role on it — and the runtime used to
+    call every signed-in person an owner there. `hello` asks only its OWNER to
+    accept its terms, so a person who is in no workspace at all was told they
+    owed them, and was answered 451 on their own preferences until they agreed.
+
+    ⚠️ IT IS THE CONSENT LEDGER THAT MAKES THIS MATTER RATHER THAN THE UX. An
+    acceptance recorded against somebody who was never the person the document is
+    for is a row that satisfies an obligation and refers to nothing — which is the
+    one property the ledger exists to deny.
+  */
+  const NOBODY = `nobody.${SLUG}@example.com`;
+
+  const clean = async () => {
+    const cookie = await signIn(NOBODY, ID);
+    /*
+      ⚠️ THIS ONE ACCOUNT'S ROWS, NEVER THE TABLE. `signIn` accepts on every
+      test's behalf so nothing here is blocked by the gate, and undoing that is
+      the only way to assert the runtime rather than the helper — but a bare
+      `DELETE FROM consents` un-accepts every OTHER account in this file, and
+      twenty sibling tests fail somewhere else with a 451 nobody can trace back.
+    */
+    const db = bindingsFor({ db: sql() }, { DB: (env as Record<string, unknown>).DIRECTORY }, { defaultRegion: "auto" })("auto" as ResolvedRegion).db;
+    const who = await db.first<{ id: string }>(`SELECT id FROM accounts WHERE email = ?`, NOBODY.toLowerCase());
+    await db.run(`DELETE FROM consents WHERE account_id = ?`, who!.id);
+    return cookie;
+  };
+
+  it("asks an owner's documents of owners, and not of somebody in no workspace", async () => {
+    const cookie = await clean();
+    const r = await get(ID, "/api/legal.list", cookie);
+    expect((r.body.outstanding as unknown as { id: string }[]).map((d) => d.id)).toEqual([]);
+    /* And the documents are still published — withheld obligation, not withheld text. */
+    expect((r.body.documents as unknown as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("lets them use their own account while owing nothing", async () => {
+    /* ⚠️ 451 IS THE SYMPTOM THIS EXISTS TO CATCH. It is not a permission failure
+       and does not read like one — "There is something to read first", about a
+       document that was never theirs. */
+    const cookie = await clean();
+    const r = await send(ID, "/api/me.preferences.set", cookie, { theme: "dark" });
+    expect(r.status).toBe(200);
   });
 });

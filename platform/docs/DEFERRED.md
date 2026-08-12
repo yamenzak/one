@@ -19,6 +19,8 @@ kind: index
 - `one-185` — Kova declares these and reads none of them yet: the  
   <sub>kova/src/manifest.ts:712</sub>
 - `one-187` — `mail:no_sender` on the identity door under a full  
-  <sub>hello/test/account.test.ts:26</sub>
+  <sub>hello/test/account.test.ts:28</sub>
 - `one-188` — a region has no human name. Every surface that  
   <sub>web/src/account/legal.tsx:178</sub>
+- `one-189` — an operator is called `owner` on their own  
+  <sub>runtime/src/runtime.ts:1040</sub>

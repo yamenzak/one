@@ -3370,6 +3370,33 @@
       "impl": "web/test/screens.test.tsx",
       "proves": "renders a declared document as text, never as markup",
       "fails": "bold headings bought at the price of making every app's manifest a way into every reader's page"
+    },
+    {
+      "id": "no-membership-is-no-role",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/account.test.ts",
+      "proves": "asks an owner's documents of owners, and not of somebody in no workspace",
+      "fails": "calling every signed-in person an owner on a door with no workspace. The consent gate believed it: a Kova client opening the account centre was told they owed the Terms of service and the data processing agreement — both `mustAccept: [\"owner\"]` — and answered 451 on their own preferences until they agreed to a contract between the platform and a studio"
+    },
+    {
+      "id": "a-person-owing-nothing-can-use-their-account",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/account.test.ts",
+      "proves": "lets them use their own account while owing nothing",
+      "fails": "451 `platform.consent_required` on the account door — not a permission failure, does not read like one, and about a document that was never theirs"
+    },
+    {
+      "id": "agreeing-survives-a-closed-gate",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/exit.test.ts",
+      "proves": "lets a workspace with a closed gate accept what it owes",
+      "fails": "a deadlock: `legal` was exempt from the CONSENT gate and not from the STANDING one. A workspace held read-only cannot write, accepting is a write, and the document is what stands between it and being able to act — so a studio that never chose a plan could not accept the terms that would let it choose one, and the refusal said nothing about documents"
     }
   ]
 }

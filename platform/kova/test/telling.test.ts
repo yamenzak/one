@@ -142,8 +142,18 @@ describe("the documents this product asks you to agree to", () => {
   let unsignedCookie = "";
   const FRESH = freshSlug("unread");
   beforeAll(async () => {
-    unsignedCookie = await signIn(`${FRESH}@example.test`, STUDIO, { accept: false });
-    unsigned = at(unsignedCookie);
+    /*
+      ⚠️ AN OWNER OF THEIR OWN STUDIO, WHICH THIS FIXTURE DID NOT USED TO MAKE.
+      It signed a fresh account in at somebody else's origin and expected all
+      three documents — including the processing agreement, which is an agreement
+      between two BUSINESSES — because the runtime called anybody with no
+      membership an owner. It does not any more: a role comes from the membership
+      row, so an owner has to actually be one.
+    */
+    const founding = await signIn(`${FRESH}@example.test`, SETUP, { accept: false });
+    await post(SETUP, "/api/identity.workspace.create", { slug: FRESH }, founding);
+    unsignedCookie = await signIn(`${FRESH}@example.test`, `https://${FRESH}.kova.4dl.app`, { accept: false });
+    unsigned = at(unsignedCookie, `https://${FRESH}.kova.4dl.app`);
   });
 
   /* ⚠️ Readable before signing up, because somebody deciding whether to sign up

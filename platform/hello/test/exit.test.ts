@@ -13,7 +13,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import worker, { REGIONAL_MODULES } from "../src/worker.js";
 import { post, SETUP, signIn } from "./session.js";
 import { erasurePlan, bindingsFor } from "@one/runtime";
-import { sql, type ResolvedRegion } from "@one/kernel";
+import { ALWAYS_ALLOWED, sql, type ResolvedRegion } from "@one/kernel";
 
 const ORIGIN = "https://leave.hello.4dl.app";
 let member = "";
@@ -256,5 +256,65 @@ describe("closing your ACCOUNT, which is not closing a workspace", () => {
     */
     const ids = ["exit.leave", "exit.account.close", "exit.account.cancel", "exit.account.status"];
     for (const id of ids) expect(id.split(".")[0]).toBe("exit");
+  });
+});
+
+/* ------------------------------------------------------------- agreeing --- */
+
+describe("agreeing is a way out, like paying and leaving", () => {
+  /*
+    ⚠️ `legal` WAS EXEMPT FROM THE CONSENT GATE AND NOT FROM THE STANDING ONE,
+    which is a different gate with the same effect. A workspace held read-only
+    cannot write; accepting a document is a write; and the document is the thing
+    standing between that workspace and being able to act. So a studio that never
+    chose a plan could not accept the terms that would let it choose one, and the
+    refusal it got said nothing about documents.
+
+    ⚠️ IT SURFACED BY ACCIDENT, which is the argument for this test existing. No
+    suite reached it because the fixture accepted everything on a door with no
+    workspace, where the gate is open — so the one path a real owner takes was
+    the one path nothing drove.
+  */
+  it("lets a workspace with a closed gate accept what it owes", async () => {
+    /*
+      ⚠️ ITS OWN WORKSPACE, CLOSED ON PURPOSE, because the gate has to actually be
+      shut for this to prove anything. Written against a workspace in good
+      standing it passes with the exemption removed — which is what the first
+      version of this test did.
+    */
+    const shut = "https://agreeing.hello.4dl.app";
+    const founding = await signIn("agreeing@example.test", SETUP);
+    await post(SETUP, "/api/identity.workspace.create", { slug: "agreeing" }, founding);
+    const cookie = await signIn("agreeing@example.test", shut);
+    const there = async (path: string, body?: unknown) => {
+      const res = await worker.fetch(
+        new Request(`${shut}${path}`, {
+          method: body === undefined ? "GET" : "POST",
+          headers: { "content-type": "application/json", cookie },
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        }),
+        env as never,
+      );
+      return { status: res.status, body: (await res.json()) as Record<string, never> };
+    };
+
+    /* ⚠️ `closing` is read-only: reads served, writes refused. Asserted here so
+       the accept below is known to be running against a shut gate. */
+    expect((await there("/api/exit.close", {})).status).toBe(200);
+    expect((await there("/api/note.create", { title: "no" })).status).toBe(402);
+
+    /* Reading was never the problem. */
+    const listed = await there("/api/legal.list");
+    expect(listed.status).toBe(200);
+
+    const doc = (listed.body.documents as unknown as { id: string; version: string }[])[0]!;
+    expect((await there("/api/legal.accept", { document: doc.id, version: doc.version })).status).toBe(200);
+  });
+
+  it("keeps the lane on the list that survives every rung", () => {
+    /* ⚠️ THE LANE IS THE MECHANISM. Reachability here is decided by the id's
+       first segment, so an operation renamed out of `legal` leaves the gate
+       closed on it again with nothing else changing. */
+    expect(ALWAYS_ALLOWED).toContain("legal");
   });
 });
