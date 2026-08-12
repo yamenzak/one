@@ -150,6 +150,21 @@ export interface Subprocessor {
    * place — a compliance claim we made about somebody else.
    */
   readonly trust?: string;
+  /**
+   * THE VENDOR'S OWN BRAND MARK, BY NAME.
+   *
+   * ⚠️ A NAME RATHER THAN A DRAWING, because this layer holds no markup and a
+   * shared package holds no company's artwork. An interface that recognises the
+   * name draws it; one that does not falls back to the initial of `name`, which
+   * is why this is optional and why nothing breaks when it is absent or unknown.
+   *
+   * ⚠️ AND IT IS NOT AN IDENTITY. `id` is what a handler reaches the processor
+   * by and is matched against what the source calls; two entries for the same
+   * company — the platform and its mail lane — are two processors sharing one
+   * mark. Keying the drawing off `id` would give the second one no logo and
+   * nobody a reason why.
+   */
+  readonly mark?: string;
 }
 
 export interface ProtectionSpec {

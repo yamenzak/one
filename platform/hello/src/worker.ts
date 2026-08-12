@@ -149,7 +149,7 @@ const runtime = createRuntime(hello, {
       await publishVaultSpec(directory, hello);
       /* ⚠️ AND WHAT THIS PRODUCT ASKS PEOPLE TO AGREE TO, for the same reason:
          the account centre renders every app's, and a worker knows only its own. */
-      await publishLegalSpec(directory, hello);
+      await publishLegalSpec(directory, hello, DEPLOYMENT);
     },
     region: (bind) => applySchema(bind.db, REGIONAL_MODULES).then(() => undefined),
   },

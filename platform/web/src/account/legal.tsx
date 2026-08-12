@@ -9,53 +9,48 @@
  * ever sent — and it rendered convincingly because the fixtures were written to
  * match. `scripts/wire.test.mjs` is why that cannot happen from here again.
  *
+ * ⚠️ A PRODUCT IS A ROW THAT GOES SOMEWHERE, NOT A THING THAT UNFOLDS. Built as a
+ * disclosure it was readable closed and wrong in two ways: a product with four
+ * documents and a disclosure of its own is a PLACE, and unfolding one pushed the
+ * next product half a screen down — so a person in three of them was reading a
+ * list that moved under them. The hub is now a list of destinations, which is what
+ * every other hub in this account centre is.
+ *
+ * ⚠️ AND EACH ONE IS AN ADDRESS. `routes.ts` gives every screen here a path, so a
+ * refusal that says "there is something to read first" can send somebody to the
+ * document rather than to the top of a settings surface.
+ *
  * ⚠️ THE DISCLOSURE IS A DESTINATION, NOT A TABLE UNDER EVERY GROUP. It was five
- * label/value rows plus two more foldouts BENEATH EACH PRODUCT'S documents, so a
- * person in three products met eleven blocks alternating between two visual
- * languages, and the answer they came for — does anything leave, is any of it
- * sensitive — was assembled by reading a table. It is one row now, whose second
- * line IS the answer, and pressing it opens the evidence. That is the same rule
- * the vault's groups and the preferences hub already live by: a summary has to be
- * worth NOT opening.
+ * label/value rows plus two foldouts BENEATH EACH PRODUCT'S documents, and the
+ * answer somebody came for — does anything leave, is any of it sensitive — was
+ * assembled by reading a table. It is one row now whose second line IS the answer.
  *
- * ⚠️ AND A PRODUCT IS A DISCLOSURE, OPENED BY WHAT IT OWES. Somebody with nothing
- * outstanding wants one line per product saying so; somebody who owes a document
- * wants it in front of them. `openAtFirst` on exactly the products with something
- * outstanding is both, with no second list of the same rows — which is what a
- * "needs your attention" section at the top would have been, ticking in two places
- * at once.
- *
- * ⚠️ THE ONLY THING THAT CAN BE PRESSED TO AGREE IS AN OUTSTANDING DOCUMENT.
- * Everything else reports. A consent screen whose every row is actionable teaches
- * that agreeing is something you do repeatedly and casually, which is the reflex a
+ * ⚠️ THE ONLY THING THAT CAN BE PRESSED TO AGREE IS AN OUTSTANDING DOCUMENT, and
+ * only from inside it. A consent screen whose every row is actionable teaches that
+ * agreeing is something you do repeatedly and casually, which is the reflex a
  * ledger exists to be evidence against.
- *
- * ⚠️ TWO LEVELS OF DISCLOSURE, AND THE SECOND IS NOT THE ARTICLE 30 RECORD.
- * `protection.record` computes one, and it is `workspace:close` — it is about the
- * DEPLOYMENT, for a regulator, and it belongs on the operator door. What a person
- * gets here is the same public declaration at two depths: the sentence, then every
- * recipient with what they receive and how the transfer is covered.
  */
 
-import { useState, type ElementType, type ReactNode } from "react";
-import type { DataCategory, Problem, Receiving, Subprocessor } from "@one/kernel";
+import type { ElementType, ReactNode } from "react";
+import type { DataCategory, LegalDoc, Problem, Receiving, Subprocessor } from "@one/kernel";
 import { SPECIAL_CATEGORIES } from "@one/kernel";
 /* ⚠️ THE SHAPES COME FROM THE SEAM, which is the module `scripts/wire.test.mjs`
    holds to the kernel. A screen that declared its own would be outside the one
    check that exists to stop it inventing a field. */
 import type { Doc, Product } from "./wire.js";
+import type { Where } from "./routes.js";
 import { Lockup } from "../brand/mark.js";
+import { JurisdictionChip } from "../jurisdiction.js";
+import { Vendor } from "../brand/vendors.js";
 import { Button } from "../button.js";
 import { useCommit } from "../commit.js";
-import { Disclose } from "../disclose.js";
 import { Others, Paper, Tick } from "../icon.js";
 import { Blank, Card, Entry, Item, Waiting } from "../list.js";
 import { Screen, Section, Title } from "../screen.js";
-import { Stack } from "../stack.js";
 
 export interface LegalScreenProps {
   /**
-   * ⚠️ ONE GROUP PER PRODUCT, because a person belongs to several and each asks
+   * ⚠️ ONE ROW PER PRODUCT, because a person belongs to several and each asks
    * different things of them. `legal.list` answers for the app serving the
    * request, which on the account centre is whichever one happens to be behind
    * that door — so this takes what every app PUBLISHED, resolved against the
@@ -68,31 +63,14 @@ export interface LegalScreenProps {
    * Null until known. `[]` is "you are in no product", which is a fact.
    */
   readonly products: readonly Product[] | null;
-  readonly onAccept: (id: string, version: string) => Promise<Problem | null>;
+  readonly onGo: (to: Where) => void;
   readonly onBack: () => void;
   readonly Heading?: ElementType;
 }
 
-/**
- * ⚠️ WHERE A LEVEL IS, AS ONE STRING, and the two kinds are prefixed rather than
- * held in two pieces of state. A document id and an app id are both opaque and
- * both could be `terms`; two states would also let both be set at once, which is
- * a screen with no defined answer to what it is showing.
- */
-const DOC = "doc:", WHO = "who:";
+/* ---------------------------------------------------------------- the hub --- */
 
-export function LegalScreen({
-  products, onAccept, onBack, Heading = "h1",
-}: LegalScreenProps): ReactNode {
-  const [at, setAt] = useState<string | null>(null);
-
-  const reading = at?.startsWith(DOC)
-    ? products?.flatMap((p) => p.docs).find((d) => d.doc.id === at.slice(DOC.length)) ?? null
-    : null;
-  const showing = at?.startsWith(WHO)
-    ? products?.find((p) => p.appId === at.slice(WHO.length)) ?? null
-    : null;
-
+export function LegalScreen({ products, onGo, onBack, Heading = "h1" }: LegalScreenProps): ReactNode {
   /* ⚠️ THE ACCOUNT IS TAKEN OUT BY ITS EMPTY `appId`, not by position. It arrives
      first today; a list that assumed so would put a product under the lockup the
      day anything reorders. */
@@ -100,97 +78,118 @@ export function LegalScreen({
   const rest = products?.filter((p) => p.appId !== "") ?? [];
 
   return (
-    <Stack at={at}>
-      {reading
-        ? (
-          <DocScreen
-            item={reading}
-            onAccept={() => onAccept(reading.doc.id, reading.doc.version)}
-            onBack={() => setAt(null)}
-            Heading={Heading}
-          />
-        )
-        : showing
-          ? <ReceivingScreen of={showing} onBack={() => setAt(null)} Heading={Heading} />
-          : (
-            <Screen leave="up" onLeave={onBack} name="Consent and legal"
-              title={<Title as={Heading}>Consent and legal</Title>}
-              lede="What you have agreed to, and who else receives what is held here."
-            >
-              {products === null ? <Section><Waiting /></Section> : (
-                <>
-                  {/* ⚠️ NAMED BY THE LOCKUP, WHICH IS THE PLATFORM'S ONE DEVICE FOR
-                      "this belongs to the account". Set as words it is a fourth
-                      product with a longer name, in a list whose whole point is
-                      that this one is a different order of thing — it exists
-                      before any product and outlives all of them. */}
-                  {account ? (
-                    <Section name={<Lockup word="Account" />}>
-                      <Card>
-                        {account.docs.map((d) => (
-                          <DocRow key={d.doc.id} of={d} onGo={() => setAt(DOC + d.doc.id)} />
-                        ))}
-                        <WhoRow of={account} onGo={() => setAt(WHO + account.appId)} />
-                      </Card>
-                    </Section>
-                  ) : null}
+    <Screen leave="up" onLeave={onBack} name="Consent and legal"
+      title={<Title as={Heading}>Consent and legal</Title>}
+      lede="What you have agreed to, and who else receives what is held here."
+    >
+      {products === null ? <Section><Waiting /></Section> : (
+        <>
+          {/* ⚠️ NAMED BY THE LOCKUP, WHICH IS THE PLATFORM'S ONE DEVICE FOR "this
+              belongs to the account". Set as words it is a fourth product with a
+              longer name, in a list whose whole point is that this one is a
+              different order of thing — it exists before any product and outlives
+              all of them. */}
+          {account ? (
+            <Section name={<Lockup word="Account" />}>
+              <Card>
+                {account.docs.map((d) => (
+                  <DocRow key={d.doc.id} of={d}
+                    onGo={() => onGo({ at: "document", product: "", document: d.doc.id })} />
+                ))}
+                <WhoRow of={account} onGo={() => onGo({ at: "receiving", product: "" })} />
+              </Card>
+            </Section>
+          ) : null}
 
-                  {rest.length === 0
-                    ? (
-                      /* ⚠️ ONLY WHERE THE ACCOUNT ITSELF SAID NOTHING EITHER. With
-                         the account's own terms above it, "nothing to agree to" is
-                         a flat contradiction of the card the reader is looking at;
-                         what is empty is the PRODUCTS, and that is a sentence about
-                         products. */
-                      account
-                        ? null
-                        : (
-                          <Section>
-                            <Blank title="Nothing to agree to">
-                              You are not in any product that asks you to accept anything.
-                            </Blank>
-                          </Section>
-                        )
-                    )
-                    : (
-                      <Section name="Products">
-                        <Card>
-                          {rest.map((p) => (
-                            /* ⚠️ NAMED BY THE PRODUCT, NOT BY THE WORKSPACE. An
-                               acceptance is recorded per account, so somebody in
-                               two studios of the same product has one obligation —
-                               listing it under each would show two rows that tick
-                               together. */
-                            <Disclose
-                              key={p.appId}
-                              title={p.appName}
-                              detail={held(p.roles)}
-                              said={<span className="disclose-count">{state(p)}</span>}
-                              /* ⚠️ OPEN WHERE SOMETHING IS OWED. A product settled
-                                 years ago is one line saying so; the one asking for
-                                 something is the reason this screen was opened. */
-                              openAtFirst={p.docs.some((d) => d.outstanding)}
-                            >
-                              {p.docs.map((d) => (
-                                <DocRow key={d.doc.id} of={d} onGo={() => setAt(DOC + d.doc.id)} />
-                              ))}
-                              <WhoRow of={p} onGo={() => setAt(WHO + p.appId)} />
-                            </Disclose>
-                          ))}
-                        </Card>
-                      </Section>
-                    )}
-                </>
-              )}
-            </Screen>
-          )}
-    </Stack>
+          {rest.length === 0
+            ? (
+              /* ⚠️ ONLY WHERE THE ACCOUNT ITSELF SAID NOTHING EITHER. With the
+                 account's own terms above it, "nothing to agree to" flatly
+                 contradicts the card the reader is looking at; what is empty is
+                 the PRODUCTS, and that is a sentence about products. */
+              account ? null : (
+                <Section>
+                  <Blank title="Nothing to agree to">
+                    You are not in any product that asks you to accept anything.
+                  </Blank>
+                </Section>
+              )
+            )
+            : (
+              <Section name="Products">
+                <Card>
+                  {rest.map((p) => (
+                    /* ⚠️ NAMED BY THE PRODUCT, NOT BY THE WORKSPACE. An acceptance
+                       is recorded per account, so somebody in two studios of the
+                       same product has one obligation — listing it under each
+                       would show two rows that tick together.
+
+                       ⚠️ AND THE NAME IS SET AS A NAME. In the text face it is a
+                       row about a word; in the brand face it is the product,
+                       recognised before it is read. */
+                    <Item
+                      key={p.appId}
+                      title={p.appName}
+                      titleAs="wordmark"
+                      detail={held(p.roles)}
+                      sign={<span className="disclose-count">{state(p)}</span>}
+                      onGo={() => onGo({ at: "product", product: p.appId })}
+                    />
+                  ))}
+                </Card>
+              </Section>
+            )}
+        </>
+      )}
+    </Screen>
+  );
+}
+
+/* ------------------------------------------------------------ one product --- */
+
+/**
+ * ONE PRODUCT'S DOCUMENTS, AND WHO ELSE ITS RECORDS REACH.
+ *
+ * ⚠️ THE PRODUCT NAMES THE SCREEN, IN THE BRAND FACE. It is the one place a
+ * product's identity appears in this surface at title size, and setting it in the
+ * reading face would make it a heading about a word rather than the product.
+ */
+export function ProductScreen({ of, onGo, onBack, Heading = "h1" }: {
+  readonly of: Product;
+  readonly onGo: (to: Where) => void;
+  readonly onBack: () => void;
+  readonly Heading?: ElementType;
+}): ReactNode {
+  const isAccount = of.appId === "";
+  return (
+    <Screen leave="up" onLeave={onBack} name={of.appName}
+      title={isAccount
+        ? <Heading className="page-title"><Lockup word="Account" /></Heading>
+        : <Title as={Heading}><span className="wordmark-title">{of.appName}</span></Title>}
+      /* ⚠️ THE ROLES ARE THE LEDE BECAUSE THEY ARE WHY THIS LIST IS THIS LIST. The
+         same product asks different things of an owner and of a client, and a
+         person reading four documents is owed the sentence that says which set
+         they are looking at. */
+      lede={isAccount
+        ? "Held for having an account, whether or not you use any product."
+        : `What this product asks of you as ${held(of.roles).toLowerCase()}.`}
+    >
+      <Section>
+        <Card>
+          {of.docs.map((d) => (
+            <DocRow key={d.doc.id} of={d}
+              onGo={() => onGo({ at: "document", product: of.appId, document: d.doc.id })} />
+          ))}
+          <WhoRow of={of} onGo={() => onGo({ at: "receiving", product: of.appId })} />
+        </Card>
+      </Section>
+    </Screen>
   );
 }
 
 /* ------------------------------------------------------------------ rows --- */
 
-/** One document, wherever it is listed. Two callers, one row. */
+/** One document, wherever it is listed. Three callers, one row. */
 const DocRow = ({ of, onGo }: { readonly of: Doc; readonly onGo: () => void }): ReactNode => (
   <Item
     icon={<Paper />}
@@ -207,8 +206,7 @@ const DocRow = ({ of, onGo }: { readonly of: Doc; readonly onGo: () => void }): 
 /**
  * ⚠️ THE SAME SHAPE AS A DOCUMENT, AT THE END OF THE SAME CARD, because it is the
  * other half of one question: this is what you agreed to, and this is who else
- * gets it. As a card of its own under every group it read as a second subject and
- * doubled the length of the screen.
+ * gets it.
  *
  * ⚠️ AND A PRODUCT THAT HAS NOT PUBLISHED ONE SAYS SO RATHER THAN VANISHING. A
  * row that predates the column is a real state; rendering nothing makes it
@@ -234,14 +232,13 @@ export const said = (d: Doc): string =>
     : d.acceptedOn ? `Accepted ${d.acceptedOn}` : "";
 
 /**
- * ⚠️ THE STATE OF A WHOLE PRODUCT, IN TWO WORDS, so the row is worth not opening.
- * It counts what is OWED rather than what is agreed: "3 of 4" would be a fraction
+ * ⚠️ THE STATE OF A WHOLE PRODUCT, IN TWO WORDS, so the row is worth pressing or
+ * not. It counts what is OWED rather than what is agreed: "3 of 4" is a fraction
  * whose remainder may be documents nobody ever has to accept, and the number a
  * person is looking for is how many are waiting on them.
  *
  * ⚠️ "Up to date" RATHER THAN "Agreed", because it is also true of a product that
- * has never asked this person for anything. A product with four documents none of
- * which are owed of a client is not a product they agreed to four things in.
+ * has never asked this person for anything.
  */
 export const state = (p: Product): string => {
   const owed = p.docs.filter((d) => d.outstanding).length;
@@ -257,8 +254,8 @@ export const state = (p: Product): string => {
 export const held = (roles: readonly string[]): string => {
   const said = roles.map((r, i) => (i === 0 ? r.charAt(0).toUpperCase() + r.slice(1) : r));
   /* ⚠️ COMMAS UNTIL THE LAST ONE. Somebody is realistically two things in a
-     product and occasionally three; joining every one with "and" reads as a
-     chant rather than a list. */
+     product and occasionally three; joining every one with "and" reads as a chant
+     rather than a list. */
   return said.length < 2 ? said.join("") : `${said.slice(0, -1).join(", ")} and ${said.at(-1)}`;
 };
 
@@ -352,7 +349,7 @@ const Tags = ({ of }: { readonly of: readonly DataCategory[] }): ReactNode => (
  *
  * ⚠️ A SCREEN, BECAUSE IT IS THE EVIDENCE. Folded under a product's documents it
  * competed with them for the same card and forced its own rows into a shape meant
- * for values; on its own it can answer in a sentence and then show the list, which
+ * for values; on its own it answers in a sentence and then shows the list, which
  * is the order somebody reading it asks in.
  */
 export function ReceivingScreen({ of, onBack, Heading = "h1" }: {
@@ -366,9 +363,9 @@ export function ReceivingScreen({ of, onBack, Heading = "h1" }: {
   const r = of.receiving;
   if (r === null) return null;
 
-  /* ⚠️ The one thing a transfer does not carry: what they DO for us. */
-  const roleOf = new Map(r.subprocessors.map((p) => [p.id, p.role]));
-  const nameOf = new Map(r.subprocessors.map((p) => [p.id, p.name]));
+  /* ⚠️ The two things a transfer does not carry: what they DO for us, and their
+     own mark and links. All three are on the processor it points at. */
+  const byId = new Map(r.subprocessors.map((p) => [p.id, p]));
 
   return (
     <Screen leave="up" onLeave={onBack} name="Who else sees this"
@@ -399,30 +396,52 @@ export function ReceivingScreen({ of, onBack, Heading = "h1" }: {
         */
         <Section name="What each one gets">
           <Card>
-            {r.transfers.map((t) => (
-              /*
-                ⚠️ WHO, THEN WHAT THEY DO, THEN WHAT THEY GET, THEN WHERE AND UNDER
-                WHAT. Four facts on one dot-separated line is a sentence somebody
-                has to parse; the categories are a set and now read as one.
+            {r.transfers.map((t) => {
+              const sub = byId.get(t.to);
+              return (
+                /*
+                  ⚠️ WHO, THEN WHAT THEY DO, THEN WHAT THEY GET, THEN WHERE AND
+                  UNDER WHAT. Four facts on one dot-separated line is a sentence
+                  somebody has to parse; the categories are a set and read as one.
 
-                ⚠️ AND IT IS A RECORD RATHER THAN AN `Entry`. As a field the
-                company's NAME was the quiet label and its job description was the
-                value — which inverts the one thing somebody scanning "who has my
-                data" is scanning for.
+                  ⚠️ AND IT IS A RECORD RATHER THAN AN `Entry`. As a field the
+                  company's NAME was the quiet label and its job description was
+                  the value — which inverts the one thing somebody scanning "who
+                  has my data" is scanning for.
 
-                ⚠️ NO "Sensitive" BADGE ON THE ROW. Article 9 is marked on the
-                category that IS Article 9, which is the word a reader is looking
-                for — a badge at the end of the line says the same thing a second
-                time and does not say which one. The sentence at the top still
-                carries it, because up there nothing names a category at all.
-              */
-              <div className="party" key={t.to}>
-                <span className="party-name">{t.name}</span>
-                <span className="party-role">{roleOf.get(t.to)}</span>
-                <Tags of={t.categories} />
-                <span className="party-where">{t.where} · {SAFEGUARD[t.safeguard]}</span>
-              </div>
-            ))}
+                  ⚠️ NO "Sensitive" BADGE ON THE ROW. Article 9 is marked on the
+                  category that IS Article 9, which is the word a reader is looking
+                  for; a badge at the end of the line says the same thing again and
+                  does not say which one.
+                */
+                <div className="party" key={t.to}>
+                  <span className="party-head">
+                    {/* ⚠️ THE MARK IS RECOGNITION, NOT IDENTIFICATION. The full
+                        legal name is on the line beside it and is what a reader is
+                        actually told; the logo is what lets somebody who has seen
+                        it on a hundred status pages skip reading. */}
+                    <Vendor mark={sub?.mark} name={t.name} />
+                    <span className="party-said">
+                      <span className="party-name">{t.name}</span>
+                      {sub ? <span className="party-role">{sub.role}</span> : null}
+                    </span>
+                  </span>
+                  <Tags of={t.categories} />
+                  <span className="party-where">{t.where} · {SAFEGUARD[t.safeguard]}</span>
+                  {/* ⚠️ THE LINKS ARE THE VENDOR'S OWN AND ARE NOT COPIED FROM.
+                      Their processing terms and their certification list change on
+                      their schedule; a copy here is wrong the first time one
+                      lapses, in the most damaging place available — a compliance
+                      claim we made about somebody else. */}
+                  {sub ? (
+                    <span className="party-links">
+                      <a href={sub.terms} target="_blank" rel="noreferrer">Their processing terms</a>
+                      {sub.trust ? <a href={sub.trust} target="_blank" rel="noreferrer">What they publish</a> : null}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })}
           </Card>
         </Section>
       ) : null}
@@ -431,24 +450,24 @@ export function ReceivingScreen({ of, onBack, Heading = "h1" }: {
         /* ⚠️ PER REGION, BECAUSE RESIDENCY IS NOT ONLY STORAGE. Choosing a region
            chooses where records are STORED; which models a generation reaches is a
            separate answer, and publishing them together is what lets somebody
-           choose knowing both.
-
-           ⚠️ AND THE REGION IS THE LABEL RATHER THAN A CLAIM ABOUT WHERE ANYBODY
-           LIVES. It is the id as declared, which is honest here — "in this region,
-           these" — and was not when the same string sat under "Stored in". */
-        /* DEFER(one-188) stage:7 — a region has no human name anywhere in the
-           platform, and this payload carries the app's offered regions rather than
-           the reader's own. Both have to move together, or a prettier word would
-           be a screen inventing where somebody's data is. */
+           choose knowing both. */
         <Section name="Where answers are generated">
-          <Card className="entries">
+          <Card>
             {Object.entries(r.inference).flatMap(([binding, byRegion]) =>
               Object.entries(byRegion).map(([region, ids]) => (
-                <Entry key={`${binding}:${region}`} label={region}>
-                  {ids.length === 0
-                    ? "Nothing generated here"
-                    : ids.map((id) => nameOf.get(id) ?? id).join(", ")}
-                </Entry>
+                /* ⚠️ THE REGION IS NAMED, NOT PRINTED. It was the id — `auto`,
+                   `eu` — which is the one field a residency question is asked
+                   about, shown as a database value. The names are the kernel's,
+                   which is a reading of what `RegionId` already documents rather
+                   than a word this screen invented. */
+                <div className="party" key={`${binding}:${region}`}>
+                  <JurisdictionChip region={region} explain />
+                  <span className="party-where">
+                    {ids.length === 0
+                      ? "Nothing is generated for a workspace here."
+                      : `Reaches ${ids.map((id) => byId.get(id)?.name ?? id).join(", ")}.`}
+                  </span>
+                </div>
               )),
             )}
           </Card>
@@ -491,6 +510,24 @@ export function DocScreen({ item, onAccept, onBack, Heading = "h1" }: {
          the record. */
       lede={`Version ${doc.version}`}
     >
+      {/* ⚠️ WHAT MOVED, ABOVE THE TEXT, AND ONLY FOR SOMEBODY WHO AGREED BEFORE.
+          Versioning was already real and silent: the ledger re-asks everybody the
+          day a version changes, and what they were shown was the same wall of text
+          with a different number on it. Somebody re-agreeing without being told
+          what changed is a signature collected rather than a consent given.
+
+          ⚠️ AND IT IS NOT SHOWN TO A FIRST READER. To somebody who has never
+          accepted anything here, "what changed" is a diff against a document they
+          have not read — noise at the top of the thing they are meant to read. */}
+      {doc.changed && item.acceptedOn ? (
+        <Section>
+          <p className="changed">
+            <span className="changed-what">What changed</span>
+            {doc.changed}
+          </p>
+        </Section>
+      ) : null}
+
       <Section>
         {doc.body ? <div className="prose">{paragraphs(doc.body)}</div> : null}
         {doc.url ? (
@@ -529,6 +566,84 @@ export function DocScreen({ item, onAccept, onBack, Heading = "h1" }: {
         /* ⚠️ THE SAME PLACE ANSWERS THE SAME QUESTION IN BOTH STATES. */
         <Section><p className="prose-said">Accepted {item.acceptedOn}.</p></Section>
       ) : null}
+    </Screen>
+  );
+}
+
+/* ---------------------------------------------------------- before you go --- */
+
+/** One thing somebody still owes, and which product is asking. */
+export interface Owed {
+  readonly product: string;
+  readonly productName: string;
+  readonly doc: LegalDoc;
+  /** ⚠️ Whether they held an earlier version — the difference between "new" and "never". */
+  readonly seenBefore: boolean;
+}
+
+/**
+ * WHAT STANDS BETWEEN SOMEBODY AND USING THE PRODUCT.
+ *
+ * ⚠️ THE SERVER ALREADY REFUSED, AND THIS IS THE SURFACE FOR IT. Every write with
+ * an outstanding document comes back `platform.consent_required` — so without a
+ * screen, a person met an error on whatever they happened to be doing, with a code
+ * naming documents and no way to reach one. A refusal that names what is missing
+ * and cannot take you to it is a dead end with a citation.
+ *
+ * ⚠️ IT IS NOT A DIALOG AND IT IS NOT DISMISSIBLE HERE. Everything a person can
+ * still do — sign out, read, leave, export, close the account — is on a lane the
+ * gate exempts, so this is not a wall around the product: it is the one thing they
+ * have to do first, shown as a place rather than as a sheet that keeps returning.
+ *
+ * ⚠️ AND IT SAYS WHICH ARE NEW VERSIONS. "You agreed to this before and it has
+ * changed" is a different sentence from "you have never agreed to this", and on
+ * the day terms are republished it is the sentence everybody is owed.
+ */
+export function MustAcceptScreen({ owed, onGo, onLeave, Heading = "h1" }: {
+  readonly owed: readonly Owed[];
+  readonly onGo: (to: Where) => void;
+  /** ⚠️ Never "cancel". The way out of this screen is out of the product. */
+  readonly onLeave: () => void;
+  readonly Heading?: ElementType;
+}): ReactNode {
+  const again = owed.some((o) => o.seenBefore);
+  return (
+    <Screen leave="dismiss" onLeave={onLeave} name="Before you continue"
+      sky="silk"
+      title={<Title as={Heading}>{again ? "Something has changed" : "Before you continue"}</Title>}
+      lede={again
+        ? "One of the documents you agreed to has been republished. Please read what changed."
+        : "There is something to read and agree to first. Everything else is waiting for you."}
+    >
+      <Section>
+        <Card>
+          {owed.map((o) => (
+            <Item
+              key={`${o.product}:${o.doc.id}`}
+              icon={<Paper />}
+              tone="warn"
+              title={o.doc.title}
+              /* ⚠️ THE PRODUCT IS ON THE ROW because this list crosses them: the
+                 account's own terms and a studio's sit in one card, and which is
+                 asking is the first thing a reader wants. */
+              detail={`${o.productName} · ${o.seenBefore ? "New version" : "Not accepted"}`}
+              onGo={() => onGo({ at: "document", product: o.product, document: o.doc.id })}
+            />
+          ))}
+        </Card>
+      </Section>
+
+      {/* ⚠️ LEAVING IS ALWAYS ALLOWED, AND IT IS SAID HERE RATHER THAN IMPLIED.
+          The exit lane survives every gate in the platform for exactly this
+          reason: a person who does not agree must be able to take their account
+          and go, and a screen that only offers agreement is one that pretends
+          otherwise. */}
+      <Section>
+        <p className="note">
+          You do not have to agree. You can download everything we hold and close
+          your account instead — both still work from here.
+        </p>
+      </Section>
     </Screen>
   );
 }

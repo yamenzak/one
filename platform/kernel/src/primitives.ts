@@ -105,6 +105,45 @@ export type TenantId = Id<"tenant">;
  */
 export type RegionId = "auto" | "eu" | (string & {});
 
+/**
+ * WHAT A REGION IS CALLED WHERE SOMEBODY READS IT, AND WHAT CHOOSING IT MEANS.
+ *
+ * ⚠️ THIS IS A READING OF THE DECLARATION ABOVE, NOT A NEW FACT. Every surface
+ * that showed a region showed the id — `auto`, `eu` — because there was no human
+ * name anywhere in the platform, and each screen that wanted one would have had
+ * to invent it. Inventing where somebody's data physically is, on the one screen
+ * that exists to answer that, is the worst available place for a guess; naming
+ * the two ids this type already documents is not a guess.
+ *
+ * ⚠️ AND IT IS OPEN, SO IT ANSWERS `null` RATHER THAN GUESSING. `RegionId`
+ * admits any string, and the day a third region exists it is a row here — added
+ * deliberately, with words somebody chose. Until then an unknown id has no name
+ * and every reader is told so rather than shown a prettified identifier.
+ */
+export interface Jurisdiction {
+  readonly id: RegionId;
+  /** What it is called. Short enough to sit in a chip beside a mark. */
+  readonly name: string;
+  /** One line: what a workspace is choosing when it chooses this. */
+  readonly means: string;
+}
+
+export const JURISDICTIONS: Readonly<Record<string, Jurisdiction>> = {
+  auto: {
+    id: "auto",
+    name: "Global edge network",
+    means: "Stored wherever the platform places it, and served from the point of presence nearest whoever is asking.",
+  },
+  eu: {
+    id: "eu",
+    name: "European Union",
+    means: "Databases and files are pinned to the union. A commitment that appears in the processing agreement.",
+  },
+};
+
+/** ⚠️ `null` for a region nobody has named, which is the honest answer. */
+export const jurisdictionOf = (id: RegionId): Jurisdiction | null => JURISDICTIONS[id] ?? null;
+
 /** Who is acting. Every operation gets one; none may assume a human. */
 export interface Actor {
   readonly userId: UserId | null;

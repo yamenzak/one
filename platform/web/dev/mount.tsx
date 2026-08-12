@@ -29,10 +29,14 @@ import { AccountCenter } from "../src/account/center.js";
 import { AccountDetails } from "../src/account/details.js";
 import { AccountHome, type AccountHomeProps } from "../src/account/home.js";
 import { PreferencesScreen, type Preferences } from "../src/account/preferences.js";
-import { KeptHere, meaning, VaultScreen, type Kept, type Looked, type Where } from "../src/account/vault.js";
-import { LegalScreen } from "../src/account/legal.js";
+import { KeptHere, meaning, VaultScreen, type Kept, type Looked, type Where as VaultWhere } from "../src/account/vault.js";
+import { LegalScreen, MustAcceptScreen, ProductScreen, ReceivingScreen, DocScreen, type Owed } from "../src/account/legal.js";
+import { ExportScreen, type Taken } from "../src/account/export.js";
+import { CloseAccountScreen } from "../src/account/close.js";
+import { keyOf, parseWhere, pathOf, upFrom, type Where } from "../src/account/routes.js";
 import type { Doc, Product } from "../src/account/wire.js";
-import { transfersOf, type Held, type Receiving, type Subprocessor } from "@one/kernel";
+import { accountReceiving, transfersOf, type Held, type Receiving, type Subprocessor } from "@one/kernel";
+import { DEPLOYMENT } from "@one/deployment";
 import { ValueEditor, type EditableField } from "../src/editor.js";
 import { Card, Entry } from "../src/list.js";
 import { Edit } from "../src/icon.js";
@@ -120,7 +124,7 @@ const OUTCOMES = {
 const RUNGS_COMPUTE = ["self", "compute"] as const;
 const RUNGS_RAW = ["self", "compute", "agent", "staff"] as const;
 
-const VAULT_WHERES: readonly Where[] = [
+const VAULT_WHERES: readonly VaultWhere[] = [
   {
     appId: "kova", appName: "Kova", tenantId: "t1", name: "Haddad Strength",
     face: face("t1"), product: "kova",
@@ -218,6 +222,10 @@ const HELLO_DOCS: readonly Doc[] = [
       id: "privacy", version: "3", title: "Privacy notice", mustAccept: ["owner", "member"],
       body: "We hold what you give us and what you make while using this.\n\nWe do not sell it. We do not use it to train anything. Where a model is involved we name what is sent to it, on the screen you are reading now.\n\nYou can take all of it, or ask for all of it to be forgotten, from your account.",
       url: "https://example.test/privacy",
+      /* ⚠️ THE ONE STATE VERSIONING EXISTS FOR. Somebody who accepted version 3
+         is being re-asked, and without this they are shown the same wall of text
+         with a different number on it. */
+      changed: "A model may now be involved in generating an answer, and this says which one and what reaches it. Nothing else moved.",
     },
     acceptedOn: "2 March", outstanding: true,
   },
@@ -232,48 +240,78 @@ const HELLO_DOCS: readonly Doc[] = [
 ];
 
 /*
-  ⚠️ ONE RECIPIENT INSIDE EUROPE, ONE UNDER AN ADEQUACY DECISION AND ONE UNDER
-  CLAUSES CARRYING ARTICLE 9 DATA — because "does anything leave, and is any of
-  it sensitive" is the question the summary answers, and a fixture where
-  everything stays in the EEA is a picture of the one state that needs no answer.
+  ⚠️ THE PLATFORM'S OWN PROCESSORS, IMPORTED RATHER THAN INVENTED. Every company
+  on this screen is one this deployment actually uses, named as it names itself,
+  with the link to its OWN processing terms — because a disclosure fixture states
+  who holds somebody's data and under what, and a plausible-looking invention
+  there is a false claim about a real business, one copy-and-paste from a screen.
+
+  ⚠️ AND IT COMES FROM THE DECLARATION, NOT FROM A COPY OF IT. `@one/deployment`
+  is what every worker passes to the runtime; the preview reads the same object,
+  so a processor added there appears here without this file being opened, and one
+  removed cannot linger in a picture.
 */
+const ACCOUNT_DOCS: readonly Doc[] = DEPLOYMENT.legal.map((doc, i) => ({
+  doc,
+  /* ⚠️ ONE ACCEPTED AND ONE NOT, so both states of the real documents are drawn.
+     Which is which is positional rather than by id: the ids are the deployment's
+     and this file must not be the thing that has to change when they do. */
+  acceptedOn: i === 0 ? "2 March" : null,
+  outstanding: i !== 0,
+}));
+
 /*
-  ⚠️ EVERY NAME HERE IS DELIBERATELY UNREAL, AND ON THIS SCREEN THAT IS NOT A
-  STYLE CHOICE. A disclosure surface renders a claim about who controls somebody's
-  data, where it is processed and what covers a transfer — so a fixture carrying a
-  real company's name states, in a picture anybody may be shown, facts about a real
-  business that nobody declared. The first version of this named a legal entity, a
-  jurisdiction, a contact address on a live domain and an infrastructure footprint,
-  all invented.
-
-  ⚠️ IT FOLLOWS THE CONVENTION THE MANIFESTS ALREADY USE — `example.test`, and a
-  controller that says it is an example. `hello`'s own governance declaration is
-  written that way for the same reason, and this preview had simply not been held
-  to it.
+  ⚠️ A PRODUCT'S OWN RECIPIENTS, ON TOP OF THE PLATFORM'S. This is exactly what
+  `receivingOf` assembles at runtime — the deployment's list with the app's merged
+  over it — and the two extra entries are the ones Kova's manifest really
+  declares, with their real roles and their real DPA addresses.
 */
-const LEGAL_SUBPROCESSORS: readonly Subprocessor[] = [
-  { id: "host", name: "The example host", role: "Runs it and stores what is in it", receives: ["identity", "usage", "content"], where: "Wherever the example runs", safeguard: "eea", terms: "https://example.test/host-dpa" },
-  /* ⚠️ `eea` rather than `adequacy`, which is what covers a country OUTSIDE the
-     union — declaring one for somewhere inside it is a contradiction the summary
-     then reports as a transfer that never happens. */
-  { id: "billing", name: "The example biller", role: "Takes payment", receives: ["identity", "contact", "financial"], where: "Inside the union", safeguard: "eea", terms: "https://example.test/billing-dpa" },
-  { id: "model", name: "The example model", role: "Generates text and images", receives: ["content", "health"], where: "Outside the union", safeguard: "sccs", terms: "https://example.test/model-dpa", trust: "https://example.test/model-trust" },
+const PRODUCT_SUBPROCESSORS: readonly Subprocessor[] = [
+  ...DEPLOYMENT.subprocessors,
+  {
+    id: "gemini",
+    name: "Google (Gemini API)",
+    mark: "google",
+    role: "Runs the generation when a model outside our own network is the one that can do it.",
+    receives: ["content", "health"],
+    where: "Google's infrastructure, outside the union.",
+    safeguard: "sccs",
+    terms: "https://cloud.google.com/terms/data-processing-addendum",
+    trust: "https://cloud.google.com/security/compliance",
+  },
+  {
+    id: "stripe",
+    name: "Stripe, Inc.",
+    mark: "stripe",
+    role: "Takes a workspace's payment for its own plan. Never involved in what a workspace charges anybody else.",
+    receives: ["identity", "contact", "financial"],
+    where: "United States and Ireland.",
+    safeguard: "dpf",
+    terms: "https://stripe.com/legal/dpa",
+    trust: "https://stripe.com/docs/security",
+  },
 ];
 
-/* What this example declares it holds — the other half `transfersOf` crosses. */
-const LEGAL_HELD: readonly Held[] = [
+/*
+  ⚠️ WHAT THE EXAMPLE PRODUCT HOLDS — the other half `transfersOf` crosses. The
+  categories are the ones a coaching product genuinely declares, which is what
+  makes the sensitive mark on the row above real rather than decorative.
+*/
+const PRODUCT_HELD: readonly Held[] = [
   { id: "people", fields: {}, retention: { days: null, onTenantClose: "export-then-purge" },
-    holding: { kind: "personal", categories: ["identity", "contact", "usage"], subjects: ["member"], purpose: "Running the example", basis: "contract" } },
+    holding: { kind: "personal", categories: ["identity", "contact", "usage"], subjects: ["member"], purpose: "Who is in this workspace.", basis: "contract" } },
   { id: "entries", fields: {}, retention: { days: null, onTenantClose: "export-then-purge" },
-    holding: { kind: "personal", categories: ["content", "health"], subjects: ["member", "customer"], purpose: "What somebody records about themselves", basis: "consent", condition: "explicit_consent" } },
+    holding: { kind: "personal", categories: ["content", "health", "financial"], subjects: ["member", "customer"], purpose: "What somebody records about themselves.", basis: "consent", condition: "explicit_consent" } },
 ];
 
-const LEGAL_RECEIVING: Receiving = {
-  controller: "The example controls it.",
-  contact: "privacy@example.test",
+const PRODUCT_RECEIVING: Receiving = {
+  controller: DEPLOYMENT.controller,
+  contact: DEPLOYMENT.contact,
+  /* ⚠️ THE REGIONS A PRODUCT OFFERS, WHICH IS WHAT THE FIELD MEANS. Both of them
+     are named in the kernel, so the screen shows the names rather than the ids. */
   regions: ["auto", "eu"],
-  subprocessors: LEGAL_SUBPROCESSORS,
-  inference: { ai: { auto: ["model"], eu: [] } },
+  subprocessors: PRODUCT_SUBPROCESSORS,
+  inference: { ai: { auto: ["gemini"], eu: [] } },
   /*
     ⚠️ DERIVED BY THE KERNEL, NOT TYPED HERE. `transfersOf` crosses what this
     product HOLDS with what each recipient claims to receive, so a hand-written
@@ -281,29 +319,18 @@ const LEGAL_RECEIVING: Receiving = {
     the first attempt did, two transfers against three recipients, which made the
     summary read "2 of 2" and mean nothing.
   */
-  transfers: transfersOf({ collections: LEGAL_HELD, subprocessors: LEGAL_SUBPROCESSORS }),
+  transfers: transfersOf({ collections: PRODUCT_HELD, subprocessors: PRODUCT_SUBPROCESSORS }),
 };
 
-/* ⚠️ TWO PRODUCTS, because one is a picture of the state where the grouping does
-   not matter. The second asks nothing outstanding, which is what most products a
-   person belongs to look like. */
+/* ⚠️ THE ACCOUNT, THEN TWO PRODUCTS, because one product is a picture of the
+   state where the grouping does not matter. The third asks nothing outstanding,
+   which is what most products a person belongs to look like. */
 const LEGAL_PRODUCTS: readonly Product[] = [
-  /* ⚠️ THE ACCOUNT FIRST, WITH AN EMPTY `appId` — how the runtime says "this is
-     the deployment rather than a product". It has a controller and a contact and
-     no recipients: every recipient in this platform receives a PRODUCT's data. */
-  {
-    appId: "", appName: "4°", roles: ["account"],
-    docs: [
-      { doc: { id: "account-terms", version: "2026-01-01", title: "Account terms", mustAccept: ["account"], body: "This covers your account itself, not any product you use it with.\n\nThe account is yours. You can take everything it holds, close it, and be forgotten." }, acceptedOn: "2 March", outstanding: false },
-      { doc: { id: "account-privacy", version: "2026-01-01", title: "Privacy notice", mustAccept: ["account"], body: "We hold what your account is made of, and your vault — the sensitive things you record about yourself.\n\nThese are yours rather than any product's, which is why they survive leaving a workspace. No product sees one unless you grant it." }, acceptedOn: null, outstanding: true },
-    ],
-    receiving: {
-      controller: "The example controls your account and your vault.",
-      contact: "privacy@example.test",
-      subprocessors: [], regions: [], inference: {}, transfers: [],
-    },
-  },
-  { appId: "kova", appName: "Kova", roles: ["client", "owner"], docs: HELLO_DOCS, receiving: LEGAL_RECEIVING },
+  /* ⚠️ AN EMPTY `appId` IS HOW THE RUNTIME SAYS "THIS IS THE DEPLOYMENT", and the
+     disclosure is the kernel's own projection of the declaration — the same
+     function `legal.mine` answers with. */
+  { appId: "", appName: DEPLOYMENT.name, roles: ["account"], docs: ACCOUNT_DOCS, receiving: accountReceiving(DEPLOYMENT) },
+  { appId: "kova", appName: "Kova", roles: ["client", "owner"], docs: HELLO_DOCS, receiving: PRODUCT_RECEIVING },
   {
     appId: "scena", appName: "Scena", roles: ["owner"],
     docs: [{
@@ -369,6 +396,38 @@ const VAULT_ASKS: readonly Asked[] = [
 /** Long enough to see the spinner and know it is a wait, not a stutter. */
 const ROUND_TRIP_MS = 900;
 
+/*
+  ⚠️ WHAT AN EXPORT ACTUALLY COMES BACK AS — table names and counts, exactly the
+  shape `exit.account.export` answers with. The names are the platform's own
+  tables rather than friendly words, because that is what the FILE calls them and
+  a screen using a second vocabulary is one nobody can check the file against.
+
+  ⚠️ ONE DROPPED TABLE, because the row that says what is MISSING is the one this
+  screen exists for and the one a happy fixture never draws.
+*/
+const EXPORTED: Taken = {
+  at: "2026-08-12T09:14:00.000Z" as Taken["at"],
+  tables: {
+    accounts: [{}],
+    sessions: [{}, {}],
+    passkeys: [{}, {}],
+    consents: [{}, {}, {}],
+    vault_facts: [{}, {}, {}, {}],
+    vault_grants: [{}, {}],
+    vault_reads: Array.from({ length: 17 }, () => ({})),
+    notifications: Array.from({ length: 42 }, () => ({})),
+  },
+  dropped: ["milestones"],
+  account: {},
+  workspaces: [{ name: "Haddad Strength" }, { name: "Corniche Screens" }],
+};
+
+/* ⚠️ THE WORKSPACE SOMEBODY IS THE LAST MANAGER OF — the state that makes closing
+   an account a refusal that teaches rather than one that just says no. */
+const STRANDED = [
+  { tenantId: "t1", name: "Haddad Strength", product: "kova", face: face("t1") },
+];
+
 const asked = new URLSearchParams(location.hash.slice(1));
 
 function Preview() {
@@ -376,8 +435,30 @@ function Preview() {
   /* ⚠️ IN THE HASH LIKE THE OTHER TWO, because the header above promises a state
      is a link and this was the one dial the promise did not cover — so every
      review of an inner screen began with three taps somebody had to be told. */
-  const [at, setAt] = useState((asked.get("screen") ?? "home") as
-    "home" | "details" | "signin" | "prefs" | "vault" | "legal");
+  /*
+    ⚠️ A PATH, NOT A SCREEN NAME, AND IT IS THE REAL ONE. Every screen in the
+    account centre has an address now — `routes.ts` parses and prints them — so a
+    review of an inner surface is a link rather than three taps somebody has to
+    be told about, and the preview exercises the same parser the app will.
+
+    ⚠️ AND IT IS ROUND-TRIPPED THROUGH THE HASH. Written to the location on every
+    move, read from it on load: which is what makes a screenshot of a document
+    reproducible and what proves the printer and the parser agree, on every
+    navigation, rather than in a test alone.
+  */
+  const [where, setWhere] = useState<Where>(() => parseWhere(asked.get("screen") ?? ""));
+  const at = where.at;
+  const go = (to: Where) => {
+    setWhere(to);
+    const next = new URLSearchParams(location.hash.slice(1));
+    const path = pathOf(to);
+    if (path) next.set("screen", path); else next.delete("screen");
+    location.hash = next.toString();
+  };
+  const up = () => go(upFrom(where));
+  /* ⚠️ THE DIAL STILL LISTS SCREENS, and it lists them as paths for the same
+     reason: what it sets is what a link carries. */
+  const [taken, setTaken] = useState<Taken | null>(null);
   const [asking, setAsking] = useState(false);
   const [which, setWhich] = useState((asked.get("state") ?? "four") as keyof typeof CASES);
   const [outcome, setOutcome] = useState((asked.get("save") ?? "ok") as keyof typeof OUTCOMES);
@@ -416,6 +497,13 @@ function Preview() {
       workspaceFace: face("t3"), workspaceName: "Corniche Screens", product: "scena" },
   ];
 
+  /* ⚠️ ONE LOOKUP FOR EVERY LEGAL SCREEN, so a path that names a product nobody
+     is in cannot render a blank surface — it falls back to the hub, which is the
+     same total-parse rule `routes.ts` states for the path itself. */
+  const legalAt = "product" in where
+    ? LEGAL_PRODUCTS.find((p) => p.appId === where.product) ?? null
+    : null;
+
   const screen = ({ Heading }: { readonly Heading: ElementType }) =>
     at === "vault" ? (
       <VaultScreen
@@ -424,10 +512,10 @@ function Preview() {
         looks={which === "waiting" ? null : VAULT_LOOKS}
         Heading={Heading}
         onSet={save}
-        onBack={() => setAt("home")}
+        onBack={up}
       />
     ) :
-    at === "prefs" ? (
+    at === "preferences" ? (
       <PreferencesScreen
         prefs={prefs}
         Heading={Heading}
@@ -438,9 +526,9 @@ function Preview() {
           if (key === "theme") setTheme(value as "dark" | "light");
           return save();
         }}
-        onBack={() => setAt("home")}
+        onBack={up}
       />
-    ) : at === "signin" ? (
+    ) : at === "security" ? (
       <SignInMethods
         email={(CASES[which] ?? CASES.four).person.email}
         /* ⚠️ `#keys=one` IS ITS OWN KNOB because the LAST passkey is a different
@@ -453,16 +541,67 @@ function Preview() {
         onAddPasskey={() => undefined}
         onRemovePasskey={save}
         onSignOut={save}
-        onBack={() => setAt("home")}
+        onBack={up}
       />
     ) : at === "legal" ? (
       <LegalScreen
         products={which === "waiting" ? null : LEGAL_PRODUCTS}
-        onAccept={save}
-        onBack={() => setAt("home")}
+        onGo={go}
+        onBack={up}
         Heading={Heading}
       />
-    ) : at === "home" ? (
+    ) : at === "product" && legalAt ? (
+      <ProductScreen of={legalAt} onGo={go} onBack={up} Heading={Heading} />
+    ) : at === "receiving" && legalAt ? (
+      <ReceivingScreen of={legalAt} onBack={up} Heading={Heading} />
+    ) : at === "document" && legalAt ? (
+      /* ⚠️ THE DOCUMENT IS FOUND IN THE PRODUCT THE PATH NAMES, not across all of
+         them. Two products may both publish `terms`, and a search that ignored
+         the product would open whichever came first. */
+      (() => {
+        const doc = legalAt.docs.find((d) => d.doc.id === ("document" in where ? where.document : ""));
+        return doc
+          ? <DocScreen item={doc} onAccept={save} onBack={up} Heading={Heading} />
+          : <LegalScreen products={LEGAL_PRODUCTS} onGo={go} onBack={up} Heading={Heading} />;
+      })()
+    ) : at === "export" ? (
+      <ExportScreen
+        taken={taken}
+        onTake={async () => {
+          const why = await save();
+          /* ⚠️ THE ANSWER IS ONLY KEPT WHERE THE WRITE SUCCEEDED. A screen that
+             shows a table list beside a failure is telling somebody their export
+             is ready when the request came back refused. */
+          if (!why) setTaken(EXPORTED);
+          return why;
+        }}
+        onSave={taken ? () => undefined : undefined}
+        onBack={up}
+        Heading={Heading}
+      />
+    ) : at === "close" ? (
+      <CloseAccountScreen
+        /* ⚠️ `#state=waiting` IS THE UNANSWERED BLOCKING LIST, which on this
+           screen is the state that matters most: an enabled Close button in front
+           of somebody whose workspaces would be stranded. */
+        blocking={which === "waiting" ? null : asked.get("stranded") === "yes" ? STRANDED : []}
+        closesOn={asked.get("closing") === "yes" ? "19 August" : null}
+        onClose={save}
+        onCancel={save}
+        onBack={up}
+        Heading={Heading}
+      />
+    ) : at === "details" ? (
+      <AccountDetails
+        person={(CASES[which] ?? CASES.four).person}
+        since="4 March 2024"
+        emailVerified
+        Heading={Heading}
+        onSave={save}
+        onPickPhoto={() => undefined}
+        onBack={up}
+      />
+    ) : (
       <AccountHome
         {...CASES[which] ?? CASES.four}
         /* ⚠️ COUNTED FROM THE VAULT FIXTURE RATHER THAN TYPED BESIDE IT, so the
@@ -474,24 +613,11 @@ function Preview() {
           : VAULT_WHERES.flatMap((w) => w.items).filter((i) => i.granted).length
         }
         Heading={Heading}
-        onGo={(to) => {
-          if (to === "account.profile") setAt("details");
-          if (to === "account.security") setAt("signin");
-          if (to === "account.preferences") setAt("prefs");
-          if (to === "account.vault") setAt("vault");
-          if (to === "account.privacy") setAt("legal");
-        }}
+        onGo={go}
+        /* ⚠️ A WORKSPACE ROW LEAVES THIS SURFACE, which is why it is not a route
+           in it. In the product it is a full navigation to another origin. */
+        onOpenWorkspace={() => setOpen(false)}
         onClose={() => setOpen(false)}
-      />
-    ) : (
-      <AccountDetails
-        person={(CASES[which] ?? CASES.four).person}
-        since="4 March 2024"
-        emailVerified
-        Heading={Heading}
-        onSave={save}
-        onPickPhoto={() => undefined}
-        onBack={() => setAt("home")}
       />
     );
 
@@ -505,7 +631,7 @@ function Preview() {
         {/* ⚠️ THE SIGN GOES SOMEWHERE, and this is the whole reason it is a
             button: an app field bound to the vault is the one place a person
             meets the vault without having gone looking for it. */}
-        <AppFields onSave={save} onOpenVault={() => { setAt("vault"); setOpen(true); }} />
+        <AppFields onSave={save} onOpenVault={() => { go({ at: "vault" }); setOpen(true); }} />
         <button type="button" onClick={() => setOpen(true)}>Open the account centre</button>
       </div>
 
@@ -513,9 +639,9 @@ function Preview() {
           INSIDE THE PRESENTATION. Navigation is the router's state in the real
           app and this preview's state here; a presentation that owned it would
           be a presentation that had to be told about every screen. */}
-      <AccountCenter open={open} onClose={() => { setOpen(false); setAt("home"); }}>
+      <AccountCenter open={open} onClose={() => { setOpen(false); go({ at: "home" }); }}>
         {({ Heading }) => (
-          <Stack at={at === "home" ? null : at}>{screen({ Heading })}</Stack>
+          <Stack at={keyOf(where)}>{screen({ Heading })}</Stack>
         )}
       </AccountCenter>
 
@@ -529,7 +655,12 @@ function Preview() {
       />
       <div className="dial" data-open={dial ? "" : undefined} onPointerDown={(e) => e.stopPropagation()}>
         <div className="dial-panel">
-          <Group label="screen" value={at} options={["home", "details", "signin", "prefs", "vault", "legal"] as const} onPick={setAt} />
+          <Group
+            label="screen"
+            value={pathOf(where)}
+            options={["", "details", "security", "preferences", "vault", "legal", "export", "close"] as const}
+            onPick={(path) => go(parseWhere(path))}
+          />
           <Group label="workspaces" value={which} options={Object.keys(CASES) as (keyof typeof CASES)[]} onPick={setWhich} />
           <Group label="save" value={outcome} options={Object.keys(OUTCOMES) as (keyof typeof OUTCOMES)[]} onPick={setOutcome} />
           <Group label="theme" value={theme} options={["dark", "light"] as const} onPick={setTheme} />

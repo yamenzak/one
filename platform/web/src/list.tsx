@@ -36,6 +36,17 @@ export interface ItemProps {
   readonly icon?: ReactNode;
   readonly mark?: ReactNode;
   readonly title: string;
+  /**
+   * ⚠️ A NAME SET AS A NAME, AND ONLY WHERE THE ROW IS ABOUT A THING WITH ONE.
+   * A product in the reading face is a row about a word; in the brand face it is
+   * the product, recognised before it is read — the same argument the lockup
+   * makes for the account, minus the mark, which is ours and not theirs.
+   *
+   * ⚠️ IT IS A CLASS RATHER THAN A BOOLEAN so the sheet owns what it means, and
+   * so a second kind of name — a workspace, a person — is a second class rather
+   * than a second flag with a rule about which wins.
+   */
+  readonly titleAs?: "wordmark";
   readonly detail?: ReactNode;
   /**
    * The rows on a card that are not like the others.
@@ -72,17 +83,28 @@ export interface ItemProps {
   readonly current?: boolean;
 }
 
-export function Item({ icon, mark, title, detail, tone, onGo, action, sign, current }: ItemProps): ReactNode {
+export function Item({ icon, mark, title, titleAs, detail, tone, onGo, action, sign, current }: ItemProps): ReactNode {
   const body = (
     <>
       {/* ⚠️ THE WELL IS THE ICON'S GROUND, and it is what makes a column of glyphs
           read as a list rather than as loose marks at different optical weights. */}
       {mark ?? (icon ? <span className="well" data-tone={tone}>{icon}</span> : null)}
       <span className="item-body">
-        <span className="item-title">{title}</span>
+        {/* ⚠️ THE CLASS IS SPELLED OUT RATHER THAN INTERPOLATED. The sheet check
+            reads the class names a source literally writes — a name assembled at
+            runtime is one the sheet can style and nothing can be proved to wear,
+            which is exactly the affordance-nobody-ships failure it exists for. */}
+        <span className={titleAs === "wordmark" ? "item-title wordmark" : "item-title"}>{title}</span>
         {detail ? <span className="item-detail">{detail}</span> : null}
       </span>
-      {onGo && current === undefined ? <Onward className="chevron" /> : (sign ?? action)}
+      {/* ⚠️ A SIGN SHARES THE ROW WITH THE CHEVRON; AN ACTION REPLACES IT. That is
+          what `sign` has said it is for since it was written — a mark rather than
+          a control — and the implementation dropped it whenever the row went
+          anywhere, so a state written beside a destination was declared, passed,
+          and silently not rendered. An `action` still takes the chevron's place,
+          because two targets on one line is the defect that rule exists for. */}
+      {sign}
+      {onGo && current === undefined ? <Onward className="chevron" /> : (sign ? null : action)}
     </>
   );
   return onGo

@@ -3662,6 +3662,7 @@ export const kova = defineApp({
         {
           id: "cloudflare",
           name: "Cloudflare, Inc.",
+          mark: "cloudflare",
           role: "Runs the product and stores everything in it — compute, the databases, the object store, the key-value cache and the durable objects.",
           receives: ["identity", "contact", "credential", "financial", "usage", "content", "health", "biometric"],
           where: "Workers run at the point of presence nearest the request. Databases and object stores are placed in the region a studio chose.",
@@ -3683,6 +3684,7 @@ export const kova = defineApp({
           */
           id: "cloudflare-email",
           name: "Cloudflare Email Routing and Email Sending",
+          mark: "cloudflare",
           role: "Sends the messages this product sends: a sign-in code, an invitation, a notification somebody asked to be emailed.",
           receives: ["identity", "contact"],
           where: "Cloudflare's network.",
@@ -3693,6 +3695,7 @@ export const kova = defineApp({
         {
           id: "workers-ai",
           name: "Cloudflare Workers AI",
+          mark: "cloudflare",
           /*
             ⚠️ IT CAME OFF THIS LIST AND CAME BACK, WHICH IS THE MECHANISM
             WORKING. The catalogue held three Gemini models and nothing else, so
@@ -3711,6 +3714,7 @@ export const kova = defineApp({
         {
           id: "gemini",
           name: "Google (Gemini API)",
+          mark: "google",
           /*
             ⚠️ THIS ONE RECEIVES HEALTH DATA, and that is why it is worth its own
             sentence rather than a line in a list. A photograph of a meal, a
@@ -3728,6 +3732,7 @@ export const kova = defineApp({
         {
           id: "stripe",
           name: "Stripe, Inc.",
+          mark: "stripe",
           /*
             ⚠️ BETWEEN US AND A STUDIO ONLY. A studio's own customers pay the
             studio, on a page the studio owns, with a link the studio configured

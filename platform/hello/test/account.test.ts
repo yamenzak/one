@@ -261,6 +261,24 @@ describe("what a person is asked to agree to", () => {
     expect((r.body.documents as unknown as unknown[]).length).toBeGreaterThan(0);
   });
 
+  it("refuses a write anywhere until the account's own terms are accepted", async () => {
+    /*
+      ⚠️ THE GATE READ THE APP'S DOCUMENTS AND NOT THE DEPLOYMENT'S, so every
+      product's terms were enforced and none of the platform's. The account's are
+      owed for HAVING an account — an address, a passkey, a vault — and are asked
+      of `ACCOUNT_HOLDER` rather than of a role inside a product, which is exactly
+      the set an app's declaration structurally cannot reach.
+    */
+    const cookie = await clean();
+    const before = await send(ID, "/api/me.preferences.set", cookie, { theme: "dark" });
+    expect(before.status).toBe(451);
+    expect(before.body.code).toBe("platform.consent_required");
+    /* ⚠️ AND IT NAMES WHAT IS IN THE WAY, so the refusal can be sent somewhere.
+       The documents are on the problem's `meta`, which is what a screen reads to
+       decide where to take somebody — a code alone is a dead end with a citation. */
+    expect(JSON.stringify(before.body)).toContain("account-terms");
+  });
+
   it("lets them use their own account once the account's own terms are accepted", async () => {
     /* ⚠️ 451 IS THE SYMPTOM THIS EXISTS TO CATCH. It is not a permission failure
        and does not read like one — "There is something to read first", about a

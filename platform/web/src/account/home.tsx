@@ -22,6 +22,7 @@ import { Face } from "../avatar.js";
 import { Lockup } from "../brand/mark.js";
 import { Adjust, Guard, Heartbreak, Key, Onward, Save } from "../icon.js";
 import { Blank, Card, Item, Pill, Waiting } from "../list.js";
+import type { Where } from "./routes.js";
 import { Screen, Section } from "../screen.js";
 
 /* ------------------------------------------------------------------ data --- */
@@ -73,7 +74,21 @@ export interface AccountHomeProps {
    * never shown to somebody who is sharing four things.
    */
   readonly sharedCount?: number | null;
-  readonly onGo: (to: string) => void;
+  /**
+   * ⚠️ A DESTINATION, NOT A NAME. It was a string — `"account.profile"` — matched
+   * by whoever mounted the surface, so a row could name a screen nobody had built
+   * and the only symptom was a press that did nothing. Every row here now hands
+   * back an address the router can parse and print, which makes an unbuilt
+   * destination a type error rather than a dead control.
+   */
+  readonly onGo: (to: Where) => void;
+  /**
+   * ⚠️ LEAVING THE ACCOUNT CENTRE IS NOT A DESTINATION INSIDE IT. A workspace row
+   * goes INTO that workspace — another product, at another address, outside this
+   * surface entirely — so it cannot be a `Where`, and folding it into `onGo`
+   * would put a route in the union that no screen here can ever render.
+   */
+  readonly onOpenWorkspace: (tenantId: string) => void;
   readonly onClose: () => void;
   /**
    * ⚠️ THE ELEMENT THAT NAMES THE SCREEN BELONGS TO WHOEVER PRESENTS IT. Standing
@@ -87,7 +102,7 @@ export interface AccountHomeProps {
 
 const PRODUCT_NAME: Record<Product, string> = { kova: "Kova", scena: "Scena", tessa: "Tessa" };
 
-export function AccountHome({ person, workspaces, sharedCount = null, onGo, onClose, Heading = "h1" }: AccountHomeProps): ReactNode {
+export function AccountHome({ person, workspaces, sharedCount = null, onGo, onOpenWorkspace, onClose, Heading = "h1" }: AccountHomeProps): ReactNode {
   return (
     <Screen
       leave="dismiss"
@@ -112,10 +127,10 @@ export function AccountHome({ person, workspaces, sharedCount = null, onGo, onCl
           <Item
             mark={<Face kind="person" src={person.avatarUrl} name={person.name ?? person.email} className="well alive" />}
             title="Your details" detail="Your name, photo and address"
-            onGo={() => onGo("account.profile")}
+            onGo={() => onGo({ at: "details" })}
           />
-          <Item icon={<Key />} title="Sign-in methods" detail="Passkeys, codes and devices" onGo={() => onGo("account.security")} />
-          <Item icon={<Adjust />} title="Preferences" detail="Theme, language, units and feedback" onGo={() => onGo("account.preferences")} />
+          <Item icon={<Key />} title="Sign-in methods" detail="Passkeys, codes and devices" onGo={() => onGo({ at: "security" })} />
+          <Item icon={<Adjust />} title="Preferences" detail="Theme, language, units and feedback" onGo={() => onGo({ at: "preferences" })} />
         </Card>
       </Section>
 
@@ -131,7 +146,7 @@ export function AccountHome({ person, workspaces, sharedCount = null, onGo, onCl
         use; a vault reachable only from inside the app that wanted the data
         would be a control somebody loses by leaving.
       */}
-      <VaultCrown shared={sharedCount} onGo={() => onGo("account.vault")} />
+      <VaultCrown shared={sharedCount} onGo={() => onGo({ at: "vault" })} />
 
       <Section name="Workspaces">
         {workspaces === null ? (
@@ -157,7 +172,7 @@ export function AccountHome({ person, workspaces, sharedCount = null, onGo, onCl
                     {w.standing ? <Pill urgent={w.standing.urgent}>{w.standing.label}</Pill> : null}
                   </>
                 }
-                onGo={() => onGo(`workspace:${w.tenantId}`)}
+                onGo={() => onOpenWorkspace(w.tenantId)}
               />
             ))}
           </Card>
@@ -166,8 +181,8 @@ export function AccountHome({ person, workspaces, sharedCount = null, onGo, onCl
 
       <Section name="Privacy">
         <Card>
-          <Item icon={<Guard />} title="Consent and legal" detail="What you have agreed to" onGo={() => onGo("account.privacy")} />
-          <Item icon={<Save />} title="Download your data" detail="Everything we hold about you" onGo={() => onGo("account.export")} />
+          <Item icon={<Guard />} title="Consent and legal" detail="What you have agreed to" onGo={() => onGo({ at: "legal" })} />
+          <Item icon={<Save />} title="Download your data" detail="Everything we hold about you" onGo={() => onGo({ at: "export" })} />
         </Card>
       </Section>
 
@@ -179,7 +194,7 @@ export function AccountHome({ person, workspaces, sharedCount = null, onGo, onCl
       */}
       <Section>
         <Card>
-          <Item icon={<Heartbreak />} tone="alarm" title="Close your account" onGo={() => onGo("account.delete")} />
+          <Item icon={<Heartbreak />} tone="alarm" title="Close your account" onGo={() => onGo({ at: "close" })} />
         </Card>
       </Section>
     </Screen>

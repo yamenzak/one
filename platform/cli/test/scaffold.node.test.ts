@@ -44,6 +44,23 @@ describe("the app id", () => {
 
   it("refuses a door and a platform package", () => {
     for (const taken of ["admin", "setup", "kernel", "runtime", "ui"]) expect(idProblem(taken), taken).toBeTruthy();
+    /*
+      ⚠️ AND EVERY NAME THE INTERFACE'S OWN ADDRESSES ALREADY USE. `RESERVED_APP_IDS`
+      is the kernel's, because the reason is the kernel's: the deployment's own id
+      is the empty string, which no path can carry, so the account centre spells it
+      out — and an app registered under that name would take over the address the
+      platform's own terms live at, on every link, with nothing failing. The
+      scaffold enforces it; this is what keeps the two lists from drifting.
+    */
+    /* ⚠️ READ OUT OF THE KERNEL'S SOURCE RATHER THAN IMPORTED, for the reason
+       stated above the CLI's own import: this package has to run in a checkout
+       where nothing is installed or built, so it may not depend on the kernel —
+       and a list copied by hand is two lists that agree until the first edit. */
+    const reserved = [...read("kernel/src/app.ts")
+      .match(/RESERVED_APP_IDS: readonly string\[\] = \[([^\]]*)\]/)![1]!
+      .matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
+    expect(reserved.length).toBeGreaterThan(0);
+    for (const taken of reserved) expect(idProblem(taken), taken).toBeTruthy();
   });
 });
 

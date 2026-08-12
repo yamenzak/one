@@ -106,15 +106,52 @@ full ink, so somebody scanning "who has my data" read a column of grey names und
 a column of white sentences about hosting and payment. The identity goes at the
 top, at the weight of an identity.
 
-**A group opens on what it owes.** — Somebody with nothing outstanding wants one
-line per group saying so; somebody who owes something wants it in front of them.
-Opening exactly the groups with something outstanding is both, and it is what
-removes the alternative: a "needs your attention" section above the list, which is
-the same rows twice, ticking in two places at once.
+**A thing with its own screenful of content is a place, not a fold.** — Built as
+a disclosure, a product with four documents and a recipient list of its own read
+fine closed and pushed the next product half a screen down when opened — so a
+person in three of them was reading a list that moved under them. What earns the
+row is the state ON it: "1 to read" or "Up to date", so the hub is readable
+without opening anything and the chevron is a promise of a place.
+
+**A sign shares a row with the chevron; an action replaces it.** — `sign` was
+documented as a mark rather than a control, and was silently dropped whenever the
+row went anywhere: a state written beside a destination was declared, passed, and
+never rendered.
 
 **Destructive is the words, not the whole row.** — A red bar in a list of
 settings reads as an error somebody has to fix. Red text on the one row that
 cannot be undone reads as a warning about that row.
+
+### 2.3a Addresses
+
+**Every screen has one, and a screen without one cannot be linked to, refused to,
+or supported.** — The account centre was a route with four pieces of component
+state inside it. So there was no link to somebody's own vault, a refusal that said
+"read this first" had nowhere to send anybody, support could not say "open this
+address", and the back button left the whole surface instead of going up one
+level. The vocabulary is a parser and a printer over a value — the package carries
+no router, because a shared surface that mounted one would have to agree with
+three of them.
+*Checked: `web/test/routes.test.ts` — every route round-trips, and no two print to
+one path.*
+
+**Up is derived, never carried.** — A screen that knew where it came from would
+behave differently when it was deep-linked to, which is the one thing the stack
+already refuses to let a screen know.
+
+**A destination is a value, not a name.** — Rows handed back strings that whoever
+mounted the surface matched, so a row could name a screen nobody had built and the
+only symptom was a press that did nothing. Handing back an address makes that a
+type error. What leaves the surface entirely — a workspace row, which goes into
+another product at another origin — is a different callback, because folding it in
+would put a route in the union that no screen here can render.
+
+**A reserved segment is refused where the name is declared, not handled where it
+is parsed.** — One path segment past a product is where a document's id goes, and
+the disclosure sits at the same depth under a fixed word. A document called that
+word would resolve to the disclosure on every link, for ever, with nothing
+throwing. A parser can only guess which the author meant; a refusal is a sentence
+somebody reads while the name is still in their hand.
 
 ### 2.4 Words
 
@@ -135,6 +172,21 @@ them is outside Europe, some of it is sensitive.* Write the fact. The rows behin
 it are the evidence and belong under it, not in place of it. It is computed from
 the same declaration the list is, in one place, because a summary that can
 disagree with the list under it is worse than no summary.
+
+**A version says what moved, and only to somebody who saw the last one.** — The
+consent ledger is keyed per person per document per VERSION, so republishing
+correctly re-asks everybody — and what they were shown was the same wall of text
+with a different number on it. Somebody re-agreeing without being told what changed
+is a signature collected, not a consent given. To a first reader it is a diff
+against a document they have not read, so it is not shown at all.
+
+**A refusal the server already makes needs a surface, or it is a dead end with a
+citation.** — Every write with an outstanding document came back 451 naming
+document ids, and no screen existed for it: a person met an error on whatever they
+happened to be doing. The screen names which product is asking, tells a new version
+from a first reading, and says that leaving is still allowed — because the exit
+lane survives every gate in the platform precisely so somebody who will not agree
+can take their account and go.
 
 **A label promises whose fact it is.** — "Stored in" over `auto, eu` was the
 regions the PRODUCT can be deployed in, under a label saying where THIS PERSON'S
@@ -201,6 +253,16 @@ something is the whole gesture. What stays shared is the timing.
 *Checked: `web/test/icon.test.tsx` — every icon's shape is pinned, because the
 movements address SVG children by position and Lucide redraws icons between
 versions. A redrawn icon does not fail; it animates the wrong part, quietly.*
+
+**A disclosure opens and closes; it does not appear and vanish.** — It was the one
+state change in the interface with no movement at all, and the worst place for it:
+the content arrives below the row that was pressed, so everything under it jumps
+and the eye has nothing to follow. The element hides its own children when closed,
+so the familiar 0fr-to-1fr transition never runs — the closed state does not render
+— which is why this animates the browser's own content box and keeps the element a
+real disclosure: keyboard, open state, and a control a reader is told is
+expandable. Where the pseudo-element is unsupported the property is dropped and it
+opens instantly, exactly as before.
 
 **Ambient motion is not on the interface scale.** — A sky drifting over
 fifty-four seconds and a face breathing over nine are weather: nothing is
@@ -322,6 +384,22 @@ carries its own light, its own lockup and its whole surface as the target — an
 the light is the page's own variant at a different hue, one number moved, so it
 is unmistakably its own without being a second design. At most one per surface;
 a second crown is a list of crowns, which is a list.
+
+**A recognisable thing gets its mark, and the mark never carries the
+identification.** — A list of company names is a list of words to read; the same
+list with logos is one to recognise, and a reader who has seen the host's mark on a
+hundred status pages skips the sentence. Which mark to draw is DECLARED rather than
+inferred from an id — two entries for one company share a mark and keep their own
+ids — and an unknown or absent name falls back to the initial, never to a drawn
+office block, which beside three real logos reads as a company nobody could
+identify. The full legal name is always on the row, so the mark is hidden from a
+reader.
+*Checked: `web/test/vendors.test.tsx` — every declared mark has a drawing.*
+
+**A link to somebody else's terms is a link, never a copy.** — Their certification
+list changes on their schedule; a copy in this repository is wrong the first time
+one lapses, in the most damaging place available — a compliance claim we made about
+somebody else.
 
 **A section that is a place with a mark of its own is named by the mark.** — The
 account's own documents sit above three products' in one list. Set as words,

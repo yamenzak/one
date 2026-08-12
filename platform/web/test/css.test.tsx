@@ -25,6 +25,7 @@ const props: AccountHomeProps = {
     { tenantId: "t2", slug: "b", name: "B", product: "scena", role: "Coach", standing: { label: "Payment failed", urgent: true } },
   ],
   onGo: () => undefined,
+  onOpenWorkspace: () => undefined,
   onClose: () => undefined,
 };
 
@@ -47,7 +48,19 @@ const used = new Set(
   [
     ...[markupFor(), markupFor({ workspaces: null }), markupFor({ workspaces: [] }), markupFor({ person: { email: "x@y.com" } })]
       .flatMap((html) => [...html.matchAll(/class="([^"]+)"/g)]),
-    ...sources.flatMap((src) => [...src.matchAll(/className="([^"]+)"/g)]),
+    /*
+      ⚠️ AND A CONDITIONAL CLASS COUNTS. A row's title is one class or two
+      depending on what it is naming, so the name is written as a literal inside
+      an expression rather than as an attribute value — and a scan that only read
+      `className="…"` reported it as styled-and-unworn, which is the one direction
+      of this check that cannot be dismissed as noise. Every quoted string inside
+      the expression is taken, because that is where a spelled-out class is.
+    */
+    ...sources.flatMap((src) => [
+      ...src.matchAll(/className="([^"]+)"/g),
+      ...[...src.matchAll(/className=\{([^}]*)\}/g)]
+        .flatMap((m) => [...m[1]!.matchAll(/"([^"]+)"/g)]),
+    ]),
   ]
     .flatMap((m) => m[1]!.split(/\s+/))
     /*

@@ -18,7 +18,7 @@ import type {
   ConfigRegistry, DeploymentSpec, InferenceHandle, ObjectHandle, ProblemCatalog, RegionId, Resolved, ResolvedBindings, ResolvedRegion, SchemaModule, Session, SqlHandle, StandingState, TenantId,
 } from "@one/kernel";
 import {
-  ALWAYS_ALLOWED, CONSENT_EXEMPT_LANES, accountCascade, assertComposable, auditFor, check, consentGate, cookieDomainFor, gateFor, laneOf, weekStarting, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT, SUPPORT_SESSION,
+  ACCOUNT_HOLDER, ALWAYS_ALLOWED, CONSENT_EXEMPT_LANES, accountCascade, assertComposable, auditFor, check, consentGate, cookieDomainFor, gateFor, laneOf, weekStarting, PLATFORM_PROBLEMS, SEATS_ENTITLEMENT, STORAGE_ENTITLEMENT, SUPPORT_SESSION,
   catalogueOf, detailFor, floorPlan, fromQuery, PUBLIC, relyingPartyFor, resolveEntitlements, resolveRequest, routeFor, tableNameFor, validateSession, withinQuota,
 } from "@one/kernel";
 import { bindingsFor, globalSql, secretFor, type RawEnv } from "./env.js";
@@ -1128,9 +1128,19 @@ export function createRuntime<B extends BindingSpec>(app: AppSpec<B>, opts: Runt
          every sign-in, every exit and every acceptance. `consentGate` still owns
          the rule, and `kernel/test/app.test.ts` covers it on its own. */
       if (op.kind === "write" && session && !CONSENT_EXEMPT_LANES.includes(laneOf(op))) {
-        const outstanding = outstandingFor(
-          app.governance.legal, personRole, await consentsOf(directoryDb, session.accountId),
-        );
+        /*
+          ⚠️ BOTH SETS, AND THE ACCOUNT'S IS THE ONE NOTHING HELD ANYBODY TO. The
+          deployment's terms are owed for HAVING an account — an address, a
+          passkey, a vault — so they are asked of `ACCOUNT_HOLDER` rather than of
+          a role inside a product, and a gate reading only the app's documents
+          enforced every product's terms and none of the platform's. That is the
+          shape the consent gate itself exists to prevent, one level up.
+        */
+        const accepted = await consentsOf(directoryDb, session.accountId);
+        const outstanding = [
+          ...outstandingFor(opts.deployment?.legal ?? [], ACCOUNT_HOLDER, accepted),
+          ...outstandingFor(app.governance.legal, personRole, accepted),
+        ];
         const consent = consentGate({ kind: "write", lane: laneOf(op), outstanding: outstanding.map((d) => d.id) });
         if (!consent.allowed) {
           return problemResponse(

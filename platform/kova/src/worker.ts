@@ -111,7 +111,7 @@ const runtime = createRuntime(kova, {
       await publishVaultSpec(directory, kova);
       /* ⚠️ AND WHAT THIS PRODUCT ASKS PEOPLE TO AGREE TO, for the same reason:
          the account centre renders every app's, and a worker knows only its own. */
-      await publishLegalSpec(directory, kova);
+      await publishLegalSpec(directory, kova, DEPLOYMENT);
     },
     region: (bind) => applySchema(bind.db, REGIONAL_MODULES).then(() => undefined),
   },

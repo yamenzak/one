@@ -28,8 +28,11 @@ import { Marked, Unset } from "../src/list.js";
 import { SwitchRow } from "../src/switch.js";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ValueEditor, ValueEditorBody } from "../src/editor.js";
-import { counted, held, LegalScreen, paragraphs, receives, ReceivingScreen, said, state } from "../src/account/legal.js";
-import type { Doc } from "../src/account/wire.js";
+import { counted, DocScreen, held, LegalScreen, MustAcceptScreen, paragraphs, ProductScreen, receives, ReceivingScreen, said, state } from "../src/account/legal.js";
+import { ExportScreen } from "../src/account/export.js";
+import { CloseAccountScreen } from "../src/account/close.js";
+import { JurisdictionChip } from "../src/jurisdiction.js";
+import type { Doc, Product } from "../src/account/wire.js";
 import { configureFeedback, feedbackSettings, FEEDBACK_DEFAULT } from "../src/feedback.js";
 import { Device } from "../src/icon.js";
 
@@ -609,15 +612,21 @@ describe("consent and legal", () => {
 
   /* ⚠️ ONE PRODUCT UNLESS A TEST SAYS OTHERWISE — the grouping is the subject of
      its own test rather than a fixture every other one has to carry. */
-  const screen = (docs: readonly Doc[], receiving: Receiving | null = null) => renderToStaticMarkup(
-    <LegalScreen
-      products={[{ appId: "hello", appName: "Hello", roles: ["owner"], docs, receiving }]}
-      onAccept={async () => null} onBack={() => undefined}
+  /* ⚠️ THE HUB LISTS PRODUCTS; A PRODUCT'S OWN SCREEN LISTS ITS DOCUMENTS. Two
+     surfaces since the disclosure came out of the hub, so the helpers are two. */
+  const hub = (products: readonly Product[]) => renderToStaticMarkup(
+    <LegalScreen products={products} onGo={() => undefined} onBack={() => undefined} />,
+  );
+  const one = (docs: readonly Doc[], receiving: Receiving | null = null) => renderToStaticMarkup(
+    <ProductScreen
+      of={{ appId: "hello", appName: "Hello", roles: ["owner"], docs, receiving }}
+      onGo={() => undefined} onBack={() => undefined}
     />,
   );
+  const screen = one;
 
   it("marks only what is unfinished, and not in the colour of a mistake", () => {
-    const html = screen([
+    const html = one([
       DOC({ acceptedOn: "2 March" }),
       DOC({ outstanding: true }, { id: "privacy", title: "Privacy" }),
     ]);
@@ -630,7 +639,7 @@ describe("consent and legal", () => {
   it("offers no way to agree without opening the document", () => {
     /* ⚠️ A tick beside a link is worth nothing as evidence: the only defensible
        record is one where the text was on the screen. */
-    expect(screen([DOC({ outstanding: true })])).not.toMatch(/I agree/);
+    expect(one([DOC({ outstanding: true })])).not.toMatch(/I agree/);
   });
 
   /* ⚠️ THE DISCLOSURE IS ITS OWN SCREEN NOW, so it is rendered as one. Folded
@@ -682,47 +691,36 @@ describe("consent and legal", () => {
     /* ⚠️ THE SUMMARY HAS TO BE WORTH NOT OPENING — the rule the vault's groups and
        the preferences hub already live by. A row saying only "Who else sees this"
        is a door, and everything behind it is one press further away for nothing. */
-    expect(screen([DOC()], RECEIVING)).toContain("2 companies \u00b7 1 outside Europe");
+    expect(one([DOC()], RECEIVING)).toContain("2 companies \u00b7 1 outside Europe");
   });
 
   it("says so when a product has published no disclosure at all", () => {
     /* ⚠️ A ROW THAT PREDATES THE COLUMN IS A REAL STATE, and rendering nothing
        makes it indistinguishable from a product that shares with nobody — which is
        the opposite claim. The row is there and does not go anywhere. */
-    const html = screen([DOC()], null);
+    const html = one([DOC()], null);
     expect(html).toContain("Not published yet");
     expect(html).not.toContain("Nobody else");
   });
 
-  it("opens the product that is owed something, and leaves the settled ones shut", () => {
+  it("makes each product a place to go rather than a thing that unfolds", () => {
     /*
-      ⚠️ BOTH READERS, WITH NO SECOND LIST. Somebody with nothing outstanding wants
-      one line per product saying so; somebody who owes a document wants it in
-      front of them. A "needs your attention" section at the top would be the same
-      rows twice, ticking in two places at once.
+      ⚠️ A DISCLOSURE PUSHED THE NEXT PRODUCT HALF A SCREEN DOWN. A product with
+      four documents and a disclosure of its own is a PLACE, and unfolding one
+      moved the list under whoever was reading it — so the hub is a list of
+      destinations, which is what every other hub in this account centre is.
     */
-    const html = renderToStaticMarkup(
-      <LegalScreen
-        products={[
-          { appId: "kova", appName: "Kova", roles: ["owner"], docs: [DOC({ outstanding: true })], receiving: null },
-          { appId: "scena", appName: "Scena", roles: ["owner"], docs: [DOC({ acceptedOn: "11 May" }, { id: "s" })], receiving: null },
-        ]}
-        onAccept={async () => null} onBack={() => undefined}
-      />,
-    );
-    /* One open, and it is the one before Scena in the markup. */
-    expect([...html.matchAll(/<details class="disclose" open/g)]).toHaveLength(1);
-    expect(html.indexOf("open=")).toBeLessThan(html.indexOf("Scena"));
-  });
-
-  it("names the roles a document is owed of, spoken", () => {
-    /* ⚠️ THE ROLES ARE WHAT DECIDES WHICH DOCUMENTS ARE OWED — the same person is
-       a client in one studio and an owner in another, and reads a different set
-       for it. Sentence case, because the stored word is a registry key; commas
-       until the last one, because joining three with "and" is a chant. */
-    expect(held(["owner"])).toBe("Owner");
-    expect(held(["client", "owner"])).toBe("Client and owner");
-    expect(held(["owner", "assistant", "client"])).toBe("Owner, assistant and client");
+    const html = hub([
+      { appId: "kova", appName: "Kova", roles: ["owner"], docs: [DOC({ outstanding: true })], receiving: null },
+      { appId: "scena", appName: "Scena", roles: ["owner"], docs: [DOC({ acceptedOn: "11 May" }, { id: "s" })], receiving: null },
+    ]);
+    expect(html).not.toContain("<details");
+    /* ⚠️ AND THE STATE IS ON THE ROW, so the hub is readable without opening
+       anything — which is what a list of doors would have taken away. */
+    expect(html).toContain("1 to read");
+    expect(html).toContain("Up to date");
+    /* ⚠️ THE NAME IS SET AS A NAME. In the reading face it is a row about a word. */
+    expect(html).toMatch(/class="item-title wordmark">Kova/);
   });
 
   it("counts what is owed rather than what was agreed", () => {
@@ -744,15 +742,10 @@ describe("consent and legal", () => {
       whichever one happens to be behind that door — so an ungrouped list is a
       list that cannot say whose terms these are.
     */
-    const html = renderToStaticMarkup(
-      <LegalScreen
-        products={[
-          { appId: "kova", appName: "Kova", roles: ["owner"], docs: [DOC({ outstanding: true })], receiving: null },
-          { appId: "scena", appName: "Scena", roles: ["owner"], docs: [DOC({ acceptedOn: "11 May" }, { id: "s" })], receiving: null },
-        ]}
-        onAccept={async () => null} onBack={() => undefined}
-      />,
-    );
+    const html = hub([
+      { appId: "kova", appName: "Kova", roles: ["owner"], docs: [DOC({ outstanding: true })], receiving: null },
+      { appId: "scena", appName: "Scena", roles: ["owner"], docs: [DOC({ acceptedOn: "11 May" }, { id: "s" })], receiving: null },
+    ]);
     expect(html).toContain("Kova");
     expect(html).toContain("Scena");
   });
@@ -778,25 +771,220 @@ describe("consent and legal", () => {
       signed up for, when it is the thing every product is reached through — and
       the one that holds the vault.
     */
-    const html = renderToStaticMarkup(
-      <LegalScreen
-        products={[
-          { appId: "", appName: "4°", roles: ["account"], docs: [DOC()], receiving: null },
-          { appId: "kova", appName: "Kova", roles: ["owner"], docs: [DOC({}, { id: "k" })], receiving: null },
-        ]}
-        onAccept={async () => null} onBack={() => undefined}
-      />,
-    );
+    const html = hub([
+      { appId: "", appName: "4°", roles: ["account"], docs: [DOC()], receiving: null },
+      { appId: "kova", appName: "Kova", roles: ["owner"], docs: [DOC({}, { id: "k" })], receiving: null },
+    ]);
     /* ⚠️ THE LOCKUP, WHICH IS THE PLATFORM'S ONE DEVICE FOR "this belongs to the
        account" — the same object that names the account centre and the vault. As
        words it is a fourth product with a longer name. */
     expect(html).toContain(`<span class="lockup-word">Account</span>`);
     expect(html).toContain(">Kova<");
-    /* ⚠️ AND IT IS NOT ONE OF THE PRODUCTS. It has no disclosure of its own to
-       fold, because it is not a group among groups. */
+    /* ⚠️ AND IT IS NOT ONE OF THE PRODUCTS. Its documents are on the hub itself,
+       under the lockup, because it is not a product among products. */
     expect(html.indexOf("lockup-word")).toBeLessThan(html.indexOf("Products"));
   });
 
+  it("says what changed, and only to somebody who agreed to the last one", () => {
+    /*
+      ⚠️ VERSIONING WAS ALREADY REAL AND SILENT. The ledger is keyed per person
+      per document per VERSION, so a new version correctly re-asks everybody — and
+      what they were shown was the same wall of text with a different number on
+      it. Somebody re-agreeing without being told what moved is a signature
+      collected rather than a consent given.
+    */
+    const changed = { ...DOC({ acceptedOn: "2 March", outstanding: true }) };
+    const doc = { ...changed, doc: { ...changed.doc, changed: "We named the model." } };
+    expect(renderToStaticMarkup(
+      <DocScreen item={doc} onAccept={async () => null} onBack={() => undefined} />,
+    )).toContain("We named the model.");
+
+    /* ⚠️ AND NOT TO A FIRST READER. To somebody who has never accepted anything
+       here it is a diff against a document they have not read — noise at the top
+       of the thing they are meant to read. */
+    const first = { ...doc, acceptedOn: null };
+    expect(renderToStaticMarkup(
+      <DocScreen item={first} onAccept={async () => null} onBack={() => undefined} />,
+    )).not.toContain("We named the model.");
+  });
+
+  it("shows every recipient's own mark and its own links", () => {
+    /*
+      ⚠️ THE LINKS ARE THE VENDOR'S AND ARE NOT COPIED FROM. Their processing
+      terms and their certification list change on their schedule; a copy in this
+      repository is wrong the first time one lapses, in the most damaging place
+      available — a compliance claim we made about somebody else.
+    */
+    const html = who(RECEIVING);
+    expect(html).toContain(`href="t"`);
+    /* ⚠️ AND A COMPANY WITH NO DRAWN MARK STILL HAS A FACE. An unknown name and
+       an absent one both fall back to the initial, so nothing here can fail to
+       render — and a generic drawn building would read as a company nobody could
+       identify. */
+    expect(html).toMatch(/class="vendor-letter">T</);
+  });
+});
+
+/* ------------------------------------------------------------ before you go --- */
+
+describe("what stands between somebody and using the product", () => {
+  const OWED = [
+    { product: "", productName: "4°", doc: DOC().doc, seenBefore: false },
+    { product: "kova", productName: "Kova", doc: { ...DOC().doc, id: "privacy", title: "Privacy notice" }, seenBefore: true },
+  ];
+
+  /*
+    ⚠️ THE SERVER ALREADY REFUSED AND THERE WAS NO SURFACE FOR IT. Every write
+    with an outstanding document comes back `platform.consent_required` — so
+    without a screen, a person met an error on whatever they happened to be
+    doing, naming documents, with no way to reach one.
+  */
+  it("names which product is asking, because the list crosses them", () => {
+    const html = renderToStaticMarkup(
+      <MustAcceptScreen owed={OWED} onGo={() => undefined} onLeave={() => undefined} />,
+    );
+    expect(html).toContain("4°");
+    expect(html).toContain("Kova");
+  });
+
+  /* ⚠️ "You agreed to this before and it has changed" IS A DIFFERENT SENTENCE
+     from "you have never agreed to this", and on the day terms are republished it
+     is the sentence everybody is owed. */
+  it("tells a new version from a first reading, on the row and in the title", () => {
+    const html = renderToStaticMarkup(
+      <MustAcceptScreen owed={OWED} onGo={() => undefined} onLeave={() => undefined} />,
+    );
+    expect(html).toContain("New version");
+    expect(html).toContain("Not accepted");
+    expect(html).toContain("Something has changed");
+
+    const fresh = renderToStaticMarkup(
+      <MustAcceptScreen owed={[OWED[0]!]} onGo={() => undefined} onLeave={() => undefined} />,
+    );
+    expect(fresh).toContain("Before you continue");
+    expect(fresh).not.toContain("Something has changed");
+  });
+
+  /* ⚠️ LEAVING IS ALWAYS ALLOWED, AND IT IS SAID HERE RATHER THAN IMPLIED. The
+     exit lane survives every gate in the platform for exactly this reason; a
+     screen that only offers agreement is one that pretends otherwise. */
+  it("says the way out is still open", () => {
+    const html = renderToStaticMarkup(
+      <MustAcceptScreen owed={OWED} onGo={() => undefined} onLeave={() => undefined} />,
+    );
+    expect(html).toContain("close your account");
+  });
+});
+
+/* ----------------------------------------------------------------- leaving --- */
+
+describe("taking your data and closing the account", () => {
+  it("keeps the close button off until it knows what would be stranded", () => {
+    /*
+      ⚠️ `null` IS NOT ANSWERED YET AND `[]` IS NOTHING IN THE WAY. Rendered
+      enabled while the blocking list is still coming, this is a working Close for
+      somebody whose workspaces would be left with nobody who can manage them.
+    */
+    const waiting = renderToStaticMarkup(
+      <CloseAccountScreen blocking={null} closesOn={null}
+        onClose={async () => null} onCancel={async () => null} onBack={() => undefined} />,
+    );
+    expect(waiting).not.toContain("Close my account");
+
+    const clear = renderToStaticMarkup(
+      <CloseAccountScreen blocking={[]} closesOn={null}
+        onClose={async () => null} onCancel={async () => null} onBack={() => undefined} />,
+    );
+    expect(clear).toContain("Close my account");
+  });
+
+  /* ⚠️ A REFUSAL THAT NAMES THE WORKSPACES IS ONE SOMEBODY CAN ACT ON, where
+     "you cannot do this" is a wall with no door in it. */
+  it("names what would be left with nobody, rather than only refusing", () => {
+    const html = renderToStaticMarkup(
+      <CloseAccountScreen
+        blocking={[{ tenantId: "t1", name: "Haddad Strength" }]}
+        closesOn={null}
+        onClose={async () => null} onCancel={async () => null} onBack={() => undefined} />,
+    );
+    expect(html).toContain("Haddad Strength");
+    expect(html).toContain("Hand those over first");
+  });
+
+  /* ⚠️ ALREADY CLOSING IS A DIFFERENT SCREEN, not the same one with a banner. The
+     only thing to decide is whether to come back. */
+  it("offers only the way back once it is already closing", () => {
+    const html = renderToStaticMarkup(
+      <CloseAccountScreen blocking={[]} closesOn="19 August"
+        onClose={async () => null} onCancel={async () => null} onBack={() => undefined} />,
+    );
+    expect(html).toContain("Keep my account");
+    expect(html).not.toContain("Close my account");
+  });
+
+  /* ⚠️ AN EXPORT THAT DOES NOT SAY WHAT IS MISSING IS THE DANGEROUS KIND: it
+     arrives, it is full of somebody's data, and nothing in it says what is not
+     there. */
+  it("lists what could not be read beside what was", () => {
+    const taken = {
+      at: "2026-08-12T00:00:00.000Z" as never,
+      tables: { consents: [{}, {}], vault_facts: [{}] },
+      dropped: ["milestones"],
+      account: {}, workspaces: [],
+    };
+    const html = renderToStaticMarkup(
+      <ExportScreen taken={taken} onTake={async () => null} onBack={() => undefined} />,
+    );
+    expect(html).toContain("2 records");
+    expect(html).toContain("1 record");
+    expect(html).toContain("milestones");
+    expect(html).toContain("Not included");
+  });
+
+  /* ⚠️ AND THE "what could not be read" SECTION IS ABSENT WHERE NOTHING WAS. A
+     reassurance on every successful export trains people to skip the one time it
+     says otherwise. */
+  it("says nothing about dropped tables when none were", () => {
+    const taken = {
+      at: "2026-08-12T00:00:00.000Z" as never,
+      tables: { consents: [{}] }, dropped: [], account: {}, workspaces: [],
+    };
+    expect(renderToStaticMarkup(
+      <ExportScreen taken={taken} onTake={async () => null} onBack={() => undefined} />,
+    )).not.toContain("What could not be read");
+  });
+});
+
+describe("where a workspace's records live", () => {
+  /*
+    ⚠️ IT WAS AN IDENTIFIER EVERYWHERE IT APPEARED. `auto` and `eu` were printed
+    raw because no human name for a region existed anywhere in the platform, and
+    any screen that wanted one would have had to invent it — on the one subject
+    where an invention is a claim about where somebody's data physically is.
+  */
+  it("names the two regions the platform declares", () => {
+    expect(renderToStaticMarkup(<JurisdictionChip region="auto" />)).toContain("Global edge network");
+    expect(renderToStaticMarkup(<JurisdictionChip region="eu" />)).toContain("European Union");
+  });
+
+  /* ⚠️ AND AN UNKNOWN ONE IS PRINTED AS ITSELF. The id is open by design, so a
+     deployment may name a third; a prettified guess would be the screen inventing
+     the answer it exists to give. */
+  it("prints a region nobody has named as itself, with no mark", () => {
+    const html = renderToStaticMarkup(<JurisdictionChip region="ap-south" />);
+    expect(html).toContain("ap-south");
+    expect(html).not.toContain("jurisdiction-face");
+  });
+
+  /* ⚠️ THE SENTENCE ONLY WHERE THE SURFACE IS ABOUT RESIDENCY. In a list it is a
+     paragraph beside every row. */
+  it("explains what choosing it means only where it is asked to", () => {
+    expect(renderToStaticMarkup(<JurisdictionChip region="eu" />)).not.toContain("processing agreement");
+    expect(renderToStaticMarkup(<JurisdictionChip region="eu" explain />)).toContain("processing agreement");
+  });
+});
+
+describe("the rest of the account centre", () => {
   it("renders a declared document as text, never as markup", () => {
     /* ⚠️ A manifest is not an injection surface. */
     const html = renderToStaticMarkup(<>{paragraphs("<img src=x onerror=alert(1)>\n\nsecond")}</>);

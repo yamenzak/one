@@ -74,8 +74,100 @@ export const ACCOUNT_CSS = `
   scanning "who has my data" is scanning FOR: they were reading a column of grey
   company names under a column of white sentences about hosting and payment.
 */
-.party { display: grid; gap: 4px; padding: 13px var(--pad); }
+.party { display: grid; gap: 6px; padding: 15px var(--pad); }
+/* ⚠️ THE MARK AND THE NAME ARE ONE OBJECT, and the mark is the row's icon well
+   rather than a logo at its own size — a company drawn larger than the platform
+   icons beside it is the one row in a column that does not line up. */
+.party-head { display: flex; align-items: center; gap: 14px; }
+.party-said { min-inline-size: 0; display: grid; gap: 2px; }
 .party-name { font-size: 17px; line-height: 1.35; }
-.party-role { color: var(--ink-quiet); font-size: 15px; }
+.party-role { color: var(--ink-quiet); font-size: 15px; line-height: 1.35; }
 .party-where { color: var(--ink-faint); font-size: 13.5px; }
+/* ⚠️ THE LINKS ARE AT THE END AND THEY ARE QUIET. Their processing terms and
+   their own trust page are what a person checks rather than what they read, so
+   they sit under the record as two small doors instead of competing with the
+   name for the top of it. */
+.party-links { display: flex; flex-wrap: wrap; gap: 14px; margin-block-start: 2px; }
+.party-links a { color: var(--accent); font-size: 13.5px; text-underline-offset: 3px; }
+
+/* ------------------------------------------------------------- somebody else */
+
+/*
+  ⚠️ THE VENDOR'S COLOUR AS A GROUND, NOT AS A FILL. Four saturated logo tiles in
+  a column is a sponsor wall; the same four mixed into the card's own surface are
+  a list with identities in it — and the mix survives both themes without a
+  second set of values, which a painted brand colour does not.
+
+  ⚠️ THE SAME WELL AS EVERY OTHER ROW'S ICON. A logo at its own size beside a
+  column of platform icons is the one row that does not line up, and it is the row
+  a reader is most likely to be scanning.
+*/
+/* ⚠️ A ROUNDED SQUARE, NEVER A DISC. Round is a symbol or a person; a company is
+   a thing with an identity of its own, and its mark in a circle is its mark with
+   the corners cut off — the same rule the workspace mark is set by. */
+/* ⚠️ AND A HAIRLINE IN THE SAME HUE, WHICH IS WHAT MAKES A ONE-COLOUR MARK READ.
+   A logo drawn in the colour of the ground it sits on is legible in one theme and
+   a smudge in the other; the ring gives the tile an edge regardless, so the mark
+   inside it is being framed rather than doing that work itself. */
+.vendor { flex: none; display: grid; place-items: center;
+  inline-size: 44px; block-size: 44px; border-radius: 14px;
+  background: color-mix(in oklab, var(--vendor, var(--ink)) 16%, var(--card));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--vendor, var(--ink)) 26%, transparent); }
+.vendor svg { inline-size: 30px; block-size: 30px; }
+/* ⚠️ A LETTER, NEVER A DRAWN OFFICE BLOCK. A generic building beside three real
+   marks reads as a company nobody could identify; an initial in the same well
+   reads as one whose mark we simply do not draw. */
+.vendor-letter { font-family: var(--font-brand); font-size: 19px; font-weight: 600;
+  color: var(--ink-quiet); }
+
+/* ------------------------------------------------------------- where it lives */
+
+/*
+  ⚠️ AN IDENTITY, SO IT IS A CHIP WITH A FACE. Global and pinned-to-the-union are
+  two commitments rather than two values, and the pair have to be told apart at a
+  glance in a list — which is the job the interface already gives a face beside a
+  name everywhere else something HAS an identity.
+*/
+.jurisdiction { display: inline-flex; align-items: center; gap: 10px; }
+.jurisdiction-face { flex: none; display: flex; inline-size: 24px; block-size: 24px; }
+.jurisdiction-said { min-inline-size: 0; display: grid; gap: 2px; }
+.jurisdiction-name { font-size: 15px; }
+/* ⚠️ THE SENTENCE ONLY WHERE THE SURFACE IS ABOUT RESIDENCY. In a list it is a
+   paragraph beside every row; on the screen that answers where things are kept it
+   is the reason somebody is reading. */
+.jurisdiction[data-explain] { align-items: flex-start; }
+.jurisdiction-means { color: var(--ink-quiet); font-size: 13.5px; line-height: 1.4; }
+/* ⚠️ A REGION NOBODY HAS NAMED IS PRINTED AS ITSELF. The id is open by design, so
+   a deployment may add a third; a prettified guess would be a screen inventing
+   where somebody's data is, on the screen that exists to answer exactly that. */
+.chip[data-plain] { padding-inline: 10px; font-size: 14.5px; }
+
+/* -------------------------------------------------------------- the products */
+
+/*
+  ⚠️ A PRODUCT'S NAME IS SET AS A NAME, WHICH IS THE FACE THE ACCOUNT CENTRE
+  ALREADY NAMES ITSELF IN. In the text face a row for Kova is a row about a word;
+  in the brand face at the row's own size it is the product, recognised before it
+  is read — the same argument the lockup makes one level up, minus the mark,
+  which is ours and not theirs.
+*/
+.wordmark { font-family: var(--font-brand); font-size: 18px; font-weight: 600;
+  letter-spacing: -0.03em; word-spacing: normal; }
+/* ⚠️ AT TITLE SIZE IT IS THE SAME DECISION, ONE STEP UP. The page name is already
+   the brand face; what this adds is the tighter tracking a name is set with, which
+   at 32px is the difference between a product and a heading about one. */
+.wordmark-title { letter-spacing: -0.04em; }
+
+/* --------------------------------------------------------------- what moved */
+
+/*
+  ⚠️ IT SITS ABOVE THE TEXT AND IS NOT PART OF IT. A summary of changes inside the
+  document is a paragraph somebody has to find; above it, in its own ground, it is
+  the first thing read — which on the one day it exists is the whole point of the
+  screen being opened again.
+*/
+.changed { display: grid; gap: 4px; padding: 14px 16px; border-radius: var(--radius-card);
+  background: var(--warn-well); color: var(--ink); font-size: 15px; line-height: 1.5; }
+.changed-what { color: var(--warn); font-size: 13px; font-weight: 600;
+  letter-spacing: 0.02em; text-transform: uppercase; }
 `.trim();

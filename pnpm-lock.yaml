@@ -1330,6 +1330,9 @@ importers:
       '@dicebear/styles':
         specifier: ^10.4.0
         version: 10.4.0
+      '@one/deployment':
+        specifier: workspace:*
+        version: link:../deployment
       '@types/react':
         specifier: ^19.2.14
         version: 19.2.17

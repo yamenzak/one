@@ -22,7 +22,7 @@
  */
 
 import type { AnyOperation, AppSpec, BindingSpec, DeploymentSpec, Instant, LegalDoc, LegalForApp, Receiving, SchemaModule, Session, SqlHandle } from "@one/kernel";
-import { ACCOUNT_HOLDER, PUBLIC, operation, ropaOf, s, transfersOf, vaultActivities } from "@one/kernel";
+import { ACCOUNT_HOLDER, PUBLIC, accountReceiving, operation, ropaOf, s, transfersOf, vaultActivities } from "@one/kernel";
 
 /** ⚠️ A symbol, so an app cannot reach the ledger by writing a property name. */
 export const REFERENCE = Symbol.for("one.runtime.reference");
@@ -140,7 +140,7 @@ export const LEGAL_SPEC_SCHEMA: SchemaModule = {
  * down over a screen in another one.
  */
 export async function publishLegalSpec<B extends BindingSpec>(
-  db: SqlHandle, app: AppSpec<B>,
+  db: SqlHandle, app: AppSpec<B>, ours: DeploymentSpec | null = null,
 ): Promise<void> {
   try {
     const legal = app.governance?.legal ?? [];
@@ -152,7 +152,7 @@ export async function publishLegalSpec<B extends BindingSpec>(
       `INSERT INTO legal_specs (app_id, app_name, documents, protection) VALUES (?, ?, ?, ?)
        ON CONFLICT(app_id) DO UPDATE SET app_name = excluded.app_name,
          documents = excluded.documents, protection = excluded.protection`,
-      app.id, app.name, JSON.stringify(legal), JSON.stringify(receivingOf(app)),
+      app.id, app.name, JSON.stringify(legal), JSON.stringify(receivingOf(app, ours)),
     );
   } catch (why) {
     /* ⚠️ SERVES ANYWAY, AND SAYS SO — see `publishVaultSpec`, whose silent
@@ -194,12 +194,26 @@ export async function publishedLegal(
  * would be between what a person is told inside a product and what they are told
  * about it from their account.
  */
-export function receivingOf<B extends BindingSpec>(app: AppSpec<B>): Receiving {
+export function receivingOf<B extends BindingSpec>(app: AppSpec<B>, ours: DeploymentSpec | null = null): Receiving {
   const p = app.governance.protection;
+  /*
+    ⚠️ THE PLATFORM'S PROCESSORS ARE UNDER EVERY PRODUCT'S, and the app wins on a
+    shared id. The host and the mail lane are reached by every app here, so each
+    manifest declaring its own copy is the same company written N times and
+    drifted by the second edit — but an app genuinely receives MORE through the
+    same processor than the account does (a coaching product's host holds health
+    data; the account's holds a session), so where both name an id the app's
+    entry is the fuller one and is the one a transfer is computed from.
+  */
+  const own = new Set(p.subprocessors.map((sub) => sub.id));
+  const subprocessors = [
+    ...(ours?.subprocessors ?? []).filter((sub) => !own.has(sub.id)),
+    ...p.subprocessors,
+  ];
   return {
     controller: p.controller,
     contact: p.contact,
-    subprocessors: p.subprocessors,
+    subprocessors,
     /*
       ⚠️ THE REGIONS ARE THE ANSWER TO "WHERE IS IT", and they come from the
       tenancy declaration rather than from a sentence. A page that names a region
@@ -232,7 +246,7 @@ export function receivingOf<B extends BindingSpec>(app: AppSpec<B>): Receiving {
       company claiming to receive `financial` in an app that holds none would make
       the transfer look larger than it is, in the direction nobody checks.
     */
-    transfers: transfersOf({ collections: app.collections, subprocessors: p.subprocessors }),
+    transfers: transfersOf({ collections: app.collections, subprocessors }),
   };
 }
 
@@ -453,10 +467,13 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
           roles: [ACCOUNT_HOLDER],
           documents: ours.legal,
           outstanding: outstandingFor(ours.legal, ACCOUNT_HOLDER, accepted),
-          /* ⚠️ ONE DISCLOSURE FOR THE ACCOUNT AND THE VAULT, and no recipients of
-             its own: the deployment holds them itself. Every recipient in this
-             platform receives a PRODUCT's data, and each product says so. */
-          receiving: { controller: ours.controller, contact: ours.contact, subprocessors: [], regions: [], inference: {}, transfers: [] },
+          /* ⚠️ ONE DISCLOSURE FOR THE ACCOUNT AND THE VAULT, AND IT HAS
+             RECIPIENTS. It said "Nobody else" — an empty list under a controller
+             and an address — while the platform's host stored the sessions table,
+             the passkeys and the vault itself, and the mail lane carried every
+             sign-in code. The assembly is the kernel's, because the preview draws
+             the same thing and two of them would drift. */
+          receiving: accountReceiving(ours),
         }]
         : [];
 
@@ -528,9 +545,11 @@ export function referenceOperations<B extends BindingSpec>(app: AppSpec<B>): rea
     output: s.object({ controller: s.text(), contact: s.text(), subprocessors: s.json(), regions: s.json(), inference: s.json(), transfers: s.json() }),
     permission: PUBLIC,
     idempotency: { mode: "none" },
-    async handler() {
-      /* ⚠️ THE SAME ASSEMBLY BOOT PUBLISHES. See `receivingOf`. */
-      return receivingOf(app);
+    async handler(ctx) {
+      /* ⚠️ THE SAME ASSEMBLY BOOT PUBLISHES, DEPLOYMENT INCLUDED. See
+         `receivingOf` — a product's own list without the platform's under it
+         omits the host that stores every row it is about. */
+      return receivingOf(app, deps(ctx).deployment);
     },
   });
 

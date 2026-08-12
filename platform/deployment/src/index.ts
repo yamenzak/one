@@ -33,6 +33,49 @@ export const DEPLOYMENT: DeploymentSpec = {
   */
   controller: "Four Degree Labs, Abu Dhabi, United Arab Emirates, controls your account — how you sign in, what you have agreed to, and the facts you keep in your vault. Each product you use controls what it records about you inside itself, and says so on its own terms.",
   contact: "legal@fourdegreelabs.com",
+  /*
+    ⚠️ THE INFRASTRUCTURE EVERY PRODUCT HERE STANDS ON, DECLARED ONCE.
+
+    The account's own disclosure said "Nobody else" — a controller, an address
+    and an empty list — while the host below stored the sessions table and the
+    passkeys and the mail lane carried every sign-in code. Those are processors
+    of the ACCOUNT: they are reached before any product is opened and they stay
+    reached by somebody who belongs to none.
+
+    ⚠️ EVERY URL HERE IS THE VENDOR'S OWN AND IS NOT COPIED FROM. A certification
+    list changes on their schedule; a copy in this repository is wrong the first
+    time one lapses, and it is wrong in the most damaging place available — a
+    compliance claim we made about somebody else.
+
+    ⚠️ AN APP'S OWN LIST MERGES ON TOP OF THIS ONE AND WINS ON A SHARED ID,
+    because a product genuinely may reach somewhere the platform does not, and
+    may receive more categories through it than the platform does.
+  */
+  subprocessors: [
+    {
+      id: "cloudflare",
+      name: "Cloudflare, Inc.",
+      mark: "cloudflare",
+      role: "Runs the platform and stores what an account is made of — the sign-in records, the passkeys, the sessions and the vault.",
+      receives: ["identity", "contact", "credential", "usage"],
+      where: "Workers run at the point of presence nearest the request. Databases and object stores are placed in the region a workspace chose.",
+      safeguard: "dpf",
+      terms: "https://www.cloudflare.com/cloudflare-customer-dpa/",
+      trust: "https://www.cloudflare.com/trust-hub/compliance-resources/",
+    },
+    {
+      /* ⚠️ The id is the mail LANE, and it must match `MAIL_LANES`. */
+      id: "cloudflare-email",
+      name: "Cloudflare Email Routing and Email Sending",
+      mark: "cloudflare",
+      role: "Carries every message an account itself sends — a sign-in code, a change of address, a security notice.",
+      receives: ["identity", "contact"],
+      where: "Cloudflare's network.",
+      safeguard: "dpf",
+      terms: "https://www.cloudflare.com/cloudflare-customer-dpa/",
+      trust: "https://www.cloudflare.com/trust-hub/compliance-resources/",
+    },
+  ],
   legal: [
     {
       id: "account-terms",

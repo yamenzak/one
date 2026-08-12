@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ACCOUNT_HOLDER, legalProblems } from "@one/kernel";
+import { ACCOUNT_HOLDER, accountReceiving, legalProblems } from "@one/kernel";
 import { DEPLOYMENT } from "../src/index.js";
 
 describe("who runs this deployment", () => {
@@ -44,5 +44,37 @@ describe("who runs this deployment", () => {
     */
     const notice = DEPLOYMENT.legal.find((d) => d.id === "account-privacy");
     expect(notice?.body ?? "").toMatch(/vault/i);
+  });
+
+  /*
+    ⚠️ THE ACCOUNT'S DISCLOSURE SAID "NOBODY ELSE", WHICH WAS FALSE. It was a
+    controller and an address over an empty list, while the platform's host stored
+    the sessions table, the passkeys and the vault itself, and the mail lane
+    carried every sign-in code. Those are processors of the ACCOUNT — reached
+    before any product is opened, and still reached by somebody who belongs to
+    none — so an app's declaration structurally cannot cover them.
+  */
+  it("names who processes an account, not only who controls it", () => {
+    expect(DEPLOYMENT.subprocessors.length).toBeGreaterThan(0);
+    const receiving = accountReceiving(DEPLOYMENT);
+    expect(receiving.transfers.length).toBe(DEPLOYMENT.subprocessors.length);
+    /* ⚠️ AND EVERY ONE CARRIES ITS OWN PROCESSING TERMS. A processor with none is
+       not one we may use, and a link rather than a copy is what keeps a claim we
+       made about somebody else from going stale on their schedule. */
+    for (const sub of DEPLOYMENT.subprocessors) {
+      expect(sub.terms, sub.id).toMatch(/^https:\/\//);
+    }
+  });
+
+  /*
+    ⚠️ NO REGIONS AND NO INFERENCE, WHICH IS A DIFFERENT KIND OF EMPTY. An account
+    is global by construction — it is what routes somebody TO a region rather than
+    a thing placed in one — and nothing generates from it. Both are absent because
+    they do not apply, and an interface omits a row rather than printing a blank.
+  */
+  it("claims no region for the account itself", () => {
+    const receiving = accountReceiving(DEPLOYMENT);
+    expect(receiving.regions).toEqual([]);
+    expect(receiving.inference).toEqual({});
   });
 });

@@ -3543,13 +3543,13 @@
       "fails": "a product whose disclosure has not published rendering nothing at all, which is indistinguishable from one that shares with nobody — the opposite claim, made silently, on the screen where the difference matters most"
     },
     {
-      "id": "a-group-opens-on-what-it-owes",
+      "id": "a-product-is-a-place-not-a-fold",
       "group": "interface",
       "stage": "7",
       "status": "live",
       "impl": "web/test/screens.test.tsx",
-      "proves": "opens the product that is owed something, and leaves the settled ones shut",
-      "fails": "every group shut, so the document somebody came to accept is behind a press — or every group open, which is the wall this screen was. The alternative that looks obvious is a \"needs your attention\" section above the list, and that is the same rows twice, ticking in two places at once"
+      "proves": "makes each product a place to go rather than a thing that unfolds",
+      "fails": "a hub of disclosures. A product with four documents and a disclosure of its own is a PLACE, and unfolding one pushed the next product half a screen down — so a person in three of them was reading a list that moved under them. The state stays on the row, which is what keeps the hub readable without opening anything"
     },
     {
       "id": "a-group-counts-what-is-owed",
@@ -3559,6 +3559,96 @@
       "impl": "web/test/screens.test.tsx",
       "proves": "counts what is owed rather than what was agreed",
       "fails": "\"3 of 4\" — a fraction whose remainder may be documents nobody ever has to accept. The number a person is looking for is how many are waiting on them, and the settled state has to be true of a product that never asked them for anything"
+    },
+    {
+      "id": "the-account-terms-gate-covers-the-account",
+      "group": "platform",
+      "stage": "7",
+      "status": "live",
+      "impl": "hello/test/account.test.ts",
+      "proves": "refuses a write anywhere until the account's own terms are accepted",
+      "fails": "a consent gate reading the app's documents and not the deployment's — every product's terms enforced and none of the platform's. The account's are owed for HAVING an account and are asked of a role no app declares, which is the one set an app's declaration structurally cannot reach"
+    },
+    {
+      "id": "a-version-says-what-moved",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "says what changed, and only to somebody who agreed to the last one",
+      "fails": "a republished document shown as the same wall of text with a different number on it. Versioning was already real — the ledger re-asks everybody the day it changes — so somebody re-agreeing without being told what moved is a signature collected rather than a consent given"
+    },
+    {
+      "id": "a-refusal-to-continue-has-a-surface",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "names which product is asking, because the list crosses them",
+      "fails": "a 451 with a list of document ids and nowhere to go. The server refused every write for outstanding consent and there was no screen for it, so a person met an error on whatever they happened to be doing — a dead end with a citation"
+    },
+    {
+      "id": "declining-still-lets-you-leave",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "says the way out is still open",
+      "fails": "a consent wall that only offers agreement. The exit lane survives every gate in the platform precisely so somebody who will not agree can take their account and go, and a screen that does not say so pretends otherwise"
+    },
+    {
+      "id": "closing-waits-for-what-it-would-strand",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "keeps the close button off until it knows what would be stranded",
+      "fails": "a working Close in front of somebody whose workspaces would be left with nobody who can manage them — `null` and `[]` read as the same answer, on the one screen where the difference is a workspace nobody can re-enter"
+    },
+    {
+      "id": "an-export-says-what-is-missing",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "lists what could not be read beside what was",
+      "fails": "an export that prints only what it managed to gather. It arrives, it is full of somebody's data, and nothing in it says what is not there — which is the omission that makes an export dangerous rather than merely incomplete"
+    },
+    {
+      "id": "a-region-is-named-or-printed-as-itself",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/screens.test.tsx",
+      "proves": "prints a region nobody has named as itself, with no mark",
+      "fails": "a prettified guess at where somebody's data physically is, on the one screen that exists to answer exactly that. The two ids the kernel documents are named; a third has no name and is shown as the identifier it is"
+    },
+    {
+      "id": "every-destination-has-an-address",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/routes.test.ts",
+      "proves": "gives every destination its own address",
+      "fails": "two screens printing to one path, so one of them is unreachable — and, before this, an account centre whose inner screens were component state: no link to a vault, no address for a refusal to send anybody to, and a back button that left the whole surface"
+    },
+    {
+      "id": "a-route-parses-back-to-where-it-was",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/routes.test.ts",
+      "proves": "prints and parses back to the same place, for every one of them",
+      "fails": "a printer and a parser that do not invert each other — a surface that works until somebody reloads, and then opens somewhere else, once, with nothing in the console"
+    },
+    {
+      "id": "a-declared-mark-is-drawn",
+      "group": "interface",
+      "stage": "7",
+      "status": "live",
+      "impl": "web/test/vendors.test.tsx",
+      "proves": "draws every mark the deployment declares",
+      "fails": "a mark named in a manifest that nothing draws. The fallback is total by design — an unknown name renders the company's initial — so a typo is a row that looks fine with the wrong thing in it, and the only way to notice is to have seen the right one"
     }
   ]
 }

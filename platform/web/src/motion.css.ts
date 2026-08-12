@@ -307,6 +307,32 @@ export const MOTION_CSS = `
 .alive:nth-child(2n) { animation-delay: -2.9s; animation-duration: 10.5s; }
 .alive:nth-child(3n) { animation-delay: -5.2s; animation-duration: 8.2s; }
 
+/* ⚠️ THE GLOBE TURNS ONCE A MINUTE, AND ONLY ITS LONGITUDES MOVE. A sphere turns
+   about its axis, so the bands of latitude are the one thing on it that stays
+   put — and the meridians narrow and widen rather than sliding, because that is
+   what a line of longitude does as it comes round the far side. Translating them
+   would be a picture drifting behind a window.
+
+   ⚠️ SIXTY SECONDS IS WEATHER, NOT AN INTERFACE. Anything on the interface scale
+   here would be a control asking to be pressed, on a chip that is a statement of
+   fact about where somebody's records are kept. */
+@keyframes turn {
+  0%, 100% { scale: 1 1; }
+  50% { scale: 0.06 1; }
+}
+.meridians > *:nth-child(1) { animation: turn 60s ease-in-out infinite; transform-origin: 12px 12px; }
+/* ⚠️ THE SECOND MERIDIAN IS A QUARTER TURN AHEAD, which is what makes the pair
+   read as one sphere rotating rather than as two ellipses pulsing. */
+.meridians > *:nth-child(2) { animation: turn 60s ease-in-out infinite -15s; transform-origin: 12px 12px; }
+
+/* ⚠️ THE RING SHIMMERS ROUND ITSELF, one star at a time, off each star's own
+   index. Pulsed together it is twelve dots blinking; travelling, it is a ring. */
+@keyframes twinkle {
+  0%, 70%, 100% { opacity: 1; }
+  35% { opacity: 0.45; }
+}
+.star { animation: twinkle 9s ease-in-out infinite; animation-delay: calc(var(--n) * -0.75s); }
+
 /* ⚠️ EVERY ANIMATION IN THE PLATFORM STOPS HERE, INCLUDING ONES ADDED LATER.
    The universal selector is deliberate: a rule that lists the classes it knows
    about is a rule that silently stops covering the next one somebody writes. The

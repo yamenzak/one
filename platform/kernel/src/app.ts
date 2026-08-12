@@ -30,7 +30,7 @@ import { momentProblems } from "./moment.js";
 import { marketProblems } from "./market.js";
 import { MILESTONE_EARNED, milestoneProblems } from "./milestone.js";
 import { danglingHelp, helpProblems } from "./help.js";
-import { agreementProblems, disclosureProblems, holdingProblems, protectionProblems, ropaOf, type ProtectionSpec, type Receiving, type Record30 } from "./protection.js";
+import { SPECIAL_CATEGORIES, agreementProblems, disclosureProblems, holdingProblems, protectionProblems, ropaOf, type ProtectionSpec, type Receiving, type Record30, type Subprocessor } from "./protection.js";
 import type { VaultSpec } from "./vault.js";
 import { shadowProblems, vaultActivities, wantProblems } from "./vault.js";
 import type { NotificationRegistry } from "./notify.js";
@@ -270,6 +270,22 @@ export interface LegalDoc {
   readonly url?: string;
   /** ⚠️ Who must accept it, recorded per person per version. Not backfillable. */
   readonly mustAccept: readonly string[];
+  /**
+   * WHAT IS DIFFERENT ABOUT THIS VERSION, IN THE WORDS OF SOMEBODY WHO AGREED TO
+   * THE LAST ONE.
+   *
+   * ⚠️ VERSIONING WAS ALREADY REAL AND SILENT. The ledger is keyed per person
+   * per document per VERSION, so a new version correctly re-asks everybody — and
+   * what they were shown was the same wall of text with a different number on it
+   * and no way to tell what moved. Somebody re-agreeing without being told what
+   * changed is a signature collected, not a consent given.
+   *
+   * ⚠️ ABSENT ON A FIRST VERSION, AND THAT IS NOT AN OMISSION. There is no
+   * previous version to differ from, so a summary of changes would be a sentence
+   * invented to fill a field. An interface shows it where it exists and asks
+   * nothing where it does not.
+   */
+  readonly changed?: string;
 }
 
 /**
@@ -308,6 +324,64 @@ export interface DeploymentSpec {
    * a version, a title, text or an address, and somebody it is required of.
    */
   readonly legal: readonly LegalDoc[];
+  /**
+   * WHO ELSE TOUCHES AN ACCOUNT — the infrastructure every product on this
+   * deployment stands on.
+   *
+   * ⚠️ IT USED TO SAY "NOBODY", WHICH WAS FALSE. The account's own disclosure was
+   * a controller and an address with an empty recipient list, so the one screen
+   * that answers "who else sees this" said nobody else did — while the platform's
+   * host stored the sessions table and the passkeys, and the mail lane carried
+   * every sign-in code. Those are processors of the ACCOUNT, before and outside
+   * any product.
+   *
+   * ⚠️ AND ONE COPY, NOT ONE PER APP. Every product here runs on the same host,
+   * the same mail lane and the same payment rail; each manifest declaring its own
+   * entry is the same company written N times and drifted by the second edit —
+   * the identical argument that made this module exist. An app's list is merged
+   * ON TOP of this one and wins on a shared id, because an app genuinely may
+   * reach somewhere the platform does not.
+   */
+  readonly subprocessors: readonly Subprocessor[];
+}
+
+/**
+ * THE ACCOUNT'S OWN DISCLOSURE, AS A PROJECTION OF THE DECLARATION ABOVE.
+ *
+ * ⚠️ ONE ASSEMBLY, TWO CALLERS, AND THAT IS WHY IT IS A FUNCTION. The runtime
+ * answers it to a signed-in person and the preview draws it; written twice they
+ * would agree until the first edit, and the disagreement would be between what a
+ * person is told about who holds their account and what a reviewer is shown.
+ *
+ * ⚠️ THE TRANSFERS ARE THE PROCESSORS THEMSELVES, WHICH IS THE ONE PLACE THAT IS
+ * TRUE. Everywhere else `transfersOf` crosses what a product HOLDS with what each
+ * processor receives, so a recipient cannot over-declare — but an account's
+ * holdings are not a collection anybody wrote, so the crossing has nothing to
+ * narrow against. Stated FROM the declaration rather than beside it, so the two
+ * cannot drift.
+ *
+ * ⚠️ NO REGIONS AND NO INFERENCE, WHICH IS A DIFFERENT KIND OF EMPTY. An account
+ * is global by construction — it is what routes somebody TO a region rather than
+ * a thing placed in one — and nothing generates from it. Both are absent because
+ * they do not apply, and an interface omits a row rather than printing a blank.
+ */
+export function accountReceiving(ours: DeploymentSpec): Receiving {
+  return {
+    controller: ours.controller,
+    contact: ours.contact,
+    subprocessors: ours.subprocessors,
+    regions: [],
+    inference: {},
+    transfers: ours.subprocessors.map((sub) => ({
+      to: sub.id,
+      name: sub.name,
+      where: sub.where,
+      safeguard: sub.safeguard,
+      categories: sub.receives,
+      special: sub.receives.some((c) => SPECIAL_CATEGORIES.includes(c)),
+      subjects: ["member"],
+    })),
+  };
 }
 
 /**
@@ -364,9 +438,39 @@ export function legalProblems(docs: readonly LegalDoc[]): readonly { readonly id
     if (!d.mustAccept.length) {
       out.push({ id: d.id, why: "is required of nobody, so it is a document that is never shown and never agreed to" });
     }
+    /*
+      ⚠️ AN ID THE ACCOUNT CENTRE'S ADDRESSES ALREADY USE IS A DOCUMENT THAT
+      EXISTS AND CANNOT BE OPENED. Its screen is one path segment past the
+      product — `legal/<product>/<document>` — and the surface reserves one word
+      at that position for the disclosure. A document called it would resolve to
+      the disclosure instead, on every link, for ever, and nothing would throw.
+      Refused where the collision is, rather than handled by a parser that would
+      have to guess which one the author meant.
+    */
+    if (RESERVED_DOCUMENT_IDS.includes(d.id)) {
+      out.push({ id: d.id, why: `is a word the account centre's own addresses use, so its screen would be unreachable (reserved: ${RESERVED_DOCUMENT_IDS.join(", ")})` });
+    }
   }
   return out;
 }
+
+/**
+ * ⚠️ WHAT A DOCUMENT MAY NOT BE CALLED, AND WHY THE LIST IS HERE. The interface
+ * gives every screen an address and one segment past a product is where a
+ * document's id goes; the disclosure sits at the same depth under a fixed word.
+ * The check belongs beside the declaration it refuses rather than inside the
+ * parser, because a parser can only guess and a refusal is a sentence somebody
+ * reads while they still have the name in their hand.
+ */
+export const RESERVED_DOCUMENT_IDS: readonly string[] = ["who"];
+
+/**
+ * ⚠️ AND THE SAME FOR AN APP ID, at the segment above. `account` is how the
+ * account centre spells the deployment — whose own id is the empty string, which
+ * no path can carry — so an app registered under that name would take over the
+ * one address the platform's own documents live at.
+ */
+export const RESERVED_APP_IDS: readonly string[] = ["account"];
 
 /* ------------------------------------------------------------ governance --- */
 

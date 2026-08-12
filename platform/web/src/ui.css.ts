@@ -22,6 +22,20 @@
 
 export const UI_CSS = `
 
+/* ⚠️ KEYWORD SIZES BECOME ANIMATABLE, AND THAT IS ONE DECLARATION FOR THE WHOLE
+   DOCUMENT. A height transition to the auto keyword is the one animation every
+   interface wants and none can have; without this the disclosure below has to be
+   given a pixel height by a script, which is a measurement that is wrong the
+   moment the text reflows. Ignored where it is not supported, and everything it
+   enables degrades to an instant change.
+
+   ⚠️ ON THE ROOT ELEMENT RATHER THAN ON THE ROOT PSEUDO-CLASS, AND THAT IS NOT
+   COSMETIC. It is inherited either way — but the theme check reads the token
+   block by splitting the sheet on the first root-pseudo rule, so a second one
+   above it silently hands that check an empty block and every colour in the
+   platform reads as undeclared. */
+html { interpolate-size: allow-keywords; }
+
 :root {
   --page: #f2f2f6;
   --card: #ffffff;
@@ -130,6 +144,14 @@ h2 { word-spacing: normal; }
    away with the page, on every screen, while the rule that broke it read as
    harmless boilerplate. A flex item takes a z-index without being positioned. */
 .page > *:not(.sky) { z-index: 1; }
+/* ⚠️ AND THE BAR HAS TO OUT-RANK IT, WHICH TAKES THE SAME SPECIFICITY. The rule
+   above is two classes to a bare .topbar's one, so it won: the sticky bar was
+   quietly on the same layer as every section, and at equal z-index the later
+   element in the document paints over the earlier one — so a card scrolled UNDER
+   the bar and straight over the top of it, taking the way out with it. Stated as
+   a child of the page it ties on specificity and wins on order, which is the
+   only way a blanket rule and an exception to it can both be readable. */
+.page > .topbar { z-index: 3; }
 
 /* ------------------------------------------------------------------ the top */
 
@@ -661,6 +683,24 @@ h2 { font-family: var(--font-brand); font-size: 20px; font-weight: 600;
    seventy-four pixels off a phone, on the one screen whose whole content is
    sentences. A rule down the inside says "these belong to the row above" in two
    pixels rather than in seventy-four. */
+/* ⚠️ IT OPENS AND CLOSES RATHER THAN APPEARING AND VANISHING. A disclosure that
+   snaps is the one place in this interface where a state change happens with no
+   movement at all, and it is the worst place for it: the content arrives below
+   the row that was pressed, so everything under it jumps and the eye has nothing
+   to follow to where it went.
+
+   ⚠️ IT IS THE DETAILS-CONTENT PSEUDO, NOT A GRID TRICK OR A SCRIPT. The element hides
+   its own children when closed, so the familiar 0fr-to-1fr transition never runs
+   — the closed state does not render at all. This is the part the browser owns,
+   and animating the browser's own box is what keeps the element a DETAILS:
+   keyboard, the open state, and a control a reader is told is expandable.
+
+   ⚠️ AND THE FALLBACK IS THE OLD BEHAVIOUR, WHICH IS FINE. Where the pseudo is
+   not supported the property is dropped and the disclosure opens instantly, as
+   it did before — nothing here is load-bearing for reading the content. */
+.disclose::details-content { block-size: 0; overflow: clip;
+  transition: block-size var(--swift) var(--move), content-visibility var(--swift) allow-discrete; }
+.disclose[open]::details-content { block-size: auto; }
 .disclose-body { padding: 0 var(--pad) 6px calc(var(--pad) + 10px); }
 .disclose-body > * { border-inline-start: 2px solid var(--edge); padding-inline-start: 14px; }
 .disclose-body > * + * { border-block-start: 1px solid var(--edge); }

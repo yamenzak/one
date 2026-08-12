@@ -36,7 +36,15 @@ export function idProblem(id) {
 }
 
 /** @type {readonly string[]} */
-const RESERVED = ["kernel", "runtime", "ui", "cli", "docs", "scripts", "admin", "setup", "root", "www", "api", "play"];
+/*
+  ⚠️ `account` IS ON THIS LIST FOR A DIFFERENT REASON FROM THE OTHERS. The rest
+  are doors and platform packages — names that already mean something to the
+  runtime. This one is how the account centre spells the DEPLOYMENT in an address,
+  because the deployment's own id is the empty string and no path can carry one.
+  An app registered under it would take over the address the platform's own terms
+  live at, on every link, with nothing failing.
+*/
+const RESERVED = ["kernel", "runtime", "ui", "cli", "docs", "scripts", "admin", "setup", "root", "www", "api", "play", "account"];
 
 const title = (id) => id.charAt(0).toUpperCase() + id.slice(1).replace(/-(\w)/g, (_, c) => c.toUpperCase());
 

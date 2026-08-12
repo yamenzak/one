@@ -298,6 +298,7 @@ export const hello = defineApp({
         {
           id: "cloudflare",
           name: "Cloudflare, Inc.",
+          mark: "cloudflare",
           role: "Runs the product and stores everything in it — compute, the databases, the object store, the cache and the durable objects.",
           receives: ["identity", "contact", "credential", "financial", "usage", "content"],
           where: "Workers run at the point of presence nearest the request. Databases and object stores are placed in the region a workspace chose.",
@@ -309,6 +310,7 @@ export const hello = defineApp({
           /* ⚠️ The id is the mail LANE, and it must match `MAIL_LANES`. */
           id: "cloudflare-email",
           name: "Cloudflare Email Routing and Email Sending",
+          mark: "cloudflare",
           role: "Sends the messages this product sends: a sign-in code, an invitation, a notification somebody asked to be emailed.",
           receives: ["identity", "contact"],
           where: "Cloudflare's network.",
@@ -319,6 +321,7 @@ export const hello = defineApp({
         {
           id: "stripe",
           name: "Stripe, Inc.",
+          mark: "stripe",
           role: "Takes a workspace's payment for its own plan. Never involved in what a workspace charges anybody else.",
           receives: ["identity", "contact", "financial"],
           where: "United States and Ireland.",
