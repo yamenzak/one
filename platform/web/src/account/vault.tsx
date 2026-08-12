@@ -53,7 +53,17 @@ export const VAULT_TINT = 268;
  * would be a component that had to be told a locale and a time zone to render a
  * list. Everything else on the item is the declaration, verbatim.
  */
-export type Item = Omit<Wanted, "expiresAt"> & { readonly expiresAt: string | null };
+export type Item = Omit<Wanted, "expiresAt" | "readings"> & {
+  readonly expiresAt: string | null;
+  /* ⚠️ THE READINGS ARE SPOKEN TOO, and leaving them out of this is how one row
+     comes to render a raw instant. A reading carries its OWN grant and its own
+     expiry — resolved separately by the kernel — so a type that formatted only
+     the top level typechecked while the one row somebody had set an end date on
+     showed a timestamp. */
+  readonly readings: readonly (Omit<Wanted["readings"][number], "expiresAt"> & {
+    readonly expiresAt: string | null;
+  })[];
+};
 
 /** A workspace, and every want the app behind it declared. */
 export interface Where extends Omit<WantedHere, "items"> {
